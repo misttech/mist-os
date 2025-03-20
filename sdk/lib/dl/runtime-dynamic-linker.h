@@ -18,6 +18,7 @@
 
 namespace dl {
 
+using size_type = Elf::size_type;
 using DlIteratePhdrCallback = int(dl_phdr_info*, size_t, void*);
 
 enum OpenSymbolScope : int {
@@ -47,7 +48,6 @@ inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
-  using size_type = Elf::size_type;
 
   // Create a RuntimeDynamicLinker with the passed in passive `abi`. The caller
   // is required to pass an AllocChecker and check it to verify the
@@ -188,8 +188,8 @@ class RuntimeDynamicLinker {
     return {.adds = loaded_, .subs = loaded_ - modules_.size()};
   }
 
-  // Return a pointer to the beginning of a module's TLS block in the thread.
-  constexpr uintptr_t GetTlsBlock(const RuntimeModule& module) const;
+  // Return a pointer to the beginning of a module's static or dynamic TLS block.
+  size_type TlsBlock(const RuntimeModule& module) const;
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.

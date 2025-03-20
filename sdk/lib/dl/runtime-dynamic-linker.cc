@@ -26,6 +26,23 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   return nullptr;
 }
 
+size_type RuntimeDynamicLinker::TlsBlock(const RuntimeModule& module) const {
+  assert(module.tls_module_id() > 0);
+  if (module.tls_module_id() <= max_static_tls_modid_) {
+    assert(module.uses_static_tls());
+    // TODO(https://fxbug.dev/403350238): Have the linker hold a reference to
+    // the passive abi so this could pass in ld::InitialExecOffset to
+    // ld::TpRelative.
+    return reinterpret_cast<uintptr_t>(
+        ld::TpRelative(static_cast<ptrdiff_t>(module.static_tls_bias())));
+  }
+  // TODO(https://fxbug.dev/403366387): Introduce a dynamic_tls_index accessor
+  // method on RuntimeModule
+  auto dynamic_tls_index = module.tls_module_id() - max_static_tls_modid_ - 1;
+  DynamicTlsPtr& module_tls = _dl_tlsdesc_runtime_dynamic_blocks[dynamic_tls_index];
+  return reinterpret_cast<uintptr_t>(module_tls.contents(module.tls_module()).data());
+}
+
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
                                                              const char* ref) {
   Diagnostics diag;
@@ -33,15 +50,12 @@ fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule
   ld::ScopedModuleDiagnostics root_diag{diag, root.name().str()};
 
   elfldltl::SymbolName name{ref};
-  // TODO(https://fxbug.dev/338229633): use elfldltl::MakeSymbolResolver.
+  // TODO(https://fxbug.dev/370087572): properly handle weak symbols.
   for (const RuntimeModule& module : root.module_tree()) {
     if (const auto* sym = name.Lookup(module.symbol_info())) {
-      if (sym->type() == elfldltl::ElfSymType::kTls) {
-        diag.SystemError(
-            "TODO(https://fxbug.dev/331421403): TLS semantics for dlsym() are not supported yet.");
-        return diag.take_error();
-      }
-      return diag.ok(reinterpret_cast<void*>(sym->value + module.load_bias()));
+      bool is_tls = sym->type() == elfldltl::ElfSymType::kTls;
+      return diag.ok(reinterpret_cast<void*>(
+          sym->value + (is_tls ? TlsBlock(module) : static_cast<size_type>(module.load_bias()))));
     }
   }
   diag.UndefinedSymbol(ref);
