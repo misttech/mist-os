@@ -257,6 +257,7 @@ impl<D: Directory + AsRefDirectory> ProgramContext<D> {
 
     // A handler for the `Admin.PerformReboot` method.
     async fn perform_reboot(&self, options: RebootOptions) -> Result<(), zx::Status> {
+        println!("[shutdown-shim] rebooting with reasons [{:?}]", options.reasons);
         let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
         let target_state = if options
             .reasons
@@ -303,7 +304,6 @@ impl<D: Directory + AsRefDirectory> ProgramContext<D> {
     }
 
     async fn drive_shutdown_manually(&self) {
-        eprintln!("[shutdown-shim]: driving shutdown manually");
         let abort_tx = self.abort_tx.clone();
         fasync::Task::spawn(async {
             fasync::Timer::new(MANUAL_SYSTEM_SHUTDOWN_TIMEOUT).await;
@@ -320,15 +320,14 @@ impl<D: Directory + AsRefDirectory> ProgramContext<D> {
             // so our critical marking causes the system to forcefully restart.
             Self::abort(self.abort_tx.clone()).await;
         }
-        eprintln!("[shutdown-shim]: manual shutdown successfully initiated");
     }
 
     async fn initiate_component_shutdown(&self) -> Result<(), anyhow::Error> {
+        println!("[shutdown-shim] shutting down components");
         let system_controller_client = self
             .connect_to_protocol::<SystemControllerMarker>()
             .context("error connecting to component_manager")?;
 
-        println!("[shutdown-shim]: calling system_controller_client.Shutdown()");
         system_controller_client.shutdown().await.context("failed to initiate shutdown")
     }
 
