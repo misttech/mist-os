@@ -238,6 +238,18 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 			PrimaryErrorMessage: createDefaultTopLevelFailureReason(testDetail),
 		}
 	}
+	if testDetail.Metadata.ComponentID > 0 {
+		r.TestMetadata = &resultpb.TestMetadata{
+			Name: testDetail.Name,
+			BugComponent: &resultpb.BugComponent{
+				System: &resultpb.BugComponent_IssueTracker{
+					IssueTracker: &resultpb.IssueTrackerComponent{
+						ComponentId: int64(testDetail.Metadata.ComponentID),
+					},
+				},
+			},
+		}
+	}
 	return &r, testsSkipped, nil
 }
 

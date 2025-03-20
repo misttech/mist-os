@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -100,6 +101,22 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	sort.Strings(artifactNames)
 	if diff := cmp.Diff(artifactNames, []string{"dir-1/outputfile", "dir_2/outputfile"}); diff != "" {
 		t.Errorf("Diff in output files (-got +want):\n%s", diff)
+	}
+	expectedMetadata := resultpb.TestMetadata{
+		Name: detail.Name,
+		BugComponent: &resultpb.BugComponent{
+			System: &resultpb.BugComponent_IssueTracker{
+				IssueTracker: &resultpb.IssueTrackerComponent{
+					ComponentId: 1478143,
+				},
+			},
+		},
+	}
+	if diff := cmp.Diff(expectedMetadata.Name, result.TestMetadata.Name); diff != "" {
+		t.Errorf("Diff in metadata name (-got +want):\n%s", diff)
+	}
+	if diff := cmp.Diff(expectedMetadata.BugComponent.GetIssueTracker().ComponentId, result.TestMetadata.BugComponent.GetIssueTracker().ComponentId); diff != "" {
+		t.Errorf("Diff in the bug component's component id (-got +want):\n%s", diff)
 	}
 }
 
@@ -282,6 +299,10 @@ func createTestDetailWithPassedAndFailedTestCase(passedTestCase int, failedTestC
 		DurationMillis:       39797,
 		IsTestingFailureMode: false,
 		Cases:                t,
+		Metadata: metadata.TestMetadata{
+			Owners:      []string{"carverforbes@google.com", "testgoogler@google.com"},
+			ComponentID: 1478143,
+		},
 	}
 }
 
