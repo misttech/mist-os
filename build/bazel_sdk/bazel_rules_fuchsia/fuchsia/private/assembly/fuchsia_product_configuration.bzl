@@ -91,6 +91,14 @@ def _fuchsia_product_configuration_impl(ctx):
 
     input_files = []
     build_id_dirs = []
+    bootfs_pkg_details = []
+    for dep in ctx.attr.bootfs_packages:
+        bootfs_pkg_details.append(_create_pkg_detail(dep))
+        input_files += _collect_file_deps(dep)
+        build_id_dirs += _collect_debug_symbols(dep)
+    if bootfs_pkg_details:
+        packages["bootfs"] = bootfs_pkg_details
+
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
         base_pkg_details.append(_create_pkg_detail(dep))
@@ -212,6 +220,14 @@ _fuchsia_product_configuration = rule(
             allow_files = True,
             default = {},
         ),
+        "bootfs_packages": attr.label_list(
+            doc = "Fuchsia packages to be included in bootfs.",
+            providers = [
+                [FuchsiaAssembledPackageInfo],
+                [FuchsiaPackageInfo],
+            ],
+            default = [],
+        ),
         "base_packages": attr.label_list(
             doc = "Fuchsia packages to be included in base.",
             providers = [
@@ -264,6 +280,7 @@ def fuchsia_prebuilt_product_configuration(
 def fuchsia_product_configuration(
         name,
         product_config_json = None,
+        bootfs_packages = None,
         base_packages = None,
         cache_packages = None,
         base_driver_packages = None,
@@ -296,6 +313,7 @@ def fuchsia_product_configuration(
             specified through the following args.
 
             TODO(https://fxbug.dev/42073826): Point to document instead of Rust definition
+        bootfs_packages: Fuchsia packages to be included in bootfs.
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
         base_driver_packages: Base driver packages to include in product.
@@ -313,6 +331,7 @@ def fuchsia_product_configuration(
         name = name,
         product_config = json.encode_indent(json_config, indent = "    "),
         product_config_labels = extract_labels(json_config),
+        bootfs_packages = bootfs_packages,
         base_packages = base_packages,
         cache_packages = cache_packages,
         base_driver_packages = base_driver_packages,
