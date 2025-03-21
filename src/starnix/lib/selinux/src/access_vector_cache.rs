@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fifo_cache::FifoCache;
 use crate::policy::AccessDecision;
 use crate::sync::Mutex;
 use crate::{AbstractObjectClass, FsNodeClass, NullessByteStr, ObjectClass, SecurityId};
-use indexmap::IndexMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
+
+pub use crate::fifo_cache::{CacheStats, HasCacheStats};
 
 /// Interface used internally by the `SecurityServer` implementation to implement policy queries
 /// such as looking up the set of permissions to grant, or the Security Context to apply to new
@@ -47,12 +49,6 @@ pub(super) trait Query {
         fs_node_class: FsNodeClass,
         fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId>;
-}
-
-/// An interface through which statistics may be obtained from each cache.
-pub trait HasCacheStats {
-    /// Returns statistics for the cache implementation.
-    fn cache_stats(&self) -> CacheStats;
 }
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
@@ -258,21 +254,13 @@ impl<D: ResetMut> ResetMut for Empty<D> {
     }
 }
 
-/// Associative FIFO cache with capacity defined at creation.
-///
-/// Lookups in the cache are O(1), as are evictions.
-///
-/// This implementation is thread-hostile; it expects all operations to be executed on the same
-/// thread.
-pub(super) struct FifoCache<D = DenyAll> {
-    cache: IndexMap<QueryArgs, QueryResult>,
-    capacity: usize,
-    oldest_index: usize,
+/// Thread-hostile associative cache with capacity defined at construction and FIFO eviction.
+pub(super) struct FifoQueryCache<D = DenyAll> {
+    cache: FifoCache<QueryArgs, QueryResult>,
     delegate: D,
-    stats: CacheStats,
 }
 
-impl<D> FifoCache<D> {
+impl<D> FifoQueryCache<D> {
     /// Constructs a fixed-size access vector cache that delegates to `delegate`.
     ///
     /// # Panics
@@ -284,93 +272,34 @@ impl<D> FifoCache<D> {
         Self {
             // Request `capacity` plus one element working-space for insertions that trigger
             // an eviction.
-            cache: IndexMap::with_capacity(capacity + 1),
-            capacity,
-            oldest_index: 0,
+            cache: FifoCache::with_capacity(capacity),
             delegate,
-            stats: CacheStats::default(),
         }
     }
 
     /// Returns true if the cache has reached capacity.
-    #[inline]
+    #[cfg(test)]
     fn is_full(&self) -> bool {
-        self.cache.len() == self.capacity
-    }
-
-    /// Searches the cache and returns the index of a [`QueryAndResult`] matching
-    /// the given `source_sid`, `target_sid`, and `target_class` (or returns `None`).
-    fn search(
-        &mut self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: AbstractObjectClass,
-    ) -> Option<usize> {
-        self.stats.lookups += 1;
-
-        if let Some(result) =
-            self.cache.get_index_of(&QueryArgs { source_sid, target_sid, target_class })
-        {
-            self.stats.hits += 1;
-            return Some(result);
-        }
-
-        self.stats.misses += 1;
-
-        None
-    }
-
-    /// Inserts the specified `query` and `result` into the cache, evicting the oldest existing
-    /// entry if capacity has been reached.
-    #[inline]
-    fn insert(&mut self, query: QueryArgs, result: QueryResult) -> usize {
-        self.stats.allocs += 1;
-
-        // If the cache is already full then it will be necessary to evict an existing entry.
-        // Eviction is performed after inserting the new entry, to allow the eviction operation to
-        // be implemented via swap-into-place.
-        let must_evict = self.is_full();
-
-        // Insert the entry, at the end of the `IndexMap` queue, then evict the oldest element.
-        let (mut index, _) = self.cache.insert_full(query, result);
-        if must_evict {
-            // The final element in the ordered container is the newly-added entry, so we can simply
-            // swap it with the oldest element, and then remove the final element, to achieve FIFO
-            // eviction.
-            assert_eq!(index, self.capacity);
-
-            self.cache.swap_remove_index(self.oldest_index);
-            self.stats.reclaims += 1;
-
-            index = self.oldest_index;
-
-            self.oldest_index += 1;
-            if self.oldest_index == self.capacity {
-                self.oldest_index = 0;
-            }
-        }
-
-        index
+        self.cache.is_full()
     }
 }
 
-impl<D: QueryMut> QueryMut for FifoCache<D> {
+impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
     fn query(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        if let Some(hit_index) = self.search(source_sid, target_sid, target_class.clone()) {
-            let entry = self.cache.get_index(hit_index);
-            let (_, result) = entry.as_ref().unwrap();
+        let query_args = QueryArgs { source_sid, target_sid, target_class: target_class.clone() };
+        if let Some(result) = self.cache.lookup(&query_args) {
             return result.access_decision.clone();
         }
 
-        let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
+        let access_decision = self.delegate.query(source_sid, target_sid, target_class);
 
-        self.insert(
-            QueryArgs { source_sid, target_sid, target_class },
+        self.cache.insert(
+            query_args,
             QueryResult { access_decision: access_decision.clone(), new_file_sid: None },
         );
 
@@ -385,17 +314,14 @@ impl<D: QueryMut> QueryMut for FifoCache<D> {
     ) -> Result<SecurityId, anyhow::Error> {
         let target_class = AbstractObjectClass::System(ObjectClass::from(fs_node_class));
 
-        let index = if let Some(index) = self.search(source_sid, target_sid, target_class.clone()) {
-            index
+        let query_args = QueryArgs { source_sid, target_sid, target_class: target_class.clone() };
+        let query_result = if let Some(result) = self.cache.lookup(&query_args) {
+            result
         } else {
-            let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
-            self.insert(
-                QueryArgs { source_sid, target_sid, target_class },
-                QueryResult { access_decision, new_file_sid: None },
-            )
+            let access_decision = self.delegate.query(source_sid, target_sid, target_class);
+            self.cache.insert(query_args, QueryResult { access_decision, new_file_sid: None })
         };
 
-        let (_, query_result) = &mut self.cache.get_index_mut(index).unwrap();
         if let Some(new_file_sid) = query_result.new_file_sid {
             Ok(new_file_sid)
         } else {
@@ -424,22 +350,20 @@ impl<D: QueryMut> QueryMut for FifoCache<D> {
     }
 }
 
-impl<D> HasCacheStats for FifoCache<D> {
+impl<D> HasCacheStats for FifoQueryCache<D> {
     fn cache_stats(&self) -> CacheStats {
-        self.stats.clone()
+        self.cache.cache_stats()
     }
 }
 
-impl<D> ResetMut for FifoCache<D> {
+impl<D> ResetMut for FifoQueryCache<D> {
     fn reset(&mut self) -> bool {
-        self.oldest_index = 0;
-        self.cache.clear();
-        self.stats = CacheStats::default();
+        self.cache = FifoCache::with_capacity(self.cache.capacity());
         true
     }
 }
 
-impl<D> ProxyMut<D> for FifoCache<D> {
+impl<D> ProxyMut<D> for FifoQueryCache<D> {
     fn set_delegate(&mut self, mut delegate: D) -> D {
         std::mem::swap(&mut self.delegate, &mut delegate);
         delegate
@@ -710,7 +634,7 @@ const DEFAULT_THREAD_LOCAL_SIZE: usize = 10;
 /// owns a shared cache of size `DEFAULT_SHARED_SIZE`, and can produce thread-local caches of size
 /// `DEFAULT_THREAD_LOCAL_SIZE`.
 pub(super) struct Manager<SS> {
-    shared_cache: Locked<FifoCache<Weak<SS>>>,
+    shared_cache: Locked<FifoQueryCache<Weak<SS>>>,
     thread_local_version: Arc<AtomicVersion>,
 }
 
@@ -719,7 +643,7 @@ impl<SS> Manager<SS> {
     /// to deny all requests).
     pub fn new() -> Self {
         Self {
-            shared_cache: Locked::new(FifoCache::new(Weak::<SS>::new(), DEFAULT_SHARED_SIZE)),
+            shared_cache: Locked::new(FifoQueryCache::new(Weak::<SS>::new(), DEFAULT_SHARED_SIZE)),
             thread_local_version: Arc::new(AtomicVersion::default()),
         }
     }
@@ -731,7 +655,7 @@ impl<SS> Manager<SS> {
 
     /// Returns a shared reference to the shared cache managed by this manager. This operation does
     /// not copy the cache, but it does perform an atomic operation to update a reference count.
-    pub fn get_shared_cache(&self) -> &Locked<FifoCache<Weak<SS>>> {
+    pub fn get_shared_cache(&self) -> &Locked<FifoQueryCache<Weak<SS>>> {
         &self.shared_cache
     }
 
@@ -739,10 +663,10 @@ impl<SS> Manager<SS> {
     /// manager (which, in turn, delegates to its security server).
     pub fn new_thread_local_cache(
         &self,
-    ) -> ThreadLocalQuery<FifoCache<Locked<FifoCache<Weak<SS>>>>> {
+    ) -> ThreadLocalQuery<FifoQueryCache<Locked<FifoQueryCache<Weak<SS>>>>> {
         ThreadLocalQuery::new(
             self.thread_local_version.clone(),
-            FifoCache::new(self.shared_cache.clone(), DEFAULT_THREAD_LOCAL_SIZE),
+            FifoQueryCache::new(self.shared_cache.clone(), DEFAULT_THREAD_LOCAL_SIZE),
         )
     }
 }
@@ -763,24 +687,6 @@ impl<SS> Reset for Manager<SS> {
         self.thread_local_version.reset();
         true
     }
-}
-
-/// Describes the performance statistics of a cache implementation.
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct CacheStats {
-    /// Cumulative count of lookups performed on the cache.
-    pub lookups: u64,
-    /// Cumulative count of lookups that returned data from an existing cache entry.
-    pub hits: u64,
-    /// Cumulative count of lookups that did not match any existing cache entry.
-    pub misses: u64,
-    /// Cumulative count of insertions into the cache.
-    pub allocs: u64,
-    /// Cumulative count of evictions from the cache, to make space for a new insertion.
-    pub reclaims: u64,
-    /// Cumulative count of evictions from the cache due to no longer being deemed relevant.
-    /// This is not used in our current implementation.
-    pub frees: u64,
 }
 
 /// Test constants and helpers shared by `tests` and `starnix_tests`.
@@ -886,7 +792,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
@@ -898,16 +804,14 @@ mod tests {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         avc.reset();
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
 
         assert_eq!(0, avc.delegate.query_count());
@@ -916,49 +820,43 @@ mod tests {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
-        for sid in unique_sids(avc.capacity) {
+        for sid in unique_sids(avc.cache.capacity()) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(true, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
 
-        for sid in unique_sids(avc.capacity) {
+        for sid in unique_sids(avc.cache.capacity()) {
             avc.query(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(true, avc.is_full());
 
         avc.reset();
-        assert_eq!(0, avc.oldest_index);
         assert_eq!(false, avc.is_full());
     }
 
     #[test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc = FifoCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         // Make the test query, which will trivially miss.
         avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert!(!avc.is_full());
 
         // Fill the cache with new queries, which should evict the test query.
-        for sid in unique_sids(avc.capacity) {
+        for sid in unique_sids(avc.cache.capacity()) {
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert!(avc.is_full());
@@ -972,7 +870,7 @@ mod tests {
         // the test query, will still result in the test query result being evicted.
         // Each test query will hit, and the interleaved queries will miss, with the final of the
         // interleaved queries evicting the test query.
-        for sid in unique_sids(avc.capacity) {
+        for sid in unique_sids(avc.cache.capacity()) {
             avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
             avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
@@ -1092,7 +990,7 @@ mod starnix_tests {
             Arc::new(PolicyServer { policy: active_policy.clone() });
         let cache_version = Arc::new(AtomicVersion::default());
 
-        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
+        let fixed_avc = FifoQueryCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
         let cache_version_for_avc = cache_version.clone();
         let mut query_avc = ThreadLocalQuery::new(cache_version_for_avc, fixed_avc);
 
@@ -1160,7 +1058,7 @@ mod starnix_tests {
 
         let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
         let policy_server = Arc::new(PolicyServer { policy: active_policy.clone() });
-        let fixed_avc = FifoCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
+        let fixed_avc = FifoQueryCache::<_>::new(policy_server.clone(), TEST_CAPACITY);
         let avc = Locked::new(fixed_avc);
         let sids = unique_sids(30);
 

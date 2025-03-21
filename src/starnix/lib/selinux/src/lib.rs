@@ -10,6 +10,7 @@ pub use security_server::SecurityServer;
 
 mod access_vector_cache;
 mod exceptions_config;
+mod fifo_cache;
 mod sid_table;
 mod sync;
 
