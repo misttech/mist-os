@@ -31,6 +31,8 @@ bootstrap_user_platform_aib_names = [
 
   # Driver Framework
   "driver_framework",
+  "driver_host_cpp",
+  "driver_host_rust",
 
   # Power
   "legacy_power_framework",
@@ -446,6 +448,7 @@ required_user_aib_names = [
   "core_realm",
   "core_realm_user_and_userdebug",
   "driver_framework",
+  "driver_host_cpp",
   "legacy_power_framework",
   "zircon",
 ]

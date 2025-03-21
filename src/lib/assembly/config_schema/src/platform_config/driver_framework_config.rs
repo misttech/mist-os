@@ -43,4 +43,8 @@ pub struct DriverFrameworkConfig {
     /// See: https://fuchsia.dev/fuchsia-src/development/components/stop_idle
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_driver_index_stop_on_idle: bool,
+
+    /// Whether to use the rust driver host or to use the c++ one instead.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub use_rust_driver_host: bool,
 }
