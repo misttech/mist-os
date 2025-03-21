@@ -13,8 +13,9 @@ use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
+use fidl_fuchsia_time_external::AdjustMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
@@ -537,6 +538,15 @@ async fn create_container(
     let security_state =
         security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
 
+    // XXX(fmil): Should there also be a condition to allow this *only* for specific containers?
+    let time_adjustment_proxy = if structured_config.enable_utc_time_adjustment {
+        connect_to_protocol_sync::<AdjustMarker>()
+            .map_err(|e| log_error!("could not connect to fuchsia.time.external/Adjust: {:?}", e))
+            .ok()
+    } else {
+        None
+    };
+
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
@@ -547,6 +557,7 @@ async fn create_container(
         features.aspect_ratio.as_ref(),
         security_state,
         procfs_device_tree_setup,
+        time_adjustment_proxy,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.program.name))?;
     let fs_context = create_fs_context(

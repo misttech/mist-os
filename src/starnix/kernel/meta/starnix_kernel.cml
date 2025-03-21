@@ -135,6 +135,14 @@
             default: 0,
             availability: "transitional",
         },
+        {
+            // XXX(fmil): Not sure if this setting should be here.
+            config: "fuchsia.time.config.WritableUTCTime",
+            key: "enable_utc_time_adjustment",
+            type: "bool",
+            default: false,
+            availability: "transitional",
+        },
     ],
     expose: [
         {

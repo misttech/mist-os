@@ -39,6 +39,7 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
+use fidl_fuchsia_time_external::AdjustSynchronousProxy;
 use futures::FutureExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
@@ -325,6 +326,10 @@ pub struct Kernel {
 
     /// Cgroups of the kernel.
     pub cgroups: KernelCgroups,
+
+    /// Used to communicate requests to adjust system time from within a Starnix
+    /// container. Used from syscalls.
+    pub time_adjustment_proxy: Option<AdjustSynchronousProxy>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -387,6 +392,7 @@ impl Kernel {
         framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_state: security::KernelState,
         procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+        time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
@@ -454,6 +460,7 @@ impl Kernel {
             container_control_handle: Mutex::new(None),
             root_cgroup_ebpf_programs: Default::default(),
             cgroups: KernelCgroups::new(kernel.clone()),
+            time_adjustment_proxy,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
