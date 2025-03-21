@@ -23,7 +23,8 @@ fuchsia_unittest_package("image-pipe-swapchain-tests") {
     "//src/lib/vulkan/validation_layers",
   ]
   test_specs = {
-    environments = vulkan_envs
+    # Disabled on AEMU because of flaky emulator failures.
+    environments = vulkan_envs - [ aemu_env ]
   }
   test_type = "system"
 }
