@@ -767,6 +767,7 @@ function track-build-event {
 
   local args_gn=""
   local args_json=""
+  local env_flags=""
 
   metrics-read-config
   if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
@@ -799,6 +800,10 @@ function track-build-event {
   local args_json1="${args_json:0:100}"
   local args_json2="${args_json:100:100}"
 
+  if [[ "${FUCHSIA_FX_ITERATIVE}" -eq 1 ]]; then
+    env_flags="${env_flags}|iterative"
+  fi
+
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
     --arg args_gn2 "${args_gn2}" \
@@ -812,6 +817,7 @@ function track-build-event {
     --argjson end_time_micros "${end_time}" \
     --argjson target_count "${target_count}" \
     --argjson is_clean_build "${is_clean_build}" \
+    --arg env_flags "${env_flags}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"

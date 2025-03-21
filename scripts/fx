@@ -324,6 +324,7 @@ while [[ $# -ne 0 ]]; do
       ;;
     -i)
       declare iterative=1
+      export FUCHSIA_FX_ITERATIVE=1
       ;;
     -x)
       export FUCHSIA_DEVSHELL_VERBOSITY=1
