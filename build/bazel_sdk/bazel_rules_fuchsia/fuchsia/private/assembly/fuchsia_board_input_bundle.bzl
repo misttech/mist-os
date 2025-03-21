@@ -48,6 +48,9 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     creation_args = ["--drivers", driver_list_file.path]
 
+    if ctx.attr.release_version:
+        creation_args.extend(["--release-version", ctx.attr.release_version])
+
     # Add single-file configs
     for (arg, file) in [
         ("--cpu-manager-config", "cpu_manager_config"),
@@ -181,6 +184,10 @@ fuchsia_board_input_bundle = rule(
             doc = "Path to sysmem format costs files",
             default = [],
             allow_files = True,
+        ),
+        "release_version": attr.string(
+            doc = "Release version string",
+            default = "unversioned",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

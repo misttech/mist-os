@@ -24,6 +24,7 @@ fuchsia_board_input_bundle(
         "//src/ui/input/drivers/adc-buttons",
         "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
     ],
+    release_version = build_info_version,
 )
 
 fuchsia_prebuilt_board_input_bundle(

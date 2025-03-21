@@ -176,6 +176,13 @@ pub struct BoardInputBundle {
     #[walk_paths]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub configuration: Option<BoardProvidedConfig>,
+
+    /// Release version that this board config corresponds to.
+    /// TODO: https://fxbug.dev/397489730 - Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_version: Option<String>,
 }
 
 /// This struct defines board-provided configuration for platform services and

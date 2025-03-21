@@ -28,6 +28,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         thread_roles,
         power_metrics_recorder_config,
         sysmem_format_costs_config,
+        release_version,
         depfile,
     } = args.to_owned();
 
@@ -90,6 +91,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),
         configuration,
+        release_version: Some(release_version.to_string()),
     };
     bundle.write_to_dir(output, depfile.as_ref())?;
 

@@ -5,6 +5,7 @@
 import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
 import("//build/group_with_inputs.gni")
+import("//build/info/info.gni")
 import("//build/python/python_action.gni")
 
 # Creates a Board Input Bundle, which provides packages and drivers to
@@ -190,6 +191,13 @@ template("board_input_bundle") {
       "--drivers",
       rebase_path(files.driver_packages_list, root_build_dir),
     ]
+
+    if (defined(build_info_version) && build_info_version != "") {
+      creation_args += [
+        "--release-version",
+        build_info_version,
+      ]
+    }
   }
 
   foreach(package_set,

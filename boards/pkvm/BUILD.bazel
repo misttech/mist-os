@@ -19,6 +19,7 @@ fuchsia_board_input_bundle(
         "//src/devices/board/drivers/x86:package",
     ],
     power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
+    release_version = build_info_version,
 )
 
 fuchsia_board_configuration(
@@ -48,6 +49,7 @@ fuchsia_board_input_bundle(
         "//src/devices/board/drivers/crosvm:package",
     ],
     power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
+    release_version = build_info_version,
 )
 
 fuchsia_board_configuration(
