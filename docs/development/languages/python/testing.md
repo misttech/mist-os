@@ -6,4 +6,4 @@ To define a host-side python test that can be run by `fx`, CI and CQ:
 *   Ensure some `group("tests")` depends on the `python_host_test` rule,
     and specify the `($host_toolchain)` in the dependency.
 
-[Here](/sdk/ctf/build/scripts/BUILD.gn) is an example BUILD.gn.
+[Here](/src/tests/end_to_end/power/tests/BUILD.gn) is an example BUILD.gn.
