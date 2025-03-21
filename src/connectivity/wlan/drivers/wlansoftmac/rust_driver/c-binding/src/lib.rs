@@ -76,6 +76,10 @@ pub unsafe extern "C" fn start_bridged_wlansoftmac(
     // of MLME, that means we can only call it once for both the client and ap modules. Ensure this
     // by using a shared `Once::call_once()`.
     LOGGER_ONCE.call_once(|| {
+        if log::log_enabled!(log::Level::Info) {
+            // Assuming logger is already initialized if log level is enabled.
+            return;
+        }
         // Initialize logging with a tag that can be used to filter for forwarding to console
         diagnostics_log::initialize_sync(
             PublishOptions::default()

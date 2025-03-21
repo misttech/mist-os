@@ -4,8 +4,8 @@
 
 use crate::{Incoming, Node};
 use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
-use namespace::Namespace;
 use log::error;
+use namespace::Namespace;
 use zx::Status;
 
 use fdf::DispatcherRef;
@@ -85,14 +85,13 @@ impl DriverContext {
             }
         };
 
-        diagnostics_log::initialize(
+        if let Err(e) = diagnostics_log::initialize(
             diagnostics_log::PublishOptions::default()
                 .use_log_sink(log_proxy)
                 .tags(&["driver", driver_name]),
-        )
-        .map_err(|err| {
-            eprintln!("Error initializing logging at driver startup: {err}");
-            Status::INVALID_ARGS
-        })
+        ) {
+            eprintln!("Error initializing logging at driver startup: {e}");
+        }
+        Ok(())
     }
 }
