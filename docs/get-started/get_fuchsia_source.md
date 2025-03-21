@@ -84,33 +84,11 @@ To download the Fuchsia source, do the following:
 
 ## 4. Set up environment variables {#set-up-environment-variables}
 
-Fuchsia recommends that you update your shell profile to include the following
-actions:
-
-*   Add the `.jiri_root/bin` directory to your `PATH`.
-
-    The `.jiri_root/bin` directory in the Fuchsia source contains the
-    [`jiri`](https://fuchsia.googlesource.com/jiri) and
-    [`fx`](/docs/development/build/fx.md) tools that are essential to
-    Fuchsia workflows. Fuchsia uses the `jiri` tool to manage repositories in
-    the Fuchsia project, and the `fx` tool helps configure, build, run, and
-    debug Fuchsia. The Fuchsia toolchain requires that `jiri` is available in
-    your `PATH`.
-
-*   Source the `scripts/fx-env.sh` file.
-
-    Though it's not required, sourcing the
-    [`fx-env.sh`](/scripts/fx-env.sh) script enables a number of
-    useful shell functions in your terminal. For instance, it creates the
-    `FUCHSIA_DIR` environment variable and provides the `fd` command for
-    navigating directories with auto-completion. (For more information, see
-    comments in `fx-env.sh`.)
-
 Note: If you don't wish to update your shell profile, see
 [Work on Fuchsia without updating your PATH](#work-on-fuchsia-without-updating-your-path)
 in Appendices instead.
 
-To update your shell profile to configure Fuchsia's environment variables,
+To configure the recommended Fuchsia environment variables in your shell profile,
 do the following:
 
 1.  Use a text editor to open your `~/.bash_profile` file (in the example below,
@@ -118,7 +96,7 @@ do the following:
 
     Note: This guide uses a `bash` terminal as an example. If you're
     using `zsh`, replace `~/.bash_profile` with `~/.zprofile` in the
-    following steps:
+    following steps.
 
     ```posix-terminal
     nano ~/.bash_profile
@@ -133,6 +111,20 @@ do the following:
     export PATH=~/fuchsia/.jiri_root/bin:$PATH
     source ~/fuchsia/scripts/fx-env.sh
     ```
+
+    *   The `.jiri_root/bin` directory in the Fuchsia source contains the
+        [`jiri`](https://fuchsia.googlesource.com/jiri) and
+        [`fx`](/docs/development/build/fx.md) tools that are essential to
+        Fuchsia workflows. Fuchsia uses the `jiri` tool to manage repositories in
+        the Fuchsia project, and the `fx` tool helps configure, build, run, and
+        debug Fuchsia. The Fuchsia toolchain requires that `jiri` is available in
+        your `PATH`.
+
+    *   The [`fx-env.sh`](/scripts/fx-env.sh) script enables a number of
+        useful shell functions in your terminal. For instance, it creates the
+        `FUCHSIA_DIR` environment variable and provides the `fd` command for
+        navigating directories with auto-completion. (For more information, see
+        comments in `fx-env.sh`.)
 
 1.  Save the file and exit the text editor.
 
