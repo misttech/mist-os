@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/environments.gni")
-import("//src/hwinfo/hwinfo_config.gni")
 
 rustc_binary("hwinfo_bin") {
   name = "hwinfo"

@@ -532,7 +532,6 @@ group("config_data_template_allowlist") {
     "//src/factory/factory_store_providers/config/qemu:widevine",
     "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
     "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-config",
-    "//src/hwinfo:default_board_config",
     "//src/media/audio/config:chromebook-config",
     "//src/power/metrics-logger:*",
     "//src/security/lib/scrutiny/tests/*",
