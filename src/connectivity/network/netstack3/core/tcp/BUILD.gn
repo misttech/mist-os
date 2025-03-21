@@ -19,6 +19,7 @@ rustc_library_with_features("netstack3-tcp") {
     "src/counters.rs",
     "src/lib.rs",
     "src/rtt.rs",
+    "src/seq_ranges.rs",
     "src/socket.rs",
     "src/socket/accept_queue.rs",
     "src/socket/demux.rs",

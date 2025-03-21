@@ -18,6 +18,7 @@ mod internal {
     pub(super) mod congestion;
     pub(super) mod counters;
     pub(super) mod rtt;
+    pub(super) mod seq_ranges;
     pub(super) mod socket;
     pub(super) mod state;
     pub(super) mod uninstantiable;
