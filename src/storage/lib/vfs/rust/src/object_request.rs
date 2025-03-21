@@ -270,10 +270,10 @@ impl ObjectRequest {
         N: Node,
     {
         let scope2 = scope.clone();
-        let fut = Box::pin(self.handle_async(async |object_request| {
+        let fut = self.handle_async(async |object_request| {
             C::create(scope2, node, protocols, object_request).await
-        }));
-        run_synchronous_future_or_spawn(&scope, fut);
+        });
+        run_synchronous_future_or_spawn(scope, fut);
     }
 }
 
@@ -355,16 +355,15 @@ pub trait ConnectionCreator<T: Node> {
 /// Synchronously polls `future` with the expectation that it won't return Pending. If the future
 /// does return Pending then this function will spawn a Task to run the future.
 pub(crate) fn run_synchronous_future_or_spawn(
-    scope: &ExecutionScope,
-    mut future: impl Future<Output = ()> + Send + Unpin + 'static,
+    scope: ExecutionScope,
+    future: impl Future<Output = ()> + Send + 'static,
 ) {
+    let mut task = scope.new_task(future);
     let noop_waker = std::task::Waker::noop();
     let mut cx = std::task::Context::from_waker(&noop_waker);
 
-    match future.poll_unpin(&mut cx) {
-        std::task::Poll::Pending => {
-            scope.spawn(future);
-        }
+    match task.poll_unpin(&mut cx) {
+        std::task::Poll::Pending => task.spawn(),
         std::task::Poll::Ready(()) => {}
     }
 }
@@ -380,14 +379,14 @@ mod tests {
     #[fuchsia::test]
     async fn test_run_synchronous_future_or_spawn_with_sync_future() {
         let scope = ExecutionScope::new();
-        run_synchronous_future_or_spawn(&scope, ready(()));
+        run_synchronous_future_or_spawn(scope.clone(), ready(()));
         scope.wait().await;
     }
 
     #[fuchsia::test]
     async fn test_run_synchronous_future_or_spawn_with_async_future() {
         let scope = ExecutionScope::new();
-        run_synchronous_future_or_spawn(&scope, Box::pin(yield_to_executor()));
+        run_synchronous_future_or_spawn(scope.clone(), yield_to_executor());
         scope.wait().await;
     }
 }

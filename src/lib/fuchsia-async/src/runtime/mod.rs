@@ -19,7 +19,7 @@ use self::stub as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{
-    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, TestExecutor,
+    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, SpawnableFuture, TestExecutor,
 };
 pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
@@ -32,7 +32,7 @@ pub use task_group::*;
 // Fuchsia specific exports.
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
-    executor::{BootInstant, EHandle, PacketReceiver, ReceiverRegistration, SpawnableFuture},
+    executor::{BootInstant, EHandle, PacketReceiver, ReceiverRegistration},
     timer::Interval,
 };
 

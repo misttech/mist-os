@@ -89,10 +89,10 @@ impl<T: Symlink> Connection<T> {
         object_request: ObjectRequest,
     ) {
         run_synchronous_future_or_spawn(
-            &scope.clone(),
-            Box::pin(object_request.handle_async(async |object_request| {
+            scope.clone(),
+            object_request.handle_async(async |object_request| {
                 Self::create(scope, symlink, options, object_request).await
-            })),
+            }),
         )
     }
 

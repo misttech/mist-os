@@ -18,14 +18,14 @@
 
 use crate::token_registry::TokenRegistry;
 
-use fuchsia_async::{JoinHandle, Scope, Task};
+use fuchsia_async::{self as fasync, JoinHandle, Scope, SpawnableFuture};
 use futures::task::{self, Poll};
 use futures::Future;
 use pin_project::pin_project;
 use std::future::{pending, poll_fn};
-use std::pin::pin;
+use std::pin::{pin, Pin};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::task::ready;
+use std::task::{ready, Context};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_async::EHandle;
@@ -62,7 +62,7 @@ struct Inner {
 
     /// A fake active task that we use when there are no other tasks yet there's still an an active
     /// count.
-    fake_active_task: Option<Task<()>>,
+    fake_active_task: Option<fasync::Task<()>>,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -104,6 +104,14 @@ impl ExecutionScope {
     /// not necessary for now.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
         self.executor.scope().spawn(FutureWithShutdown { executor: self.executor.clone(), task })
+    }
+
+    /// Returns a task that can be spawned later.  The task can also be polled before spawning.
+    pub fn new_task(self, task: impl Future<Output = ()> + Send + 'static) -> Task {
+        Task(
+            self.executor.clone(),
+            SpawnableFuture::new(FutureWithShutdown { executor: self.executor, task }),
+        )
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -311,6 +319,23 @@ impl<Task: Future<Output = ()> + Send + 'static> Future for FutureWithShutdown<T
                 _ => Poll::Ready(()),
             },
         }
+    }
+}
+
+pub struct Task(Arc<Executor>, SpawnableFuture<'static, ()>);
+
+impl Task {
+    /// Spawns the task on the scope.
+    pub fn spawn(self) {
+        self.0.scope().spawn(self.1);
+    }
+}
+
+impl Future for Task {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut &mut self.1).poll(cx)
     }
 }
 

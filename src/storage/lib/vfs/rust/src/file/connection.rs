@@ -174,10 +174,10 @@ impl<T: 'static + File + FileIo> FidlIoConnection<T> {
         object_request: ObjectRequest,
     ) {
         run_synchronous_future_or_spawn(
-            &scope.clone(),
-            Box::pin(object_request.handle_async(async |object_request| {
+            scope.clone(),
+            object_request.handle_async(async |object_request| {
                 Self::create(scope, file, options, object_request).await
-            })),
+            }),
         )
     }
 }
@@ -419,10 +419,10 @@ mod stream_io {
             object_request: ObjectRequest,
         ) {
             run_synchronous_future_or_spawn(
-                &scope.clone(),
-                Box::pin(object_request.handle_async(async |object_request| {
+                scope.clone(),
+                object_request.handle_async(async |object_request| {
                     Self::create(scope, file, options, object_request).await
-                })),
+                }),
             )
         }
 

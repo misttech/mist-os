@@ -66,7 +66,7 @@ impl<O> Future for &mut SpawnableFuture<'_, O> {
         ready!(result);
 
         let result = unsafe { ((meta.vtable.get_result)(meta.into()) as *const O).read() };
-        *meta.state.get_mut() = DONE | RESULT_TAKEN;
+        *meta.state.get_mut() = 1 | DONE | RESULT_TAKEN;
 
         Poll::Ready(result)
     }
@@ -105,6 +105,14 @@ mod tests {
             Scope::current().spawn(task1).await;
 
             assert_eq!(counter.load(Relaxed), old + 2);
+        });
+    }
+
+    #[test]
+    fn test_drop_done_spawnable_future() {
+        futures::executor::block_on(async {
+            let mut future = SpawnableFuture::new(async {});
+            assert!(futures::poll!(&mut future).is_ready());
         });
     }
 }

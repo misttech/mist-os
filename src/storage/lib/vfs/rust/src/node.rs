@@ -152,10 +152,10 @@ impl<N: Node> Connection<N> {
         object_request: ObjectRequest,
     ) {
         run_synchronous_future_or_spawn(
-            &scope.clone(),
-            Box::pin(object_request.handle_async(async |object_request| {
+            scope.clone(),
+            object_request.handle_async(async |object_request| {
                 Self::create(scope, node, options, object_request).await
-            })),
+            }),
         )
     }
 
