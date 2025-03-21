@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_fxfs::BlobWriterProxy;
 
-use crc::Hasher32 as _;
 use futures::future::{BoxFuture, FutureExt as _};
 use futures::stream::{FuturesOrdered, StreamExt as _, TryStreamExt as _};
 
@@ -13,8 +12,7 @@ pub use errors::{CreateError, WriteError};
 
 /// BlobWriter is a wrapper around the fuchsia.fxfs.BlobWriter fidl protocol. Clients will use this
 /// library to write blobs to disk.
-#[derive(derivative::Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 pub struct BlobWriter {
     blob_writer_proxy: BlobWriterProxy,
     vmo: zx::Vmo,
@@ -41,10 +39,6 @@ pub struct BlobWriter {
     blob_len: u64,
     // Size of the vmo.
     vmo_len: u64,
-    // TODO(https://fxbug.dev/378158208) Remove checksum when corruption is understood.
-    // Checksum of the first `bytes_sent` bytes of the blob.
-    #[derivative(Debug = "ignore")]
-    digest: crc::crc32::Digest,
 }
 
 impl BlobWriter {
@@ -68,7 +62,6 @@ impl BlobWriter {
             available: vmo_len,
             blob_len: size,
             vmo_len,
-            digest: crc::crc32::Digest::new(crc::crc32::IEEE),
         })
     }
 
@@ -97,16 +90,7 @@ impl BlobWriter {
                     .await
                     .ok_or_else(|| WriteError::QueueEnded)?
                     .map_err(WriteError::Fidl)?
-                    .map_err(|e| {
-                        if e == zx::Status::IO_DATA_INTEGRITY {
-                            println!(
-                                "caught corruption, dumping checksum, length: {} digest: {:#x}",
-                                self.bytes_sent,
-                                self.digest.sum32()
-                            )
-                        }
-                        WriteError::BytesReady(e)
-                    })?;
+                    .map_err(WriteError::BytesReady)?;
                 self.available += bytes_ackd;
             }
 
@@ -143,7 +127,6 @@ impl BlobWriter {
             );
             self.available -= bytes_to_send_len;
             self.bytes_sent += bytes_to_send_len;
-            self.digest.write(bytes_to_send);
         }
         debug_assert!(self.bytes_sent <= self.blob_len);
 
@@ -154,16 +137,7 @@ impl BlobWriter {
             {
                 match result {
                     Ok(bytes_ackd) => self.available += bytes_ackd,
-                    Err(e) => {
-                        if e == zx::Status::IO_DATA_INTEGRITY {
-                            println!(
-                                "caught corruption, dumping checksum, length: {} digest: {:#x}",
-                                self.bytes_sent,
-                                self.digest.sum32()
-                            )
-                        }
-                        return Err(WriteError::BytesReady(e));
-                    }
+                    Err(e) => return Err(WriteError::BytesReady(e)),
                 }
             }
             // This should not be possible.

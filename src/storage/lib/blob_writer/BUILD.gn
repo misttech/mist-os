@@ -14,8 +14,6 @@ rustc_library("blob-writer") {
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
-    "//third_party/rust_crates:crc",
-    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
   ]
