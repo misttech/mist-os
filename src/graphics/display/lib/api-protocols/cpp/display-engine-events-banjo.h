@@ -10,6 +10,7 @@
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 
@@ -30,6 +31,12 @@ namespace display {
 // guarantees.
 class DisplayEngineEventsBanjo final : public DisplayEngineEventsInterface {
  public:
+  // Maximum size of the `preferred_modes` argument to `OnDisplayAdded`.
+  static constexpr int kMaxPreferredModes = 4;
+
+  // Maximum size of `pixel_formats` argument to `OnDisplayAdded`.
+  static constexpr int kMaxPixelFormats = 4;
+
   explicit DisplayEngineEventsBanjo();
 
   DisplayEngineEventsBanjo(const DisplayEngineEventsBanjo&) = delete;
