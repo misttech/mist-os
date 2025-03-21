@@ -247,6 +247,13 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+wlan_nuc11_env = {
+  dimensions = {
+    device_type = "Intel NUC Kit NUC11TNHv5"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
+
 qemu_env = {
   dimensions = {
     device_type = "QEMU"
@@ -297,6 +304,13 @@ _all_named_fuchsia_envs += [
     env = vim3_env
   },
 ]
+
+wlan_vim3_env = {
+  dimensions = {
+    device_type = "Vim3"
+    pool = "fuchsia.tests.connectivity"
+  }
+}
 
 gce_env = {
   dimensions = {
@@ -413,6 +427,8 @@ wlan_with_display_envs = [
   wlan_astro_env,
   wlan_sherlock_env,
   wlan_nelson_env,
+  wlan_nuc11_env,
+  wlan_vim3_env,
 ]
 
 basic_envs = []
