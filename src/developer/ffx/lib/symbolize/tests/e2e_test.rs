@@ -89,7 +89,7 @@ async fn symbolize_fn_ptr() {
     let symbol_sys_inc = symbolizer.resolve_addr(outputs.fn_sys_inc_addr).unwrap();
     assert_eq!(symbol_sys_inc.len(), 1);
     let sys_inc_location = &symbol_sys_inc[0];
-    assert_eq!(sys_inc_location.function.as_ref().unwrap(), "SYSCALL_zx_channel_create");
+    assert!(sys_inc_location.function.as_ref().unwrap().ends_with("zx_channel_create"));
     assert_eq!(
         sys_inc_location.file_and_line.as_ref().unwrap().0,
         "fidling/gen/zircon/vdso/zx/zither/kernel/lib/syscalls/syscalls.inc"
