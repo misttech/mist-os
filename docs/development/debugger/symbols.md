@@ -117,12 +117,13 @@ Note: These directories do not need to be named `.build-id`
 
 * {ffx}
 
-  Note: These `build-id-dirs` are added to the configuration of zxdb and persist
-  through zxdb instances.
+  Note: These paths are added to the configuration of zxdb and persist
+  through zxdb instances. Make sure to use a path that is relative to your
+  Fuchsia checkout
 
 
   ```posix-terminal
-  ffx debug symbol-index add --build-dir /home/alice/project/out/x64/.build-id
+  ffx debug symbol-index add out/default/.build-id
   ```
 
 These directories are then annotated with `(folder)` in the output of the
