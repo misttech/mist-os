@@ -13,7 +13,7 @@ namespace ktrace_provider {
 
 class DeviceReader : public Reader {
  public:
-  explicit DeviceReader(zx::resource debug_resource);
+  explicit DeviceReader(zx::resource tracing_resource);
 
  private:
   static constexpr size_t kChunkSize{16 * 4 * 1024};
@@ -21,7 +21,7 @@ class DeviceReader : public Reader {
   void ReadMoreData() override;
 
   uint32_t offset_ = 0;
-  zx::resource debug_resource_;
+  zx::resource tracing_resource_;
 
   // We read data into this buffer in byte sized chunks, but we want to read out aligned 8 byte
   // fxt words.

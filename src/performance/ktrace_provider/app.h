@@ -21,16 +21,16 @@ namespace ktrace_provider {
 std::vector<trace::KnownCategory> GetKnownCategories();
 
 struct DrainContext {
-  DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource debug_resource)
-      : start(start), reader(std::move(debug_resource)), context(context) {}
+  DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource tracing_resource)
+      : start(start), reader(std::move(tracing_resource)), context(context) {}
 
-  static std::unique_ptr<DrainContext> Create(const zx::resource& debug_resource) {
+  static std::unique_ptr<DrainContext> Create(const zx::resource& tracing_resource) {
     auto context = trace_acquire_prolonged_context();
     if (context == nullptr) {
       return nullptr;
     }
     zx::resource cloned_resource;
-    zx_status_t res = debug_resource.duplicate(ZX_RIGHT_SAME_RIGHTS, &cloned_resource);
+    zx_status_t res = tracing_resource.duplicate(ZX_RIGHT_SAME_RIGHTS, &cloned_resource);
     if (res != ZX_OK) {
       return nullptr;
     }
@@ -46,7 +46,7 @@ struct DrainContext {
 
 class App {
  public:
-  explicit App(zx::resource debug_resource, const fxl::CommandLine& command_line);
+  explicit App(zx::resource tracing_resource, const fxl::CommandLine& command_line);
   ~App();
 
  private:
@@ -62,7 +62,7 @@ class App {
   // This context keeps the trace context alive until we've written our trace
   // records, which doesn't happen until after tracing has stopped.
   trace_prolonged_context_t* context_ = nullptr;
-  zx::resource debug_resource_;
+  zx::resource tracing_resource_;
 
   App(const App&) = delete;
   App(App&&) = delete;

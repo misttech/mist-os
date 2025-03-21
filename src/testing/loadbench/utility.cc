@@ -224,14 +224,14 @@ zx::unowned_profile GetProfile(zx::duration capacity, zx::duration deadline, zx:
   return zx::unowned_profile{iter->second.get()};
 }
 
-zx::unowned_resource GetDebugResource() {
-  static zx::resource debug_resource;
+zx::unowned_resource GetTracingResource() {
+  static zx::resource tracing_resource;
   static std::mutex mutex;
 
   std::lock_guard<std::mutex> guard{mutex};
 
-  if (debug_resource) {
-    return zx::unowned_resource{debug_resource.get()};
+  if (tracing_resource) {
+    return zx::unowned_resource{tracing_resource.get()};
   }
 
   // Connect to the debug resource.
@@ -242,14 +242,14 @@ zx::unowned_resource GetDebugResource() {
   FX_CHECK(status == ZX_OK);
 
   status = fdio_service_connect(
-      (std::string("/svc/") + fuchsia::kernel::DebugResource::Name_).c_str(), channel0.release());
+      (std::string("/svc/") + fuchsia::kernel::TracingResource::Name_).c_str(), channel0.release());
   FX_CHECK(status == ZX_OK);
 
-  fuchsia::kernel::DebugResource_SyncProxy proxy(std::move(channel1));
-  status = proxy.Get(&debug_resource);
+  fuchsia::kernel::TracingResource_SyncProxy proxy(std::move(channel1));
+  status = proxy.Get(&tracing_resource);
   FX_CHECK(status == ZX_OK);
 
-  return zx::unowned_resource{debug_resource.get()};
+  return zx::unowned_resource{tracing_resource.get()};
 }
 
 zx::unowned_resource GetInfoResource() {

@@ -38,9 +38,9 @@ zx::unowned_profile GetProfile(int priority, std::optional<zx_cpu_set_t> affinit
 zx::unowned_profile GetProfile(zx::duration capacity, zx::duration deadline, zx::duration period,
                                std::optional<zx_cpu_set_t> affinity = std::nullopt);
 
-// Returns an unowned handle to the root resource. Mantains an internal handle and returns the same
-// value for multiple requests.
-zx::unowned_resource GetDebugResource();
+// Returns an unowned handle to the tracing resource. Maintains an internal handle and returns the
+// same value for multiple requests.
+zx::unowned_resource GetTracingResource();
 
 // Returns the number of CPUs in the system.
 size_t ReadCpuCount();

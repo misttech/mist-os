@@ -90,7 +90,7 @@ class Tracing {
   size_t ReadKernelRecords(trace::TraceReader::RecordConsumer consumer,
                            trace::TraceReader::ErrorHandler error_handler);
 
-  zx_handle_t debug_resource_ = GetDebugResource()->get();
+  zx_handle_t tracing_resource_ = GetTracingResource()->get();
   bool running_ = false;
 };
 

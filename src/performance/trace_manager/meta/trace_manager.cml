@@ -56,6 +56,11 @@
         {
             protocol: "fuchsia.kernel.DebugResource",
             from: "parent",
+            to: [ "#cpuperf_provider" ],
+        },
+        {
+            protocol: "fuchsia.kernel.TracingResource",
+            from: "parent",
             to: [
                 "#cpuperf_provider",
                 "#ktrace_provider",

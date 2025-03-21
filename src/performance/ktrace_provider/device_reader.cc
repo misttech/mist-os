@@ -15,8 +15,8 @@
 
 namespace ktrace_provider {
 
-DeviceReader::DeviceReader(zx::resource debug_resource)
-    : Reader(buffer_, kChunkSize), debug_resource_(std::move(debug_resource)) {}
+DeviceReader::DeviceReader(zx::resource tracing_resource)
+    : Reader(buffer_, kChunkSize), tracing_resource_(std::move(tracing_resource)) {}
 
 void DeviceReader::ReadMoreData() {
   memmove(buffer_, current_, AvailableBytes());
@@ -26,7 +26,7 @@ void DeviceReader::ReadMoreData() {
     size_t read_size = std::distance(const_cast<const char*>(new_marker), end_);
     size_t actual;
     if (zx_status_t status =
-            zx_ktrace_read(debug_resource_.get(), new_marker, offset_, read_size, &actual);
+            zx_ktrace_read(tracing_resource_.get(), new_marker, offset_, read_size, &actual);
         status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to read from zx_ktrace open";
       break;

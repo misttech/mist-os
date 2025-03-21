@@ -139,7 +139,7 @@ zx_status_t sys_ktrace_read(zx_handle_t handle, user_out_ptr<void> _data, uint32
   }
 
   zx_status_t status;
-  if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_DEBUG_BASE,
+  if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_TRACING_BASE,
                                          1)) != ZX_OK) {
     return status;
   }
@@ -160,7 +160,7 @@ zx_status_t sys_ktrace_control(zx_handle_t handle, uint32_t action, uint32_t opt
   }
 
   zx_status_t status;
-  if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_DEBUG_BASE,
+  if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_TRACING_BASE,
                                          1)) != ZX_OK) {
     return status;
   }
