@@ -38,6 +38,9 @@ struct MsdCommandDescriptor {
 
 struct MsdDriverCallbacks {
   void (*log)(int32_t level, const char* file, int32_t line, const char* str);
+  // TODO(b/401274209): remove when vthread tracing available in rust
+  void (*trace_vthread_duration)(magma_bool_t begin, const char* category, const char* name,
+                                 const char* vthread, uint64_t vthread_id, uint64_t timestamp);
 };
 
 void msd_driver_register_callbacks(struct MsdDriverCallbacks* callbacks);
