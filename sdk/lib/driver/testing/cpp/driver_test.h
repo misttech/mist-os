@@ -248,14 +248,6 @@ class DriverTestCommon {
     }
   }
 
- private:
-  virtual zx::result<> StartDriverInner(fdf::DriverStartArgs start_args) = 0;
-  virtual zx::result<> StopDriverInner() = 0;
-  virtual bool DriverExists() = 0;
-  virtual void ShutdownAndDestroyDriverInner() = 0;
-
-  bool StartedSuccessfully() const { return start_result_.has_value() && start_result_->is_ok(); }
-
   fidl::ClientEnd<fuchsia_io::Directory> ConnectToDriverSvcDir() {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     zx_status_t status = fdio_open3_at(
@@ -266,6 +258,14 @@ class DriverTestCommon {
                   zx_status_get_string(status));
     return std::move(client_end);
   }
+
+ private:
+  virtual zx::result<> StartDriverInner(fdf::DriverStartArgs start_args) = 0;
+  virtual zx::result<> StopDriverInner() = 0;
+  virtual bool DriverExists() = 0;
+  virtual void ShutdownAndDestroyDriverInner() = 0;
+
+  bool StartedSuccessfully() const { return start_result_.has_value() && start_result_->is_ok(); }
 
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
