@@ -71,6 +71,8 @@ class Soname {
   // This returns the size of a buffer sufficient for copy() not to truncate.
   constexpr size_t copy_size() const { return size_ + 1; }
 
+  constexpr bool empty() const { return size_ == 0; }
+
   constexpr uint32_t size() const { return size_; }
 
   constexpr uint32_t hash() const { return hash_; }

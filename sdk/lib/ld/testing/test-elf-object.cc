@@ -47,7 +47,7 @@ const TestElfLoadSet* TestElfLoadSet::Get(elfldltl::Soname<> name) {
 TestElfLoadSet::SonameMap TestElfLoadSet::MakeSonameMap() const {
   SonameMap map;
   for (const TestElfObject* object : objects_) {
-    if (!object->soname.str().empty()) {
+    if (!object->soname.empty()) {
       map.try_emplace(object->soname, *object);
     }
   }
