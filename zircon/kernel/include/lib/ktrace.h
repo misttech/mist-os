@@ -643,9 +643,8 @@ class KTrace {
   // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
-  // then the options field functions as the group mask. The ptr argument is only used when
-  // probing.
-  static zx_status_t Control(uint32_t action, uint32_t options, void* ptr);
+  // then the options field functions as the group mask.
+  static zx_status_t Control(uint32_t action, uint32_t options);
 
   // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
   // buffer.

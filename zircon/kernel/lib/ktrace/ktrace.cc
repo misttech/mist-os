@@ -589,7 +589,7 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 internal::KTraceState KTrace::state_;
 KTrace::CpuContextMap KTrace::cpu_context_map_;
 
-zx_status_t KTrace::Control(uint32_t action, uint32_t options, void* ptr) {
+zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
   using StartMode = ::internal::KTraceState::StartMode;
   switch (action) {
     case KTRACE_ACTION_START:
@@ -604,9 +604,6 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options, void* ptr) {
 
     case KTRACE_ACTION_REWIND:
       return GetInstance().Rewind();
-
-    case KTRACE_ACTION_NEW_PROBE:
-      return ZX_ERR_NOT_SUPPORTED;
 
     default:
       return ZX_ERR_INVALID_ARGS;
