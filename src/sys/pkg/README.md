@@ -113,8 +113,9 @@ You can discover more tests with by running `fx list-packages` on the host.
 
 To update the base of your fuchsia image, you can use `fx ota` if you’re
 running on hardware which supports OTA. If you’re running under QEMU, you’ll
-need to just restart QEMU to get an updated base after a rebuild. Don’t worry,
-it’s fast.
+usually just restart QEMU to get an updated base after a rebuild. Don’t worry,
+it’s fast. If you are running an emulator that supports OTA workflows (i.e.
+started with `ffx emu start --uefi ...`), you can use `fx ota` if you prefer.
 
 ##### Pulling down a new version of an external dependency
 
