@@ -38,7 +38,7 @@ use packet_formats::tcp::{
 
 use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpIpSockOptions};
 use crate::internal::counters::{
-    TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket, TcpCountersWithoutSocket,
+    self, TcpCounterContext, TcpCountersRefs, TcpCountersWithoutSocket,
 };
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
@@ -201,19 +201,6 @@ where
         CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
             .valid_segments_received
             .increment();
-        // TODO(https://fxbug.dev/42081990): Track these counters per socket.
-        match incoming.header.control {
-            None => {}
-            Some(Control::RST) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
-                .resets_received
-                .increment(),
-            Some(Control::SYN) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
-                .syns_received
-                .increment(),
-            Some(Control::FIN) => CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx)
-                .fins_received
-                .increment(),
-        }
         handle_incoming_packet::<I, _, _>(
             core_ctx,
             bindings_ctx,
@@ -252,11 +239,17 @@ fn handle_incoming_packet<WireI, BC, CC>(
         incoming_device.downgrade(),
     );
 
+    enum FoundSocket<S> {
+        // Typically holds the demux ID of the found socket, but may hold
+        // `None` if the found socket was destroyed as a result of the segment.
+        Yes(Option<S>),
+        No,
+    }
     let found_socket = loop {
         let sock = core_ctx
             .with_demux(|demux| lookup_socket::<WireI, CC, BC>(demux, &mut addrs_to_search));
         match sock {
-            None => break false,
+            None => break FoundSocket::No,
             Some(SocketLookupResult::Connection(demux_conn_id, conn_addr)) => {
                 // It is not possible to have two same connections that
                 // share the same local and remote IPs and ports.
@@ -282,10 +275,10 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 match disposition {
                     ConnectionIncomingSegmentDisposition::Destroy => {
                         WireI::destroy_socket_with_demux_id(core_ctx, bindings_ctx, demux_conn_id);
-                        break true;
+                        break FoundSocket::Yes(None);
                     }
                     ConnectionIncomingSegmentDisposition::FoundSocket => {
-                        break true;
+                        break FoundSocket::Yes(Some(demux_conn_id));
                     }
                     ConnectionIncomingSegmentDisposition::ReuseCandidateForListener => {
                         tw_reuse = Some((demux_conn_id, conn_addr));
@@ -293,7 +286,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 }
             }
             Some(SocketLookupResult::Listener((demux_listener_id, _listener_addr))) => {
-                match WireI::into_dual_stack_ip_socket(demux_listener_id) {
+                match WireI::as_dual_stack_ip_socket(&demux_listener_id) {
                     EitherStack::ThisStack(listener_id) => {
                         let disposition = core_ctx.with_socket_mut_isn_transport_demux(
                             &listener_id,
@@ -343,12 +336,13 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             disposition,
+                            &demux_listener_id,
                             &mut tw_reuse,
                             &mut addrs_to_search,
                             conn_addr,
                             incoming_device,
                         ) {
-                            break true;
+                            break FoundSocket::Yes(Some(demux_listener_id));
                         }
                     }
                     EitherStack::OtherStack(listener_id) => {
@@ -391,12 +385,13 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             disposition,
+                            &demux_listener_id,
                             &mut tw_reuse,
                             &mut addrs_to_search,
                             conn_addr,
                             incoming_device,
                         ) {
-                            break true;
+                            break FoundSocket::Yes(Some(demux_listener_id));
                         }
                     }
                 };
@@ -404,34 +399,53 @@ fn handle_incoming_packet<WireI, BC, CC>(
         }
     };
 
-    if !found_socket {
-        CounterContext::<TcpCountersWithoutSocket<WireI>>::counters(core_ctx)
-            .received_segments_no_dispatch
-            .increment();
+    let demux_id = match found_socket {
+        FoundSocket::No => {
+            CounterContext::<TcpCountersWithoutSocket<WireI>>::counters(core_ctx)
+                .received_segments_no_dispatch
+                .increment();
 
-        // There is no existing TCP state, pretend it is closed
-        // and generate a RST if needed.
-        // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
-        // CLOSED is fictional because it represents the state when
-        // there is no TCB, and therefore, no connection.
-        if let Some(seg) =
-            (Closed { reason: None::<Option<ConnectionError>> }.on_segment(&incoming))
-        {
-            socket::send_tcp_segment::<WireI, WireI, _, _, _>(
-                core_ctx,
-                bindings_ctx,
-                None,
-                None,
-                conn_addr,
-                seg.into_empty(),
-                &TcpIpSockOptions { marks: *marks },
-            );
+            // There is no existing TCP state, pretend it is closed
+            // and generate a RST if needed.
+            // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
+            // CLOSED is fictional because it represents the state when
+            // there is no TCB, and therefore, no connection.
+            if let Some(seg) =
+                (Closed { reason: None::<Option<ConnectionError>> }.on_segment(&incoming))
+            {
+                socket::send_tcp_segment::<WireI, WireI, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    None,
+                    None,
+                    conn_addr,
+                    seg.into_empty(),
+                    &TcpIpSockOptions { marks: *marks },
+                );
+            }
+            None
         }
-    } else {
-        // TODO(https://fxbug.dev/42081990): Track per socket.
-        CounterContext::<TcpCountersWithSocket<WireI>>::counters(core_ctx)
-            .received_segments_dispatched
-            .increment();
+        FoundSocket::Yes(demux_id) => {
+            counters::increment_counter_with_optional_demux_id::<WireI, _, _, _, _>(
+                core_ctx,
+                demux_id.as_ref(),
+                |c| &c.received_segments_dispatched,
+            );
+            demux_id
+        }
+    };
+
+    match incoming.header.control {
+        None => {}
+        Some(control) => counters::increment_counter_with_optional_demux_id::<WireI, _, _, _, _>(
+            core_ctx,
+            demux_id.as_ref(),
+            |c| match control {
+                Control::RST => &c.resets_received,
+                Control::SYN => &c.syns_received,
+                Control::FIN => &c.fins_received,
+            },
+        ),
     }
 }
 
@@ -755,6 +769,7 @@ fn try_handle_listener_incoming_disposition<SockI, WireI, CC, BC, Addr>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     disposition: ListenerIncomingSegmentDisposition<PrimaryRc<SockI, CC::WeakDeviceId, BC>>,
+    demux_listener_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     tw_reuse: &mut Option<(WireI::DemuxSocketId<CC::WeakDeviceId, BC>, Addr)>,
     addrs_to_search: &mut AddrVecIter<WireI, CC::WeakDeviceId, TcpPortSpec>,
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
@@ -834,10 +849,11 @@ where
             if let Some(to_destroy) = to_destroy {
                 socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
             }
-            // TODO(https://fxbug.dev/42081990): Track per socket.
-            CounterContext::<TcpCountersWithSocket<SockI>>::counters(core_ctx)
-                .passive_connection_openings
-                .increment();
+            counters::increment_counter_for_demux_id::<WireI, _, _, _, _>(
+                core_ctx,
+                demux_listener_id,
+                |c| &c.passive_connection_openings,
+            );
             true
         }
     }

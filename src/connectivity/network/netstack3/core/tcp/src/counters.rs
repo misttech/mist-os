@@ -5,6 +5,7 @@
 //! Facilities for tracking the counts of various TCP events.
 
 use net_types::ip::{Ip, IpMarked};
+use netstack3_base::socket::EitherStack;
 use netstack3_base::{
     Counter, CounterContext, Inspectable, Inspector, InspectorExt as _, ResourceCounterContext,
     WeakDeviceIdentifier,
@@ -286,6 +287,72 @@ impl<'a> TcpCountersRefs<'a> {
         let Self { stack_wide, per_socket } = self;
         cb(stack_wide).increment();
         cb(per_socket).increment();
+    }
+}
+
+/// Increments the stack-wide counters, and optionally the per-resouce counters.
+///
+/// Used to increment counters that can, but are not required to, have an
+/// associated socket. For example, sent segment counts.
+pub(crate) fn increment_counter_with_optional_socket_id<I, CC, BT, D, F>(
+    core_ctx: &CC,
+    socket_id: Option<&TcpSocketId<I, D, BT>>,
+    cb: F,
+) where
+    I: DualStackIpExt,
+    CC: TcpCounterContext<I, D, BT>,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    F: Fn(&TcpCountersWithSocket<I>) -> &Counter,
+{
+    match socket_id {
+        Some(id) => core_ctx.increment_both(id, cb),
+        None => cb(core_ctx.counters()).increment(),
+    }
+}
+
+/// Increments the stack-wide counters, and optionally the per-resouce counters.
+///
+/// Used to increment counters that can, but are not required to, have an
+/// associated socket. For example, received segment counts.
+pub(crate) fn increment_counter_with_optional_demux_id<I, CC, BT, D, F>(
+    core_ctx: &CC,
+    demux_id: Option<&I::DemuxSocketId<D, BT>>,
+    cb: F,
+) where
+    I: DualStackIpExt,
+    CC: TcpCounterContext<I, D, BT> + TcpCounterContext<I::OtherVersion, D, BT>,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    F: Fn(&TcpCountersWithSocketInner) -> &Counter,
+{
+    match demux_id {
+        Some(id) => increment_counter_for_demux_id::<I, _, _, _, _>(core_ctx, &id, cb),
+        None => {
+            cb(CounterContext::<TcpCountersWithSocket<I>>::counters(core_ctx).as_ref()).increment()
+        }
+    }
+}
+
+/// Increment a counter for TCP demux_ids, which may exist in either stack.
+pub(crate) fn increment_counter_for_demux_id<I, D, BT, CC, F>(
+    core_ctx: &CC,
+    demux_id: &I::DemuxSocketId<D, BT>,
+    cb: F,
+) where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    CC: TcpCounterContext<I, D, BT> + TcpCounterContext<I::OtherVersion, D, BT>,
+    F: Fn(&TcpCountersWithSocketInner<Counter>) -> &Counter,
+{
+    match I::as_dual_stack_ip_socket(demux_id) {
+        EitherStack::ThisStack(socket_id) => core_ctx
+            .increment_both(socket_id, |counters: &TcpCountersWithSocket<I>| cb(counters.as_ref())),
+        EitherStack::OtherStack(socket_id) => core_ctx
+            .increment_both(socket_id, |counters: &TcpCountersWithSocket<I::OtherVersion>| {
+                cb(counters.as_ref())
+            }),
     }
 }
 

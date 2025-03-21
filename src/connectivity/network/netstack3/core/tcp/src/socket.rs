@@ -50,14 +50,13 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, Counter,
-    CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
-    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
-    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain, Mss,
-    OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
-    RemoveResourceResult, ResourceCounterContext as _, RngContext, Segment, SeqNum,
-    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
-    WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CtxPair,
+    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
+    IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt, InstantBindingsTypes, IpDeviceAddr,
+    IpExt, LocalAddressError, Mark, MarkDomain, Mss, OwnedOrRefsBidirectionalConverter,
+    PortAllocImpl, ReferenceNotifiersExt as _, RemoveResourceResult, ResourceCounterContext as _,
+    RngContext, Segment, SeqNum, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
@@ -74,7 +73,7 @@ use crate::internal::base::{
 };
 use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::counters::{
-    CombinedTcpCounters, TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket,
+    self, CombinedTcpCounters, TcpCounterContext, TcpCountersRefs, TcpCountersWithSocket,
 };
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
@@ -5491,17 +5490,23 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     };
     match result {
         Ok(()) => {
-            increment_optional_tcp_counter(core_ctx, socket_id, |counters| &counters.segments_sent);
+            counters::increment_counter_with_optional_socket_id(core_ctx, socket_id, |counters| {
+                &counters.segments_sent
+            });
             if let Some(control) = control {
-                increment_optional_tcp_counter(core_ctx, socket_id, |counters| match control {
-                    Control::RST => &counters.resets_sent,
-                    Control::SYN => &counters.syns_sent,
-                    Control::FIN => &counters.fins_sent,
-                })
+                counters::increment_counter_with_optional_socket_id(
+                    core_ctx,
+                    socket_id,
+                    |counters| match control {
+                        Control::RST => &counters.resets_sent,
+                        Control::SYN => &counters.syns_sent,
+                        Control::FIN => &counters.fins_sent,
+                    },
+                )
             }
         }
         Err(err) => {
-            increment_optional_tcp_counter(core_ctx, socket_id, |counters| {
+            counters::increment_counter_with_optional_socket_id(core_ctx, socket_id, |counters| {
                 &counters.segment_send_errors
             });
             match socket_id {
@@ -5509,24 +5514,6 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 None => debug!("TCP: failed to send segment: {:?}", err),
             }
         }
-    }
-}
-
-// Increments the stack-wide counters, and optionally, the per-resouce counters.
-fn increment_optional_tcp_counter<I, CC, BT, D, F>(
-    core_ctx: &CC,
-    socket_id: Option<&TcpSocketId<I, D, BT>>,
-    cb: F,
-) where
-    I: DualStackIpExt,
-    CC: TcpCounterContext<I, D, BT>,
-    D: WeakDeviceIdentifier,
-    BT: TcpBindingsTypes,
-    F: Fn(&TcpCountersWithSocket<I>) -> &Counter,
-{
-    match socket_id {
-        Some(id) => core_ctx.increment_both(id, cb),
-        None => cb(core_ctx.counters()).increment(),
     }
 }
 
@@ -6681,24 +6668,32 @@ mod tests {
         >,
     {
         set_logger_for_test();
-        let (mut net, _client, _client_snd_end, _accepted) =
+        let (mut net, client, _client_snd_end, accepted) =
             bind_listen_connect_accept_inner::<I>(listen_addr, bind_config, 0, 0.0);
 
         let mut assert_counters =
             |context_name: &'static str,
+             socket: &TcpSocketId<I, _, _>,
              expected: CounterExpectations,
-             expected_without_socket: CounterExpectationsWithoutSocket| {
+             expected_without_socket: CounterExpectationsWithoutSocket,
+             expected_per_socket: CounterExpectations| {
                 net.with_context(context_name, |ctx| {
                     let counters =
                         CounterContext::<TcpCountersWithSocket<I>>::counters(&ctx.core_ctx);
                     let counters_without_socket =
                         CounterContext::<TcpCountersWithoutSocket<I>>::counters(&ctx.core_ctx);
+                    let counters_per_socket = ctx.core_ctx.per_resource_counters(socket);
                     assert_eq!(expected, counters.as_ref().into(), "{context_name}");
                     assert_eq!(
                         expected_without_socket,
                         counters_without_socket.as_ref().into(),
                         "{context_name}"
                     );
+                    assert_eq!(
+                        expected_per_socket,
+                        counters_per_socket.as_ref().into(),
+                        "{context_name}"
+                    )
                 })
             };
 
@@ -6710,20 +6705,27 @@ mod tests {
         //   LOCAL <- REMOTE: ACK "hello".
         //   LOCAL <- REMOTE: Send "hello".
         //   LOCAL -> REMOTE: ACK "hello".
+        let local_with_socket_expects = || CounterExpectations {
+            segments_sent: 4,
+            received_segments_dispatched: 3,
+            active_connection_openings: 1,
+            syns_sent: 1,
+            syns_received: 1,
+            ..Default::default()
+        };
         assert_counters(
             LOCAL,
-            CounterExpectations {
-                segments_sent: 4,
-                received_segments_dispatched: 3,
-                active_connection_openings: 1,
-                syns_sent: 1,
-                syns_received: 1,
-                ..Default::default()
-            },
+            &client,
+            local_with_socket_expects(),
             CounterExpectationsWithoutSocket { valid_segments_received: 3, ..Default::default() },
+            // Note: The local side only has 1 socket, so the stack-wide and
+            // per-socket expectations are identical.
+            local_with_socket_expects(),
         );
+
         assert_counters(
             REMOTE,
+            &accepted,
             CounterExpectations {
                 segments_sent: 3,
                 received_segments_dispatched: 4,
@@ -6733,6 +6735,15 @@ mod tests {
                 ..Default::default()
             },
             CounterExpectationsWithoutSocket { valid_segments_received: 4, ..Default::default() },
+            // Note: The remote side has a listener socket and the accepted
+            // socket. The stack-wide counters are higher than the accepted
+            // socket's counters, because some events are attributed to the
+            // listener.
+            CounterExpectations {
+                segments_sent: 2,
+                received_segments_dispatched: 3,
+                ..Default::default()
+            },
         );
     }
 
