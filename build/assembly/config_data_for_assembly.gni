@@ -51,12 +51,6 @@ template("config_data_for_assembly") {
              _config_data_outputs - [ _config_data_outputs[0] ] == [],
          "Exactly one output pattern required.")
 
-  import("//build/config_data_for_pkg_allowlist.gni")
-  assert(config_data_for_pkg_allowlist == [] ||
-             config_data_for_pkg_allowlist + [ invoker.for_pkg ] -
-                 [ invoker.for_pkg ] != config_data_for_pkg_allowlist,
-         "${invoker.for_pkg} is not an allowed value for for_pkg")
-
   # Create the set of config_data entries
   config_data_entries = []
   foreach(source, invoker.sources) {
