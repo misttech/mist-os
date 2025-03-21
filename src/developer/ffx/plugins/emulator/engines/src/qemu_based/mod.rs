@@ -21,7 +21,7 @@ use ffx_emulator_common::{config, dump_log_to_out, host_is_mac, process};
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use ffx_ssh::SshKeyFiles;
 use ffx_target::KnockError;
-use fho::{bug, return_bug, return_user_error, user_error, Result};
+use fho::{bug, return_bug, return_user_error, user_error, FfxContext, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use serde_json::{json, Deserializer, Value};
@@ -126,6 +126,13 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             .get_file()
             .await
             .map_err(|e| bug!("Error reading config for instance root: {e}"))?;
+        // This should really just be part of the conversion, but the structure of the config file
+        // makes it awkward to do. The `file_check` function doesn't allow for returning an error,
+        // for example, and the `get_file` function has to support returning a `Vec` in addition to
+        // a `PathBuf`.
+        if !instance_root.has_root() {
+            instance_root = std::fs::canonicalize(instance_root).bug()?;
+        }
         instance_root.push(instance_name);
         fs::create_dir_all(&instance_root)
             .map_err(|e| bug!("Error creating {instance_root:?}: {e}"))?;
