@@ -11,7 +11,7 @@ use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
-    ClassPermissionId, FsUseLabelAndType, FsUseType, Policy,
+    ClassPermissionId, FsUseLabelAndType, FsUseType, IoctlAccessDecision, Policy,
 };
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
@@ -595,6 +595,46 @@ impl Query for SecurityServer {
         )?;
 
         active_policy.sid_table.security_context_to_sid(&new_file_context).ok()
+    }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        let locked_state = self.state.lock();
+
+        let active_policy = match &locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
+            None => return IoctlAccessDecision::ALLOW_ALL,
+        };
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        match target_class {
+            AbstractObjectClass::System(target_class) => {
+                active_policy.parsed.compute_ioctl_access_decision(
+                    &source_context,
+                    &target_context,
+                    &target_class,
+                    ioctl_prefix,
+                )
+            }
+            AbstractObjectClass::Custom(target_class) => {
+                active_policy.parsed.compute_ioctl_access_decision_custom(
+                    &source_context,
+                    &target_context,
+                    &target_class,
+                    ioctl_prefix,
+                )
+            }
+            // No meaningful policy can be determined without target class.
+            _ => IoctlAccessDecision::DENY_ALL,
+        }
     }
 }
 

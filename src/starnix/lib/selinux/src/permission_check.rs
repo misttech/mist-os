@@ -151,7 +151,7 @@ mod tests {
     use super::*;
     use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use crate::policy::{AccessDecision, AccessVector};
+    use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
     use crate::{AbstractObjectClass, ProcessPermission};
 
     use std::any::Any;
@@ -228,6 +228,18 @@ mod tests {
         ) -> Option<SecurityId> {
             unreachable!();
         }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: AbstractObjectClass,
+            _ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            // ioctl access decisions are only checked if the `ioctl` permission is allowed, which is
+            // never the case for `DenyAllPermissions`.
+            unreachable!()
+        }
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
@@ -272,6 +284,16 @@ mod tests {
             _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!();
+        }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: AbstractObjectClass,
+            _ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            IoctlAccessDecision::ALLOW_ALL
         }
     }
 

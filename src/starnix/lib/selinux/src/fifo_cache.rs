@@ -4,6 +4,7 @@
 
 use indexmap::IndexMap;
 use std::hash::Hash;
+use std::ops::Add;
 
 #[cfg(test)]
 use indexmap::map::Iter;
@@ -24,6 +25,21 @@ pub struct CacheStats {
     /// Cumulative count of evictions from the cache due to no longer being deemed relevant.
     /// This is not used in our current implementation.
     pub frees: u64,
+}
+
+impl Add for &CacheStats {
+    type Output = CacheStats;
+
+    fn add(self, other: &CacheStats) -> CacheStats {
+        CacheStats {
+            lookups: self.lookups + other.lookups,
+            hits: self.hits + other.hits,
+            misses: self.misses + other.misses,
+            allocs: self.allocs + other.allocs,
+            reclaims: self.reclaims + other.reclaims,
+            frees: self.frees + other.frees,
+        }
+    }
 }
 
 /// An interface through which statistics may be obtained from each cache.

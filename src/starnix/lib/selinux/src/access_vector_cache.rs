@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fifo_cache::FifoCache;
-use crate::policy::AccessDecision;
+use crate::policy::{AccessDecision, IoctlAccessDecision};
 use crate::sync::Mutex;
 use crate::{AbstractObjectClass, FsNodeClass, NullessByteStr, ObjectClass, SecurityId};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -49,6 +49,16 @@ pub(super) trait Query {
         fs_node_class: FsNodeClass,
         fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId>;
+
+    /// Computes the [`IoctlAccessDecision`] permitted to `source_sid` for accessing `target_sid`,
+    /// an object of of type `target_class`, for ioctls with high byte `ioctl_prefix`.
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision;
 }
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
@@ -85,6 +95,16 @@ pub trait QueryMut {
         fs_node_class: FsNodeClass,
         fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId>;
+
+    /// Computes the [`IoctlAccessDecision`] permitted to `source_sid` for accessing `target_sid`,
+    /// an object of of type `target_class`, for ioctls with high byte `ioctl_prefix`.
+    fn compute_ioctl_access_decision(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -118,6 +138,21 @@ impl<Q: Query> QueryMut for Q {
             target_sid,
             fs_node_class,
             fs_node_name,
+        )
+    }
+
+    fn compute_ioctl_access_decision(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        (self as &dyn Query).compute_ioctl_access_decision(
+            source_sid,
+            target_sid,
+            target_class,
+            ioctl_prefix,
         )
     }
 }
@@ -179,6 +214,16 @@ impl Query for DenyAll {
     ) -> Option<SecurityId> {
         unreachable!()
     }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _target_class: AbstractObjectClass,
+        _ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        IoctlAccessDecision::DENY_ALL
+    }
 }
 
 impl Reset for DenyAll {
@@ -200,6 +245,14 @@ struct AccessQueryArgs {
 struct AccessQueryResult {
     access_decision: AccessDecision,
     new_file_sid: Option<SecurityId>,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+struct IoctlAccessQueryArgs {
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    target_class: AbstractObjectClass,
+    ioctl_prefix: u8,
 }
 
 /// An empty access vector cache that delegates to an [`AccessQueryable`].
@@ -246,6 +299,16 @@ impl<D: QueryMut> QueryMut for Empty<D> {
     ) -> Option<SecurityId> {
         unreachable!()
     }
+
+    fn compute_ioctl_access_decision(
+        &mut self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _target_class: AbstractObjectClass,
+        _ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        todo!()
+    }
 }
 
 impl<D: ResetMut> ResetMut for Empty<D> {
@@ -257,10 +320,14 @@ impl<D: ResetMut> ResetMut for Empty<D> {
 /// Thread-hostile associative cache with capacity defined at construction and FIFO eviction.
 pub(super) struct FifoQueryCache<D = DenyAll> {
     access_cache: FifoCache<AccessQueryArgs, AccessQueryResult>,
+    ioctl_access_cache: FifoCache<IoctlAccessQueryArgs, IoctlAccessDecision>,
     delegate: D,
 }
 
 impl<D> FifoQueryCache<D> {
+    // The multiplier used to compute the ioctl access cache capacity from the main cache capacity.
+    const IOCTL_CAPACITY_MULTIPLIER: f32 = 0.25;
+
     /// Constructs a fixed-size access vector cache that delegates to `delegate`.
     ///
     /// # Panics
@@ -268,19 +335,32 @@ impl<D> FifoQueryCache<D> {
     /// This will panic if called with a `capacity` of zero.
     pub fn new(delegate: D, capacity: usize) -> Self {
         assert!(capacity > 0, "cannot instantiate fixed access vector cache of size 0");
+        let ioctl_access_cache_capacity =
+            (Self::IOCTL_CAPACITY_MULTIPLIER * (capacity as f32)) as usize;
+        assert!(
+            ioctl_access_cache_capacity > 0,
+            "cannot instantiate ioctl cache partition of size 0"
+        );
 
         Self {
             // Request `capacity` plus one element working-space for insertions that trigger
             // an eviction.
             access_cache: FifoCache::with_capacity(capacity),
+            ioctl_access_cache: FifoCache::with_capacity(ioctl_access_cache_capacity),
             delegate,
         }
     }
 
-    /// Returns true if the cache has reached capacity.
+    /// Returns true if the main access decision cache has reached capacity.
     #[cfg(test)]
-    fn is_full(&self) -> bool {
+    fn access_cache_is_full(&self) -> bool {
         self.access_cache.is_full()
+    }
+
+    /// Returns true if the ioctl access decision cache has reached capacity.
+    #[cfg(test)]
+    fn ioctl_access_cache_is_full(&self) -> bool {
+        self.ioctl_access_cache.is_full()
     }
 }
 
@@ -353,17 +433,47 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
             fs_node_name,
         )
     }
+
+    fn compute_ioctl_access_decision(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        let query_args = IoctlAccessQueryArgs {
+            source_sid,
+            target_sid,
+            target_class: target_class.clone(),
+            ioctl_prefix,
+        };
+        if let Some(result) = self.ioctl_access_cache.get(&query_args) {
+            return result.clone();
+        }
+
+        let ioctl_access_decision = self.delegate.compute_ioctl_access_decision(
+            source_sid,
+            target_sid,
+            target_class,
+            ioctl_prefix,
+        );
+
+        self.ioctl_access_cache.insert(query_args, ioctl_access_decision.clone());
+
+        ioctl_access_decision
+    }
 }
 
 impl<D> HasCacheStats for FifoQueryCache<D> {
     fn cache_stats(&self) -> CacheStats {
-        self.access_cache.cache_stats()
+        &self.access_cache.cache_stats() + &self.ioctl_access_cache.cache_stats()
     }
 }
 
 impl<D> ResetMut for FifoQueryCache<D> {
     fn reset(&mut self) -> bool {
         self.access_cache = FifoCache::with_capacity(self.access_cache.capacity());
+        self.ioctl_access_cache = FifoCache::with_capacity(self.ioctl_access_cache.capacity());
         true
     }
 }
@@ -424,6 +534,21 @@ impl<D: QueryMut> Query for Locked<D> {
             target_sid,
             fs_node_class,
             fs_node_name,
+        )
+    }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        self.delegate.lock().compute_ioctl_access_decision(
+            source_sid,
+            target_sid,
+            target_class,
+            ioctl_prefix,
         )
     }
 }
@@ -506,6 +631,21 @@ impl<Q: Query> Query for Arc<Q> {
             fs_node_name,
         )
     }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        self.as_ref().compute_ioctl_access_decision(
+            source_sid,
+            target_sid,
+            target_class,
+            ioctl_prefix,
+        )
+    }
 }
 
 impl<R: Reset> Reset for Arc<R> {
@@ -551,6 +691,20 @@ impl<Q: Query> Query for Weak<Q> {
             fs_node_class,
             fs_node_name,
         )
+    }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        self.upgrade()
+            .map(|q| {
+                q.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
+            })
+            .unwrap_or(IoctlAccessDecision::DENY_ALL)
     }
 }
 
@@ -627,6 +781,21 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
             target_sid,
             fs_node_class,
             fs_node_name,
+        )
+    }
+
+    fn compute_ioctl_access_decision(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        self.delegate.compute_ioctl_access_decision(
+            source_sid,
+            target_sid,
+            target_class,
+            ioctl_prefix,
         )
     }
 }
@@ -727,7 +896,7 @@ mod testing {
 mod tests {
     use super::testing::*;
     use super::*;
-    use crate::policy::AccessVector;
+    use crate::policy::{AccessVector, XpermsBitmap};
     use crate::ObjectClass;
 
     use std::sync::atomic::AtomicUsize;
@@ -778,6 +947,22 @@ mod tests {
         ) -> Option<SecurityId> {
             unreachable!()
         }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            source_sid: SecurityId,
+            target_sid: SecurityId,
+            target_class: AbstractObjectClass,
+            ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            self.query_count.fetch_add(1, Ordering::Relaxed);
+            self.delegate.compute_ioctl_access_decision(
+                source_sid,
+                target_sid,
+                target_class,
+                ioctl_prefix,
+            )
+        }
     }
 
     impl<D: Reset> Reset for Counter<D> {
@@ -826,7 +1011,7 @@ mod tests {
             .allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
     }
 
     #[test]
@@ -834,7 +1019,7 @@ mod tests {
         let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         avc.reset();
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
 
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
@@ -847,10 +1032,10 @@ mod tests {
             .allow
         );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
 
         avc.reset();
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
     }
 
     #[test]
@@ -860,18 +1045,18 @@ mod tests {
         for sid in unique_sids(avc.access_cache.capacity()) {
             avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
-        assert_eq!(true, avc.is_full());
+        assert_eq!(true, avc.access_cache_is_full());
 
         avc.reset();
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
 
         for sid in unique_sids(avc.access_cache.capacity()) {
             avc.compute_access_decision(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
-        assert_eq!(true, avc.is_full());
+        assert_eq!(true, avc.access_cache_is_full());
 
         avc.reset();
-        assert_eq!(false, avc.is_full());
+        assert_eq!(false, avc.access_cache_is_full());
     }
 
     #[test]
@@ -884,13 +1069,13 @@ mod tests {
             A_TEST_SID.clone(),
             ObjectClass::Process.into(),
         );
-        assert!(!avc.is_full());
+        assert!(!avc.access_cache_is_full());
 
         // Fill the cache with new queries, which should evict the test query.
         for sid in unique_sids(avc.access_cache.capacity()) {
             avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
-        assert!(avc.is_full());
+        assert!(avc.access_cache_is_full());
 
         // Making the test query should result in another miss.
         let delegate_query_count = avc.delegate.query_count();
@@ -939,6 +1124,75 @@ mod tests {
             ObjectClass::Process.into(),
         );
         assert_eq!(1, avc.delegate.reset_count());
+    }
+
+    #[test]
+    fn access_vector_cache_ioctl_hit() {
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        assert_eq!(0, avc.delegate.query_count());
+        assert_eq!(
+            XpermsBitmap::NONE,
+            avc.compute_ioctl_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into(),
+                0x0,
+            )
+            .allow
+        );
+        assert_eq!(1, avc.delegate.query_count());
+        // The second request for the same key is a cache hit.
+        assert_eq!(
+            XpermsBitmap::NONE,
+            avc.compute_ioctl_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into(),
+                0x0
+            )
+            .allow
+        );
+        assert_eq!(1, avc.delegate.query_count());
+    }
+
+    #[test]
+    fn access_vector_cache_ioctl_miss() {
+        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+
+        // Make the test query, which will trivially miss.
+        avc.compute_ioctl_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+            0x0,
+        );
+
+        // Fill the ioctl cache with new queries, which should evict the test query.
+        for ioctl_prefix in 0x1..(1 + avc.ioctl_access_cache.capacity())
+            .try_into()
+            .expect("assumed that test ioctl cache capacity was < 255")
+        {
+            avc.compute_ioctl_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into(),
+                ioctl_prefix,
+            );
+        }
+        // Make sure that we've fulfilled at least one new cache miss since the original test query,
+        // and that the cache is now full.
+        assert!(avc.delegate.query_count() > 1);
+        assert!(avc.ioctl_access_cache_is_full());
+        let delegate_query_count = avc.delegate.query_count();
+
+        // Making the original test query again should result in another miss.
+        avc.compute_ioctl_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+            0x0,
+        );
+        assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 }
 
@@ -1014,6 +1268,16 @@ mod starnix_tests {
             _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!()
+        }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: AbstractObjectClass,
+            _ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            todo!()
         }
     }
 
@@ -1343,6 +1607,16 @@ mod starnix_tests {
             _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!()
+        }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: AbstractObjectClass,
+            _ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            todo!()
         }
     }
 
