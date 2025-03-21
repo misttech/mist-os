@@ -730,8 +730,8 @@ impl RootComponentInputBuilder {
             runner.name().clone(),
             Some(self.policy_checker.clone()),
             Arc::new(move |server_end, weak_component| {
-                let flags = fio::OpenFlags::empty();
-                let mut object_request = flags.to_object_request(server_end);
+                const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+                let mut object_request = FLAGS.to_object_request(server_end);
                 runner
                     .factory()
                     .clone()
@@ -739,7 +739,7 @@ impl RootComponentInputBuilder {
                         ScopedPolicyChecker::new(security_policy.clone(), weak_component.moniker),
                         OpenRequest::new(
                             execution_scope.clone(),
-                            flags,
+                            FLAGS,
                             Path::dot(),
                             &mut object_request,
                         ),
@@ -1608,7 +1608,7 @@ impl BuiltinEnvironment {
             let root = self.model.top_instance().root();
             let root = WeakComponentInstance::new(&root);
             scope.spawn(async move {
-                let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
+                let flags: fio::Flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into();
                 let mut object_request = flags.to_object_request(server_end);
                 object_request.wait_till_ready().await;
                 if let Ok(root) = root.upgrade() {
@@ -1801,11 +1801,12 @@ impl BuiltinEnvironment {
     async fn connect_to_tracing_from_exposed(&self) {
         let (trace_provider_proxy, server) = endpoints::create_proxy::<ftp::RegistryMarker>();
         let root = self.model.root();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+        let mut object_request = FLAGS.to_object_request(server);
         match root
             .open_exposed(OpenRequest::new(
                 root.execution_scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 ftp::RegistryMarker::PROTOCOL_NAME.try_into().unwrap(),
                 &mut object_request,
             ))

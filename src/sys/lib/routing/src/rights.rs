@@ -10,19 +10,6 @@ use moniker::ExtendedMoniker;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use std::fmt;
 
-/// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.
-const LEGACY_READABLE_RIGHTS: fio::Operations = fio::Operations::empty()
-    .union(fio::Operations::READ_BYTES)
-    .union(fio::Operations::GET_ATTRIBUTES)
-    .union(fio::Operations::TRAVERSE)
-    .union(fio::Operations::ENUMERATE);
-
-/// All the fio rights required to represent fio::OpenFlags::RIGHT_WRITABLE.
-const LEGACY_WRITABLE_RIGHTS: fio::Operations = fio::Operations::empty()
-    .union(fio::Operations::WRITE_BYTES)
-    .union(fio::Operations::UPDATE_ATTRIBUTES)
-    .union(fio::Operations::MODIFY_DIRECTORY);
-
 /// Performs rights validation for a routing step
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(super) struct RightsWalker {
@@ -40,31 +27,16 @@ impl RightsWalker {
     }
 }
 
-impl Rights {
-    /// Converts new fuchsia.io directory rights to legacy fuchsia.io compatible rights. This will
-    /// be remove once new rights are supported by component manager.
-    pub fn into_legacy(&self) -> fio::OpenFlags {
-        let mut flags = fio::OpenFlags::empty();
-        let Self(rights) = self;
-        // The `intersects` below is intentional. The translation from io2 to io rights is lossy
-        // in the sense that a single io2 right may require an io right with coarser permissions.
-        if rights.intersects(LEGACY_READABLE_RIGHTS) {
-            flags |= fio::OpenFlags::RIGHT_READABLE;
-        }
-        if rights.intersects(LEGACY_WRITABLE_RIGHTS) {
-            flags |= fio::OpenFlags::RIGHT_WRITABLE;
-        }
-        if rights.contains(fio::Operations::EXECUTE) {
-            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-        }
-        flags
-    }
-}
-
 /// Allows creating rights from fio::Operations.
 impl From<fio::Operations> for Rights {
     fn from(rights: fio::Operations) -> Self {
         Rights(rights)
+    }
+}
+
+impl From<Rights> for fio::Flags {
+    fn from(rights: Rights) -> Self {
+        fio::Flags::from_bits_retain(rights.0.bits())
     }
 }
 
@@ -140,15 +112,12 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
 
-    /// All the fio rights required to represent fio::OpenFlags::RIGHT_EXECUTABLE.
-    const LEGACY_EXECUTABLE_RIGHTS: fio::Operations = fio::Operations::EXECUTE;
-
     #[test]
     fn validate_next() {
         assert_matches!(
             RightsWalker::new(fio::Operations::empty(), ExtendedMoniker::ComponentManager)
                 .validate_next(&RightsWalker::new(
-                    LEGACY_READABLE_RIGHTS,
+                    fio::R_STAR_DIR,
                     ExtendedMoniker::ComponentManager
                 )),
             Ok(())
@@ -158,19 +127,16 @@ mod tests {
                 fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES,
                 ExtendedMoniker::ComponentManager
             )
-            .validate_next(&RightsWalker::new(
-                LEGACY_READABLE_RIGHTS,
-                ExtendedMoniker::ComponentManager
-            )),
+            .validate_next(&RightsWalker::new(fio::R_STAR_DIR, ExtendedMoniker::ComponentManager)),
             Ok(())
         );
         let provided = fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES;
         assert_eq!(
-            RightsWalker::new(LEGACY_READABLE_RIGHTS, ExtendedMoniker::ComponentManager)
+            RightsWalker::new(fio::R_STAR_DIR, ExtendedMoniker::ComponentManager)
                 .validate_next(&RightsWalker::new(provided, ExtendedMoniker::ComponentManager)),
             Err(RightsRoutingError::Invalid {
                 moniker: ExtendedMoniker::ComponentManager,
-                requested: Rights::from(LEGACY_READABLE_RIGHTS),
+                requested: Rights::from(fio::R_STAR_DIR),
                 provided: Rights::from(provided),
             })
         );
@@ -183,63 +149,6 @@ mod tests {
                 requested: Rights::from(fio::Operations::WRITE_BYTES),
                 provided: Rights::from(provided),
             })
-        );
-    }
-
-    #[test]
-    fn into_legacy() {
-        assert_eq!(
-            Rights::from(LEGACY_READABLE_RIGHTS).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-        );
-        assert_eq!(
-            Rights::from(LEGACY_WRITABLE_RIGHTS).into_legacy(),
-            fio::OpenFlags::RIGHT_WRITABLE
-        );
-        assert_eq!(
-            Rights::from(LEGACY_EXECUTABLE_RIGHTS).into_legacy(),
-            fio::OpenFlags::RIGHT_EXECUTABLE
-        );
-        assert_eq!(
-            Rights::from(LEGACY_READABLE_RIGHTS | LEGACY_WRITABLE_RIGHTS).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
-        );
-        assert_eq!(
-            Rights::from(
-                LEGACY_READABLE_RIGHTS | LEGACY_WRITABLE_RIGHTS | LEGACY_EXECUTABLE_RIGHTS
-            )
-            .into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::READ_BYTES).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::GET_ATTRIBUTES).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::TRAVERSE).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::ENUMERATE).into_legacy(),
-            fio::OpenFlags::RIGHT_READABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::WRITE_BYTES).into_legacy(),
-            fio::OpenFlags::RIGHT_WRITABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::UPDATE_ATTRIBUTES).into_legacy(),
-            fio::OpenFlags::RIGHT_WRITABLE
-        );
-        assert_eq!(
-            Rights::from(fio::Operations::MODIFY_DIRECTORY).into_legacy(),
-            fio::OpenFlags::RIGHT_WRITABLE
         );
     }
 }
