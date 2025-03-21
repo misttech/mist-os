@@ -1543,4 +1543,70 @@ TEST(StreamTestCase, NoStreamFromContiguousOrPhysicalVmo) {
   EXPECT_EQ(0, content_size);
 }
 
+// Tests that when reducing the stream size, the range between the old and new stream size can not
+// have a mapping snuck in, which would allow memory accesses past the stream size without a fault
+// in a FAULT_BEYOND_STREAM_SIZE mapping.
+TEST(StreamTestCase, FaultBeyondStreamSizeResizeDownRace) {
+  constexpr size_t kNumIterations = 100;
+
+  constexpr size_t kTestPages = 8;
+  const size_t kPageSize = zx_system_get_page_size();
+  const size_t kVmoSize = kTestPages * kPageSize;
+  const size_t kTestOffset = kVmoSize / 2;
+
+  zx::vmo vmo;
+
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
+
+  zx_vaddr_t vaddr;
+  ASSERT_OK(zx::vmar::root_self()->map(
+      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS | ZX_VM_FAULT_BEYOND_STREAM_SIZE, 0,
+      vmo, 0, kVmoSize, &vaddr));
+
+  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(vaddr, kVmoSize); });
+
+  for (size_t i = 0; i < kNumIterations; i++) {
+    vmo.set_stream_size(kVmoSize);
+    EXPECT_OK(vmo.write(&vaddr, kTestOffset, sizeof(vaddr)));
+
+    pager_tests::TestThread set_thread([&]() -> bool {
+      EXPECT_OK(vmo.write(&vaddr, kTestOffset, sizeof(vaddr)));
+      EXPECT_OK(vmo.set_stream_size(0));
+      return true;
+    });
+
+    std::atomic<bool> terminate = false;
+    pager_tests::TestThread read_spam([&]() -> bool {
+      while (!terminate) {
+        volatile uint64_t* test_addr = reinterpret_cast<volatile uint64_t*>(vaddr + kTestOffset);
+        if (*test_addr == 42) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    pager_tests::TestThread fault_thread([&]() -> bool {
+      volatile uint64_t* test_addr = reinterpret_cast<volatile uint64_t*>(vaddr + kTestOffset);
+      if (*test_addr != 0) {
+        return true;
+      }
+      return true;
+    });
+
+    // Interleave read & reduce stream size.
+    ASSERT_TRUE(read_spam.Start());
+    ASSERT_TRUE(set_thread.Start());
+
+    // Let read & resize finish.
+    ASSERT_TRUE(set_thread.Wait());
+    terminate = true;
+    read_spam.WaitForAnyCrash();
+
+    // A read now should fault.
+    ASSERT_TRUE(fault_thread.Start());
+    ASSERT_TRUE(fault_thread.WaitForCrash(vaddr + kTestOffset, ZX_ERR_OUT_OF_RANGE));
+  }
+}
+
 }  // namespace

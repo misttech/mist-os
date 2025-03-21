@@ -156,6 +156,11 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
     options |= ZX_VM_CAN_MAP_EXECUTE;
   }
 
+  // Allow faults flag must be used if creating a mapping that can fault.
+  if ((options & ZX_VM_FAULT_BEYOND_STREAM_SIZE) && !(options & ZX_VM_ALLOW_FAULTS)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   zx::result<VmAddressRegionDispatcher::MapResult> map_result =
       vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options);
   if (map_result.is_error()) {
@@ -190,6 +195,7 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
   return ZX_OK;
 }
+
 }  // namespace
 
 // zx_status_t zx_vmar_map
@@ -212,6 +218,14 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
   status = up->handle_table().GetDispatcherAndRights(*up, vmo_handle, &vmo, &vmo_rights);
   if (status != ZX_OK) {
     return status;
+  }
+
+  // Allocate CSM if creating a fault-beyond-stream-size mapping.
+  if (options & ZX_VM_FAULT_BEYOND_STREAM_SIZE) {
+    status = vmo->content_size_manager().status_value();
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
   return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, vmo->vmo(), vmo_offset,

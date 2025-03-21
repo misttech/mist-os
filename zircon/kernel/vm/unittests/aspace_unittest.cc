@@ -595,6 +595,7 @@ static bool vmaspace_merge_mapping_test() {
   enum MmuFlags { FLAG_TYPE_1, FLAG_TYPE_2 };
   enum MarkMerge { MERGE, NO_MERGE };
   enum MergeResult { MERGES_LEFT, DOES_NOT_MERGE };
+  enum BeyondStreamSize { OK, FAULT };
 
   // To avoid boilerplate declare some tests in a data driven way.
   struct {
@@ -603,37 +604,48 @@ static bool vmaspace_merge_mapping_test() {
       fbl::RefPtr<VmObjectPaged> vmo;
       uint64_t vmo_offset;
       MmuFlags flags;
+      BeyondStreamSize beyond_stream_size;
       MergeResult merge_result;
+
     } mappings[3];
   } cases[] = {
       // Simple two mapping merge
-      {{{0, vmo1, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, MERGES_LEFT},
+      {{{0, vmo1, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, MERGES_LEFT},
         {}}},
       // Simple three mapping merge
-      {{{0, vmo1, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, MERGES_LEFT},
-        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, MERGES_LEFT}}},
+      {{{0, vmo1, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, MERGES_LEFT},
+        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, OK, MERGES_LEFT}}},
       // Different mapping flags should block merge
-      {{{0, vmo1, 0, FLAG_TYPE_2, DOES_NOT_MERGE},
-        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, MERGES_LEFT}}},
+      {{{0, vmo1, 0, FLAG_TYPE_2, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, OK, MERGES_LEFT}}},
       // Discontiguous aspace, but contiguous vmo should not work.
-      {{{0, vmo1, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE * 2, vmo1, PAGE_SIZE, FLAG_TYPE_1, DOES_NOT_MERGE},
+      {{{0, vmo1, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE * 2, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
         {}}},
       // Similar discontiguous vmo, but contiguous aspace should not work.
-      {{{0, vmo1, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, DOES_NOT_MERGE},
+      {{{0, vmo1, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
         {}}},
       // Leaving a contiguous hole also does not work, mapping needs to actually join.
-      {{{0, vmo1, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, DOES_NOT_MERGE},
+      {{{0, vmo1, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
         {}}},
       // Different vmo should not work.
-      {{{0, vmo2, 0, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, DOES_NOT_MERGE},
-        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, MERGES_LEFT}}},
+      {{{0, vmo2, 0, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {PAGE_SIZE * 2, vmo1, PAGE_SIZE * 2, FLAG_TYPE_1, OK, MERGES_LEFT}}},
+      // Two fault-beyond-stream-size mapping merge
+      {{{0, vmo1, 0, FLAG_TYPE_1, FAULT, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, FAULT, MERGES_LEFT},
+        {}}},
+      // Can't merge adjacent mappings if only one has fault-beyond-stream-size.
+      {{{0, vmo1, 0, FLAG_TYPE_1, FAULT, DOES_NOT_MERGE},
+        {PAGE_SIZE, vmo1, PAGE_SIZE, FLAG_TYPE_1, OK, DOES_NOT_MERGE},
+        {}}},
+
   };
 
   for (auto& test : cases) {
@@ -658,20 +670,23 @@ static bool vmaspace_merge_mapping_test() {
           if (test.mappings[i].vmo) {
             uint mmu_flags = ARCH_MMU_FLAG_PERM_READ |
                              (test.mappings[i].flags == FLAG_TYPE_1 ? ARCH_MMU_FLAG_PERM_WRITE : 0);
+            uint vmar_flags = VMAR_FLAG_SPECIFIC | (test.mappings[i].beyond_stream_size == FAULT
+                                                        ? VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE
+                                                        : 0);
             if (use_subvmar[i]) {
               ASSERT_OK(vmar->CreateSubVmar(test.mappings[i].vmar_offset, PAGE_SIZE, 0,
                                             VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC |
                                                 VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE,
                                             "sub vmar", &vmars[i]));
-              auto map_result = vmars[i]->CreateVmMapping(
-                  0, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC, test.mappings[i].vmo,
-                  test.mappings[i].vmo_offset, mmu_flags, "test mapping");
+              auto map_result =
+                  vmars[i]->CreateVmMapping(0, PAGE_SIZE, 0, vmar_flags, test.mappings[i].vmo,
+                                            test.mappings[i].vmo_offset, mmu_flags, "test mapping");
               ASSERT_OK(map_result.status_value());
               mappings[i] = ktl::move(map_result->mapping);
             } else {
               auto map_result = vmar->CreateVmMapping(
-                  test.mappings[i].vmar_offset, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC,
-                  test.mappings[i].vmo, test.mappings[i].vmo_offset, mmu_flags, "test mapping");
+                  test.mappings[i].vmar_offset, PAGE_SIZE, 0, vmar_flags, test.mappings[i].vmo,
+                  test.mappings[i].vmo_offset, mmu_flags, "test mapping");
               ASSERT_OK(map_result.status_value());
               mappings[i] = ktl::move(map_result->mapping);
             }

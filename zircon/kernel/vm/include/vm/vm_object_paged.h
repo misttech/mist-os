@@ -95,6 +95,25 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return user_content_size_->GetContentSize();
   }
 
+  // Calculates the minimum of the VMO size and the page-aligned user content size.
+  ktl::optional<uint64_t> saturating_content_size_locked() TA_REQ(lock()) {
+    if (!user_content_size_) {
+      return ktl::nullopt;
+    }
+
+    uint64_t user_content_size = user_content_size_->GetContentSize();
+    uint64_t vmo_size = size_locked();
+
+    // If user content size is larger, trim to the VMO.
+    // TODO(https://fxbug.dev/380960681): remove check when stream size <= VMO size invariant is
+    // enforced.
+    if (user_content_size > vmo_size) {
+      return vmo_size;
+    }
+
+    return ROUNDUP_PAGE_SIZE(user_content_size);
+  }
+
   bool is_contiguous() const override { return (options_ & kContiguous); }
   bool is_resizable() const override { return (options_ & kResizable); }
   bool is_discardable() const override { return (options_ & kDiscardable); }

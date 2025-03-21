@@ -65,6 +65,7 @@ zx_status_t split_syscall_flags(uint32_t flags, uint32_t* vmar_flags, uint* arch
   vmar |= ExtractFlag<ZX_VM_REQUIRE_NON_RESIZABLE, VMAR_FLAG_REQUIRE_NON_RESIZABLE>(&flags);
   vmar |= ExtractFlag<ZX_VM_ALLOW_FAULTS, VMAR_FLAG_ALLOW_FAULTS>(&flags);
   vmar |= ExtractFlag<ZX_VM_OFFSET_IS_UPPER_LIMIT, VMAR_FLAG_OFFSET_IS_UPPER_LIMIT>(&flags);
+  vmar |= ExtractFlag<ZX_VM_FAULT_BEYOND_STREAM_SIZE, VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE>(&flags);
 
   if (flags & ((1u << ZX_VM_ALIGN_BASE) - 1u)) {
     return ZX_ERR_INVALID_ARGS;

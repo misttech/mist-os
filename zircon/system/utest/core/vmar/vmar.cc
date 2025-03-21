@@ -2828,4 +2828,337 @@ TEST(Vmar, Prefetch) {
   EXPECT_OK(vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size() * 2, nullptr, 0));
 }
 
+// Tests general functionality of mapping a VMO with ZX_VM_FAULT_BEYOND_STREAM_SIZE option.
+TEST(Vmar, FaultBeyondStreamSize) {
+  // 6 page VMAR.
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 6, &vmar, &vmar_addr));
+
+  // Unbounded VMO with stream size of 3 pages.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 3, ZX_VMO_UNBOUNDED, &vmo));
+
+  uint64_t stream_size = 0;
+  uint64_t vmo_size = 0;
+
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 3);
+  EXPECT_OK(vmo.get_size(&vmo_size));
+  EXPECT_GT(vmo_size, stream_size);
+
+  // ZX_VM_ALLOW_FAULTS is required with ZX_VM_FAULT_BEYOND_STREAM_SIZE.
+  zx_vaddr_t addr;
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                                              ZX_VM_FAULT_BEYOND_STREAM_SIZE,
+                                          0, vmo, 0, zx_system_get_page_size() * 4, &addr));
+
+  // 4 page, fault-beyond-stream-size mapping.
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                         ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                     0, vmo, 0, zx_system_get_page_size() * 4, &addr));
+
+  // Memory access within stream size is OK.
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr)));
+
+  // Memory access inside mapping but outside of stream size should fault.
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "write");
+
+  // Write to the first 4 pages of the VMO (one page outside of the stream size).
+  char buffer1[zx_system_get_page_size() * 4];
+  memset(buffer1, 0, zx_system_get_page_size() * 4);
+  EXPECT_OK(vmo.write(buffer1, 0, zx_system_get_page_size() * 4));
+
+  char vmo_buffer1[zx_system_get_page_size() * 4];
+  EXPECT_OK(vmo.read(vmo_buffer1, 0, zx_system_get_page_size() * 4));
+  EXPECT_BYTES_EQ(buffer1, vmo_buffer1, zx_system_get_page_size() * 4);
+
+  // Should still fault beyond stream size.
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  // Pages still in VMO.
+  EXPECT_OK(vmo.read(vmo_buffer1, 0, zx_system_get_page_size() * 4));
+  EXPECT_BYTES_EQ(buffer1, vmo_buffer1, zx_system_get_page_size() * 4);
+
+  // Can write from mapping.
+  EXPECT_OK(probe_for_write(reinterpret_cast<void*>(addr)));
+
+  // Reduce stream size to 2.
+  vmo.set_stream_size(2 * _zx_system_get_page_size());
+
+  // Range in between old & new stream size should now fault.
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "write");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  // Unbounded VMO with stream size of 0.5 pages.
+  zx::vmo vmo2;
+  ASSERT_OK(zx::vmo::create((zx_system_get_page_size() / 2), ZX_VMO_UNBOUNDED, &vmo2));
+
+  EXPECT_OK(vmo2.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() / 2);
+  EXPECT_OK(vmo2.get_size(&vmo_size));
+  EXPECT_GT(vmo_size, stream_size);
+
+  // Can't overwrite mapping without overwrite flag.
+  zx_vaddr_t addr2;
+  EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, vmar.map(ZX_VM_PERM_READ | ZX_VM_SPECIFIC |
+                                                ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                                            0, vmo2, 0, zx_system_get_page_size() * 2, &addr2));
+
+  // 2 page mapping with overwrite and no write perms, will overwrite first 2 pages of existing 4
+  // page mapping.
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_SPECIFIC_OVERWRITE | ZX_VM_FAULT_BEYOND_STREAM_SIZE |
+                         ZX_VM_ALLOW_FAULTS,
+                     0, vmo2, 0, zx_system_get_page_size() * 2, &addr2));
+
+  // Check that the previous mapping was overwritten & can no longer write.
+  EXPECT_EQ(addr, addr2);
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(addr)), ZX_ERR_ACCESS_DENIED, "write");
+
+  // Memory accesses are ok before the stream size and past the stream size but on the page
+  // containing the stream size.
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr2)));
+  EXPECT_OK(probe_for_read(
+      reinterpret_cast<void*>(addr2 + zx_system_get_page_size() - sizeof(zx_vaddr_t))));
+
+  // Memory accesses on pages past the stream-size containing page fault.
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr2 + zx_system_get_page_size())),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  vmar.destroy();
+
+  // Fresh, 6 page VMAR.
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 6, &vmar, &vmar_addr));
+
+  // Unbounded VMO with stream size of 2 pages.
+  zx::vmo vmo3;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 2, ZX_VMO_UNBOUNDED, &vmo3));
+
+  EXPECT_OK(vmo3.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 2);
+  EXPECT_OK(vmo3.get_size(&vmo_size));
+  EXPECT_GT(vmo_size, stream_size);
+
+  // Write to first 4 pages of VMO.
+  char buffer3[zx_system_get_page_size() * 4];
+  memset(buffer3, 0, zx_system_get_page_size() * 4);
+  EXPECT_OK(vmo3.write(buffer3, 0, zx_system_get_page_size() * 4));
+
+  char vmo_buffer3[zx_system_get_page_size() * 4];
+  EXPECT_OK(vmo3.read(vmo_buffer3, 0, zx_system_get_page_size() * 4));
+  EXPECT_BYTES_EQ(buffer3, vmo_buffer3, zx_system_get_page_size() * 4);
+
+  // 6 Page mapping of VMO.
+  zx_vaddr_t addr3;
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                         ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                     0, vmo3, 0, zx_system_get_page_size() * 6, &addr3));
+
+  // Should fault beyond stream size even though VMO has pages.
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr3 + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  // Increase stream size to 4 pages & check memory access in new range.
+  vmo3.set_stream_size(_zx_system_get_page_size() * 4);
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr3 + (2 * zx_system_get_page_size()))));
+
+  // Decrease back to 2 pages, which should cause that range to fault.
+  vmo3.set_stream_size(_zx_system_get_page_size() * 2);
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr3 + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  vmar.destroy();
+}
+
+// Tests that reducing the stream size will remove mappings & the range between the new (smaller)
+// stream size and the old (larger) stream size continues to fault.
+TEST(Vmar, FaultBeyondReducedStreamSize) {
+  // 6 page VMAR.
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 6, &vmar, &vmar_addr));
+
+  // Unbounded VMO with stream size of 5 pages.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 5, ZX_VMO_UNBOUNDED, &vmo));
+
+  zx_vaddr_t addr;
+
+  // 6 page, fault-beyond-stream-size mapping.
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                         ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                     0, vmo, 0, zx_system_get_page_size() * 6, &addr));
+
+  // Write to 5 pages using the mapping address.
+  *reinterpret_cast<uint64_t*>(addr) = 0xdeadbeef;
+  *reinterpret_cast<uint64_t*>(addr + zx_system_get_page_size()) = 0xdeadbeef;
+  *reinterpret_cast<uint64_t*>(addr + (2 * zx_system_get_page_size())) = 0xdeadbeef;
+  *reinterpret_cast<uint64_t*>(addr + (3 * zx_system_get_page_size())) = 0xdeadbeef;
+  *reinterpret_cast<uint64_t*>(addr + (4 * zx_system_get_page_size())) = 0xdeadbeef;
+
+  // Write on last page (beyond stream size) should fault
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(addr + (5 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "write");
+
+  // Check some pages in VMO.
+  uint64_t val;
+  EXPECT_OK(vmo.read(&val, 0, sizeof(uint64_t)));
+  EXPECT_EQ(0xdeadbeef, val);
+  EXPECT_OK(vmo.read(&val, 4 * zx_system_get_page_size(), sizeof(uint64_t)));
+  EXPECT_EQ(0xdeadbeef, val);
+
+  // Size stream down -1 page, which should cause trimmed page to fault.
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr + (4 * zx_system_get_page_size()))),
+            "read");
+  vmo.set_stream_size(4 * zx_system_get_page_size());
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (4 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  // Write data to the end of the 4th page.
+  *reinterpret_cast<uint64_t*>(addr + (4 * zx_system_get_page_size() - sizeof(uint64_t))) =
+      0xdeadbeef;
+
+  // Size stream down -0.5 pages, which should not cause the trimmed page to fault.
+  vmo.set_stream_size((3 * zx_system_get_page_size()) + zx_system_get_page_size() / 2);
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))));
+
+  // Trimmed part of full page should be zeroed in VMO.
+  EXPECT_OK(vmo.read(&val, (3 * zx_system_get_page_size() + (zx_system_get_page_size() / 2)),
+                     sizeof(uint64_t)));
+  EXPECT_EQ(0, val);
+  // Page containing stream size should retain data within the stream size.
+  EXPECT_OK(vmo.read(&val, 3 * zx_system_get_page_size(), sizeof(uint64_t)));
+  EXPECT_EQ(0xdeadbeef, val);
+  // Data passed the trimmed stream size but on the same should be zeroed, even though it doesn't
+  // fault.
+  EXPECT_OK(vmo.read(&val, (4 * zx_system_get_page_size()) - sizeof(uint64_t), sizeof(uint64_t)));
+  EXPECT_EQ(0, val);
+
+  // Use legacy set_prop_content_size to resize the stream size down to 2 pages (trimming 1.5
+  // pages) and check that the trimmed pages fault.
+  EXPECT_OK(vmo.set_prop_content_size(2 * _zx_system_get_page_size()));
+
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  // First two pages ok.
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr + zx_system_get_page_size())), "read");
+  EXPECT_OK(probe_for_read(reinterpret_cast<void*>(addr)), "read");
+
+  vmar.destroy();
+
+  // 4 page VMAR.
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 4, &vmar, &vmar_addr));
+
+  // 4 page VMO without unbounded flag.
+  zx::vmo vmo_bounded;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 4, 0u, &vmo_bounded));
+
+  // Map whole VMO.
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                         ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                     0, vmo_bounded, 0, zx_system_get_page_size() * 4, &addr));
+
+  // Reduce stream size to 2 pages.
+  vmo_bounded.set_stream_size(_zx_system_get_page_size() * 2);
+
+  // Write to all pages.
+  char buffer[zx_system_get_page_size() * 4];
+  memset(buffer, 1, zx_system_get_page_size() * 4);
+  EXPECT_OK(vmo.write(buffer, 0, zx_system_get_page_size() * 4));
+
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (3 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+}
+
+// Test zx_vmar_op_range operations on a ZX_VM_FAULT_BEYOND_STREAM_SIZE mapping.
+TEST(Vmar, FaultBeyondStreamSizeRange) {
+  // 6 page VMAR.
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 6, &vmar, &vmar_addr));
+
+  // Unbounded VMO with stream size of 2 pages.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * 2, ZX_VMO_UNBOUNDED, &vmo));
+
+  // Write to 4 pages of VMO (2 pages past the stream size).
+  char buffer[zx_system_get_page_size() * 4];
+  memset(buffer, 1, zx_system_get_page_size() * 4);
+  EXPECT_OK(vmo.write(buffer, 0, zx_system_get_page_size() * 4));
+
+  char vmo_buffer[zx_system_get_page_size() * 4];
+  EXPECT_OK(vmo.read(vmo_buffer, 0, zx_system_get_page_size() * 4));
+  EXPECT_BYTES_EQ(buffer, vmo_buffer, zx_system_get_page_size() * 4);
+
+  zx_vaddr_t addr;
+
+  // 6 page mapping of VMO with ZX_VM_MAP_RANGE option.
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                         ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS | ZX_VM_MAP_RANGE,
+                     0, vmo, 0, zx_system_get_page_size() * 6, &addr));
+
+  // Prefetch, commit and decommit should fail with out-of-range error as gaps are not allowed.
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size() * 3, nullptr, 0));
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmar.op_range(ZX_VMAR_OP_COMMIT, addr, zx_system_get_page_size() * 3, nullptr, 0));
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "read");
+  EXPECT_STATUS(probe_for_write(reinterpret_cast<void*>(addr + (2 * zx_system_get_page_size()))),
+                ZX_ERR_OUT_OF_RANGE, "write");
+
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE,
+            vmar.op_range(ZX_VMAR_OP_DECOMMIT, addr, zx_system_get_page_size() * 3, nullptr, 0));
+  EXPECT_OK(vmo.read(vmo_buffer, 0, zx_system_get_page_size() * 4));
+  EXPECT_BYTES_EQ(buffer, vmo_buffer, zx_system_get_page_size() * 4);
+
+  // Can prefetch, commit and decommit up to the stream size.
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_PREFETCH, addr, zx_system_get_page_size() * 2, nullptr, 0));
+
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_COMMIT, addr, zx_system_get_page_size() * 2, nullptr, 0));
+
+  EXPECT_OK(vmar.op_range(ZX_VMAR_OP_DECOMMIT, addr, zx_system_get_page_size() * 2, nullptr, 0));
+
+  // Out of range error when op length length = stream length, but not from start of mapping.
+  EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmar.op_range(ZX_VMAR_OP_COMMIT, addr + zx_system_get_page_size(),
+                                               zx_system_get_page_size() * 2, nullptr, 0));
+
+  char buffer_half[zx_system_get_page_size() * 4];
+  memset(buffer_half, 1, zx_system_get_page_size() * 4);
+  char zero_buffer_half[zx_system_get_page_size() * 2];
+  memset(zero_buffer_half, 0, zx_system_get_page_size() * 2);
+
+  char vmo_buffer_half[zx_system_get_page_size() * 2];
+  EXPECT_OK(vmo.read(vmo_buffer_half, 0, zx_system_get_page_size() * 2));
+  EXPECT_BYTES_EQ(vmo_buffer_half, zero_buffer_half, zx_system_get_page_size() * 2);
+
+  EXPECT_OK(
+      vmo.read(vmo_buffer_half, zx_system_get_page_size() * 2, zx_system_get_page_size() * 2));
+  EXPECT_BYTES_EQ(vmo_buffer_half, buffer_half, zx_system_get_page_size() * 2);
+}
+
 }  // namespace
