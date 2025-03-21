@@ -146,7 +146,7 @@ def main() -> int:
     # to regenerate `availability_levels_file_path` twice but would include a
     # preprocessor condition in the production code. Do the same for the Rust
     # macros.
-    sysroot_api_file = "zircon/public/sysroot/sdk/sysroot.api"
+    sysroot_api_file = "zircon/public/sysroot_sdk/sysroot.api"
     if not _update_availability_levels(
         new_level, args.availability_levels_file_path
     ):

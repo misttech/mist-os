@@ -153,12 +153,12 @@ review procedures.
 
 #### sysroot.api
 
-For the C library, [`sysroot.api`](/zircon/public/sysroot/sdk/sysroot.api) is
+For the C library, [`sysroot.api`](/zircon/public/sysroot_sdk/sysroot.api) is
 the file that must be updated.  This will usually happen incidentally in a
 build.  But it can always be checked explicitly with:
 
 ```shell
-fx build //zircon/public/sysroot/sdk:sysroot_sdk
+fx build //zircon/public/sysroot_sdk
 ```
 
 This will fail for any changes by default.  To update it in the source tree,
@@ -317,7 +317,7 @@ The precise details for each step are:
       ```
    3. Update your local build, with whatever you usually do, or:
       ```shell
-      fx build //zircon/public/sysroot/sdk:sysroot_sdk
+      fx build //zircon/public/sysroot_sdk
       ```
       This should modify the `llvm-libc-golden` files in the source tree,
       and perhaps also the `llvm-libc-generated.json` file.
