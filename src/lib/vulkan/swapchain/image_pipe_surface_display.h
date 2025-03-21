@@ -19,6 +19,7 @@
 
 #include "src/lib/vulkan/swapchain/display_coordinator_listener.h"
 #include "src/lib/vulkan/swapchain/image_pipe_surface.h"
+#include "vulkan/vulkan_core.h"
 
 namespace image_pipe_swapchain {
 
@@ -35,7 +36,8 @@ class ImagePipeSurfaceDisplay final
 
   bool CreateImage(VkDevice device, VkLayerDispatchTable* pDisp, VkFormat format,
                    VkImageUsageFlags usage, VkSwapchainCreateFlagsKHR swapchain_flags,
-                   VkExtent2D extent, uint32_t image_count, const VkAllocationCallbacks* pAllocator,
+                   VkExtent2D extent, uint32_t image_count, VkCompositeAlphaFlagBitsKHR alpha_flags,
+                   const VkAllocationCallbacks* pAllocator,
                    std::vector<ImageInfo>* image_info_out) override;
 
   bool CanPresentPendingImage() override { return false; }

@@ -275,7 +275,8 @@ VkResult ImagePipeSwapchain::Initialize(VkDevice device,
   std::vector<ImagePipeSurface::ImageInfo> image_infos;
 
   if (!surface_->CreateImage(device, pDisp, pCreateInfo->imageFormat, usage, pCreateInfo->flags,
-                             pCreateInfo->imageExtent, num_images, pAllocator, &image_infos)) {
+                             pCreateInfo->imageExtent, num_images, pCreateInfo->compositeAlpha,
+                             pAllocator, &image_infos)) {
     return VK_ERROR_OUT_OF_DEVICE_MEMORY;
   }
   for (uint32_t i = 0; i < num_images; i++) {
@@ -702,7 +703,7 @@ GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfa
   pSurfaceCapabilities->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
   pSurfaceCapabilities->maxImageArrayLayers = 1;
   pSurfaceCapabilities->supportedUsageFlags = image_pipe_surface->SupportedUsage();
-  pSurfaceCapabilities->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  pSurfaceCapabilities->supportedCompositeAlpha = ImagePipeSurface::SupportedAlphaFlags();
   return VK_SUCCESS;
 }
 
