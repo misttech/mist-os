@@ -356,10 +356,7 @@ template("sdk_static_library") {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_prebuilt_meta_file.py"
 
-    inputs = sdk_metas + [
-               "//build/cpp/binaries.py",
-               "//build/images/elfinfo.py",
-             ]
+    inputs = sdk_metas
 
     outputs = [ metadata_file ]
 
