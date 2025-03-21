@@ -24,8 +24,8 @@ import("//build/zbi/zbi.gni")
 declare_args() {
   # These remain only to allow for a soft-transition with developer's
   # local args.gn files.
-  base_package_labels = []
-  cache_package_labels = []
+  base_package_labels = false
+  cache_package_labels = false
 
   # If you add package labels to this variable, the packages will be included
   # in the 'universe' package set, which represents all software that is
@@ -134,11 +134,27 @@ assert(
     current_toolchain == default_toolchain,
     "The root build file (//BUILD.gn) can only be processed in the `default_toolchain`.")
 
-if (base_package_labels != [] || cache_package_labels != []) {
+# Detect if base_package_labels or cache_package_labels have been set to _some_
+# value via 'args.gn'
+if (base_package_labels != false || cache_package_labels != false) {
+  # Error out if they have any contents.
+  error_out_build =
+      (base_package_labels != false && base_package_labels != []) ||
+      (cache_package_labels != false && cache_package_labels != [])
+  print()
+  if (error_out_build) {
+    print(
+        "ERROR:  The 'base_package_labels' and 'cache_package_labels' GN build arguments")
+    print("          are being removed and can no longer be used.")
+  } else {
+    print(
+        "WARNING:  The 'base_package_labels' and 'cache_package_labels' GN build arguments")
+    print(
+        "          are being removed and need to be removed from your build configuration.")
+  }
   print()
   print(
-      "WARNING:  The 'base_package_labels' and 'cache_package_labels' GN build arguments")
-  print("          are being removed and can no longer be used.")
+      "  Re-run 'fx set' or remove them from your 'args.gn' file using 'fx args'.")
   print()
   print(
       "  To add tests, use '--with-test' or the 'developer_test_labels' GN arg.")
@@ -148,7 +164,9 @@ if (base_package_labels != [] || cache_package_labels != []) {
   print(
       "  https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-package")
   print()
-  assert(false)
+  if (error_out_build) {
+    assert(false)
+  }
 }
 
 ###
