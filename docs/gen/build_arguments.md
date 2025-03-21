@@ -226,27 +226,7 @@ From //build/images/vbmeta.gni:20
 These remain only to allow for a soft-transition with developer's
 local args.gn files.
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //out/not-default/args.gn:15
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:27
-
-**Current value for `target_cpu = "riscv64"`:** `[]`
-
-From //out/not-default/args.gn:15
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:27
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //out/not-default/args.gn:15
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `false`
 
 From //BUILD.gn:27
 
@@ -719,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719877863477885409"`
+**Current value for `target_cpu = "arm64"`:** `"8719787252325720097"`
 
 From //out/not-default/args.gn:10
 
@@ -727,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719877863477885409"`
+**Current value for `target_cpu = "riscv64"`:** `"8719787252325720097"`
 
 From //out/not-default/args.gn:10
 
@@ -735,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719877863477885409"`
+**Current value for `target_cpu = "x64"`:** `"8719787252325720097"`
 
 From //out/not-default/args.gn:10
 
@@ -754,7 +734,7 @@ only want to build and define a small subset of the tree.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -762,7 +742,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -770,7 +750,7 @@ From //BUILD.gn:123
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -823,27 +803,7 @@ From //build/config/fuchsia/versioning.gni:11
 
 ### cache_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //out/not-default/args.gn:16
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:28
-
-**Current value for `target_cpu = "riscv64"`:** `[]`
-
-From //out/not-default/args.gn:16
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:28
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //out/not-default/args.gn:16
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `false`
 
 From //BUILD.gn:28
 
@@ -1130,7 +1090,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
@@ -1944,7 +1904,7 @@ Selects the Cobalt environment to send data to. Choices:
 
 **Current value (from the default):** `false`
 
-From //src/cobalt/bin/app/BUILD.gn:16
+From //src/cobalt/bin/app/BUILD.gn:15
 
 ### comparison_diagnostics_dir
 
@@ -2300,7 +2260,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
@@ -2308,7 +2268,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
@@ -2316,7 +2276,7 @@ From //BUILD.gn:86
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:27
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
@@ -2389,7 +2349,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -2397,7 +2357,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -2405,7 +2365,7 @@ From //BUILD.gn:75
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -2713,7 +2673,7 @@ From //third_party/perfetto/gn/perfetto.gni:310
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:124
+From //src/power/power-manager/BUILD.gn:123
 
 ### enable_suspend
 
@@ -3106,7 +3066,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -3114,7 +3074,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -3122,7 +3082,7 @@ From //BUILD.gn:67
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:21
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -3183,7 +3143,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
@@ -3191,7 +3151,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
@@ -3199,7 +3159,7 @@ From //BUILD.gn:81
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
@@ -4921,7 +4881,7 @@ Example:
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
@@ -4929,7 +4889,7 @@ From //build/assembly/developer_overrides.gni:429
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
@@ -4937,7 +4897,7 @@ From //build/assembly/developer_overrides.gni:429
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:29
+From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
@@ -6088,7 +6048,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -6096,7 +6056,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -6104,7 +6064,7 @@ From //BUILD.gn:71
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -6226,7 +6186,7 @@ the build.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -6234,7 +6194,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -6242,7 +6202,7 @@ From //BUILD.gn:34
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -6639,7 +6599,7 @@ Selects the wlan configuration type to use. Choices:
 
 **Current value (from the default):** `"client"`
 
-From //src/connectivity/wlan/wlancfg/BUILD.gn:18
+From //src/connectivity/wlan/wlancfg/BUILD.gn:17
 
 ### zedboot_product_assembly_config_label
 
@@ -9817,7 +9777,7 @@ built and mounted inside the container at /mnt/chromeos.
 
 **Current value (from the default):** `true`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:13
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:12
 
 ### termina_hermetic_bootstrap
 
@@ -9831,7 +9791,7 @@ connection at runtime.
 
 **Current value (from the default):** `false`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:36
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:35
 
 ### termina_stateful_partition_size_bytes
 
@@ -9842,7 +9802,7 @@ If you change this value you will need to rebuild the guest partition using
 
 **Current value (from the default):** `42949672960`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:27
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:26
 
 ### termina_user_extras
 
@@ -9850,7 +9810,7 @@ Point this to the location of external files to be included as extras
 
 **Current value (from the default):** `[]`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:21
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:20
 
 ### termina_volatile_block
 
@@ -9860,7 +9820,7 @@ the linux kernel as crashes and panics can sometimes corrupt the images.
 
 **Current value (from the default):** `false`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:18
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:17
 
 ### use_prebuilt_ffmpeg
 
@@ -9968,5 +9928,5 @@ From //third_party/mesa/src/intel/vulkan/BUILD.gn:33
 
 **Current value (from the default):** `"//third_party/android/device/generic/goldfish-opengl:libvulkan_goldfish"`
 
-From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:13
+From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:12
 
