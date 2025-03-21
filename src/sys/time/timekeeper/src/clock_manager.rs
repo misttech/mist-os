@@ -8,6 +8,7 @@ use crate::enums::{
 };
 use crate::estimator::Estimator;
 use crate::rtc::Rtc;
+use crate::time_source::Sample;
 use crate::time_source_manager::{KernelBootTimeProvider, TimeSourceManager};
 use crate::{Config, UtcTransform};
 use anyhow::{anyhow, Result};
@@ -59,6 +60,14 @@ const ERROR_REFRESH_INTERVAL: zx::BootDuration = zx::BootDuration::from_minutes(
 
 /// Denotes an unknown clock error bound
 const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
+
+/// An arbitrary standard deviation to ascribe to user-provided time samples.
+///
+/// Ideally, we'd put a large value for manual user-provided samples, but possibly small or precise
+/// values for automated user-provided samples. But we do not have this sort of information.
+///
+/// 50ms is about the largest nonzero, but not broken typical value for standard deviation.
+const USER_SAMPLE_DEFAULT_STD_DEV: zx::BootDuration = zx::BootDuration::from_millis(50);
 
 /// Describes how a correction will be made to a clock.
 enum ClockCorrection {
@@ -324,7 +333,10 @@ impl UserClockAdjust {
         proposed_boot: zx::BootInstant,
         proposed_utc: UtcInstant,
     ) -> Result<(UtcTransform, UtcDuration)> {
+        // This is a conceptually simple calculation, but we opt to express it in
+        // terms of already existing transform operations.
         let actual_utc_at_proposed_boot = actual_transform.synthetic(proposed_boot);
+
         assert!(self.max_window_width_past >= UtcDuration::ZERO);
         let min_allowed_utc = actual_utc_at_proposed_boot - self.max_window_width_past;
         assert!(self.max_window_width_future >= UtcDuration::ZERO);
@@ -341,6 +353,10 @@ impl UserClockAdjust {
             // The corrected transform translates the synthetic offset by the computed
             // allowed delta.
             new_transform.synthetic_offset += allowed_delta;
+            debug!(
+                "AdjustDecision::try_adjust: new_transform: {:?}, allowed_delta: {:?}",
+                new_transform, allowed_delta
+            );
             Ok((new_transform, allowed_delta))
         } else {
             // The user-supplied adjustment is rejected. Starnix calls that bottom out
@@ -427,6 +443,120 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         }
     }
 
+    /// Initialize or update the estimator with the provided time `sample`.
+    ///
+    /// If the estimator does not exist, one is created from `sample`. Otherwise,
+    /// the existing estimator is updated with the sample.
+    fn init_or_update_estimator(&mut self, sample: Sample) {
+        match &mut self.estimator {
+            Some(estimator) => estimator.update(sample),
+            None => {
+                self.estimator = Some(Estimator::new(
+                    self.track,
+                    sample,
+                    Arc::clone(&self.diagnostics),
+                    Arc::clone(&self.config),
+                ))
+            }
+        }
+    }
+
+    /// Encapsulates the entire clock start procedure.
+    ///
+    /// 1. Determine the intended reference->UTC transform and start or correct the clock.
+    /// 2. If a proposal to adjust the transform is present, try to use it.
+    /// 3. Update the RTC reading, if we have an RTC to update.
+    /// 4. Update the clock maintenance persistent state to match (e.g. `clock_started`).
+    ///
+    /// This method does not block-wait. It is async because it calls async methods which
+    /// spawn coroutines.
+    async fn managed_clock_start(
+        &mut self,
+        clock_started: &mut bool,
+        last_proposal: Option<&Sample>,
+        update_rtc: bool,
+        adjust_decision: &UserClockAdjust,
+    ) {
+        let estimate_transform = self.new_clock_transform(&adjust_decision, last_proposal);
+        if !*clock_started {
+            self.start_clock(&estimate_transform);
+            *clock_started = true;
+        } else {
+            self.apply_clock_correction(&estimate_transform).await;
+        }
+        if update_rtc {
+            self.update_rtc(&estimate_transform).await;
+        }
+    }
+
+    // Produces a new clock update transform, based on the last proposal sample, and
+    // the initialized value of the estimator.
+    fn new_clock_transform(
+        &mut self,
+        adjust_decision: &UserClockAdjust,
+        last_proposal: Option<&Sample>,
+    ) -> UtcTransform {
+        if let Some(ref estimator) = self.estimator {
+            // We already initialized the estimator. Use the last proposal to
+            // adjust the UTC reference.
+            let estimate_transform = estimator.transform();
+            let estimate_transform = match last_proposal {
+                None => estimate_transform,
+                Some(ref proposal) => adjust_decision
+                    .try_adjust(&estimate_transform, proposal.reference, proposal.utc)
+                    .map(|(tr, _)| tr)
+                    .map_err(|e| {
+                        error!("time adjustmend rejected: {:?}", e);
+                    })
+                    .unwrap_or(estimate_transform),
+            };
+            estimate_transform
+        } else {
+            // No estimator.  We let the clock start from the reference.
+            let estimate_transform = match last_proposal {
+                None => Default::default(),
+                Some(ref proposal) => {
+                    let estimate_transform = UtcTransform {
+                        reference_offset: proposal.reference,
+                        synthetic_offset: proposal.utc,
+                        error_bound_at_offset: USER_SAMPLE_DEFAULT_STD_DEV.into_nanos() as u64,
+                        error_bound_growth_ppm: self.config.get_oscillator_error_std_dev_ppm()
+                            as u32,
+                        ..Default::default()
+                    };
+                    estimate_transform
+                }
+            };
+            debug!(
+                "initialized estimate transform from externally provided time: {:?}",
+                estimate_transform
+            );
+            estimate_transform
+        }
+    }
+
+    async fn delayed_sample(
+        &mut self,
+        first_delay: Option<&zx::MonotonicDuration>,
+        back_off_delay: &zx::MonotonicDuration,
+    ) -> Sample {
+        // Pause before first sampling is sometimes useful. But not if no delay
+        // was ordered, so as not to change the scheduling order.
+        if let Some(first_delay) = first_delay {
+            if *first_delay != zx::MonotonicDuration::ZERO {
+                // This should be an uncommon setting, so log it.
+                info!("first time source sample, delaying by: {:?}", first_delay);
+                _ = fasync::Timer::new(fasync::MonotonicInstant::after(*first_delay)).await;
+                debug!("first time source sample, delay    done");
+            }
+        } else {
+            info!("source sample pause, delaying by: {:?}", *back_off_delay);
+            _ = fasync::Timer::new(fasync::MonotonicInstant::after(*back_off_delay)).await;
+        }
+        debug!("manage_clock: asking for a time sample");
+        self.time_source_manager.next_sample().await
+    }
+
     /// Maintain the clock indefinitely. This future will never complete.
     ///
     /// Args:
@@ -467,60 +597,28 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             zx::MonotonicDuration::from_millis(10)
         };
 
+        let adjust_decision = UserClockAdjust {
+            // Get these values from configuration.
+            max_window_width_past: self.config.max_window_width_past(),
+            max_window_width_future: self.config.max_window_width_future(),
+        };
+        let mut last_proposal: Option<Sample> = None;
+
         loop {
             debug!("clock_manager: waiting for command");
             select! {
-                // This may block for a *long* time if a sample is not available.
-                sample = {
-                    // Pause before first sampling is sometimes useful. But not if no delay
-                    // was ordered, so as not to change the scheduling order.
-                    if let Some(first_delay) = first_delay {
-                        if first_delay != zx::MonotonicDuration::ZERO {
-                            // This should be an uncommon setting, so log it.
-                            info! ("first time source sample, delaying by: {:?}", first_delay);
-                            _ = fasync::Timer::new(fasync::MonotonicInstant::after(first_delay)).await;
-                            debug!("first time source sample, delay    done");
-                        }
-                    } else {
-                        info!("source sample pause, delaying by: {:?}", back_off_delay);
-                        _ = fasync::Timer::new(fasync::MonotonicInstant::after(back_off_delay)).await;
-                    }
-                    // After the first pass through this loop, no more first_delay.
-                    first_delay.take();
-
-                    debug!("manage_clock: asking for a time sample");
-                    self.time_source_manager.next_sample().fuse()
-                } => {
+                sample = self.delayed_sample(first_delay.as_ref(), &back_off_delay).fuse() => {
                     debug!("manage_clock: `---- got a time sample: {:?}", sample);
+                    self.init_or_update_estimator(sample);
 
-                    // Feed it to the estimator (or initialize the estimator).
-                    match &mut self.estimator {
-                        Some(estimator) => estimator.update(sample),
-                        None => {
-                            self.estimator = Some(Estimator::new(
-                                self.track,
-                                sample,
-                                Arc::clone(&self.diagnostics),
-                                Arc::clone(&self.config),
-                            ))
-                        }
-                    }
-                    // Note: Both branches of the match led to a populated estimator so safe to unwrap.
-                    let estimator: &mut Estimator<D> = &mut self.estimator.as_mut().unwrap();
+                    // Consider clearing out last_proposal, if it is sufficiently
+                    // close to external source estimate.
 
-                    // Determine the intended reference->UTC transform and start or correct the clock.
-                    let estimate_transform = estimator.transform();
-                    if !clock_started {
-                        self.start_clock(&estimate_transform);
-                        clock_started = true;
-                    } else {
-                        self.apply_clock_correction(&estimate_transform).await;
-                    }
-
-                    if allow_timekeeper_to_update_rtc {
-                        // Update the RTC clock if we have one.
-                        self.update_rtc(&estimate_transform).await;
-                    }
+                    self.managed_clock_start(
+                        &mut clock_started,
+                        last_proposal.as_ref(),
+                        allow_timekeeper_to_update_rtc,
+                        &adjust_decision).await;
 
                     // Used as a test-only hook.
                     if let Some(ref mut test_signaler) = self.sample_test_signaler {
@@ -529,7 +627,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         }
                     }
                 },
-
                 command = receiver.next() => {
                     debug!("received command: {:?}", &command);
 
@@ -538,11 +635,26 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                             self.record_correction(
                                 ClockCorrection::MaxErrorBound, &Default::default(), zx::BootInstant::ZERO);
                         }
+                        Some(Command::Reference{
+                            boot_reference, utc_reference, mut responder
+                        }) => {
+                            last_proposal = Some(Sample {
+                                    reference: boot_reference,
+                                    utc: utc_reference,
+                                    // Don't allow user samples to be infinitely precise, there is
+                                    // always *some* error involved.
+                                    std_dev: USER_SAMPLE_DEFAULT_STD_DEV,
+                            });
+                            self.managed_clock_start(
+                                &mut clock_started,
+                                last_proposal.as_ref(),
+                                allow_timekeeper_to_update_rtc,
+                                &adjust_decision).await;
+
+                            responder.send(Ok(())).await.expect("infallible");
+                        }
                         None => {
                             debug!("unexpected `None`");
-                        }
-                        Some(ref cmd) => {
-                            warn!("clock_manager.rs: unrecognized command: {:?}", cmd);
                         }
                     }
                     // If a test signaler is present, acknowledge command receipt.
@@ -554,7 +666,9 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                     }
                 },
             }
-        }
+            // Don't use the initial sampling delay in next loop iterations.
+            first_delay.take();
+        } // loop
     }
 
     /// Starts the clock on the requested reference->utc transform, recording diagnostic events.
@@ -745,14 +859,14 @@ mod tests {
     use crate::enums::{FrequencyDiscardReason, Role};
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
-    use crate::{make_test_config, make_test_config_with_delay};
+    use crate::{
+        make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+    };
     use assert_matches::assert_matches;
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
     use fuchsia_async as fasync;
-    use futures::Future;
     use lazy_static::lazy_static;
     use std::pin::pin;
-    use std::task::Poll;
     use test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
@@ -770,51 +884,6 @@ mod tests {
         static ref TEST_TRACK: Track = Track::from(TEST_ROLE);
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
         static ref START_CLOCK_SOURCE: StartClockSource = StartClockSource::External(TEST_ROLE);
-    }
-
-    // Run the future `main_fut` in fake time.  The fake time is being advanced
-    // in relatively small increments until a specified `total_duration` has
-    // elapsed.
-    //
-    // This complication is needed to ensure that any expired
-    // timers are awoken in the correct sequence because the test executor does
-    // not automatically wake the timers. For the fake time execution to
-    // be comparable to a real time execution, we need each timer to have the
-    // chance of waking up, so that we can properly process the consequences
-    // of that timer firing.
-    //
-    // We require that `main_fut` has completed at `total_duration`, and panic
-    // if it has not.  This ensures that we never block forever in fake time.
-    //
-    // This method could possibly be implemented in [TestExecutor] for those
-    // test executor users who do not care to wake the timers in any special
-    // way.
-    fn run_in_fake_time<F>(
-        executor: &mut fasync::TestExecutor,
-        main_fut: &mut F,
-        total_duration: fasync::MonotonicDuration,
-    ) -> Poll<()>
-    where
-        F: Future<Output = ()> + Unpin,
-    {
-        const INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1);
-        // Run the loop for a bit longer than the fake time needed to pump all
-        // the events, to allow the event queue to drain.
-        let mut current = zx::MonotonicDuration::from_millis(0);
-        let mut poll_status = Poll::Pending;
-
-        // We run until either the future completes or the timeout is reached,
-        // whichever comes first.
-        // Running the future after it returns Poll::Ready is not allowed, so
-        // we must exit the loop then.
-        while current < total_duration && poll_status == Poll::Pending {
-            let fake_time = executor.now() + INCREMENT;
-            executor.set_fake_time(fake_time.into());
-            executor.wake_expired_timers();
-            poll_status = executor.run_until_stalled(main_fut);
-            current = current + INCREMENT;
-        }
-        poll_status
     }
 
     fn new_state_for_test(value: bool) -> Rc<RefCell<time_persistence::State>> {
@@ -1710,5 +1779,89 @@ mod tests {
             ),
             Err(_)
         );
+    }
+
+    #[fuchsia::test]
+    fn test_user_time_adjustment() -> Result<()> {
+        // Start from the system time. Required to work around backstop time issues.
+        let real_boot_now = zx::MonotonicInstant::get();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+
+        let fake_now = real_boot_now + zx::MonotonicDuration::from_nanos(1000);
+        executor.set_fake_time(fake_now.into());
+
+        let clock = create_clock();
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
+
+        let config = make_test_config_with_fn(|mut config| {
+            config.first_sampling_delay_sec = 5;
+            config.first_sampling_delay_sec = 10;
+
+            // Don't forbid any user time adjustment.
+            config.utc_max_allowed_delta_future_sec = i64::MAX;
+            config.utc_max_allowed_delta_past_sec = i64::MAX;
+
+            config
+        });
+
+        let clock_manager = create_clock_manager_no_test_signalers(
+            Arc::clone(&clock),
+            vec![Sample::new(
+                UtcInstant::from_nanos((reference + OFFSET_2).into_nanos()),
+                reference,
+                STD_DEV,
+            )],
+            None,
+            None,
+            Arc::clone(&diagnostics),
+            config,
+        );
+
+        let (mut cmd_tx, cmd_rx) = mpsc::channel(2);
+        let b = new_state_for_test(false);
+
+        let proposed_utc = BACKSTOP_TIME + UtcDuration::from_hours(1);
+        let proposed_boot = reference;
+
+        let mut run_fut = pin!(async move {
+            let (responder, mut rx) = mpsc::channel(1);
+            cmd_tx
+                .send(Command::Reference {
+                    boot_reference: proposed_boot,
+                    utc_reference: proposed_utc,
+                    responder,
+                })
+                .await
+                .unwrap();
+            debug!("Command::Reference sent");
+
+            fasync::Task::local(async move {
+                let _ignore = rx.next().await.unwrap().unwrap();
+                debug!("Command::Reference acked");
+            })
+            .detach();
+            debug!("before clock_manager.maintain_clock");
+            clock_manager.maintain_clock(cmd_rx, b).await;
+        });
+
+        // Run in fake time to get the proposed sample, but not enough to get an actual sample.
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            fasync::MonotonicDuration::from_millis(5),
+        );
+        assert_geq!(clock.read().unwrap(), proposed_utc);
+
+        // Run in fake time a little while longer, to get another sample.
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            fasync::MonotonicDuration::from_millis(9),
+        );
+        // Verify that the time did *not* move resulting from a widely different external
+        // time sample. This means that user-provided time remains.
+        assert_leq!(clock.read().unwrap(), proposed_utc + UtcDuration::from_millis(9));
+        Ok(())
     }
 }
