@@ -4,13 +4,13 @@
 
 #include "spi.h"
 
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fit/function.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -22,14 +22,14 @@
 namespace spi {
 
 zx::result<> SpiDriver::Start() {
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_spi_businfo::SpiBusMetadata>(
-      incoming(), DEVICE_METADATA_SPI_CHANNELS);
-  if (!decoded.is_ok()) {
-    FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-    return decoded.take_error();
+  zx::result metadata_result =
+      fdf_metadata::GetMetadata<fuchsia_hardware_spi_businfo::SpiBusMetadata>(*incoming());
+  if (metadata_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get SPI metadata: %s", metadata_result.status_string());
+    return metadata_result.take_error();
   }
+  fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata = metadata_result.value();
 
-  fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata = *decoded;
   if (!metadata.bus_id()) {
     FDF_LOG(ERROR, "No bus ID metadata provided");
     return zx::error(ZX_ERR_INVALID_ARGS);

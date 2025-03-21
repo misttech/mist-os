@@ -47,11 +47,6 @@ zx::result<> SpiBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
             node.name().c_str(), encoded_bus_metadata.error_value().FormatDescription().c_str());
     return zx::error(encoded_bus_metadata.error_value().status());
   }
-  // TODO(b/392676138): Don't add DEVICE_METADATA_SPI_CHANNELS once no longer retrieved.
-  node.AddMetadata({{
-      .id = std::to_string(DEVICE_METADATA_SPI_CHANNELS),
-      .data = encoded_bus_metadata.value(),
-  }});
   node.AddMetadata({{
       .id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
       .data = std::move(encoded_bus_metadata.value()),

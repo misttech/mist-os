@@ -78,28 +78,11 @@ TEST(SpiBusVisitorTest, TestSpiChannels) {
       pbus_node->metadata();
 
   ASSERT_TRUE(metadata);
-  ASSERT_EQ(2lu, metadata->size());
+  ASSERT_EQ(1lu, metadata->size());
 
   // SPI bus metadata
   {
     const std::vector<uint8_t>& metadata_blob = *(*metadata)[0].data();
-    fit::result decoded =
-        fidl::Unpersist<fuchsia_hardware_spi_businfo::SpiBusMetadata>(cpp20::span(metadata_blob));
-    ASSERT_TRUE(decoded.is_ok());
-    ASSERT_EQ(decoded->bus_id(), 0u);
-    ASSERT_TRUE(decoded->channels());
-
-    const std::vector<fuchsia_hardware_spi_businfo::SpiChannel>& channels = *decoded->channels();
-    ASSERT_EQ(channels.size(), 4lu);
-    EXPECT_EQ(channels[0].cs(), 0);
-    EXPECT_EQ(channels[1].cs(), 1);
-    EXPECT_EQ(channels[2].cs(), 2);
-    EXPECT_EQ(channels[3].cs(), 3);
-  }
-
-  // SPI bus metadata
-  {
-    const std::vector<uint8_t>& metadata_blob = *(*metadata)[1].data();
     fit::result decoded =
         fidl::Unpersist<fuchsia_hardware_spi_businfo::SpiBusMetadata>(cpp20::span(metadata_blob));
     ASSERT_TRUE(decoded.is_ok());

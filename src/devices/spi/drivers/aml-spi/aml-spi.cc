@@ -867,7 +867,7 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
 void AmlSpiDriver::OnGetSchedulerRoleName(
     fdf::StartCompleter completer,
     const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name) {
-  std::unordered_set<compat::MetadataKey> forward_metadata({DEVICE_METADATA_SPI_CHANNELS});
+  compat::ForwardMetadata forward_metadata = compat::ForwardMetadata::None();
 
   std::vector<uint8_t> role_name;
 
@@ -875,7 +875,7 @@ void AmlSpiDriver::OnGetSchedulerRoleName(
   // expectation that their calls to us will be inlined. If we don't have scheduler role metadata,
   // then add the default role name as metadata instead.
   if (scheduler_role_name.is_ok()) {
-    forward_metadata.emplace(DEVICE_METADATA_SCHEDULER_ROLE_NAME);
+    forward_metadata = compat::ForwardMetadata::Some({DEVICE_METADATA_SCHEDULER_ROLE_NAME});
   } else {
     const fuchsia_scheduler::RoleName role{kDefaultRoleName};
 
@@ -909,7 +909,7 @@ void AmlSpiDriver::OnGetSchedulerRoleName(
 
         OnCompatServerInitialized(std::move(completer));
       },
-      compat::ForwardMetadata::Some(std::move(forward_metadata)));
+      std::move(forward_metadata));
 }
 
 void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {

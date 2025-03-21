@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 
 #include <memory>
 
@@ -26,9 +28,7 @@ class TestSpiDriver : public fdf::DriverBase,
   zx::result<> Start() override {
     {
       zx::result<> result = compat_server_.Initialize(
-          incoming(), outgoing(), node_name(), kChildNodeName,
-          // TODO(b/392676138): Don't forward DEVICE_METADATA_SPI_CHANNELS once no longer retrieved.
-          compat::ForwardMetadata::Some({DEVICE_METADATA_SPI_CHANNELS}));
+          incoming(), outgoing(), node_name(), kChildNodeName, compat::ForwardMetadata::None());
       if (result.is_error()) {
         return result.take_error();
       }
@@ -38,6 +38,18 @@ class TestSpiDriver : public fdf::DriverBase,
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to add metadata: %s", zx_status_get_string(status));
       return zx::error(status);
+    }
+
+    zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+    if (zx::result result = spi_metadata_server_.SetMetadataFromPDevIfExists(pdev.value());
+        result.is_error()) {
+      FDF_LOG(ERROR, "Failed to set SPI metadata from platform device: %s", result.status_string());
+      return result.take_error();
+    }
+    if (zx::result result = spi_metadata_server_.Serve(*outgoing(), dispatcher());
+        result.is_error()) {
+      FDF_LOG(ERROR, "Failed to serve SPI metadata: %s", result.status_string());
+      return result.take_error();
     }
 
     {
@@ -54,6 +66,7 @@ class TestSpiDriver : public fdf::DriverBase,
 
     std::vector offers = compat_server_.CreateOffers2();
     offers.push_back(fdf::MakeOffer2<fuchsia_hardware_spiimpl::Service>());
+    offers.push_back(spi_metadata_server_.MakeOffer());
     zx::result child =
         AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty>{}, offers);
     if (child.is_error()) {
@@ -135,6 +148,7 @@ class TestSpiDriver : public fdf::DriverBase,
   fdf::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> spi_metadata_server_;
 };
 
 }  // namespace spi

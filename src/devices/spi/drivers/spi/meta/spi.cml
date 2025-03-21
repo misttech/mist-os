@@ -24,6 +24,7 @@
     ],
     use: [
         { service: "fuchsia.hardware.spiimpl.Service" },
+        { service: "fuchsia.hardware.spi.businfo.SpiBusMetadata" },
     ],
     expose: [
         {
