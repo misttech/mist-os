@@ -145,13 +145,14 @@ impl<T: 'static> DriverShutdownObserver<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct Driver<T> {
     pub(crate) inner: NonNull<T>,
     shutdown_triggered: bool,
 }
 
 /// SAFETY: This inner pointer is movable across threads.
-unsafe impl<T> Send for Driver<T> {}
+unsafe impl<T: Send> Send for Driver<T> {}
 
 impl<T: 'static> Driver<T> {
     /// Returns a builder capable of creating a new dispatcher. Note that this dispatcher cannot
@@ -232,6 +233,8 @@ pub struct DriverRef<'a, T>(pub *const T, PhantomData<&'a Driver<T>>);
 pub struct Environment;
 
 impl Environment {
+    pub const ENFORCE_ALLOWED_SCHEDULER_ROLES: u32 = 1;
+
     /// Start the driver runtime. This sets up the initial thread that the dispatchers run on.
     pub fn start(options: u32) -> Result<Environment, Status> {
         // SAFETY: calling fdf_env_start, which does not have any soundness

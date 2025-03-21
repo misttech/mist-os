@@ -53,6 +53,8 @@ rustc_library("driver_symbols_rust") {
 
   non_rust_deps = [ ":driver_symbols" ]
 
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
+
   sources = [
     "src/bindings.rs",
     "src/lib.rs",
