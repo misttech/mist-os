@@ -27,6 +27,13 @@ class DlLoadTestsBase : public DlTestsBase {
   using Loader = elfldltl::MmapLoader;
   using SystemError = elfldltl::PosixError;
 
+  // This owns state necessary for dynamic TLS (__tls_get_addr) to be usable.
+  // It gets called with Init on a module just loaded via DlOpen, and its
+  // destructor runs when that module is being unloaded.
+  struct DynamicTlsHelper {
+    void Init(const char* file) {}
+  };
+
   // Track information about a dlopen-ed module in a test so that the test
   // fixture can verify all dlopen-ed modules have a corresponding dlclose.
   struct ModuleInfo {

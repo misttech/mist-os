@@ -193,13 +193,13 @@ class OpenModule {
   using SymbolMap = std::unordered_map<std::string, void*>;
 
  public:
-  explicit OpenModule(Test& test_fixture) : fixture_(test_fixture) {}
+  explicit OpenModule(Test& test) : test_(test) {}
 
   void InitModule(const char* file, int mode, std::initializer_list<const char*> lookup_symbols,
                   const char* canary_symbol = nullptr) {
-    fixture_.ExpectRootModule(file);
+    test_.ExpectRootModule(file);
     file_ = file;
-    auto open = fixture_.DlOpen(file_, mode);
+    auto open = test_.DlOpen(file_, mode);
     ASSERT_TRUE(open.is_ok()) << file_ << ": " << open.error_value();
     handle_ = open.value();
 
@@ -207,18 +207,22 @@ class OpenModule {
       return;
     }
     InitSymbols(lookup_symbols);
+
+    // This is only really needed for the __tls_get_addr tests, but doesn't
+    // really hurt for the TLSDESC tests.
+    ASSERT_NO_FATAL_FAILURE(helper_.Init(file));
   }
 
   void InitSymbols(std::initializer_list<const char*> symbol_list) {
     for (const char* symbol : symbol_list) {
-      auto sym = fixture_.DlSym(handle_, symbol);
+      auto sym = test_.DlSym(handle_, symbol);
       ASSERT_TRUE(sym.is_ok()) << file_ << ": " << symbol << ": " << sym.error_value();
       symbols_[symbol] = sym.value();
     }
   }
 
   bool IsSymbolEnabledAtCompileTime(const char* symbol) {
-    auto sym = fixture_.DlSym(handle_, symbol);
+    auto sym = test_.DlSym(handle_, symbol);
     if (sym.is_error()) {
       EXPECT_THAT(sym.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol, file_));
       skip_ = true;
@@ -228,7 +232,7 @@ class OpenModule {
 
   void CloseHandle() {
     if (handle_) {
-      auto close = fixture_.DlClose(std::exchange(handle_, nullptr));
+      auto close = test_.DlClose(std::exchange(handle_, nullptr));
       EXPECT_TRUE(close.is_ok()) << close.error_value();
     }
   }
@@ -253,7 +257,8 @@ class OpenModule {
   }
 
  private:
-  Test& fixture_;
+  Test& test_;
+  [[no_unique_address]] Test::DynamicTlsHelper helper_;
   const char* file_ = nullptr;
   void* handle_ = nullptr;
   SymbolMap symbols_;

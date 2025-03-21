@@ -69,6 +69,29 @@ class DlImplTests : public Base {
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
   static constexpr bool kDlCloseUnloadsModules = false;
 
+  class DynamicTlsHelper {
+   public:
+    // Load the same module in parallel with the system dlopen.  It and its
+    // deps should get assigned the same module IDs that the just-completed
+    // DlImplTests::DlOpen call assigned, so the system __tls_get_addr lookups
+    // will find the corresponding module's dynamic TLS segment with the right
+    // initial data.
+    void Init(const char* file) {
+      ASSERT_EQ(system_handle_, nullptr);
+      system_handle_ = dlopen(file, RTLD_NOW | RTLD_LOCAL);
+      ASSERT_TRUE(system_handle_) << "system dlopen(\"" << file << "\"): " << dlerror();
+    }
+
+    ~DynamicTlsHelper() {
+      if (system_handle_) {
+        EXPECT_EQ(dlclose(system_handle_), 0) << dlerror();
+      }
+    }
+
+   private:
+    void* system_handle_ = nullptr;
+  };
+
   void SetUp() override {
     Base::SetUp();
 
