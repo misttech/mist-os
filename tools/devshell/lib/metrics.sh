@@ -804,6 +804,10 @@ function track-build-event {
     env_flags="${env_flags}|iterative"
   fi
 
+  if [[ "${FUCHSIA_FX_TEST_RUN}" -eq 1 ]]; then
+    env_flags="${env_flags}|test"
+  fi
+
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
     --arg args_gn2 "${args_gn2}" \
