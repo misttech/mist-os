@@ -198,6 +198,7 @@ mod tests {
         let board_path = tmp_path.join("my_board");
         let board = BoardInformation {
             name: "my_board".to_string(),
+            release_version: Some("fake_version".to_string()),
             hardware_info: Default::default(),
             provided_features: Default::default(),
             devicetree: Default::default(),
