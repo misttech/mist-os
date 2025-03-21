@@ -63,7 +63,11 @@ _COMMON_BOARD_INPUT_BUNDLES = [
 
 fuchsia_board_input_bundle_set(
     name = "vim3_bibs",
-    board_input_bundles = _COMMON_BOARD_INPUT_BUNDLES,
+    board_input_bundles = [
+        ":devicetree_board_driver",
+        ":main_bundle",
+        ":bazel_drivers",
+    ],
 )
 
 _COMMON_FILESYSTEMS = {
