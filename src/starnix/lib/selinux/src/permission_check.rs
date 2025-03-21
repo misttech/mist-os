@@ -110,7 +110,7 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     profile_duration!("libselinux.check_permission");
     let target_class = permission.class();
 
-    let decision = query.query(source_sid, target_sid, target_class.into());
+    let decision = query.compute_access_decision(source_sid, target_sid, target_class.into());
 
     let mut result = if let Some(permission_access_vector) =
         access_vector_computer.access_vector_from_permissions(&[permission])
@@ -201,13 +201,13 @@ mod tests {
     pub struct DenyAllPermissions(DenyAll);
 
     impl Query for DenyAllPermissions {
-        fn query(
+        fn compute_access_decision(
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
             target_class: AbstractObjectClass,
         ) -> AccessDecision {
-            self.0.query(source_sid, target_sid, target_class)
+            self.0.compute_access_decision(source_sid, target_sid, target_class)
         }
 
         fn compute_new_fs_node_sid(
@@ -246,7 +246,7 @@ mod tests {
     struct AllowAllPermissions;
 
     impl Query for AllowAllPermissions {
-        fn query(
+        fn compute_access_decision(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,

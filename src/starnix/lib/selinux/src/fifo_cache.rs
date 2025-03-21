@@ -73,7 +73,7 @@ impl<A: Hash + Eq, R> FifoCache<A, R> {
     /// Searches the cache and returns the index of a [`QueryAndResult`] matching
     /// the given `source_sid`, `target_sid`, and `target_class` (or returns `None`).
     #[inline]
-    pub fn lookup(&mut self, query_args: &A) -> Option<&mut R> {
+    pub fn get(&mut self, query_args: &A) -> Option<&mut R> {
         self.stats.lookups += 1;
 
         let result = self.cache.get_mut(query_args);

@@ -505,7 +505,7 @@ impl SecurityServer {
 }
 
 impl Query for SecurityServer {
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -661,7 +661,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.query(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.compute_access_decision(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }

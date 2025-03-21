@@ -18,9 +18,9 @@ pub use crate::fifo_cache::{CacheStats, HasCacheStats};
 /// This trait allows layering of caching, delegation, and thread-safety between the policy-backed
 /// calculations, and the caller-facing permission-check interface.
 pub(super) trait Query {
-    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
+    /// Computes the [`AccessDecision`] permitted to `source_sid` for accessing `target_sid`, an
     /// object of of type `target_class`.
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -54,9 +54,9 @@ pub(super) trait Query {
 /// An interface for computing the rights permitted to a source accessing a target of a particular
 /// SELinux object type.
 pub trait QueryMut {
-    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
+    /// Computes the [`AccessDecision`] permitted to `source_sid` for accessing `target_sid`, an
     /// object of type `target_class`.
-    fn query(
+    fn compute_access_decision(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -88,13 +88,13 @@ pub trait QueryMut {
 }
 
 impl<Q: Query> QueryMut for Q {
-    fn query(
+    fn compute_access_decision(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        (self as &dyn Query).query(source_sid, target_sid, target_class)
+        (self as &dyn Query).compute_access_decision(source_sid, target_sid, target_class)
     }
 
     fn compute_new_fs_node_sid(
@@ -152,7 +152,7 @@ pub(super) trait ProxyMut<D> {
 pub(super) struct DenyAll;
 
 impl Query for DenyAll {
-    fn query(
+    fn compute_access_decision(
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
@@ -190,14 +190,14 @@ impl Reset for DenyAll {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-struct QueryArgs {
+struct AccessQueryArgs {
     source_sid: SecurityId,
     target_sid: SecurityId,
     target_class: AbstractObjectClass,
 }
 
 #[derive(Clone)]
-struct QueryResult {
+struct AccessQueryResult {
     access_decision: AccessDecision,
     new_file_sid: Option<SecurityId>,
 }
@@ -219,13 +219,13 @@ impl<D> Empty<D> {
 }
 
 impl<D: QueryMut> QueryMut for Empty<D> {
-    fn query(
+    fn compute_access_decision(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        self.delegate.query(source_sid, target_sid, target_class)
+        self.delegate.compute_access_decision(source_sid, target_sid, target_class)
     }
 
     fn compute_new_fs_node_sid(
@@ -256,7 +256,7 @@ impl<D: ResetMut> ResetMut for Empty<D> {
 
 /// Thread-hostile associative cache with capacity defined at construction and FIFO eviction.
 pub(super) struct FifoQueryCache<D = DenyAll> {
-    cache: FifoCache<QueryArgs, QueryResult>,
+    access_cache: FifoCache<AccessQueryArgs, AccessQueryResult>,
     delegate: D,
 }
 
@@ -272,7 +272,7 @@ impl<D> FifoQueryCache<D> {
         Self {
             // Request `capacity` plus one element working-space for insertions that trigger
             // an eviction.
-            cache: FifoCache::with_capacity(capacity),
+            access_cache: FifoCache::with_capacity(capacity),
             delegate,
         }
     }
@@ -280,27 +280,29 @@ impl<D> FifoQueryCache<D> {
     /// Returns true if the cache has reached capacity.
     #[cfg(test)]
     fn is_full(&self) -> bool {
-        self.cache.is_full()
+        self.access_cache.is_full()
     }
 }
 
 impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
-    fn query(
+    fn compute_access_decision(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        let query_args = QueryArgs { source_sid, target_sid, target_class: target_class.clone() };
-        if let Some(result) = self.cache.lookup(&query_args) {
+        let query_args =
+            AccessQueryArgs { source_sid, target_sid, target_class: target_class.clone() };
+        if let Some(result) = self.access_cache.get(&query_args) {
             return result.access_decision.clone();
         }
 
-        let access_decision = self.delegate.query(source_sid, target_sid, target_class);
+        let access_decision =
+            self.delegate.compute_access_decision(source_sid, target_sid, target_class);
 
-        self.cache.insert(
+        self.access_cache.insert(
             query_args,
-            QueryResult { access_decision: access_decision.clone(), new_file_sid: None },
+            AccessQueryResult { access_decision: access_decision.clone(), new_file_sid: None },
         );
 
         access_decision
@@ -314,12 +316,15 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
     ) -> Result<SecurityId, anyhow::Error> {
         let target_class = AbstractObjectClass::System(ObjectClass::from(fs_node_class));
 
-        let query_args = QueryArgs { source_sid, target_sid, target_class: target_class.clone() };
-        let query_result = if let Some(result) = self.cache.lookup(&query_args) {
+        let query_args =
+            AccessQueryArgs { source_sid, target_sid, target_class: target_class.clone() };
+        let query_result = if let Some(result) = self.access_cache.get(&query_args) {
             result
         } else {
-            let access_decision = self.delegate.query(source_sid, target_sid, target_class);
-            self.cache.insert(query_args, QueryResult { access_decision, new_file_sid: None })
+            let access_decision =
+                self.delegate.compute_access_decision(source_sid, target_sid, target_class);
+            self.access_cache
+                .insert(query_args, AccessQueryResult { access_decision, new_file_sid: None })
         };
 
         if let Some(new_file_sid) = query_result.new_file_sid {
@@ -352,13 +357,13 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
 
 impl<D> HasCacheStats for FifoQueryCache<D> {
     fn cache_stats(&self) -> CacheStats {
-        self.cache.cache_stats()
+        self.access_cache.cache_stats()
     }
 }
 
 impl<D> ResetMut for FifoQueryCache<D> {
     fn reset(&mut self) -> bool {
-        self.cache = FifoCache::with_capacity(self.cache.capacity());
+        self.access_cache = FifoCache::with_capacity(self.access_cache.capacity());
         true
     }
 }
@@ -389,13 +394,13 @@ impl<D> Locked<D> {
 }
 
 impl<D: QueryMut> Query for Locked<D> {
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        self.delegate.lock().query(source_sid, target_sid, target_class)
+        self.delegate.lock().compute_access_decision(source_sid, target_sid, target_class)
     }
 
     fn compute_new_fs_node_sid(
@@ -469,13 +474,13 @@ impl Reset for AtomicVersion {
 }
 
 impl<Q: Query> Query for Arc<Q> {
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        self.as_ref().query(source_sid, target_sid, target_class)
+        self.as_ref().compute_access_decision(source_sid, target_sid, target_class)
     }
 
     fn compute_new_fs_node_sid(
@@ -510,13 +515,15 @@ impl<R: Reset> Reset for Arc<R> {
 }
 
 impl<Q: Query> Query for Weak<Q> {
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessDecision {
-        self.upgrade().map(|q| q.query(source_sid, target_sid, target_class)).unwrap_or_default()
+        self.upgrade()
+            .map(|q| q.compute_access_decision(source_sid, target_sid, target_class))
+            .unwrap_or_default()
     }
 
     fn compute_new_fs_node_sid(
@@ -575,7 +582,7 @@ impl<D> ThreadLocalQuery<D> {
 }
 
 impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
-    fn query(
+    fn compute_access_decision(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -588,7 +595,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         }
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
-        self.delegate.query(source_sid, target_sid, target_class)
+        self.delegate.compute_access_decision(source_sid, target_sid, target_class)
     }
 
     fn compute_new_fs_node_sid(
@@ -743,14 +750,14 @@ mod tests {
     }
 
     impl<D: Query> Query for Counter<D> {
-        fn query(
+        fn compute_access_decision(
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
             target_class: AbstractObjectClass,
         ) -> AccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
-            self.delegate.query(source_sid, target_sid, target_class)
+            self.delegate.compute_access_decision(source_sid, target_sid, target_class)
         }
 
         fn compute_new_fs_node_sid(
@@ -786,7 +793,12 @@ mod tests {
         let mut avc = Empty::<DenyAll>::default();
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
+            avc.compute_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into()
+            )
+            .allow
         );
     }
 
@@ -796,12 +808,22 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
+            avc.compute_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into()
+            )
+            .allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
+            avc.compute_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into()
+            )
+            .allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(false, avc.is_full());
@@ -817,7 +839,12 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
+            avc.compute_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into()
+            )
+            .allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(false, avc.is_full());
@@ -830,16 +857,16 @@ mod tests {
     fn fixed_access_vector_cache_fill() {
         let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
-        for sid in unique_sids(avc.cache.capacity()) {
-            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+        for sid in unique_sids(avc.access_cache.capacity()) {
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert_eq!(true, avc.is_full());
 
         avc.reset();
         assert_eq!(false, avc.is_full());
 
-        for sid in unique_sids(avc.cache.capacity()) {
-            avc.query(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
+        for sid in unique_sids(avc.access_cache.capacity()) {
+            avc.compute_access_decision(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
         assert_eq!(true, avc.is_full());
 
@@ -852,32 +879,48 @@ mod tests {
         let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
 
         // Make the test query, which will trivially miss.
-        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
+        avc.compute_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+        );
         assert!(!avc.is_full());
 
         // Fill the cache with new queries, which should evict the test query.
-        for sid in unique_sids(avc.cache.capacity()) {
-            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+        for sid in unique_sids(avc.access_cache.capacity()) {
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert!(avc.is_full());
 
         // Making the test query should result in another miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
+        avc.compute_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+        );
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
         // Because the cache is not LRU, making `capacity()` unique queries, each preceded by
         // the test query, will still result in the test query result being evicted.
         // Each test query will hit, and the interleaved queries will miss, with the final of the
         // interleaved queries evicting the test query.
-        for sid in unique_sids(avc.cache.capacity()) {
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
-            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
+        for sid in unique_sids(avc.access_cache.capacity()) {
+            avc.compute_access_decision(
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
+                ObjectClass::Process.into(),
+            );
+            avc.compute_access_decision(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
 
         // The test query should now miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
+        avc.compute_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+        );
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 
@@ -890,7 +933,11 @@ mod tests {
         assert_eq!(0, avc.delegate.reset_count());
         cache_version.reset();
         assert_eq!(0, avc.delegate.reset_count());
-        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
+        avc.compute_access_decision(
+            A_TEST_SID.clone(),
+            A_TEST_SID.clone(),
+            ObjectClass::Process.into(),
+        );
         assert_eq!(1, avc.delegate.reset_count());
     }
 }
@@ -932,7 +979,7 @@ mod starnix_tests {
     }
 
     impl Query for PolicyServer {
-        fn query(
+        fn compute_access_decision(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
@@ -946,7 +993,7 @@ mod starnix_tests {
             } else if policy == WRITE_RIGHTS {
                 ACCESS_VECTOR_WRITE
             } else {
-                panic!("query found invalid policy: {}", policy);
+                panic!("compute_access_decision found invalid policy: {}", policy);
             }
         }
 
@@ -1000,7 +1047,7 @@ mod starnix_tests {
             let mut trace = vec![];
 
             for _ in 0..2000 {
-                trace.push(query_avc.query(
+                trace.push(query_avc.compute_access_decision(
                     A_TEST_SID.clone(),
                     A_TEST_SID.clone(),
                     ObjectClass::Process.into(),
@@ -1092,7 +1139,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_1.query(
+                    avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1105,7 +1152,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_1.query(
+                    avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1116,12 +1163,13 @@ mod starnix_tests {
             tx1.send(trace).expect("send trace 1");
 
             //
-            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
-            // caches (including those that lazily reset on next query) must contain *only* items
-            // consistent with the final policy: `(_, _, ) => WRITE`.
+            // Test expectations: After `<final-policy-reset>; avc.reset();
+            // avc.compute_access_decision();`, all caches (including those that lazily reset on
+            // next query) must contain *only* items consistent with the final policy: `(_, _, ) =>
+            // WRITE`.
             //
 
-            for (_, result) in avc_for_query_1.delegate.lock().cache.iter() {
+            for (_, result) in avc_for_query_1.delegate.lock().access_cache.iter() {
                 assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
@@ -1137,7 +1185,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_2.query(
+                    avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1150,7 +1198,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_2.query(
+                    avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1161,12 +1209,13 @@ mod starnix_tests {
             tx2.send(trace).expect("send trace 2");
 
             //
-            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
-            // caches (including those that lazily reset on next query) must contain *only* items
-            // consistent with the final policy: `(_, _, ) => NONE`.
+            // Test expectations: After `<final-policy-reset>; avc.reset();
+            // avc.compute_access_decision();`, all caches (including those that lazily reset on
+            // next query) must contain *only* items consistent with the final policy: `(_, _, ) =>
+            // NONE`.
             //
 
-            for (_, result) in avc_for_query_2.delegate.lock().cache.iter() {
+            for (_, result) in avc_for_query_2.delegate.lock().access_cache.iter() {
                 assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
@@ -1259,7 +1308,7 @@ mod starnix_tests {
     }
 
     impl Query for SecurityServer {
-        fn query(
+        fn compute_access_decision(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
@@ -1273,7 +1322,7 @@ mod starnix_tests {
             } else if policy == WRITE_RIGHTS {
                 ACCESS_VECTOR_WRITE
             } else {
-                panic!("query found invalid policy: {}", policy);
+                panic!("compute_access_decision found invalid policy: {}", policy);
             }
         }
 
@@ -1375,7 +1424,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_1.query(
+                    avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1388,7 +1437,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_1.query(
+                    avc_for_query_1.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1399,12 +1448,13 @@ mod starnix_tests {
             tx1.send(trace).expect("send trace 1");
 
             //
-            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
-            // caches (including those that lazily reset on next query) must contain *only* items
-            // consistent with the final policy: `(_, _, ) => WRITE`.
+            // Test expectations: After `<final-policy-reset>; avc.reset();
+            // avc.compute_access_decision();`, all caches (including those that lazily reset on
+            // next query) must contain *only* items consistent with the final policy: `(_, _, ) =>
+            // WRITE`.
             //
 
-            for (_, result) in avc_for_query_1.delegate.cache.iter() {
+            for (_, result) in avc_for_query_1.delegate.access_cache.iter() {
                 assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
@@ -1420,7 +1470,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_2.query(
+                    avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1433,7 +1483,7 @@ mod starnix_tests {
             for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
                     sids[i].clone(),
-                    avc_for_query_2.query(
+                    avc_for_query_2.compute_access_decision(
                         sids[i].clone(),
                         A_TEST_SID.clone(),
                         ObjectClass::Process.into(),
@@ -1444,12 +1494,13 @@ mod starnix_tests {
             tx2.send(trace).expect("send trace 2");
 
             //
-            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
-            // caches (including those that lazily reset on next query) must contain *only* items
-            // consistent with the final policy: `(_, _, ) => WRITE`.
+            // Test expectations: After `<final-policy-reset>; avc.reset();
+            // avc.compute_access_decision();`, all caches (including those that lazily reset on
+            // next query) must contain *only* items consistent with the final policy: `(_, _, ) =>
+            // WRITE`.
             //
 
-            for (_, result) in avc_for_query_2.delegate.cache.iter() {
+            for (_, result) in avc_for_query_2.delegate.access_cache.iter() {
                 assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
             }
         });
@@ -1534,7 +1585,7 @@ mod starnix_tests {
         }
 
         let shared_cache = security_server.manager().shared_cache.delegate.lock();
-        for (_, result) in shared_cache.cache.iter() {
+        for (_, result) in shared_cache.access_cache.iter() {
             assert_eq!(ACCESS_VECTOR_WRITE, result.access_decision);
         }
     }
