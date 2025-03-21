@@ -12,6 +12,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use byteorder::ByteOrder;
+use linux_uapi::IP_MULTICAST_ALL;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
@@ -542,6 +543,10 @@ impl SocketOps for ZxioBackedSocket {
             }
             (SOL_IP, IP_RECVERR) => {
                 track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
+                Ok(())
+            }
+            (SOL_IP, IP_MULTICAST_ALL) => {
+                track_stub!(TODO("https://fxbug.dev/404596095"), "SOL_IP.IP_MULTICAST_ALL");
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
