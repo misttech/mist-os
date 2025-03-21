@@ -357,9 +357,9 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 },
                             },
                             "Tx": {
-                                SegmentsSent: 1u64,
+                                SegmentsSent: diagnostics_assertions::NonZeroUintProperty,
                                 ResetsSent: 0u64,
-                                SynsSent: 1u64,
+                                SynsSent: diagnostics_assertions::NonZeroUintProperty,
                                 FinsSent: 0u64,
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
@@ -556,9 +556,9 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                                 },
                             },
                             "Tx": {
-                                SegmentsSent: 1u64,
+                                SegmentsSent: diagnostics_assertions::NonZeroUintProperty,
                                 ResetsSent: 0u64,
-                                SynsSent: 1u64,
+                                SynsSent: diagnostics_assertions::NonZeroUintProperty,
                                 FinsSent: 0u64,
                                 Timeouts: 0u64,
                                 Retransmits: 0u64,
