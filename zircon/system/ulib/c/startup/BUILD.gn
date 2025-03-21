@@ -58,7 +58,10 @@ crt1_rspfile = "$target_gen_dir/crt1.rsp"
 # though it doesn't directly contribute any link inputs by being in deps.  This
 # will be instantiated in every toolchain that needs a sysroot.
 toolchain_utils_action("startfiles") {
-  visibility = [ "//zircon/public/sysroot/*" ]
+  visibility = [
+    "//zircon/public/sysroot/*",
+    "//zircon/public/sysroot_sdk/*",
+  ]
 
   sysroot_gen_dir = get_label_info("//zircon/public/sysroot", "target_gen_dir")
   outputs = [ "$sysroot_gen_dir/lib/Scrt1.o" ]

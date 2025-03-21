@@ -879,7 +879,7 @@ sdk_documentation("sdk_notice") {
 # and properly populated, see [1] for all details. Also, some third-party repos
 # build or reference building this rule [2].
 #
-# Note that //zircon/public/sysroot/sdk:sysroot_sdk is already
+# Note that //zircon/public/sysroot_sdk is already
 # a transitive dependency of //sdk:in_tree_collection, so using the content of
 # $OUTPUT_DIR/sdk/exported/in_tree_collection/ would be equivalent, except that
 # this directory is much longer to build (since it contains host tools).
@@ -894,7 +894,7 @@ sdk_collection("zircon_sysroot") {
   # sdk_* templates.
   category = "internal"
 
-  deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+  deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
 if (is_host) {
@@ -1202,7 +1202,7 @@ sdk_molecule("core_cc_source_libraries") {
 
 sdk_molecule("core_sysroot") {
   category = "partner"
-  deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+  deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
 # License/copyright files for the SDK.

@@ -361,6 +361,7 @@ group("libc") {
   visibility = [
     ":*",
     "//zircon/public/sysroot/*",
+    "//zircon/public/sysroot_sdk/*",
   ]
 
   # This has to be public_deps so that the shared_library() target's output

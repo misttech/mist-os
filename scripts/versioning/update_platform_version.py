@@ -163,7 +163,7 @@ def main() -> int:
     print(
         f"""
 API level {new_level} has been added.
-Now run `fx build //zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}` (unless `update_goldens=true`).
+Now run `fx build //zircon/public/sysroot_sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}` (unless `update_goldens=true`).
 Then run `git add -u {history} {availability_levels_file} {sysroot_api_file} && git add {level_dir}`."""
     )
     return 0
