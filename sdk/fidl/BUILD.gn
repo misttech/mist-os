@@ -65,7 +65,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.factory:fuchsia.factory",
   "//sdk/fidl/fuchsia.feedback:fuchsia.feedback",
   "//sdk/fidl/fuchsia.fonts:fuchsia.fonts",
-  "//sdk/fidl/fuchsia.gnss.types:fuchsia.gnss.types",
+  "//sdk/fidl/fuchsia.location.gnss.types:fuchsia.location.gnss.types",
   "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis",
   "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma",
   "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc",

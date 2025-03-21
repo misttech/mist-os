@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.gnss.types") {
+fidl("fuchsia.location.gnss.types") {
   sources = [ "gnss_types.fidl" ]
   sdk_area = "Unknown"
   sdk_category = "partner"

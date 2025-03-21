@@ -6,7 +6,7 @@
 ///
 /// This FIDL provides shared types used by GNSS drivers or services.
 @available(added=HEAD)
-library fuchsia.gnss.types;
+library fuchsia.location.gnss.types;
 
 /// Horizontal location on earth.
 type LatLong = struct {
@@ -58,7 +58,7 @@ type Bearing = table {
 
 /// GNSS location.
 ///
-/// Location provider leaves optional fields blank if the corresponding
+/// Location provider leaves optional fields blank if the corresponding.
 /// information is unavailable.
 type Location = table {
     /// Horizontal location.
@@ -103,4 +103,52 @@ type FixParams = table {
     ///  the estimated accuracy is within `max_dist_meters` meters.
     /// Required.
     3: max_dist_meters uint32;
+};
+
+/// Bit masks indicating capabilities that are supported by platform and engine.
+type Capabilities = flexible bits : uint32 {
+    /// Capability bit mask indicating that GNSS supports scheduling fixes.
+    CAPABILITY_SCHEDULING = 0x00000001;
+
+    /// Capability bit mask indicating that GNSS supports Mobile Station-Based
+    /// AGNSS mode.
+    CAPABILITY_MSB = 0x00000002;
+
+    /// Capability bit mask indicating that GNSS supports Mobile Station-Assisted
+    /// AGNSS mode.
+    CAPABILITY_MSA = 0x00000004;
+
+    /// Capability bit mask indicating that GNSS supports single-shot fixes.
+    CAPABILITY_SINGLE_SHOT = 0x00000008;
+};
+
+/// Errors returned in case of failures.
+type Error = flexible enum {
+
+    /// Modem is offline.
+    MODEM_OFFLINE = 1;
+
+    /// GNSS is disabled.
+    GNSS_DISABLED = 2;
+
+    /// Timeout occurred while waiting for an action.
+    TIMEOUT = 3;
+
+    /// No cached fix available.
+    NO_FIX_AVAILABLE = 4;
+
+    /// Failed due to internal error.
+    INTERNAL_ERROR = 5;
+
+    /// Active location session is ongoing.
+    ACTIVE_SESSION_ONGOING = 6;
+
+    /// All required parameters are not available.
+    MISSING_PARAMETERS = 7;
+
+    /// Unsupported feature.
+    NOT_SUPPORTED = 8;
+
+    /// Bad state.
+    BAD_STATE = 9;
 };
