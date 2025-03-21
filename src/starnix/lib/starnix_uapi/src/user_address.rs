@@ -369,6 +369,21 @@ impl<T, T64, T32> MappingMultiArchUserRef<T, T64, T32> {
         }
     }
 
+    pub fn new_with_ref<
+        E,
+        Arch: ArchSpecific,
+        UR: TryInto<UserRef<T64>, Error = E> + TryInto<UserRef<T32>, Error = E>,
+    >(
+        arch: &Arch,
+        user_ref: UR,
+    ) -> Result<Self, E> {
+        if arch.is_arch32() {
+            user_ref.try_into().map(Self::Arch32)
+        } else {
+            user_ref.try_into().map(|r| Self::Arch64(r, Default::default()))
+        }
+    }
+
     pub fn null<Arch: ArchSpecific>(arch: &Arch) -> Self {
         Self::new(arch, UserAddress::NULL)
     }

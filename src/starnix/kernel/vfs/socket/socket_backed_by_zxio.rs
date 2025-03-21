@@ -531,10 +531,7 @@ impl SocketOps for ZxioBackedSocket {
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog_ptr = SockFProfPtr::new(current_task, user_opt.address);
-                if fprog_ptr.size_of_object() < user_opt.length {
-                    return error!(EINVAL);
-                }
+                let fprog_ptr = SockFProfPtr::new_with_ref(current_task, user_opt)?;
                 let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
                 if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);

@@ -34,7 +34,7 @@ use zx::{
 pub type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
 pub type ITimerSpecPtr = MultiArchUserRef<uapi::itimerspec, uapi::arch32::itimerspec>;
 pub type ITimerValPtr = MultiArchUserRef<uapi::itimerval, uapi::arch32::itimerval>;
-type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
+pub type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
 type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 
 fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespec, Errno> {

@@ -9,6 +9,7 @@ use super::{
 };
 use crate::mm::MemoryAccessorExt;
 use crate::security;
+use crate::syscalls::time::TimeValPtr;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
@@ -451,8 +452,9 @@ impl Socket {
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let read_timeval = || {
-            let timeval_ref = user_opt.try_into()?;
-            let duration = duration_from_timeval(current_task.read_object(timeval_ref)?)?;
+            let timeval_ref = TimeValPtr::new_with_ref(current_task, user_opt)?;
+            let duration =
+                duration_from_timeval(current_task.read_multi_arch_object(timeval_ref)?)?;
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
