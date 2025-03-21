@@ -1809,12 +1809,21 @@ exec "${{cmd[@]}}"
             command = self.launch_command
         quoted = cl_utils.command_quoted_str(command)
         self.vmsg(f"Launching: {quoted}")
+
         with cl_utils.timer_cm("subprocess (remote, rewrapper)"):
             return cl_utils.subprocess_call(
                 command,
                 cwd=self.working_dir,
-                quiet=self.exec_strategy == "local",
+                quiet=self._should_rerun_locally_on_failure,
             )
+
+    @property
+    def _should_rerun_locally_on_failure(self) -> bool:
+        """If the operation fails in rewrapper, it should be re-run directly"""
+        return (self.exec_strategy or "remote") in {
+            "local",
+            "remote_local_fallback",
+        } and self._local_only_command != self._remote_only_command
 
     def _on_success(self) -> int:
         """Work to do after success (local or remote)."""
@@ -1868,36 +1877,32 @@ exec "${{cmd[@]}}"
                 for f in self.inputs_relative_to_project_root:
                     cl_utils.copy_preserve_subpath(f, export_dir)
 
-        exec_strategy = self.exec_strategy or "remote"  # rewrapper default
         # rewrapper assumes that the command it was given is suitable for
         # both local and remote execution, but this isn't always the case,
         # e.g. remote cross-compiling may require invoking different
         # binaries.  We know however, whether the local/remote commands
         # match and can take the appropriate local fallback action,
         # like running a different command than the remote one.
-        if exec_strategy in {"local", "remote_local_fallback"}:
-            if self._local_only_command != self._remote_only_command:
-                # We intended to run a different local command,
-                # so ignore the result from rewrapper.
-                local_exit_code = self._run_locally()
-                if local_exit_code == 0:
-                    # local succeeded where remote failed
-                    self.show_local_remote_command_differences()
+        if self._should_rerun_locally_on_failure:
+            # We intended to run a different local command,
+            # so ignore the result from rewrapper.
+            local_exit_code = self._run_locally()
+            if local_exit_code == 0:
+                # local succeeded where remote failed
+                self.show_local_remote_command_differences()
 
-                return local_exit_code
+            return local_exit_code
 
-            # Not an RBE issue if local execution failed.
-            return result.returncode
-
-        if not self.diagnose_nonzero:
-            return result.returncode
-
-        # Otherwise, there was some remote execution failure.
-        # Continue to analyze log files.
-        analyze_rbe_logs(
-            rewrapper_pid=result.pid,
-            action_log=self._action_log,
-        )
+        # If it wasn't run locally, the failure mode could be RBE related, so
+        # diagnose if needed.
+        if (self.exec_strategy or "remote") not in [
+            "local",
+            "remote_local_fallback",
+        ] and self.diagnose_nonzero:
+            analyze_rbe_logs(
+                rewrapper_pid=result.pid,
+                action_log=self._action_log,
+            )
 
         return result.returncode
 
