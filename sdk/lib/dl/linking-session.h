@@ -145,8 +145,7 @@ class LinkingSession {
         // in its direct_deps list.
         auto enqueue_dep = [this, &diag, &parent_list = module.runtime_module().direct_deps()](
                                const Soname& name) {
-          if (std::find(session_modules_.begin(), session_modules_.end(), name) !=
-              session_modules_.end()) {
+          if (std::ranges::any_of(session_modules_, name.equal_to())) {
             return true;
           }
           if (const RuntimeModule* dep = EnqueueModule(diag, name)) {

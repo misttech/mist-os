@@ -6,6 +6,8 @@
 
 #include <lib/fit/defer.h>
 
+#include <algorithm>
+
 #include <fbl/array.h>
 
 #include "tlsdesc-runtime-dynamic.h"
@@ -18,12 +20,13 @@ void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
 }
 
 RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
-  if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
-    // TODO(https://fxbug.dev/328135195): increase reference count.
-    RuntimeModule& found = *it;
-    return &found;
+  auto it = std::ranges::find_if(modules_, name.equal_to());
+  if (it == modules_.end()) {
+    return nullptr;
   }
-  return nullptr;
+  // TODO(https://fxbug.dev/328135195): increase reference count.
+  RuntimeModule& found = *it;
+  return &found;
 }
 
 size_type RuntimeDynamicLinker::TlsBlock(const RuntimeModule& module) const {

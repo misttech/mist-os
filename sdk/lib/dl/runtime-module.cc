@@ -7,6 +7,8 @@
 #include <lib/ld/decoded-module.h>
 #include <lib/ld/dl-phdr-info.h>
 
+#include <algorithm>
+
 namespace dl {
 
 bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
@@ -23,14 +25,13 @@ bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
     return false;
   }
 
-  auto enqueue_unique = [&](const RuntimeModule& module) -> bool {
-    // Skip if the module has already been enqueued, preventing circular
-    // dependencies.
-    if (std::ranges::find(module_tree_, module.name(), &RuntimeModule::name) !=
-        module_tree_.end()) {
-      return true;
-    }
-    return enqueue(module);
+  auto on_queue = [this](const RuntimeModule& module) -> bool {
+    return std::ranges::any_of(module_tree_, module.name().equal_to(), DerefElement{});
+  };
+
+  // Skip if the module has already been enqueued, preventing circular deps.
+  auto enqueue_unique = [enqueue, on_queue](const RuntimeModule& module) {
+    return on_queue(module) || enqueue(module);
   };
 
   // Build the BFS-ordered queue: this uses an indexed-for-loop to iterate

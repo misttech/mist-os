@@ -80,14 +80,18 @@ class Soname {
     return other.hash_ == hash_ && other.str() == str();
   }
 
-  template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
-  constexpr bool operator!=(const Soname& other) const {
-    return other.hash_ != hash_ || other.str() != str();
-  }
+  constexpr bool operator!=(const Soname& other) const = default;
 
   template <typename Ptr = AbiPtr<const char, Elf, AbiTraits>, typename = decltype(Ptr{}.get())>
   constexpr auto operator<=>(const Soname& other) const {
     return str() <=> other.str();
+  }
+
+  // This returns a convenient unary predicate for using things such as
+  // std::ranges::find_if or std::ranges::any_of across a range of things that
+  // support operator==(const Soname&).
+  constexpr auto equal_to() const {
+    return [self = *this](const auto& other) { return other == self; };
   }
 
  private:
