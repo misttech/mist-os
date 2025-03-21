@@ -8,6 +8,7 @@ use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use selectors::SelectorExt;
+use std::borrow::Cow;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use zx_types::zx_koid_t;
@@ -73,6 +74,8 @@ pub struct LogFilterCriteria {
     /// Overrides min_severity for components matching the selector.
     /// In the event of an ambiguous match, the lowest severity is used.
     interest_selectors: Vec<LogInterestSelector>,
+    /// True if case sensitive, false otherwise
+    case_sensitive: bool,
 }
 
 impl Default for LogFilterCriteria {
@@ -86,8 +89,19 @@ impl Default for LogFilterCriteria {
             exclude_tags: vec![],
             pid: None,
             tid: None,
+            case_sensitive: false,
             interest_selectors: vec![],
         }
+    }
+}
+
+// Convert a string to lowercase if needed for case insensitive comparisons.
+// If case_sensitive is false, the conversion is performed.
+fn convert_to_lowercase_if_needed<'a>(input: &'a str, case_sensitive: bool) -> Cow<'a, str> {
+    if case_sensitive {
+        Cow::Borrowed(input)
+    } else {
+        Cow::Owned(input.to_lowercase())
     }
 }
 
@@ -106,6 +120,7 @@ impl From<LogCommand> for LogFilterCriteria {
             },
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
+            case_sensitive: cmd.case_sensitive,
             tid: cmd.tid,
             interest_selectors: cmd.set_severity.into_iter().flatten().collect(),
         }
@@ -149,11 +164,29 @@ impl LogFilterCriteria {
 
     /// Returns true if the given 'LogsData' matches the filter string by
     /// message, moniker, or component URL.
-    fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        message.contains(filter_string)
-            || log.file_path().is_some_and(|s| s.contains(filter_string))
-            || log.metadata.component_url.as_ref().is_some_and(|s| s.contains(filter_string))
-            || log.moniker.to_string().contains(filter_string)
+    fn matches_filter_string(
+        filter_string: &str,
+        message: &str,
+        log: &LogsData,
+        case_sensitive: bool,
+    ) -> bool {
+        // Convert strings to lower-case if needed
+        let filter_string = convert_to_lowercase_if_needed(filter_string, case_sensitive);
+        let message = convert_to_lowercase_if_needed(message, case_sensitive);
+        let file_path =
+            log.file_path().map(|value| convert_to_lowercase_if_needed(value, case_sensitive));
+        let component_url = log
+            .metadata
+            .component_url
+            .as_ref()
+            .map(|value| convert_to_lowercase_if_needed(value.as_str(), case_sensitive));
+        let moniker_str = log.moniker.to_string();
+        let moniker = convert_to_lowercase_if_needed(&moniker_str, case_sensitive);
+
+        message.contains(&*filter_string)
+            || file_path.is_some_and(|s| s.contains(&*filter_string))
+            || component_url.as_ref().is_some_and(|s| s.contains(&*filter_string))
+            || moniker.contains(&*filter_string)
     }
 
     // TODO(b/303315896): If/when debuglog is structured remove this.
@@ -231,12 +264,19 @@ impl LogFilterCriteria {
         let msg = data.msg().unwrap_or("");
 
         if !self.filters.is_empty()
-            && !self.filters.iter().any(|f| Self::matches_filter_string(f, msg, data))
+            && !self
+                .filters
+                .iter()
+                .any(|f| Self::matches_filter_string(f, msg, data, self.case_sensitive))
         {
             return false;
         }
 
-        if self.excludes.iter().any(|f| Self::matches_filter_string(f, msg, data)) {
+        if self
+            .excludes
+            .iter()
+            .any(|f| Self::matches_filter_string(f, msg, data, self.case_sensitive))
+        {
             return false;
         }
 
@@ -949,6 +989,52 @@ mod test {
         );
 
         assert!(!criteria.matches(&entry));
+    }
+
+    #[test]
+    fn filter_fiters_case_sensitivity() {
+        // Case-insensitive by default
+        let cmd = LogCommand { filter: vec!["sometestfile".into()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        let entry_0 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_file("sometestfile")
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+
+        let entry_1 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_file("someTESTfile")
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+        assert!(criteria.matches(&entry_0));
+        assert!(criteria.matches(&entry_1));
+
+        // Case-sensitive
+        let cmd = LogCommand {
+            filter: vec!["sometestfile".into()],
+            case_sensitive: true,
+            ..empty_dump_command()
+        };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        assert!(criteria.matches(&entry_0));
+        assert!(!criteria.matches(&entry_1));
     }
 
     #[test]

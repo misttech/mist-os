@@ -180,6 +180,14 @@
     {
       "kind": "Switch",
       "optionality": "optional",
+      "long": "--case-sensitive",
+      "short": null,
+      "description": "if enabled, text filtering options are case-sensitive this applies to --filter and --exclude.",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
       "long": "--show-metadata",
       "short": null,
       "description": "shows process-id and thread-id in log output",

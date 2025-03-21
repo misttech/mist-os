@@ -276,6 +276,11 @@ pub struct LogCommand {
     #[argh(switch)]
     pub no_color: bool,
 
+    /// if enabled, text filtering options are case-sensitive
+    /// this applies to --filter and --exclude.
+    #[argh(switch)]
+    pub case_sensitive: bool,
+
     /// shows process-id and thread-id in log output
     #[argh(switch)]
     pub show_metadata: bool,
@@ -351,6 +356,7 @@ impl Default for LogCommand {
             since: None,
             since_boot: None,
             until: None,
+            case_sensitive: false,
             until_boot: None,
             sub_command: None,
             set_severity: vec![],
