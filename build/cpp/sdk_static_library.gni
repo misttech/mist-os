@@ -130,9 +130,9 @@ template("sdk_static_library") {
   sdk_id = "sdk://${sdk_root_path}"
 
   main_target_name = target_name
-  metadata_target_name = "${target_name}_sdk_metadata"
-  manifest_target_name = "${target_name}_sdk_manifest"
-  sdk_target_name = "${target_name}_sdk"
+  metadata_target_name = "${main_target_name}_sdk_metadata"
+  manifest_target_name = "${main_target_name}_sdk_manifest"
+  sdk_target_name = "${main_target_name}_sdk"
 
   # This is subtle: If one of the dependencies is listed in runtime_deps
   # with an _sdk suffix, assume it is a shared_library() target, and ensure
@@ -294,13 +294,6 @@ template("sdk_static_library") {
     ]
   }
 
-  verify_public_headers_target = "$target_name.verify_public_headers"
-  verify_public_headers(verify_public_headers_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    target_label = ":${target_name}"
-    headers = all_headers
-  }
-
   # Add binaries.
   #
   # Use the binary from the shared library toolchain to allow the static
@@ -395,6 +388,13 @@ template("sdk_static_library") {
     verify_pragma_once(verify_pragma_target_name) {
       headers = all_headers
     }
+  }
+
+  verify_public_headers_target = "${main_target_name}.verify_public_headers"
+  verify_public_headers(verify_public_headers_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target_label = static_lib_target
+    headers = all_headers
   }
 
   sdk_atom(manifest_target_name) {

@@ -180,10 +180,10 @@ template("sdk_shared_library") {
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
   main_target_name = target_name
-  metadata_target_name = "${target_name}_sdk_metadata"
-  manifest_target_name = "${target_name}_sdk_manifest"
-  verify_pragma_target_name = "${target_name}_sdk_pragma"
-  sdk_target_name = "${target_name}_sdk"
+  metadata_target_name = "${main_target_name}_sdk_metadata"
+  manifest_target_name = "${main_target_name}_sdk_manifest"
+  verify_pragma_target_name = "${main_target_name}_sdk_pragma"
+  sdk_target_name = "${main_target_name}_sdk"
 
   shared_library(main_target_name) {
     forward_variables_from(invoker,
@@ -331,13 +331,6 @@ template("sdk_shared_library") {
         dest = header_dest
       },
     ]
-  }
-
-  verify_public_headers_target = "${target_name}.verify_public_headers"
-  verify_public_headers(verify_public_headers_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    target_label = ":${target_name}"
-    headers = all_headers
   }
 
   # Add binaries.
@@ -492,12 +485,20 @@ template("sdk_shared_library") {
     headers = all_headers
   }
 
-  main_target_dir = get_label_info(":${main_target_name}", "dir")
-  verify_public_symbols_target_name = "${target_name}_sdk_verify_public_symbols"
+  verify_public_headers_target = "${main_target_name}.verify_public_headers"
+  verify_public_headers(verify_public_headers_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target_label = shared_lib_target
+    headers = all_headers
+  }
+
+  verify_public_symbols_target_name =
+      "${main_target_name}_sdk_verify_public_symbols"
   verify_public_symbols(verify_public_symbols_target_name) {
     current = generated_ifs_file
     reference = ifs_golden_file
-    library_name = main_target_dir
+    library_name =
+        get_label_info(":${main_target_name}", "label_with_toolchain")
 
     deps = [ shared_lib_target ]
   }
@@ -560,10 +561,10 @@ template("sdk_shared_library") {
 
   sdk_manifest_file = "${target_gen_dir}/${manifest_target_name}.sdk"
 
-  verify_runtime_deps_target = "${target_name}_verify"
+  verify_runtime_deps_target = "${main_target_name}_verify"
 
   sdk_verify_runtime_deps(verify_runtime_deps_target) {
-    atom_target = ":$main_target_name"
+    atom_target = shared_lib_target
     manifest_file = sdk_manifest_file
     manifest_target = ":$manifest_target_name"
   }
