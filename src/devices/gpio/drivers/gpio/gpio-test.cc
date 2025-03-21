@@ -1161,16 +1161,27 @@ TEST_F(GpioTest, DoubleGetInterruptAndRelease) {
       *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   gpio_client->GetInterrupt({}).ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_TRUE(result->value()->interrupt.is_valid());
+        driver_test().runtime().Quit();
       });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
   gpio_client->GetInterrupt({}).ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_error());
         EXPECT_EQ(result->error_value(), ZX_ERR_ALREADY_EXISTS);
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  gpio_client->ReleaseInterrupt().ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
         driver_test().runtime().Quit();
       });
   driver_test().runtime().Run();
@@ -1179,16 +1190,10 @@ TEST_F(GpioTest, DoubleGetInterruptAndRelease) {
   gpio_client->ReleaseInterrupt().ThenExactlyOnce(
       [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
         ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-      });
-  gpio_client->ReleaseInterrupt().ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
-        ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_error());
         EXPECT_EQ(result->error_value(), ZX_ERR_NOT_FOUND);
-        driver_test().runtime().Quit();
       });
-  driver_test().runtime().Run();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
