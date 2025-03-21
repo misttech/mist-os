@@ -1265,7 +1265,7 @@ where
                     op,
                 )
             } else {
-                Err(errno!(EPERM))
+                error!(EPERM)
             }
         },
     )

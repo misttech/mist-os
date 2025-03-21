@@ -1154,7 +1154,7 @@ impl CurrentTask {
         // prevents conflicts with fact that SECCOMP_FILTER_FLAG_NEW_LISTENER
         // makes seccomp return an fd.
         if flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH != 0 {
-            Err(errno!(ESRCH))
+            error!(ESRCH)
         } else {
             Ok(id.into())
         }

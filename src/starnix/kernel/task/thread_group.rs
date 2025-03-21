@@ -891,11 +891,11 @@ impl ThreadGroup {
                 return Ok(itimerval::default());
             }
             track_stub!(TODO("https://fxbug.dev/322874521"), "Unsupported itimer type", which);
-            return Err(errno!(ENOTSUP));
+            return error!(ENOTSUP);
         }
 
         if which != ITIMER_REAL {
-            return Err(errno!(EINVAL));
+            return error!(EINVAL);
         }
         let itimer_real = self.itimer_real();
         let prev_remaining = itimer_real.time_remaining();
@@ -916,7 +916,7 @@ impl ThreadGroup {
             return Ok(itimerval::default());
         }
         if which != ITIMER_REAL {
-            return Err(errno!(EINVAL));
+            return error!(EINVAL);
         }
         let remaining = self.itimer_real().time_remaining();
         Ok(itimerval {

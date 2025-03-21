@@ -3369,7 +3369,7 @@ impl MemoryManager {
         if base.checked_add(length).ok_or_else(|| errno!(EINVAL))? <= state.mmap_top.ptr() {
             Ok(UserAddress::from_ptr(base))
         } else {
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         }
     }
     pub fn executable_node(&self) -> Option<NamespaceNode> {
@@ -5650,7 +5650,7 @@ mod tests {
                 2 * *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(ENOMEM))
+            error!(ENOMEM)
         );
 
         // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
@@ -5688,7 +5688,7 @@ mod tests {
                 2 * *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(ENOMEM))
+            error!(ENOMEM)
         );
 
         // Unlike a range which starts within a mapping and extends past the end, this should not assign

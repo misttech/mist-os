@@ -1083,7 +1083,7 @@ pub fn default_ioctl(
             let attributes = file.node().ops().get_attr(has)?;
             if attributes.has.wrapping_key_id {
                 if attributes.wrapping_key_id != policy.master_key_identifier {
-                    return Err(errno!(EEXIST));
+                    return error!(EEXIST);
                 }
             } else {
                 file.node().update_info(|info| {

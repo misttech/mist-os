@@ -43,11 +43,11 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryRegularFile};
 use starnix_logging::track_stub;
 use starnix_types::user_buffer::UserBuffer;
-use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::{errno, error};
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -128,7 +128,7 @@ fn attempt_open_path(
     let result = unsafe { magma_device_import(device_channel, &mut device_out as *mut u64) };
 
     if result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     let magma_device = MagmaDevice { handle: device_out };
 
@@ -143,12 +143,12 @@ fn attempt_open_path(
         )
     };
     if query_result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
 
     let vendor_id = result_out as u16;
     if !supported_vendor_list.contains(&vendor_id) {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     Ok(magma_device)
 }
@@ -203,7 +203,7 @@ fn get_magma_vendor_id(supported_vendor_list: &Vec<u16>) -> Result<u64, Errno> {
         )
     };
     if query_result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     return Ok(result_out);
 }

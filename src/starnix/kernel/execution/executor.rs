@@ -588,7 +588,7 @@ where
         Err(e) => {
             task_builder.release(locked);
             match e.kind() {
-                std::io::ErrorKind::WouldBlock => return Err(errno!(EAGAIN)),
+                std::io::ErrorKind::WouldBlock => return error!(EAGAIN),
                 other => panic!("unexpected error on thread spawn: {other}"),
             }
         }

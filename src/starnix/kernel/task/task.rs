@@ -33,8 +33,8 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred, CLD_CONTINUED,
-    CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
+    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -685,7 +685,7 @@ impl TaskMutableState<Base = Task> {
 
     pub fn set_ptrace(&mut self, tracer: Option<PtraceState>) -> Result<(), Errno> {
         if tracer.is_some() && self.ptrace.is_some() {
-            return Err(errno!(EPERM));
+            return error!(EPERM);
         }
 
         if tracer.is_none() {

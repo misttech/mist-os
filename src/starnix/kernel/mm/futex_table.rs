@@ -56,7 +56,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
         let loaded_value = Self::load_futex_value(current_task, addr)?;
         if value != loaded_value {
-            return Err(errno!(EAGAIN));
+            return error!(EAGAIN);
         }
 
         let key = Key::get_key(current_task, addr)?;
@@ -98,7 +98,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
         let loaded_value = Self::load_futex_value(current_task, addr)?;
         if value != loaded_value {
-            return Err(errno!(EAGAIN));
+            return error!(EAGAIN);
         }
 
         let key = Key::get_key(current_task, addr)?;

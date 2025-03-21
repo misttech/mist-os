@@ -11,7 +11,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
-use starnix_uapi::errors::{errno, Errno, EAGAIN};
+use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::vfs::FdEvents;
 use std::cmp;
@@ -237,7 +237,7 @@ impl LogSubscription {
             // The channel was closed and there's no more messages in the queue.
             Err(mpsc::TryRecvError::Disconnected) => Ok(None),
             // No messages available but the channel hasn't closed.
-            Err(mpsc::TryRecvError::Empty) => Err(errno!(EAGAIN)),
+            Err(mpsc::TryRecvError::Empty) => error!(EAGAIN),
         }
     }
 }

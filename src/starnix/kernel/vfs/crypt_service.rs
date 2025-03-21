@@ -14,7 +14,7 @@ use futures::stream::StreamExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use rand::{thread_rng, Rng};
 use starnix_logging::{log_error, log_info};
-use starnix_uapi::errno;
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Mutex;
@@ -166,7 +166,7 @@ impl CryptService {
             Entry::Occupied(mut e) => {
                 let user_ids = &mut e.get_mut().users;
                 if !user_ids.contains(&uid) {
-                    return Err(errno!(ENOKEY));
+                    return error!(ENOKEY);
                 } else {
                     let index = user_ids.iter().position(|x: &u32| *x == uid).unwrap();
                     user_ids.remove(index);
@@ -176,7 +176,7 @@ impl CryptService {
                 }
             }
             Entry::Vacant(_) => {
-                return Err(errno!(ENOKEY));
+                return error!(ENOKEY);
             }
         }
         Ok(())
@@ -189,7 +189,7 @@ impl CryptService {
         let mut inner = self.inner.lock().unwrap();
         let key_id = EncryptionKeyId::from(wrapping_key_id);
         if !inner.ciphers.contains_key(&key_id) {
-            return Err(errno!(ENOENT));
+            return error!(ENOENT);
         }
         inner.metadata_key = Some(key_id);
         Ok(())

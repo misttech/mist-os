@@ -235,7 +235,7 @@ impl SeccompFilterContainer {
     ) -> Result<(), Errno> {
         let maybe_new_length = self.provided_instructions + original_length + 4;
         if maybe_new_length > SECCOMP_MAX_INSNS_PER_PATH {
-            return Err(errno!(ENOMEM));
+            return error!(ENOMEM);
         }
 
         self.provided_instructions = maybe_new_length;
@@ -300,7 +300,7 @@ impl SeccompFilterContainer {
         // notifier otherwise.
         let filters = &mut current_task.write().seccomp_filters;
         if filters.notifier.is_some() {
-            return Err(errno!(EBUSY));
+            return error!(EBUSY);
         }
         let fd = current_task.add_file(handle, FdFlags::CLOEXEC)?;
         {
@@ -354,7 +354,7 @@ impl SeccompState {
                 return Ok(());
             }
             if seccomp_filter_status != SeccompStateValue::None {
-                return Err(errno!(EINVAL));
+                return error!(EINVAL);
             }
 
             if self
@@ -462,7 +462,7 @@ impl SeccompState {
             }
             SeccompAction::Trace => {
                 track_stub!(TODO("https://fxbug.dev/297311898"), "ptrace seccomp support");
-                Some(Err(errno!(ENOSYS)))
+                Some(error!(ENOSYS))
             }
             SeccompAction::Trap(errno) => {
                 #[cfg(target_arch = "x86_64")]
@@ -512,7 +512,7 @@ impl SeccompState {
                             // clear the thread-local notifier.  Do it now.
                             drop(notifier);
                             current_task.set_seccomp_notifier(None);
-                            return Some(Err(errno!(ENOSYS)));
+                            return Some(error!(ENOSYS));
                         }
                         notifier.create_notification(cookie, msg);
                         notifier.waiters.wait_async_value(&waiter, cookie);
@@ -549,7 +549,7 @@ impl SeccompState {
                     }
                     Some(Ok(0.into()))
                 } else {
-                    Some(Err(errno!(ENOSYS)))
+                    Some(error!(ENOSYS))
                 }
             }
         }
@@ -712,10 +712,10 @@ impl SeccompAction {
                     "trap" => Self::Trap(0).set_logged_bit(&mut new_actions_logged),
                     "user_notif" => Self::UserNotif.set_logged_bit(&mut new_actions_logged),
                     // Not allowed to write anything other than the approved actions to that list.
-                    _ => return Err(errno!(EINVAL)),
+                    _ => return error!(EINVAL),
                 }
             } else {
-                return Err(errno!(EINVAL));
+                return error!(EINVAL);
             }
         }
         kernel.actions_logged.store(new_actions_logged, Ordering::Relaxed);
@@ -926,7 +926,7 @@ impl FileOps for SeccompNotifierFileObject {
         _offset: usize,
         _usize: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        Err(errno!(EINVAL))
+        error!(EINVAL)
     }
 
     fn write(
@@ -937,7 +937,7 @@ impl FileOps for SeccompNotifierFileObject {
         _offset: usize,
         _buffer: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        Err(errno!(EINVAL))
+        error!(EINVAL)
     }
 
     fn ioctl(

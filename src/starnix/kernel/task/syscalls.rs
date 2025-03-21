@@ -2017,7 +2017,7 @@ mod tests {
             {
                 assert_eq!(result, Ok(SUCCESS));
             } else {
-                assert_eq!(result, Err(errno!(EINVAL)));
+                assert_eq!(result, error!(EINVAL));
             }
         }
     }
@@ -2045,7 +2045,7 @@ mod tests {
                 *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         );
 
         let name_just_long_enough = CString::new(vec![b'a'; 255]).unwrap();
@@ -2088,7 +2088,7 @@ mod tests {
                 *PAGE_SIZE - 1,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         );
 
         // Passing an unaligned length does work, however.

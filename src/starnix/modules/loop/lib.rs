@@ -641,7 +641,7 @@ impl LoopDeviceRegistry {
                 }
             }
         }
-        Err(errno!(ENODEV))
+        error!(ENODEV)
     }
 
     fn add<L>(
@@ -686,7 +686,7 @@ impl LoopDeviceRegistry {
                 if let Some(dev) = &k_device {
                     registry.remove_device(locked, current_task, dev.clone());
                 } else {
-                    return Err(errno!(EINVAL));
+                    return error!(EINVAL);
                 }
                 Ok(())
             }

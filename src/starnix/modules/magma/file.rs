@@ -976,7 +976,7 @@ impl FileOps for MagmaFile {
                                 let _ = current_task
                                     .write_object(UserRef::new(request_address), &control);
                             }
-                            return Err(errno!(EINTR));
+                            return error!(EINTR);
                         }
                     }
                 }

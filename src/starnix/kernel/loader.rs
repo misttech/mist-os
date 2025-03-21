@@ -620,7 +620,7 @@ pub fn load_executable(
     // or vice versa.
     if main_elf.arch_width != entry_elf.arch_width {
         log_warn!("interpreter elf and main elf are different architectures!");
-        return Err(errno!(ENOEXEC));
+        return error!(ENOEXEC);
     }
     let entry_addr = entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias);
     let main_elf_entry = main_elf.headers.file_header().entry.wrapping_add(main_elf.vaddr_bias);

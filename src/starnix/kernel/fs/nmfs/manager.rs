@@ -11,7 +11,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt as _, StreamExt as _};
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::errno;
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -209,7 +209,7 @@ impl NetworkManager {
                     "Failed to add empty network to HashMap, was present for id: {}",
                     network_id
                 );
-                return Err(errno!(EEXIST));
+                return error!(EEXIST);
             }
             Entry::Vacant(entry) => entry.insert(None),
         };
@@ -234,7 +234,7 @@ impl NetworkManager {
                             "Failed to add network with id {} to HashMap, already existed",
                             network.netid
                         );
-                        return Err(errno!(EEXIST));
+                        return error!(EEXIST);
                     }
                     let _ = entry.insert(Some(network.clone()));
                 }
@@ -280,12 +280,12 @@ impl NetworkManager {
             let _old_network = match inner.networks.entry(network.netid) {
                 Entry::Occupied(mut entry) => {
                     if let None = entry.get() {
-                        return Err(errno!(ENOENT));
+                        return error!(ENOENT);
                     }
                     entry.insert(Some(network.clone()))
                 }
                 Entry::Vacant(_) => {
-                    return Err(errno!(ENOENT));
+                    return error!(ENOENT);
                 }
             };
             inner.updated_networks.seen += 1;
@@ -323,14 +323,14 @@ impl NetworkManager {
         let default_network_id = self.get_default_network_id();
         if let Some(id) = default_network_id {
             if id == network_id {
-                return Err(errno!(EPERM));
+                return error!(EPERM);
             }
         }
         {
             let mut inner_guard = self.lock();
             let mut inner = inner_guard.as_mut();
             if let None = inner.networks.remove(&network_id) {
-                return Err(errno!(ENOENT));
+                return error!(ENOENT);
             }
             inner.removed_networks.seen += 1;
         }
