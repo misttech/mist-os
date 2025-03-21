@@ -108,7 +108,6 @@ fuchsia_test_package("cpp_driver") {
     ":shim_component",
     ":values",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
 
     # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
