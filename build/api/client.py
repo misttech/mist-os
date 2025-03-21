@@ -192,6 +192,14 @@ class OutputsDatabase(object):
         assert self._database
         return self._database.path_to_gn_label(path)
 
+    def target_name_to_gn_labels(self, target: str) -> T.List[str]:
+        assert self._database
+        return self._database.target_name_to_gn_labels(target)
+
+    def is_valid_target_name(self, target: str) -> bool:
+        assert self._database
+        return self._database.is_valid_target_name(target)
+
 
 def get_build_dir(fuchsia_dir: Path) -> Path:
     """Get current Ninja build directory."""
@@ -380,6 +388,26 @@ def cmd_ninja_path_to_gn_label(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ninja_target_to_gn_labels(args: argparse.Namespace) -> int:
+    """Implement the `ninja_target_to_gn_labels` command."""
+    outputs = OutputsDatabase()
+    if not outputs.load(args.build_dir):
+        return 1
+
+    ninja_target = args.ninja_target
+    if not outputs.is_valid_target_name(ninja_target):
+        print(
+            f"ERROR: Malformed Ninja target file name: {args.ninja_target}",
+            file=sys.stderr,
+        )
+        return 1
+
+    gn_labels = outputs.target_name_to_gn_labels(args.ninja_target)
+    if gn_labels:
+        print("\n".join(sorted(gn_labels)))
+    return 0
+
+
 def _get_target_cpu(build_dir: Path) -> str:
     args_json_path = build_dir / "args.json"
     if not args_json_path.exists():
@@ -457,10 +485,26 @@ def cmd_fx_build_args_to_labels(args: argparse.Namespace) -> int:
             )
             return label
 
-        if args.allow_unknown and not path.startswith("/"):
-            return path
+        error_msg = f"Unknown Ninja path: {path}"
 
-        _error(f"Unknown Ninja path: {path}")
+        if args.allow_targets and outputs.is_valid_target_name(path):
+            target_labels = outputs.target_name_to_gn_labels(path)
+            if len(target_labels) == 1:
+                label_args = qualifier.label_to_build_args(target_labels[0])
+                _warning(
+                    f"Use '{' '.join(label_args)}' instead of Ninja target '{path}'"
+                )
+                return target_labels[0]
+
+            if len(target_labels) > 1:
+                error_msg = (
+                    f"Ambiguous Ninja target name '{path}' matches several GN labels:\n"
+                    + "\n".join(target_labels)
+                )
+            else:
+                error_msg = f"Unknown Ninja target: {path}"
+
+        _error(error_msg)
         nonlocal failure
         failure = True
         return ""
@@ -539,7 +583,7 @@ def main(main_args: T.Sequence[str]) -> int:
     ninja_path_to_gn_label_parser.add_argument(
         "--allow-unknown",
         action="store_true",
-        help="Keep unknown input Nija paths in result.",
+        help="Keep unknown input Ninja paths in result.",
     )
     ninja_path_to_gn_label_parser.add_argument(
         "paths",
@@ -548,6 +592,17 @@ def main(main_args: T.Sequence[str]) -> int:
         help="Ninja output path, relative to the build directory.",
     )
     ninja_path_to_gn_label_parser.set_defaults(func=cmd_ninja_path_to_gn_label)
+
+    ninja_target_to_gn_labels_parser = subparsers.add_parser(
+        "ninja_target_to_gn_labels",
+        help="Find all GN labels that output a target with a given file name",
+    )
+    ninja_target_to_gn_labels_parser.add_argument(
+        "ninja_target", help="Ninja target file name only."
+    )
+    ninja_target_to_gn_labels_parser.set_defaults(
+        func=cmd_ninja_target_to_gn_labels
+    )
 
     gn_label_to_ninja_paths_parser = subparsers.add_parser(
         "gn_label_to_ninja_paths",
@@ -575,7 +630,9 @@ def main(main_args: T.Sequence[str]) -> int:
         description="Convert a series of `fx build` arguments into a list of fully qualified GN labels.",
     )
     fx_build_args_to_labels_parser.add_argument(
-        "--allow-unknown", action="store_true"
+        "--allow-targets",
+        action="store_true",
+        help="Try to convert Ninja target file names (not paths) to GN labels.",
     )
     fx_build_args_to_labels_parser.add_argument(
         "--args", required=True, nargs=argparse.REMAINDER

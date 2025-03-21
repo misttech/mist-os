@@ -115,10 +115,41 @@ class NinjaOutputsBase(object):
         """
         return ""
 
+    @staticmethod
+    def is_valid_target_name(target: str) -> bool:
+        """Returns true if input is a valid target file name.
+
+        Args:
+            target: An input string.
+        Returns:
+            True if the input if a file name, i.e. not a file path that
+            contains a directory separator, or a GN or Bazel target that
+            begins with @ or //.
+        """
+        return all(target.find(ch) < 0 for ch in "@/:\\")
+
+    def target_name_to_gn_labels(self, target: str) -> List[str]:
+        """Return the GN labels that matches a given target name if possible.
+
+        This operation is slow and should only be performed as a fallback.
+
+        Args:
+            target: A target name, i.e. one without any separator (colon or slash)
+        Returns:
+            A list of GN labels, each one having a Ninja output path whose
+            basename matches |target|.
+        """
+        if not self.is_valid_target_name(target):
+            raise ValueError(f"Malformed target name: {target}")
+        return self.get_target_labels_internal(target)
+
     def get_labels_internal(self) -> List[str]:
         return []
 
     def get_paths_internal(self) -> List[str]:
+        return []
+
+    def get_target_labels_internal(self, target: str) -> List[str]:
         return []
 
 
@@ -167,6 +198,14 @@ class NinjaOutputsJSON(NinjaOutputsBase):
 
     def path_to_gn_label(self, path: str) -> str:
         return self._path_to_label.get(path, "")
+
+    def get_target_labels_internal(self, target: str) -> List[str]:
+        candidate_paths = [
+            p
+            for p in self._path_to_label.keys()
+            if p.rpartition("/")[2] == target
+        ]
+        return sorted({self._path_to_label[p] for p in candidate_paths})
 
 
 class NinjaOutputsTabular(NinjaOutputsBase):
@@ -234,6 +273,17 @@ class NinjaOutputsTabular(NinjaOutputsBase):
             return items[0].decode()
 
         return ""
+
+    def get_target_labels_internal(self, target: str) -> List[str]:
+        labels = set()
+        for line in self._find_rows_containing_target(target.encode()):
+            items = line.split(b"\t")
+            for item in items[1:]:
+                if item.decode().rpartition("/")[2] == target:
+                    labels.add(items[0].decode())
+                    break
+
+        return sorted(labels)
 
     def get_labels_internal(self) -> List[str]:
         result = []
@@ -368,6 +418,42 @@ class NinjaOutputsTabular(NinjaOutputsBase):
             ):
                 # Mismatch.
                 content_pos = pos + value_len
+                continue
+
+            # Find line start and end.
+            line_start = content.rfind(10, 0, pos)
+            if line_start < 0:
+                line_start = 0
+            else:
+                line_start += 1
+            line_end = content.find(10, pos, content_len)
+            if line_end < 0:
+                line_end = content_len
+
+            result.append(content[line_start:line_end])
+            content_pos = line_end
+
+        return result
+
+    def _find_rows_containing_target(self, target: bytes) -> List[bytes]:
+        content = self._content
+        result = []
+        target_len = len(target)
+        content_len = len(content)
+        content_pos = 0
+        while content_pos < content_len:
+            pos = content.find(target, content_pos)
+            if pos < 0:
+                break
+
+            # Found it, check boundaries.
+            if (
+                pos == 0
+                or content[pos - 1] not in (9, ord("/"))
+                or content[pos + target_len] not in (9, 10)
+            ):
+                # Mismatch.
+                content_pos = pos + target_len
                 continue
 
             # Find line start and end.
