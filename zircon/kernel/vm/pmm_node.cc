@@ -1019,9 +1019,12 @@ void PmmNode::Dump(bool is_panic) const {
         "%zu\n",
         this, free_count, free_count * PAGE_SIZE, free_loaned_count, free_loaned_count * PAGE_SIZE,
         arena_cumulative_size_);
+    PmmStateCount count_sum = {};
     for (const auto& a : active_arenas()) {
-      a.Dump(false, false);
+      a.Dump(false, false, &count_sum);
     }
+    printf("Totals\n");
+    PrintPageStateCounts(count_sum);
   };
 
   if (is_panic) {

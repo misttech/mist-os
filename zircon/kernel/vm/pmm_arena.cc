@@ -199,13 +199,13 @@ vm_page_t* PmmArena::FindFreeContiguous(size_t count, uint8_t alignment_log2) {
   return result;
 }
 
-void PmmArena::CountStates(size_t state_count[VmPageStateIndex(vm_page_state::COUNT_)]) const {
+void PmmArena::CountStates(PmmStateCount* state_count) const {
   for (size_t i = 0; i < size() / PAGE_SIZE; i++) {
-    state_count[VmPageStateIndex(page_array_[i].state())]++;
+    (*state_count)[VmPageStateIndex(page_array_[i].state())]++;
   }
 }
 
-void PmmArena::Dump(bool dump_pages, bool dump_free_ranges) const {
+void PmmArena::Dump(bool dump_pages, bool dump_free_ranges, PmmStateCount* counts_sum) const {
   printf("  arena %p: name '%s' base %#" PRIxPTR " size %s (0x%zx) flags 0x%x\n", this, name(),
          base(), pretty::FormattedBytes(size()).c_str(), size(), flags());
   printf("\tpage_array %p search_hint %lu\n", page_array_, search_hint_);
@@ -218,14 +218,14 @@ void PmmArena::Dump(bool dump_pages, bool dump_free_ranges) const {
   }
 
   // count the number of pages in every state
-  size_t state_count[VmPageStateIndex(vm_page_state::COUNT_)] = {};
-  CountStates(state_count);
+  PmmStateCount state_count = {};
+  CountStates(&state_count);
 
-  printf("\tpage states:\n");
-  for (unsigned int i = 0; i < VmPageStateIndex(vm_page_state::COUNT_); i++) {
-    printf("\t\t%-12s %-16zu (%zu bytes)\n", page_state_to_string(vm_page_state(i)), state_count[i],
-           state_count[i] * PAGE_SIZE);
+  for (size_t ix = 0; ix < counts_sum->size(); ++ix) {
+    (*counts_sum)[ix] += state_count[ix];
   }
+
+  PrintPageStateCounts(state_count);
 
   // dump the free pages
   if (dump_free_ranges) {
@@ -248,5 +248,13 @@ void PmmArena::Dump(bool dump_pages, bool dump_free_ranges) const {
     if (last != -1) {
       printf("\t\t%#" PRIxPTR " - %#" PRIxPTR "\n", base() + last * PAGE_SIZE, base() + size());
     }
+  }
+}
+
+void PrintPageStateCounts(const PmmStateCount& state_count) {
+  printf("\tpage states:\n");
+  for (unsigned int i = 0; i < VmPageStateIndex(vm_page_state::COUNT_); i++) {
+    printf("\t\t%-12s %-16zu (%zu bytes)\n", page_state_to_string(vm_page_state(i)), state_count[i],
+           state_count[i] * PAGE_SIZE);
   }
 }

@@ -11,6 +11,7 @@
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
+#include <ktl/array.h>
 #include <vm/page.h>
 #include <vm/phys/arena.h>
 
@@ -25,6 +26,9 @@ typedef struct pmm_arena_info {
   paddr_t base;
   size_t size;
 } pmm_arena_info_t;
+
+using PmmStateCount = ktl::array<size_t, static_cast<size_t>(vm_page_state::COUNT_)>;
+void PrintPageStateCounts(const PmmStateCount& state_count);
 
 class PmmNode;
 
@@ -51,7 +55,7 @@ class PmmArena {
   // Counts the number of pages in every state. For each page in the arena,
   // increments the corresponding vm_page_state::*-indexed entry of
   // |state_count|. Does not zero out the entries first.
-  void CountStates(size_t state_count[VmPageStateIndex(vm_page_state::COUNT_)]) const;
+  void CountStates(PmmStateCount* state_count) const;
 
   vm_page_t* get_page(size_t index) { return &page_array_[index]; }
 
@@ -70,7 +74,7 @@ class PmmArena {
     return (address >= info_.base && address <= info_.base + info_.size - 1);
   }
 
-  void Dump(bool dump_pages, bool dump_free_ranges) const;
+  void Dump(bool dump_pages, bool dump_free_ranges, PmmStateCount* counts) const;
 
  private:
   // Walks the region defined by |offset| and |count| and returns the index of
