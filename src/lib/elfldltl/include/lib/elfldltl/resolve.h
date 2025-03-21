@@ -146,7 +146,17 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, ModuleList& modules,
       // folded into DT_RELR), but it doesn't have to be.  In practice, this
       // comes up for TLS relocations which still need to have their specific
       // reloc type but can be for purely module-local references.
-      return fit::ok(Definition{&ref, &ref_module});
+      return fit::ok(Definition{
+          .symbol_ = &ref,
+          .module_ = &ref_module,
+
+          // This member is only needed when tls_type == RelocateTls::kDesc,
+          // but it doesn't hurt to set it unconditionally.  The self-defined
+          // symbol (either a real one or the index 0 pseudo-symbol that always
+          // has value == 0) will provide the value (offset within module) to
+          // go with the reloc's addend.
+          .tlsdesc_resolver_ = &tlsdesc_resolver,
+      });
     }
 
     SymbolName name{ref_module.symbol_info(), ref};
