@@ -207,6 +207,17 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
+                source_name: "fuchsia.kernel.TracingResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/sshd-host/shell:**",
+                    "/core/testing/system-tests:**",
+                    "/core/test_manager/system-tests:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [

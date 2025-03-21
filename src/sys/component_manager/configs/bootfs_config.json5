@@ -38,6 +38,7 @@
                 "fuchsia.kernel.MsiResource",
                 "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",

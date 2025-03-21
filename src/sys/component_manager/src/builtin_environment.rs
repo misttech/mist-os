@@ -82,6 +82,7 @@ use builtins::power_resource::PowerResource;
 use builtins::profile_resource::ProfileResource;
 use builtins::root_job::RootJob;
 use builtins::stall_resource::StallResource;
+use builtins::tracing_resource::TracingResource;
 use builtins::vmex_resource::VmexResource;
 use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{
@@ -1370,6 +1371,28 @@ impl BuiltinEnvironment {
         if let Some(stall_resource) = stall_resource {
             root_input_builder.add_builtin_protocol_if_enabled::<fkernel::StallResourceMarker>(
                 move |stream| stall_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the TracingResource service.
+        let tracing_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_TRACING_BASE,
+                        1,
+                        b"tracing",
+                    )
+                    .ok()
+            })
+            .map(TracingResource::new)
+            .and_then(Result::ok);
+        if let Some(tracing_resource) = tracing_resource {
+            root_input_builder.add_builtin_protocol_if_enabled::<fkernel::TracingResourceMarker>(
+                move |stream| tracing_resource.clone().serve(stream).boxed(),
             );
         }
 

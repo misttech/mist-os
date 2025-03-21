@@ -155,6 +155,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.process.Launcher",

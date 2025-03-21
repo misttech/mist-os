@@ -240,6 +240,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",

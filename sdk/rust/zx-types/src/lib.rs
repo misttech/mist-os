@@ -577,6 +577,7 @@ multiconst!(zx_rsrc_system_base_t, [
     ZX_RSRC_SYSTEM_MSI_BASE         = 11;
     ZX_RSRC_SYSTEM_DEBUGLOG_BASE    = 12;
     ZX_RSRC_SYSTEM_STALL_BASE       = 13;
+    ZX_RSRC_SYSTEM_TRACING_BASE     = 14;
 ]);
 
 // clock ids
