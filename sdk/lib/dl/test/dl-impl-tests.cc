@@ -199,16 +199,36 @@ thread_local DlImplTestsTls DlImplTestsTls::cleanup_at_thread_exit_;
 // call on this same thread within this same test.  Its .data() should always
 // match what's in _dl_tlsdesc_runtime_dynamic_blocks.  Its only real purpose
 // is just to remember the old size so EnlargeDynamicTlsArray can be used.
-void DlImplTestsTls::Prepare(size_t dynamic_tls_size) {
+void DlImplTestsTls::Prepare(const RuntimeDynamicLinker& linker) {
+  size_t dynamic_tls_size = linker.DynamicTlsCount();
+
   UnsizedDynamicTlsArray used_blocks = ExchangeRuntimeDynamicBlocks({});
   ASSERT_EQ(used_blocks.release(), cleanup_at_thread_exit_.blocks_.data());
 
-  fbl::AllocChecker ac;
-  SizedDynamicTlsArray new_blocks =
-      EnlargeDynamicTlsArray(ac, cleanup_at_thread_exit_.blocks_, dynamic_tls_size);
-  ASSERT_TRUE(ac.check());
+  size_t prev_tls_size = cleanup_at_thread_exit_.blocks_.size();
+  ASSERT_GE(dynamic_tls_size, prev_tls_size);
 
-  cleanup_at_thread_exit_.blocks_ = std::move(new_blocks);
+  // Only enlarge the dynamic TLS array if new TLS modules were loaded.
+  if (dynamic_tls_size > prev_tls_size) {
+    fbl::AllocChecker ac;
+    SizedDynamicTlsArray new_blocks =
+        EnlargeDynamicTlsArray(ac, cleanup_at_thread_exit_.blocks_, dynamic_tls_size);
+    ASSERT_TRUE(ac.check());
+
+    // Initialize any new TLS blocks for TLS modules that have been loaded since
+    // the last time __dl_tlsdesc_runtime_dynamic_blocks was prepared for TLS access.
+    DynamicTlsPtr* next = new_blocks.begin() + prev_tls_size;
+    for (const RuntimeModule& module : linker.modules()) {
+      if (module.tls_module_id() <= (linker.max_static_tls_modid() + prev_tls_size)) {
+        continue;
+      }
+      fbl::AllocChecker block_ac;
+      *next++ = DynamicTlsPtr::New(block_ac, module.tls_module());
+      ASSERT_TRUE(block_ac.check());
+    }
+    cleanup_at_thread_exit_.blocks_ = std::move(new_blocks);
+  }
+
   _dl_tlsdesc_runtime_dynamic_blocks = cleanup_at_thread_exit_.blocks_.data();
 }
 

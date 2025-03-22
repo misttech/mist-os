@@ -57,6 +57,8 @@ class RuntimeDynamicLinker {
 
   constexpr const ModuleList& modules() const { return modules_; }
 
+  size_t max_static_tls_modid() const { return max_static_tls_modid_; }
+
   // Lookup a symbol from the given module, returning a pointer to it in memory,
   // or an error if not found (ie undefined symbol).
   fit::result<Error, void*> LookupSymbol(const RuntimeModule& root, const char* ref);
@@ -160,13 +162,7 @@ class RuntimeDynamicLinker {
   [[nodiscard]] fit::result<Error> PrepareTlsBlocksForThread(void* tp) const;
 
   // The number of dynamic TLS modules that are loaded.
-  size_t DynamicTlsCount() const {
-    // TODO(https://fxbug.dev/342480690): Hard-code for the test that loads one
-    // module with a PT_TLS segment.  The proper bookkeeping for this is not
-    // yet in place. Uncomment this when libdl's new TlsDescResolver is wired in.
-    // return max_tls_modid_ - max_static_tls_modid_;
-    return 1;
-  }
+  size_t DynamicTlsCount() const { return max_tls_modid_ - max_static_tls_modid_; }
 
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).

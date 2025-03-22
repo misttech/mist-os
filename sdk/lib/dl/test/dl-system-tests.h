@@ -24,7 +24,6 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
   static constexpr bool kCanMatchExactError = false;
-
 #ifdef __Fuchsia__
   // Musl always prioritizes a loaded module for symbol lookup.
   static constexpr bool kStrictLoadOrderPriority = true;

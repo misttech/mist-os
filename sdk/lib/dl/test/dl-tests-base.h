@@ -47,9 +47,6 @@ class DlTestsBase : public ::testing::Test {
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
 
-  // Whether the test fixture supports dynamic TLS.
-  static constexpr bool kSupportsDynamicTls = true;
-
   // Whether the test fixture's dlclose function will run finalizers.
   static constexpr bool kDlCloseCanRunFinalizers = true;
 

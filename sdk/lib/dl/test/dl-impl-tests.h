@@ -28,7 +28,7 @@ class DlImplTestsTls {
   // integration of thread startup with RuntimeDynamicLinker, and for the
   // synchronization regime for existing threads when dlopen expands the
   // _dl_tlsdesc_runtime_dynamic_blocks arrays.
-  static void Prepare(size_t dynamic_tls_size);
+  static void Prepare(const RuntimeDynamicLinker& linker);
 
   // This happens at the end of each test, which is only on the main thread.
   // Always leave a clean slate for the next test.
@@ -62,8 +62,6 @@ class DlImplTests : public Base {
   // since the error message returned from the libdl implementation will be the
   // same regardless of the OS.
   static constexpr bool kCanMatchExactError = true;
-  // TODO(https://fxbug.dev/342480690): Support Dynamic TLS
-  static constexpr bool kSupportsDynamicTls = false;
   // TODO(https://fxbug.dev/382529434): Have dlclose() run finalizers
   static constexpr bool kDlCloseCanRunFinalizers = false;
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
@@ -152,7 +150,7 @@ class DlImplTests : public Base {
   // A test will call this function before the running thread accesses a TLS
   // variable. This function will allocate and initialize TLS data on the
   // thread so the thread can access that data.
-  void PrepareForTlsAccess() { DlImplTestsTls::Prepare(dynamic_linker_->DynamicTlsCount()); }
+  void PrepareForTlsAccess() { DlImplTestsTls::Prepare(*dynamic_linker_); }
 
  private:
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;

@@ -332,7 +332,8 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   }
 
   // Access TLS data from the 'early' module.
-  auto access_early_var = [&early_module = std::as_const(early_module)] {
+  auto access_early_var = [&self, &early_module = std::as_const(early_module)] {
+    self.PrepareForTlsAccess();
     AccessEarlyLoadedVar(early_module);
   };
 
@@ -370,10 +371,6 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
@@ -393,10 +390,6 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
@@ -417,10 +410,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
@@ -441,10 +430,6 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
@@ -515,7 +500,8 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   };
 
   // Access TLS data from the 'early' module.
-  auto access_early_var = [&early_module = std::as_const(early_module)] {
+  auto access_early_var = [&self, &early_module = std::as_const(early_module)] {
+    self.PrepareForTlsAccess();
     AccessEarlyLoadedVar(early_module);
   };
 
@@ -560,10 +546,6 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
@@ -584,10 +566,6 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
@@ -608,10 +586,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
@@ -632,10 +606,6 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
@@ -694,10 +664,6 @@ void DynamicTlsGetAddrRelocTest(auto& self, const TlsLoadedSymbolNames& names) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires dynamic TLS support";
-  }
-
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = "tls-get-addr-global-dynamic-reloc.so",
       .data_symbol = kGdDataSymbolName,
@@ -708,10 +674,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires dynamic TLS support";
-  }
-
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = "tls-get-addr-local-dynamic-reloc.so",
       .data_symbol = kLdDataSymbolName,

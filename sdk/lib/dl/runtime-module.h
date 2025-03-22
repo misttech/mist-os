@@ -27,6 +27,7 @@
 #include <fbl/vector.h>
 
 #include "diagnostics.h"
+#include "tls-desc-resolver.h"
 
 namespace dl {
 
@@ -151,6 +152,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr AbiModule& module() { return abi_module_; }
   constexpr const AbiModule& module() const { return abi_module_; }
 
+  constexpr void set_tls_module(TlsModule tls_module) { tls_module_ = tls_module; }
   constexpr const TlsModule& tls_module() const { return tls_module_; }
 
   size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
@@ -209,6 +211,11 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr void set_global() { abi_module_.symbols_visible = true; }
   constexpr bool is_local() const { return !is_global(); }
 
+  // This is the list of TlsDesc objects (see tls-desc-resolver.h) that was set
+  // during TLS relocation for this module. The RuntimeModule owns this list:
+  // it will get destroyed with the module.
+  constexpr TlsdescIndirectList& tls_desc_indirect_list() { return tls_desc_indirect_list_; }
+
   // Run the init functions for this module (as the root module) and the init
   // functions for all its dependencies.
   void InitializeModuleTree();
@@ -234,6 +241,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   size_type static_tls_bias_ = 0;
   bool can_unload_ = true;
   bool initialized_ = false;
+  TlsdescIndirectList tls_desc_indirect_list_;
 };
 
 // This is the module tree view type returned by RuntimeModule::module_tree.
