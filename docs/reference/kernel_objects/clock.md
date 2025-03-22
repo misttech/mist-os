@@ -180,8 +180,6 @@ configured with a backstop time that is greater than the current clock
 monotonic time. If this was allowed, this would result in a state where a
 clock's current time is set to a time before its backstop time.
 
-
-
 ### Maintaining a clock {#maintaining-a-clock}
 
 Users who possess **ZX_RIGHT_WRITE** permissions for a clock object may act as a
@@ -230,10 +228,176 @@ dates, or DRM license expiration), they should understand which component in the
 system is maintaining their clock, and what guarantees that maintainer provides
 when it comes to the confidence levels of its published error bound estimates.
 
-## SYSCALLS
+### Mappable clocks
+
+In addition to reading a clock or getting its details using the standard
+syscalls (`zx_clock_read()` and `zx_clock_get_details()`), Zircon kernel clocks
+offer another approach which can decrease observation overhead by (almost
+always) skipping the need to enter the Zircon kernel in order to observe the
+clock.  The main idea here is that clocks are, at their core, nothing more than
+an affine transformation applied to the current value of the selected reference
+clock.  If the transformation state can be accessed by user-mode via shared
+memory, and the underlying reference clock does not require entering the Zircon
+kernel to read, then the synthetic clock can be also observed without ever
+needing to enter the kernel. Enter "mappable" clocks.
+
+#### Creation
+
+A mappable kernel clock can be created by calling `zx_clock_create()` and
+passing `ZX_CLOCK_OPT_MAPPABLE` at the time of creation. The newly created clock
+handle will contain the `ZX_RIGHT_MAP` permission as well as all of the other
+default permissions.  Additionally, the options field reported via a get-details
+operation will contain the `ZX_CLOCK_OPT_MAPPABLE` flag, reflecting the fact
+that this is a mappable clock.
+
+#### Mapping
+
+In order to observe the clock's state using shared memory, two things must
+happen first.
+
+1) The mapped size of the clock state must be determined.
+2) The clock's shared state must be mapped into the user's address space.
+
+To fetch the clock's mapped size, users must call `zx_object_get_info()` with
+the `ZX_INFO_CLOCK_MAPPED_SIZE` topic, passing a `uint64_t` sized buffer to
+receive the mapped size of the clock.
+
+Once the size is known, users may call `zx_vmar_map_clock()` in order to
+actually map the clock's state into their address space.  This call operates
+very similarly to `zx_vmap_map_vmo()`, only with some extra built in
+restrictions.  Notably:
+
+1) Only the `ZX_VM_PERM_READ` permission is allowed, all of the other
+   `ZX_VM_PERM` flags are are explicitly disallowed, regardless of the handle
+   rights the user possesses.  Mapped clock data must always be read only.
+2) The `len` parameter passed to the syscall *must* match the value retrieved
+   from the get-info call.
+3) There is no ability to specify a `vmo_offset` when mapping the clock's state.
+   The entire clock state region must always be mapped.
+
+Mapping a clock requires both the `ZX_RIGHT_READ` and `ZX_RIGHT_MAP` permissions
+on the clock handle.
+
+A successful map operation will return the virtual address of where the clock
+object's state has been mapped in the specified VMAR.
+
+#### Unmapping
+
+The process of unmapping a clock is identical to the process of unmapping a VMO
+or an IO Buffer region.  Users simply call `zx_vmar_unmap()` on the VMAR they
+used to map the clock, passing the length received from the original get-info
+call, and virtual address received from the `zx_clock_map()` call.
+
+Users may close their clock's handle after mapping it and still read the
+clock's state.  Just like closing a VMO handle will not destroy any mappings of
+that VMO, closing the clock handle will also not destroy any of its mappings.
+See `zx_vmar_unmap()` and `zx_vmar_destroy()`.
+
+#### Observing a mapped clock
+
+To observe a mapped clock, users call either `zx_clock_read_mapped()` or
+`zx_clock_get_details_mapped()`, passing the virtual address for the mapped
+clock state as the first parameter.  Everything else remains the same, please
+refer to the documentation for `zx_clock_read()` and `zx_clock_get_details()`
+for more information.
+
+Any of the following actions will result in undefined behavior:
+
+ - Attempting to call a mapped clock observation syscall using any virtual
+   address aside from the one returned by the original call to `zx_clock_map()`.
+ - Attempting to call a mapped clock observation syscall using clock state which
+   has been either partially, or completely, unmapped.
+
+Additionally, users *must not* make any attempt to use the mapped clock state to
+infer details about the clock itself.  The format of the clock's state is
+unspecified and subject to change at any time.  The *only* legitimate way to use
+a clock's mapped state is in conjunction with calls to `zx_clock_read_mapped()
+or `zx_clock_get_details_mapped()`.
+
+When properly accessed using the provided syscalls, clock observations will be
+"multi-observer" consistent, meaning the properties such as monotonicity and
+continuity will be consistent across a set of observations made by multiple
+observers _if those observations have an established order_. See
+[here](/docs/contribute/governance/rfcs/0266_memory_mappable_kernel_clocks.md#Consistency)
+for details.
+
+#### Clock mapping representation in `zx_info_maps_t` and `zx_info_vmos_t` structures
+
+Zircon currently provides two diagnostic `zx_object_get_info()` topics for
+fetching information about about currently active mappings, `ZX_INFO_VMAR_MAPS`
+and `ZX_INFO_PROCESS_MAPS`, both of which will return an array of
+`zx_info_maps_t` strcutres describing the currently active mappings in the
+specified VMAR, or process.
+
+Clock mappings will be enumerated in the same way that VMO mappings are, with
+the following differences.
+
+1) Since clocks are not currently nameable objects, the string "kernel-clock"
+   will be returned as the name of the mapping, instead of the current name of a
+   VMO as would typically be done.
+2) The KOID field of the mapping will be populated using the clock object's
+   KOID.
+
+Additionally, programs can get info on the current VMOs associated with a
+process using the `ZX_INFO_PROCESS_VMOS` topic to fetch an array of
+`zx_info_vmos_t` structures.  When a process has a clock
+mapped into its address space, the clock will show up in this enumaration as
+well.  Just like in the `zx_info_maps_t` case, the KOID reported will be the
+KOID of the clock object, and the name reported will be "kernel-clock".
+Additionally, the `flags` field of the entry will have the
+`ZX_INFO_VMO_VIA_MAPPING` bit set to indicate that the object is being
+enumerated on the list because of the active mapping.
+
+#### Example
+
+Here is a simplified example showing how you might map and read a clock.
+
+```c++
+class MappedClockReader {
+ public:
+  MappedClockReader(const zx::clock& clock) {
+    zx_status_t status = clock.get_info(ZX_INFO_CLOCK_MAPPED_SIZE, &mapped_clock_size_,
+                                        sizeof(mapped_clock_size_), nullptr, nullptr));
+    ZX_ASSERT(status == ZX_OK);
+
+    status = zx::vmar::root_self()->map_clock(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0, clock,
+                                              mapped_clock_size_, &clock_addr_);
+    ZX_ASSERT(status == ZX_OK);
+  }
+
+  ~MappedClockReader() {
+    if (clock_addr_ != 0) {
+      zx::vmar::root_self()->unmap(clock_addr_, mapped_clock_size_);
+    }
+  }
+
+  zx_time_t Read() {
+    zx_time_t result{0};
+    const zx_status_t status = zx::clock::read_mapped(clock_addr_, &result);
+    ZX_ASSERT(status == ZX_OK);
+    return result;
+  }
+
+ private:
+  zx_vaddr_t clock_addr_{0};
+  uint64_t mapped_clock_size_{0};
+}
+```
+
+## REFERENCES
 
  - [clock transformations](/docs/concepts/kernel/clock_transformations.md)
  - [`zx_clock_create()`](/reference/syscalls/clock_create.md) - create a clock
  - [`zx_clock_read()`](/reference/syscalls/clock_read.md) - read the time of the clock
- - [`zx_clock_get_details()`](/reference/syscalls/clock_get_details.md) - fetch the details of a clock's relationship to clock monotonic
- - [`zx_clock_update()`](/reference/syscalls/clock_update.md) - adjust the current relationship of a clock to the clock monotonic reference.
+ - [`zx_clock_get_details()`](/reference/syscalls/clock_get_details.md) - fetch the details of a clock's relationship to its reference
+ - [`zx_clock_update()`](/reference/syscalls/clock_update.md) - adjust the current relationship of a clock to its reference
+ - [mappable clocks RFC](/docs/contribute/governance/rfcs/0266_memory_mappable_kernel_clocks.md)
+ - [`zx_clock_read_mapped()`](/reference/syscalls/clock_read_mapped.md) - read the time of a mapped clock
+ - [`zx_clock_get_details_mapped()`](/reference/syscalls/clock_get_details_mapped.md) - fetch the details of a mapped clock's relationship to its reference
+ - [`zx_clock_map()`](/reference/syscalls/vmar_map_clock.md) - map a clock's state into the specified VMAR
+ - [`zx_vmar_destroy()`](/reference/syscalls/vmar_destroy.md) - destroy a VMAR and all of the mappings in it.
+ - [`zx_vmar_map()`](/reference/syscalls/vmar_map.md) - map all or part of a VMO the specified VMAR
+ - [`zx_vmar_unmap()`](/reference/syscalls/vmar_unmap.md) - unmap a currently active mapping in a VMAR
+ - [`ZX_INFO_CLOCK_MAPPED_SIZE`]: (/reference/syscalls/object_get_info#zx_info_clock_mapped_size)
+ - [`ZX_INFO_VMAR_MAPS`](/reference/syscalls/object_get_info#zx_info_vmar_maps) - Fetch info about currently active mappins in a VMAR.
+ - [`ZX_INFO_PROCESS_MAPS`](/reference/syscalls/object_get_info#zx_info_process_maps) - Fetch info about currently active mappins in a process.

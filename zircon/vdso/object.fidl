@@ -2167,6 +2167,18 @@ closed protocol Object {
     /// } zx_info_memory_stall_t;
     /// ```
     ///
+    /// ### ZX_INFO_CLOCK_MAPPED_SIZE
+    ///
+    /// Returns the mapped size of a mappable clock object.  The size is returned via a `u64` out
+    /// parameter, and is the value which must be passed to
+    /// [`zx_vmar_map_clock()`](vmar_map_clock.md) when mapping a clock's state.
+    ///
+    /// *handle* type: `Clock`
+    /// *buffer* type: `uint64_t'
+    ///
+    /// See also
+    /// [mappable clocks](/docs/reference/kernel_objects/clock.md#mappable_clocks) for more details.
+    ///
     /// ## Rights
     ///
     /// If *topic* is `ZX_INFO_PROCESS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.

@@ -334,3 +334,9 @@ zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t 
   return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, ktl::move(*vmo),
                          region_offset, region_rights, region_length, mapped_addr);
 }
+
+zx_status_t sys_vmar_map_clock(zx_handle_t handle, zx_vm_option_t options, uint64_t vmar_offset,
+                               zx_handle_t clock_handle, uint64_t len,
+                               user_out_ptr<zx_vaddr_t> mapped_addr) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
