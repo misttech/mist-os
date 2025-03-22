@@ -9,13 +9,15 @@ use fidl_fuchsia_hardware_overnet::{
 };
 use fuchsia_async::Socket;
 use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
 use futures::future::{select, Either};
-use futures::io::{BufReader, ReadHalf, WriteHalf};
+use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, TryStreamExt};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use std::io::Error;
 use std::pin::pin;
-use usb_vsock::{Header, Packet, PacketMut, PacketType, VsockPacketIterator};
+use std::sync::Arc;
+use usb_vsock::{Connection, Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator};
 use zx::{SocketOpts, Status};
 
 static MTU: usize = 1024;
@@ -129,18 +131,18 @@ impl<P: SocketCallback> UsbConnection<P> {
             };
             // reset whether we found the magic string last time around or not.
             found_magic = false;
+            let (connection_tx, _connection_rx) = mpsc::channel(5);
+            let connection = Arc::new(Connection::new(client_socket, connection_tx));
 
-            let (client_reader, mut client_writer) = client_socket.split();
-            let mut client_reader = BufReader::new(client_reader);
-            let client_socket_copy =
-                mtu_copy::<MTU>(&mut client_reader, &mut self.usb_socket_writer);
-            let usb_socket_copy = magic_interrupt_copy::<MTU>(
+            let usb_socket_writer =
+                usb_socket_writer::<MTU>(&connection, &mut self.usb_socket_writer);
+            let usb_socket_reader = usb_socket_reader::<MTU>(
                 &mut found_magic,
                 &mut self.usb_socket_reader,
-                &mut client_writer,
+                &connection,
             );
-            let client_socket_copy = pin!(client_socket_copy);
-            let usb_socket_copy = pin!(usb_socket_copy);
+            let client_socket_copy = pin!(usb_socket_writer);
+            let usb_socket_copy = pin!(usb_socket_reader);
             let res = select(client_socket_copy, usb_socket_copy).await;
             match res {
                 Either::Left((Err(err), _)) => {
@@ -171,40 +173,30 @@ async fn read_packet_stream<'a>(
     Ok(Some(VsockPacketIterator::new(&buffer[0..size])))
 }
 
-/// Reads from `reader` in `MTU`-sized chunks and then writes them out to `writer`, ensuring that
-/// we never write an item larger than `MTU` to it. This must be used with a datagram socket
-/// or other writer where writes are guaranteed to transmit all data if the write returns success.
-async fn mtu_copy<const MTU: usize>(
-    reader: &mut (impl AsyncRead + Unpin),
-    writer: &mut (impl AsyncWrite + Unpin),
+async fn usb_socket_writer<const MTU: usize>(
+    connection: &Connection<Vec<u8>>,
+    usb_writer: &mut (impl AsyncWrite + Unpin),
 ) -> Result<(), Error> {
-    let mut data = [0; MTU];
+    let mut builder = UsbPacketBuilder::new(vec![0; MTU]);
     loop {
-        // add a data header to the packet
-        let packet = PacketMut::new_in(PacketType::Data, &mut data);
-        let payload_len = reader.read(packet.payload).await?;
-        trace!("Read {payload_len} bytes from normal source");
-        if payload_len == 0 {
-            break;
-        }
-        let packet_len = packet.finish(payload_len).unwrap();
-        // we assert here because this must be used with a datagram-like socket.
-        assert_eq!(writer.write(&data[..packet_len]).await?, packet_len);
+        builder = connection.fill_usb_packet(builder).await;
+        let buf = builder.take_usb_packet().unwrap();
+        assert_eq!(
+            buf.len(),
+            usb_writer.write(buf).await?,
+            "datagram socket sent incomplete packet"
+        );
     }
-    Ok(())
 }
 
-/// Reads from `reader` until it polls and finds the 'magic' string in the buffer. Until then
-/// it writes all data received to the `writer`, leaving the magic string in the buffer if it
-/// was found.
-async fn magic_interrupt_copy<const MTU: usize>(
+async fn usb_socket_reader<const MTU: usize>(
     found_magic: &mut bool,
-    reader: &mut (impl AsyncRead + Unpin),
-    writer: &mut (impl AsyncWrite + Unpin),
+    usb_reader: &mut (impl AsyncRead + Unpin),
+    connection: &Connection<Vec<u8>>,
 ) -> Result<(), Error> {
     let mut data = [0; MTU];
     loop {
-        let Some(mut packets) = read_packet_stream(reader, &mut data).await? else {
+        let Some(mut packets) = read_packet_stream(usb_reader, &mut data).await? else {
             break;
         };
         while let Some(packet) = packets.next() {
@@ -214,12 +206,7 @@ async fn magic_interrupt_copy<const MTU: usize>(
                     *found_magic = true;
                     return Ok(());
                 }
-                Ok(Packet { header: Header { packet_type: PacketType::Data, .. }, payload }) => {
-                    writer.write_all(&payload).await?;
-                }
-                Ok(packet) => {
-                    warn!("Ignoring unexpected packet of type {:?}", packet.header.packet_type);
-                }
+                Ok(packet) => connection.handle_vsock_packet(packet).await?,
                 Err(err) => {
                     error!("Failed to parse vsock packet, going back to waiting for sync packet: {err:?}");
                     break;
@@ -377,46 +364,6 @@ mod tests {
 
     fn sync_packet() -> Vec<u8> {
         make_packet(PacketType::Sync, OVERNET_MAGIC)
-    }
-
-    fn data_packet(c: u8, len: usize) -> Vec<u8> {
-        let bytes = vec![c; len];
-        make_packet(PacketType::Data, &bytes)
-    }
-
-    #[fuchsia::test]
-    async fn test_mtu_copy() {
-        let inputs = [b'a'; 9001];
-        let mut outputs = ExactPackets::default();
-        mtu_copy::<1024>(&mut inputs.as_ref(), &mut outputs).await.unwrap();
-        assert_eq!(
-            Vec::from_iter(outputs.iter().map(|v| v.len())),
-            vec![1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 25],
-            "output has been chunked into MTU-sized bits plus headers"
-        )
-    }
-
-    #[fuchsia::test]
-    async fn test_interrupt_copy() {
-        let mut inputs = ExactPackets(VecDeque::from([
-            data_packet(b'a', 99),
-            sync_packet(),
-            data_packet(b'b', 99),
-        ]));
-        let mut outputs = ExactPackets::default();
-        let mut found_magic = false;
-        magic_interrupt_copy::<1024>(&mut found_magic, &mut inputs, &mut outputs).await.unwrap();
-        assert_eq!(
-            *outputs,
-            VecDeque::from([vec![b'a'; 99]]),
-            "output contains everything up to the magic reset string"
-        );
-        assert_eq!(
-            *inputs,
-            VecDeque::from([data_packet(b'b', 99)]),
-            "input still contains the remainder"
-        );
-        assert!(found_magic, "the magic reset string was found");
     }
 
     impl SocketCallback for mpsc::Sender<zx::Socket> {
