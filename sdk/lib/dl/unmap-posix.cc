@@ -9,6 +9,7 @@
 namespace dl {
 
 RuntimeModule::~RuntimeModule() {
+  delete[] name_.c_str();
   if (can_unload_ && vaddr_size() > 0) {
     munmap(reinterpret_cast<void*>(static_cast<uintptr_t>(abi_module_.vaddr_start)), vaddr_size());
   }

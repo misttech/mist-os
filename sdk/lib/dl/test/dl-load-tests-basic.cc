@@ -13,6 +13,32 @@ using dl::testing::RunFunction;
 using dl::testing::TestModule;
 using dl::testing::TestSym;
 
+// Test that the module data structure uses its own copy of the module's name,
+// so that there is no dependency on the memory backing the original string
+// pointer.
+TYPED_TEST(DlTests, ModuleNameOwnership) {
+  std::string file = TestModule("ret17");
+
+  this->ExpectRootModule(file);
+  auto open_first = this->DlOpen(file.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_first.is_ok()) << open_first.error_value();
+  EXPECT_TRUE(open_first.value());
+
+  // Changing the contents for this pointer should not affect the dynamic
+  // linker's state.
+  file = "FOO";
+
+  // A lookup for the original filename should succeed.
+  auto open_second = this->DlOpen(TestModule("ret17").c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_second.is_ok()) << open_second.error_value();
+  EXPECT_TRUE(open_second.value());
+
+  EXPECT_EQ(open_first.value(), open_second.value());
+
+  ASSERT_TRUE(this->DlClose(open_first.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_second.value()).is_ok());
+}
+
 // Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
   constexpr int64_t kReturnValue = 17;

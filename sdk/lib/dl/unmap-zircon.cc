@@ -9,6 +9,7 @@
 namespace dl {
 
 RuntimeModule::~RuntimeModule() {
+  delete[] name_.c_str();
   if (can_unload_ && vaddr_size() > 0) {
     zx::vmar::root_self()->unmap(abi_module_.vaddr_start, vaddr_size());
   }

@@ -20,6 +20,8 @@
 #include <lib/ld/load.h>  // For ld::AbiModule
 #include <lib/ld/tls.h>
 
+#include <cstring>
+
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/vector.h>
@@ -99,19 +101,35 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // create the runtime module. This is usually the same as the DT_SONAME of the
   // AbiModule, but that is not guaranteed. When performing an equality check,
   // match against both possible name values.
-  constexpr bool operator==(const Soname& name) const {
-    return name == name_ || name == abi_module_.soname;
+  constexpr bool operator==(const Soname& other) const {
+    return other == name() || other == abi_module_.soname;
   }
 
   constexpr const Soname& name() const { return name_; }
 
   // TODO(https://fxbug.dev/333920495): pass in the symbolizer_modid.
-  [[nodiscard]] static std::unique_ptr<RuntimeModule> Create(fbl::AllocChecker& ac, Soname name) {
-    std::unique_ptr<RuntimeModule> module{new (ac) RuntimeModule};
-    if (module) [[likely]] {
-      module->name_ = name;
+  [[nodiscard]] static std::unique_ptr<RuntimeModule> Create(fbl::AllocChecker& ac, Soname soname) {
+    auto result = [&ac](std::unique_ptr<RuntimeModule> v) {
+      ac.arm(sizeof(RuntimeModule), v);
+      return v;
+    };
+
+    fbl::AllocChecker module_ac;
+    std::unique_ptr<RuntimeModule> module{new (module_ac) RuntimeModule};
+    if (!module_ac.check()) [[unlikely]] {
+      return result(nullptr);
     }
-    return module;
+    fbl::AllocChecker name_ac;
+
+    size_t buf_sz = soname.size() + 1;
+    char* buf = new (name_ac) char[buf_sz];
+    if (!name_ac.check()) [[unlikely]] {
+      return result(nullptr);
+    }
+    soname.copy(buf, buf_sz);
+    module->name_ = Soname{buf};
+
+    return result(std::move(module));
   }
 
   // This is called if the RuntimeModule is created from a startup module (i.e.
