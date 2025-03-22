@@ -12,7 +12,9 @@ use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
 };
-use netstack_testing_common::wait_for_component_stopped;
+use netstack_testing_common::{
+    get_component_stopped_event_stream, wait_for_component_stopped_with_stream,
+};
 
 const IPERF_URL: &str = "#meta/iperf.cm";
 const NAME_PROVIDER_URL: &str = "#meta/device-name-provider.cm";
@@ -81,15 +83,17 @@ fn device_name_provider_component() -> fnetemul::ChildDef {
 }
 
 async fn watch_for_exit(
+    event_stream: &mut component_events::events::EventStream,
     realm: &netemul::TestRealm<'_>,
     component_moniker: &str,
 ) -> component_events::events::ExitStatus {
-    let event = wait_for_component_stopped(&realm, component_moniker, None)
-        .on_timeout(std::time::Duration::from_secs(60), || {
-            panic!("timed out waiting for component stopped event: {component_moniker}");
-        })
-        .await
-        .expect("observe stopped event");
+    let event =
+        wait_for_component_stopped_with_stream(event_stream, &realm, component_moniker, None)
+            .on_timeout(std::time::Duration::from_secs(60), || {
+                panic!("timed out waiting for component stopped event: {component_moniker}");
+            })
+            .await
+            .expect("observe stopped event");
     let component_events::events::StoppedPayload { status, .. } =
         event.result().expect("extract event payload");
     *status
@@ -243,17 +247,23 @@ async fn bench<N: Netstack, I: TestIpExt>(
 
     // Start the iPerf client until a successful run is observed.
     let realm_ref = &realm;
-    let mut servers = futures::future::select_all(
-        (0..flows)
-            .map(|i| Box::pin(async move { watch_for_exit(realm_ref, &server_moniker(i)).await })),
-    )
+    let mut servers = futures::future::select_all((0..flows).map(|i| {
+        Box::pin(async move {
+            let mut stream = get_component_stopped_event_stream().await.expect("get event stream");
+            watch_for_exit(&mut stream, realm_ref, &server_moniker(i)).await
+        })
+    }))
     .fuse();
     let mut clients = futures::future::join_all((0..flows).map(|i| async move {
         loop {
+            // Create an event stream watcher before starting the client so we're sure to
+            // observe its stopped event.
+            let mut stream = get_component_stopped_event_stream().await.expect("get event stream");
+
             realm_ref.start_child_component(&client_moniker(i)).await.expect("start client");
             log::info!("started client {i}");
 
-            let status = watch_for_exit(realm_ref, &client_moniker(i)).await;
+            let status = watch_for_exit(&mut stream, realm_ref, &client_moniker(i)).await;
             if status == component_events::events::ExitStatus::Clean {
                 log::info!("client {i} exited cleanly");
                 return;
@@ -306,6 +316,11 @@ mod test {
     async fn version<N: Netstack>(name: &str) {
         let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
+        // Create an event stream watcher before starting iPerf so we're sure to observe
+        // its stopped event.
+        let mut component_stopped_event_stream =
+            get_component_stopped_event_stream().await.expect("get event stream");
+
         const IPERF_MONIKER: &str = "iperf";
         let realm = sandbox
             .create_netstack_realm_with::<N, _, _>(
@@ -326,7 +341,8 @@ mod test {
 
         let watch_exit_fut = async move {
             log::info!("waiting for {:?} to exit", IPERF_MONIKER);
-            let status = watch_for_exit(&realm, IPERF_MONIKER).await;
+            let status =
+                watch_for_exit(&mut component_stopped_event_stream, &realm, IPERF_MONIKER).await;
             log::info!("observed {:?} exit", IPERF_MONIKER);
             assert_eq!(status, component_events::events::ExitStatus::Clean);
         };
