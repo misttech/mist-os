@@ -50,6 +50,7 @@
             protocol: [
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.settings.Privacy",
+                "fuchsia.time.external.Adjust",
             ],
             availability: "optional",
         },
@@ -57,6 +58,13 @@
             // Sets the platform's data collection bit.
             config: "fuchsia.starnix.runner.EnableDataCollection",
             key: "enable_data_collection",
+            type: "bool",
+            default: false,
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.time.config.WritableUTCTime",
+            key: "enable_utc_time_adjustment",
             type: "bool",
             default: false,
             availability: "transitional",
@@ -152,7 +160,10 @@
             to: [ "#kernels" ],
         },
         {
-            config: [ "fuchsia.ui.VisualDebuggingLevel" ],
+            config: [
+                "fuchsia.time.config.WritableUTCTime",
+                "fuchsia.ui.VisualDebuggingLevel",
+            ],
             from: "parent",
             to: [ "#kernels" ],
         },

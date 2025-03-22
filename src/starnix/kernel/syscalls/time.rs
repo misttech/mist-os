@@ -12,7 +12,7 @@ use crate::task::{
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
-use starnix_logging::{log_error, log_trace, track_stub};
+use starnix_logging::{log_debug, log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
@@ -160,6 +160,11 @@ pub fn sys_settimeofday(
         let utc_now_nanos = utc_now_sec_as_nanos
             .checked_add(utc_now_usec_as_nanos)
             .ok_or_else(|| errno!(EINVAL))?;
+        log_debug!(
+            "settimeofday: reporting reference: boot_now={:?}, utc_now_nanos={:?}",
+            boot_now,
+            utc_now_nanos
+        );
         proxy
             .report_boot_to_utc_mapping(
                 boot_now.into(),
@@ -181,6 +186,7 @@ pub fn sys_settimeofday(
             })
     } else {
         // We expect most systems not to be allowed to set time.
+        log_debug!("settimeofday: No functionality");
         error!(ENOSYS)
     }
 }

@@ -4,9 +4,9 @@
 {
     offer: [
         {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "#config",
             to: "#core",
-            config: "fuchsia.starnix.runner.EnableDataCollection",
         },
     ],
 }

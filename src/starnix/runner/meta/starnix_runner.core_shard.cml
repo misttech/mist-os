@@ -189,6 +189,11 @@
             to: "#starnix_runner",
         },
         {
+            config: "fuchsia.time.config.WritableUTCTime",
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
             config: "fuchsia.ui.VisualDebuggingLevel",
             from: "parent",
             to: "#starnix_runner",

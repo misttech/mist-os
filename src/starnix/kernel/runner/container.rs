@@ -539,11 +539,16 @@ async fn create_container(
         security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
 
     // XXX(fmil): Should there also be a condition to allow this *only* for specific containers?
+    //
+    // `config.enable_utc_time_adjustment` is set through config capability
+    // `fuchsia.time.config.WritableUTCTime`.
     let time_adjustment_proxy = if structured_config.enable_utc_time_adjustment {
         connect_to_protocol_sync::<AdjustMarker>()
             .map_err(|e| log_error!("could not connect to fuchsia.time.external/Adjust: {:?}", e))
             .ok()
     } else {
+        // See the comment above. UTC adjustment is a per-product setting.
+        log_info!("UTC adjustment is forbidden.");
         None
     };
 
