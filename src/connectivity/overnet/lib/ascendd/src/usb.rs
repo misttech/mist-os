@@ -17,6 +17,7 @@ use usb_vsock::{Header, Packet, PacketMut, PacketType, VsockPacketIterator};
 
 static OVERNET_MAGIC: &[u8; 16] = b"OVERNET USB\xff\x00\xff\x00\xff";
 const MAGIC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const MAGIC_TRIES: usize = 2;
 const MTU: usize = 1024;
 
 pub async fn listen_for_usb_devices(router: Weak<Router>) -> Result<(), Error> {
@@ -91,9 +92,10 @@ async fn wait_for_magic(
     out_ep: &BulkOutEndpoint,
     in_ep: &BulkInEndpoint,
 ) -> Result<(), Error> {
-    let mut magic_timer = fuchsia_async::Timer::new(MAGIC_TIMEOUT);
     let mut buf = [0u8; MTU];
+    let mut timeout_count = 0;
     loop {
+        let mut magic_timer = fuchsia_async::Timer::new(MAGIC_TIMEOUT);
         out_ep.write(&sync_packet()).await?;
         let size = {
             tracing::trace!(device = debug_path, "Reading from in endpoint for magic string");
@@ -104,6 +106,14 @@ async fn wait_for_magic(
                 Either::Right((_, fut)) => {
                     if let Some(got) = fut.now_or_never() {
                         got?
+                    } else if timeout_count < MAGIC_TRIES {
+                        timeout_count += 1;
+                        tracing::info!(
+                            device = debug_path,
+                            "Timed out waiting for sync reply. Will try {} more times.",
+                            MAGIC_TRIES - timeout_count
+                        );
+                        continue;
                     } else {
                         return Err(format_err!("Timed out waiting for driver to synchronize"));
                     }
