@@ -38,7 +38,7 @@ constexpr KTraceCategory kGroupCategories[] = {
     {"kernel:tasks", KTRACE_GRP_TASKS, "<unused>"},
     {"kernel:ipc", KTRACE_GRP_IPC, "Emit an event for each FIDL call"},
     {"kernel:irq", KTRACE_GRP_IRQ, "Emit a duration event for interrupts"},
-    {"kernel:probe", KTRACE_GRP_PROBE, "Userspace defined zx_ktrace_write events"},
+    {"kernel:probe", KTRACE_GRP_PROBE, "Used for LOCAL_KTRACE events"},
     {"kernel:arch", KTRACE_GRP_ARCH, "Hypervisor vcpus"},
     {"kernel:syscall", KTRACE_GRP_SYSCALL, "Emit an event for each syscall"},
     {"kernel:vm", KTRACE_GRP_VM, "Virtual memory events such as paging, mappings, and accesses"},

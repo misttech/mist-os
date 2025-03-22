@@ -168,11 +168,6 @@ zx_status_t sys_ktrace_control(zx_handle_t handle, uint32_t action, uint32_t opt
   return KTrace::Control(action, options);
 }
 
-// zx_status_t zx_ktrace_write
-zx_status_t sys_ktrace_write(zx_handle_t handle, uint32_t event_id, uint32_t arg0, uint32_t arg1) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 // zx_status_t zx_mtrace_control
 zx_status_t sys_mtrace_control(zx_handle_t handle, uint32_t kind, uint32_t action, uint32_t options,
                                user_inout_ptr<void> ptr, size_t size) {

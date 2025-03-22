@@ -215,41 +215,6 @@ KTRACE_CONTROL_DISPLAY_TEST(
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m\n")
 
-// zx_ktrace_write tests.
-
-std::unique_ptr<SystemCallTest> ZxKtraceWrite(int64_t result, std::string_view result_name,
-                                              zx_handle_t handle, uint32_t id, uint32_t arg0,
-                                              uint32_t arg1) {
-  auto value = std::make_unique<SystemCallTest>("zx_ktrace_write", result, result_name);
-  value->AddInput(handle);
-  value->AddInput(id);
-  value->AddInput(arg0);
-  value->AddInput(arg1);
-  return value;
-}
-
-#define KTRACE_WRITE_DISPLAY_TEST_CONTENT(result, expected)                                     \
-  PerformDisplayTest("$plt(zx_ktrace_write)", ZxKtraceWrite(result, #result, kHandle, 0, 1, 2), \
-                     expected)
-
-#define KTRACE_WRITE_DISPLAY_TEST(name, errno, expected) \
-  TEST_F(InterceptionWorkflowTestX64, name) {            \
-    KTRACE_WRITE_DISPLAY_TEST_CONTENT(errno, expected);  \
-  }                                                      \
-  TEST_F(InterceptionWorkflowTestArm, name) { KTRACE_WRITE_DISPLAY_TEST_CONTENT(errno, expected); }
-
-KTRACE_WRITE_DISPLAY_TEST(ZxKtraceWrite, ZX_OK,
-                          "\n"
-                          "\x1B[32m0.000000\x1B[0m "
-                          "test_3141 \x1B[31m3141\x1B[0m:\x1B[31m8764\x1B[0m "
-                          "zx_ktrace_write("
-                          "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
-                          "id: \x1B[32muint32\x1B[0m = \x1B[34m0\x1B[0m, "
-                          "arg0: \x1B[32muint32\x1B[0m = \x1B[34m1\x1B[0m, "
-                          "arg1: \x1B[32muint32\x1B[0m = \x1B[34m2\x1B[0m)\n"
-                          "\x1B[32m0.000000\x1B[0m "
-                          "  -> \x1B[32mZX_OK\x1B[0m\n")
-
 // zx_mtrace_control tests.
 
 std::unique_ptr<SystemCallTest> ZxMtraceControl(int64_t result, std::string_view result_name,

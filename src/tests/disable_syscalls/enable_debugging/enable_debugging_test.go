@@ -42,9 +42,6 @@ func TestEnableDebuggingSyscalls(t *testing.T) {
 	ensureContains(t, stdout, "zx_system_mexec_payload_get: enabled")
 	ensureContains(t, stdout, "zx_thread_write_state: enabled")
 
-	// ktrace write is no longer supported and will be removed in the future.
-	ensureContains(t, stdout, "zx_ktrace_write: disabled")
-
 	if stderr != "" {
 		t.Fatal(stderr)
 	}

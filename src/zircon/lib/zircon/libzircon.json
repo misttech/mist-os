@@ -68,7 +68,6 @@
     "zx_job_set_policy",
     "zx_ktrace_control",
     "zx_ktrace_read",
-    "zx_ktrace_write",
     "zx_msi_allocate",
     "zx_msi_create",
     "zx_mtrace_control",

@@ -71,7 +71,6 @@ Symbols:
   - { Name: _zx_job_set_policy, Type: Func }
   - { Name: _zx_ktrace_control, Type: Func }
   - { Name: _zx_ktrace_read, Type: Func }
-  - { Name: _zx_ktrace_write, Type: Func }
   - { Name: _zx_msi_allocate, Type: Func }
   - { Name: _zx_msi_create, Type: Func }
   - { Name: _zx_mtrace_control, Type: Func }
@@ -286,7 +285,6 @@ Symbols:
   - { Name: zx_job_set_policy, Type: Func, Weak: true }
   - { Name: zx_ktrace_control, Type: Func, Weak: true }
   - { Name: zx_ktrace_read, Type: Func, Weak: true }
-  - { Name: zx_ktrace_write, Type: Func, Weak: true }
   - { Name: zx_msi_allocate, Type: Func, Weak: true }
   - { Name: zx_msi_create, Type: Func, Weak: true }
   - { Name: zx_mtrace_control, Type: Func, Weak: true }

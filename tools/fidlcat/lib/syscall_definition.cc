@@ -5200,21 +5200,6 @@ void SyscallDecoderDispatcher::Populate() {
   }
 
   {
-    Syscall* zx_ktrace_write = Add("zx_ktrace_write", SyscallReturnType::kStatus);
-    // Arguments
-    auto handle = zx_ktrace_write->Argument<zx_handle_t>(SyscallType::kHandle);
-    auto id = zx_ktrace_write->Argument<uint32_t>(SyscallType::kUint32);
-    auto arg0 = zx_ktrace_write->Argument<uint32_t>(SyscallType::kUint32);
-    auto arg1 = zx_ktrace_write->Argument<uint32_t>(SyscallType::kUint32);
-    // Inputs
-    zx_ktrace_write->Input<zx_handle_t>("handle",
-                                        std::make_unique<ArgumentAccess<zx_handle_t>>(handle));
-    zx_ktrace_write->Input<uint32_t>("id", std::make_unique<ArgumentAccess<uint32_t>>(id));
-    zx_ktrace_write->Input<uint32_t>("arg0", std::make_unique<ArgumentAccess<uint32_t>>(arg0));
-    zx_ktrace_write->Input<uint32_t>("arg1", std::make_unique<ArgumentAccess<uint32_t>>(arg1));
-  }
-
-  {
     Syscall* zx_mtrace_control = Add("zx_mtrace_control", SyscallReturnType::kStatus);
     // Arguments
     auto handle = zx_mtrace_control->Argument<zx_handle_t>(SyscallType::kHandle);
