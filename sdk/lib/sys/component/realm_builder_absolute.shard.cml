@@ -9,6 +9,13 @@
             url: "fuchsia-pkg://fuchsia.com/test_manager#meta/realm_builder_server.cm",
         },
     ],
+    collections: [
+        {
+            name: "realm_builder",
+            environment: "#realm_builder_env",
+            durability: "transient",
+        },
+    ],
     offer: [
         {
             dictionary: "diagnostics",

@@ -3,13 +3,6 @@
 // found in the LICENSE file.
 {
     include: [ "syslog/client.shard.cml" ],
-    collections: [
-        {
-            name: "realm_builder",
-            environment: "#realm_builder_env",
-            durability: "transient",
-        },
-    ],
     use: [
         {
             protocol: "fuchsia.component.Realm",
