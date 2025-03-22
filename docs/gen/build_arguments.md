@@ -699,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719787252325720097"`
+**Current value for `target_cpu = "arm64"`:** `"8719741948912885537"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719787252325720097"`
+**Current value for `target_cpu = "riscv64"`:** `"8719741948912885537"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719787252325720097"`
+**Current value for `target_cpu = "x64"`:** `"8719741948912885537"`
 
 From //out/not-default/args.gn:10
 
@@ -1183,7 +1183,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
