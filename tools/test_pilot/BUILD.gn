@@ -9,23 +9,26 @@ import("//build/rust/rustc_test.gni")
 import("//build/sdk/sdk_host_tool.gni")
 
 if (is_host) {
-  rustc_binary("test_pilot") {
-    name = "test_pilot"
+  rustc_binary("test-pilot") {
+    name = "test-pilot"
     with_unit_tests = true
     edition = "2021"
 
     deps = [
       "//src/lib/fuchsia",
+      "//third_party/rust_crates:futures",
       "//third_party/rust_crates:heck",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:serde_json5",
       "//third_party/rust_crates:thiserror",
+      "//third_party/rust_crates:tokio",
       "//third_party/rust_crates:valico",
     ]
 
     test_deps = [
       "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:rand",
       "//third_party/rust_crates:tempfile",
     ]
 
@@ -33,28 +36,32 @@ if (is_host) {
       "src/builder.rs",
       "src/env.rs",
       "src/errors.rs",
+      "src/invocation_log.rs",
       "src/logger.rs",
       "src/main.rs",
       "src/name.rs",
       "src/parsers.rs",
+      "src/run_tests.rs",
       "src/schema.rs",
+      "src/std_writer.rs",
       "src/test_config.rs",
+      "src/test_output.rs",
     ]
   }
 
   install_host_tools("install") {
-    deps = [ ":test_pilot" ]
-    outputs = [ "test_pilot" ]
+    deps = [ ":test-pilot" ]
+    outputs = [ "test-pilot" ]
   }
 
   host_test_data("test_deps") {
     testonly = true
     deps = [ ":install" ]
-    sources = [ "${root_out_dir}/test_pilot" ]
+    sources = [ "${root_out_dir}/test-pilot" ]
   }
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":test_pilot_test($host_toolchain)" ]
+  deps = [ ":test-pilot_test($host_toolchain)" ]
 }
