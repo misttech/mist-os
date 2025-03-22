@@ -7,7 +7,8 @@ use anyhow::format_err;
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::bluetooth_config::{
-    BluetoothConfig, HandsFreeConfig, HfpAudioGatewayFeature, HfpCodecId, Snoop,
+    AudioGatewayConfig, AudioGatewayEnabledConfig, BluetoothConfig, HandsFreeConfig, HfpCodecId,
+    Snoop,
 };
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
@@ -87,7 +88,10 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
         } else {
             profiles.hfp.codecs_supported.clone()
         };
-        if profiles.hfp.enabled {
+        // TODO(https://fxbug.dev/401064356): Remove `profiles.hfp.enabled` after soft-transition
+        if profiles.hfp.enabled
+            || matches!(profiles.hfp.audio_gateway, AudioGatewayConfig::Enabled(_))
+        {
             builder.platform_bundle("bluetooth_hfp_ag");
 
             let controller_encodes = if profiles.hfp.controller_encodes.is_empty() {
@@ -105,63 +109,31 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
             let mut hfp_ag_config = builder
                 .package("bt-hfp-audio-gateway")
                 .component("meta/bt-hfp-audio-gateway.cm")?;
+            let hfp_ag_features = match profiles.hfp.audio_gateway {
+                AudioGatewayConfig::Enabled(config) => config,
+                AudioGatewayConfig::Disabled => AudioGatewayEnabledConfig::default(),
+            };
             hfp_ag_config
-                .field(
-                    "three_way_calling",
-                    profiles.hfp.audio_gateway.contains(&HfpAudioGatewayFeature::ThreeWayCalling),
-                )?
-                .field(
-                    "reject_incoming_voice_call",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::RejectIncomingCall),
-                )?
-                .field(
-                    "in_band_ringtone",
-                    profiles.hfp.audio_gateway.contains(&HfpAudioGatewayFeature::InbandRingtone),
-                )?
-                .field(
-                    "voice_recognition",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus),
-                )?
+                .field("three_way_calling", hfp_ag_features.three_way_calling)?
+                .field("reject_incoming_voice_call", hfp_ag_features.reject_incoming_call)?
+                .field("in_band_ringtone", hfp_ag_features.inband_ringtone)?
+                .field("voice_recognition", hfp_ag_features.voice_recognition)?
                 .field(
                     "echo_canceling_and_noise_reduction",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction),
+                    hfp_ag_features.echo_canceling_and_noise_reduction,
                 )?
                 .field(
                     "attach_phone_number_to_voice_tag",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag),
+                    hfp_ag_features.attach_phone_number_voice_tag,
                 )?
-                .field(
-                    "enhanced_call_controls",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::EnhancedCallControl),
-                )?
+                .field("enhanced_call_controls", hfp_ag_features.enhanced_call_control)?
                 .field(
                     "enhanced_voice_recognition",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus),
+                    hfp_ag_features.enhanced_voice_recognition_status,
                 )?
                 .field(
                     "enhanced_voice_recognition_with_text",
-                    profiles
-                        .hfp
-                        .audio_gateway
-                        .contains(&HfpAudioGatewayFeature::VoiceRecognitionText),
+                    hfp_ag_features.voice_recognition_text,
                 )?
                 .field("controller_encoding_cvsd", controller_encodes.contains(&HfpCodecId::Cvsd))?
                 .field("controller_encoding_msbc", controller_encodes.contains(&HfpCodecId::Msbc))?

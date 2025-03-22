@@ -19,7 +19,7 @@ pub enum Snoop {
 }
 
 /// Configuration options for Bluetooth audio streaming (bt-a2dp).
-// TODO(b/324894109): Add profile-specific arguments
+// TODO(https://fxbug.dev/324894109): Add profile-specific arguments
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct A2dpConfig {
@@ -28,7 +28,7 @@ pub struct A2dpConfig {
 }
 
 /// Configuration options for Bluetooth media info and controls (bt-avrcp).
-// TODO(b/324894109): Add profile-specific arguments
+// TODO(https://fxbug.dev/324894109): Add profile-specific arguments
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct AvrcpConfig {
@@ -65,44 +65,6 @@ pub struct DeviceIdConfig {
     pub service_description: Option<String>,
 }
 
-/// HFP Audio Gateway Features
-/// See HFP v1.9 Page 100 for details.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HfpAudioGatewayFeature {
-    ThreeWayCalling,
-    EchoCancelingAndNoiseReduction,
-    VoiceRecognition,
-    InbandRingtone,
-    AttachPhoneNumberVoiceTag,
-    RejectIncomingCall,
-    EnhancedCallControl,
-    EnhancedVoiceRecognitionStatus,
-    VoiceRecognitionText,
-}
-
-impl std::fmt::Display for HfpAudioGatewayFeature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HfpAudioGatewayFeature::ThreeWayCalling => write!(f, "three_way_calling"),
-            HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction => {
-                write!(f, "echo_canceling_and_noise_reduction")
-            }
-            HfpAudioGatewayFeature::VoiceRecognition => write!(f, "voice_recognition"),
-            HfpAudioGatewayFeature::InbandRingtone => write!(f, "inband_ringtone"),
-            HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag => {
-                write!(f, "attach_phone_number_voice_tag")
-            }
-            HfpAudioGatewayFeature::RejectIncomingCall => write!(f, "reject_incoming_call"),
-            HfpAudioGatewayFeature::EnhancedCallControl => write!(f, "enhanced_call_control"),
-            HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus => {
-                write!(f, "enhanced_voice_recognition_status")
-            }
-            HfpAudioGatewayFeature::VoiceRecognitionText => write!(f, "voice_recognition_text"),
-        }
-    }
-}
-
 /// Codec IDs defined by the Bluetooth HFP Specification
 /// See HFP v1.9 Appendix B
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
@@ -113,56 +75,149 @@ pub enum HfpCodecId {
     Lc3Swb,
 }
 
+/// Tri-state representation of a Bluetooth profile with optional features.
+/// Allows product integrators to enable a profile without specifying any optional feature values.
+#[derive(Deserialize, Default, PartialEq, Debug)]
+enum BluetoothProfileDeserializer<T> {
+    /// Disable the profile.
+    #[default]
+    #[serde(rename = "disabled")]
+    Disabled,
+    /// Enable the profile and use default values for the features.
+    #[serde(rename = "enabled")]
+    EnabledDefault,
+    /// Enable the profile and use the provided input `T` values for the features.
+    #[serde(untagged)]
+    Enabled(T),
+}
+
+/// HFP Audio Gateway Features
+/// See HFP v1.9 Page 100 for details.
+/// Features not included are disabled by default, with the exception of the following which are
+/// always enabled:
+///  - Enhanced Call Status
+///  - Extended Error Result Codes
+///  - Codec Negotiation
+///  - HF Indicators
+///  - eSCO S4
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default)]
+pub struct AudioGatewayEnabledConfig {
+    /// Enable management of of several concurrent calls.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub three_way_calling: bool,
+    /// Enable echo canceling and/or noise reduction functionality.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub echo_canceling_and_noise_reduction: bool,
+    /// Enable hands-free control of a device's functions through voice commands.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub voice_recognition: bool,
+    /// Enable sending the ringtone for a phone call.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub inband_ringtone: bool,
+    /// Enable the voice tag association feature.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub attach_phone_number_voice_tag: bool,
+    /// Enable the reject incoming call feature.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub reject_incoming_call: bool,
+    /// Enabled enhanced call controls (private mode & release specified call index procedures).
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub enhanced_call_control: bool,
+    /// Enable enhanced hands-free call controls including integration with voice assistants.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub enhanced_voice_recognition_status: bool,
+    /// Enable the voice-to-text feature.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub voice_recognition_text: bool,
+}
+
+/// Configuration options for the Bluetooth HFP Audio Gateway component ('bt-hfp-audio-gateway').
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(from = "BluetoothProfileDeserializer<AudioGatewayEnabledConfig>")]
+pub enum AudioGatewayConfig {
+    /// Disable `bt-hfp-audio-gateway`.
+    #[default]
+    Disabled,
+    /// Enable `bt-hfp-audio-gateway`.
+    Enabled(AudioGatewayEnabledConfig),
+}
+
+impl From<BluetoothProfileDeserializer<AudioGatewayEnabledConfig>> for AudioGatewayConfig {
+    fn from(s: BluetoothProfileDeserializer<AudioGatewayEnabledConfig>) -> Self {
+        match s {
+            BluetoothProfileDeserializer::Disabled => Self::Disabled,
+            BluetoothProfileDeserializer::EnabledDefault => {
+                Self::Enabled(AudioGatewayEnabledConfig::default())
+            }
+            BluetoothProfileDeserializer::Enabled(c) => Self::Enabled(c),
+        }
+    }
+}
+
 /// HFP Hands Free Features
 /// See HFP v1.9 Table 6.4 for the list of features and Table 3.2 for a description of the features.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct HandsFreeEnabledConfig {
     /// Enable echo canceling and/or noise reduction functionality.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub echo_canceling_and_noise_reduction: bool,
     /// Enable management of of several concurrent calls.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub three_way_calling: bool,
     /// Enable call identification for incoming calls.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub calling_line_identification: bool,
     /// Enable hands-free control of a device's functions through voice commands.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub voice_recognition: bool,
     /// Enable the remote volume control feature.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub remote_volume_control: bool,
     /// Enable enhanced hands-free call controls including integration with voice assistants.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enhanced_voice_recognition: bool,
     /// Enable the voice-to-text feature.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub voice_recognition_text: bool,
 }
 
-/// Configuration options for Bluetooth hands free calling (Hands Free role).
+/// Configuration options for the Bluetooth HFP Hands Free component ('bt-hfp-hands-free').
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(untagged)]
+#[serde(from = "BluetoothProfileDeserializer<HandsFreeEnabledConfig>")]
 pub enum HandsFreeConfig {
+    /// Disabled `bt-hfp-hands-free`.
     #[default]
-    #[serde(rename = "disabled")]
     Disabled,
-    /// Enable hands free calling hands free (`bt-hfp-hands-free`).
+    /// Enable `bt-hfp-hands-free`.
     Enabled(HandsFreeEnabledConfig),
 }
 
-/// Configuration options for Bluetooth hands free calling (Audio Gateway role).
+impl From<BluetoothProfileDeserializer<HandsFreeEnabledConfig>> for HandsFreeConfig {
+    fn from(s: BluetoothProfileDeserializer<HandsFreeEnabledConfig>) -> Self {
+        match s {
+            BluetoothProfileDeserializer::Disabled => Self::Disabled,
+            BluetoothProfileDeserializer::EnabledDefault => {
+                Self::Enabled(HandsFreeEnabledConfig::default())
+            }
+            BluetoothProfileDeserializer::Enabled(c) => Self::Enabled(c),
+        }
+    }
+}
+
+/// Configuration options for Bluetooth hands free calling.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct HfpConfig {
     /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
+    // TODO(https://fxbug.dev/401064356): Remove this field after soft-transition is complete.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 
-    /// The set of AudioGateway features that are enabled.
-    /// Features not included are disabled by default, with the exception of the
-    /// following which are always enabled:
-    ///  - Enhanced Call Status
-    ///  - Extended Error Result Codes
-    ///  - Codec Negotiation
-    ///  - HF Indicators
-    ///  - eSCO S4
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub audio_gateway: Vec<HfpAudioGatewayFeature>,
+    /// Specifies the configuration for `bt-hfp-audio-gateway`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub audio_gateway: AudioGatewayConfig,
 
     /// Specifies the configuration for `bt-hfp-hands-free`.
     #[serde(skip_serializing_if = "crate::common::is_default")]
@@ -324,17 +379,18 @@ mod tests {
                     "service_description": "foobar",
                 },
                 "hfp": {
-                    "enabled": true,
-                    "audio_gateway": [
-                        "voice_recognition",
-                        "three_way_calling",
-                        "inband_ringtone",
-                        "echo_canceling_and_noise_reduction",
-                        "attach_phone_number_voice_tag",
-                        "reject_incoming_call",
-                        "enhanced_call_control",
-                        "enhanced_voice_recognition_status",
-                        "voice_recognition_text" ],
+                    "audio_gateway": {
+                        "voice_recognition": true,
+                        "three_way_calling": true,
+                        "inband_ringtone": true,
+                        "echo_canceling_and_noise_reduction": true,
+                        "attach_phone_number_voice_tag": true,
+                        "reject_incoming_call": true,
+                        "enhanced_call_control": true,
+                        "enhanced_voice_recognition_status": true,
+                        "voice_recognition_text": true,
+                    },
+                    "enabled": true, // TODO(https://fxbug.dev/401064356): Remove after migration
                     "hands_free": {
                         "echo_canceling_and_noise_reduction": true,
                         "three_way_calling": true,
@@ -366,18 +422,18 @@ mod tests {
                 service_description: Some("foobar".to_string()),
             },
             hfp: HfpConfig {
+                audio_gateway: AudioGatewayConfig::Enabled(AudioGatewayEnabledConfig {
+                    three_way_calling: true,
+                    echo_canceling_and_noise_reduction: true,
+                    voice_recognition: true,
+                    inband_ringtone: true,
+                    attach_phone_number_voice_tag: true,
+                    reject_incoming_call: true,
+                    enhanced_call_control: true,
+                    enhanced_voice_recognition_status: true,
+                    voice_recognition_text: true,
+                }),
                 enabled: true,
-                audio_gateway: vec![
-                    HfpAudioGatewayFeature::VoiceRecognition,
-                    HfpAudioGatewayFeature::ThreeWayCalling,
-                    HfpAudioGatewayFeature::InbandRingtone,
-                    HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction,
-                    HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag,
-                    HfpAudioGatewayFeature::RejectIncomingCall,
-                    HfpAudioGatewayFeature::EnhancedCallControl,
-                    HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus,
-                    HfpAudioGatewayFeature::VoiceRecognitionText,
-                ],
                 hands_free: HandsFreeConfig::Enabled(HandsFreeEnabledConfig {
                     echo_canceling_and_noise_reduction: true,
                     three_way_calling: true,
@@ -397,6 +453,55 @@ mod tests {
             profiles: expected_profiles,
             core: expected_core,
             snoop: Snoop::Eager,
+        };
+
+        assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    fn deserialize_hfp_profiles_without_defaults() {
+        let json = serde_json::json!({
+            "type": "standard",
+            "profiles": {
+                "hfp": {
+                    "audio_gateway": "enabled",
+                    "hands_free": "enabled",
+                },
+            },
+        });
+
+        let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
+        let expected_profiles = BluetoothProfilesConfig {
+            hfp: HfpConfig {
+                audio_gateway: AudioGatewayConfig::Enabled(AudioGatewayEnabledConfig {
+                    three_way_calling: false,
+                    echo_canceling_and_noise_reduction: false,
+                    voice_recognition: false,
+                    inband_ringtone: false,
+                    attach_phone_number_voice_tag: false,
+                    reject_incoming_call: false,
+                    enhanced_call_control: false,
+                    enhanced_voice_recognition_status: false,
+                    voice_recognition_text: false,
+                }),
+                enabled: false, // TODO(https://fxbug.dev/401064356): Remove after migration
+                hands_free: HandsFreeConfig::Enabled(HandsFreeEnabledConfig {
+                    echo_canceling_and_noise_reduction: false,
+                    three_way_calling: false,
+                    calling_line_identification: false,
+                    voice_recognition: false,
+                    remote_volume_control: false,
+                    enhanced_voice_recognition: false,
+                    voice_recognition_text: false,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let expected = BluetoothConfig::Standard {
+            profiles: expected_profiles,
+            core: BluetoothCoreConfig::default(),
+            snoop: Snoop::None,
         };
 
         assert_eq!(parsed, expected);
