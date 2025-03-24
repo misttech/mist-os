@@ -9,6 +9,7 @@
     program: {
         runner: "elf",
         binary: "bin/driver-host-rust",
+        use_next_vdso: "true",
 
         // DriverHost cannot be shut down until its Driver Components have
         // exited. Currently if it gets a Stop event it will ignore it, and
