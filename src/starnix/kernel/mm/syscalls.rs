@@ -736,6 +736,7 @@ mod arch32 {
     pub use super::{
         sys_futex as sys_arch32_futex, sys_madvise as sys_arch32_madvise,
         sys_mremap as sys_arch32_mremap, sys_msync as sys_arch32_msync,
+        sys_process_vm_readv as sys_arch32_process_vm_readv,
     };
 }
 

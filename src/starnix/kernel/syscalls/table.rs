@@ -143,8 +143,9 @@ pub fn dispatch_syscall(
         };
         pub use crate::mm::syscalls::{
             sys_arch32_futex, sys_arch32_madvise, sys_arch32_mmap2, sys_arch32_mremap,
-            sys_arch32_msync, sys_arch32_munmap, sys_arch32_set_robust_list,
-            sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
+            sys_arch32_msync, sys_arch32_munmap, sys_arch32_process_vm_readv,
+            sys_arch32_set_robust_list, sys_brk as sys_arch32_brk,
+            sys_mprotect as sys_arch32_mprotect,
         };
         pub use crate::signals::syscalls::{
             sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
@@ -332,6 +333,7 @@ pub fn dispatch_syscall(
             pread64[6],
             preadv[4],
             prlimit64[4],
+            process_vm_readv[6],
             pwrite64[6],
             pwritev[4],
             read[3],
