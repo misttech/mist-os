@@ -4,14 +4,11 @@
 
 use component_events::matcher::*;
 use component_events::sequence::{EventSequence, Ordering};
-use fidl::endpoints::ServerEnd;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::*;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use log::*;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
@@ -33,19 +30,9 @@ fn mock_boot_handles(
         },
     };
 
-    let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    let server = server.into_channel();
-
-    let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server),
-    );
     async move {
         let mut fs = ServiceFs::new();
-        fs.add_remote("boot", client);
+        fs.add_remote("boot", vfs::directory::serve_read_only(dir));
         fs.serve_connection(handles.outgoing_dir).expect("serve mock ServiceFs");
         fs.collect::<()>().await;
         Ok(())

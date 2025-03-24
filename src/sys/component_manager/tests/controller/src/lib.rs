@@ -4,9 +4,7 @@
 
 use assert_matches::assert_matches;
 use cm_rust::{ComponentDecl, FidlIntoNative};
-use fidl::endpoints::{
-    create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
-};
+use fidl::endpoints::{create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd};
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
@@ -16,8 +14,6 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use std::sync::{Arc, Mutex};
 use test_case::test_case;
-use vfs::directory::entry_container::Directory as _;
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use zx::{self as zx, AsHandleRef, HandleBased};
@@ -364,8 +360,13 @@ async fn start(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
 
 #[fuchsia::test]
 async fn start_with_namespace_entries() {
+    let namespace_entries = pseudo_directory! {
+        "file.txt" => read_only("hippos"),
+    };
+
+    let ns_proxy = vfs::directory::serve_read_only(namespace_entries);
+
     let mut spawned_child = spawn_local_child_controller_from_create_child().await;
-    let (ns_client_end, ns_server_end) = create_endpoints::<fio::DirectoryMarker>();
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>();
     spawned_child
@@ -374,7 +375,7 @@ async fn start_with_namespace_entries() {
             fcomponent::StartChildArgs {
                 namespace_entries: Some(vec![fcomponent::NamespaceEntry {
                     path: Some("/test".to_string()),
-                    directory: Some(ns_client_end),
+                    directory: Some(ns_proxy.into_client_end().unwrap()),
                     ..Default::default()
                 }]),
                 ..Default::default()
@@ -387,17 +388,6 @@ async fn start_with_namespace_entries() {
 
     let local_component_handles = spawned_child.handles_receiver.next().await.unwrap();
     let test_dir_proxy = local_component_handles.clone_from_namespace("test").unwrap();
-
-    let () = pseudo_directory! {
-        "file.txt" => read_only("hippos"),
-    }
-    .open(
-        ExecutionScope::new(),
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        vfs::path::Path::dot(),
-        ns_server_end.into_channel().into(),
-    );
-
     let file_proxy =
         fuchsia_fs::directory::open_file(&test_dir_proxy, "file.txt", fio::PERM_READABLE)
             .await

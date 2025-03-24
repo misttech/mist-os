@@ -824,16 +824,14 @@ async fn component_adds_service_entries_late() {
                     let outdir = Simple::new();
                     backing_directory_sender.unbounded_send(outdir.clone()).unwrap();
                     let scope = ExecutionScope::new();
-                    fio::OpenFlags::RIGHT_READABLE.to_object_request(h.outgoing_dir).handle(
-                        |object_request| {
-                            Ok(outdir.open_entry(vfs::directory::entry::OpenRequest::new(
-                                scope.clone(),
-                                fio::OpenFlags::RIGHT_READABLE,
-                                vfs::path::Path::dot(),
-                                object_request,
-                            )))
-                        },
-                    );
+                    fio::PERM_READABLE.to_object_request(h.outgoing_dir).handle(|object_request| {
+                        Ok(outdir.open_entry(vfs::directory::entry::OpenRequest::new(
+                            scope.clone(),
+                            fio::PERM_READABLE,
+                            vfs::path::Path::dot(),
+                            object_request,
+                        )))
+                    });
                     scope.wait().await;
                     Ok(())
                 }
