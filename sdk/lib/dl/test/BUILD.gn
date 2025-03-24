@@ -23,7 +23,6 @@ test("dl-unittests") {
     "dl-tests.cc",
   ]
   deps = [
-    ":allow-new-delete-type-mismatch",
     "..:concat-view",
     "..:diagnostics",
     "..:error",
@@ -135,15 +134,4 @@ fuchsia_unittest_package("dl-tests") {
   # hard-coded assumptions about the old dynamic linker and libc implementation
   # that don't hold true for the test binaries here.
   disable_elf_binaries_checks = true
-}
-
-# TODO(https://fxbug.dev/405478111): Investigate the type mismatch underlying
-# these ASAN errors in TLS tests.
-sanitizer_extra_options("allow-new-delete-type-mismatch") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  args = [ "new_delete_type_mismatch=0" ]
-  tags = [ "asan" ]
-  sanitizer = "asan"
 }

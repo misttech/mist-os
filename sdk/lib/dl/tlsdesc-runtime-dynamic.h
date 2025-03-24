@@ -25,7 +25,7 @@ using TlsDescGot = elfldltl::Elf<>::TlsDescGot<>;
 // For dynamic TLS modules, each thread's copy of each dynamic PT_TLS segment
 // is found in by index into an array of pointers.  That array itself is found
 // as a normal thread_local variable dl::_dl_tlsdesc_runtime_dynamic_blocks
-// (owned by libdl) using a normal IE access These TLSDESC hooks take two
+// (owned by libdl) using a normal IE access.  These TLSDESC hooks take two
 // values: an index into that array, and an offset within that PT_TLS segment.
 // They compute `_dl_tlsdesc_runtime_dynamic_blocks[index] + offset - $tp`.
 //
@@ -104,22 +104,36 @@ class DynamicTlsPtr {
   // `operator delete[]` *function* directly, rather than the `delete[]`
   // *operator*.  This is to match the precise means of allocation, which has
   // to use the `operator new[]` function directly (not `new std::byte[n]`) so
-  // as to use the overload that indicates alignment as well as size.  Since
-  // std::byte is both trivially-destructible and usable uninitialized, there
-  // is no semantic difference between using the proper `new[]` and `delete[]`
-  // operators (which in the general case ensure constructors and destructors
-  // and formal C++ object lifetime rules) and using the underlying allocator
-  // functions those operators call, which are called `operator new[]` and
-  // `operator delete[]` to keep it confusing since they're neither operators
-  // nor functions that take the same arguments as those operators.  But there
-  // is an important low-level difference, since the `new[]` and `delete[]`
-  // operators implicitly use a hidden element count that's stored as a size_t
-  // before the pointer (to allow `delete[]` to run the right number of
-  // destructors); the underlying allocation includes space for this hidden
-  // pointer, not just for the elements.  So it always matters to manually pair
-  // the precise allocator and deallocator functions being used.
+  // as to use the overload that indicates (dynamic) alignment as well as size.
+  // Since std::byte is both trivially-destructible and usable uninitialized,
+  // there is no semantic difference between using the proper `new[]` and
+  // `delete[]` operators (which in the general case ensure constructors and
+  // destructors and formal C++ object lifetime rules) and using the underlying
+  // allocator functions those operators call, which are called `operator
+  // new[]` and `operator delete[]` to keep it confusing since they're neither
+  // operators nor functions that take the same arguments as those operators.
+  // But there is an important low-level difference, since the `new[]` and
+  // `delete[]` operators implicitly use a hidden element count that's stored
+  // as a size_t before the pointer (to allow `delete[]` to run the right
+  // number of destructors); the underlying allocation includes space for this
+  // hidden pointer, not just for the elements.  So it always matters to
+  // manually pair the precise allocator and deallocator functions being used.
+  //
+  // Furthermore, which `operator delete[]` function signature is used to
+  // deallocate a particular array should match which `operator new[]` function
+  // signature was used to allocare it.  The compiler would generate the
+  // `operator new[]` taking the dynamic alignment argument for `new T[n]` when
+  // the static alignof(T) is > __STDCPP_DEFAULT_NEW_ALIGNMENT__; in that case,
+  // its `delete[]` on T* would use the `operator delete[]` function that takes
+  // the alignment (and it could choose or not to use the one that also takes
+  // the size).  So this Deleter needs to recover the size and alignment of the
+  // original allocation to call the correct `operator delete[]` signature.
+  // The private BlockSizes helper class handles all this.
   struct Deleter {
-    void operator()(std::byte* ptr) { operator delete[](ptr); }
+    void operator()(std::byte* ptr) const {
+      const TlsModule& module = BlockSizes::GetModule(ptr);
+      BlockSizes{module}.Delete(ptr);
+    }
   };
   using UniquePtr = std::unique_ptr<std::byte[], Deleter>;
 
@@ -129,34 +143,27 @@ class DynamicTlsPtr {
   // properly constinit-initialized values for some thread to start using (or,
   // later, that it is already using).
   [[nodiscard]] static DynamicTlsPtr New(fbl::AllocChecker& ac, const TlsModule& module) {
-    const size_t size = module.tls_size();
-    const std::align_val_t alignment{module.tls_alignment()};
-    DynamicTlsPtr block;
-    block.ptr_ = static_cast<std::byte*>(operator new[](size, alignment, ac));
-    if (block.ptr_) {
-      ld::TlsModuleInit(module, {block.ptr_, size});
-    }
-    return block;
+    const BlockSizes sizes{module};
+    return sizes.New(ac, module);
   }
 
   constexpr DynamicTlsPtr() = default;
   DynamicTlsPtr(const DynamicTlsPtr&) = delete;
 
-  constexpr DynamicTlsPtr(DynamicTlsPtr&& other) noexcept
-      : ptr_{std::exchange(other.ptr_, nullptr)} {}
+  constexpr DynamicTlsPtr(DynamicTlsPtr&& other) noexcept : ptr_{other.release()} {}
 
   DynamicTlsPtr& operator=(const DynamicTlsPtr&) = delete;
   DynamicTlsPtr& operator=(DynamicTlsPtr&& other) noexcept {
     reset();
-    ptr_ = std::exchange(other.ptr_, nullptr);
+    ptr_ = other.release();
     return *this;
   }
 
-  void reset() { UniquePtr{std::exchange(ptr_, nullptr)}.reset(); }
+  void reset() { UniquePtr{release()}.reset(); }
 
   ~DynamicTlsPtr() { UniquePtr{ptr_}.reset(); }
 
-  explicit operator bool() const { return ptr_; }
+  explicit constexpr operator bool() const { return ptr_; }
 
   // There are no get(), operator*(), or operator->() methods.  Once a TLS
   // block has been allocated, the only way to see a pointer inside it is to
@@ -166,6 +173,76 @@ class DynamicTlsPtr {
   std::span<std::byte> contents(const TlsModule& module) { return contents(module.tls_size()); }
 
  private:
+  // This helper class encapsulates all the arithmetic.  It's created by
+  // extract size details from a TlsModule.  It then has enough information to
+  // allocate (and initialize) or deallocate that module's TLS blocks.
+  //
+  // Each TLS block is allocated with extra space (before the returned pointer)
+  // for its bookkeeping.  This is how the compiler's `new T[n]` and `delete[]`
+  // usually work: storing the element count at `((size_t*)ptr)[-1]` by
+  // allocating a slightly larger block from the underlying allocator, and
+  // actually returning a pointer just inside that block.  This does the same,
+  // with the same overhead: one word plus alignment padding.  But it instead
+  // stores the TlsModule pointer whence both the size and the alignment of the
+  // block allocated can be recomputed.  These blocks must be cleared out of
+  // every thread and freed before the module can be unloaded and its TlsModule
+  // pointer made invalid.
+  class BlockSizes {
+   public:
+    using ModulePtr = const TlsModule*;
+
+    BlockSizes() = delete;
+    BlockSizes(const BlockSizes&) = default;
+
+    // Compute sizes to allocate for this TlsModule.  Every block must be
+    // aligned well enough to store the TlsModule pointer, in case that's more
+    // than the requested alignment.  Its size must leave space for that
+    // pointer to be before the aligned block of the requested size, so it
+    // needs as much extra space as the total alignment to store the pointer.
+    explicit BlockSizes(const TlsModule& module)
+        : align_(std::max(sizeof(ModulePtr), module.tls_alignment())),
+          size_{module.tls_size() + align_} {}
+
+    // Do the actual allocation and initialization.  The module must be the
+    // same one used in the constructor.  The returned pointer can be passed to
+    // GetModule and Delete.
+    DynamicTlsPtr New(fbl::AllocChecker& ac, const TlsModule& module) const {
+      assert(module.tls_alignment() <= align_);
+      assert(module.tls_size() <= size_ - align_);
+      void* ptr = operator new[](size_, std::align_val_t{align_}, ac);
+      if (!ptr) [[unlikely]] {
+        return {};
+      }
+      DynamicTlsPtr block;
+      block.ptr_ = static_cast<std::byte*>(ptr) + align_;
+      ModulePointer(block.ptr_) = &module;
+      ld::TlsModuleInit(module, {block.ptr_, module.tls_size()});
+      return block;
+    }
+
+    // Recover the module pointer saved by New() from the DynamicTlsPtr::ptr_.
+    static const TlsModule& GetModule(std::byte* ptr) {
+      assert(ptr);
+      return *ModulePointer(ptr);
+    }
+
+    // Given the DynamicTlsPtr::ptr_ value, recover the original pointer from
+    // operator new[] and pass that to operator delete[].  The sizes recovered
+    // via the saved TlsModule pointer match the operator new[] call exactly.
+    void Delete(std::byte* ptr) const {
+      operator delete[](ptr - align_, size_, std::align_val_t{align_});
+    }
+
+   private:
+    static ModulePtr& ModulePointer(std::byte* ptr) {
+      return reinterpret_cast<ModulePtr*>(ptr)[-1];
+    }
+
+    size_t align_, size_;
+  };
+
+  std::byte* release() { return std::exchange(ptr_, nullptr); }
+
   std::byte* ptr_ = nullptr;
 };
 static_assert(!std::is_copy_constructible_v<DynamicTlsPtr>);
