@@ -133,11 +133,6 @@ zx_status_t sys_debug_send_command(zx_handle_t handle, user_in_ptr<const char> p
 // zx_status_t zx_ktrace_read
 zx_status_t sys_ktrace_read(zx_handle_t handle, user_out_ptr<void> _data, uint32_t offset,
                             size_t len, user_out_ptr<size_t> _actual) {
-  // See also ktrace_init() in zircon/kernel/lib/ktrace/ktrace.cc.
-  if (!gBootOptions->enable_debugging_syscalls) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   zx_status_t status;
   if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_TRACING_BASE,
                                          1)) != ZX_OK) {
@@ -154,11 +149,6 @@ zx_status_t sys_ktrace_read(zx_handle_t handle, user_out_ptr<void> _data, uint32
 // zx_status_t zx_ktrace_control
 zx_status_t sys_ktrace_control(zx_handle_t handle, uint32_t action, uint32_t options,
                                user_inout_ptr<void> _ptr) {
-  // See also ktrace_init() in zircon/kernel/lib/ktrace/ktrace.cc.
-  if (!gBootOptions->enable_debugging_syscalls) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   zx_status_t status;
   if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_TRACING_BASE,
                                          1)) != ZX_OK) {

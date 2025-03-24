@@ -34,8 +34,6 @@ func TestEnableDebuggingSyscalls(t *testing.T) {
 	ensureContains(t, stdout, "zx_debug_read: enabled")
 	ensureContains(t, stdout, "zx_debug_send_command: enabled")
 	ensureContains(t, stdout, "zx_debug_write: enabled")
-	ensureContains(t, stdout, "zx_ktrace_control: enabled")
-	ensureContains(t, stdout, "zx_ktrace_read: enabled")
 	ensureContains(t, stdout, "zx_mtrace_control: enabled")
 	ensureContains(t, stdout, "zx_process_write_memory: enabled")
 	ensureContains(t, stdout, "zx_system_mexec: enabled")

@@ -612,17 +612,10 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
 }
 
 void KTrace::InitHook(unsigned) {
-  // There's no utility in setting up the singleton ktrace instance if there are
-  // no syscalls to access it. See zircon/kernel/syscalls/debug.cc for the
-  // corresponding syscalls. Note that because the internal KTraceState grpmask starts at 0
-  // and will not be changed, the other functions in this file need not check
-  // for enabled-ness manually.
-  const bool syscalls_enabled = gBootOptions->enable_debugging_syscalls;
-  const uint32_t bufsize = syscalls_enabled ? (gBootOptions->ktrace_bufsize << 20) : 0;
+  const uint32_t bufsize = gBootOptions->ktrace_bufsize << 20;
   const uint32_t initial_grpmask = gBootOptions->ktrace_grpmask;
 
-  dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
-          bufsize, initial_grpmask);
+  dprintf(INFO, "ktrace_init: bufsize=%u grpmask=%x\n", bufsize, initial_grpmask);
 
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");

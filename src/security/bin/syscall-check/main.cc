@@ -23,8 +23,6 @@ int main(int argc, char** argv) {
   SYSCALL_STATUS(zx_debug_read, (ZX_HANDLE_INVALID, nullptr, 0, &actual));
   SYSCALL_STATUS(zx_debug_send_command, (ZX_HANDLE_INVALID, nullptr, 0));
   SYSCALL_STATUS(zx_debug_write, (nullptr, 0));
-  SYSCALL_STATUS(zx_ktrace_control, (ZX_HANDLE_INVALID, 0, 0, nullptr));
-  SYSCALL_STATUS(zx_ktrace_read, (ZX_HANDLE_INVALID, nullptr, 0, 0, &actual));
   SYSCALL_STATUS(zx_mtrace_control, (ZX_HANDLE_INVALID, 0, 0, 0, nullptr, 0));
   SYSCALL_STATUS(zx_process_write_memory, (ZX_HANDLE_INVALID, 0, nullptr, 0, &actual));
   SYSCALL_STATUS(zx_system_mexec, (ZX_HANDLE_INVALID, ZX_HANDLE_INVALID, ZX_HANDLE_INVALID));
