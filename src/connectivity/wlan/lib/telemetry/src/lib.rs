@@ -125,11 +125,16 @@ pub fn serve_telemetry(
     let inspect_metadata_node = inspect_node.create_child(METADATA_NODE_NAME);
     let inspect_time_series_node = inspect_node.create_child("time_series");
     let driver_specific_time_series_node = inspect_time_series_node.create_child("driver_specific");
+    let driver_counters_time_series_node =
+        driver_specific_time_series_node.create_child("counters");
+    let driver_gauges_time_series_node = driver_specific_time_series_node.create_child("gauges");
 
     let (time_matrix_client, time_series_fut) =
         serve_time_matrix_inspection(inspect_time_series_node);
-    let (driver_specific_time_series_client, driver_specific_time_series_fut) =
-        serve_time_matrix_inspection(driver_specific_time_series_node);
+    let (driver_counters_time_series_client, driver_counters_time_series_fut) =
+        serve_time_matrix_inspection(driver_counters_time_series_node);
+    let (driver_gauges_time_series_client, driver_gauges_time_series_fut) =
+        serve_time_matrix_inspection(driver_gauges_time_series_node);
 
     // Create and initialize modules
     let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
@@ -149,13 +154,15 @@ pub fn serve_telemetry(
         processors::client_iface_counters::ClientIfaceCountersLogger::new(
             monitor_svc_proxy,
             &time_matrix_client,
-            driver_specific_time_series_client,
+            driver_counters_time_series_client,
+            driver_gauges_time_series_client,
         );
 
     let fut = async move {
         // Prevent the inspect nodes from being dropped while the loop is running.
         let _inspect_node = inspect_node;
         let _inspect_metadata_node = inspect_metadata_node;
+        let _driver_specific_time_series_node = driver_specific_time_series_node;
 
         let mut telemetry_interval = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
         loop {
@@ -204,7 +211,12 @@ pub fn serve_telemetry(
             }
         }
     };
-    let fut = future::try_join3(fut, time_series_fut, driver_specific_time_series_fut)
-        .map_ok(|((), (), ())| ());
+    let fut = future::try_join4(
+        fut,
+        time_series_fut,
+        driver_counters_time_series_fut,
+        driver_gauges_time_series_fut,
+    )
+    .map_ok(|((), (), (), ())| ());
     (sender, fut)
 }
