@@ -37,8 +37,8 @@ TEST_P(ProcSelfMemProts, CanWriteToPrivateAnonymousMappings) {
   fbl::unique_fd fd = fbl::unique_fd(open("/proc/self/mem", O_RDWR));
   ASSERT_TRUE(fd.is_valid()) << "open /proc/self/mem: " << std::strerror(errno);
 
-  const off_t offset = reinterpret_cast<off_t>(mapped);
-  ASSERT_EQ(lseek(fd.get(), offset, SEEK_SET), offset) << "lseek: " << std::strerror(errno);
+  const off64_t offset = static_cast<off64_t>(reinterpret_cast<uintptr_t>(mapped));
+  ASSERT_EQ(lseek64(fd.get(), offset, SEEK_SET), offset) << "lseek: " << std::strerror(errno);
 
   memset(buf, 'a', sizeof(buf));
 
