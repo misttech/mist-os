@@ -63,9 +63,9 @@ test("aml-saradc-test-bin") {
   sources = [ "aml-saradc-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
