@@ -13,6 +13,7 @@ rustc_library_with_features("netstack3-udp") {
   check_cfgs = [ "test" ]
   sources = [
     "src/base.rs",
+    "src/counters.rs",
     "src/lib.rs",
   ]
   deps = [

@@ -19,7 +19,7 @@ use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
 use netstack3_tcp::{CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket};
-use netstack3_udp::{UdpCounters, UdpCountersInner};
+use netstack3_udp::UdpCounters;
 
 /// An API struct for accessing all stack counters.
 pub struct CountersApi<C>(C);
@@ -156,10 +156,14 @@ where
         });
         inspector.record_child("UDP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspect_udp_counters::<Ipv4>(inspector, self.core_ctx().counters());
+                inspector.delegate_inspectable(
+                    CounterContext::<UdpCounters<Ipv4>>::counters(self.core_ctx()).as_ref(),
+                );
             });
             inspector.record_child("V6", |inspector| {
-                inspect_udp_counters::<Ipv6>(inspector, self.core_ctx().counters());
+                inspector.delegate_inspectable(
+                    CounterContext::<UdpCounters<Ipv6>>::counters(self.core_ctx()).as_ref(),
+                );
             });
         });
         inspector.record_child("TCP", |inspector| {
@@ -364,29 +368,4 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("ErrorInnerSizeLimitExceeded", error_inner_size_limit_exceeded);
         inspector.record_counter("ErrorFragmentedSerializer", error_fragmented_serializer);
     });
-}
-
-fn inspect_udp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &UdpCounters<I>) {
-    let UdpCountersInner {
-        rx_icmp_error,
-        rx,
-        rx_mapped_addr,
-        rx_unknown_dest_port,
-        rx_malformed,
-        tx,
-        tx_error,
-    } = counters.as_ref();
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("Received", rx);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("MappedAddr", rx_mapped_addr);
-            inspector.record_counter("UnknownDstPort", rx_unknown_dest_port);
-            inspector.record_counter("Malformed", rx_malformed);
-        });
-    });
-    inspector.record_child("Tx", |inspector| {
-        inspector.record_counter("Sent", tx);
-        inspector.record_counter("Errors", tx_error);
-    });
-    inspector.record_counter("IcmpErrors", rx_icmp_error);
 }

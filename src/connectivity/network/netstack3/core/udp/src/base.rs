@@ -18,9 +18,7 @@ use derivative::Derivative;
 use either::Either;
 use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 use log::{debug, trace};
-use net_types::ip::{
-    GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
-};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv6};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_base::socket::{
     AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
@@ -32,7 +30,7 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, Counter, CounterContext,
+    AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
     MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext,
     SocketError, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
@@ -64,6 +62,8 @@ use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
+
+use crate::internal::counters::UdpCounters;
 
 /// A builder for UDP layer state.
 #[derive(Clone)]
@@ -171,34 +171,6 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Default for UdpSta
     fn default() -> UdpState<I, D, BT> {
         UdpStateBuilder::default().build()
     }
-}
-
-/// Counters for the UDP layer.
-pub type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
-
-/// Counters for the UDP layer.
-#[derive(Default)]
-pub struct UdpCountersInner {
-    /// Count of ICMP error messages received.
-    pub rx_icmp_error: Counter,
-    /// Count of UDP datagrams received from the IP layer, including error
-    /// cases.
-    pub rx: Counter,
-    /// Count of incoming UDP datagrams dropped because it contained a mapped IP
-    /// address in the header.
-    pub rx_mapped_addr: Counter,
-    /// Count of incoming UDP datagrams dropped because of an unknown
-    /// destination port.
-    pub rx_unknown_dest_port: Counter,
-    /// Count of incoming UDP datagrams dropped because their UDP header was in
-    /// a malformed state.
-    pub rx_malformed: Counter,
-    /// Count of outgoing UDP datagrams sent from the socket layer, including
-    /// error cases.
-    pub tx: Counter,
-    /// Count of outgoing UDP datagrams which failed to be sent out of the
-    /// transport layer.
-    pub tx_error: Counter,
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
