@@ -8,11 +8,11 @@
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/vmo.h>
 
 #include <utility>
 
 #include <fbl/alloc_checker.h>
+#include <object/vm_object_dispatcher.h>
 
 namespace vmo_store {
 
@@ -50,10 +50,11 @@ template <typename Meta>
 class StoredVmo {
  public:
   template <typename = std::enable_if<std::is_void<Meta>::value>>
-  explicit StoredVmo(zx::vmo vmo) : vmo_(std::move(vmo)) {}
+  explicit StoredVmo(fbl::RefPtr<VmObjectDispatcher> vmo) : vmo_(std::move(vmo)) {}
 
   template <typename M = Meta, typename = std::enable_if<!std::is_void<Meta>::value>>
-  StoredVmo(zx::vmo vmo, M meta) : vmo_(std::move(vmo)), meta_(std::move(meta)) {}
+  StoredVmo(fbl::RefPtr<VmObjectDispatcher> vmo, M meta)
+      : vmo_(std::move(vmo)), meta_(std::move(meta)) {}
 
   template <typename M = Meta, typename = std::enable_if<!std::is_void<Meta>::value>>
   M& meta() {
@@ -80,7 +81,8 @@ class StoredVmo {
   //
   // Returns `ZX_ERR_ALREADY_BOUND` if the VMO is already pinned.
   // For other possible errors, see `fzl::PinnedVmo::Pin`.
-  zx_status_t Pin(const zx::bti& bti, uint32_t options, bool index = true) {
+  zx_status_t Pin(const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti, uint32_t options,
+                  bool index = true) {
     if (pinned_.region_count() != 0) {
       return ZX_ERR_ALREADY_BOUND;
     }
@@ -113,7 +115,7 @@ class StoredVmo {
   }
 
   // Get an unowned handle to the VMO.
-  zx::unowned_vmo vmo() { return zx::unowned_vmo(vmo_); }
+  fbl::RefPtr<VmObjectDispatcher> vmo() { return vmo_; }
 
   // Accessor for pinned VMO regions.
   const fzl::PinnedVmo& pinned_vmo() { return pinned_; }
@@ -225,10 +227,10 @@ class StoredVmo {
   void set_owner_cookie(void* owner_cookie) { owner_cookie_ = owner_cookie; }
   void* owner_cookie() const { return owner_cookie_; }
 
-  zx::vmo take_vmo() { return std::move(vmo_); }
+  fbl::RefPtr<VmObjectDispatcher> take_vmo() { return std::move(vmo_); }
 
  private:
-  zx::vmo vmo_;
+  fbl::RefPtr<VmObjectDispatcher> vmo_;
   internal::MetaStorage<Meta> meta_;
   fzl::VmoMapper mapper_;
   fzl::PinnedVmo pinned_;

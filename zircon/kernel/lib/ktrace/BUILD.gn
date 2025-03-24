@@ -53,6 +53,7 @@ config("suppress-warning.config") {
     "//src/lib/elfldltl/*",
     "//src/lib/llvm-profdata/*",
     "//src/lib/ubsan-custom/*",
+    "//src/lib/vmo_store/*",
     "//src/lib/zbitl/*",
     "//src/performance/lib/fxt/*",
     "//third_party/acpica/*",

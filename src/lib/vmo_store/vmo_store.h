@@ -12,6 +12,7 @@
 #include <memory>
 
 #include <fbl/alloc_checker.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
 
 #include "storage_types.h"
 
@@ -22,7 +23,7 @@ struct PinOptions {
   // The BTI used for pinning.
   // Note that `VmoStore` does *not* take ownership of the BTI handle. It is the caller's
   // responsibility to ensure the BTI handle is valid.
-  zx::unowned_bti bti;
+  fbl::RefPtr<BusTransactionInitiatorDispatcher> bti;
   // Options passed to zx_bti_pin. See `StoredVmo::Map` for more details.
   uint32_t bti_pin_options;
   // Index pinned pages for fast lookup. See `StoredVmo::Map` for more details.
@@ -134,7 +135,7 @@ class VmoStore : public VmoStoreBase<Backing> {
 
   // Registers a VMO with this store, returning the key used to access that VMO on success.
   template <typename... MetaArgs>
-  zx::result<Key> Register(zx::vmo vmo, MetaArgs... vmo_args) {
+  zx::result<Key> Register(fbl::RefPtr<VmObjectDispatcher> vmo, MetaArgs... vmo_args) {
     return Register(StoredVmo(std::move(vmo), std::forward<MetaArgs>(vmo_args)...));
   }
 
@@ -152,7 +153,7 @@ class VmoStore : public VmoStoreBase<Backing> {
 
   // Registers a VMO with this store using the provided `key`.
   template <typename... MetaArgs>
-  zx_status_t RegisterWithKey(Key key, zx::vmo vmo, MetaArgs... vmo_args) {
+  zx_status_t RegisterWithKey(Key key, fbl::RefPtr<VmObjectDispatcher> vmo, MetaArgs... vmo_args) {
     return RegisterWithKey(std::move(key),
                            StoredVmo(std::move(vmo), std::forward<MetaArgs>(vmo_args)...));
   }
@@ -169,7 +170,7 @@ class VmoStore : public VmoStoreBase<Backing> {
   // All the mapping and pinning handles will be dropped, and the VMO will be
   // returned to the caller.
   // Returns `ZX_ERR_NOT_FOUND` if `key` does not point to a registered VMO.
-  zx::result<zx::vmo> Unregister(Key key) {
+  zx::result<fbl::RefPtr<VmObjectDispatcher>> Unregister(Key key) {
     cpp17::optional<StoredVmo> vmo = this->impl_.Extract(key);
     if (vmo) {
       return zx::ok(std::move(vmo->take_vmo()));
@@ -185,7 +186,7 @@ class VmoStore : public VmoStoreBase<Backing> {
 
  private:
   zx_status_t PrepareStore(StoredVmo* vmo) {
-    if (!vmo->vmo()->is_valid()) {
+    if (!vmo->vmo()) {
       return ZX_ERR_BAD_HANDLE;
     }
     zx_status_t status;
@@ -193,13 +194,15 @@ class VmoStore : public VmoStoreBase<Backing> {
       const auto& map_options = *options_.map;
       status = vmo->Map(map_options.vm_option, map_options.vmar);
       if (status != ZX_OK) {
+        printf("VmoStore::PrepareStore: Map failed: %s\n", zx_status_get_string(status));
         return status;
       }
     }
     if (options_.pin) {
       const auto& pin_options = *options_.pin;
-      status = vmo->Pin(*pin_options.bti, pin_options.bti_pin_options, pin_options.index);
+      status = vmo->Pin(pin_options.bti, pin_options.bti_pin_options, pin_options.index);
       if (status != ZX_OK) {
+        printf("VmoStore::PrepareStore: Pin failed: %s\n", zx_status_get_string(status));
         return status;
       }
     }

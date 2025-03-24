@@ -54,10 +54,13 @@ class GrowableSlab {
   }
 
   void GrowTo(KeyType capacity) {
-    slots_.reserve(capacity);
+    fbl::AllocChecker ac;
+    slots_.reserve(capacity, &ac);
+    ZX_ASSERT(ac.check());
     while (slots_.size() != slots_.capacity()) {
       auto key = static_cast<KeyType>(slots_.size());
-      slots_.push_back(Slot());
+      slots_.push_back(Slot(), &ac);
+      ZX_ASSERT(ac.check());
       ListInsert(&free_list_, key);
     }
   }
