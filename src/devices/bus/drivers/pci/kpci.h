@@ -10,7 +10,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pci.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #include <ddktl/device.h>
 
@@ -20,7 +20,7 @@ struct kpci_device {
   zx_device_t* zxdev;
   // only set for non-proxy devices
   pciroot_protocol_t pciroot;
-  ddk::PDevFidl pdev;
+  fdf::PDev pdev;
   // kernel pci handle, only set for shadow devices
   zx_handle_t handle;
   // nth device index
