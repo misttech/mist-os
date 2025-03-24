@@ -3470,6 +3470,23 @@ mod arch32 {
         super::sys_inotify_init1(locked, current_task, 0)
     }
 
+    pub fn sys_arch32_link(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        old_user_path: UserCString,
+        new_user_path: UserCString,
+    ) -> Result<(), Errno> {
+        super::sys_linkat(
+            locked,
+            current_task,
+            FdNumber::AT_FDCWD,
+            old_user_path,
+            FdNumber::AT_FDCWD,
+            new_user_path,
+            0,
+        )
+    }
+
     pub use super::{
         sys_chroot as sys_arch32_chroot, sys_dup3 as sys_arch32_dup3,
         sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
