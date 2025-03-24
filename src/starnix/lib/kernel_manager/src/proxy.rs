@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::suspend::{ResumeEvents, KERNEL_SIGNAL, RUNNER_SIGNAL};
+use crate::suspend::{WakeSources, KERNEL_SIGNAL, RUNNER_SIGNAL};
 use anyhow::{anyhow, Error};
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
@@ -29,6 +29,10 @@ pub struct ChannelProxy {
     /// The resume event that is signaled when messages are proxied into the container.
     pub resume_event: zx::EventPair,
 
+    /// The number of unhandled messages on this proxy. If non-zero, the container is still
+    /// processing one of the incoming messages and the container should not be suspended.
+    pub message_counter: Option<zx::Counter>,
+
     /// Human readable name for the thing that is being proxied.
     pub name: String,
 }
@@ -45,7 +49,7 @@ const PROXY_ROLE_NAME: &str = "fuchsia.starnix.runner.proxy";
 
 /// Starts a thread that listens for new proxies and runs `start_proxy` on each.
 pub fn run_proxy_thread(
-    new_proxies: async_channel::Receiver<(ChannelProxy, Arc<Mutex<ResumeEvents>>)>,
+    new_proxies: async_channel::Receiver<(ChannelProxy, Arc<Mutex<WakeSources>>)>,
 ) {
     let _ = std::thread::Builder::new().name("proxy_thread".to_string()).spawn(move || {
         if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(PROXY_ROLE_NAME) {
@@ -73,10 +77,10 @@ pub fn run_proxy_thread(
 /// `proxy.remote_channel`. The task will exit when either of the channels' peer is closed, or
 /// if `proxy.resume_event`'s peer is closed.
 ///
-/// When the task exits, `proxy.resume_event` will be removed from `resume_events`.
+/// When the task exits, `proxy.resume_event` will be removed from `wake_sources`.
 async fn start_proxy(
     proxy: ChannelProxy,
-    resume_events: Arc<Mutex<ResumeEvents>>,
+    wake_sources: Arc<Mutex<WakeSources>>,
     bounce_bytes: Rc<RefCell<[MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize]>>,
     bounce_handles: Rc<
         RefCell<[MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize]>,
@@ -125,25 +129,48 @@ async fn start_proxy(
         // should signal `proxy.resume_event`, since those are the only messages that should
         // wake the container if it's suspended.
         let name = proxy.name.as_str();
-        let result = match finished_wait {
-            WaitReturn::Container => forward_message(
-                &signals,
-                &proxy.container_channel,
-                &proxy.remote_channel,
-                None,
-                &mut bounce_bytes.borrow_mut(),
-                &mut bounce_handles.borrow_mut(),
-                name,
-            ),
-            WaitReturn::Remote => forward_message(
-                &signals,
-                &proxy.remote_channel,
-                &proxy.container_channel,
-                Some(&proxy.resume_event),
-                &mut bounce_bytes.borrow_mut(),
-                &mut bounce_handles.borrow_mut(),
-                name,
-            ),
+        let result = if let Some(message_counter) = proxy.message_counter.as_ref() {
+            match finished_wait {
+                WaitReturn::Container => forward_message_counter(
+                    &signals,
+                    &proxy.container_channel,
+                    &proxy.remote_channel,
+                    None,
+                    &mut bounce_bytes.borrow_mut(),
+                    &mut bounce_handles.borrow_mut(),
+                    name,
+                ),
+                WaitReturn::Remote => forward_message_counter(
+                    &signals,
+                    &proxy.remote_channel,
+                    &proxy.container_channel,
+                    Some(message_counter),
+                    &mut bounce_bytes.borrow_mut(),
+                    &mut bounce_handles.borrow_mut(),
+                    name,
+                ),
+            }
+        } else {
+            match finished_wait {
+                WaitReturn::Container => forward_message(
+                    &signals,
+                    &proxy.container_channel,
+                    &proxy.remote_channel,
+                    None,
+                    &mut bounce_bytes.borrow_mut(),
+                    &mut bounce_handles.borrow_mut(),
+                    name,
+                ),
+                WaitReturn::Remote => forward_message(
+                    &signals,
+                    &proxy.remote_channel,
+                    &proxy.container_channel,
+                    Some(&proxy.resume_event),
+                    &mut bounce_bytes.borrow_mut(),
+                    &mut bounce_handles.borrow_mut(),
+                    name,
+                ),
+            }
         };
 
         if result.is_err() {
@@ -162,7 +189,7 @@ async fn start_proxy(
 
     trace_instant(c"starnix_runner:start_proxy:loop:exit", proxy_name);
     if let Ok(koid) = proxy.resume_event.get_koid() {
-        resume_events.lock().events.remove(&koid);
+        wake_sources.lock().remove(&koid);
     }
 }
 
@@ -236,6 +263,47 @@ fn forward_message(
     }
 }
 
+/// Forwards any pending messages on `read_channel` to `write_channel`, if the `wait_item.pending`
+/// contains `CHANNEL_READABLE`.
+///
+/// If `message_counter` is `Some`, it will be incremented by one when writing the message to the
+/// write_channel.
+fn forward_message_counter(
+    signals: &zx::Signals,
+    read_channel: &zx::Channel,
+    write_channel: &zx::Channel,
+    message_counter: Option<&zx::Counter>,
+    bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
+    handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
+    name: &str,
+) -> Result<(), Error> {
+    trace_duration(c"starnix_runner:forward_message", name);
+
+    if signals.contains(zx::Signals::CHANNEL_READABLE) {
+        let (actual_bytes, actual_handles) = {
+            match read_channel.read_uninit(bytes, handles) {
+                zx::ChannelReadResult::Ok(r) => r,
+                _ => return Err(anyhow!("Failed to read from channel")),
+            }
+        };
+
+        if let Some(counter) = message_counter {
+            counter.add(1).expect("Failed to add to the proxy's message counter");
+            trace_instant(c"starnix_runner:forward_message:counter_incremented", name);
+        }
+
+        write_channel.write(actual_bytes, actual_handles)?;
+    }
+
+    // It is important to check for peer closed after readable, in order to flush any
+    // remaining messages in the proxied channel.
+    if signals.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+        Err(anyhow!("Proxy peer was closed"))
+    } else {
+        Ok(())
+    }
+}
+
 fn trace_duration(event: &'static std::ffi::CStr, name: &str) {
     fuchsia_trace::duration!(c"power", event, "name" => name);
 }
@@ -252,6 +320,7 @@ fn trace_instant(event: &'static std::ffi::CStr, name: &str) {
 #[cfg(test)]
 mod test {
     use super::{fasync, start_proxy, ChannelProxy};
+    use fidl::HandleBased;
     use std::cell::RefCell;
     use std::mem::MaybeUninit;
     use std::rc::Rc;
@@ -276,6 +345,7 @@ mod test {
             container_channel: local_server,
             remote_channel: remote_client,
             resume_event,
+            message_counter: None,
             name: "test".to_string(),
         };
         let _task = run_proxy_for_test(channel_proxy);
@@ -295,6 +365,7 @@ mod test {
             container_channel: local_server,
             remote_channel: remote_client,
             resume_event,
+            message_counter: None,
             name: "test".to_string(),
         };
         let _task = run_proxy_for_test(channel_proxy);
@@ -314,6 +385,7 @@ mod test {
             container_channel: local_server,
             remote_channel: remote_client,
             resume_event,
+            message_counter: None,
             name: "test".to_string(),
         };
         let _task = run_proxy_for_test(channel_proxy);
@@ -323,5 +395,72 @@ mod test {
         assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
 
         fasync::OnSignals::new(local_client, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_counter_sequential() {
+        let (_local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+        let message_counter = zx::Counter::create().expect("Failed to create counter");
+        let local_message_counter = message_counter
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .expect("Failed to duplicate counter");
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+            message_counter: Some(message_counter),
+            name: "test".to_string(),
+        };
+        let _task = run_proxy_for_test(channel_proxy);
+
+        // Send a message and make sure counter is incremented.
+        fasync::OnSignals::new(&local_message_counter, zx::Signals::COUNTER_NON_POSITIVE)
+            .await
+            .unwrap();
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
+        fasync::OnSignals::new(&local_message_counter, zx::Signals::COUNTER_POSITIVE)
+            .await
+            .unwrap();
+
+        // Decrement the counter, simulating a read, and make sure it goes back down to zero.
+        local_message_counter.add(-1).expect("Failed add");
+        fasync::OnSignals::new(&local_message_counter, zx::Signals::COUNTER_NON_POSITIVE)
+            .await
+            .unwrap();
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
+        fasync::OnSignals::new(&local_message_counter, zx::Signals::COUNTER_POSITIVE)
+            .await
+            .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_counter_multiple() {
+        let (_local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+        let message_counter = zx::Counter::create().expect("Failed to create counter");
+        let local_message_counter = message_counter
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .expect("Failed to duplicate counter");
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+            message_counter: Some(message_counter),
+            name: "test".to_string(),
+        };
+        let _task = run_proxy_for_test(channel_proxy);
+
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
+        fasync::OnSignals::new(&local_message_counter, zx::Signals::COUNTER_POSITIVE)
+            .await
+            .unwrap();
+        assert_eq!(local_message_counter.read().expect("Failed to read counter"), 3);
     }
 }

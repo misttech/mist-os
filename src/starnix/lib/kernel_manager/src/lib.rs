@@ -19,7 +19,7 @@ use rand::Rng;
 use std::future::Future;
 use std::sync::Arc;
 use suspend::{
-    suspend_container, ResumeEvent, ResumeEvents, SuspendContext, ASLEEP_SIGNAL, AWAKE_SIGNAL,
+    suspend_container, SuspendContext, WakeSource, WakeSources, ASLEEP_SIGNAL, AWAKE_SIGNAL,
 };
 use zx::AsHandleRef;
 use {
@@ -216,7 +216,7 @@ pub async fn serve_starnix_manager(
     mut stream: fstarnixrunner::ManagerRequestStream,
     suspend_context: Arc<SuspendContext>,
     kernels: &Kernels,
-    sender: &async_channel::Sender<(ChannelProxy, Arc<Mutex<ResumeEvents>>)>,
+    sender: &async_channel::Sender<(ChannelProxy, Arc<Mutex<WakeSources>>)>,
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
@@ -236,6 +236,7 @@ pub async fn serve_starnix_manager(
                     remote_channel: Some(remote_channel),
                     container_channel: Some(container_channel),
                     resume_event: Some(resume_event),
+                    counter,
                     name: Some(name),
                     ..
                 } = payload
@@ -247,19 +248,20 @@ pub async fn serve_starnix_manager(
                     container_channel,
                     remote_channel,
                     resume_event,
+                    message_counter: counter,
                     name: name.clone(),
                 };
-                suspend_context.resume_events.lock().events.insert(
+                suspend_context.wake_sources.lock().insert(
                     proxy.resume_event.get_koid().unwrap(),
-                    ResumeEvent {
-                        event: proxy
+                    WakeSource::new_event(
+                        proxy
                             .resume_event
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("failed"),
                         name,
-                    },
+                    ),
                 );
-                sender.try_send((proxy, suspend_context.resume_events.clone())).unwrap();
+                sender.try_send((proxy, suspend_context.wake_sources.clone())).unwrap();
             }
             fstarnixrunner::ManagerRequest::RegisterWakeWatcher { payload, responder } => {
                 if let Some(watcher) = payload.watcher {
