@@ -41,6 +41,10 @@ uapi::check_arch_independent_layout! {
         sin6_addr,
         sin6_scope_id
     }
+
+    in_addr {
+        s_addr,
+    }
 }
 
 bitflags! {

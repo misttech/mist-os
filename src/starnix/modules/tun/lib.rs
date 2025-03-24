@@ -4,19 +4,17 @@
 
 //! This file contains code for creating and serving tun/tap devices.
 
-use std::num::NonZeroU64;
-use std::sync::Arc;
-
 use fidl::endpoints::Proxy as _;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::signals::RunState;
 use starnix_core::task::{CurrentTask, WaiterRef};
+use starnix_core::vfs::socket::IfReqPtr;
 use starnix_core::vfs::{default_ioctl, FileObject, FileOps};
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::user_address::{UserAddress, UserRef};
-use zerocopy::IntoBytes as _;
+use std::num::NonZeroU64;
+use std::sync::Arc;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
@@ -371,27 +369,12 @@ impl FileOps for DevTun {
                 let mut inner = self.0.lock();
 
                 log_info!("handling TUNSETIFF for /dev/tun");
-                let user_addr = UserAddress::from(arg);
-                let in_ifreq: starnix_uapi::ifreq =
-                    current_task.read_object(UserRef::new(user_addr))?;
+                let user_addr = IfReqPtr::new(current_task, arg);
+                let in_ifreq = current_task.read_multi_arch_object(user_addr)?;
 
-                // SAFETY: `ifr_ifrn` is a union, but `ifrn_name` is its only
-                // variant, and it is guaranteed to be initialized by
-                // `CurrentTask::read_object`.
-                let name: &[_; 16] = unsafe { &in_ifreq.ifr_ifrn.ifrn_name };
-                let name = std::ffi::CStr::from_bytes_until_nul(name.as_bytes())
-                    .map_err(|_| {
-                        starnix_uapi::errno!(EINVAL, "interface name had no null terminator")
-                    })?
-                    .to_str()
-                    .map_err(|_| starnix_uapi::errno!(EINVAL, "interface name was not UTF-8"))?
-                    .to_string();
+                let name = in_ifreq.name_as_str()?.to_string();
 
-                // SAFETY: `ifr_ifru` is guaranteed to be initialized by
-                // `CurrentTask::read_object`, and all bit patterns of `i16` are
-                // valid.
-                let flags: i16 = unsafe { in_ifreq.ifr_ifru.ifru_flags };
-                let flags = flags as u32;
+                let flags = in_ifreq.ifru_flags() as u32;
 
                 let iff_tun = flags & starnix_uapi::IFF_TUN != 0;
                 let iff_tap = flags & starnix_uapi::IFF_TAP != 0;
