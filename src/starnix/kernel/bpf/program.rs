@@ -14,7 +14,7 @@ use ebpf::{
 };
 use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_uapi::auth::{CAP_BPF, CAP_SYS_ADMIN};
+use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use std::collections::HashMap;
@@ -111,7 +111,48 @@ impl Program {
         if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
             return Ok(());
         }
-        security::check_task_capable(current_task, CAP_BPF)
+        security::check_task_capable(current_task, CAP_BPF)?;
+        match info.program_type {
+            // Loading tracing program types additionally require the CAP_PERFMON capability.
+            ProgramType::Kprobe
+            | ProgramType::Tracepoint
+            | ProgramType::PerfEvent
+            | ProgramType::RawTracepoint
+            | ProgramType::RawTracepointWritable
+            | ProgramType::Tracing => security::check_task_capable(current_task, CAP_PERFMON),
+
+            // Loading networking program types additionally require the CAP_NET_ADMIN capability.
+            ProgramType::SocketFilter
+            | ProgramType::SchedCls
+            | ProgramType::SchedAct
+            | ProgramType::Xdp
+            | ProgramType::SockOps
+            | ProgramType::SkSkb
+            | ProgramType::SkMsg
+            | ProgramType::SkLookup
+            | ProgramType::SkReuseport
+            | ProgramType::FlowDissector
+            | ProgramType::Netfilter => security::check_task_capable(current_task, CAP_NET_ADMIN),
+
+            // No additional checks are necessary for other program types.
+            ProgramType::CgroupDevice
+            | ProgramType::CgroupSkb
+            | ProgramType::CgroupSock
+            | ProgramType::CgroupSockAddr
+            | ProgramType::CgroupSockopt
+            | ProgramType::CgroupSysctl
+            | ProgramType::Ext
+            | ProgramType::LircMode2
+            | ProgramType::Lsm
+            | ProgramType::LwtIn
+            | ProgramType::LwtOut
+            | ProgramType::LwtSeg6Local
+            | ProgramType::LwtXmit
+            | ProgramType::StructOps
+            | ProgramType::Syscall
+            | ProgramType::Unspec
+            | ProgramType::Fuse => Ok(()),
+        }
     }
 }
 
