@@ -77,12 +77,13 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	if len(extraTags) != 1 {
 		t.Errorf("extraTags(%v) got mutated, this value should not be changed.", extraTags)
 	}
-	// We only expect 4 tags
-	// 1. gn_label:value
-	// 2. test_case_count:value
-	// 3. affected:value
-	// 4. key1:value1
-	if len(tags) != 4 {
+	// We only expect 5 tags
+	// 1. key1:value1
+	// 2. gn_label:value
+	// 3. test_case_count:value
+	// 4. affected:value
+	// 5. is_top_level_test:value
+	if len(tags) != 5 {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
@@ -90,6 +91,7 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	checkTagValue(t, tags, "gn_label", detail.GNLabel)
 	checkTagValue(t, tags, "test_case_count", "7")
 	checkTagValue(t, tags, "affected", "false")
+	checkTagValue(t, tags, "is_top_level_test", "true")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
@@ -144,12 +146,13 @@ func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testi
 	if len(extraTags) != 1 {
 		t.Errorf("extraTags(%v) got mutated, this value should not be changed.", extraTags)
 	}
-	// We only expect 4 tags
-	// 1. gn_label:value
-	// 2. test_case_count:value
-	// 3. affected:value
-	// 4. key1:value1
-	if len(tags) != 4 {
+	// We only expect 5 tags
+	// 1. key1:value1
+	// 2. gn_label:value
+	// 3. test_case_count:value
+	// 4. affected:value
+	// 5. is_top_level_test:value
+	if len(tags) != 5 {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
@@ -157,6 +160,7 @@ func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testi
 	checkTagValue(t, tags, "gn_label", detail.GNLabel)
 	checkTagValue(t, tags, "test_case_count", "205")
 	checkTagValue(t, tags, "affected", "false")
+	checkTagValue(t, tags, "is_top_level_test", "true")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
@@ -184,13 +188,15 @@ func TestSetTestCaseToResultSink(t *testing.T) {
 		for _, tag := range result.Tags {
 			tags[tag.Key] = tag.Value
 		}
-		// We only expect 2 tags
+		// We only expect 3 tags
 		// 1. format:value
-		// 2. key1:value1
-		if len(tags) != 2 {
+		// 2. is_test_case:value
+		// 3. key1:value1
+		if len(tags) != 3 {
 			t.Errorf("tags(%v) contains unexpected values.", tags)
 		}
 		checkTagValue(t, tags, "format", detail.Cases[i].Format)
+		checkTagValue(t, tags, "is_test_case", "true")
 		checkTagValue(t, tags, "key1", "value1")
 		if len(result.Artifacts) != 2 {
 			t.Errorf("Got %d artifacts for test case %d, want 2", len(result.Artifacts), i+1)

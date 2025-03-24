@@ -140,7 +140,9 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 			testsSkipped = append(testsSkipped, testID)
 			continue
 		}
-		testCaseTags := append([]*resultpb.StringPair{{Key: "format", Value: testCase.Format}}, tags...)
+		testCaseTags := append([]*resultpb.StringPair{
+			{Key: "format", Value: testCase.Format},
+			{Key: "is_test_case", Value: "true"}}, tags...)
 		for _, tag := range testCase.Tags {
 			testCaseTags = append(testCaseTags, &resultpb.StringPair{
 				Key: tag.Key, Value: tag.Value,
@@ -195,6 +197,7 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 		{Key: "gn_label", Value: testDetail.GNLabel},
 		{Key: "test_case_count", Value: strconv.Itoa(len(testDetail.Cases))},
 		{Key: "affected", Value: strconv.FormatBool(testDetail.Affected)},
+		{Key: "is_top_level_test", Value: "true"},
 	}, tags...)
 	for _, tag := range testDetail.Tags {
 		testTags = append(testTags, &resultpb.StringPair{
