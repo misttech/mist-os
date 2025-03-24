@@ -143,6 +143,7 @@ template("rustc_test_internal") {
                              "enforce_source_listing",
                              "features",
                              "inputs",
+                             "public_deps",
                              "quiet_clippy",
                              "rustenv",
                              "sources",
