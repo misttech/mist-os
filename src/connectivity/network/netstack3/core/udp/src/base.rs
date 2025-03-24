@@ -2744,8 +2744,9 @@ mod tests {
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
     use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
     use packet::Buf;
-
     use test_case::test_case;
+
+    use crate::internal::counters::testutil::CounterExpectations;
 
     use super::*;
 
@@ -3556,6 +3557,12 @@ mod tests {
         assert_eq!(udp_packet.src_port().unwrap(), LOCAL_PORT);
         assert_eq!(udp_packet.dst_port(), REMOTE_PORT);
         assert_eq!(udp_packet.body(), &body[..]);
+
+        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
+        assert_eq!(
+            CounterExpectations { rx: 1, tx: 1, ..Default::default() },
+            counters.as_ref().into()
+        );
     }
 
     /// Tests that UDP connections fail with an appropriate error for
@@ -3934,6 +3941,12 @@ mod tests {
         // Now try to send something over this new connection:
         let send_err = api.send(&socket, Buf::new(Vec::new(), ..)).unwrap_err();
         assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
+
+        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
+        assert_eq!(
+            CounterExpectations { tx: 1, tx_error: 1, ..Default::default() },
+            counters.as_ref().into()
+        );
     }
 
     #[ip_test(I)]

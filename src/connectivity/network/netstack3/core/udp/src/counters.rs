@@ -11,28 +11,31 @@ use netstack3_base::{Counter, Inspectable, Inspector, InspectorExt as _};
 pub type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
 
 /// Counters for the UDP layer.
+///
+/// The counter type `C` is generic to facilitate testing.
 #[derive(Default)]
-pub struct UdpCountersInner {
+#[cfg_attr(test, derive(Debug, PartialEq))]
+pub struct UdpCountersInner<C = Counter> {
     /// Count of ICMP error messages received.
-    pub rx_icmp_error: Counter,
+    pub rx_icmp_error: C,
     /// Count of UDP datagrams received from the IP layer, including error
     /// cases.
-    pub rx: Counter,
+    pub rx: C,
     /// Count of incoming UDP datagrams dropped because it contained a mapped IP
     /// address in the header.
-    pub rx_mapped_addr: Counter,
+    pub rx_mapped_addr: C,
     /// Count of incoming UDP datagrams dropped because of an unknown
     /// destination port.
-    pub rx_unknown_dest_port: Counter,
+    pub rx_unknown_dest_port: C,
     /// Count of incoming UDP datagrams dropped because their UDP header was in
     /// a malformed state.
-    pub rx_malformed: Counter,
+    pub rx_malformed: C,
     /// Count of outgoing UDP datagrams sent from the socket layer, including
     /// error cases.
-    pub tx: Counter,
+    pub tx: C,
     /// Count of outgoing UDP datagrams which failed to be sent out of the
     /// transport layer.
-    pub tx_error: Counter,
+    pub tx_error: C,
 }
 
 impl Inspectable for UdpCountersInner {
@@ -59,5 +62,35 @@ impl Inspectable for UdpCountersInner {
             inspector.record_counter("Errors", tx_error);
         });
         inspector.record_counter("IcmpErrors", rx_icmp_error);
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod testutil {
+    use super::*;
+
+    pub(crate) type CounterExpectations = UdpCountersInner<u64>;
+
+    impl From<&UdpCountersInner> for CounterExpectations {
+        fn from(counters: &UdpCountersInner) -> CounterExpectations {
+            let UdpCountersInner {
+                rx_icmp_error,
+                rx,
+                rx_mapped_addr,
+                rx_unknown_dest_port,
+                rx_malformed,
+                tx,
+                tx_error,
+            } = counters;
+            CounterExpectations {
+                rx_icmp_error: rx_icmp_error.get(),
+                rx: rx.get(),
+                rx_mapped_addr: rx_mapped_addr.get(),
+                rx_unknown_dest_port: rx_unknown_dest_port.get(),
+                rx_malformed: rx_malformed.get(),
+                tx: tx.get(),
+                tx_error: tx_error.get(),
+            }
+        }
     }
 }
