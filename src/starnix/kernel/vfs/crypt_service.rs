@@ -29,6 +29,7 @@ pub struct KeyInfo {
 pub struct CryptServiceInner {
     ciphers: HashMap<EncryptionKeyId, KeyInfo>,
     metadata_key: Option<EncryptionKeyId>,
+    data_key: Option<EncryptionKeyId>,
 }
 
 impl CryptServiceInner {
@@ -63,10 +64,17 @@ impl CryptService {
         inner.ciphers.get(&key).map(|x| x.users.clone())
     }
 
-    fn create_key(&self, owner: u64, _purpose: KeyPurpose) -> CryptCreateKeyResult {
+    fn create_key(&self, owner: u64, purpose: KeyPurpose) -> CryptCreateKeyResult {
         let inner = self.inner.lock().unwrap();
-        let wrapping_key_id =
-            inner.metadata_key.as_ref().ok_or_else(|| zx::Status::BAD_STATE.into_raw())?;
+        let wrapping_key_id = match purpose {
+            KeyPurpose::Data => {
+                inner.data_key.as_ref().ok_or_else(|| zx::Status::BAD_STATE.into_raw())?
+            }
+            KeyPurpose::Metadata => {
+                inner.metadata_key.as_ref().ok_or_else(|| zx::Status::BAD_STATE.into_raw())?
+            }
+            _ => return Err(zx::Status::INVALID_ARGS.into_raw()),
+        };
         let cipher = inner
             .ciphers
             .get(wrapping_key_id)
@@ -182,16 +190,21 @@ impl CryptService {
         Ok(())
     }
 
-    pub fn set_metadata_key(
+    pub fn set_active_key(
         &self,
         wrapping_key_id: [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize],
+        purpose: KeyPurpose,
     ) -> Result<(), Errno> {
         let mut inner = self.inner.lock().unwrap();
         let key_id = EncryptionKeyId::from(wrapping_key_id);
         if !inner.ciphers.contains_key(&key_id) {
             return error!(ENOENT);
         }
-        inner.metadata_key = Some(key_id);
+        match purpose {
+            KeyPurpose::Data => inner.data_key = Some(key_id),
+            KeyPurpose::Metadata => inner.metadata_key = Some(key_id),
+            _ => return error!(EINVAL),
+        }
         Ok(())
     }
 
@@ -267,8 +280,10 @@ mod tests {
                 .expect_err("create_key should fail without a metadata key set"),
             zx::Status::BAD_STATE.into_raw()
         );
-        service.set_metadata_key(u128::to_le_bytes(1)).expect("failed to set metadata key");
-        service.create_key(0, KeyPurpose::Data).expect("create_key failed");
+        service
+            .set_active_key(u128::to_le_bytes(1), KeyPurpose::Metadata)
+            .expect("failed to set metadata key");
+        service.create_key(0, KeyPurpose::Metadata).expect("create_key failed");
     }
 
     #[test]
@@ -331,9 +346,13 @@ mod tests {
     #[test]
     fn wrap_unwrap_key() {
         let service = CryptService::new();
-        let key = vec![0xABu8; 32];
-        service.add_wrapping_key(u128::to_le_bytes(1), key.clone(), 0).expect("add_key failed");
-        service.set_metadata_key(u128::to_le_bytes(1)).expect("set metadata key failed");
+        let data_key = vec![0xCDu8; 32];
+        service
+            .add_wrapping_key(u128::to_le_bytes(0), data_key.clone(), 0)
+            .expect("add wrapping key failed");
+        service
+            .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
+            .expect("set active key failed for data");
 
         let (wrapping_key_id, wrapped, unwrapped) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
@@ -398,10 +417,13 @@ mod tests {
     #[test]
     fn unwrap_key_wrong_key() {
         let service = CryptService::new();
-        let key = vec![0xABu8; 32];
-        service.add_wrapping_key(u128::to_le_bytes(1), key.clone(), 0).expect("add_key failed");
-        service.set_metadata_key(u128::to_le_bytes(1)).expect("set_active_key failed");
-
+        let data_key = vec![0xCDu8; 32];
+        service
+            .add_wrapping_key(u128::to_le_bytes(0), data_key.clone(), 0)
+            .expect("add wrapping key failed");
+        service
+            .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
+            .expect("set active key failed for data");
         let (wrapping_key_id, mut wrapped, _) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
         for byte in &mut wrapped {
@@ -415,11 +437,13 @@ mod tests {
     #[test]
     fn unwrap_key_wrong_owner() {
         let service = CryptService::new();
-        let key = vec![0xABu8; 32];
+        let data_key = vec![0xCDu8; 32];
         service
-            .add_wrapping_key(u128::to_le_bytes(1), key.clone(), 0)
+            .add_wrapping_key(u128::to_le_bytes(0), data_key.clone(), 0)
             .expect("add wrapping key failed");
-        service.set_metadata_key(u128::to_le_bytes(1)).expect("set metadata key failed");
+        service
+            .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
+            .expect("set active key failed for data");
 
         let (wrapping_key_id, wrapped, _) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");

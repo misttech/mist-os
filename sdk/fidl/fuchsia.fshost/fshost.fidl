@@ -102,10 +102,18 @@ closed protocol Recovery {
 /// Provides access to the volume which will be used by Starnix to store its data.
 @discoverable
 closed protocol StarnixVolumeProvider {
-    /// Mounts the main starnix volume using `crypt`, creating the volume if it does not already
-    /// exist. `exposed_dir` will be connected to the exposed directory of the mounted starnix
-    /// volume.
+    /// Mounts the main starnix volume using `crypt`. `exposed_dir` will be connected to the
+    /// exposed directory of the mounted starnix volume. Silently creates the volume if it does
+    /// not already exist.
     strict Mount(resource struct {
+        crypt client_end:fuchsia.fxfs.Crypt;
+        exposed_dir server_end:fuchsia.io.Directory;
+    }) -> () error zx.Status;
+
+    /// Creates and mounts the main starnix volume using `crypt`. If the volume already exists,
+    /// unmount and delete the volume before creating the new one. `exposed_dir` will be connected
+    /// to the exposed directory of the mounted starnix volume.
+    strict Create(resource struct {
         crypt client_end:fuchsia.fxfs.Crypt;
         exposed_dir server_end:fuchsia.io.Directory;
     }) -> () error zx.Status;

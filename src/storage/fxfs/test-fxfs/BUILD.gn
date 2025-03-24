@@ -22,6 +22,7 @@ rustc_binary("bin") {
     "//src/storage/fxfs/crypto",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/fxfs/platform",
+    "//src/storage/fxfs/test-fxfs/fidl/fuchsia.test.fxfs:fuchsia.test.fxfs_rust",
     "//src/storage/lib/storage_device",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",

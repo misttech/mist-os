@@ -5,7 +5,7 @@
     include: [
         "//src/storage/fxfs/test-fxfs/meta/test-fxfs.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
-        "sys/component/realm_builder.shard.cml",
+        "sys/component/realm_builder_persistent_storage.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -19,6 +19,14 @@
                 "stopped",
             ],
         },
+        {
+            protocol: "fuchsia.sys2.StorageAdmin",
+            from: "#data",
+        },
+        {
+            protocol: "fuchsia.test.fxfs.StarnixVolumeAdmin",
+            from: "#test-fxfs",
+        },
     ],
     offer: [
         {
@@ -30,6 +38,11 @@
             directory: "boot-kernel",
             from: "parent",
             to: "#realm_builder",
+        },
+        {
+            storage: "data",
+            from: "self",
+            to: [ "#realm_builder" ],
         },
         {
             protocol: "fuchsia.fshost.StarnixVolumeProvider",

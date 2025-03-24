@@ -37,6 +37,11 @@
             to: "#kernel",
         },
         {
+            storage: "data",
+            from: "parent",
+            to: [ "#debian_container" ],
+        },
+        {
             protocol: "fuchsia.fshost.StarnixVolumeProvider",
             from: "parent",
             to: "#debian_container",

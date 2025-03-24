@@ -418,6 +418,7 @@ template("fshost_integration_test_package") {
 fshost_integration_test_package("fshost_integration_tests_fxfs") {
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
+  allow_error_severity_logs = true
   options = {
   }
   extra_deps = [

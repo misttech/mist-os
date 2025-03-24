@@ -1589,6 +1589,29 @@ pub fn directory_read_file(
     }
 }
 
+/// Create an anonymous temp file in the given directory.
+pub fn directory_create_tmp_file(
+    directory: &fio::DirectorySynchronousProxy,
+    flags: fio::Flags,
+    deadline: zx::MonotonicInstant,
+) -> Result<fio::FileSynchronousProxy, zx::Status> {
+    let description = directory_open(
+        directory,
+        ".",
+        flags
+            | fio::PERM_WRITABLE
+            | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+            | fio::Flags::PROTOCOL_FILE,
+        deadline,
+    )?;
+    let file = match description.kind {
+        NodeKind::File => fio::FileSynchronousProxy::new(description.node.into_channel()),
+        _ => return Err(zx::Status::NOT_FILE),
+    };
+
+    Ok(file)
+}
+
 /// Open the given path in the given directory without blocking.
 ///
 /// A zx::Channel to the opened node is returned (or an error).

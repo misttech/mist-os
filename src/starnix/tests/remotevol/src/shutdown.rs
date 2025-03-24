@@ -12,6 +12,9 @@ use futures::StreamExt;
 use log::info;
 use std::collections::BTreeMap;
 
+/// The purpose of this test is to ensure that Starnix unmounts its volume on container shutdown.
+/// This test checks the inspect tree exposed by the test-fxfs instance to ensure that the
+/// container has appropriately unmounted its volume on shutdown.
 #[fuchsia::test]
 async fn o_shutdown() {
     let mut events = EventStream::open().await.unwrap();

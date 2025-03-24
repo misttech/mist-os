@@ -22,7 +22,7 @@ group("tests") {
     "nanohub:tests",
     "psi:tests",
     "reboot:tests",
-    "remotevol_shutdown:tests",
+    "remotevol:tests",
     "scheduler:tests",
     "selinux/userspace:tests",
     "suspend:tests",
