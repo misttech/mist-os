@@ -88,7 +88,7 @@ impl quote::ToTokens for Executor {
 }
 
 // Helper trait for things that can generate the final token stream
-trait Finish {
+pub trait Finish {
     fn finish(self) -> TokenStream
     where
         Self: Sized;
@@ -457,17 +457,11 @@ impl Finish for Transformer {
     }
 }
 
-impl Finish for Error {
-    fn finish(self) -> TokenStream {
-        self.to_compile_error().into()
-    }
-}
-
-impl<R: Finish, E: Finish> Finish for Result<R, E> {
+impl<R: Finish> Finish for Result<R, Error> {
     fn finish(self) -> TokenStream {
         match self {
             Ok(r) => r.finish(),
-            Err(e) => e.finish(),
+            Err(e) => e.to_compile_error(),
         }
     }
 }

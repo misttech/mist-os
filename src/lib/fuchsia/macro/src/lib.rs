@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use proc_macro::TokenStream;
-use transformer::Transformer;
+use transformer::{Finish, Transformer};
 
 /// Define a fuchsia main function.
 ///
@@ -24,7 +24,7 @@ use transformer::Transformer;
 /// The main function can return either () or a Result<(), E> where E is an error type.
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
-    Transformer::parse_main(args.into(), input.into()).unwrap().finish().into()
+    Transformer::parse_main(args.into(), input.into()).finish().into()
 }
 
 /// Define a fuchsia test.
@@ -57,5 +57,5 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
 /// argument, that value will be the current iteration count of running this test repeatedly.
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, input: TokenStream) -> TokenStream {
-    Transformer::parse_test(args.into(), input.into()).unwrap().finish().into()
+    Transformer::parse_test(args.into(), input.into()).finish().into()
 }
