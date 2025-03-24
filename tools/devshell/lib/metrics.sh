@@ -601,12 +601,12 @@ function track-command-execution {
     args=""
   fi
 
-  # Limit to the first 100 characters of arguments.
-  # The GA4 API supports up to 100 characters for parameter values
+  # Limit to the first 500 characters of arguments.
+  # The GA4 360 supports up to 500 characters for parameter values
   local args_truncated=0
-  local args1="${args:0:100}"
-  local args2="${args:100:100}"
-  if [[ "${#args}" -gt 200 ]]; then
+  local args1="${args:0:500}"
+  local args2="${args:500:500}"
+  if [[ "${#args}" -gt 1000 ]]; then
     args_truncated=1
   fi
 
@@ -690,9 +690,9 @@ function track-command-finished {
   fi
 
   local args_truncated=0
-  local args1="${args:0:100}"
-  local args2="${args:100:100}"
-  if [[ "${#args}" -gt 200 ]]; then
+  local args1="${args:0:500}"
+  local args2="${args:500:500}"
+  if [[ "${#args}" -gt 1000 ]]; then
     args_truncated=1
   fi
 
@@ -791,14 +791,14 @@ function track-build-event {
     args_json=""
   fi
 
-  switches="${switches:0:100}"
-  ninja_switches="${ninja_switches:0:100}"
-  fuchsia_targets="${fuchsia_targets:0:100}"
+  switches="${switches:0:500}"
+  ninja_switches="${ninja_switches:0:500}"
+  fuchsia_targets="${fuchsia_targets:0:500}"
 
-  local args_gn1="${args_gn:0:100}"
-  local args_gn2="${args_gn:100:100}"
-  local args_json1="${args_json:0:100}"
-  local args_json2="${args_json:100:100}"
+  local args_gn1="${args_gn:0:500}"
+  local args_gn2="${args_gn:500:500}"
+  local args_json1="${args_json:0:500}"
+  local args_json2="${args_json:500:500}"
 
   if [[ "${FUCHSIA_FX_ITERATIVE}" -eq 1 ]]; then
     env_flags="${env_flags}|iterative"

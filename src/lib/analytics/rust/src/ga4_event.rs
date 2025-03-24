@@ -9,12 +9,12 @@ use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const POST_EVENT_COUNT_MAX: usize = 25;
-const EVENT_PARAM_COUNT_MAX: usize = 25;
+const EVENT_PARAM_COUNT_MAX: usize = 100;
 const EVENT_NAME_LENGTH_MAX: usize = 40;
 
-const EVENT_USER_PROPERTY_COUNT_MAX: usize = 25;
+const EVENT_USER_PROPERTY_COUNT_MAX: usize = 100;
 const PARAM_NAME_LENGTH_MAX: usize = 40;
-const PARAM_VALUE_LENGTH_MAX: usize = 100;
+const PARAM_VALUE_LENGTH_MAX: usize = 500;
 const USER_PROPERTY_NAME_LENGTH_MAX: usize = 24;
 const USER_PROPERTY_VALUE_LENGTH_MAX: usize = 36;
 const ITEM_PARAM_COUNT_MAX: usize = 10;
