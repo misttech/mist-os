@@ -159,9 +159,10 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest};
+    use fuchsia_sync::Mutex;
     use futures::{pin_mut, select};
     use rand::{thread_rng, Rng as _};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use zx::HandleBased;
 
     const VMO_SIZE: usize = 4096;
@@ -189,7 +190,7 @@ mod tests {
                     }
                     Ok(BlobWriterRequest::BytesReady { responder, bytes_written, .. }) => {
                         let vmo = check_vmo.as_ref().unwrap();
-                        let mut count_locked = count.lock().unwrap();
+                        let mut count_locked = count.lock();
                         let mut buf = vec![0; bytes_written as usize];
                         let data_range = writes[*count_locked];
                         let vmo_offset = data_range.0 % VMO_SIZE;
@@ -218,7 +219,7 @@ mod tests {
         select! {
             _ = mock_server => unreachable!(),
             _ = write_fun(proxy).fuse() => {
-                assert_eq!(*count_clone.lock().unwrap(), expected_count);
+                assert_eq!(*count_clone.lock(), expected_count);
             }
         }
     }

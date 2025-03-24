@@ -10,6 +10,7 @@ use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
 use fatfs::validate_filename;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::RwLock;
 use futures::future::BoxFuture;
 use std::borrow::Borrow;
 use std::cell::UnsafeCell;
@@ -17,7 +18,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use vfs::directory::dirents_sink::{self, AppendResult, Sink};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
@@ -189,7 +190,7 @@ impl FatDirectory {
         fs: &'a FatFilesystemInner,
         name: &str,
     ) -> Result<Option<DirEntry<'a>>, Status> {
-        if self.data.read().unwrap().deleted {
+        if self.data.read().deleted {
             return Ok(None);
         }
         let dir = self.borrow_dir(fs)?;
@@ -227,7 +228,7 @@ impl FatDirectory {
         child.attach(self.clone(), &name, fs)?;
         // We only add back to the cache if the above succeeds, otherwise we have no
         // interest in serving more connections to a file that doesn't exist.
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         // TODO: need to delete cache entries somewhere.
         if let Some(node) = data.children.insert(InsensitiveString(name), child.downgrade()) {
             assert!(node.upgrade().is_none(), "conflicting cache entries with the same name")
@@ -238,7 +239,7 @@ impl FatDirectory {
     /// Remove a child entry from the cache, if it exists. The caller must hold the fs lock, as
     /// otherwise another thread could immediately add the entry back to the cache.
     pub(crate) fn cache_remove(&self, _fs: &FatFilesystemInner, name: &str) -> Option<FatNode> {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.children.remove(&name as &dyn InsensitiveStringRef).and_then(|entry| entry.upgrade())
     }
 
@@ -246,7 +247,7 @@ impl FatDirectory {
     pub fn cache_get(&self, name: &str) -> Option<FatNode> {
         // Note that we don't remove an entry even if its Arc<> has
         // gone away, to allow us to use the read-only lock here and avoid races.
-        let data = self.data.read().unwrap();
+        let data = self.data.read();
         data.children.get(&name as &dyn InsensitiveStringRef).and_then(|entry| entry.upgrade())
     }
 
@@ -316,7 +317,7 @@ impl FatDirectory {
         flags: fio::OpenFlags,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         // First, check the cache.
         if let Some(entry) = self.cache_get(name) {
             check_open_flags_for_existing_entry(flags)?;
@@ -352,7 +353,7 @@ impl FatDirectory {
             }
         };
 
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.children.insert(InsensitiveString(name.to_owned()), node.downgrade());
         if created {
             data.watchers.send_event(&mut SingleNameEventProducer::added(name));
@@ -371,7 +372,7 @@ impl FatDirectory {
         if flags.create_unnamed_temporary_in_directory_path() {
             return Err(Status::NOT_SUPPORTED);
         }
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
 
         // Check if the entry already exists in the cache.
         if let Some(entry) = self.cache_get(name) {
@@ -412,7 +413,7 @@ impl FatDirectory {
             }
         };
 
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.children.insert(InsensitiveString(name.to_owned()), node.downgrade());
         if created_entry {
             data.watchers.send_event(&mut SingleNameEventProducer::added(name));
@@ -424,17 +425,17 @@ impl FatDirectory {
 
     /// True if this directory has been deleted.
     pub(crate) fn is_deleted(&self) -> bool {
-        self.data.read().unwrap().deleted
+        self.data.read().deleted
     }
 
     /// Called to indicate a file or directory was removed from this directory.
     pub(crate) fn did_remove(&self, name: &str) {
-        self.data.write().unwrap().watchers.send_event(&mut SingleNameEventProducer::removed(name));
+        self.data.write().watchers.send_event(&mut SingleNameEventProducer::removed(name));
     }
 
     /// Called to indicate a file or directory was added to this directory.
     pub(crate) fn did_add(&self, name: &str) {
-        self.data.write().unwrap().watchers.send_event(&mut SingleNameEventProducer::added(name));
+        self.data.write().watchers.send_event(&mut SingleNameEventProducer::added(name));
     }
 
     /// Do a simple rename of the file, without unlinking dst.
@@ -523,7 +524,7 @@ impl FatDirectory {
                 // Walk the parents of the destination and make sure it doesn't match the source.
                 let mut dest = self.clone();
                 loop {
-                    let next_dir = if let Some(parent) = &dest.data.read().unwrap().parent {
+                    let next_dir = if let Some(parent) = &dest.data.read().parent {
                         if Arc::ptr_eq(&dir, parent) {
                             return Err(Status::INVALID_ARGS);
                         }
@@ -650,7 +651,7 @@ impl Node for FatDirectory {
         name: &str,
         fs: &FatFilesystemInner,
     ) -> Result<(), Status> {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.name = name.to_owned();
 
         // Safe because we hold the fs lock.
@@ -663,14 +664,14 @@ impl Node for FatDirectory {
     }
 
     fn did_delete(&self) {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.parent.take();
         data.watchers.send_event(&mut SingleNameEventProducer::deleted());
         data.deleted = true;
     }
 
     fn open_ref(&self, fs: &FatFilesystemInner) -> Result<(), Status> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read();
         let dir_ref = unsafe { self.dir.get().as_mut() }.unwrap();
 
         unsafe { dir_ref.open(&fs, data.parent.as_ref(), &data.name) }
@@ -678,7 +679,7 @@ impl Node for FatDirectory {
 
     fn shut_down(&self, fs: &FatFilesystemInner) -> Result<(), Status> {
         unsafe { self.dir.get().as_mut() }.unwrap().take(fs);
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         for (_, child) in data.children.drain() {
             if let Some(child) = child.upgrade() {
                 child.shut_down(fs)?;
@@ -701,13 +702,13 @@ impl Node for FatDirectory {
 
 impl Debug for FatDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FatDirectory").field("parent", &self.data.read().unwrap().parent).finish()
+        f.debug_struct("FatDirectory").field("parent", &self.data.read().parent).finish()
     }
 }
 
 impl MutableDirectory for FatDirectory {
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let parent = self.borrow_dir(&fs_lock)?;
         let mut existing_node = self.cache_get(name);
         let mut done = false;
@@ -749,7 +750,7 @@ impl MutableDirectory for FatDirectory {
         }
 
         self.filesystem.mark_dirty();
-        self.data.write().unwrap().watchers.send_event(&mut SingleNameEventProducer::removed(name));
+        self.data.write().watchers.send_event(&mut SingleNameEventProducer::removed(name));
         Ok(())
     }
 
@@ -767,7 +768,7 @@ impl MutableDirectory for FatDirectory {
             return Err(Status::NOT_SUPPORTED);
         }
 
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let dir = self.borrow_dir_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
         if let Some(creation_time) = attributes.creation_time {
             dir.set_created(unix_to_dos_time(creation_time));
@@ -805,7 +806,7 @@ impl MutableDirectory for FatDirectory {
             validate_filename(dst_name).map_err(fatfs_error_to_status)?;
 
             let mut closer = Closer::new(&self.filesystem);
-            let filesystem = self.filesystem.lock().unwrap();
+            let filesystem = self.filesystem.lock();
 
             // Figure out if src is a directory.
             let entry = src_dir.find_child(&filesystem, &src_name)?;
@@ -844,7 +845,7 @@ impl vfs::node::Node for FatDirectory {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let dir = self.borrow_dir(&fs_lock)?;
 
         let creation_time = dos_to_unix_time(dir.created());
@@ -866,7 +867,7 @@ impl vfs::node::Node for FatDirectory {
     }
 
     fn close(self: Arc<Self>) {
-        self.close_ref(&self.filesystem.lock().unwrap());
+        self.close_ref(&self.filesystem.lock());
     }
 
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
@@ -874,7 +875,7 @@ impl vfs::node::Node for FatDirectory {
     }
 
     fn will_clone(&self) {
-        self.open_ref(&self.filesystem.lock().unwrap()).unwrap();
+        self.open_ref(&self.filesystem.lock()).unwrap();
     }
 }
 
@@ -892,7 +893,7 @@ impl Directory for FatDirectory {
             match self.lookup(flags, path, &mut closer)? {
                 FatNode::Dir(entry) => {
                     let () = entry
-                        .open_ref(&self.filesystem.lock().unwrap())
+                        .open_ref(&self.filesystem.lock())
                         .expect("entry should already be open");
                     object_request
                         .take()
@@ -900,7 +901,7 @@ impl Directory for FatDirectory {
                     Ok(())
                 }
                 FatNode::File(entry) => {
-                    let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                    let () = entry.open_ref(&self.filesystem.lock())?;
                     object_request
                         .take()
                         .create_connection_sync::<FidlIoConnection<_>, _>(scope, entry, flags);
@@ -921,14 +922,14 @@ impl Directory for FatDirectory {
 
         match self.lookup_with_open3_flags(flags, path, &mut closer)? {
             FatNode::Dir(entry) => {
-                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                let () = entry.open_ref(&self.filesystem.lock())?;
                 object_request
                     .take()
                     .create_connection_sync::<MutableConnection<_>, _>(scope, entry, flags);
                 Ok(())
             }
             FatNode::File(entry) => {
-                let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
+                let () = entry.open_ref(&self.filesystem.lock())?;
                 object_request
                     .take()
                     .create_connection_sync::<FidlIoConnection<_>, _>(scope, entry, flags);
@@ -946,7 +947,7 @@ impl Directory for FatDirectory {
             return Ok((TraversalPosition::End, sink.seal()));
         }
 
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let dir = self.borrow_dir(&fs_lock)?;
 
         if let TraversalPosition::End = pos {
@@ -982,7 +983,7 @@ impl Directory for FatDirectory {
             .collect::<std::io::Result<Vec<_>>>()?;
 
         // If it's the root directory, we need to synthesize a "." entry if appropriate.
-        if self.data.read().unwrap().parent.is_none() && filter(".") {
+        if self.data.read().parent.is_none() && filter(".") {
             entries.push((
                 ".".to_owned(),
                 EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory),
@@ -1014,8 +1015,8 @@ impl Directory for FatDirectory {
         mask: fio::WatchMask,
         watcher: DirectoryWatcher,
     ) -> Result<(), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
-        let mut data = self.data.write().unwrap();
+        let fs_lock = self.filesystem.lock();
+        let mut data = self.data.write();
         let is_deleted = data.deleted;
         let is_root = data.parent.is_none();
         let controller = data.watchers.add(scope, self.clone(), mask, watcher);
@@ -1052,7 +1053,7 @@ impl Directory for FatDirectory {
     }
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
-        self.data.write().unwrap().watchers.remove(key);
+        self.data.write().watchers.remove(key);
     }
 }
 
@@ -1078,8 +1079,8 @@ mod tests {
 
         let fs = disk.into_fatfs();
         let dir = fs.get_fatfs_root();
-        dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
-        defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) }
+        dir.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
+        defer! { dir.close_ref(&fs.filesystem().lock()) }
         assert_eq!(
             dir.clone().link("test2".to_owned(), dir.clone(), "test3").await.unwrap_err(),
             Status::NOT_SUPPORTED
@@ -1146,8 +1147,8 @@ mod tests {
         let fs = disk.into_fatfs();
         let dir = fs.get_fatfs_root();
 
-        dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
-        defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) }
+        dir.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
+        defer! { dir.close_ref(&fs.filesystem().lock()) }
 
         let (pos, sealed) = futures::executor::block_on(
             dir.clone().read_dirents(&TraversalPosition::Start, Box::new(DummySink::new(4))),
@@ -1190,8 +1191,8 @@ mod tests {
         let fs = disk.into_fatfs();
         let dir = fs.get_fatfs_root();
 
-        dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
-        defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) }
+        dir.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
+        defer! { dir.close_ref(&fs.filesystem().lock()) }
 
         let (_, sealed) = futures::executor::block_on(
             dir.read_dirents(&TraversalPosition::Start, Box::new(DummySink::new(30))),
@@ -1221,8 +1222,8 @@ mod tests {
         let fs = disk.into_fatfs();
         let dir = fs.get_fatfs_root();
 
-        dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
-        defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) }
+        dir.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
+        defer! { dir.close_ref(&fs.filesystem().lock()) }
 
         let (pos, sealed) = futures::executor::block_on(
             dir.clone().read_dirents(&TraversalPosition::Start, Box::new(DummySink::new(1))),

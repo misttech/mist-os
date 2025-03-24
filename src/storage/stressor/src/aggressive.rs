@@ -9,13 +9,14 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_async::MonotonicInstant;
+use fuchsia_sync::Mutex;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::os::unix::fs::FileExt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 struct Inner {
     /// Used to round-robin across NUM_FILES in order.
@@ -152,7 +153,7 @@ impl Stressor {
                 "bytes_stored: {}, target_bytes {}, counts: {:?}",
                 self.bytes_stored.load(Ordering::Relaxed),
                 self.target_bytes,
-                self.op_stats.lock().unwrap()
+                self.op_stats.lock()
             );
         }
     }
@@ -169,7 +170,7 @@ impl Stressor {
             f64::powf(bytes_stored as f64 / self.target_bytes as f64, 20.0), /* TRUNCATE */
         ];
         let op = WeightedIndex::new(weights).unwrap().sample(rng);
-        let file_num = self.inner.lock().unwrap().next_file_num();
+        let file_num = self.inner.lock().next_file_num();
         let path = format!("{}/{file_num}", self.path_prefix);
         match op {
             READ => match File::options().read(true).write(false).open(&path) {
@@ -241,7 +242,7 @@ impl Stressor {
             },
             _ => unreachable!(),
         }
-        self.op_stats.lock().unwrap()[op] += 1;
+        self.op_stats.lock()[op] += 1;
     }
 
     /// Worker thread function.
@@ -263,8 +264,8 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut buf = Vec::new();
         stressor.work_unit(&mut rng, &mut buf);
-        assert_eq!(stressor.op_stats.lock().unwrap().iter().sum::<u64>(), 1);
+        assert_eq!(stressor.op_stats.lock().iter().sum::<u64>(), 1);
         stressor.work_unit(&mut rng, &mut buf);
-        assert_eq!(stressor.op_stats.lock().unwrap().iter().sum::<u64>(), 2);
+        assert_eq!(stressor.op_stats.lock().iter().sum::<u64>(), 2);
     }
 }

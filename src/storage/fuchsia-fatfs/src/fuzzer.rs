@@ -106,7 +106,7 @@ async fn do_fuzz(disk: Cursor<Box<[u8]>>) -> Result<(), Error> {
     let fs = FatFs::new(Box::new(disk))?;
     let root: Arc<FatDirectory> = fs.get_fatfs_root();
 
-    root.open_ref(&fs.filesystem().lock().unwrap()).unwrap();
+    root.open_ref(&fs.filesystem().lock()).unwrap();
     let _ = fuzz_node(&fs, FatNode::Dir(root.clone()), 0).await;
     defer! { root.close() };
 

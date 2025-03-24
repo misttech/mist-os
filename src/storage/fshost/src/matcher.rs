@@ -571,7 +571,8 @@ mod tests {
     use fs_management::format::constants::{
         ALL_FVM_LABELS, FUCHSIA_FVM_PARTITION_LABEL, FVM_PARTITION_LABEL,
     };
-    use std::sync::{Arc, Mutex};
+    use fuchsia_sync::Mutex;
+    use std::sync::Arc;
 
     #[derive(Clone)]
     struct MockDevice {
@@ -712,47 +713,47 @@ mod tests {
             env
         }
         fn expect_attach_driver(mut self, path: impl ToString) -> Self {
-            *self.expected_driver_path.get_mut().unwrap() = Some(path.to_string());
+            *self.expected_driver_path.get_mut() = Some(path.to_string());
             self
         }
         fn expect_bind_and_enumerate_fvm(mut self) -> Self {
-            *self.expect_bind_and_enumerate_fvm.get_mut().unwrap() = true;
+            *self.expect_bind_and_enumerate_fvm.get_mut() = true;
             self
         }
         fn expect_mount_blobfs_on(mut self) -> Self {
-            *self.expect_mount_blobfs_on.get_mut().unwrap() = true;
+            *self.expect_mount_blobfs_on.get_mut() = true;
             self
         }
         fn expect_format_data(mut self) -> Self {
-            *self.expect_format_data.get_mut().unwrap() = true;
+            *self.expect_format_data.get_mut() = true;
             self
         }
         fn expect_bind_data(mut self) -> Self {
-            *self.expect_bind_data.get_mut().unwrap() = true;
+            *self.expect_bind_data.get_mut() = true;
             self
         }
         fn expect_mount_fxblob(mut self) -> Self {
-            *self.expect_mount_fxblob.get_mut().unwrap() = true;
+            *self.expect_mount_fxblob.get_mut() = true;
             self
         }
         fn expect_mount_fvm(mut self) -> Self {
-            *self.expect_mount_fvm.get_mut().unwrap() = true;
+            *self.expect_mount_fvm.get_mut() = true;
             self
         }
         fn expect_mount_blob_volume(mut self) -> Self {
-            *self.expect_mount_blob_volume.get_mut().unwrap() = true;
+            *self.expect_mount_blob_volume.get_mut() = true;
             self
         }
         fn expect_mount_data_volume(mut self) -> Self {
-            *self.expect_mount_data_volume.get_mut().unwrap() = true;
+            *self.expect_mount_data_volume.get_mut() = true;
             self
         }
         fn expect_mount_data_on(mut self) -> Self {
-            *self.expect_mount_data_on.get_mut().unwrap() = true;
+            *self.expect_mount_data_on.get_mut() = true;
             self
         }
         fn expect_launch_storage_host(mut self) -> Self {
-            *self.expect_launch_storage_host.get_mut().unwrap() = true;
+            *self.expect_launch_storage_host.get_mut() = true;
             self
         }
         fn legacy_data_format(mut self) -> Self {
@@ -774,18 +775,14 @@ mod tests {
         ) -> Result<(), Error> {
             assert_eq!(
                 driver_path,
-                self.expected_driver_path
-                    .lock()
-                    .unwrap()
-                    .take()
-                    .expect("Unexpected call to attach_driver")
+                self.expected_driver_path.lock().take().expect("Unexpected call to attach_driver")
             );
             Ok(())
         }
 
         async fn launch_gpt_component(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_launch_storage_host.lock().unwrap()),
+                std::mem::take(&mut *self.expect_launch_storage_host.lock()),
                 true,
                 "Unexpected call to launch_storage_host"
             );
@@ -803,7 +800,7 @@ mod tests {
             _device: &mut dyn Device,
         ) -> Result<Vec<String>, Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_bind_and_enumerate_fvm.lock().unwrap()),
+                std::mem::take(&mut *self.expect_bind_and_enumerate_fvm.lock()),
                 true,
                 "Unexpected call to bind_and_enumerate_fvm"
             );
@@ -820,7 +817,7 @@ mod tests {
 
         async fn mount_blobfs_on(&mut self, _blobfs_partition_name: &str) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_blobfs_on.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_blobfs_on.lock()),
                 true,
                 "Unexpected call to mount_blobfs_on"
             );
@@ -833,7 +830,7 @@ mod tests {
             _is_fshost_ramdisk: bool,
         ) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_data_on.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_data_on.lock()),
                 true,
                 "Unexpected call to mount_data_on"
             );
@@ -842,7 +839,7 @@ mod tests {
 
         async fn format_data(&mut self, _fvm_topo_path: &str) -> Result<Filesystem, Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_format_data.lock().unwrap()),
+                std::mem::take(&mut *self.expect_format_data.lock()),
                 true,
                 "Unexpected call to format_data"
             );
@@ -851,7 +848,7 @@ mod tests {
 
         fn bind_data(&mut self, mut _fs: Filesystem) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_bind_data.lock().unwrap()),
+                std::mem::take(&mut *self.expect_bind_data.lock()),
                 true,
                 "Unexpected call to bind_data"
             );
@@ -860,7 +857,7 @@ mod tests {
 
         async fn mount_fxblob(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_fxblob.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_fxblob.lock()),
                 true,
                 "Unexpected call to mount_fxblob"
             );
@@ -869,7 +866,7 @@ mod tests {
 
         async fn mount_fvm(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_fvm.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_fvm.lock()),
                 true,
                 "Unexpected call to mount_fvm"
             );
@@ -878,7 +875,7 @@ mod tests {
 
         async fn mount_blob_volume(&mut self) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_blob_volume.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_blob_volume.lock()),
                 true,
                 "Unexpected call to mount_blob_volume"
             );
@@ -887,7 +884,7 @@ mod tests {
 
         async fn mount_data_volume(&mut self) -> Result<(), Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_data_volume.lock().unwrap()),
+                std::mem::take(&mut *self.expect_mount_data_volume.lock()),
                 true,
                 "Unexpected call to mount_data_volume"
             );
@@ -917,17 +914,17 @@ mod tests {
 
     impl Drop for MockEnv {
         fn drop(&mut self) {
-            assert!(self.expected_driver_path.get_mut().unwrap().is_none());
-            assert!(!*self.expect_mount_blobfs_on.lock().unwrap());
-            assert!(!*self.expect_mount_data_on.lock().unwrap());
-            assert!(!*self.expect_bind_and_enumerate_fvm.lock().unwrap());
-            assert!(!*self.expect_bind_data.lock().unwrap());
-            assert!(!*self.expect_mount_fxblob.lock().unwrap());
-            assert!(!*self.expect_mount_fvm.lock().unwrap());
-            assert!(!*self.expect_mount_blob_volume.lock().unwrap());
-            assert!(!*self.expect_mount_data_volume.lock().unwrap());
-            assert!(!*self.expect_format_data.lock().unwrap());
-            assert!(!*self.expect_launch_storage_host.lock().unwrap());
+            assert!(self.expected_driver_path.get_mut().is_none());
+            assert!(!*self.expect_mount_blobfs_on.lock());
+            assert!(!*self.expect_mount_data_on.lock());
+            assert!(!*self.expect_bind_and_enumerate_fvm.lock());
+            assert!(!*self.expect_bind_data.lock());
+            assert!(!*self.expect_mount_fxblob.lock());
+            assert!(!*self.expect_mount_fvm.lock());
+            assert!(!*self.expect_mount_blob_volume.lock());
+            assert!(!*self.expect_mount_data_volume.lock());
+            assert!(!*self.expect_format_data.lock());
+            assert!(!*self.expect_launch_storage_host.lock());
         }
     }
 

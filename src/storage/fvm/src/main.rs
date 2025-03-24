@@ -25,6 +25,7 @@ use fs_management::filesystem::{BlockConnector, Filesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
+use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::stream::{FuturesUnordered, TryStreamExt as _};
 use log::{debug, error, info, warn};
@@ -41,7 +42,7 @@ use std::marker::PhantomData;
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
@@ -994,7 +995,7 @@ impl Component {
             /* overwrite: */ true,
         )?;
 
-        *self.fvm.lock().unwrap() = Some(Arc::new(fvm));
+        *self.fvm.lock() = Some(Arc::new(fvm));
         Ok(())
     }
 
@@ -1020,7 +1021,7 @@ impl Component {
 
     // NOTE: Only safe after `handle_start` has been called.
     fn fvm(&self) -> Arc<Fvm> {
-        self.fvm.lock().unwrap().as_ref().unwrap().clone()
+        self.fvm.lock().as_ref().unwrap().clone()
     }
 
     async fn handle_volumes_requests(
@@ -1207,7 +1208,7 @@ impl Component {
             // For now, just leak the mounted filesystem.
             let exposed_dir = fs.serve().await?.take_exposed_dir();
 
-            self.mounted.lock().unwrap().insert(partition_index, volume);
+            self.mounted.lock().insert(partition_index, volume);
 
             let outgoing_dir = vfs::directory::immutable::simple();
             // TODO(https://fxbug.dev/392184892): fxfs volumes have an svc directory instead of the
@@ -1262,14 +1263,14 @@ impl Component {
             let volume = MountedVolume::new(block_server);
             let volume_clone = volume.clone();
             let volume_scope = volume.scope.clone();
-            self.mounted.lock().unwrap().insert(partition_index, volume);
+            self.mounted.lock().insert(partition_index, volume);
 
             // Unmount when the last connection is closed (i.e. when `scope` terminates).
             let this = self.clone();
             fasync::Task::spawn(async move {
                 volume_clone.scope.wait().await;
                 if !volume_clone.shutdown.swap(true, Ordering::Relaxed) {
-                    this.mounted.lock().unwrap().remove(&partition_index);
+                    this.mounted.lock().remove(&partition_index);
                 }
             })
             .detach();
@@ -1290,7 +1291,7 @@ impl Component {
         partition_index: u16,
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
-        let partition = self.mounted.lock().unwrap()[&partition_index].clone();
+        let partition = self.mounted.lock()[&partition_index].clone();
         partition.block_server.handle_requests(requests).await
     }
 
@@ -1301,7 +1302,7 @@ impl Component {
         create_options: CreateOptions,
         mount_options: MountOptions,
     ) -> Result<(), Error> {
-        let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
+        let fvm = self.fvm.lock().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some(type_guid) = create_options.type_guid else {
             return Err(anyhow!(zx::Status::INVALID_ARGS).context("Missing type GUID"));
@@ -1341,19 +1342,19 @@ impl Component {
     }
 
     async fn handle_remove_volume(self: &Arc<Self>, name: &str) -> Result<(), Error> {
-        let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
+        let fvm = self.fvm.lock().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some((&partition_index, _)) =
             inner.metadata.partitions.iter().find(|(_, p)| p.name() == name)
         else {
             bail!(zx::Status::NOT_FOUND);
         };
-        let volume = self.mounted.lock().unwrap().get(&partition_index).cloned();
+        let volume = self.mounted.lock().get(&partition_index).cloned();
         if let Some(volume) = volume {
             volume.scope.shutdown();
             volume.scope.wait().await;
             if !volume.shutdown.swap(true, Ordering::Relaxed) {
-                self.mounted.lock().unwrap().remove(&partition_index);
+                self.mounted.lock().remove(&partition_index);
             }
         }
         let mut new_metadata = inner.metadata.clone();
@@ -1388,7 +1389,7 @@ impl Component {
             Some(AdminRequest::Shutdown { responder }) => {
                 info!("Received admin shutdown request");
                 // Shut down any remaining volumes.
-                let volumes = self.mounted.lock().unwrap();
+                let volumes = self.mounted.lock();
                 for volume in volumes.values() {
                     volume.scope.shutdown();
                 }

@@ -19,6 +19,7 @@ use fs_management::FSConfig;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::hierarchy::DiagnosticsHierarchy;
+use fuchsia_sync::Mutex;
 use futures::lock::Mutex as FuturesMutex;
 use futures::StreamExt as _;
 use key_bag::Aes256Key;
@@ -26,7 +27,7 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use storage_stress_test_utils::data::{Compressibility, FileFactory, UncompressedSize};
 use storage_stress_test_utils::fvm::{get_volume_path, FvmInstance, Guid};
@@ -273,7 +274,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
                         .ok_or(format_err!("expected one inspect hierarchy"))
                 }) {
                 Ok(data) => {
-                    let mut inspect = inspect.lock().unwrap();
+                    let mut inspect = inspect.lock();
                     if inspect.replace(data).is_none() {
                         // Whenever we first receive data for a new instance, dump it out.
                         print_inspect_data(inspect.as_ref().unwrap());
@@ -392,7 +393,7 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                 Either::Left(instance)
             };
 
-            *self.inspect.lock().unwrap() = None;
+            *self.inspect.lock() = None;
 
             // Replace the fvm and fs instances
             actor.instance = Some((fvm, instance));
@@ -415,15 +416,11 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
         Some(Box::new(move || {
             eprintln!("Printing inspect data for test due to panic.");
             let mut inspect = match inspect.try_lock() {
-                Ok(v) if v.is_none() => {
+                None => {
                     eprintln!("No inspect data was collected; can't print additional debug info");
                     return;
                 }
-                Ok(inspect) => inspect,
-                Err(_) => {
-                    eprintln!("Failed to acquire lock; can't print additional debug info");
-                    return;
-                }
+                Some(inspect) => inspect,
             };
             let inspect = inspect.as_mut().unwrap();
             inspect.sort();

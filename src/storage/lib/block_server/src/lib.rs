@@ -4,6 +4,7 @@
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
+use fuchsia_sync::Mutex;
 use futures::{Future, FutureExt as _, TryStreamExt as _};
 use std::borrow::Cow;
 use std::collections::btree_map::Entry;
@@ -11,7 +12,7 @@ use std::collections::BTreeMap;
 use std::num::NonZero;
 use std::ops::Range;
 use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
@@ -81,7 +82,7 @@ impl FifoMessageGroups {
     /// Completes a request and returns a response to be sent if it's the last outstanding request
     /// for this group.
     fn complete(&self, group_id: u16, status: zx::Status) -> Option<BlockFifoResponse> {
-        let mut map = self.0.lock().unwrap();
+        let mut map = self.0.lock();
         let Entry::Occupied(mut o) = map.entry(group_id) else { unreachable!() };
         let group = o.get_mut();
         if group.count == 1 {
@@ -491,7 +492,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
             fblock::SessionRequest::AttachVmo { vmo, responder } => {
                 let vmo = Arc::new(vmo);
                 let vmo_id = {
-                    let mut vmos = self.vmos.lock().unwrap();
+                    let mut vmos = self.vmos.lock();
                     if vmos.len() == u16::MAX as usize {
                         responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?;
                         return Ok(());
@@ -573,7 +574,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
             BlockOpcode::from_primitive(request.command.opcode).ok_or(zx::Status::INVALID_ARGS);
 
         let group_or_request = if is_group {
-            let mut groups = self.message_groups.0.lock().unwrap();
+            let mut groups = self.message_groups.0.lock();
             let group = groups.entry(request.group).or_insert_with(|| FifoMessageGroup::new());
             if group.req_id.is_some() {
                 // We have already received a request tagged as last.
@@ -611,7 +612,6 @@ impl<SM: SessionManager> SessionHelper<SM> {
                     .ok_or(zx::Status::OUT_OF_RANGE)?;
                 self.vmos
                     .lock()
-                    .unwrap()
                     .get(&request.vmoid)
                     .cloned()
                     .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo)))
@@ -619,7 +619,6 @@ impl<SM: SessionManager> SessionHelper<SM> {
             Ok(BlockOpcode::CloseVmo) => self
                 .vmos
                 .lock()
-                .unwrap()
                 .remove(&request.vmoid)
                 .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo))),
             _ => Ok(None),
@@ -700,7 +699,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
     }
 
     fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
-        std::mem::take(&mut *self.vmos.lock().unwrap())
+        std::mem::take(&mut *self.vmos.lock())
     }
 }
 
@@ -874,6 +873,7 @@ mod tests {
     use assert_matches::assert_matches;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
+    use fuchsia_sync::Mutex;
     use futures::channel::oneshot;
     use futures::future::BoxFuture;
     use futures::FutureExt as _;
@@ -882,7 +882,7 @@ mod tests {
     use std::num::NonZero;
     use std::pin::pin;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
     use {
@@ -1203,7 +1203,7 @@ mod tests {
             } else {
                 if self.do_checks {
                     assert_matches!(
-                        self.expected_op.lock().unwrap().take(),
+                        self.expected_op.lock().take(),
                         Some(ExpectedOp::Read(a, b, c)) if device_block_offset == a &&
                             block_count == b && vmo_offset / BLOCK_SIZE as u64 == c,
                         "Read {device_block_offset} {block_count} {vmo_offset}"
@@ -1227,7 +1227,7 @@ mod tests {
             } else {
                 if self.do_checks {
                     assert_matches!(
-                        self.expected_op.lock().unwrap().take(),
+                        self.expected_op.lock().take(),
                         Some(ExpectedOp::Write(a, b, c)) if device_block_offset == a &&
                             block_count == b && vmo_offset / BLOCK_SIZE as u64 == c,
                         "Write {device_block_offset} {block_count} {vmo_offset}"
@@ -1242,10 +1242,7 @@ mod tests {
                 Err(zx::Status::NO_RESOURCES)
             } else {
                 if self.do_checks {
-                    assert_matches!(
-                        self.expected_op.lock().unwrap().take(),
-                        Some(ExpectedOp::Flush)
-                    );
+                    assert_matches!(self.expected_op.lock().take(), Some(ExpectedOp::Flush));
                 }
                 Ok(())
             }
@@ -1262,7 +1259,7 @@ mod tests {
             } else {
                 if self.do_checks {
                     assert_matches!(
-                        self.expected_op.lock().unwrap().take(),
+                        self.expected_op.lock().take(),
                         Some(ExpectedOp::Trim(a, b)) if device_block_offset == a &&
                             block_count == b,
                         "Trim {device_block_offset} {block_count}"
@@ -1309,7 +1306,7 @@ mod tests {
             let (mut reader, mut writer) = fifo.async_io();
 
             // READ
-            *expected_op.lock().unwrap() = Some(ExpectedOp::Read(1, 2, 3));
+            *expected_op.lock() = Some(ExpectedOp::Read(1, 2, 3));
             writer
                 .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
@@ -1330,7 +1327,7 @@ mod tests {
             assert_eq!(response.status, zx::sys::ZX_OK);
 
             // WRITE
-            *expected_op.lock().unwrap() = Some(ExpectedOp::Write(4, 5, 6));
+            *expected_op.lock() = Some(ExpectedOp::Write(4, 5, 6));
             writer
                 .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
@@ -1351,7 +1348,7 @@ mod tests {
             assert_eq!(response.status, zx::sys::ZX_OK);
 
             // FLUSH
-            *expected_op.lock().unwrap() = Some(ExpectedOp::Flush);
+            *expected_op.lock() = Some(ExpectedOp::Flush);
             writer
                 .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
@@ -1367,7 +1364,7 @@ mod tests {
             assert_eq!(response.status, zx::sys::ZX_OK);
 
             // TRIM
-            *expected_op.lock().unwrap() = Some(ExpectedOp::Trim(7, 8));
+            *expected_op.lock() = Some(ExpectedOp::Trim(7, 8));
             writer
                 .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
@@ -1640,10 +1637,7 @@ mod tests {
                     Arc::new(MockInterface {
                         read_hook: Some(Box::new(move |dev_block_offset, _, _, _| {
                             let (tx, rx) = oneshot::channel();
-                            waiting_readers_clone
-                                .lock()
-                                .unwrap()
-                                .push((dev_block_offset as u32, tx));
+                            waiting_readers_clone.lock().push((dev_block_offset as u32, tx));
                             Box::pin(async move {
                                 let _ = rx.await;
                                 Ok(())
@@ -1701,7 +1695,7 @@ mod tests {
 
                 // Wait till both those entries are pending.
                 poll_fn(|cx: &mut Context<'_>| {
-                    if waiting_readers.lock().unwrap().len() == 2 {
+                    if waiting_readers.lock().len() == 2 {
                         Poll::Ready(())
                     } else {
                         // Yield to the executor.
@@ -1714,7 +1708,7 @@ mod tests {
                 let mut response = BlockFifoResponse::default();
                 assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
-                let (id, tx) = waiting_readers.lock().unwrap().pop().unwrap();
+                let (id, tx) = waiting_readers.lock().pop().unwrap();
                 tx.send(()).unwrap();
 
                 reader.read_entries(&mut response).await.unwrap();
@@ -1723,7 +1717,7 @@ mod tests {
 
                 assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
-                let (id, tx) = waiting_readers.lock().unwrap().pop().unwrap();
+                let (id, tx) = waiting_readers.lock().pop().unwrap();
                 tx.send(()).unwrap();
 
                 reader.read_entries(&mut response).await.unwrap();
@@ -1926,7 +1920,7 @@ mod tests {
                     BLOCK_SIZE,
                     Arc::new(MockInterface {
                         read_hook: Some(Box::new(move |_, _, _, _| {
-                            let rx = rx.lock().unwrap().take().unwrap();
+                            let rx = rx.lock().take().unwrap();
                             Box::pin(async {
                                 let _ = rx.await;
                                 Ok(())
@@ -2030,7 +2024,7 @@ mod tests {
                 BLOCK_SIZE,
                 Arc::new(MockInterface {
                     read_hook: Some(Box::new(move |_, _, _, _| {
-                        let rx = rx.lock().unwrap().take().unwrap();
+                        let rx = rx.lock().take().unwrap();
                         Box::pin(async {
                             let _ = rx.await;
                             Ok(())
@@ -2249,7 +2243,7 @@ mod tests {
                 let (mut reader, mut writer) = fifo.async_io();
 
                 // READ
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Read(11, 2, 3));
+                *expected_op.lock() = Some(ExpectedOp::Read(11, 2, 3));
                 writer
                     .write_entries(&BlockFifoRequest {
                         command: BlockFifoCommand {
@@ -2270,7 +2264,7 @@ mod tests {
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // WRITE
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Write(14, 5, 6));
+                *expected_op.lock() = Some(ExpectedOp::Write(14, 5, 6));
                 writer
                     .write_entries(&BlockFifoRequest {
                         command: BlockFifoCommand {
@@ -2290,7 +2284,7 @@ mod tests {
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // FLUSH
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Flush);
+                *expected_op.lock() = Some(ExpectedOp::Flush);
                 writer
                     .write_entries(&BlockFifoRequest {
                         command: BlockFifoCommand {
@@ -2306,7 +2300,7 @@ mod tests {
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // TRIM
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Trim(17, 3));
+                *expected_op.lock() = Some(ExpectedOp::Trim(17, 3));
                 writer
                     .write_entries(&BlockFifoRequest {
                         command: BlockFifoCommand {
@@ -2324,7 +2318,7 @@ mod tests {
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // READ past window
-                *expected_op.lock().unwrap() = None;
+                *expected_op.lock() = None;
                 writer
                     .write_entries(&BlockFifoRequest {
                         command: BlockFifoCommand {

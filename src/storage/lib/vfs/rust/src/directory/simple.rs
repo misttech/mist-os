@@ -25,10 +25,11 @@ use crate::protocols::ProtocolsExt;
 use crate::{ObjectRequestRef, ToObjectRequest};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::iter;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zx_status::Status;
 
 use super::entry::GetEntryInfo;
@@ -72,7 +73,7 @@ impl Simple {
         self: Arc<Self>,
         handler: Box<dyn FnMut(&str) + Send + Sync + 'static>,
     ) {
-        let mut this = self.not_found_handler.lock().unwrap();
+        let mut this = self.not_found_handler.lock();
         this.replace(handler);
     }
 
@@ -80,7 +81,7 @@ impl Simple {
     pub fn get_entry(&self, name: &str) -> Result<Arc<dyn DirectoryEntry>, Status> {
         crate::name::validate_name(name)?;
 
-        let this = self.inner.lock().unwrap();
+        let this = self.inner.lock();
         match this.entries.get(name) {
             Some(entry) => Ok(entry.clone()),
             None => Err(Status::NOT_FOUND),
@@ -93,7 +94,7 @@ impl Simple {
         name: Name,
         f: impl FnOnce() -> Arc<T>,
     ) -> Arc<dyn DirectoryEntry> {
-        let mut guard = self.inner.lock().unwrap();
+        let mut guard = self.inner.lock();
         let inner = &mut *guard;
         match inner.entries.entry(name) {
             Entry::Vacant(slot) => {
@@ -106,7 +107,7 @@ impl Simple {
 
     /// Removes all entries from the directory.
     pub fn remove_all_entries(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if !inner.entries.is_empty() {
             let names = std::mem::take(&mut inner.entries)
                 .into_keys()
@@ -140,14 +141,14 @@ impl Simple {
         };
 
         // Don't hold the inner lock while opening the entry in case the directory contains itself.
-        let entry = self.inner.lock().unwrap().entries.get(name).cloned();
+        let entry = self.inner.lock().entries.get(name).cloned();
         match (entry, path_ref.is_empty(), protocols.creation_mode()) {
             (None, false, _) | (None, true, CreationMode::Never) => {
                 // Either:
                 //   - we're at an intermediate directory and the next entry doesn't exist, or
                 //   - we're at the last directory and the next entry doesn't exist and creating the
                 //     entry wasn't requested.
-                if let Some(not_found_handler) = &mut *self.not_found_handler.lock().unwrap() {
+                if let Some(not_found_handler) = &mut *self.not_found_handler.lock() {
                     not_found_handler(path_ref.as_str());
                 }
                 Err(Status::NOT_FOUND)
@@ -249,7 +250,7 @@ impl Directory for Simple {
     ) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), Status> {
         use dirents_sink::AppendResult;
 
-        let this = self.inner.lock().unwrap();
+        let this = self.inner.lock();
 
         let (mut sink, entries_iter) = match pos {
             TraversalPosition::Start => {
@@ -312,7 +313,7 @@ impl Directory for Simple {
         mask: fio::WatchMask,
         watcher: DirectoryWatcher,
     ) -> Result<(), Status> {
-        let mut this = self.inner.lock().unwrap();
+        let mut this = self.inner.lock();
 
         let mut names = StaticVecEventProducer::existing({
             let entry_names = this.entries.keys();
@@ -327,7 +328,7 @@ impl Directory for Simple {
     }
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
-        let mut this = self.inner.lock().unwrap();
+        let mut this = self.inner.lock();
         this.watchers.remove(key);
     }
 }
@@ -339,7 +340,7 @@ impl DirectlyMutable for Simple {
         entry: Arc<dyn DirectoryEntry>,
         overwrite: bool,
     ) -> Result<(), AlreadyExists> {
-        let mut this = self.inner.lock().unwrap();
+        let mut this = self.inner.lock();
 
         if !overwrite && this.entries.contains_key(&name) {
             return Err(AlreadyExists);
@@ -356,7 +357,7 @@ impl DirectlyMutable for Simple {
         name: Name,
         must_be_directory: bool,
     ) -> Result<Option<Arc<dyn DirectoryEntry>>, NotDirectory> {
-        let mut this = self.inner.lock().unwrap();
+        let mut this = self.inner.lock();
 
         match this.entries.entry(name) {
             Entry::Vacant(_) => Ok(None),
@@ -432,13 +433,13 @@ mod tests {
         let path_mutex = Arc::new(Mutex::new(None));
         let path_mutex_clone = path_mutex.clone();
         dir.clone().set_not_found_handler(Box::new(move |path| {
-            *path_mutex_clone.lock().unwrap() = Some(path.to_string());
+            *path_mutex_clone.lock() = Some(path.to_string());
         }));
 
         let sub_dir = Simple::new();
         let path_mutex_clone = path_mutex.clone();
         sub_dir.clone().set_not_found_handler(Box::new(move |path| {
-            *path_mutex_clone.lock().unwrap() = Some(path.to_string());
+            *path_mutex_clone.lock() = Some(path.to_string());
         }));
         dir.add_entry("dir", sub_dir).expect("add entry with valid filename should succeed");
 
@@ -460,7 +461,7 @@ mod tests {
             dir.clone().open(scope.clone(), flags, path, server_end.into_channel().into());
             assert_event!(proxy, fio::NodeEvent::OnOpen_ { .. }, {});
 
-            assert_eq!(expectation, path_mutex.lock().unwrap().take());
+            assert_eq!(expectation, path_mutex.lock().take());
         }
     }
 

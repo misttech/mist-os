@@ -6,9 +6,10 @@ use block_client::{BlockClient, RemoteBlockClient, VmoId};
 use event_listener::Event;
 use fidl_fuchsia_hardware_block::Flag;
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 pub type Device = DeviceImpl<RemoteBlockClient>;
 
@@ -35,7 +36,6 @@ impl<C: BlockClient> DeviceImpl<C> {
         assert!(
             self.vmo_ids
                 .lock()
-                .unwrap()
                 .insert(
                     vmo as *const _ as usize,
                     Arc::new(VmoIdWrapperImpl(Arc::downgrade(self), vmo_id))
@@ -50,7 +50,7 @@ impl<C: BlockClient> DeviceImpl<C> {
     pub fn detach_vmo(&self, vmo: &zx::Vmo) {
         // This won't immediately detach because it might still be in-use, but as soon as all uses
         // finish, it will get detached.
-        self.vmo_ids.lock().unwrap().remove(&(vmo as *const _ as usize));
+        self.vmo_ids.lock().remove(&(vmo as *const _ as usize));
     }
 
     /// Returns the VMO ID registered the given vmo.
@@ -59,14 +59,14 @@ impl<C: BlockClient> DeviceImpl<C> {
     ///
     /// Panics if we don't know about `vmo` i.e. `attach_vmo` above was not called.
     pub fn get_vmo_id(&self, vmo: &zx::Vmo) -> Arc<VmoIdWrapperImpl<C>> {
-        self.vmo_ids.lock().unwrap()[&(vmo as *const _ as usize)].clone()
+        self.vmo_ids.lock()[&(vmo as *const _ as usize)].clone()
     }
 
     /// Returns a buffer that can be used that is registered with the device.
     pub async fn get_buffer(&self) -> BufferGuard<'_, C> {
         loop {
             let listener = {
-                let mut buffers = self.buffers.buffers.lock().unwrap();
+                let mut buffers = self.buffers.buffers.lock();
                 if let Some(offset) = buffers.pop() {
                     return BufferGuard {
                         device: self,
@@ -183,7 +183,7 @@ impl<C: BlockClient> BufferGuard<'_, C> {
 impl<C: BlockClient> Drop for BufferGuard<'_, C> {
     fn drop(&mut self) {
         {
-            let mut buffers = self.device.buffers.buffers.lock().unwrap();
+            let mut buffers = self.device.buffers.buffers.lock();
             buffers.push(self.buffer.as_ptr() as usize - self.device.buffers.addr);
         }
         self.device.buffers.event.notify_additional_relaxed(1);

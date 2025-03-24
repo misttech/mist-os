@@ -15,6 +15,7 @@ common_vfs_args = {
     "//sdk/rust/zx-status",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-sync",
     "//src/storage/lib/trace",
     "//src/storage/lib/vfs/rust/macros",
     "//src/storage/lib/vfs/rust/name",

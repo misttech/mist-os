@@ -323,10 +323,11 @@ mod tests {
     use crate::directory::traversal_position::TraversalPosition;
     use crate::node::Node;
     use crate::ToObjectRequest;
+    use fuchsia_sync::Mutex;
     use futures::future::BoxFuture;
     use std::any::Any;
     use std::future::ready;
-    use std::sync::{Mutex, Weak};
+    use std::sync::Weak;
 
     #[derive(Debug, PartialEq)]
     enum MutableDirectoryAction {
@@ -490,7 +491,7 @@ mod tests {
         }
 
         pub fn handle_event(&self, event: MutableDirectoryAction) -> Result<(), Status> {
-            self.events.upgrade().map(|x| x.0.lock().unwrap().push(event));
+            self.events.upgrade().map(|x| x.0.lock().push(event));
             Ok(())
         }
 
@@ -498,7 +499,7 @@ mod tests {
             self: &Arc<Self>,
             flags: fio::OpenFlags,
         ) -> (Arc<MockDirectory>, fio::DirectoryProxy) {
-            let mut cur_id = self.cur_id.lock().unwrap();
+            let mut cur_id = self.cur_id.lock();
             let dir = MockDirectory::new(*cur_id, self.clone());
             *cur_id += 1;
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -537,7 +538,7 @@ mod tests {
         let status = proxy.rename("src", Event::from(token.unwrap()), "dest").await.unwrap();
         assert!(status.is_ok());
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(
             *events,
             vec![MutableDirectoryAction::Rename {
@@ -569,7 +570,7 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("update attributes failed");
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::UpdateAttributes { id: 0, attributes }]);
     }
 
@@ -589,7 +590,7 @@ mod tests {
 
         let status = proxy.link("src", token.unwrap(), "dest").await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Link { id: 1, path: "dest".to_owned() },]);
     }
 
@@ -605,7 +606,7 @@ mod tests {
             .await
             .expect("fidl call failed")
             .expect("unlink failed");
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(
             *events,
             vec![MutableDirectoryAction::Unlink { id: 0, name: "test".to_string() },]
@@ -620,7 +621,7 @@ mod tests {
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let () = proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Sync]);
     }
 
@@ -632,7 +633,7 @@ mod tests {
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let () = proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Close]);
     }
 
@@ -647,7 +648,7 @@ mod tests {
         fs.scope.shutdown();
         fs.scope.wait().await;
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Close]);
     }
 }

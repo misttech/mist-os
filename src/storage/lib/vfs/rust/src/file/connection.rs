@@ -1162,8 +1162,8 @@ mod tests {
     use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::node::Node;
     use assert_matches::assert_matches;
+    use fuchsia_sync::Mutex;
     use futures::prelude::*;
-    use std::sync::Mutex;
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);
@@ -1251,7 +1251,7 @@ mod tests {
 
         fn handle_operation(&self, operation: FileOperation) -> Result<(), Status> {
             let result = (self.callback)(&operation);
-            self.operations.lock().unwrap().push(operation);
+            self.operations.lock().push(operation);
             match result {
                 Status::OK => Ok(()),
                 err => Err(err),
@@ -1406,7 +1406,7 @@ mod tests {
         );
         // Do a no-op sync() to make sure that the open has finished.
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1443,7 +1443,7 @@ mod tests {
         // Read from original proxy.
         let _: Vec<u8> = env.proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         // Each connection should have an independent seek.
         assert_eq!(
             *events,
@@ -1463,7 +1463,7 @@ mod tests {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
         let () = env.proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1484,7 +1484,7 @@ mod tests {
         let status = env.proxy.close().await.unwrap().map_err(Status::from_raw);
         assert_eq!(status, Err(Status::IO));
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1504,7 +1504,7 @@ mod tests {
         std::mem::drop(env.proxy);
         env.scope.shutdown();
         env.scope.wait().await;
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1555,7 +1555,7 @@ mod tests {
         assert_eq!(mutable_attributes, expected.mutable_attributes);
         assert_eq!(immutable_attributes, expected.immutable_attributes);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1581,7 +1581,7 @@ mod tests {
             .unwrap()
             .map_err(Status::from_raw);
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1608,7 +1608,7 @@ mod tests {
         assert_eq!(result, Err(Status::ACCESS_DENIED));
         #[cfg(not(target_os = "fuchsia"))]
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1635,7 +1635,7 @@ mod tests {
         assert_eq!(result, Err(Status::ACCESS_DENIED));
         #[cfg(not(target_os = "fuchsia"))]
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1656,7 +1656,7 @@ mod tests {
         assert_eq!(Status::from_raw(status), Status::OK);
         // OPEN_FLAG_TRUNCATE should get stripped because it only applies at open time.
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1690,7 +1690,7 @@ mod tests {
             }
             e => panic!("Expected OnOpen event with fio::NodeInfoDeprecated::File, got {:?}", e),
         }
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1705,7 +1705,7 @@ mod tests {
         let data = env.proxy.read(10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1738,7 +1738,7 @@ mod tests {
         let data = env.proxy.read_at(5, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10, 11, 12, 13, 14]);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1776,7 +1776,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1811,7 +1811,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![8]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1845,7 +1845,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![(offset % 256) as u8]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1875,7 +1875,7 @@ mod tests {
             .map_err(Status::from_raw)
             .unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1901,7 +1901,7 @@ mod tests {
     async fn test_sync() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1921,7 +1921,7 @@ mod tests {
     async fn test_resize() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
         let () = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -1938,7 +1938,7 @@ mod tests {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
         let result = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1953,7 +1953,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -1976,7 +1976,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let result = env.proxy.write(data).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1991,7 +1991,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write_at(data, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -2025,7 +2025,7 @@ mod tests {
             .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, MOCK_FILE_SIZE + data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -2098,7 +2098,7 @@ mod tests {
                 .unwrap();
             assert_eq!(data, vmo_contents);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2125,7 +2125,7 @@ mod tests {
                 .unwrap();
             assert_eq!(data, vmo_contents[OFFSET as usize..]);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2151,7 +2151,7 @@ mod tests {
             vmo.read(&mut vmo_contents, 0).unwrap();
             assert_eq!(vmo_contents, data);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2179,7 +2179,7 @@ mod tests {
             vmo.read(&mut vmo_contents, OFFSET).unwrap();
             assert_eq!(vmo_contents, data);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {

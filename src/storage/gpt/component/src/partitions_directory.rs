@@ -4,8 +4,9 @@
 
 use crate::gpt::GptManager;
 use block_server::{BlockServer, SessionManager};
+use fuchsia_sync::Mutex;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use vfs::directory::helper::DirectlyMutable as _;
 
 /// A directory of instances of the fuchsia.storage.partitions.PartitionService service.
@@ -27,7 +28,7 @@ impl PartitionsDirectory {
 
     pub fn clear(&self) {
         self.node.remove_all_entries();
-        self.entries.lock().unwrap().clear();
+        self.entries.lock().clear();
     }
 
     pub fn add_entry<SM: SessionManager + Send + Sync + 'static>(
@@ -39,7 +40,7 @@ impl PartitionsDirectory {
     ) {
         let entry = PartitionsDirectoryEntry::new(block_server, gpt_manager, gpt_index);
         self.node.add_entry(name, entry.node.clone()).expect("Added an entry twice");
-        self.entries.lock().unwrap().insert(name.to_string(), entry);
+        self.entries.lock().insert(name.to_string(), entry);
     }
 }
 

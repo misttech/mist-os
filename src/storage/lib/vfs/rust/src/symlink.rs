@@ -397,9 +397,10 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ServerEnd};
     use fidl_fuchsia_io as fio;
+    use fuchsia_sync::Mutex;
     use futures::StreamExt;
     use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use zx_status::Status;
 
     const TARGET: &[u8] = b"target";
@@ -419,11 +420,11 @@ mod tests {
             Ok(TARGET.to_vec())
         }
         async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-            let map = self.xattrs.lock().unwrap();
+            let map = self.xattrs.lock();
             Ok(map.values().map(|x| x.clone()).collect())
         }
         async fn get_extended_attribute(&self, name: Vec<u8>) -> Result<Vec<u8>, Status> {
-            let map = self.xattrs.lock().unwrap();
+            let map = self.xattrs.lock();
             map.get(&name).map(|x| x.clone()).ok_or(Status::NOT_FOUND)
         }
         async fn set_extended_attribute(
@@ -432,14 +433,14 @@ mod tests {
             value: Vec<u8>,
             _mode: fio::SetExtendedAttributeMode,
         ) -> Result<(), Status> {
-            let mut map = self.xattrs.lock().unwrap();
+            let mut map = self.xattrs.lock();
             // Don't bother replicating the mode behavior, we just care that this method is hooked
             // up at all.
             map.insert(name, value);
             Ok(())
         }
         async fn remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
-            let mut map = self.xattrs.lock().unwrap();
+            let mut map = self.xattrs.lock();
             map.remove(&name);
             Ok(())
         }

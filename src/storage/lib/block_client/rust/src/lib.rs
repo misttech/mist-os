@@ -7,6 +7,7 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::PartitionProxy;
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use lazy_static::lazy_static;
@@ -17,7 +18,7 @@ use std::mem::MaybeUninit;
 use std::ops::{DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use zx::sys::zx_handle_t;
 use zx::{self as zx, HandleBased as _};
@@ -187,7 +188,7 @@ impl Future for ResponseFuture {
     type Output = Result<(), zx::Status>;
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut state = self.fifo_state.lock().unwrap();
+        let mut state = self.fifo_state.lock();
         let request_state = state.map.get_mut(&self.request_id).unwrap();
         if let Some(result) = request_state.result {
             Poll::Ready(result.into())
@@ -200,7 +201,7 @@ impl Future for ResponseFuture {
 
 impl Drop for ResponseFuture {
     fn drop(&mut self) {
-        self.fifo_state.lock().unwrap().map.remove(&self.request_id).unwrap();
+        self.fifo_state.lock().map.remove(&self.request_id).unwrap();
     }
 }
 
@@ -392,7 +393,7 @@ impl Common {
     async fn send(&self, mut request: BlockFifoRequest) -> Result<(), zx::Status> {
         async move {
             let (request_id, trace_flow_id) = {
-                let mut state = self.fifo_state.lock().unwrap();
+                let mut state = self.fifo_state.lock();
                 if state.fifo.is_none() {
                     // Fifo has been closed.
                     return Err(zx::Status::CANCELED);
@@ -608,7 +609,7 @@ impl Common {
     }
 
     fn is_connected(&self) -> bool {
-        self.fifo_state.lock().unwrap().fifo.is_some()
+        self.fifo_state.lock().fifo.is_some()
     }
 }
 
@@ -617,7 +618,7 @@ impl Drop for Common {
         // It's OK to leak the VMO id because the server will dump all VMOs when the fifo is torn
         // down.
         let _ = self.temp_vmo_id.take().into_id();
-        self.fifo_state.lock().unwrap().terminate();
+        self.fifo_state.lock().terminate();
     }
 }
 
@@ -879,7 +880,7 @@ impl Future for FifoPoller {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut state_lock = self.fifo_state.lock().unwrap();
+        let mut state_lock = self.fifo_state.lock();
         let state = state_lock.deref_mut(); // So that we can split the borrow.
 
         // Send requests.
@@ -1224,7 +1225,7 @@ mod tests {
             let (server_fifo, client_fifo) =
                 zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)
                     .expect("Fifo::create failed");
-            let maybe_server_fifo = std::sync::Mutex::new(Some(client_fifo));
+            let maybe_server_fifo = fuchsia_sync::Mutex::new(Some(client_fifo));
 
             let (fifo_future_abort, fifo_future_abort_registration) = AbortHandle::new_pair();
             let fifo_future = Abortable::new(
@@ -1279,7 +1280,7 @@ mod tests {
                                         }
                                         match request {
                                             block::SessionRequest::GetFifo { responder } => {
-                                                match maybe_server_fifo.lock().unwrap().take() {
+                                                match maybe_server_fifo.lock().take() {
                                                     Some(fifo) => {
                                                         responder.send(Ok(fifo.downcast()))
                                                     }
@@ -1316,7 +1317,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_block_close_is_called() {
-        let close_called = std::sync::Mutex::new(false);
+        let close_called = fuchsia_sync::Mutex::new(false);
         let (client_end, server) = fidl::endpoints::create_endpoints::<block::BlockMarker>();
 
         std::thread::spawn(move || {
@@ -1327,14 +1328,14 @@ mod tests {
 
         let channel_handler = |request: &block::SessionRequest| -> bool {
             if let block::SessionRequest::Close { .. } = request {
-                *close_called.lock().unwrap() = true;
+                *close_called.lock() = true;
             }
             false
         };
         FakeBlockServer::new(server, channel_handler, |_| unreachable!()).run().await;
 
         // After the server has finished running, we can check to see that close was called.
-        assert!(*close_called.lock().unwrap());
+        assert!(*close_called.lock());
     }
 
     #[fuchsia::test]
@@ -1424,10 +1425,10 @@ mod tests {
                 block_client.flush().await.expect("flush failed");
             },
             async {
-                let flow_id: std::sync::Mutex<Option<u64>> = std::sync::Mutex::new(None);
+                let flow_id: fuchsia_sync::Mutex<Option<u64>> = fuchsia_sync::Mutex::new(None);
                 let fifo_handler = |request: BlockFifoRequest| -> BlockFifoResponse {
                     if request.trace_flow_id > 0 {
-                        *flow_id.lock().unwrap() = Some(request.trace_flow_id);
+                        *flow_id.lock() = Some(request.trace_flow_id);
                     }
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
@@ -1437,7 +1438,7 @@ mod tests {
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;
                 // After the server has finished running, verify the trace flow ID was set to some value.
-                assert!(flow_id.lock().unwrap().is_some());
+                assert!(flow_id.lock().is_some());
             }
         );
     }

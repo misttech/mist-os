@@ -20,6 +20,7 @@ rustc_library("blob-writer") {
 
   test_deps = [
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:rand",
   ]

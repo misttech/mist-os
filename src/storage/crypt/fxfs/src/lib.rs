@@ -12,9 +12,9 @@ use fidl_fuchsia_fxfs::{
     KeyPurpose,
 };
 
+use fuchsia_sync::Mutex;
 use futures::stream::TryStreamExt;
 use std::collections::hash_map::{Entry, HashMap};
-use std::sync::Mutex;
 
 pub mod log;
 use log::*;
@@ -47,7 +47,7 @@ impl CryptService {
     }
 
     fn create_key(&self, owner: u64, purpose: KeyPurpose) -> CryptCreateKeyResult {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let wrapping_key_id = match purpose {
             KeyPurpose::Data => inner.active_data_key.as_ref(),
             KeyPurpose::Metadata => inner.active_metadata_key.as_ref(),
@@ -70,7 +70,7 @@ impl CryptService {
     }
 
     fn create_key_with_id(&self, owner: u64, wrapping_key_id: u128) -> CryptCreateKeyWithIdResult {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let cipher =
             inner.ciphers.get(&wrapping_key_id).ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?;
         let nonce = zero_extended_nonce(owner);
@@ -87,7 +87,7 @@ impl CryptService {
     }
 
     fn unwrap_key(&self, wrapping_key_id: u128, owner: u64, key: Vec<u8>) -> CryptUnwrapKeyResult {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let cipher =
             inner.ciphers.get(&wrapping_key_id).ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?;
         let nonce = zero_extended_nonce(owner);
@@ -100,7 +100,7 @@ impl CryptService {
         wrapping_key_id: u128,
         key: Vec<u8>,
     ) -> CryptManagementAddWrappingKeyResult {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         match inner.ciphers.entry(wrapping_key_id) {
             Entry::Occupied(_) => Err(zx::Status::ALREADY_EXISTS.into_raw()),
             Entry::Vacant(vacant) => {
@@ -116,7 +116,7 @@ impl CryptService {
         purpose: KeyPurpose,
         wrapping_key_id: u128,
     ) -> CryptManagementSetActiveKeyResult {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if !inner.ciphers.contains_key(&wrapping_key_id) {
             return Err(zx::Status::NOT_FOUND.into_raw());
         }
@@ -130,7 +130,7 @@ impl CryptService {
 
     fn forget_wrapping_key(&self, wrapping_key_id: u128) -> CryptManagementForgetWrappingKeyResult {
         info!(wrapping_key_id; "Removing wrapping key");
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         if let Some(id) = &inner.active_data_key {
             if *id == wrapping_key_id {
                 return Err(zx::Status::INVALID_ARGS.into_raw());

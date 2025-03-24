@@ -7,6 +7,7 @@ use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
 use fuchsia_async::{self as fasync, EHandle};
+use fuchsia_sync::{Condvar, Mutex};
 use futures::stream::{AbortHandle, Abortable};
 use futures::TryStreamExt;
 use std::borrow::Cow;
@@ -14,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::MaybeUninit;
 use std::num::NonZero;
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use zx::{self as zx, AsHandleRef as _};
 use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
 
@@ -36,15 +37,15 @@ impl SessionManager {
             // `open_sessions` because `Session::drop` needs to take that same lock.
             #[allow(clippy::collection_is_never_read)]
             let mut terminated_sessions = Vec::new();
-            for (_, session) in &*self.open_sessions.lock().unwrap() {
+            for (_, session) in &*self.open_sessions.lock() {
                 if let Some(session) = session.upgrade() {
                     session.terminate();
                     terminated_sessions.push(session);
                 }
             }
         }
-        let _guard =
-            self.condvar.wait_while(self.open_sessions.lock().unwrap(), |s| !s.is_empty()).unwrap();
+        let mut guard = self.open_sessions.lock();
+        self.condvar.wait_while(&mut guard, |s| !s.is_empty());
     }
 }
 
@@ -69,10 +70,7 @@ impl super::SessionManager for SessionManager {
             vmos: Mutex::default(),
             abort_handle,
         });
-        self.open_sessions
-            .lock()
-            .unwrap()
-            .insert(Arc::as_ptr(&session) as usize, Arc::downgrade(&session));
+        self.open_sessions.lock().insert(Arc::as_ptr(&session) as usize, Arc::downgrade(&session));
         unsafe {
             (self.callbacks.on_new_session)(self.callbacks.context, Arc::into_raw(session.clone()));
         }
@@ -181,7 +179,7 @@ impl Session {
         loop {
             // Send queued responses.
             let is_queue_empty = {
-                let mut queue = self.queue.lock().unwrap();
+                let mut queue = self.queue.lock();
                 while !queue.responses.is_empty() {
                     let (front, _) = queue.responses.as_slices();
                     match self.fifo.write(front) {
@@ -247,7 +245,7 @@ impl Session {
                 let mut request_id = group_or_request.into();
                 let vmo = if let Some(vmo) = r.vmo {
                     let raw_handle = vmo.raw_handle();
-                    self.vmos.lock().unwrap().insert(request_id, vmo);
+                    self.vmos.lock().insert(request_id, vmo);
                     request_id = request_id.with_vmo();
                     UnownedVmo(raw_handle)
                 } else {
@@ -279,7 +277,7 @@ impl Session {
             Some(response) => response,
             None => return,
         };
-        let mut queue = self.queue.lock().unwrap();
+        let mut queue = self.queue.lock();
         if queue.responses.is_empty() {
             match self.fifo.write_one(&response) {
                 Ok(()) => {
@@ -303,7 +301,7 @@ impl Session {
 impl Drop for Session {
     fn drop(&mut self) {
         let notify = {
-            let mut open_sessions = self.manager.open_sessions.lock().unwrap();
+            let mut open_sessions = self.manager.open_sessions.lock();
             open_sessions.remove(&(self as *const _ as usize));
             open_sessions.is_empty()
         };
@@ -319,15 +317,18 @@ pub struct BlockServer {
     abort_handle: AbortHandle,
 }
 
-#[derive(Default)]
 struct ExecutorMailbox(Mutex<Mail>, Condvar);
 
 impl ExecutorMailbox {
     /// Returns the old mail.
     fn post(&self, mail: Mail) -> Mail {
-        let old = std::mem::replace(&mut *self.0.lock().unwrap(), mail);
+        let old = std::mem::replace(&mut *self.0.lock(), mail);
         self.1.notify_all();
         old
+    }
+
+    fn new() -> Self {
+        Self(Mutex::default(), Condvar::new())
     }
 }
 
@@ -346,8 +347,8 @@ impl Drop for BlockServer {
     fn drop(&mut self) {
         self.abort_handle.abort();
         let manager = &self.server.session_manager;
-        let mbox = manager.mbox.0.lock().unwrap();
-        let _unused = manager.mbox.1.wait_while(mbox, |mbox| !matches!(mbox, Mail::Finished));
+        let mut mbox = manager.mbox.0.lock();
+        manager.mbox.1.wait_while(&mut mbox, |mbox| !matches!(mbox, Mail::Finished));
         manager.terminate();
         debug_assert!(Arc::strong_count(manager) > 0);
     }
@@ -402,7 +403,7 @@ pub unsafe extern "C" fn block_server_new(
         callbacks,
         open_sessions: Mutex::default(),
         condvar: Condvar::new(),
-        mbox: ExecutorMailbox::default(),
+        mbox: ExecutorMailbox::new(),
         info: partition_info.to_rust(),
     });
 
@@ -413,11 +414,9 @@ pub unsafe extern "C" fn block_server_new(
 
     let mbox = &session_manager.mbox;
     let mail = {
-        let mail = mbox.0.lock().unwrap();
-        std::mem::replace(
-            &mut *mbox.1.wait_while(mail, |mail| matches!(mail, Mail::None)).unwrap(),
-            Mail::None,
-        )
+        let mut mail = mbox.0.lock();
+        mbox.1.wait_while(&mut mail, |mail| matches!(mail, Mail::None));
+        std::mem::replace(&mut *mail, Mail::None)
     };
 
     let block_size = partition_info.block_size;
@@ -542,7 +541,7 @@ pub unsafe extern "C" fn block_server_send_reply(
     status: zx_status_t,
 ) {
     if request_id.did_have_vmo() {
-        session.vmos.lock().unwrap().remove(&request_id);
+        session.vmos.lock().remove(&request_id);
     }
     session.send_reply(
         RequestTracking { group_or_request: request_id.into(), trace_flow_id },

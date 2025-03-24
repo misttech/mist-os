@@ -80,14 +80,14 @@ impl FatFs {
     }
 
     pub fn is_present(&self) -> bool {
-        self.inner.lock().unwrap().with_disk(|disk| disk.is_present())
+        self.inner.lock().with_disk(|disk| disk.is_present())
     }
 
     /// Get the root directory of this filesystem.
     /// The caller must call close() on the returned entry when it's finished with it.
     pub fn get_root(&self) -> Result<Arc<FatDirectory>, Status> {
         // Make sure it's open.
-        self.root.open_ref(&self.inner.lock().unwrap())?;
+        self.root.open_ref(&self.inner.lock())?;
         Ok(self.root.clone())
     }
 
@@ -106,7 +106,7 @@ impl FatFs {
 
     /// Shut down the filesystem.
     pub fn shut_down(&self) -> Result<(), Status> {
-        let mut fs = self.inner.lock().unwrap();
+        let mut fs = self.inner.lock();
         self.root.shut_down(&fs)?;
         fs.shut_down()
     }

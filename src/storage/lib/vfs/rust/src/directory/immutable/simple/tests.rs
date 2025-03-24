@@ -26,9 +26,10 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
+use fuchsia_sync::Mutex;
 use futures::TryStreamExt;
 use static_assertions::assert_eq_size;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use vfs_macros::pseudo_directory;
 use zx_status::Status;
 
@@ -260,7 +261,7 @@ fn one_file_open_missing_not_found_handler() {
     {
         let last_handler_value = last_handler_value.clone();
         root.clone().set_not_found_handler(Box::new(move |path| {
-            *last_handler_value.lock().unwrap() = Some(path.to_string());
+            *last_handler_value.lock() = Some(path.to_string());
         }));
     }
 
@@ -269,7 +270,7 @@ fn one_file_open_missing_not_found_handler() {
         open_as_file_assert_err!(&root, flags, "file2", Status::NOT_FOUND);
 
         assert_close!(root);
-        assert_eq!(Some("file2".to_string()), *last_handler_value.lock().unwrap())
+        assert_eq!(Some("file2".to_string()), *last_handler_value.lock())
     });
 }
 
@@ -284,7 +285,7 @@ fn one_file_open3_missing_not_found_handler() {
     {
         let last_handler_value = last_handler_value.clone();
         root.clone().set_not_found_handler(Box::new(move |path| {
-            *last_handler_value.lock().unwrap() = Some(path.to_string());
+            *last_handler_value.lock() = Some(path.to_string());
         }));
     }
 
@@ -301,7 +302,7 @@ fn one_file_open3_missing_not_found_handler() {
         );
 
         assert_close!(proxy);
-        assert_eq!(Some("bar".to_string()), *last_handler_value.lock().unwrap())
+        assert_eq!(Some("bar".to_string()), *last_handler_value.lock())
     });
 }
 

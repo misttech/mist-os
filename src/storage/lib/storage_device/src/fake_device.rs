@@ -8,10 +8,10 @@ use crate::{Device, DeviceHolder};
 use anyhow::{ensure, Error};
 use async_trait::async_trait;
 use block_protocol::WriteOptions;
+use fuchsia_sync::Mutex;
 use rand::Rng;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
 
 pub enum Op {
     Read,
@@ -90,7 +90,7 @@ impl Device for FakeDevice {
     }
 
     fn block_count(&self) -> u64 {
-        self.data.lock().unwrap().0.len() as u64 / self.block_size() as u64
+        self.data.lock().0.len() as u64 / self.block_size() as u64
     }
 
     async fn read(&self, offset: u64, mut buffer: MutableBufferRef<'_>) -> Result<(), Error> {
@@ -98,7 +98,7 @@ impl Device for FakeDevice {
         (self.operation_closure)(Op::Read)?;
         let offset = offset as usize;
         assert_eq!(offset % self.allocator.block_size(), 0);
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock();
         let size = buffer.len();
         assert!(
             offset + size <= data.0.len(),
@@ -122,7 +122,7 @@ impl Device for FakeDevice {
         (self.operation_closure)(Op::Write)?;
         let offset = offset as usize;
         assert_eq!(offset % self.allocator.block_size(), 0);
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock();
         let size = buffer.len();
         assert!(
             offset + size <= data.0.len(),
@@ -145,7 +145,7 @@ impl Device for FakeDevice {
         assert_eq!(range.start % self.block_size() as u64, 0);
         assert_eq!(range.end % self.block_size() as u64, 0);
         // Blast over the range to simulate it being used for something else.
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock();
         data.0[range.start as usize..range.end as usize].fill(0xab);
         Ok(())
     }
@@ -156,7 +156,7 @@ impl Device for FakeDevice {
     }
 
     async fn flush(&self) -> Result<(), Error> {
-        self.data.lock().unwrap().1.clear();
+        self.data.lock().1.clear();
         (self.operation_closure)(Op::Flush)
     }
 
@@ -178,7 +178,7 @@ impl Device for FakeDevice {
             BufferAllocator::new(self.block_size() as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Ok(DeviceHolder::new(Self {
             allocator,
-            data: Mutex::new(self.data.lock().unwrap().clone()),
+            data: Mutex::new(self.data.lock().clone()),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
@@ -189,7 +189,7 @@ impl Device for FakeDevice {
     fn discard_random_since_last_flush(&self) -> Result<(), Error> {
         let bs = self.allocator.block_size();
         let mut rng = rand::thread_rng();
-        let mut guard = self.data.lock().unwrap();
+        let mut guard = self.data.lock();
         let (ref mut data, ref mut blocks_written) = &mut *guard;
         log::info!("Discarding from {blocks_written:?}");
         let mut discarded = Vec::new();

@@ -8,10 +8,11 @@ use block_server::async_interface::{PassthroughSession, SessionManager};
 use block_server::OffsetMap;
 use fidl_fuchsia_hardware_block as fblock;
 
+use fuchsia_sync::Mutex;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::num::NonZero;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// PartitionBackend is an implementation of block_server's Interface which is backed by a windowed
 /// view of the underlying GPT device.
@@ -42,7 +43,7 @@ impl block_server::async_interface::Interface for PartitionBackend {
     async fn on_attach_vmo(&self, vmo: &zx::Vmo) -> Result<(), zx::Status> {
         let key = std::ptr::from_ref(vmo) as usize;
         let vmoid = self.partition.attach_vmo(vmo).await?;
-        let old = self.vmo_keys_to_vmoids_map.lock().unwrap().insert(key, Arc::new(vmoid));
+        let old = self.vmo_keys_to_vmoids_map.lock().insert(key, Arc::new(vmoid));
         if let Some(vmoid) = old {
             // For now, leak the old vmoid.
             // XXX kludge -- addresses can be reused!  We need to manage vmoids ourself to properly
@@ -109,19 +110,13 @@ impl PartitionBackend {
 
     fn get_vmoid(&self, vmo: &zx::Vmo) -> Result<Arc<VmoId>, zx::Status> {
         let key = std::ptr::from_ref(vmo) as usize;
-        self.vmo_keys_to_vmoids_map
-            .lock()
-            .unwrap()
-            .get(&key)
-            .map(Arc::clone)
-            .ok_or(zx::Status::NOT_FOUND)
+        self.vmo_keys_to_vmoids_map.lock().get(&key).map(Arc::clone).ok_or(zx::Status::NOT_FOUND)
     }
 }
 
 impl Drop for PartitionBackend {
     fn drop(&mut self) {
-        for vmoid in std::mem::take(&mut *self.vmo_keys_to_vmoids_map.lock().unwrap()).into_values()
-        {
+        for vmoid in std::mem::take(&mut *self.vmo_keys_to_vmoids_map.lock()).into_values() {
             // For now, leak the vmoids.
             // TODO(https://fxbug.dev/339491886): Reconcile vmoid management.
             let _ = Arc::try_unwrap(vmoid)

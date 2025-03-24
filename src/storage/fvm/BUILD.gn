@@ -218,6 +218,7 @@ fvm_deps = [
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-runtime",
+  "//src/lib/fuchsia-sync",
   "//src/lib/trace/rust:trace-provider",
   "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
   "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",

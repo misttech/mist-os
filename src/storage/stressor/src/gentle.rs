@@ -7,6 +7,7 @@
 //! Open file count is kept probabilistically low to avoid using too much disk.
 //! Panics if operations fail.
 
+use fuchsia_sync::{Mutex, RwLock};
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -14,7 +15,7 @@ use std::fs::File;
 use std::io::ErrorKind;
 use std::os::unix::fs::FileExt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct Stressor {
@@ -69,8 +70,8 @@ impl Stressor {
 
     /// Weights used to decide which operation to probabilistically favour.
     fn get_weights(&self) -> [f64; NUM_OPS] {
-        let all_file_count = self.all_files.read().unwrap().len() as f64;
-        let open_file_count = self.open_files.read().unwrap().len() as f64;
+        let all_file_count = self.all_files.read().len() as f64;
+        let open_file_count = self.open_files.read().len() as f64;
         let if_open = |x| if open_file_count > 0.0 { x } else { 0.0 };
         [
             /* OPEN_FILE: */ 1.0 / (open_file_count + 1.0) * all_file_count,
@@ -87,7 +88,7 @@ impl Stressor {
     pub fn run(self: &Arc<Self>, num_threads: usize) {
         log::info!(
             "Running stressor, found {} files, counter: {}",
-            self.all_files.read().unwrap().len(),
+            self.all_files.read().len(),
             self.name_counter.load(Ordering::Relaxed),
         );
         for _ in 0..num_threads {
@@ -97,14 +98,14 @@ impl Stressor {
 
         loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
-            let all_file_count = self.all_files.read().unwrap().len();
-            let open_file_count = self.open_files.read().unwrap().len();
+            let all_file_count = self.all_files.read().len();
+            let open_file_count = self.open_files.read().len();
             log::info!(
                 "{} files, {} open, weights: {:?}, counts: {:?}",
                 all_file_count,
                 open_file_count,
                 self.get_weights(),
-                self.op_stats.lock().unwrap()
+                self.op_stats.lock()
             );
         }
     }
@@ -118,12 +119,11 @@ impl Stressor {
             let op = WeightedIndex::new(weights).unwrap().sample(&mut rng);
             match op {
                 OPEN_FILE => {
-                    let Some(file) = self.all_files.read().unwrap().choose(&mut rng).cloned()
-                    else {
+                    let Some(file) = self.all_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
                     match File::options().read(true).write(true).open(&file.path) {
-                        Ok(f) => self.open_files.write().unwrap().push(Arc::new(f)),
+                        Ok(f) => self.open_files.write().push(Arc::new(f)),
                         Err(e) => match e.kind() {
                             ErrorKind::NotFound => {}
                             e => {
@@ -134,7 +134,7 @@ impl Stressor {
                 }
                 CLOSE_FILE => {
                     let _file = {
-                        let mut open_files = self.open_files.write().unwrap();
+                        let mut open_files = self.open_files.write();
                         let num = open_files.len();
                         if num == 0 {
                             continue;
@@ -148,8 +148,8 @@ impl Stressor {
                     match File::options().create(true).read(true).write(true).open(&path) {
                         Ok(file) => {
                             let file_state = Arc::new(FileState { path });
-                            self.all_files.write().unwrap().push(file_state.clone());
-                            self.open_files.write().unwrap().push(Arc::new(file));
+                            self.all_files.write().push(file_state.clone());
+                            self.open_files.write().push(Arc::new(file));
                         }
                         Err(error) => {
                             panic!("Failed to create file: {error:?}");
@@ -158,7 +158,7 @@ impl Stressor {
                 }
                 DELETE_FILE => {
                     let file = {
-                        let mut all_files = self.all_files.write().unwrap();
+                        let mut all_files = self.all_files.write();
                         if all_files.is_empty() {
                             continue;
                         }
@@ -168,8 +168,7 @@ impl Stressor {
                     std::fs::remove_file(&file.path).unwrap();
                 }
                 READ => {
-                    let Some(file) = self.open_files.read().unwrap().choose(&mut rng).cloned()
-                    else {
+                    let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
                     let read_offset = rng.gen_range(0..100_000) as u64;
@@ -178,8 +177,7 @@ impl Stressor {
                     file.read_at(&mut buf, read_offset).unwrap();
                 }
                 WRITE => {
-                    let Some(file) = self.open_files.read().unwrap().choose(&mut rng).cloned()
-                    else {
+                    let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
                     let write_len = (-rng.gen::<f64>().ln() * 10_000.0) as u64;
@@ -188,15 +186,14 @@ impl Stressor {
                     file.write_at(&buf, write_offset).unwrap();
                 }
                 TRUNCATE => {
-                    let Some(file) = self.open_files.read().unwrap().choose(&mut rng).cloned()
-                    else {
+                    let Some(file) = self.open_files.read().choose(&mut rng).cloned() else {
                         continue;
                     };
                     file.set_len(rng.gen_range(0..100_000)).unwrap();
                 }
                 _ => unreachable!(),
             }
-            self.op_stats.lock().unwrap()[op] += 1;
+            self.op_stats.lock()[op] += 1;
         }
     }
 }

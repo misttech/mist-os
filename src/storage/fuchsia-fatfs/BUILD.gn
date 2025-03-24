@@ -15,6 +15,7 @@ fatfs_deps = [
   "//sdk/rust/zx",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
+  "//src/lib/fuchsia-sync",
   "//src/storage/lib/block_client/rust",
   "//src/storage/lib/vfs/rust:vfs",
   "//third_party/rust_crates:anyhow",

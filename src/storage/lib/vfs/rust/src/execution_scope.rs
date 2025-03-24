@@ -19,12 +19,13 @@
 use crate::token_registry::TokenRegistry;
 
 use fuchsia_async::{self as fasync, JoinHandle, Scope, SpawnableFuture};
+use fuchsia_sync::Mutex;
 use futures::task::{self, Poll};
 use futures::Future;
 use pin_project::pin_project;
 use std::future::{pending, poll_fn};
 use std::pin::{pin, Pin};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::task::{ready, Context};
 
 #[cfg(target_os = "fuchsia")]
@@ -88,7 +89,7 @@ impl ExecutionScope {
 
     /// Returns the active count: the number of tasks that are active and will prevent shutdown.
     pub fn active_count(&self) -> usize {
-        self.executor.inner.lock().unwrap().active_count
+        self.executor.inner.lock().active_count
     }
 
     /// Sends a `task` to be executed in this execution scope.  This is very similar to
@@ -124,7 +125,7 @@ impl ExecutionScope {
 
     /// Forcibly shut down the executor without respecting the active guards.
     pub fn force_shutdown(&self) {
-        let mut inner = self.executor.inner.lock().unwrap();
+        let mut inner = self.executor.inner.lock();
         inner.shutdown_state = ShutdownState::ForceShutdown;
         self.executor.scope().wake_all();
     }
@@ -132,7 +133,7 @@ impl ExecutionScope {
     /// Restores the executor so that it is no longer in the shut-down state.  Any tasks
     /// that are still running will continue to run after calling this.
     pub fn resurrect(&self) {
-        self.executor.inner.lock().unwrap().shutdown_state = ShutdownState::Active;
+        self.executor.inner.lock().shutdown_state = ShutdownState::Active;
     }
 
     /// Wait for all tasks to complete.
@@ -140,7 +141,7 @@ impl ExecutionScope {
         let mut on_no_tasks = pin!(self.executor.scope().on_no_tasks());
         poll_fn(|cx| {
             // Hold the lock whilst we poll the scope so that the active count can't change.
-            let mut inner = self.executor.inner.lock().unwrap();
+            let mut inner = self.executor.inner.lock();
             ready!(on_no_tasks.as_mut().poll(cx));
             if inner.active_count == 0 {
                 Poll::Ready(())
@@ -162,7 +163,7 @@ impl ExecutionScope {
     /// Prevents the executor from shutting down whilst the guard is held. Returns None if the
     /// executor is shutting down.
     pub fn try_active_guard(&self) -> Option<ActiveGuard> {
-        let mut inner = self.executor.inner.lock().unwrap();
+        let mut inner = self.executor.inner.lock();
         if inner.shutdown_state != ShutdownState::Active {
             return None;
         }
@@ -173,7 +174,7 @@ impl ExecutionScope {
     /// As above, but succeeds even if the executor is shutting down. This can be used in drop
     /// implementations to spawn tasks that *must* run before the executor shuts down.
     pub fn active_guard(&self) -> ActiveGuard {
-        self.executor.inner.lock().unwrap().active_count += 1;
+        self.executor.inner.lock().active_count += 1;
         ActiveGuard(self.executor.clone())
     }
 }
@@ -241,7 +242,7 @@ impl Executor {
 
     fn shutdown(&self) {
         let wake_all = {
-            let mut inner = self.inner.lock().unwrap();
+            let mut inner = self.inner.lock();
             inner.shutdown_state = ShutdownState::Shutdown;
             inner.active_count == 0
         };
@@ -265,7 +266,7 @@ pub struct ActiveGuard(Arc<Executor>);
 impl Drop for ActiveGuard {
     fn drop(&mut self) {
         let wake_all = {
-            let mut inner = self.0.inner.lock().unwrap();
+            let mut inner = self.0.inner.lock();
             inner.active_count -= 1;
             if inner.active_count == 0 {
                 if let Some(task) = inner.fake_active_task.take() {
@@ -308,12 +309,12 @@ impl<Task: Future<Output = ()> + Send + 'static> Future for FutureWithShutdown<T
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let shutdown_state = this.executor.inner.lock().unwrap().shutdown_state;
+        let shutdown_state = this.executor.inner.lock().shutdown_state;
         match this.task.poll(cx) {
             Poll::Ready(()) => Poll::Ready(()),
             Poll::Pending => match shutdown_state {
                 ShutdownState::Active => Poll::Pending,
-                ShutdownState::Shutdown if this.executor.inner.lock().unwrap().active_count > 0 => {
+                ShutdownState::Shutdown if this.executor.inner.lock().active_count > 0 => {
                     Poll::Pending
                 }
                 _ => Poll::Ready(()),
@@ -457,16 +458,16 @@ mod tests {
 
             // We test that wait is working correctly by concurrently waiting and telling the
             // task to complete, and making sure that the order is correct.
-            let done = std::sync::Mutex::new(false);
+            let done = fuchsia_sync::Mutex::new(false);
             futures::join!(
                 async {
                     scope.wait().await;
-                    assert_eq!(*done.lock().unwrap(), true);
+                    assert_eq!(*done.lock(), true);
                 },
                 async {
                     // This is a Turing halting problem so the sleep is justified.
                     Timer::new(Duration::from_millis(100)).await;
-                    *done.lock().unwrap() = true;
+                    *done.lock() = true;
                     processing_done_sender.send(()).unwrap();
                 }
             );

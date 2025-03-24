@@ -12,9 +12,10 @@
 
 use async_trait::async_trait;
 use fuchsia_inspect::{LazyNode, Node};
+use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use std::collections::hash_map::HashMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 const INFO_NODE_NAME: &'static str = "fs.info";
 const USAGE_NODE_NAME: &'static str = "fs.usage";
@@ -92,7 +93,7 @@ impl FsInspectTree {
                     None => return Ok(inspector),
                 };
                 let volumes = {
-                    let tracker = tracker.lock().unwrap();
+                    let tracker = tracker.lock();
                     let mut volumes = Vec::with_capacity(tracker.len());
                     for (name, volume) in tracker.iter() {
                         volumes.push((name.clone(), volume.clone()));
@@ -128,11 +129,11 @@ impl FsInspectTree {
         name: String,
         volume: Weak<dyn FsInspectVolume + Send + Sync + 'static>,
     ) {
-        self.volumes_tracker.lock().unwrap().insert(name, volume);
+        self.volumes_tracker.lock().insert(name, volume);
     }
 
     pub fn unregister_volume(&self, name: String) {
-        self.volumes_tracker.lock().unwrap().remove(&name);
+        self.volumes_tracker.lock().remove(&name);
     }
 }
 

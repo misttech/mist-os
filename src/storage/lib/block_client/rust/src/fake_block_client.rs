@@ -5,10 +5,10 @@
 use async_trait::async_trait;
 use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId, WriteOptions};
 use fidl_fuchsia_hardware_block as block;
+use fuchsia_sync::Mutex;
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};
-use std::sync::Mutex;
 
 type VmoRegistry = BTreeMap<u16, zx::Vmo>;
 
@@ -46,7 +46,7 @@ impl BlockClient for FakeBlockClient {
     async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
         let len = vmo.get_size()?;
         let vmo = vmo.create_child(zx::VmoChildOptions::SLICE, 0, len)?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         // 0 is a sentinel value
         for id in 1..u16::MAX {
             if let std::collections::btree_map::Entry::Vacant(e) = inner.vmo_registry.entry(id) {
@@ -58,7 +58,7 @@ impl BlockClient for FakeBlockClient {
     }
 
     async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let id = vmo_id.into_id();
         if let None = inner.vmo_registry.remove(&id) {
             Err(zx::Status::NOT_FOUND)
@@ -77,7 +77,7 @@ impl BlockClient for FakeBlockClient {
             return Err(zx::Status::INVALID_ARGS);
         }
         let device_offset = device_offset as usize;
-        let inner = &mut *self.inner.lock().unwrap();
+        let inner = &mut *self.inner.lock();
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
                 if offset % self.block_size as u64 != 0 {
@@ -112,7 +112,7 @@ impl BlockClient for FakeBlockClient {
             return Err(zx::Status::INVALID_ARGS);
         }
         let device_offset = device_offset as usize;
-        let inner = &mut *self.inner.lock().unwrap();
+        let inner = &mut *self.inner.lock();
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 if offset % self.block_size as u64 != 0 {
@@ -144,7 +144,7 @@ impl BlockClient for FakeBlockClient {
             return Err(zx::Status::INVALID_ARGS);
         }
         // Blast over the range to simulate it being reused.
-        let inner = &mut *self.inner.lock().unwrap();
+        let inner = &mut *self.inner.lock();
         if range.end as usize > inner.data.len() {
             return Err(zx::Status::OUT_OF_RANGE);
         }
@@ -166,7 +166,7 @@ impl BlockClient for FakeBlockClient {
     }
 
     fn block_count(&self) -> u64 {
-        self.inner.lock().unwrap().data.len() as u64 / self.block_size as u64
+        self.inner.lock().data.len() as u64 / self.block_size as u64
     }
 
     fn block_flags(&self) -> block::Flag {
