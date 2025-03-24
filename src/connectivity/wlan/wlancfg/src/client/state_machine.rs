@@ -23,7 +23,7 @@ use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::{mpsc, oneshot};
-use futures::future::FutureExt;
+use futures::future::{Fuse, FutureExt};
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use log::{debug, error, info, warn};
@@ -39,10 +39,10 @@ use {
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
 const NUM_PAST_SCORES: usize = 91; // number of past periodic connection scores to store for metrics
+const PENDING_ROAM_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(3);
 
 type State = state_machine::State<ExitReason>;
 type ReqStream = stream::Fuse<mpsc::Receiver<ManualRequest>>;
-
 pub trait ClientApi {
     fn connect(&mut self, selection: types::ConnectSelection) -> Result<(), anyhow::Error>;
     fn disconnect(
@@ -564,6 +564,8 @@ struct ConnectedOptions {
     roam_request_receiver: mpsc::Receiver<PolicyRoamRequest>,
     post_connect_metric_timer: Pin<Box<fasync::Timer>>,
     bss_connect_duration_metric_timer: Pin<Box<fasync::Timer>>,
+    pending_roam: Option<PolicyRoamRequest>,
+    pending_roam_timer: Pin<Box<Fuse<fasync::Timer>>>,
 }
 impl ConnectedOptions {
     pub fn new(
@@ -613,6 +615,8 @@ impl ConnectedOptions {
             bss_connect_duration_metric_timer: Box::pin(fasync::Timer::new(
                 METRICS_SHORT_CONNECT_DURATION.after_now(),
             )),
+            pending_roam: None,
+            pending_roam_timer: Box::pin(Fuse::terminated()),
         }
     }
 }
@@ -657,11 +661,13 @@ async fn connected_state(
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnRoamResult { result } => {
-                            handle_roam_result(&mut common_options, &mut options, &result).await.map_err(|error| {
-                                ExitReason(Err(format_err!("Error handling roam result, cannot proceed with connection: {:?}", error)))
-                            })?;
-                            let connected = result.status_code == fidl_ieee80211::StatusCode::Success || result.original_association_maintained;
-                            !connected
+                            if let Err(error) = handle_roam_result(&mut common_options, &mut options, &result).await {
+                                error!("Error handling roam result: {:?}. Cannot proceed with connection.", error);
+                                true
+                            } else {
+                                let connected = result.status_code == fidl_ieee80211::StatusCode::Success || result.original_association_maintained;
+                                !connected
+                            }
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
                             // Update connection data
@@ -787,19 +793,39 @@ async fn connected_state(
                 common_options.telemetry_sender.send(TelemetryEvent::LongDurationSignals{
                     signals: options.tracked_signals.get_before(fasync::MonotonicInstant::now())
                 });
+            },
+            () = &mut options.pending_roam_timer => {
+                error!("Pending roam request has timed out without a response from SME, cannot proceed with connection");
+                notify_on_roam_error_and_exit(&common_options, &options).await;
+                let options = DisconnectingOptions {
+                    disconnect_responder: None,
+                    previous_network: Some((
+                        options.network_identifier.clone(),
+                        types::DisconnectStatus::ConnectionFailed
+                    )),
+                    next_network: None,
+                    // TODO(b/405151253): Add a disconnect reason for errors attempting to roam.
+                    reason: types::DisconnectReason::DisconnectDetectedFromSme,
+                };
+                return Ok(disconnecting_state(common_options, options).into_state());
             }
             roam_request = options.roam_request_receiver.select_next_some() => {
-
-                let _ = common_options
-                .proxy
-                .roam(&roam_request.clone().into())
-                .inspect_err(|e| {
-                    error!("Error sending sme roam request: {}", e);
-                });
-                common_options.telemetry_sender.send(TelemetryEvent::PolicyRoamAttempt {
-                    request: roam_request,
-                    connected_duration: fasync::MonotonicInstant::now() - options.bss_connect_start_time,
-                });
+                if let Some(pending_roam) = &options.pending_roam {
+                    info!("Already pending a roam result for a requested roam to BSSID: {:?}", pending_roam.candidate.bss.bssid);
+                } else {
+                    let _ = common_options
+                    .proxy
+                    .roam(&roam_request.clone().into())
+                    .inspect_err(|e| {
+                        error!("Error sending sme roam request: {}", e);
+                    });
+                    options.pending_roam = Some(roam_request.clone());
+                    options.pending_roam_timer.set(fasync::Timer::new(PENDING_ROAM_TIMEOUT.after_now()).fuse());
+                    common_options.telemetry_sender.send(TelemetryEvent::PolicyRoamAttempt {
+                        request: roam_request,
+                        connected_duration: fasync::MonotonicInstant::now() - options.bss_connect_start_time,
+                    });
+                }
             }
         }
     }
@@ -911,6 +937,32 @@ async fn handle_roam_result(
     options: &mut ConnectedOptions,
     result: &fidl_sme::RoamResult,
 ) -> Result<(), anyhow::Error> {
+    // TODO(b/399649753): Distinguish between policy-initaited and firmware-initiated RoamResults
+    // here, when possible. Only correlate policy-initiated RoamResults with pending roams.
+
+    // Verify that the received roam result matches the pending roam request. If there is not a
+    // pending roam request, or the pending request is for another BSS, the connection cannot
+    // proceed.
+    match options.pending_roam.take() {
+        None => {
+            notify_on_roam_error_and_exit(common_options, options).await;
+            return Err(format_err!(
+                "Roam result unexpectedly received without a pending roam request."
+            ));
+        }
+        Some(req) => {
+            if req.candidate.bss.bssid != result.bssid.into() {
+                notify_on_roam_error_and_exit(common_options, options).await;
+                return Err(format_err!(
+                    "Roam result received for bssid {:?} while awaiting result for bssid {:?}.",
+                    result.bssid,
+                    req.candidate.bss.bssid
+                ));
+            }
+        }
+    };
+    options.pending_roam_timer.set(Fuse::terminated());
+
     let roam_succeeded = result.status_code == fidl_ieee80211::StatusCode::Success;
     if roam_succeeded {
         // Record BSS disconnect to config manager. We do not report a disconnect to
@@ -980,7 +1032,7 @@ async fn notify_on_roam_result(
         )
         .await;
 
-    // Log roam result to telemetry once state is up to date.
+    // Log policy-initiated roam result to telemetry once state is up to date.
     common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
         iface_id: common_options.iface_id,
         result: result.clone(),
@@ -1000,6 +1052,30 @@ async fn notify_on_roam_result(
             warn!("Failed to log connection failure: {}", e);
         }
     }
+}
+
+async fn notify_on_roam_error_and_exit(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+) {
+    // TODO(b/405151253): Add a disconnect reason for errors attempting to roam.
+    let fidl_info = fidl_sme::DisconnectInfo {
+        is_sme_reconnecting: false,
+        disconnect_source: fidl_sme::DisconnectSource::User(
+            fidl_sme::UserDisconnectReason::Unknown,
+        ),
+    };
+    log_disconnect_to_telemetry(common_options, options, fidl_info, false).await;
+    log_disconnect_to_config_manager(common_options, options, types::DisconnectReason::Unknown)
+        .await;
+
+    // Clear the network from the updates stream, since this state machine will exit.
+    let networks = Some(ClientNetworkState {
+        id: options.network_identifier.clone(),
+        state: types::ConnectionState::Disconnected,
+        status: Some(types::DisconnectStatus::ConnectionFailed),
+    });
+    send_listener_state_update(&common_options.update_sender, networks);
 }
 
 async fn log_disconnect_to_telemetry(
@@ -1118,9 +1194,9 @@ mod tests {
     use crate::util::listener;
     use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
     use crate::util::testing::{
-        generate_connect_selection, generate_disconnect_info, generate_random_scanned_candidate,
-        poll_sme_req, random_connection_data, ConnectResultRecord, ConnectionRecord,
-        FakeSavedNetworksManager,
+        generate_connect_selection, generate_disconnect_info, generate_policy_roam_request,
+        generate_random_scanned_candidate, poll_sme_req, random_connection_data,
+        ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
     };
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
@@ -3177,7 +3253,7 @@ mod tests {
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
-        let options = ConnectedOptions::new(
+        let mut options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
             connect_selection.target.network_has_multiple_bss,
@@ -3187,6 +3263,9 @@ mod tests {
             connect_txn_proxy.take_event_stream(),
             false,
         );
+        // Set the pending roam request, so we don't immediately exit when a result comes in.
+        let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
+        options.pending_roam = Some(policy_request.clone());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3247,7 +3326,7 @@ mod tests {
             assert_eq!(data, &expected_connect_result);
         });
 
-        // Verify roam result telemetry event
+        // Verify telemetry event for roam result
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
@@ -3257,6 +3336,14 @@ mod tests {
         // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
         // ESS.
         assert_variant!(telemetry_receiver.try_next(), Err(_));
+
+        // Run time forward past the timeout for the pending roam request.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            PENDING_ROAM_TIMEOUT + zx::MonotonicDuration::from_millis(1),
+        ));
+
+        // Run the state machine and verify that it does NOT fire the pending timer and exit.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -3276,7 +3363,7 @@ mod tests {
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
-        let options = ConnectedOptions::new(
+        let mut options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
             connect_selection.target.network_has_multiple_bss,
@@ -3286,6 +3373,9 @@ mod tests {
             connect_txn_proxy.take_event_stream(),
             false,
         );
+        // Set the pending roam request, so we don't immediately exit when a result comes in.
+        let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
+        options.pending_roam = Some(policy_request.clone());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3328,18 +3418,18 @@ mod tests {
             assert_eq!(data, &expected_connect_result);
         });
 
-        // Verify roam result telemetry event
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
-                assert_eq!(result, roam_result);
-            });
-        });
-
         // A defect should be logged.
         assert_variant!(
             test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
+
+        // Verify telemetry event for roam result
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+                assert_eq!(result, roam_result);
+            });
+        });
 
         // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
         // ESS.
@@ -3347,6 +3437,14 @@ mod tests {
 
         // Verify the roam monitor was _not_ re-initialized.
         assert_variant!(test_values.roam_service_request_receiver.try_next(), Err(_));
+
+        // Run time forward past the timeout for the pending roam request.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            PENDING_ROAM_TIMEOUT + zx::MonotonicDuration::from_millis(1),
+        ));
+
+        // Run the state machine and verify that it does NOT fire the pending timer and exit.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -3368,7 +3466,7 @@ mod tests {
         // Set up the state machine, starting at the connected state.
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
-        let options = ConnectedOptions::new(
+        let mut options = ConnectedOptions::new(
             &mut test_values.common_options,
             Box::new(ap_state.clone()),
             connect_selection.target.network_has_multiple_bss,
@@ -3378,6 +3476,9 @@ mod tests {
             connect_txn_proxy.take_event_stream(),
             false,
         );
+        // Set the pending roam request, so we don't immediately exit when a result comes in.
+        let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
+        options.pending_roam = Some(policy_request.clone());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3461,6 +3562,330 @@ mod tests {
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect { .. })
+        );
+
+        // Run time forward past the timeout for the pending roam request.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            PENDING_ROAM_TIMEOUT + zx::MonotonicDuration::from_millis(1),
+        ));
+
+        // Run the state machine and verify that it does NOT fire the pending timer and exit.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+    }
+    #[fuchsia::test]
+    fn connected_state_on_unexpected_policy_roam_result_disconnects() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+        let sme_fut = test_values.sme_req_stream.into_future();
+        let mut sme_fut = pin!(sme_fut);
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
+        let mut options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
+        // Set the pending roam request for some BSSID.
+        let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
+        options.pending_roam = Some(policy_request);
+        let initial_state = connected_state(test_values.common_options, options);
+
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Send a roam result with a BSSID that does NOT match the roam request.
+        let bss_desc = random_fidl_bss_description!();
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [2, 2, 2, 2, 2, 2],
+            status_code: fidl_ieee80211::StatusCode::Success,
+            original_association_maintained: false,
+            bss_description: Some(Box::new(bss_desc.clone())),
+            disconnect_info: None,
+            is_credential_rejected: false,
+        };
+        connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
+
+        // Run forward the state machine.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify a disconnect request is sent to SME.
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
+                responder.send().expect("could not send sme response");
+            }
+        );
+
+        // Ensure the state machine exits once the disconnect is processed.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify a disconnect was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+            assert_eq!(id, &connect_selection.target.network.clone());
+            assert_eq!(credential, &connect_selection.target.credential.clone());
+            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+                assert_eq!(bssid, &connect_selection.target.bss.bssid);
+                assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
+            })
+        });
+
+        // Verify a disconnect event was logged to telemetry
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+            });
+        });
+
+        // Verify a disconnected listener update is sent.
+        assert_variant!(
+            test_values.update_receiver.try_next(),
+            Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
+                state: fidl_policy::WlanClientState::ConnectionsEnabled,
+                networks
+            }))) => {
+                assert_eq!(networks.len(), 1);
+                assert_eq!(networks[0].id, connect_selection.target.network);
+                assert_eq!(networks[0].state, fidl_policy::ConnectionState::Disconnected);
+                assert_eq!(networks[0].status, Some(fidl_policy::DisconnectStatus::ConnectionFailed));
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn connected_state_on_unexpected_policy_roam_result_exits_on_broken_sme() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
+        let mut options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
+        // Set the pending roam request for some BSSID.
+        let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
+        options.pending_roam = Some(policy_request);
+        let initial_state = connected_state(test_values.common_options, options);
+
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Break the SME by dropping the server end of the SME stream, so it causes an error
+        drop(test_values.sme_req_stream);
+
+        // Send a roam result with a BSSID that does NOT match the roam request.
+        let bss_desc = random_fidl_bss_description!();
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [2, 2, 2, 2, 2, 2],
+            status_code: fidl_ieee80211::StatusCode::Success,
+            original_association_maintained: false,
+            bss_description: Some(Box::new(bss_desc.clone())),
+            disconnect_info: None,
+            is_credential_rejected: false,
+        };
+        connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
+
+        // Ensure the state machine exits.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify a disconnect was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+            assert_eq!(id, &connect_selection.target.network.clone());
+            assert_eq!(credential, &connect_selection.target.credential.clone());
+            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+                assert_eq!(bssid, &connect_selection.target.bss.bssid);
+                assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
+            })
+        });
+
+        // Verify a disconnect event was logged to telemetry
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+            });
+        });
+
+        // Verify a disconnected listener update is sent.
+        assert_variant!(
+            test_values.update_receiver.try_next(),
+            Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
+                state: fidl_policy::WlanClientState::ConnectionsEnabled,
+                networks
+            }))) => {
+                assert_eq!(networks.len(), 1);
+                assert_eq!(networks[0].id, connect_selection.target.network);
+                assert_eq!(networks[0].state, fidl_policy::ConnectionState::Disconnected);
+                assert_eq!(networks[0].status, Some(fidl_policy::DisconnectStatus::ConnectionFailed));
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn connected_state_pending_roam_expires() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+
+        let mut test_values = test_setup();
+        let sme_fut = test_values.sme_req_stream.into_future();
+        let mut sme_fut = pin!(sme_fut);
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        let (connect_txn_proxy, _connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>();
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
+        // Set the pending roam request for some BSSID.
+        let initial_state = connected_state(test_values.common_options, options);
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Verify roam monitor init was sent.
+        let mut roam_sender;
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { roam_request_sender, .. } => {
+                roam_sender = roam_request_sender;
+            });
+        });
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send a roam request to state machine.
+        let roam_candidate = generate_random_scanned_candidate();
+        roam_sender
+            .try_send(PolicyRoamRequest { candidate: roam_candidate.clone(), reasons: vec![] })
+            .unwrap();
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify state machine issues a roam to SME.
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Roam{ req, ..}) => {
+                assert_eq!(req.bss_description, Sequestered::release(roam_candidate.clone().bss.bss_description));
+            }
+        );
+
+        // Verify roam attempt telemetry event.
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::PolicyRoamAttempt { request, .. } => {
+                assert_eq!(request.candidate,
+                    roam_candidate);
+                assert_eq!(request.reasons, vec![]);
+            });
+        });
+
+        // Run time forward past the timeout for the pending roam request.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            PENDING_ROAM_TIMEOUT + zx::MonotonicDuration::from_millis(1),
+        ));
+
+        // Run forward the state machine.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify a disconnect request is sent to SME.
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{ responder, reason: fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme }) => {
+                responder.send().expect("could not send sme response");
+            }
+        );
+
+        // Ensure the state machine exits once the disconnect is processed.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify a disconnect was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+            assert_eq!(id, &connect_selection.target.network.clone());
+            assert_eq!(credential, &connect_selection.target.credential.clone());
+            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+                assert_eq!(bssid, &connect_selection.target.bss.bssid);
+                assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
+            })
+        });
+
+        // Verify a disconnect event was logged to telemetry
+        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+            });
+        });
+
+        // Verify a disconnected listener update is sent.
+        assert_variant!(
+            test_values.update_receiver.try_next(),
+            Ok(Some(listener::Message::NotifyListeners(ClientStateUpdate {
+                state: fidl_policy::WlanClientState::ConnectionsEnabled,
+                networks
+            }))) => {
+                assert_eq!(networks.len(), 1);
+                assert_eq!(networks[0].id, connect_selection.target.network);
+                assert_eq!(networks[0].state, fidl_policy::ConnectionState::Disconnected);
+                assert_eq!(networks[0].status, Some(fidl_policy::DisconnectStatus::ConnectionFailed));
+            }
         );
     }
 

@@ -2848,8 +2848,35 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
         assert_variant!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
             assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
         });
-    }
 
+        // Respond with a roam failure, but with original association maintained, so we don't tear
+        // down the state machine.
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::DisassociateIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [1, 1, 1, 1, 1, 1],
+            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            original_association_maintained: true,
+            bss_description: None,
+            disconnect_info: Some(Box::new(disconnect_info)),
+            is_credential_rejected: false,
+        };
+        existing_connection
+            .connect_txn_handle
+            .send_on_roam_result(&roam_result)
+            .expect("failed to return roam result");
+
+        // Run forward internal futures.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+            Poll::Pending
+        );
+    }
     // Advance fake time past max roam scan backoff time.
     exec.set_fake_time(fasync::MonotonicInstant::after(
         max_roam_scan_backoff_time + fasync::MonotonicDuration::from_seconds(1),

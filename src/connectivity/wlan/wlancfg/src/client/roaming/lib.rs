@@ -136,7 +136,7 @@ pub enum RoamReason {
 }
 
 #[derive(Clone)]
-#[cfg_attr(test, derive(Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct PolicyRoamRequest {
     pub candidate: types::ScannedCandidate,
     pub reasons: Vec<RoamReason>,
