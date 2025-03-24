@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 
-SUCCESS_RE = re.compile("^TEST SUCCESS$", re.MULTILINE)
+SUCCESS_RE = re.compile("TEST SUCCESS$", re.MULTILINE)
 
 
 def parse_manifest(

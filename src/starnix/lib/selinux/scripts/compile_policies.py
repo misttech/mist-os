@@ -37,6 +37,14 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/anon_inode_policy.conf",
+        ],
+        "anon_inode_policy.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/bounded_transition_policy.conf",
         ],
         "bounded_transition_policy.pp",

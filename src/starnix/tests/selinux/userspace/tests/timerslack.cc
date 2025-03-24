@@ -15,6 +15,8 @@
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
+namespace {
+
 class ScopedTargetProcess {
  public:
   ScopedTargetProcess(std::string label = "") {
@@ -108,3 +110,5 @@ constexpr TestCase kTests[] = {
 
 INSTANTIATE_TEST_SUITE_P(TimerslackNsPermsTest, TimerslackNsTestWithParam,
                          ::testing::ValuesIn(kTests));
+
+}  // namespace

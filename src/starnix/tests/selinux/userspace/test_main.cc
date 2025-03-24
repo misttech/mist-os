@@ -9,14 +9,16 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 void PrepareTestEnvironment() {
-  EXPECT_THAT(mkdir("/sys", 0755), SyscallSucceeds());
   EXPECT_THAT(mkdir("/proc", 0755), SyscallSucceeds());
+  EXPECT_THAT(mkdir("/sys", 0755), SyscallSucceeds());
+  EXPECT_THAT(mkdir("/tmp", 0755), SyscallSucceeds());
   EXPECT_THAT(mount("proc", "/proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
               SyscallSucceeds());
   EXPECT_THAT(mount("sysfs", "/sys", "sysfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
               SyscallSucceeds());
   EXPECT_THAT(mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", MS_NOEXEC | MS_NOSUID, nullptr),
               SyscallSucceeds());
+  EXPECT_THAT(mount("tmpfs", "/tmp", "tmpfs", MS_RELATIME, nullptr), SyscallSucceeds());
 }
 
 int main(int argc, char** argv) {
