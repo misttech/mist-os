@@ -592,6 +592,7 @@ multiconst!(u64, [
     ZX_CLOCK_OPT_CONTINUOUS = 1 << 1;
     ZX_CLOCK_OPT_AUTO_START = 1 << 2;
     ZX_CLOCK_OPT_BOOT = 1 << 3;
+    ZX_CLOCK_OPT_MAPPABLE = 1 << 4;
 
     // v1 clock update flags
     ZX_CLOCK_UPDATE_OPTION_VALUE_VALID = 1 << 0;
@@ -1744,6 +1745,7 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_VMAR_MAPS                  = 36; // zx_info_maps_t[n]
     ZX_INFO_POWER_DOMAINS              = 37; // zx_info_power_domain_info_t[n]
     ZX_INFO_MEMORY_STALL               = 38; // zx_info_memory_stall_t[1]
+    ZX_INFO_CLOCK_MAPPED_SIZE          = 40; // usize[1]
 ]);
 
 multiconst!(zx_system_memory_stall_type_t, [
