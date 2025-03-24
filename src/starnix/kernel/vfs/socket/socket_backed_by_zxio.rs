@@ -5,6 +5,7 @@
 use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
+use crate::task::syscalls::SockFProgPtr;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
 use crate::vfs::socket::{
     Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
@@ -17,7 +18,6 @@ use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
-use starnix_uapi::user_address::{MappingMultiArchUserRef, MultiArchUserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, uapi, ucred,
@@ -49,22 +49,6 @@ const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
-
-type SockFilterPtr = MultiArchUserRef<uapi::sock_filter, uapi::arch32::sock_filter>;
-
-struct SockFProg {
-    len: u32,
-    filter: SockFilterPtr,
-}
-
-uapi::arch_map_data! {
-    BidiTryFrom<SockFProg, sock_fprog> {
-        len = len;
-        filter = filter;
-    }
-}
-
-type SockFProfPtr = MappingMultiArchUserRef<SockFProg, uapi::sock_fprog, uapi::arch32::sock_fprog>;
 
 impl ServiceConnector for SocketProviderServiceConnector {
     fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
@@ -534,7 +518,7 @@ impl SocketOps for ZxioBackedSocket {
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog_ptr = SockFProfPtr::new_with_ref(current_task, user_opt)?;
+                let fprog_ptr = SockFProgPtr::new_with_ref(current_task, user_opt)?;
                 let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
                 if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);

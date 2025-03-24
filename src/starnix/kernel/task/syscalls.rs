@@ -32,12 +32,13 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, UncheckedSignal};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::user_address::{
-    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserCStringPtr, UserRef,
+    ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef, UserAddress, UserCString,
+    UserCStringPtr, UserRef,
 };
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uapi, uid_t, AT_EMPTY_PATH,
+    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, uapi, uid_t, AT_EMPTY_PATH,
     AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
     CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS,
     CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ,
@@ -58,6 +59,22 @@ use std::cmp;
 use std::ffi::CString;
 use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
+pub type SockFProgPtr =
+    MappingMultiArchUserRef<SockFProg, uapi::sock_fprog, uapi::arch32::sock_fprog>;
+pub type SockFilterPtr = MultiArchUserRef<uapi::sock_filter, uapi::arch32::sock_filter>;
+
+pub struct SockFProg {
+    pub len: u32,
+    pub filter: SockFilterPtr,
+}
+
+uapi::arch_map_data! {
+    BidiTryFrom<SockFProg, sock_fprog> {
+        len = len;
+        filter = filter;
+    }
+}
 
 pub fn do_clone(
     locked: &mut Locked<'_, Unlocked>,
@@ -1491,12 +1508,13 @@ pub fn sys_seccomp(
             {
                 return error!(EINVAL);
             }
-            let fprog: sock_fprog = current_task.read_object(UserRef::new(args))?;
-            if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+            let fprog =
+                current_task.read_multi_arch_object(SockFProgPtr::new(current_task, args))?;
+            if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                 return error!(EINVAL);
             }
             let code: Vec<sock_filter> =
-                current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                current_task.read_multi_arch_objects_to_vec(fprog.filter, fprog.len as usize)?;
 
             if !current_task.read().no_new_privs() {
                 security::check_task_capable(current_task, CAP_SYS_ADMIN)
@@ -1928,7 +1946,7 @@ mod arch32 {
         sys_getppid as sys_arch32_getppid, sys_getresgid as sys_arch32_getresgid32,
         sys_getresuid as sys_arch32_getresuid32, sys_getrlimit as sys_arch32_ugetrlimit,
         sys_getuid as sys_arch32_getuid32, sys_sched_getaffinity as sys_arch32_sched_getaffinity,
-        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity, sys_seccomp as sys_arch32_seccomp,
         sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
         sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
         sys_setrlimit as sys_arch32_setrlimit, sys_setsid as sys_arch32_setsid,
