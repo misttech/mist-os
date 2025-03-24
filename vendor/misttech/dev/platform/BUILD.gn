@@ -4,8 +4,11 @@
 
 import("//build/zircon/zx_library.gni")
 
-zx_library("virtio") {
-  sources = [ "bind.cc" ]
+zx_library("platform") {
+  sources = [
+    "bind.cc",
+    "platform-bus.cc",
+  ]
   deps = [
     "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice_lib",
     "//src/devices/block/drivers/virtio:block_lib",
@@ -13,5 +16,6 @@ zx_library("virtio") {
     "//zircon/kernel/lib/init",
     "//zircon/system/ulib/virtio",
   ]
+  public_deps = [ "//vendor/misttech/zircon/kernel/lib/mistos/util:headers" ]
   configs += [ "//build/config:default_include_dirs" ]
 }

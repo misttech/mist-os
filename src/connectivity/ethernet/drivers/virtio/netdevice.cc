@@ -55,8 +55,9 @@ uint16_t MaxVirtqueuePairs(const virtio_net_config& config, bool is_mq_supported
 
 }  // namespace
 
-NetworkDevice::NetworkDevice(ktl::unique_ptr<Backend> backend)
-    : virtio::Device(ktl::move(backend)), rx_(this), tx_(this) {}
+NetworkDevice::NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
+                             ktl::unique_ptr<Backend> backend)
+    : virtio::Device(ktl::move(bti), ktl::move(backend)), rx_(this), tx_(this) {}
 
 NetworkDevice::~NetworkDevice() {}
 

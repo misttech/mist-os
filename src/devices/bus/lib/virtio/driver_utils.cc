@@ -14,14 +14,29 @@
 #include <memory>
 
 #include <dev/pcie_device.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
 #include <object/pci_device_dispatcher.h>
+#include <platform/platform-bus.h>
 
 #include <ktl/enforce.h>
 
 namespace virtio {
 
-zx::result<ktl::unique_ptr<virtio::Backend>> GetBackend(KernelHandle<PciDeviceDispatcher> pci,
-                                                        zx_pcie_device_info_t info) {
+zx::result<
+    ktl::pair<fbl::RefPtr<BusTransactionInitiatorDispatcher>, ktl::unique_ptr<virtio::Backend>>>
+GetBtiAndBackend(platform_bus::PlatformBus* platform_bus, KernelHandle<PciDeviceDispatcher> pci,
+                 zx_pcie_device_info_t info) {
+  if (!pci.dispatcher()) {
+    dprintf(CRITICAL, "pci client invalid");
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  fbl::RefPtr<BusTransactionInitiatorDispatcher> bti;
+  zx_status_t status = platform_bus->GetBti(0, 0, &bti);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
   // Due to the similarity between Virtio 0.9.5 legacy devices and Virtio 1.0
   // transitional devices we need to check whether modern capabilities exist.
   // If no vendor capabilities are found then we will default to the legacy
@@ -49,12 +64,12 @@ zx::result<ktl::unique_ptr<virtio::Backend>> GetBackend(KernelHandle<PciDeviceDi
   dprintf(INFO, "virtio %02x:%02x.%1x using %s PCI backend\n", info.bus_id, info.dev_id,
           info.func_id, (is_modern) ? "modern" : "legacy");
 
-  zx_status_t status = backend->Bind();
+  status = backend->Bind();
   if (status != ZX_OK) {
     return zx::error(status);
   }
 
-  return zx::ok(ktl::move(backend));
+  return zx::ok(ktl::pair(ktl::move(bti), ktl::move(backend)));
 }
 
 }  // namespace virtio

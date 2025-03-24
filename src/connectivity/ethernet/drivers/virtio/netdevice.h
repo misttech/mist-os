@@ -43,7 +43,7 @@ class NetworkDevice : public virtio::Device {
   static constexpr uint16_t kRxId = 0u;
   static constexpr uint16_t kTxId = 1u;
 
-  NetworkDevice(ktl::unique_ptr<Backend> backend);
+  NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend);
   virtual ~NetworkDevice();
 
   zx_status_t Init() override __TA_EXCLUDES(state_lock_);

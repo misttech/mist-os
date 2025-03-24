@@ -12,13 +12,16 @@
 #include <type_traits>
 
 #include <object/pci_device_dispatcher.h>
+#include <platform/platform-bus.h>
 
 #include "device.h"
 
 namespace virtio {
 // Get the virtio backend for a given pci virtio device.
-zx::result<std::unique_ptr<virtio::Backend>> GetBackend(KernelHandle<PciDeviceDispatcher> pci,
-                                                        zx_pcie_device_info_t info);
+zx::result<
+    std::pair<fbl::RefPtr<BusTransactionInitiatorDispatcher>, std::unique_ptr<virtio::Backend>>>
+GetBtiAndBackend(platform_bus::PlatformBus* platform_bus, KernelHandle<PciDeviceDispatcher> pci,
+                 zx_pcie_device_info_t info);
 
 // Creates a Virtio device by determining the backend and moving that into
 // |VirtioDevice|'s constructor, then call's the device's Init() method. The
@@ -26,14 +29,15 @@ zx::result<std::unique_ptr<virtio::Backend>> GetBackend(KernelHandle<PciDeviceDi
 // is released to devmgr.
 template <class VirtioDevice, class = typename std::enable_if<
                                   std::is_base_of<virtio::Device, VirtioDevice>::value>::type>
-zx_status_t CreateAndBind(void* /*ctx*/, KernelHandle<PciDeviceDispatcher> device,
-                          zx_pcie_device_info_t info) {
-  auto backend = GetBackend(ktl::move(device), info);
-  if (!backend.is_ok()) {
-    return backend.status_value();
+zx_status_t CreateAndBind(platform_bus::PlatformBus* platform_bus,
+                          KernelHandle<PciDeviceDispatcher> device, zx_pcie_device_info_t info) {
+  auto bti_and_backend = GetBtiAndBackend(platform_bus, ktl::move(device), info);
+  if (!bti_and_backend.is_ok()) {
+    return bti_and_backend.status_value();
   }
   fbl::AllocChecker ac;
-  auto dev = ktl::make_unique<VirtioDevice>(&ac, std::move(backend.value()));
+  auto dev = ktl::make_unique<VirtioDevice>(&ac, ktl::move(bti_and_backend.value().first),
+                                            ktl::move(bti_and_backend.value().second));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

@@ -23,6 +23,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/inline_array.h>
 #include <kernel/lockdep.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
 #include <pretty/hexdump.h>
 
 #include "src/devices/block/lib/common/include/common.h"
@@ -75,7 +76,9 @@ void BlockDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback comp
   SignalWorker(txn);
 }
 
-BlockDevice::BlockDevice(ktl::unique_ptr<Backend> backend) : virtio::Device(ktl::move(backend)) {
+BlockDevice::BlockDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
+                         ktl::unique_ptr<Backend> backend)
+    : virtio::Device(ktl::move(bti), ktl::move(backend)) {
   txn_signal_.Unsignal();
   worker_signal_.Unsignal();
   watchdog_signal_.Unsignal();

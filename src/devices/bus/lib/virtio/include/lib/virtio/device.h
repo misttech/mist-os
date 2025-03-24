@@ -21,7 +21,7 @@ namespace virtio {
 
 class Device {
  public:
-  Device(ktl::unique_ptr<Backend> backend);
+  Device(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend);
   virtual ~Device();
 
   virtual zx_status_t Init() = 0;
@@ -76,6 +76,9 @@ class Device {
 
   static int IrqThreadEntry(void* arg);
   void IrqWorker();
+
+  // BTI for managing DMA
+  fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_;
 
   // backend responsible for hardware io. Will be released when device goes out of scope
   ktl::unique_ptr<Backend> backend_;

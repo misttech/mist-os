@@ -39,7 +39,7 @@ struct block_txn_t {
 class Ring;
 class BlockDevice : public virtio::Device, public bdev_t {
  public:
-  BlockDevice(ktl::unique_ptr<Backend> backend);
+  BlockDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend);
   ~BlockDevice();
 
   // virtio::Device overrides

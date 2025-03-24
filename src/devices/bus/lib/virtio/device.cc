@@ -18,6 +18,7 @@
 #include <memory>
 #include <utility>
 
+#include <object/bus_transaction_initiator_dispatcher.h>
 #include <pretty/hexdump.h>
 
 #include <ktl/enforce.h>
@@ -26,7 +27,8 @@
 
 namespace virtio {
 
-Device::Device(ktl::unique_ptr<Backend> backend) : backend_(ktl::move(backend)) {}
+Device::Device(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, ktl::unique_ptr<Backend> backend)
+    : bti_(ktl::move(bti)), backend_(ktl::move(backend)) {}
 
 Device::~Device() { TRACEF("%s: exit", __func__); }
 

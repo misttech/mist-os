@@ -16,10 +16,19 @@
 #include <virtio/block.h>
 #include <virtio/virtio.h>
 
+#include "platform/platform-bus.h"
 #include "src/connectivity/ethernet/drivers/virtio/netdevice.h"
 #include "src/devices/block/drivers/virtio/block.h"
 
-void virtio_scan(uint level) {
+namespace platform_bus {
+
+namespace {
+PlatformBus* platform_bus;
+}
+
+void platform_bus_scan(uint level) {
+  ZX_ASSERT(PlatformBus::Create("platform-bus", &platform_bus) == ZX_OK);
+
   auto bus_drv = PcieBusDriver::GetDriver();
   if (bus_drv == nullptr) {
     dprintf(CRITICAL, "pci bus not found\n");
@@ -45,11 +54,11 @@ void virtio_scan(uint level) {
       switch (device->device_id()) {
         case VIRTIO_DEV_TYPE_T_BLOCK:
         case VIRTIO_DEV_TYPE_BLOCK:
-          virtio::CreateAndBind<virtio::BlockDevice>(nullptr, std::move(handle), info);
+          virtio::CreateAndBind<virtio::BlockDevice>(platform_bus, std::move(handle), info);
           break;
         case VIRTIO_DEV_TYPE_T_NETWORK:
         case VIRTIO_DEV_TYPE_NETWORK:
-          virtio::CreateAndBind<virtio::NetworkDevice>(nullptr, std::move(handle), info);
+          virtio::CreateAndBind<virtio::NetworkDevice>(platform_bus, std::move(handle), info);
           break;
         default:
           break;
@@ -58,4 +67,6 @@ void virtio_scan(uint level) {
   }
 }
 
-LK_INIT_HOOK(virtio_scan, virtio_scan, LK_INIT_LEVEL_ARCH_LATE - 1)
+}  // namespace platform_bus
+
+LK_INIT_HOOK(platform_bus_scan, platform_bus::platform_bus_scan, LK_INIT_LEVEL_ARCH_LATE - 1)
