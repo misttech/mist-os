@@ -47,6 +47,7 @@ cc_library(
         "//src/devices/usb/lib/usb:descriptors",
         "//src/devices/usb/lib/usb:usb-fidl",
         "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+        "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//bind/fuchsia.designware.platform:fuchsia.designware.platform_cc",
         "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
         "@fuchsia_sdk//fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",

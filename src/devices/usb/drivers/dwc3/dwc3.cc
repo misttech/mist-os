@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
+#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -50,8 +51,10 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
 
 zx::result<> Dwc3::Start() {
   {  // Compat server initialization.
-    auto result = compat_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                     compat::ForwardMetadata::All());
+    auto result = compat_.Initialize(
+        incoming(), outgoing(), node_name(), name(),
+        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS, DEVICE_METADATA_SERIAL_NUMBER,
+                                       DEVICE_METADATA_USB_MODE}));
     if (result.is_error()) {
       FDF_LOG(ERROR, "compat_.Initalize(): %s", result.status_string());
       return result.take_error();
