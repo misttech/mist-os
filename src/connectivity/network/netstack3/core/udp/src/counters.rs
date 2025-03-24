@@ -21,6 +21,11 @@ pub struct UdpCountersInner<C = Counter> {
     /// Count of UDP datagrams received from the IP layer, including error
     /// cases.
     pub rx: C,
+    /// Count of UDP datagrams that were delivered to a socket. Because some
+    /// datagrams may be delivered to multiple sockets (e.g. multicast traffic)
+    /// this counter may exceed the total number of individual UDP datagrams
+    /// received by the stack.
+    pub rx_delivered: C,
     /// Count of incoming UDP datagrams dropped because it contained a mapped IP
     /// address in the header.
     pub rx_mapped_addr: C,
@@ -43,6 +48,7 @@ impl Inspectable for UdpCountersInner {
         let UdpCountersInner {
             rx_icmp_error,
             rx,
+            rx_delivered,
             rx_mapped_addr,
             rx_unknown_dest_port,
             rx_malformed,
@@ -51,6 +57,7 @@ impl Inspectable for UdpCountersInner {
         } = self;
         inspector.record_child("Rx", |inspector| {
             inspector.record_counter("Received", rx);
+            inspector.record_counter("Delivered", rx_delivered);
             inspector.record_child("Errors", |inspector| {
                 inspector.record_counter("MappedAddr", rx_mapped_addr);
                 inspector.record_counter("UnknownDstPort", rx_unknown_dest_port);
@@ -76,6 +83,7 @@ pub(crate) mod testutil {
             let UdpCountersInner {
                 rx_icmp_error,
                 rx,
+                rx_delivered,
                 rx_mapped_addr,
                 rx_unknown_dest_port,
                 rx_malformed,
@@ -85,6 +93,7 @@ pub(crate) mod testutil {
             CounterExpectations {
                 rx_icmp_error: rx_icmp_error.get(),
                 rx: rx.get(),
+                rx_delivered: rx_delivered.get(),
                 rx_mapped_addr: rx_mapped_addr.get(),
                 rx_unknown_dest_port: rx_unknown_dest_port.get(),
                 rx_malformed: rx_malformed.get(),

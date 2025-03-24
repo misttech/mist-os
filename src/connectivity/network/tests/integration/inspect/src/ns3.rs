@@ -1696,6 +1696,7 @@ async fn inspect_counters(name: &str) {
                 "V4": {
                     "Rx": {
                         Received: 1u64,
+                        Delivered: 1u64,
                         "Errors": {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,
@@ -1711,6 +1712,7 @@ async fn inspect_counters(name: &str) {
                 "V6": {
                     "Rx": {
                         Received: 0u64,
+                        Delivered: 0u64,
                         "Errors": {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,

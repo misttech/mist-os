@@ -1460,6 +1460,9 @@ fn receive_ip_packet<
             require_transparent,
             &buffer,
         );
+        if delivered {
+            core_ctx.counters().rx_delivered.increment();
+        }
         was_delivered | delivered
     });
 
@@ -3560,7 +3563,7 @@ mod tests {
 
         let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
         assert_eq!(
-            CounterExpectations { rx: 1, tx: 1, ..Default::default() },
+            CounterExpectations { rx: 1, rx_delivered: 1, tx: 1, ..Default::default() },
             counters.as_ref().into()
         );
     }
@@ -4406,6 +4409,12 @@ mod tests {
                 (specific_listeners[1].downgrade(), vec![&[1], &[2]]),
                 (any_listener.downgrade(), vec![&[1], &[2], &[3]]),
             ]),
+        );
+
+        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
+        assert_eq!(
+            CounterExpectations { rx: 3, rx_delivered: 7, ..Default::default() },
+            counters.as_ref().into()
         );
     }
 
