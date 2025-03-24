@@ -263,13 +263,13 @@ Note: You can explore the full source for the realm component at
    instances and routes the capabilities:
 
     ```posix-terminal
-    ffx component run /core/ffx-laboratory:echo-client fuchsia-pkg://fuchsia.com/echo-cpp-client#meta/echo_realm.cm
+    ffx component run /core/ffx-laboratory:echo-realm fuchsia-pkg://fuchsia.com/echo-cpp-client#meta/echo_realm.cm
     ```
 
 1. Start the `echo_client` instance:
 
     ```posix-terminal
-    ffx component start /core/ffx-laboratory:echo_realm/echo_client
+    ffx component start /core/ffx-laboratory:echo-realm/echo_client
     ```
 
 The server component starts when the client attempts to connect to the `Echo`
