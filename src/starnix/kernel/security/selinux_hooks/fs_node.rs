@@ -878,6 +878,7 @@ pub(in crate::security) fn check_fs_node_setattr_access(
         || attributes.access_time
         || attributes.modification_time
         || attributes.change_time
+        || attributes.casefold
     {
         [CommonFsNodePermission::SetAttr.for_class(file_class)]
     } else {
