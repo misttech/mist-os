@@ -6,6 +6,7 @@ use super::{
     selinux_hooks, BpfMapState, BpfProgState, FileObjectState, FileSystemState, ResolvedElfState,
     TaskState,
 };
+use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
@@ -597,7 +598,7 @@ pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
 /// Corresponds to the `bpf_prog_alloc_security()` LSM hook.
 pub fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
     track_hook_duration!(c"security.hooks.bpf_prog_alloc");
-    BpfProgState { _state: selinux_hooks::bpf::bpf_prog_alloc(current_task) }
+    BpfProgState { state: selinux_hooks::bpf::bpf_prog_alloc(current_task) }
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
@@ -1294,9 +1295,23 @@ pub fn check_bpf_map_access(
     bpf_map: &BpfMap,
     flags: PermissionFlags,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_bpf_access");
+    profile_duration!("security.hooks.check_bpf_map_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::bpf::check_bpf_map_access(security_server, current_task, bpf_map, flags)
+    })
+}
+
+/// Checks whether `current_task` can create a bpf_program. This hook is called from the
+/// `sys_bpf()` syscall when the kernel tries to generate and return a file descriptor for
+/// programs.
+/// Corresponds to the `bpf_prog()` LSM hook.
+pub fn check_bpf_prog_access(
+    current_task: &CurrentTask,
+    bpf_program: &Program,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_bpf_prog_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::bpf::check_bpf_prog_access(security_server, current_task, bpf_program)
     })
 }
 

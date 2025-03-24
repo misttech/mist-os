@@ -7,6 +7,7 @@
 
 use super::{check_permission, check_self_permission, BpfMapState, BpfProgState};
 
+use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
 use crate::security::PermissionFlags;
 use crate::task::CurrentTask;
@@ -47,7 +48,8 @@ pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
     check_self_permission(&security_server.as_permission_check(), sid, permission, audit_context)
 }
 
-/// Returns whether `current_task` can create a bpf_map.
+/// Performs necessary checks when the kernel generates and returns a file descriptor for BPF
+/// maps.
 pub(in crate::security) fn check_bpf_map_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -74,4 +76,23 @@ pub(in crate::security) fn check_bpf_map_access(
         )?;
     }
     Ok(())
+}
+
+/// Performs necessary checks when the kernel generates and returns a file descriptor for BPF
+/// programs.
+pub fn check_bpf_prog_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    bpf_program: &Program,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
+    let subject_sid = current_task.security_state.lock().current_sid;
+    check_permission(
+        &security_server.as_permission_check(),
+        subject_sid,
+        bpf_program.security_state.state.sid,
+        BpfPermission::ProgRun,
+        audit_context,
+    )
 }

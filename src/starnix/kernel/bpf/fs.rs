@@ -88,14 +88,15 @@ impl BpfHandle {
 
     /// Performs security-related checks when opening a BPF map.
     pub(super) fn security_check_open_fd(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        if let BpfHandle::Map(ref bpf_map) = self {
-            security::check_bpf_map_access(
+        match self {
+            Self::Map(bpf_map) => security::check_bpf_map_access(
                 current_task,
                 &bpf_map,
                 PermissionFlags::from_bpf_flags(bpf_map.flags),
-            )?;
+            ),
+            Self::Program(program) => security::check_bpf_prog_access(current_task, &program),
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
