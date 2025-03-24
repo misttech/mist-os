@@ -5,11 +5,13 @@
 #ifndef LIB_ZX_VMAR_H_
 #define LIB_ZX_VMAR_H_
 
+#include <lib/zx/clock.h>
 #include <lib/zx/iob.h>
 #include <lib/zx/object.h>
 #include <lib/zx/vmo.h>
 #include <zircon/availability.h>
 #include <zircon/process.h>
+#include <zircon/syscalls.h>
 
 namespace zx {
 
@@ -42,6 +44,11 @@ class vmar final : public object<vmar> {
                       zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(14) {
     return zx_vmar_map_iob(get(), options, vmar_offset, iob_handle.get(), region_index,
                            region_offset, region_len, ptr);
+  }
+
+  zx_status_t map_clock(zx_vm_option_t options, size_t vmar_offset, const clock& clock_handle,
+                        size_t len, zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(HEAD) {
+    return zx_vmar_map_clock(get(), options, vmar_offset, clock_handle.get(), len, ptr);
   }
 
   zx_status_t unmap(uintptr_t address, size_t len) const ZX_AVAILABLE_SINCE(7) {

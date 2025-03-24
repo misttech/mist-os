@@ -1,7 +1,7 @@
 {
   "pkg/zx/include/lib/zx/bti.h": "037fd05e49256efdd7273a0a11d928a0",
   "pkg/zx/include/lib/zx/channel.h": "707b24a22a33836318708efcca584da1",
-  "pkg/zx/include/lib/zx/clock.h": "99d2c9273dcfe98a43e54fc7c9271d0d",
+  "pkg/zx/include/lib/zx/clock.h": "f486ef42fc640d0dfe636bc8fb30b3e4",
   "pkg/zx/include/lib/zx/counter.h": "1b8bc8eb07f54893d6be80fc512ffa80",
   "pkg/zx/include/lib/zx/debuglog.h": "f7295957c11d44dcb54142db061e5fcb",
   "pkg/zx/include/lib/zx/event.h": "ead99b1e894f533450306f02b385e32e",
@@ -32,6 +32,6 @@
   "pkg/zx/include/lib/zx/time.h": "398d6ba168dd09cfa99bf0c4a7627417",
   "pkg/zx/include/lib/zx/timer.h": "bccfacf36ff94e357db55c69697ffc0f",
   "pkg/zx/include/lib/zx/vcpu.h": "830ce0b65c469d394cca3cad0ee51ad9",
-  "pkg/zx/include/lib/zx/vmar.h": "6748f652d7d60879374addc12e6b03b4",
+  "pkg/zx/include/lib/zx/vmar.h": "676705898b2c4bded99ffc388d5a8308",
   "pkg/zx/include/lib/zx/vmo.h": "707c4ec7901a990bf86814795876f745"
 }
