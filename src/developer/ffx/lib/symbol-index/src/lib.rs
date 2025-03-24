@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use errors::ffx_error;
+use ffx_config::EnvironmentContext;
 use glob::glob as _glob;
-use sdk::Sdk;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -16,16 +16,12 @@ pub fn global_symbol_index_path() -> Result<String> {
         + "/.fuchsia/debug/symbol-index.json")
 }
 
-// Ensures that symbols in sdk.root are registered in the global symbol index.
-pub fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
-    let symbol_index_path = if sdk.get_version() == &sdk::SdkVersion::InTree {
-        let symbol_index_path = sdk.get_path_prefix().join(".symbol-index.json");
-        if !symbol_index_path.exists() {
-            bail!("Required {:?} doesn't exist", symbol_index_path);
-        }
-        symbol_index_path
+// Ensures that symbols in the root or sdk.root are registered in the global symbol index.
+pub fn ensure_symbol_index_registered(context: &EnvironmentContext) -> Result<()> {
+    let symbol_index_path = if let Some(build_dir) = context.build_dir() {
+        build_dir.join(".symbol-index.json")
     } else {
-        sdk.get_path_prefix().join("data/config/symbol_index*/config.json")
+        context.get_sdk()?.get_path_prefix().join("data/config/symbol_index*/config.json")
     };
 
     let symbol_index_path = pathbuf_to_string(symbol_index_path)?;
@@ -38,6 +34,7 @@ pub fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
         index.includes.push(symbol_index_path);
         index.save(&global_symbol_index)?;
     }
+
     return Ok(());
 }
 

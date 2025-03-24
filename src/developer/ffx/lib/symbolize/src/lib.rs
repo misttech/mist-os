@@ -36,9 +36,7 @@ impl Symbolizer {
 
     /// Create a new symbolizer instance with a specific ffx context. Normally only needed in tests.
     pub fn with_context(context: &EnvironmentContext) -> Result<Self, CreateSymbolizerError> {
-        let sdk = context.get_sdk().map_err(CreateSymbolizerError::NoSdkAvailable)?;
-
-        symbol_index::ensure_symbol_index_registered(&sdk)
+        symbol_index::ensure_symbol_index_registered(&context)
             .map_err(CreateSymbolizerError::SymbolIndexRegistration)?;
 
         let _global_init = global_init::GlobalInitHandle::new();

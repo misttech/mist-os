@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use ffx_config::global_env_context;
 use futures::{ready, select, Future, FutureExt, Stream, StreamExt};
 use log_command::{LogEntry, Symbolize};
@@ -262,7 +262,9 @@ impl RealSymbolizerProcess {
             tracing::warn!(?err, "Failed to get SDK");
             LogError::SdkNotAvailable { msg: "not found" }
         })?;
-        if let Err(e) = ensure_symbol_index_registered(&sdk) {
+        if let Err(e) = ensure_symbol_index_registered(
+            &global_env_context().ok_or_else(|| anyhow!("Failed to get global context"))?,
+        ) {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
         let mut args = vec![

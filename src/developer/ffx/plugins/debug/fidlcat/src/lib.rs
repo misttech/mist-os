@@ -68,7 +68,7 @@ impl FfxMain for FidlTool {
         let Self { cmd, context, launcher_proxy } = self;
         let sdk = context.get_sdk().user_message("Could not load currently active SDK")?;
 
-        if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
+        if let Err(e) = symbol_index::ensure_symbol_index_registered(&context) {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 

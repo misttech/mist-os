@@ -46,6 +46,11 @@ if (is_host) {
     output_name = "symbolizer"
   }
 
+  install_host_tools("symbolizer_host_tool") {
+    deps = [ ":symbolizer" ]
+    outputs = [ "symbolizer" ]
+  }
+
   test("symbolizer_tests") {
     sources = [
       "analytics_test.cc",

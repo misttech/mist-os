@@ -8,7 +8,7 @@ mod fuchsia_map;
 mod processes_data;
 mod write_human_readable_output;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
@@ -289,7 +289,9 @@ async fn stack_trace_subcommand(
 
 async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<()> {
     let sdk = global_env_context().context("Loading global environment context")?.get_sdk()?;
-    if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
+    if let Err(e) = symbol_index::ensure_symbol_index_registered(
+        &global_env_context().ok_or_else(|| anyhow!("Failed to get global context"))?,
+    ) {
         tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 

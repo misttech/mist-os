@@ -125,7 +125,10 @@ pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()?;
-    if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
+    if let Err(e) = symbol_index::ensure_symbol_index_registered(
+        &ffx_config::global_env_context()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get global context"))?,
+    ) {
         eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 
