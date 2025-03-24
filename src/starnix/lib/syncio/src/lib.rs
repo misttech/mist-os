@@ -1448,12 +1448,19 @@ impl Zxio {
         let status = unsafe { zxio::zxio_sync(self.as_ptr()) };
         zx::ok(status)
     }
+
+    pub fn close(&self) -> Result<(), zx::Status> {
+        let status = unsafe {
+            zxio::zxio_close(self.as_ptr(), /* should_wait= */ true)
+        };
+        zx::ok(status)
+    }
 }
 
 impl Drop for Zxio {
     fn drop(&mut self) {
         unsafe {
-            zxio::zxio_close(self.as_ptr(), true);
+            zxio::zxio_close(self.as_ptr(), /* should_wait= */ false);
         };
     }
 }

@@ -7,6 +7,7 @@ use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
 use fuchsia_async as fasync;
 use pin_project::pin_project;
+use scopeguard::ScopeGuard;
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::errors::Errno;
@@ -84,7 +85,7 @@ impl KernelThreads {
     ///
     /// Prefer this function to `spawn` for non-blocking work.
     pub fn spawn_future(&self, future: impl Future<Output = ()> + 'static) {
-        self.ehandle.spawn_local_detached(WrappedFuture(self.kernel.clone(), future));
+        self.ehandle.spawn_local_detached(WrappedFuture::new(self.kernel.clone(), future));
     }
 
     /// Spawn a thread in the main starnix process to run the given function.
@@ -212,21 +213,34 @@ impl SystemTask {
     }
 }
 
+// The order is important here. Rust will drop fields in declaration order and we want
+// the future to be dropped before the ScopeGuard runs.
 #[pin_project]
-struct WrappedFuture<F: Future<Output = ()> + 'static>(Weak<Kernel>, #[pin] F);
+struct WrappedFuture<F>(#[pin] F, ScopeGuard<Weak<Kernel>, fn(Weak<Kernel>)>);
+
+impl<F> WrappedFuture<F> {
+    fn new(kernel: Weak<Kernel>, fut: F) -> Self {
+        // We need the ScopeGuard in case the future queues releasers when dropped.
+        Self(fut, ScopeGuard::with_strategy(kernel, |kernel| trigger_delayed_releaser(&kernel)))
+    }
+}
+
 impl<F: Future<Output = ()> + 'static> Future for WrappedFuture<F> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let kernel = self.0.clone();
-        let result = self.project().1.poll(cx);
-
-        if let Some(kernel) = kernel.upgrade() {
-            kernel
-                .kthreads
-                .system_task()
-                .trigger_delayed_releaser(kernel.kthreads.unlocked_for_async().deref_mut());
-        }
+        let this = self.project();
+        let result = this.0.poll(cx);
+        trigger_delayed_releaser(&this.1);
         result
+    }
+}
+
+fn trigger_delayed_releaser(kernel: &Weak<Kernel>) {
+    if let Some(kernel) = kernel.upgrade() {
+        kernel
+            .kthreads
+            .system_task()
+            .trigger_delayed_releaser(kernel.kthreads.unlocked_for_async().deref_mut());
     }
 }

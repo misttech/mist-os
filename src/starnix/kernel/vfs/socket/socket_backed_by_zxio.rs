@@ -496,7 +496,9 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {}
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {
+        let _ = self.zxio.close();
+    }
 
     fn getsockname(
         &self,
