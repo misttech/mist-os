@@ -7,7 +7,7 @@ use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::user_address::ArchSpecific;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower,
     fidl_fuchsia_recovery as frecovery,
@@ -37,11 +37,11 @@ use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
-    c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname, EFAULT,
-    GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
-    LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
-    LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
-    LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
+    c_char, errno, error, from_status_like_fdio, pid_t, uapi, utsname, EFAULT, GRND_NONBLOCK,
+    GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON, LINUX_REBOOT_CMD_HALT,
+    LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART, LINUX_REBOOT_CMD_RESTART2,
+    LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A,
+    LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
 };
 
 pub fn do_uname(
@@ -511,7 +511,7 @@ impl FileOps for PerfEventFile {
 pub fn sys_perf_event_open(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    _attr: UserRef<perf_event_attr>,
+    _attr: MultiArchUserRef<uapi::perf_event_attr, uapi::arch32::perf_event_attr>,
     pid: pid_t,
     cpu: i32,
     _group_fd: FdNumber,
@@ -569,7 +569,9 @@ mod arch32 {
         Ok(())
     }
 
-    pub use super::sys_reboot as sys_arch32_reboot;
+    pub use super::{
+        sys_perf_event_open as sys_arch32_perf_event_open, sys_reboot as sys_arch32_reboot,
+    };
 }
 
 #[cfg(feature = "arch32")]

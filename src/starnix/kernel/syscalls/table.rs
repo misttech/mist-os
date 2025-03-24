@@ -160,8 +160,9 @@ pub fn dispatch_syscall(
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
-            sys_arch32_reboot, sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
-            sys_personality as sys_arch32_personality, sys_sched_yield as sys_arch32_sched_yield,
+            sys_arch32_perf_event_open, sys_arch32_reboot, sys_arch32_uname,
+            sys_getrandom as sys_arch32_getrandom, sys_personality as sys_arch32_personality,
+            sys_sched_yield as sys_arch32_sched_yield,
         };
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
@@ -326,6 +327,7 @@ pub fn dispatch_syscall(
             nanosleep[2],
             open[3],
             openat[4],
+            perf_event_open[5],
             personality[1],
             pidfd_getfd[3],
             pidfd_open[2],
