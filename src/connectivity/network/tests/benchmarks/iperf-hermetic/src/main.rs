@@ -6,7 +6,6 @@ use std::fmt::Display;
 
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_netemul as fnetemul;
-use fuchsia_async::TimeoutExt as _;
 use futures::FutureExt as _;
 use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{
@@ -89,9 +88,6 @@ async fn watch_for_exit(
 ) -> component_events::events::ExitStatus {
     let event =
         wait_for_component_stopped_with_stream(event_stream, &realm, component_moniker, None)
-            .on_timeout(std::time::Duration::from_secs(60), || {
-                panic!("timed out waiting for component stopped event: {component_moniker}");
-            })
             .await
             .expect("observe stopped event");
     let component_events::events::StoppedPayload { status, .. } =
@@ -261,14 +257,10 @@ async fn bench<N: Netstack, I: TestIpExt>(
             let mut stream = get_component_stopped_event_stream().await.expect("get event stream");
 
             realm_ref.start_child_component(&client_moniker(i)).await.expect("start client");
-            log::info!("started client {i}");
 
             let status = watch_for_exit(&mut stream, realm_ref, &client_moniker(i)).await;
             if status == component_events::events::ExitStatus::Clean {
-                log::info!("client {i} exited cleanly");
                 return;
-            } else {
-                log::info!("client {i} crashed: {status:?}; retrying");
             }
         }
     }))
@@ -340,18 +332,14 @@ mod test {
             .expect("subscribe to logs");
 
         let watch_exit_fut = async move {
-            log::info!("waiting for {:?} to exit", IPERF_MONIKER);
             let status =
                 watch_for_exit(&mut component_stopped_event_stream, &realm, IPERF_MONIKER).await;
-            log::info!("observed {:?} exit", IPERF_MONIKER);
             assert_eq!(status, component_events::events::ExitStatus::Clean);
         };
 
         let watch_log_fut = async move {
             const WAIT_FOR_LOG: &str = "iperf 3.7-FUCHSIA";
-            log::info!("waiting for log {:?}", WAIT_FOR_LOG);
             wait_for_log(stream, WAIT_FOR_LOG).await;
-            log::info!("observed log {:?}", WAIT_FOR_LOG);
         };
 
         let ((), ()) = futures::future::join(watch_exit_fut, watch_log_fut).await;
