@@ -7,7 +7,10 @@ import("//build/rust/rustc_test.gni")
 
 f2fs_reader_source = [
   "src/checkpoint.rs",
+  "src/dir.rs",
+  "src/inode.rs",
   "src/lib.rs",
+  "src/nat.rs",
   "src/reader.rs",
   "src/superblock.rs",
 ]
@@ -15,6 +18,8 @@ f2fs_reader_source = [
 f2fs_reader_deps = [
   "//src/storage/lib/storage_device",
   "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:bitflags",
+  "//third_party/rust_crates:enumn",
   "//third_party/rust_crates:zerocopy",
 ]
 

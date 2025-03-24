@@ -8,6 +8,8 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 const MAX_ACTIVE_NODE_LOGS: usize = 8;
 const MAX_ACTIVE_DATA_LOGS: usize = 8;
 const MAX_ACTIVE_LOGS: usize = 16;
+pub const CKPT_FLAG_UNMOUNT: u32 = 0x1;
+pub const CKPT_FLAG_COMPACT_SUMMARY: u32 = 0x4;
 
 #[derive(Debug, Eq, PartialEq, FromBytes, Immutable, IntoBytes, KnownLayout)]
 #[repr(C, packed)]
