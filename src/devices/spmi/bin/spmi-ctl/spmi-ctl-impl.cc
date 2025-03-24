@@ -288,7 +288,24 @@ int SpmiCtl::Execute(int argc, char** argv) {
           std::cerr << "Read failed: " << result.error_value().FormatDescription() << std::endl;
           return -1;
         }
-        std::cout << FidlString(*result) << std::endl;
+        switch (read_bytes) {
+          case 2:
+            printf("Register: 0x%04x  value: 0x%02x%02x (%u)\n", *address, result->data()[1],
+                   result->data()[0], result->data()[0] | (result->data()[1] << 8));
+            break;
+          case 4:
+            printf("Register: 0x%04x  value: 0x%02x%02x%02x%02x (%u)\n", *address,
+                   result->data()[3], result->data()[2], result->data()[1], result->data()[0],
+                   result->data()[0] | (result->data()[1] << 8) | (result->data()[2] << 16) |
+                       (result->data()[3] << 24));
+            break;
+          default:
+            for (int32_t i = 0; i < read_bytes; ++i) {
+              printf("Register: 0x%04x  value: 0x%02x (%u)\n", *address + i, result->data()[i],
+                     result->data()[i]);
+            }
+            break;
+        }
         return 0;
       } break;
 
