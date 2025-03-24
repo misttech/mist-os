@@ -14,7 +14,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
-    LookupContext, Message,
+    LookupContext, Message, UcredPtr,
 };
 use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, FieldMapping, Packet,
@@ -785,17 +785,18 @@ impl SocketOps for UnixSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
         let opt_value = match level {
             SOL_SOCKET => match optname {
-                SO_PEERCRED => self
-                    .peer_cred()
-                    .unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX })
-                    .as_bytes()
-                    .to_owned(),
+                SO_PEERCRED => UcredPtr::into_bytes(
+                    current_task,
+                    self.peer_cred().unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX }),
+                )
+                .map_err(|_| errno!(EINVAL))?,
                 SO_PEERSEC => "unconfined".as_bytes().to_vec(),
                 SO_ACCEPTCONN =>
                 {
@@ -1118,7 +1119,8 @@ mod tests {
             .setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
             .unwrap();
 
-        let opt_bytes = server_socket.getsockopt(&mut locked, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
+        let opt_bytes =
+            server_socket.getsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
         let retrieved_capacity = socklen_t::from_ne_bytes(opt_bytes.try_into().unwrap());
         // Setting SO_SNDBUF actually sets it to double the size
         assert_eq!(2 * send_capacity, retrieved_capacity);

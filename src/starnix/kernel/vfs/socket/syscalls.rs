@@ -547,14 +547,14 @@ where
     let header_size = CMsgHdrPtr::size_of_object_for(current_task);
 
     for ancillary_data in info.ancillary_data {
-        if ancillary_data.total_size() == 0 {
+        if ancillary_data.total_size(current_task) == 0 {
             // Skip zero-byte ancillary data on the receiving end. Not doing this trips this
             // assert:
             // https://cs.android.com/android/platform/superproject/+/master:system/libbase/cmsg.cpp;l=144;drc=15ec2c7a23cda814351a064a345a8270ed8c83ab
             continue;
         }
 
-        let expected_size = header_size + ancillary_data.total_size();
+        let expected_size = header_size + ancillary_data.total_size(current_task);
         let message_bytes = ancillary_data.into_bytes(
             current_task,
             flags,
@@ -777,7 +777,7 @@ where
             current_task,
             ControlMsg::new(cmsg.cmsg_level, cmsg.cmsg_type, data),
         )?;
-        if data.total_size() == 0 {
+        if data.total_size(current_task) == 0 {
             continue;
         }
         ancillary_data.push(data);
@@ -896,7 +896,7 @@ pub fn sys_getsockopt(
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
         current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval)?
     } else {
-        socket.getsockopt(locked, level, optname, optlen)?
+        socket.getsockopt(locked, current_task, level, optname, optlen)?
     };
 
     let actual_optlen = opt_value.len() as socklen_t;

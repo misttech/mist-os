@@ -307,6 +307,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
         _optlen: u32,
@@ -562,6 +563,7 @@ impl Socket {
     pub fn getsockopt<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         optlen: u32,
@@ -580,16 +582,20 @@ impl Socket {
                 SO_PROTOCOL => self.protocol.as_raw().to_ne_bytes().to_vec(),
                 SO_RCVTIMEO => {
                     let duration = self.receive_timeout().unwrap_or_default();
-                    timeval_from_duration(duration).as_bytes().to_owned()
+                    TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
+                        .map_err(|_| errno!(EINVAL))?
                 }
                 SO_SNDTIMEO => {
                     let duration = self.send_timeout().unwrap_or_default();
-                    timeval_from_duration(duration).as_bytes().to_owned()
+                    TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
+                        .map_err(|_| errno!(EINVAL))?
                 }
                 SO_MARK => self.state.lock().mark.as_bytes().to_owned(),
-                _ => self.ops.getsockopt(&mut locked, self, level, optname, optlen)?,
+                _ => {
+                    self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?
+                }
             },
-            _ => self.ops.getsockopt(&mut locked, self, level, optname, optlen)?,
+            _ => self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?,
         };
         Ok(value)
     }

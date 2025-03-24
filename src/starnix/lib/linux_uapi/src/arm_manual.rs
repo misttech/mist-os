@@ -63,6 +63,12 @@ arch_translate_data! {
         jf,
         k,
     }
+
+    BidiFrom<ucred> {
+        pid,
+        uid,
+        gid,
+    }
 }
 
 translate_data! {

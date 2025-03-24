@@ -289,6 +289,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,

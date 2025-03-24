@@ -438,6 +438,18 @@ impl<T, T64: FromBytes, T32: FromBytes> MappingMultiArchUserRef<T, T64, T32> {
     }
 }
 
+impl<T, T64: FromBytes + TryInto<T>, T32: FromBytes + TryInto<T>>
+    MappingMultiArchUserRef<T, T64, T32>
+{
+    pub fn read_from_prefix<A: ArchSpecific>(a: &A, bytes: &[u8]) -> Result<T, ()> {
+        if a.is_arch32() {
+            T32::read_from_prefix(bytes).map_err(|_| ())?.0.try_into().map_err(|_| ())
+        } else {
+            T64::read_from_prefix(bytes).map_err(|_| ())?.0.try_into().map_err(|_| ())
+        }
+    }
+}
+
 impl<T, T64, T32>
     MappingMultiArchUserRef<
         MappingMultiArchUserRef<T, T64, T32>,

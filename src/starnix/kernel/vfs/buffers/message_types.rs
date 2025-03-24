@@ -11,7 +11,7 @@ use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString};
 use byteorder::{ByteOrder, NativeEndian};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::user_address::ArchSpecific;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 use starnix_uapi::{
     c_int, errno, error, uapi, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_RECVORIGDSTADDR,
     IP_TOS, IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET,
@@ -20,6 +20,15 @@ use starnix_uapi::{
 use std::fmt::Debug;
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
+
+uapi::check_arch_independent_layout! {
+    in6_pktinfo {
+        ipi6_addr,
+        ipi6_ifindex,
+    }
+}
+
+pub type UcredPtr = MultiArchUserRef<uapi::ucred, uapi::arch32::ucred>;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
 #[derive(Clone, Debug)]
@@ -219,9 +228,9 @@ impl AncillaryData {
     }
 
     /// Returns the total size of all data in this message.
-    pub fn total_size(&self) -> usize {
+    pub fn total_size(&self, current_task: &CurrentTask) -> usize {
         match self {
-            AncillaryData::Unix(control) => control.total_size(),
+            AncillaryData::Unix(control) => control.total_size(current_task),
             AncillaryData::Ip(msg) => msg.get_data_size(),
         }
     }
@@ -332,14 +341,12 @@ impl UnixControlData {
                 Ok(UnixControlData::Rights(files))
             }
             SCM_CREDENTIALS => {
-                if message.data.len() < std::mem::size_of::<uapi::ucred>() {
+                if message.data.len() < UcredPtr::size_of_object_for(current_task) {
                     return error!(EINVAL);
                 }
 
-                let credentials = uapi::ucred::read_from_bytes(
-                    &message.data[..std::mem::size_of::<uapi::ucred>()],
-                )
-                .map_err(|_| errno!(EINVAL))?;
+                let credentials = UcredPtr::read_from_prefix(current_task, &message.data)
+                    .map_err(|_| errno!(EINVAL))?;
                 Ok(UnixControlData::Credentials(credentials))
             }
             SCM_SECURITY => Ok(UnixControlData::Security(message.data.into())),
@@ -387,19 +394,22 @@ impl UnixControlData {
                 }
                 (SCM_RIGHTS, fds.as_bytes().to_owned())
             }
-            UnixControlData::Credentials(credentials) => {
-                (SCM_CREDENTIALS, credentials.as_bytes().to_owned())
-            }
+            UnixControlData::Credentials(credentials) => (
+                SCM_CREDENTIALS,
+                UcredPtr::into_bytes(current_task, credentials).map_err(|_| errno!(EINVAL))?,
+            ),
             UnixControlData::Security(string) => (SCM_SECURITY, string.as_bytes().to_owned()),
         };
         Ok(Some(ControlMsg::new(SOL_SOCKET, msg_type, data)))
     }
 
     /// Returns the total size of all data in this message.
-    pub fn total_size(&self) -> usize {
+    pub fn total_size(&self, current_task: &CurrentTask) -> usize {
         match self {
             UnixControlData::Rights(files) => files.len() * std::mem::size_of::<FdNumber>(),
-            UnixControlData::Credentials(_credentials) => std::mem::size_of::<uapi::ucred>(),
+            UnixControlData::Credentials(_credentials) => {
+                UcredPtr::size_of_object_for(current_task)
+            }
             UnixControlData::Security(string) => string.len(),
         }
     }
