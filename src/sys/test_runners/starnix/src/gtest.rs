@@ -11,6 +11,7 @@ use ftest::CaseListenerProxy;
 use futures::io::BufReader;
 use futures::AsyncBufReadExt;
 use gtest_runner_lib::parser::*;
+use log::{debug, error};
 use std::collections::HashMap;
 use test_runners_lib::cases::TestCaseInfo;
 use {fidl_fuchsia_component_runner as frunner, fuchsia_async as fasync};
@@ -27,6 +28,7 @@ pub async fn get_cases_list_for_gtests(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: TestType,
 ) -> Result<Vec<ftest::Case>, Error> {
+    debug!("getting test cases for gtest");
     // Replace the program args to get test cases in a json file.
     let list_tests_arg = format_arg(test_type, LIST_TESTS_ARG);
     let output_file_name = unique_filename();
@@ -42,14 +44,20 @@ pub async fn get_cases_list_for_gtests(
     start_info.numbered_handles = Some(vec![]);
     let output_dir = add_output_dir_to_namespace(&mut start_info)?;
 
+    debug!(start_info:?; "starting test component to list test cases");
     let component_controller = start_test_component(start_info, component_runner)?;
-    let _ = read_result(component_controller.take_event_stream()).await;
+    match read_result(component_controller.take_event_stream()).await.status {
+        Some(ftest::Status::Passed) => (),
+        Some(ftest::Status::Failed) => error!("Test dry-run to list cases failed."),
+        Some(ftest::Status::Skipped) => error!("Test dry-run to list cases was skipped."),
+        None => error!("Test dry-run to list cases didn't provide a status."),
+    }
 
     // Parse tests from output file.
     let read_content = read_file(&output_dir, &output_file_name)
         .await
-        .expect("Failed to read tests from output file.");
-    let tests = parse_test_cases(read_content).expect("Failed to parse tests.");
+        .context("reading tests from output file.")?;
+    let tests = parse_test_cases(read_content).context("parsing test cases")?;
     Ok(tests
         .iter()
         .map(|TestCaseInfo { name, enabled }| ftest::Case {
