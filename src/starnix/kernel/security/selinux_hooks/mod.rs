@@ -284,6 +284,12 @@ fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
+    if permission.class() == FileClass::AnonFsNode.into() {
+        // TODO: https://fxbug.dev/404773987 - Skip all `anon_inode` checks, since most should be
+        // treated as "private" to the kernel, and therefore un-checked.
+        return Ok(());
+    }
+
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
@@ -309,7 +315,11 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::SockFile.into() {
+    if permission.class() == FileClass::AnonFsNode.into() {
+        // TODO: https://fxbug.dev/404773987 - Skip all `anon_inode` checks, since most should be
+        // treated as "private" to the kernel, and therefore un-checked.
+        return Ok(());
+    } else if permission.class() == FileClass::SockFile.into() {
         return todo_check_permission(
             TODO_DENY!(
                 "https://fxbug.dev/364568517",
