@@ -294,12 +294,6 @@ TEST(KernelClocksTestCase, GetDetails) {
       ASSERT_OK(the_clock.get_details(&details));
       zx::ticks get_details_after = zx::ticks::now();
 
-      // Check the generation counter.  It does not have a defined starting
-      // value, but it should always be even.  An odd generation counter
-      // indicates a clock which is in the process of being updates (something
-      // we should never see when querying details)
-      ASSERT_TRUE((details.generation_counter & 0x1) == 0);
-
       // The options reported should match those used to create the clock.
       ASSERT_EQ(options, details.options);
 

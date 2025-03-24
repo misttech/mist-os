@@ -12,8 +12,13 @@
 #include <lockdep/lockdep.h>
 
 namespace internal {
-struct FuchsiaKernelOsal;
-}
+
+struct FuchsiaKernelOsal {
+  static zx_instant_mono_t GetClockMonotonic() { return current_mono_time(); }
+  static void ArchYield() { arch::Yield(); }
+};
+
+}  // namespace internal
 
 template <::concurrent::SyncOpt kSyncOpt = ::concurrent::SyncOpt::AcqRelOps>
 using SeqLock = ::concurrent::internal::SeqLock<::internal::FuchsiaKernelOsal, kSyncOpt>;
