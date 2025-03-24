@@ -120,7 +120,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, flags, params, flags.checkoutDir, m)
+	return execute(ctx, flags, params, m)
 }
 
 type buildModules interface {
@@ -143,7 +143,7 @@ var getHostPlatform = func() (string, error) {
 	return hostplatform.Name()
 }
 
-func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, checkoutDir string, m buildModules) error {
+func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
 	if flags.depsFile != "" && flags.outputFile == "" {
 		return fmt.Errorf("output-file needs to be set if deps-file is set")
 	}
@@ -189,7 +189,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	// actually applied by recipes. Centralize the default values in the build
 	// system.
 	testSpecs := m.TestSpecs()
-	metadataMap, err := metadata.GetMetadata(testSpecs, checkoutDir)
+	metadataMap, err := metadata.GetMetadata(testSpecs, flags.checkoutDir)
 	if err != nil {
 		return err
 	}
@@ -464,11 +464,11 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", flags.outputFile, err)
 		}
-		allDeps, err := testsharder.GetBuilderDeps(shards, flags.buildDir, m.Tools(), platform, append(extraDeps, absOutputFile))
+		allDeps, err := testsharder.GetBuilderDeps(shards, flags.buildDir, flags.checkoutDir, m.Tools(), platform, append(extraDeps, absOutputFile))
 		if err != nil {
 			return err
 		}
-		if err := testsharder.WriteCASPathsJSONFile(allDeps, flags.buildDir, flags.depsFile); err != nil {
+		if err := testsharder.WriteCASPathsJSONFile(allDeps, flags.buildDir, flags.checkoutDir, flags.depsFile); err != nil {
 			return err
 		}
 	}
