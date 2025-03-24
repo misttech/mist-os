@@ -11,23 +11,27 @@
 
 namespace fzl {
 
-zx_status_t PinnedVmo::Pin(const zx::vmo& vmo, const zx::bti& bti, uint32_t options) {
-  if (!vmo.is_valid()) {
+zx_status_t PinnedVmo::Pin(const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                           const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti,
+                           uint32_t options) {
+  if (!vmo) {
     return ZX_ERR_INVALID_ARGS;
   }
   // To pin the entire VMO, we need to get the length:
   zx_status_t res;
   uint64_t vmo_size;
-  res = vmo.get_size(&vmo_size);
+  res = vmo->GetSize(&vmo_size);
   if (res != ZX_OK) {
     return res;
   }
   return PinInternal(0, vmo_size, vmo, bti, options);
 }
 
-zx_status_t PinnedVmo::PinRange(uint64_t offset, uint64_t len, const zx::vmo& vmo,
-                                const zx::bti& bti, uint32_t options) {
-  const size_t kPageSize = zx_system_get_page_size();
+zx_status_t PinnedVmo::PinRange(uint64_t offset, uint64_t len,
+                                const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                                const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti,
+                                uint32_t options) {
+  const size_t kPageSize = PAGE_SIZE;
   if ((len & (kPageSize - 1)) || (offset & (kPageSize - 1)) || len == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -35,15 +39,17 @@ zx_status_t PinnedVmo::PinRange(uint64_t offset, uint64_t len, const zx::vmo& vm
   return PinInternal(offset, len, vmo, bti, options);
 }
 
-zx_status_t PinnedVmo::PinInternal(uint64_t offset, uint64_t len, const zx::vmo& vmo,
-                                   const zx::bti& bti, uint32_t options) {
-  const size_t kPageSize = zx_system_get_page_size();
+zx_status_t PinnedVmo::PinInternal(uint64_t offset, uint64_t len,
+                                   const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                                   const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti,
+                                   uint32_t options) {
+  const size_t kPageSize = PAGE_SIZE;
   zx_status_t res;
 
   // If we are holding a pinned memory token, then we are already holding a
   // pinned VMO.  It is an error to try and pin a new VMO without first
   // explicitly unpinning the old one.
-  if (pmt_.is_valid()) {
+  if (pmt_.dispatcher()) {
     ZX_DEBUG_ASSERT(regions_ != nullptr);
     ZX_DEBUG_ASSERT(region_count_ > 0);
     return ZX_ERR_BAD_STATE;
@@ -51,7 +57,7 @@ zx_status_t PinnedVmo::PinInternal(uint64_t offset, uint64_t len, const zx::vmo&
 
   // Check our args, read/write/bti_contiguous is all that users may ask for.
   constexpr uint32_t kAllowedOptions = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE | ZX_BTI_CONTIGUOUS;
-  if (((options & kAllowedOptions) != options) || !vmo.is_valid() || !bti.is_valid()) {
+  if (((options & kAllowedOptions) != options) /*|| !vmo.is_valid() || !bti.is_valid()*/) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -71,7 +77,8 @@ zx_status_t PinnedVmo::PinInternal(uint64_t offset, uint64_t len, const zx::vmo&
   }
 
   // Now actually pin the region.
-  res = bti.pin(options, vmo, offset, len, addrs.get(), page_count, &pmt_);
+  zx_rights_t rights;
+  res = bti->Pin(vmo->vmo(), offset, len, options, &pmt_, &rights);
   if (res != ZX_OK) {
     return res;
   }
@@ -137,7 +144,7 @@ zx_status_t PinnedVmo::PinInternal(uint64_t offset, uint64_t len, const zx::vmo&
 }
 
 void PinnedVmo::Unpin() {
-  if (!pmt_.is_valid()) {
+  if (!pmt_.dispatcher()) {
     ZX_DEBUG_ASSERT(regions_ == nullptr);
     ZX_DEBUG_ASSERT(region_count_ == 0);
     return;
@@ -150,13 +157,13 @@ void PinnedVmo::Unpin() {
 }
 
 void PinnedVmo::UnpinInternal() {
-  ZX_DEBUG_ASSERT(pmt_.is_valid());
+  ZX_DEBUG_ASSERT(pmt_.dispatcher());
 
   // Given the level of sanity checking we have done so far, it should be
   // completely impossible for us to fail to unpin this memory.
-  [[maybe_unused]] zx_status_t res;
-  res = pmt_.unpin();
-  ZX_DEBUG_ASSERT(res == ZX_OK);
+  // pmt_.dispatcher()->Unpin();
+  // pinned_vmo_'s destructor will un-pin the pages just unmapped.
+  pmt_.reset();
 
   regions_.reset();
   region_count_ = 0;

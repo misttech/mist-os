@@ -68,3 +68,14 @@ test("fzl") {
     "//zircon/system/ulib/zxtest",
   ]
 }
+
+if (is_mistos) {
+  group("tests-kernel") {
+    deps = [ ":fzl-kernel-test" ]
+  }
+
+  source_set("fzl-kernel-test") {
+    sources = [ "pinned-vmo-tests-kernel.cc" ]
+    deps = [ "//zircon/kernel/object" ]
+  }
+}

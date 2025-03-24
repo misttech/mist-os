@@ -48,3 +48,31 @@ group("tests") {
   testonly = true
   deps = [ "tests" ]
 }
+
+if (is_mistos) {
+  zx_library("fzl_kernel") {
+    sdk = "source"
+    sdk_publishable = "internal"
+    sdk_headers = [
+      "lib/fzl/pinned-vmo.h",
+      "lib/fzl/vmar-manager.h",
+      "lib/fzl/vmo-mapper.h",
+    ]
+    sources = [
+      "pinned-vmo.cc",
+      "vmar-manager.cc",
+      "vmo-mapper.cc",
+    ]
+    deps = [ "//zircon/system/ulib/fbl" ]
+    public_deps = [
+      "//zircon/kernel/object:headers",
+
+      # Many public headers here use various fbl headers.
+      "//zircon/system/ulib/fbl",
+    ]
+  }
+
+  group("tests-kernel") {
+    deps = [ "tests:tests-kernel" ]
+  }
+}
