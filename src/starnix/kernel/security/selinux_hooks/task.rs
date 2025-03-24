@@ -550,6 +550,29 @@ pub(in crate::security) fn task_prlimit(
     Ok(())
 }
 
+/// Check permission before setting the max resource limits of `target` from `old_limit` to `new_limit`.
+pub fn task_setrlimit(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    target: &Task,
+    old_limit: rlimit,
+    new_limit: rlimit,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+    let source_sid = current_task.security_state.lock().current_sid;
+    let target_sid = target.security_state.lock().current_sid;
+    if new_limit.rlim_max != old_limit.rlim_max {
+        check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SetRlimit,
+            audit_context,
+        )?;
+    }
+    Ok(())
+}
+
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub(in crate::security) fn ptrace_access_check(
     permission_check: &PermissionCheck<'_>,

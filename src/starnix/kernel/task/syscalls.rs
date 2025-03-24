@@ -9,7 +9,7 @@ use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
     PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
-    PR_SET_PTRACER_ANY,
+    ThreadGroup, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
@@ -1312,7 +1312,7 @@ where
                 }
                 Some(new_limit)
             };
-            target_task.thread_group.adjust_rlimits(current_task, resource, new_limit)?
+            ThreadGroup::adjust_rlimits(current_task, &target_task, resource, new_limit)?
         }
     };
     if !old_limit_ref.is_null() {

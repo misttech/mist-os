@@ -30,7 +30,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{bpf_cmd, errno, error, BPF_F_RDONLY, BPF_F_WRONLY};
+use starnix_uapi::{bpf_cmd, errno, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -973,6 +973,26 @@ pub fn task_prlimit(
             &target,
             check_get_rlimit,
             check_set_rlimit,
+        )
+    })
+}
+
+/// Called before `source` sets the resource limits of `target` from `old_limit` to `new_limit`.
+/// Corresponds to the `security_task_setrlimit` hook.
+pub fn task_setrlimit(
+    source: &CurrentTask,
+    target: &Task,
+    old_limit: rlimit,
+    new_limit: rlimit,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.task_setrlimit");
+    if_selinux_else_default_ok(source, |security_server| {
+        selinux_hooks::task::task_setrlimit(
+            &security_server.as_permission_check(),
+            &source,
+            &target,
+            old_limit,
+            new_limit,
         )
     })
 }

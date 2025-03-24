@@ -1162,15 +1162,25 @@ impl ThreadGroup {
         self.limits.lock().get(resource).rlim_cur
     }
 
+    /// Adjusts the rlimits of the ThreadGroup to which `target_task` belongs to.
     pub fn adjust_rlimits(
-        &self,
         current_task: &CurrentTask,
+        target_task: &Task,
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
+        let thread_group = &target_task.thread_group;
         let can_increase_rlimit = security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE);
-        let mut limit_state = self.limits.lock();
-        limit_state.get_and_set(resource, maybe_new_limit, can_increase_rlimit)
+        let mut limit_state = thread_group.limits.lock();
+        let old_limit = limit_state.get(resource);
+        if let Some(new_limit) = maybe_new_limit {
+            if new_limit.rlim_max > old_limit.rlim_max && !can_increase_rlimit {
+                return error!(EPERM);
+            }
+            security::task_setrlimit(current_task, &target_task, old_limit, new_limit)?;
+            limit_state.set(resource, new_limit)
+        }
+        Ok(old_limit)
     }
 
     pub fn time_stats(&self) -> TaskTimeStats {
