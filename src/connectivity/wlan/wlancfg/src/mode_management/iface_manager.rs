@@ -740,6 +740,7 @@ impl IfaceManagerService {
         if let Some(iface_index) =
             self.clients.iter().position(|client_container| client_container.iface_id == iface_id)
         {
+            warn!("client interface {} was unxpectedly removed, attempting to recover", iface_id);
             let _ = self.clients.remove(iface_index);
             let client_iface_ids = self
                 .phy_manager
