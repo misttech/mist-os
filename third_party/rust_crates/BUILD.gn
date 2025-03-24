@@ -289,10 +289,8 @@ group("elliptic-curve") {
   public_deps = [ ":elliptic-curve-v0_12_3" ]
 }
 
-if (current_os == "fuchsia") {
-  group("enumn") {
-    public_deps = [ ":enumn-v0_1_14($host_toolchain)" ]
-  }
+group("enumn") {
+  public_deps = [ ":enumn-v0_1_14($host_toolchain)" ]
 }
 
 if (current_os == "fuchsia") {
