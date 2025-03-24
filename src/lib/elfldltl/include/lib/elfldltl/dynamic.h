@@ -520,7 +520,7 @@ template <class Elf>
 DynamicSymbolInfoObserver(SymbolInfo<Elf>& info) -> DynamicSymbolInfoObserver<Elf>;
 
 // These observers fill the same simple result structure.
-// Their constructors take (elfldltl::InitFiniInfo<Elf>&, Memory&).
+// Their constructors take (elfldltl::InitFiniInfo<Elf>&).
 template <class Elf>
 class DynamicInitObserver;
 
@@ -603,6 +603,51 @@ DynamicInitObserver(InitFiniInfo<Elf>& info) -> DynamicInitObserver<Elf>;
 
 template <class Elf>
 DynamicFiniObserver(InitFiniInfo<Elf>& info) -> DynamicFiniObserver<Elf>;
+
+// This is simpler than the Init and Fini observers because DT_PREINIT_ARRAY
+// has no corresponding legacy tag.  So instead of using the InitFiniInfo
+// object, this ctor just takes (std::span<const Addr>& preinit_array).
+template <class Elf>
+class DynamicPreinitObserver;
+
+template <class Elf>
+using DynamicPreinitObserverBase =
+    DynamicInfoObserver<DynamicPreinitObserver<Elf>, std::span<const typename Elf::Addr>, Elf,
+                        ElfDynTag::kPreinitArray, ElfDynTag::kPreinitArraySz>;
+
+template <class Elf>
+class DynamicPreinitObserver : public DynamicPreinitObserverBase<Elf> {
+ public:
+  using Base = DynamicPreinitObserverBase<Elf>;
+  using Addr = typename Elf::Addr;
+  using size_type = typename Elf::size_type;
+
+  using Base::Base;
+
+  template <class DiagnosticsType, class Memory>
+  constexpr bool Observe(DiagnosticsType& diagnostics, Memory& memory,
+                         DynamicTagMatch<ElfDynTag::kPreinitArray> tag, size_type val) {
+    array_.set_address(val);
+    return true;
+  }
+
+  template <class DiagnosticsType, class Memory>
+  constexpr bool Observe(DiagnosticsType& diagnostics, Memory& memory,
+                         DynamicTagMatch<ElfDynTag::kPreinitArraySz> tag, size_type val) {
+    array_.set_size_bytes(val);
+    return true;
+  }
+
+  template <class DiagnosticsType, class Memory>
+  constexpr bool Finish(DiagnosticsType& diagnostics, Memory& memory) {
+    return array_.template Finish<typename Elf::Addr, &std::span<const Addr>::operator=,
+                                  ElfDynTag::kPreinitArray, ElfDynTag::kPreinitArraySz>(
+        diagnostics, memory, this->info());
+  }
+
+ private:
+  typename Base::SizedArray array_;
+};
 
 // This can be used for invoking a callback over every DT_NEEDED tag, passed
 // as a string. Getting the string value requires that the SymbolInfo object

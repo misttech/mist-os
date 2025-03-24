@@ -134,10 +134,13 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     main_executable->decoded().SetTls(diag, main_executable->memory(), *phdr_info->tls_phdr, 1);
   }
 
+  std::span<const Addr> preinit_array;
   size_t needed_count = 0;
   main_executable->set_dynamic(*main_executable->decoded().DecodeDynamic(  //
       diag, main_executable->memory(), phdr_info->dyn_phdr,
-      StartupModule::NeededCountObserver(needed_count)));
+      StartupModule::NeededCountObserver(needed_count),
+      StartupModule::PreinitObserver(preinit_array)));
+  mutable_abi.preinit_array = preinit_array;
 
   return {main_executable, needed_count};
 }

@@ -7,6 +7,7 @@
 
 #include <optional>
 #include <span>
+#include <type_traits>
 
 #include "abi-span.h"
 
@@ -33,6 +34,18 @@ struct InitFiniInfo {
  public:
   using Addr = typename Elf::Addr;
   using size_type = typename Elf::size_type;
+
+  constexpr InitFiniInfo() = default;
+  constexpr InitFiniInfo(const InitFiniInfo&) = default;
+
+  // InitFiniInfo can be default-constructed and then set_* called, or it can
+  // be explicitly constructed from an array with no legacy singleton.
+  constexpr explicit InitFiniInfo(std::span<const Addr> array) : array_{array} {
+    static_assert(std::is_copy_constructible_v<InitFiniInfo>);
+    static_assert(std::is_copy_assignable_v<InitFiniInfo>);
+  }
+
+  constexpr InitFiniInfo& operator=(const InitFiniInfo&) = default;
 
   // An array of function pointers, in the .init_array or .fini_array section,
   // which is normally part of the RELRO segment.  So the pointers here are

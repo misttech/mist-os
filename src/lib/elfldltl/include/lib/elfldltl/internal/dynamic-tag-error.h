@@ -51,6 +51,10 @@ consteval std::string DynamicTagName(ElfDynTag tag) {
       return "DT_FINI_ARRAY";
     case ElfDynTag::kFiniArraySz:
       return "DT_FINI_ARRAYSZ";
+    case ElfDynTag::kPreinitArray:
+      return "DT_PREINIT_ARRAY";
+    case ElfDynTag::kPreinitArraySz:
+      return "DT_PREINIT_ARRAYSZ";
     default:
       __builtin_abort();
   }

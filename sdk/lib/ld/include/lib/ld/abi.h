@@ -71,6 +71,11 @@ struct Abi {
   // This is the number of elements in the loaded_modules list.
   Addr loaded_modules_count;
 
+  // This is the DT_PREINIT_ARRAY of the main executable, if it had one.  Since
+  // only the executable's preinit array is ever consulted, there is no field
+  // for it in each Module.
+  Span<const Addr> preinit_array;
+
   // TLS details for initial-exec modules that have PT_TLS segments.  The entry
   // at index `.tls_mod_id - 1` describes that module's PT_TLS.  A module with
   // `.tls_mod_id == 0` has no PT_TLS segment.  TLS module ID numbers above
