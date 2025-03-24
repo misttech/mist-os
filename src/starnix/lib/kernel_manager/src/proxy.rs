@@ -27,7 +27,7 @@ pub struct ChannelProxy {
     pub remote_channel: zx::Channel,
 
     /// The resume event that is signaled when messages are proxied into the container.
-    pub resume_event: zx::EventPair,
+    pub resume_event: Option<zx::EventPair>,
 
     /// The number of unhandled messages on this proxy. If non-zero, the container is still
     /// processing one of the incoming messages and the container should not be suspended.
@@ -156,7 +156,7 @@ async fn start_proxy(
                     &signals,
                     &proxy.container_channel,
                     &proxy.remote_channel,
-                    None,
+                    &None,
                     &mut bounce_bytes.borrow_mut(),
                     &mut bounce_handles.borrow_mut(),
                     name,
@@ -165,7 +165,7 @@ async fn start_proxy(
                     &signals,
                     &proxy.remote_channel,
                     &proxy.container_channel,
-                    Some(&proxy.resume_event),
+                    &proxy.resume_event,
                     &mut bounce_bytes.borrow_mut(),
                     &mut bounce_handles.borrow_mut(),
                     name,
@@ -188,7 +188,10 @@ async fn start_proxy(
     }
 
     trace_instant(c"starnix_runner:start_proxy:loop:exit", proxy_name);
-    if let Ok(koid) = proxy.resume_event.get_koid() {
+    if let Some(Ok(koid)) = proxy.resume_event.map(|e| e.get_koid()) {
+        wake_sources.lock().remove(&koid);
+    }
+    if let Some(Ok(koid)) = proxy.message_counter.map(|c| c.get_koid()) {
         wake_sources.lock().remove(&koid);
     }
 }
@@ -202,7 +205,7 @@ fn forward_message(
     signals: &zx::Signals,
     read_channel: &zx::Channel,
     write_channel: &zx::Channel,
-    event: Option<&zx::EventPair>,
+    event: &Option<zx::EventPair>,
     bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
     name: &str,
@@ -344,7 +347,7 @@ mod test {
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
             remote_channel: remote_client,
-            resume_event,
+            resume_event: Some(resume_event),
             message_counter: None,
             name: "test".to_string(),
         };
@@ -364,7 +367,7 @@ mod test {
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
             remote_channel: remote_client,
-            resume_event,
+            resume_event: Some(resume_event),
             message_counter: None,
             name: "test".to_string(),
         };
@@ -384,7 +387,7 @@ mod test {
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
             remote_channel: remote_client,
-            resume_event,
+            resume_event: Some(resume_event),
             message_counter: None,
             name: "test".to_string(),
         };
@@ -410,7 +413,7 @@ mod test {
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
             remote_channel: remote_client,
-            resume_event,
+            resume_event: Some(resume_event),
             message_counter: Some(message_counter),
             name: "test".to_string(),
         };
@@ -449,7 +452,7 @@ mod test {
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
             remote_channel: remote_client,
-            resume_event,
+            resume_event: Some(resume_event),
             message_counter: Some(message_counter),
             name: "test".to_string(),
         };
