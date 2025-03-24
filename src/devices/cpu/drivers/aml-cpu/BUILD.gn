@@ -35,13 +35,18 @@ source_set("common") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
+  deps = [
+    "//zircon/system/ulib/ddk-platform-defs",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-engine",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
   ]
 }
@@ -72,12 +77,13 @@ test("aml-cpu-test-bin") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/inspect/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
   ]
 }

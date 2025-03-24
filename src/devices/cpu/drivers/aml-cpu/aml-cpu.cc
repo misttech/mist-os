@@ -59,35 +59,35 @@ zx_status_t GetPopularVoltageTable(const zx::resource& smc_resource, uint32_t* m
   return ZX_OK;
 }
 
-zx::result<AmlCpuConfiguration> LoadConfiguration(ddk::PDevFidl& pdev) {
+zx::result<AmlCpuConfiguration> LoadConfiguration(fdf::PDev& pdev) {
   zx_status_t st;
   AmlCpuConfiguration config;
 
-  std::optional<fdf::MmioBuffer> mmio_buffer;
-  st = pdev.MapMmio(0, &mmio_buffer);
-  if (st != ZX_OK) {
-    FDF_LOG(ERROR, "aml-cpu: Failed to map mmio: %s", zx_status_get_string(st));
-    return zx::error(st);
+  zx::result mmio_result = pdev.MapMmio(0);
+  if (mmio_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to map mmio: %s", mmio_result.status_string());
+    return mmio_result.take_error();
   }
+  auto mmio_buffer = std::move(mmio_result.value());
 
-  config.info = {};
-  st = pdev.GetDeviceInfo(&config.info);
-  if (st != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get DeviceInfo: %s", zx_status_get_string(st));
-    return zx::error(st);
+  zx::result device_info = pdev.GetDeviceInfo();
+  if (device_info.is_error()) {
+    FDF_LOG(ERROR, "Failed to get device info: %s", device_info.status_string());
+    return device_info.take_error();
   }
+  config.info = std::move(device_info.value());
 
-  zx::resource smc_resource = {};
   config.metadata_type = DEVICE_METADATA_AML_OP_POINTS;
   config.fragments_per_pf_domain = kFragmentsPerPfDomain;
   zx_off_t cpu_version_offset = kCpuVersionOffset;
   if (config.info.pid == PDEV_PID_AMLOGIC_A5) {
-    st = pdev.GetSmc(0, &smc_resource);
-    if (st != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to get smc: %s", zx_status_get_string(st));
-      return zx::error(st);
+    zx::result smc_resource = pdev.GetSmc(0);
+    if (smc_resource.is_error()) {
+      FDF_LOG(ERROR, "Failed to get SMC: %s", smc_resource.status_string());
+      return smc_resource.take_error();
     }
-    st = GetPopularVoltageTable(smc_resource, &config.metadata_type);
+
+    st = GetPopularVoltageTable(smc_resource.value(), &config.metadata_type);
     if (st != ZX_OK) {
       FDF_LOG(ERROR, "Failed to get popular voltage table: %s", zx_status_get_string(st));
       return zx::error(st);
@@ -99,7 +99,7 @@ zx::result<AmlCpuConfiguration> LoadConfiguration(ddk::PDevFidl& pdev) {
     cpu_version_offset = kCpuVersionOffsetA1;
   }
 
-  config.cpu_version_packed = mmio_buffer->Read32(cpu_version_offset);
+  config.cpu_version_packed = mmio_buffer.Read32(cpu_version_offset);
 
   config.has_div16_clients = config.fragments_per_pf_domain == kFragmentsPerPfDomain;
 

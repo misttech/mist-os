@@ -9,8 +9,8 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/inspect/cpp/inspector.h>
 
 #include <mutex>
@@ -35,7 +35,7 @@ constexpr zx_off_t kCpuVersionOffsetA5 = 0x300;
 constexpr zx_off_t kCpuVersionOffsetA1 = 0x220;
 
 struct AmlCpuConfiguration {
-  pdev_device_info_t info;
+  fdf::PDev::DeviceInfo info;
   uint32_t metadata_type;
   size_t fragments_per_pf_domain;
   uint32_t cpu_version_packed;
@@ -121,7 +121,7 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
 std::vector<operating_point_t> PerformanceDomainOpPoints(const perf_domain_t& perf_domain,
                                                          std::vector<operating_point>& op_points);
 zx_status_t GetPopularVoltageTable(const zx::resource& smc_resource, uint32_t* metadata_type);
-zx::result<AmlCpuConfiguration> LoadConfiguration(ddk::PDevFidl& pdev);
+zx::result<AmlCpuConfiguration> LoadConfiguration(fdf::PDev& pdev);
 
 }  // namespace amlogic_cpu
 
