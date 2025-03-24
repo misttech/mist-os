@@ -76,12 +76,6 @@ GpioImplVisitor::GpioImplVisitor() {
       std::make_unique<fdf_devicetree::PropertyParser>(std::move(pinctrl_state_properties));
 }
 
-bool GpioImplVisitor::is_match(
-    const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties) {
-  auto controller = properties.find("gpio-controller");
-  return controller != properties.end();
-}
-
 zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
                                     const devicetree::PropertyDecoder& decoder) {
   auto gpio_hog = node.properties().find("gpio-hog");
@@ -97,8 +91,8 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
   } else {
     auto gpio_props = gpio_parser_->Parse(node);
 
-    if (gpio_props->find(kGpioReference) != gpio_props->end()) {
-      if (gpio_props->find(kGpioNames) == gpio_props->end() ||
+    if (gpio_props->contains(kGpioReference)) {
+      if (!gpio_props->contains(kGpioNames) ||
           (*gpio_props)[kGpioNames].size() != (*gpio_props)[kGpioReference].size()) {
         // We need a gpio names to generate bind rules.
         FDF_LOG(ERROR, "Gpio reference '%s' does not have valid gpio names field.",
@@ -119,7 +113,7 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
     }
 
     auto pinctrl_props = pinctrl_state_parser_->Parse(node);
-    if (pinctrl_props->find(kPinCtrl0) != pinctrl_props->end()) {
+    if (pinctrl_props->contains(kPinCtrl0)) {
       // Names of gpio controllers used in this pin control state. This is used to add gpio init
       // bind rule only once per controller.
       std::vector<uint32_t> controllers;
@@ -154,7 +148,8 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
 }
 
 zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin,
-                                               uint32_t controller_id, std::string gpio_name) {
+                                               uint32_t controller_id,
+                                               const std::string& gpio_name) {
   auto gpio_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
@@ -236,46 +231,44 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
     pull = val;
     return zx::ok();
   };
-  if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinBiasPullDown)) {
     auto result = save_pull(Pull::kDown);
     if (result.is_error()) {
       return result.take_error();
     }
   }
-  if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinBiasPullUp)) {
     auto result = save_pull(Pull::kUp);
     if (result.is_error()) {
       return result.take_error();
     }
   }
-  if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinBiasDisable)) {
     auto result = save_pull(Pull::kNone);
     if (result.is_error()) {
       return result.take_error();
     }
   }
 
-  if (pull.has_value()) {
-    config.pull(*pull);
-  }
+  config.pull(pull);
 
-  if (cfg_node.properties().find(kPinFunction) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinFunction)) {
     auto function = cfg_node.properties().at(kPinFunction).AsUint64();
     if (!function) {
       FDF_LOG(ERROR, "Pin controller config '%s' has invalid function.", cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    config.function(*function);
+    config.function(function);
   }
 
-  if (cfg_node.properties().find(kPinDriveStrengthUa) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinDriveStrengthUa)) {
     auto drive_strength_ua = cfg_node.properties().at(kPinDriveStrengthUa).AsUint64();
     if (!drive_strength_ua) {
       FDF_LOG(ERROR, "Pin controller config '%s' has invalid drive strength.",
               cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    config.drive_strength_ua(*drive_strength_ua);
+    config.drive_strength_ua(drive_strength_ua);
   }
 
   std::optional<DriveType> drive_type;
@@ -290,29 +283,29 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
     drive_type = val;
     return zx::ok();
   };
-  if (cfg_node.properties().find(kPinDrivePushPull) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinDrivePushPull)) {
     auto result = save_drive_type(DriveType::kPushPull);
     if (result.is_error()) {
       return result.take_error();
     }
   }
-  if (cfg_node.properties().find(kPinDriveOpenDrain) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinDriveOpenDrain)) {
     auto result = save_drive_type(DriveType::kOpenDrain);
     if (result.is_error()) {
       return result.take_error();
     }
   }
-  if (cfg_node.properties().find(kPinDriveOpenSource) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinDriveOpenSource)) {
     auto result = save_drive_type(DriveType::kOpenSource);
     if (result.is_error()) {
       return result.take_error();
     }
   }
   if (drive_type.has_value()) {
-    config.drive_type(*drive_type);
+    config.drive_type(drive_type);
   }
 
-  if (cfg_node.properties().find(kPinPowerSource) != cfg_node.properties().end()) {
+  if (cfg_node.properties().contains(kPinPowerSource)) {
     auto power_source = cfg_node.properties().at(kPinPowerSource).AsUint32();
     if (!power_source) {
       FDF_LOG(ERROR, "Pin controller config '%s' has invalid power source.",
@@ -390,10 +383,10 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
 
   std::optional<fuchsia_hardware_gpio::BufferMode> buffer_mode;
 
-  if (child.properties().find("input") != child.properties().end()) {
+  if (child.properties().contains("input")) {
     buffer_mode = fuchsia_hardware_gpio::BufferMode::kInput;
   }
-  if (child.properties().find("output-low") != child.properties().end()) {
+  if (child.properties().contains("output-low")) {
     if (buffer_mode) {
       FDF_LOG(
           ERROR,
@@ -404,7 +397,7 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
     buffer_mode = fuchsia_hardware_gpio::BufferMode::kOutputLow;
   }
 
-  if (child.properties().find("output-high") != child.properties().end()) {
+  if (child.properties().contains("output-high")) {
     if (buffer_mode) {
       FDF_LOG(
           ERROR,
@@ -471,8 +464,7 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
 }
 
 GpioImplVisitor::GpioController& GpioImplVisitor::GetController(uint32_t node_id) {
-  auto controller_iter = gpio_controllers_.find(node_id);
-  if (controller_iter == gpio_controllers_.end()) {
+  if (!gpio_controllers_.contains(node_id)) {
     gpio_controllers_[node_id] = GpioController();
   }
   return gpio_controllers_[node_id];

@@ -12,7 +12,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <vector>
 
 namespace gpio_impl_dt {
 
@@ -70,16 +69,19 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   zx::result<> ParsePinCtrlCfg(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& cfg_node,
                                fdf_devicetree::ParentNode& gpio_node);
 
-  zx::result<fdf_devicetree::ParentNode> GetGpioNodeForPinConfig(
+  static zx::result<fdf_devicetree::ParentNode> GetGpioNodeForPinConfig(
       fdf_devicetree::ReferenceNode& cfg_node);
 
-  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, uint32_t controller_id,
-                                std::string gpio_name);
+  static zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin,
+                                       uint32_t controller_id, const std::string& gpio_name);
 
-  zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id,
-                               uint32_t controller_index);
+  static zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id,
+                                      uint32_t controller_index);
 
-  bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties);
+  static bool is_match(
+      const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties) {
+    return properties.contains("gpio-controller");
+  }
 
   // Mapping of gpio controller node ID to its info.
   std::map<uint32_t, GpioController> gpio_controllers_;
