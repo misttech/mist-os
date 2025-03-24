@@ -7,13 +7,13 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::PartitionProxy;
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
-use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::future::Future;
 use std::hash::{Hash, Hasher};
+use std::mem::MaybeUninit;
 use std::ops::{DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -23,7 +23,7 @@ use zx::sys::zx_handle_t;
 use zx::{self as zx, HandleBased as _};
 use {
     fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
-    storage_trace as trace,
+    fuchsia_async as fasync, storage_trace as trace,
 };
 
 pub use cache::Cache;
@@ -153,7 +153,7 @@ impl FifoState {
             if slice.is_empty() {
                 return false;
             }
-            match fifo.write(context, slice) {
+            match fifo.try_write(context, slice) {
                 Poll::Ready(Ok(sent)) => {
                     self.queue.drain(0..sent);
                 }
@@ -889,9 +889,15 @@ impl Future for FifoPoller {
 
         // Receive responses.
         let fifo = state.fifo.as_ref().unwrap(); // Safe because poll_send_requests checks.
-        while let Poll::Ready(result) = fifo.read_one(context) {
-            match result {
-                Ok(response) => {
+        loop {
+            let mut response = MaybeUninit::uninit();
+            match fifo.try_read(context, &mut response) {
+                Poll::Pending => {
+                    state.poller_waker = Some(context.waker().clone());
+                    return Poll::Pending;
+                }
+                Poll::Ready(Ok(_)) => {
+                    let response = unsafe { response.assume_init() };
                     let request_id = response.reqid;
                     // If the request isn't in the map, assume that it's a cancelled read.
                     if let Some(request_state) = state.map.get_mut(&request_id) {
@@ -901,15 +907,12 @@ impl Future for FifoPoller {
                         }
                     }
                 }
-                Err(_) => {
+                Poll::Ready(Err(_)) => {
                     state.terminate();
                     return Poll::Ready(());
                 }
             }
         }
-
-        state.poller_waker = Some(context.waker().clone());
-        Poll::Pending
     }
 }
 
@@ -921,8 +924,6 @@ mod tests {
     };
     use block_server::{BlockServer, DeviceInfo, PartitionInfo};
     use fidl::endpoints::RequestStream as _;
-    use fidl_fuchsia_hardware_block as block;
-    use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
     use futures::future::{AbortHandle, Abortable, TryFutureExt as _};
     use futures::join;
     use futures::stream::futures_unordered::FuturesUnordered;
@@ -932,6 +933,7 @@ mod tests {
     use std::num::NonZero;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use {fidl_fuchsia_hardware_block as block, fuchsia_async as fasync};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;
@@ -1227,16 +1229,20 @@ mod tests {
             let (fifo_future_abort, fifo_future_abort_registration) = AbortHandle::new_pair();
             let fifo_future = Abortable::new(
                 async {
-                    let fifo = fasync::Fifo::from_fifo(server_fifo);
+                    let mut fifo = fasync::Fifo::from_fifo(server_fifo);
+                    let (mut reader, mut writer) = fifo.async_io();
+                    let mut request = BlockFifoRequest::default();
                     loop {
-                        let request = match fifo.read_entry().await {
-                            Ok(r) => r,
+                        match reader.read_entries(&mut request).await {
+                            Ok(1) => {}
                             Err(zx::Status::PEER_CLOSED) => break,
                             Err(e) => panic!("read_entry failed {:?}", e),
+                            _ => unreachable!(),
                         };
 
                         let response = self.fifo_handler.as_ref()(request);
-                        fifo.write_entries(std::slice::from_ref(&response))
+                        writer
+                            .write_entries(std::slice::from_ref(&response))
                             .await
                             .expect("write_entries failed");
                     }

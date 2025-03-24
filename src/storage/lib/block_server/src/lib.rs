@@ -874,7 +874,6 @@ mod tests {
     use assert_matches::assert_matches;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
-    use fuchsia_async::{FifoReadable as _, FifoWritable as _};
     use futures::channel::oneshot;
     use futures::future::BoxFuture;
     use futures::FutureExt as _;
@@ -1061,8 +1060,9 @@ mod tests {
                     .unwrap();
                 assert_ne!(vmo_id.id, 0);
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
                 // Keep attaching VMOs until we eventually hit the maximum.
                 let mut count = 1;
@@ -1081,19 +1081,21 @@ mod tests {
 
                     // Only test every 10 to keep test time down.
                     if count % 10 == 0 {
-                        fifo.write_entries(&BlockFifoRequest {
-                            command: BlockFifoCommand {
-                                opcode: BlockOpcode::Read.into_primitive(),
+                        writer
+                            .write_entries(&BlockFifoRequest {
+                                command: BlockFifoCommand {
+                                    opcode: BlockOpcode::Read.into_primitive(),
+                                    ..Default::default()
+                                },
+                                vmoid: vmo_id.id,
+                                length: 1,
                                 ..Default::default()
-                            },
-                            vmoid: vmo_id.id,
-                            length: 1,
-                            ..Default::default()
-                        })
-                        .await
-                        .unwrap();
+                            })
+                            .await
+                            .unwrap();
 
-                        let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                        let mut response = BlockFifoResponse::default();
+                        reader.read_entries(&mut response).await.unwrap();
                         assert_eq!(response.status, zx::sys::ZX_OK);
                     }
 
@@ -1103,18 +1105,20 @@ mod tests {
                 assert_eq!(count, u16::MAX as u64);
 
                 // Detach the original VMO, and make sure we can then attach another one.
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::CloseVmo.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::CloseVmo.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 let new_vmo_id = session_proxy
@@ -1275,36 +1279,39 @@ mod tests {
 
         let expected_op = Arc::new(Mutex::new(None));
         let expected_op_clone = expected_op.clone();
-        futures::join!(
-            async {
-                let block_server = BlockServer::new(
-                    BLOCK_SIZE,
-                    Arc::new(IoMockInterface {
-                        return_errors: false,
-                        do_checks: true,
-                        expected_op: expected_op_clone,
-                    }),
-                );
-                block_server.handle_requests(stream).await.unwrap();
-            },
-            async move {
-                let (session_proxy, server) = fidl::endpoints::create_proxy();
 
-                proxy.open_session(server).unwrap();
+        let server = async {
+            let block_server = BlockServer::new(
+                BLOCK_SIZE,
+                Arc::new(IoMockInterface {
+                    return_errors: false,
+                    do_checks: true,
+                    expected_op: expected_op_clone,
+                }),
+            );
+            block_server.handle_requests(stream).await.unwrap();
+        };
 
-                let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
-                let vmo_id = session_proxy
-                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
-                    .await
-                    .unwrap()
-                    .unwrap();
+        let client = async move {
+            let (session_proxy, server) = fidl::endpoints::create_proxy();
 
-                let fifo =
-                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+            proxy.open_session(server).unwrap();
 
-                // READ
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Read(1, 2, 3));
-                fifo.write_entries(&BlockFifoRequest {
+            let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+            let vmo_id = session_proxy
+                .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                .await
+                .unwrap()
+                .unwrap();
+
+            let mut fifo =
+                fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+            let (mut reader, mut writer) = fifo.async_io();
+
+            // READ
+            *expected_op.lock().unwrap() = Some(ExpectedOp::Read(1, 2, 3));
+            writer
+                .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Read.into_primitive(),
                         ..Default::default()
@@ -1318,12 +1325,14 @@ mod tests {
                 .await
                 .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
-                assert_eq!(response.status, zx::sys::ZX_OK);
+            let mut response = BlockFifoResponse::default();
+            reader.read_entries(&mut response).await.unwrap();
+            assert_eq!(response.status, zx::sys::ZX_OK);
 
-                // WRITE
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Write(4, 5, 6));
-                fifo.write_entries(&BlockFifoRequest {
+            // WRITE
+            *expected_op.lock().unwrap() = Some(ExpectedOp::Write(4, 5, 6));
+            writer
+                .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Write.into_primitive(),
                         ..Default::default()
@@ -1337,12 +1346,14 @@ mod tests {
                 .await
                 .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
-                assert_eq!(response.status, zx::sys::ZX_OK);
+            let mut response = BlockFifoResponse::default();
+            reader.read_entries(&mut response).await.unwrap();
+            assert_eq!(response.status, zx::sys::ZX_OK);
 
-                // FLUSH
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Flush);
-                fifo.write_entries(&BlockFifoRequest {
+            // FLUSH
+            *expected_op.lock().unwrap() = Some(ExpectedOp::Flush);
+            writer
+                .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Flush.into_primitive(),
                         ..Default::default()
@@ -1352,12 +1363,13 @@ mod tests {
                 .await
                 .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
-                assert_eq!(response.status, zx::sys::ZX_OK);
+            reader.read_entries(&mut response).await.unwrap();
+            assert_eq!(response.status, zx::sys::ZX_OK);
 
-                // TRIM
-                *expected_op.lock().unwrap() = Some(ExpectedOp::Trim(7, 8));
-                fifo.write_entries(&BlockFifoRequest {
+            // TRIM
+            *expected_op.lock().unwrap() = Some(ExpectedOp::Trim(7, 8));
+            writer
+                .write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Trim.into_primitive(),
                         ..Default::default()
@@ -1369,12 +1381,13 @@ mod tests {
                 .await
                 .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
-                assert_eq!(response.status, zx::sys::ZX_OK);
+            reader.read_entries(&mut response).await.unwrap();
+            assert_eq!(response.status, zx::sys::ZX_OK);
 
-                std::mem::drop(proxy);
-            }
-        );
+            std::mem::drop(proxy);
+        };
+
+        futures::join!(server, client);
     }
 
     #[fuchsia::test]
@@ -1405,72 +1418,78 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
                 // READ
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        length: 1,
+                        reqid: 1,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    reqid: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_INTERNAL);
 
                 // WRITE
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Write.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        length: 1,
+                        reqid: 2,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    reqid: 2,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_NOT_SUPPORTED);
 
                 // FLUSH
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Flush.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Flush.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: 3,
                         ..Default::default()
-                    },
-                    reqid: 3,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_NO_RESOURCES);
 
                 // TRIM
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Trim.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Trim.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: 4,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 4,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_NO_MEMORY);
 
                 std::mem::drop(proxy);
@@ -1506,15 +1525,17 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
 
                 async fn test(
-                    fifo: &fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
+                    fifo: &mut fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
                     request: BlockFifoRequest,
                 ) -> Result<(), zx::Status> {
-                    fifo.write_entries(&request).await.unwrap();
-                    let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                    let (mut reader, mut writer) = fifo.async_io();
+                    writer.write_entries(&request).await.unwrap();
+                    let mut response = BlockFifoResponse::default();
+                    reader.read_entries(&mut response).await.unwrap();
                     zx::Status::ok(response.status)
                 }
 
@@ -1530,14 +1551,17 @@ mod tests {
                 };
 
                 assert_eq!(
-                    test(&fifo, BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_read_request() })
-                        .await,
+                    test(
+                        &mut fifo,
+                        BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_read_request() }
+                    )
+                    .await,
                     Err(zx::Status::INVALID_ARGS)
                 );
 
                 assert_eq!(
                     test(
-                        &fifo,
+                        &mut fifo,
                         BlockFifoRequest {
                             vmo_offset: 0xffff_ffff_ffff_ffff,
                             ..good_read_request()
@@ -1559,14 +1583,17 @@ mod tests {
                 };
 
                 assert_eq!(
-                    test(&fifo, BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_write_request() })
-                        .await,
+                    test(
+                        &mut fifo,
+                        BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_write_request() }
+                    )
+                    .await,
                     Err(zx::Status::INVALID_ARGS)
                 );
 
                 assert_eq!(
                     test(
-                        &fifo,
+                        &mut fifo,
                         BlockFifoRequest {
                             vmo_offset: 0xffff_ffff_ffff_ffff,
                             ..good_write_request()
@@ -1580,7 +1607,7 @@ mod tests {
 
                 assert_eq!(
                     test(
-                        &fifo,
+                        &mut fifo,
                         BlockFifoRequest {
                             command: BlockFifoCommand {
                                 opcode: BlockOpcode::CloseVmo.into_primitive(),
@@ -1638,36 +1665,39 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: 1,
+                        dev_offset: 1, // Intentionally use the same as `reqid`.
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 1,
-                    dev_offset: 1, // Intentionally use the same as `reqid`.
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: 2,
+                        dev_offset: 2,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 2,
-                    dev_offset: 2,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
                 // Wait till both those entries are pending.
                 poll_fn(|cx: &mut Context<'_>| {
@@ -1681,21 +1711,22 @@ mod tests {
                 })
                 .await;
 
-                assert!(futures::poll!(fifo.read_entry()).is_pending());
+                let mut response = BlockFifoResponse::default();
+                assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
                 let (id, tx) = waiting_readers.lock().unwrap().pop().unwrap();
                 tx.send(()).unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
                 assert_eq!(response.reqid, id);
 
-                assert!(futures::poll!(fifo.read_entry()).is_pending());
+                assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
                 let (id, tx) = waiting_readers.lock().unwrap().pop().unwrap();
                 tx.send(()).unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
                 assert_eq!(response.reqid, id);
             }
@@ -1728,39 +1759,43 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: BlockIoFlag::GROUP_ITEM.bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: BlockIoFlag::GROUP_ITEM.bits(),
+                            ..Default::default()
+                        },
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                            ..Default::default()
+                        },
+                        reqid: 2,
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 2,
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
                 assert_eq!(response.reqid, 2);
                 assert_eq!(response.group, 1);
@@ -1800,22 +1835,24 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: BlockIoFlag::GROUP_ITEM.bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: BlockIoFlag::GROUP_ITEM.bits(),
+                            ..Default::default()
+                        },
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
                 // Wait until processed.
                 poll_fn(|cx: &mut Context<'_>| {
@@ -1829,43 +1866,46 @@ mod tests {
                 })
                 .await;
 
-                assert!(futures::poll!(fifo.read_entry()).is_pending());
+                let mut response = BlockFifoResponse::default();
+                assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: BlockIoFlag::GROUP_ITEM.bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: BlockIoFlag::GROUP_ITEM.bits(),
+                            ..Default::default()
+                        },
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                            ..Default::default()
+                        },
+                        reqid: 2,
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 2,
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_BAD_STATE);
                 assert_eq!(response.reqid, 2);
                 assert_eq!(response.group, 1);
 
-                assert!(futures::poll!(fifo.read_entry()).is_pending());
+                assert!(futures::poll!(pin!(reader.read_entries(&mut response))).is_pending());
 
                 // Only the first request should have been processed.
                 assert_eq!(counter.load(Ordering::Relaxed), 1);
@@ -1908,54 +1948,59 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                            ..Default::default()
+                        },
+                        reqid: 1,
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 1,
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
-                        flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                            ..Default::default()
+                        },
+                        reqid: 2,
+                        group: 1,
+                        vmoid: vmo_id.id,
+                        length: 1,
                         ..Default::default()
-                    },
-                    reqid: 2,
-                    group: 1,
-                    vmoid: vmo_id.id,
-                    length: 1,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
                 // Send an independent request to flush through the fifo.
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::CloseVmo.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::CloseVmo.into_primitive(),
+                            ..Default::default()
+                        },
+                        reqid: 3,
+                        vmoid: vmo_id.id,
                         ..Default::default()
-                    },
-                    reqid: 3,
-                    vmoid: vmo_id.id,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
                 // It should succeed.
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
                 assert_eq!(response.reqid, 3);
 
@@ -1964,7 +2009,8 @@ mod tests {
 
                 // The response should be for the first message tagged as last, and it should be
                 // an error because we sent two messages with the LAST marker.
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_INVALID_ARGS);
                 assert_eq!(response.reqid, 1);
                 assert_eq!(response.group, 1);
@@ -2008,24 +2054,28 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
-            let fifo = fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+            let mut fifo =
+                fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+            let (mut reader, mut writer) = fifo.async_io();
 
-            fifo.write_entries(&BlockFifoRequest {
-                command: BlockFifoCommand {
-                    opcode: BlockOpcode::Read.into_primitive(),
-                    flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+            writer
+                .write_entries(&BlockFifoRequest {
+                    command: BlockFifoCommand {
+                        opcode: BlockOpcode::Read.into_primitive(),
+                        flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                        ..Default::default()
+                    },
+                    reqid: 1,
+                    group: 1,
+                    vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
-                },
-                reqid: 1,
-                group: 1,
-                vmoid: vmo_id.id,
-                length: 1,
-                ..Default::default()
-            })
-            .await
-            .unwrap();
+                })
+                .await
+                .unwrap();
 
-            let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+            let mut response = BlockFifoResponse::default();
+            reader.read_entries(&mut response).await.unwrap();
             assert_eq!(response.status, zx::sys::ZX_OK);
         });
 
@@ -2083,25 +2133,27 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
                 for i in 0..MAX_REQUESTS {
-                    fifo.write_entries(&BlockFifoRequest {
-                        command: BlockFifoCommand {
-                            opcode: BlockOpcode::Read.into_primitive(),
+                    writer
+                        .write_entries(&BlockFifoRequest {
+                            command: BlockFifoCommand {
+                                opcode: BlockOpcode::Read.into_primitive(),
+                                ..Default::default()
+                            },
+                            reqid: (i + 1) as u32,
+                            dev_offset: i,
+                            vmoid: vmo_id.id,
+                            length: 1,
                             ..Default::default()
-                        },
-                        reqid: (i + 1) as u32,
-                        dev_offset: i,
-                        vmoid: vmo_id.id,
-                        length: 1,
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap();
+                        })
+                        .await
+                        .unwrap();
                 }
-                assert!(futures::poll!(fifo.write_entries(&BlockFifoRequest {
+                assert!(futures::poll!(pin!(writer.write_entries(&BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Read.into_primitive(),
                         ..Default::default()
@@ -2111,7 +2163,7 @@ mod tests {
                     vmoid: vmo_id.id,
                     length: 1,
                     ..Default::default()
-                }))
+                })))
                 .is_pending());
                 // OK, let the server start to process.
                 event.1.store(true, Ordering::SeqCst);
@@ -2119,25 +2171,28 @@ mod tests {
                 // For each entry we read, make sure we can write a new one in.
                 let mut finished_reqids = vec![];
                 for i in MAX_REQUESTS..2 * MAX_REQUESTS {
-                    let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                    let mut response = BlockFifoResponse::default();
+                    reader.read_entries(&mut response).await.unwrap();
                     assert_eq!(response.status, zx::sys::ZX_OK);
                     finished_reqids.push(response.reqid);
-                    fifo.write_entries(&BlockFifoRequest {
-                        command: BlockFifoCommand {
-                            opcode: BlockOpcode::Read.into_primitive(),
+                    writer
+                        .write_entries(&BlockFifoRequest {
+                            command: BlockFifoCommand {
+                                opcode: BlockOpcode::Read.into_primitive(),
+                                ..Default::default()
+                            },
+                            reqid: (i + 1) as u32,
+                            dev_offset: i,
+                            vmoid: vmo_id.id,
+                            length: 1,
                             ..Default::default()
-                        },
-                        reqid: (i + 1) as u32,
-                        dev_offset: i,
-                        vmoid: vmo_id.id,
-                        length: 1,
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap();
+                        })
+                        .await
+                        .unwrap();
                 }
+                let mut response = BlockFifoResponse::default();
                 for _ in 0..MAX_REQUESTS {
-                    let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                    reader.read_entries(&mut response).await.unwrap();
                     assert_eq!(response.status, zx::sys::ZX_OK);
                     finished_reqids.push(response.reqid);
                 }
@@ -2189,96 +2244,103 @@ mod tests {
                     .unwrap()
                     .unwrap();
 
-                let fifo =
+                let mut fifo =
                     fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
 
                 // READ
                 *expected_op.lock().unwrap() = Some(ExpectedOp::Read(11, 2, 3));
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 1,
+                        length: 2,
+                        vmo_offset: 3,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    dev_offset: 1,
-                    length: 2,
-                    vmo_offset: 3,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // WRITE
                 *expected_op.lock().unwrap() = Some(ExpectedOp::Write(14, 5, 6));
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Write.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 4,
+                        length: 5,
+                        vmo_offset: 6,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    dev_offset: 4,
-                    length: 5,
-                    vmo_offset: 6,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // FLUSH
                 *expected_op.lock().unwrap() = Some(ExpectedOp::Flush);
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Flush.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Flush.into_primitive(),
+                            ..Default::default()
+                        },
                         ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // TRIM
                 *expected_op.lock().unwrap() = Some(ExpectedOp::Trim(17, 3));
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Trim.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Trim.into_primitive(),
+                            ..Default::default()
+                        },
+                        dev_offset: 7,
+                        length: 3,
                         ..Default::default()
-                    },
-                    dev_offset: 7,
-                    length: 3,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_OK);
 
                 // READ past window
                 *expected_op.lock().unwrap() = None;
-                fifo.write_entries(&BlockFifoRequest {
-                    command: BlockFifoCommand {
-                        opcode: BlockOpcode::Read.into_primitive(),
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Read.into_primitive(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 19,
+                        length: 2,
+                        vmo_offset: 3,
                         ..Default::default()
-                    },
-                    vmoid: vmo_id.id,
-                    dev_offset: 19,
-                    length: 2,
-                    vmo_offset: 3,
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
+                    })
+                    .await
+                    .unwrap();
 
-                let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+                reader.read_entries(&mut response).await.unwrap();
                 assert_eq!(response.status, zx::sys::ZX_ERR_OUT_OF_RANGE);
 
                 std::mem::drop(proxy);

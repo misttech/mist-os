@@ -8,7 +8,6 @@ use anyhow::Error;
 use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block_volume::{self as volume, VolumeMarker, VolumeRequest};
-use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
 use fuchsia_sync::Mutex;
 use futures::stream::TryStreamExt;
 use futures::try_join;
@@ -19,7 +18,7 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use vfs::file::File;
 use vfs::node::Node;
-use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
+use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // Multiple Block I/O request may be sent as a group.
 // Notes:
@@ -457,12 +456,14 @@ impl BlockServer {
 
         // Handling requests from fifo
         let fifo_future = async {
-            let fifo = fasync::Fifo::from_fifo(server_fifo);
+            let mut fifo = fasync::Fifo::from_fifo(server_fifo);
+            let (mut reader, mut writer) = fifo.async_io();
+            let mut request = BlockFifoRequest::default();
             loop {
-                match fifo.read_entry().await {
-                    Ok(request) => {
+                match reader.read_entries(&mut request).await {
+                    Ok(_) => {
                         if let Some(response) = self.handle_fifo_request(request).await {
-                            fifo.write_entries(std::slice::from_ref(&response)).await?;
+                            writer.write_entries(&response).await?;
                         }
                         // if `self.handle_fifo_request(..)` returns None, then
                         // there's no reply for this request. This occurs for

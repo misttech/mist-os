@@ -5,7 +5,6 @@
 use super::{DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
-use fuchsia_async::{self as fasync, FifoReadable as _};
 use futures::future::Fuse;
 use futures::stream::FuturesUnordered;
 use futures::{select_biased, FutureExt, StreamExt};
@@ -16,7 +15,10 @@ use std::num::NonZero;
 use std::pin::pin;
 use std::sync::Arc;
 use std::task::{ready, Poll};
-use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+    fuchsia_async as fasync,
+};
 
 pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
 
@@ -235,7 +237,8 @@ async fn run_fifo<I: Interface + ?Sized>(
     //  - Read `requests`, decode them, and spawn a task to process them in `active_requests`, which
     //    will eventually write them into `responses`.
     //  - Read `responses` and write out to the FIFO.
-    let fifo = fasync::Fifo::from_fifo(fifo);
+    let mut fifo = fasync::Fifo::from_fifo(fifo);
+    let (mut reader, mut writer) = fifo.async_io();
     let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); FIFO_MAX_REQUESTS];
     let mut active_requests = FuturesUnordered::new();
     let mut responses = vec![];
@@ -248,13 +251,13 @@ async fn run_fifo<I: Interface + ?Sized>(
             let mut receive_requests = pin!(if count == 0 {
                 Fuse::terminated()
             } else {
-                fifo.read_entries(&mut requests[..count]).fuse()
+                reader.read_entries(&mut requests[..count]).fuse()
             });
             let mut send_responses = pin!(if responses.is_empty() {
                 Fuse::terminated()
             } else {
                 poll_fn(|cx| -> Poll<Result<(), zx::Status>> {
-                    match ready!(fifo.try_write(cx, &responses[..])) {
+                    match ready!(writer.try_write(cx, &responses[..])) {
                         Ok(written) => {
                             responses.drain(..written);
                             Poll::Ready(Ok(()))
