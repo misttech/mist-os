@@ -62,6 +62,7 @@ syscall_tests = [
   "touch_standby_test",
   "trivial_test",
   "tun_test",
+  "udev_test",
   "vmsplice_test",
   "waitpid_exit_signal_test",
 
@@ -88,7 +89,6 @@ arch64_syscall_tests = [
   "seccomp_test",
   "sysfs_power_test",
   "terminal_test",
-  "udev_test",
   "uio_test",
   "userfaultfd_test",
   "vdso_test",
