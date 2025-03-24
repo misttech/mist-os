@@ -30,6 +30,7 @@ use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{
     FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
 };
+use starnix_kernel_structured_config::Config as KernelStructuredConfig;
 use starnix_logging::{
     log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
     NAME_CREATE_CONTAINER,
@@ -133,7 +134,7 @@ fn attribution_info_for_kernel(
     ]
 }
 
-pub struct Config {
+pub struct ContainerStartInfo {
     /// Configuration specified by the component's `program` block.
     pub program: ContainerProgram,
 
@@ -152,6 +153,27 @@ pub struct Config {
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
+}
+
+impl ContainerStartInfo {
+    fn new(mut start_info: frunner::ComponentStartInfo) -> Result<Self, Error> {
+        let program = start_info.program.as_ref().context("retrieving program block")?;
+        let program: ContainerProgram =
+            runner::serde::deserialize_program(&program).context("parsing program block")?;
+        let ns = start_info.ns.take().context("retrieving container namespace")?;
+        let container_namespace = ContainerNamespace::from(ns);
+
+        let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
+        let component_instance = start_info.component_instance;
+
+        Ok(Self {
+            program,
+            outgoing_dir,
+            container_namespace,
+            component_instance,
+            runtime_dir: start_info.runtime_dir,
+        })
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -241,24 +263,6 @@ fn default_uid() -> runner::serde::StoreAsString<u32> {
     runner::serde::StoreAsString(42)
 }
 
-fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
-    let program = start_info.program.as_ref().expect("must specify a program block");
-    let program: ContainerProgram = runner::serde::deserialize_program(&program).unwrap();
-    let ns = start_info.ns.take().expect("Unable to access container namespace!");
-    let container_namespace = ContainerNamespace::from(ns);
-
-    let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
-    let component_instance = start_info.component_instance;
-
-    Config {
-        program,
-        outgoing_dir,
-        container_namespace,
-        component_instance,
-        runtime_dir: start_info.runtime_dir,
-    }
-}
-
 // Creates a CString from a String. Calling this with an invalid CString will panic.
 fn to_cstr(str: &str) -> CString {
     CString::new(str.to_string()).unwrap()
@@ -266,7 +270,7 @@ fn to_cstr(str: &str) -> CString {
 
 #[must_use = "The container must run serve on this config"]
 pub struct ContainerServiceConfig {
-    config: Config,
+    start_info: ContainerStartInfo,
     request_stream: frunner::ComponentControllerRequestStream,
     receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
 }
@@ -343,7 +347,7 @@ impl Container {
 
     pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
-            self.serve_outgoing_directory(service_config.config.outgoing_dir),
+            self.serve_outgoing_directory(service_config.start_info.outgoing_dir),
             server_component_controller(
                 self.kernel.clone(),
                 service_config.request_stream,
@@ -423,20 +427,21 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-    structured_config: &starnix_kernel_structured_config::Config,
+    kernel_structured_config: &KernelStructuredConfig,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 let request_stream = controller.into_stream();
-                let mut config = get_config_from_component_start_info(start_info);
+                let mut start_info = ContainerStartInfo::new(start_info)?;
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut config, sender, structured_config)
+                let container = create_container(&mut start_info, sender, kernel_structured_config)
                     .await
                     .with_source_context(|| {
-                        format!("creating container \"{}\"", &config.program.name)
+                        format!("creating container \"{}\"", start_info.program.name)
                     })?;
-                let service_config = ContainerServiceConfig { config, request_stream, receiver };
+                let service_config =
+                    ContainerServiceConfig { start_info, request_stream, receiver };
 
                 container.kernel.kthreads.spawn_future({
                     let vvar = container.kernel.vdso.vvar_writeable.clone();
@@ -463,19 +468,23 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
-    config: &mut Config,
+    start_info: &mut ContainerStartInfo,
     task_complete: oneshot::Sender<TaskResult>,
-    structured_config: &starnix_kernel_structured_config::Config,
+    kernel_structured_config: &KernelStructuredConfig,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    log_info!("Creating container {:#?}, {:#?}", config.program, structured_config);
-    let pkg_channel = config.container_namespace.get_namespace_channel("/pkg").unwrap();
+    log_info!(
+        "Creating container {:#?}, kernel config {:#?}",
+        start_info.program,
+        kernel_structured_config,
+    );
+    let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
-    let features = parse_features(&config, structured_config)?;
-    let mut kernel_cmdline = BString::from(config.program.kernel_cmdline.as_bytes());
+    let features = parse_features(&start_info, kernel_structured_config)?;
+    let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {
         match get_serial_number().await {
             Ok(serial) => {
@@ -501,7 +510,7 @@ async fn create_container(
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
     let mut rt_mappings = RoleOverrides::new();
-    for m in &config.program.rt_role_overrides {
+    for m in &start_info.program.rt_role_overrides {
         rt_mappings.add(m.process.clone(), m.thread.clone(), m.role.clone());
     }
     let rt_mappings = rt_mappings.build().context("adding custom realtime task role")?;
@@ -542,7 +551,7 @@ async fn create_container(
     //
     // `config.enable_utc_time_adjustment` is set through config capability
     // `fuchsia.time.config.WritableUTCTime`.
-    let time_adjustment_proxy = if structured_config.enable_utc_time_adjustment {
+    let time_adjustment_proxy = if kernel_structured_config.enable_utc_time_adjustment {
         connect_to_protocol_sync::<AdjustMarker>()
             .map_err(|e| log_error!("could not connect to fuchsia.time.external/Adjust: {:?}", e))
             .ok()
@@ -555,7 +564,7 @@ async fn create_container(
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
-        config.container_namespace.try_clone()?,
+        start_info.container_namespace.try_clone()?,
         scheduler_manager,
         Some(crash_reporter),
         kernel_node,
@@ -564,12 +573,12 @@ async fn create_container(
         procfs_device_tree_setup,
         time_adjustment_proxy,
     )
-    .with_source_context(|| format!("creating Kernel: {}", &config.program.name))?;
+    .with_source_context(|| format!("creating Kernel: {}", &start_info.program.name))?;
     let fs_context = create_fs_context(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         &features,
-        config,
+        start_info,
         &pkg_dir_proxy,
     )
     .source_context("creating FsContext")?;
@@ -608,7 +617,7 @@ async fn create_container(
     mount_filesystems(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &system_task,
-        config,
+        start_info,
         &pkg_dir_proxy,
     )
     .source_context("mounting filesystems")?;
@@ -626,7 +635,7 @@ async fn create_container(
         init_remote_block_devices(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             &system_task,
-            config,
+            start_info,
         )
         .source_context("initalizing remote block devices")?;
     }
@@ -635,10 +644,10 @@ async fn create_container(
     // startup_file_path to be created. The task struct is still used
     // to initialize the system up until this point, regardless of whether
     // or not there is an actual init to be run.
-    let argv = if config.program.init.is_empty() {
+    let argv = if start_info.program.init.is_empty() {
         vec![DEFAULT_INIT.to_string()]
     } else {
-        config.program.init.clone()
+        start_info.program.init.clone()
     }
     .iter()
     .map(|s| to_cstr(s))
@@ -652,13 +661,13 @@ async fn create_container(
         )
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let initial_name = if config.program.init.is_empty() {
+    let initial_name = if start_info.program.init.is_empty() {
         CString::default()
     } else {
-        CString::new(config.program.init[0].clone())?
+        CString::new(start_info.program.init[0].clone())?
     };
 
-    let rlimits = parse_rlimits(&config.program.rlimits)?;
+    let rlimits = parse_rlimits(&start_info.program.rlimits)?;
     let init_task = CurrentTask::create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
@@ -667,7 +676,7 @@ async fn create_container(
         Arc::clone(&fs_context),
         &rlimits,
     )
-    .with_source_context(|| format!("creating init task: {:?}", &config.program.init))?;
+    .with_source_context(|| format!("creating init task: {:?}", &start_info.program.init))?;
 
     execute_task_with_prerun_result(
         kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -683,17 +692,17 @@ async fn create_container(
         None,
     )?;
 
-    if !config.program.startup_file_path.is_empty() {
-        wait_for_init_file(&config.program.startup_file_path, &system_task, init_pid).await?;
+    if !start_info.program.startup_file_path.is_empty() {
+        wait_for_init_file(&start_info.program.startup_file_path, &system_task, init_pid).await?;
     };
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
         Arc::downgrade(&kernel),
-        config.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
+        start_info.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
 
     // Serve the runtime directory.
-    if let Some(runtime_dir) = config.runtime_dir.take() {
+    if let Some(runtime_dir) = start_info.runtime_dir.take() {
         kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
     }
 
@@ -709,13 +718,13 @@ fn create_fs_context(
     locked: &mut Locked<'_, Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
-    config: &Config,
+    start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
-    let mut mounts_iter = config.program.mounts.iter();
+    let mut mounts_iter = start_info.program.mounts.iter();
     let mut root = MountAction::new_for_root(
         locked,
         kernel,
@@ -802,10 +811,10 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 fn mount_filesystems(
     locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
-    config: &Config,
+    start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
-    let mut mounts_iter = config.program.mounts.iter();
+    let mut mounts_iter = start_info.program.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
@@ -822,9 +831,9 @@ fn mount_filesystems(
 fn init_remote_block_devices(
     locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
-    config: &Config,
+    start_info: &ContainerStartInfo,
 ) -> Result<(), Error> {
-    let devices_iter = config.program.remote_block_devices.iter();
+    let devices_iter = start_info.program.remote_block_devices.iter();
     for device_spec in devices_iter {
         create_remote_block_device_from_spec(locked, system_task, device_spec)
             .with_source_context(|| format!("creating remoteblk from spec: {}", &device_spec))?;

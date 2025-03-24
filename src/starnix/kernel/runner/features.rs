@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Config;
+use crate::ContainerStartInfo;
 
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
@@ -186,11 +186,11 @@ impl Features {
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
 pub fn parse_features(
-    config: &Config,
-    structured_config: &starnix_kernel_structured_config::Config,
+    start_info: &ContainerStartInfo,
+    kernel_structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Features, Error> {
     let mut features = Features::default();
-    for entry in &config.program.features {
+    for entry in &start_info.program.features {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -255,14 +255,14 @@ pub fn parse_features(
         };
     }
 
-    if structured_config.ui_visual_debugging_level > 0 {
+    if kernel_structured_config.ui_visual_debugging_level > 0 {
         features.kernel.enable_visual_debugging = true;
     }
 
-    features.kernel.default_uid = config.program.default_uid.0;
-    features.kernel.default_seclabel = config.program.default_seclabel.clone();
+    features.kernel.default_uid = start_info.program.default_uid.0;
+    features.kernel.default_seclabel = start_info.program.default_seclabel.clone();
     features.kernel.default_ns_mount_options =
-        if let Some(mount_options) = &config.program.default_ns_mount_options {
+        if let Some(mount_options) = &start_info.program.default_ns_mount_options {
             let options = mount_options
                 .iter()
                 .map(|item| {
