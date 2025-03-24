@@ -54,8 +54,6 @@ ${FASTBOOT} reboot bootloader
 # gone which causes the command to fail.
 sleep 4
 
-${FASTBOOT} flash super "$FVM_PATH"
-
 # Attempt to flash SSH keys. This is only supported on devices running custom
 # Fuchsia firmware, so if it doesn't work just log a warning.
 function push_ssh_keys {
@@ -77,9 +75,17 @@ else
   fx-warn "Skipping bootloader provisioning of SSH keys"
 fi
 
+# Flash the super partition last; some Kola devices exhibit USB instability
+# after flashing large super partition data so we want to do as much as
+# possible before this while the USB is more reliable (b/405436515).
+${FASTBOOT} flash super "$FVM_PATH"
+
 # SSH keys require `fastboot continue`, since they are stored in RAM and would
 # get lost in a reboot. We rebooted earlier to ensure a complete boot chain
 # using the new images.
-${FASTBOOT} continue
+${FASTBOOT} continue || {
+  fx-warn "Fastboot got a communication error, but this may be OK"
+  fx-warn "If the device is now booting then flash succeeded (b/405436515)"
+}
 
 fx-info "Done flashing Kola device."
