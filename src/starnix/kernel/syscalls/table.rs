@@ -160,7 +160,7 @@ pub fn dispatch_syscall(
             sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{
-            sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
+            sys_arch32_reboot, sys_arch32_uname, sys_getrandom as sys_arch32_getrandom,
             sys_personality as sys_arch32_personality, sys_sched_yield as sys_arch32_sched_yield,
         };
         pub use crate::syscalls::time::{
@@ -340,6 +340,7 @@ pub fn dispatch_syscall(
             readlink[3],
             readlinkat[4],
             readv[3],
+            reboot[4],
             recv[4],
             recvfrom[6],
             recvmmsg[5],

@@ -568,6 +568,8 @@ mod arch32 {
         current_task.write_object(name, &old_result)?;
         Ok(())
     }
+
+    pub use super::sys_reboot as sys_arch32_reboot;
 }
 
 #[cfg(feature = "arch32")]
