@@ -899,7 +899,7 @@ group("schemars") {
 }
 
 group("scopeguard") {
-  public_deps = [ ":scopeguard-v1_1_0" ]
+  public_deps = [ ":scopeguard-v1_2_0" ]
 }
 
 group("scrypt") {
@@ -4157,7 +4157,7 @@ rust_library("crossbeam-epoch-v0_9_4") {
   deps += [ ":crossbeam-utils-v0_8_14" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":memoffset-v0_6_3" ]
-  deps += [ ":scopeguard-v1_1_0" ]
+  deps += [ ":scopeguard-v1_2_0" ]
 
   rustenv = []
 
@@ -8623,7 +8623,7 @@ rust_library("lock_api-v0_4_11") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":scopeguard-v1_1_0" ]
+  deps += [ ":scopeguard-v1_2_0" ]
 
   rustenv = []
 
@@ -14617,18 +14617,18 @@ rust_library("scoped-tls-v1_0_1") {
   applicable_licenses = [ ":scoped-tls-v1_0_1.license" ]
 }
 
-license("scopeguard-v1_1_0.license") {
+license("scopeguard-v1_2_0.license") {
   public_package_name = "scopeguard"
   license_files = [
-    "//third_party/rust_crates/vendor/scopeguard-1.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/scopeguard-1.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/scopeguard-1.2.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/scopeguard-1.2.0/LICENSE-MIT",
   ]
 }
 
-rust_library("scopeguard-v1_1_0") {
+rust_library("scopeguard-v1_2_0") {
   crate_name = "scopeguard"
-  crate_root = "//third_party/rust_crates/vendor/scopeguard-1.1.0/src/lib.rs"
-  output_name = "scopeguard-6ef302a7f864fbb3"
+  crate_root = "//third_party/rust_crates/vendor/scopeguard-1.2.0/src/lib.rs"
+  output_name = "scopeguard-13be818cdb7baccf"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14638,15 +14638,15 @@ rust_library("scopeguard-v1_1_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=6ef302a7f864fbb3",
-    "-Cextra-filename=-6ef302a7f864fbb3",
+    "-Cmetadata=13be818cdb7baccf",
+    "-Cextra-filename=-13be818cdb7baccf",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"use_std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":scopeguard-v1_1_0.license" ]
+  applicable_licenses = [ ":scopeguard-v1_2_0.license" ]
 }
 
 license("scrypt-v0_10_0.license") {
