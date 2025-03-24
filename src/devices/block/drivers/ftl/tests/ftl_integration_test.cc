@@ -4,14 +4,12 @@
 
 #include <fidl/fuchsia.storage.ftl/cpp/fidl.h>
 #include <fidl/fuchsia.storage.ftl/cpp/wire.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
-#include <lib/zxio/include/lib/zxio/types.h>
-#include <lib/zxio/include/lib/zxio/zxio.h>
 
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.storage.ftl/cpp/markers.h"
 #include "ftl_test_observer.h"
 #include "launch.h"
 
@@ -33,42 +31,16 @@ TEST(FtlTest, IoCheck) {
 }
 
 void ConnectToConfiguration(fidl::WireSyncClient<fsftl::Configuration>* out_client) {
-  auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_EQ(
-      fdio_open3("/driver_exposed/fuchsia.storage.ftl.Service",
-                 uint64_t{fuchsia_io::wire::kPermReadable}, service_server.channel().release()),
-      ZX_OK);
-
-  // The service will be a random instance name string, find it in the listing. This would be racy
-  // if the test environment didn't begin by waiting for the block device to be available, which
-  // happens after registering the service.
-  zxio_storage_t io_storage;
-  ASSERT_EQ(zxio_create(service_client.channel().get(), &io_storage), ZX_OK);
-  zxio_dirent_iterator_t iterator;
-  ASSERT_EQ(zxio_dirent_iterator_init(&iterator, &io_storage.io), ZX_OK);
-  char name[255] = ".";
-  zxio_dirent_t dirent;
-  dirent.name = name;
-  dirent.name_length = 1;
-  // Should only be one entry excluding the "." entry.
-  while (name[0] == '.' && name[1] == '\0') {
-    ASSERT_EQ(zxio_dirent_iterator_next(&iterator, &dirent), ZX_OK);
-    name[dirent.name_length] = '\0';
-  }
-
-  // Open the randomly named child instance.
-  auto [instance_client, instance_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_EQ(
-      fdio_open3_at(service_client.channel().get(), name, uint64_t{fuchsia_io::wire::kPermReadable},
-                    instance_server.channel().release()),
-      ZX_OK);
-
-  // Connect to the Configuration protocol inside the service.
-  auto [config_client, config_server] = fidl::Endpoints<fsftl::Configuration>::Create();
-  ASSERT_EQ(fdio_service_connect_at(instance_client.channel().get(), fsftl::Service::Config::Name,
-                                    config_server.channel().release()),
+  auto [svc, svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  ASSERT_EQ(fdio_open3("/driver_exposed", uint64_t{fuchsia_io::wire::kPermReadable},
+                       svc_server.channel().release()),
             ZX_OK);
-  out_client->Bind(std::move(config_client));
+
+  component::SyncServiceMemberWatcher<fsftl::Service::Config> watcher(svc);
+  zx::result config = watcher.GetNextInstance(false);
+  ASSERT_STATUS(config.status_value(), ZX_OK);
+
+  out_client->Bind(std::move(config.value()));
 }
 
 TEST(FtlTest, ConfigurationService) {
