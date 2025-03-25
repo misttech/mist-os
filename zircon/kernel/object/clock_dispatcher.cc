@@ -14,7 +14,9 @@
 #include <zircon/syscalls/clock.h>
 
 #include <fbl/alloc_checker.h>
+#include <ktl/memory.h>
 #include <object/clock_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 
 KCOUNTER(dispatcher_clock_create_count, "dispatcher.clock.create")
 KCOUNTER(dispatcher_clock_destroy_count, "dispatcher.clock.destroy")
@@ -100,21 +102,91 @@ zx_status_t ClockDispatcher::Create(uint64_t options, const zx_clock_create_args
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // If the user requested a map-able clock, create a single-page VMO which we
+  // will use to share clock state with our user.
+  fbl::RefPtr<VmObjectPaged> vmo_paged;
+  if ((options & ZX_CLOCK_OPT_MAPPABLE) != 0) {
+    // Make sure to allocate our VMO with the `kAlwaysPinned` flag, for two
+    // reasons.
+    //
+    // 1) To save a bit of time and overhead, we use the physmap view of this
+    //    page in the kernel in order to access the actual memory.  If the page
+    //    backing this clock is not pinned, then this technique is no good.  _In
+    //    theory_, the page could be re-claimed then restored (to a different
+    //    physical location) invalidating our kernel-physmap view of the memory
+    //    in the process.  This cannot be allowed to happen.
+    // 2) Even if we make a kernel-specific PTE for the kernel view of the
+    //    memory (instead of using the physmap view), it needs to be accessed
+    //    from inside of a spinlock-equivalent (the exclusive form of the
+    //    seq-lock) during an Update operation.  We are going to be touching the
+    //    memory, but cannot allow a page fault during this operation, so it is
+    //    important that it always remain pinned.
+    static_assert(kMappedSize == PAGE_SIZE,
+                  "Mapped clock size must be a single page to ensure continuity");
+    zx_status_t res = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT,
+                                            VmObjectPaged::kAlwaysPinned, kMappedSize, &vmo_paged);
+    if (res != ZX_OK) {
+      return res;
+    }
+  }
+
   fbl::AllocChecker ac;
-  KernelHandle clock(fbl::AdoptRef(new (&ac) ClockDispatcher(options, create_args.backstop_time)));
+  KernelHandle clock(fbl::AdoptRef(
+      new (&ac) ClockDispatcher(options, create_args.backstop_time, ktl::move(vmo_paged))));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  *rights = default_rights();
+  // The new clock instance should have the default rights, plus the "map" right
+  // if the clock was created as map-able.
+  *rights = default_rights() | ((options & ZX_CLOCK_OPT_MAPPABLE) ? ZX_RIGHT_MAP : 0);
   *handle = ktl::move(clock);
+
   return ZX_OK;
 }
 
-ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
-    : clock_transformation_(options, backstop_time) {
+ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time,
+                                 fbl::RefPtr<VmObjectPaged> vmo)
+    : vmo_(ktl::move(vmo)) {
+  // Find our storage for our clock transformation, either in our VMO if we are
+  // mappable, or in our local storage if not.
+  if (vmo_ != nullptr) {
+    // Find the physical address of our VMO's (single) page, then use it to
+    // locate the kernel view of that page in the kernel's flat map.  There
+    // should be no possible way for this to fail, so unconditionally assert
+    // that everything goes as we expect.
+    static_assert(kMappedSize == PAGE_SIZE, "Mapped clock size must be exactly one page");
+
+    paddr_t pa;
+    const zx_status_t res = vmo_->GetPage(0, 0, nullptr, nullptr, nullptr, &pa);
+    ASSERT_MSG(res == ZX_OK, "Failed to get storage page for mappable clock (%d)", res);
+    ASSERT_MSG(is_physmap_phys_addr(pa),
+               "Mappable clock storage page is not in the physmap 0x%016lx", pa);
+    DEBUG_ASSERT((options & ZX_CLOCK_OPT_MAPPABLE) != 0);
+    clock_transformation_ = reinterpret_cast<ClockTransformationType*>(paddr_to_physmap(pa));
+
+    // Set the user-id of our VMO to be the same as our KOID.  This way, when a
+    // mapped clock is enumerated in a diagnostic info call, the KOID of this
+    // clock will be what gets reported in the info record.
+    vmo_->set_user_id(this->get_koid());
+
+    // Clocks (as kernel objects) currently don't have names, so we cannot use a
+    // similar trick to apply a name to how our mapped clock is reported.  For
+    // now, just set the name of the underlying VMO to "kernel-clock", so that
+    // it will be clear to someone looking at diagnostic info that the mapping
+    // is for a clock.
+    constexpr const char* default_name = "kernel-clock";
+    vmo_->set_name(default_name, strlen(default_name));
+  } else {
+    DEBUG_ASSERT((options & ZX_CLOCK_OPT_MAPPABLE) == 0);
+    clock_transformation_ = reinterpret_cast<ClockTransformationType*>(local_storage_);
+  }
+
+  // Explicitly placement new our transformation structure in our storage of choice.
+  new (clock_transformation_) ClockTransformationType(options, backstop_time);
+
   // Initialize the internal transformation structure.
-  ClockTransformationType& t = clock_transformation_;
+  ClockTransformationType& t = *clock_transformation_;
   ClockTransformationType::Params local_params;
   affine::Transform local_ticks_to_synthetic;
 
@@ -149,14 +221,19 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
   kcounter_add(dispatcher_clock_create_count, 1);
 }
 
-ClockDispatcher::~ClockDispatcher() { kcounter_add(dispatcher_clock_destroy_count, 1); }
+ClockDispatcher::~ClockDispatcher() {
+  // Explicitly destruct our clock transformation instance before its underlying
+  // storage goes away.
+  ktl::destroy_at(clock_transformation_);
+  kcounter_add(dispatcher_clock_destroy_count, 1);
+}
 
 zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
-  return clock_transformation_.Read(out_now);
+  return clock_transformation_->Read(out_now);
 }
 
 zx_status_t ClockDispatcher::GetDetails(zx_clock_details_v1_t* out_details) {
-  return clock_transformation_.GetDetails(out_details);
+  return clock_transformation_->GetDetails(out_details);
 }
 
 template <typename UpdateArgsType>
@@ -194,7 +271,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // because this operation should be very quick, and we may have observers
     // who are spinning attempting to read the clock. We cannot afford to become
     // preempted while we are performing an update operation.
-    ClockTransformationType& t = clock_transformation_;
+    ClockTransformationType& t = *clock_transformation_;
     SeqGuard guard(t.seq_lock_);
 
     // If the clock has not yet been started, then we require the first update

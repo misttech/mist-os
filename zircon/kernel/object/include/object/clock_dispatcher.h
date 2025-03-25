@@ -22,6 +22,8 @@ struct FuchsiaKernelOsal;
 
 class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_CLOCK_RIGHTS> {
  public:
+  static inline constexpr uint64_t kMappedSize = PAGE_SIZE;
+
   static zx_status_t Create(uint64_t options, const zx_clock_create_args_v1_t& create_args,
                             KernelHandle<ClockDispatcher>* handle, zx_rights_t* rights);
 
@@ -34,8 +36,11 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   template <typename UpdateArgsType>
   zx_status_t Update(uint64_t options, const UpdateArgsType& args);
 
+  const fbl::RefPtr<VmObjectPaged>& vmo() { return vmo_; }
+  bool is_mappable() const { return clock_transformation_->is_mappable(); }
+
  private:
-  ClockDispatcher(uint64_t options, zx_time_t backstop_time);
+  ClockDispatcher(uint64_t options, zx_time_t backstop_time, fbl::RefPtr<VmObjectPaged> vmo);
 
   // Supply the kernel specific implementation of ArchYield and reference timer
   // accessors in order to use libfasttime's implementation of the
@@ -51,7 +56,12 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   }
 
   using ClockTransformationType = ::fasttime::ClockTransformation<ClockTransformationAdapter>;
-  ClockTransformationType clock_transformation_;
+  static_assert(sizeof(ClockTransformationType) <= kMappedSize);
+  static_assert(alignof(ClockTransformationType) <= kMappedSize);
+
+  alignas(ClockTransformationType) uint8_t local_storage_[sizeof(ClockTransformationType)];
+  const fbl::RefPtr<VmObjectPaged> vmo_;
+  ClockTransformationType* clock_transformation_{nullptr};
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_

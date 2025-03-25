@@ -30,6 +30,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
 #include <object/bus_transaction_initiator_dispatcher.h>
+#include <object/clock_dispatcher.h>
 #include <object/diagnostics.h>
 #include <object/exception_dispatcher.h>
 #include <object/handle.h>
@@ -1299,6 +1300,23 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       };
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
+    }
+
+    case ZX_INFO_CLOCK_MAPPED_SIZE: {
+      fbl::RefPtr<ClockDispatcher> clock;
+      zx_status_t status =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &clock);
+      if (status != ZX_OK) {
+        return status;
+      }
+
+      // Only mappable clocks have a defined mapped size.
+      if (!clock->is_mappable()) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail,
+                                  ClockDispatcher::kMappedSize);
     }
 
     case ZX_INFO_INTERRUPT: {
