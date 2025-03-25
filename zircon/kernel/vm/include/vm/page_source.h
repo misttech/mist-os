@@ -352,6 +352,10 @@ class PageSource final : public PageRequestInterface {
     return detached_;
   }
 
+  // Method for the VmCowPages to retrieve the lock for paged VMOs.
+  // See VmCowPages::DeferredOps.
+  Lock<Mutex>* paged_vmo_lock() { return &paged_vmo_mutex_; }
+
  protected:
   // destructor should only be invoked from RefPtr
   virtual ~PageSource();
@@ -359,6 +363,11 @@ class PageSource final : public PageRequestInterface {
 
  private:
   fbl::Canary<fbl::magic("VMPS")> canary_;
+
+  // Lock used by the VMO to perform synchronization across its hierarchy. This lock does not
+  // strictly belong here, but this is a convenient and efficient place to put it.
+  // See VmCowPages::DeferredOps for more.
+  DECLARE_MUTEX(PageSource) paged_vmo_mutex_;
 
   mutable DECLARE_MUTEX(PageSource) page_source_mtx_;
   bool detached_ TA_GUARDED(page_source_mtx_) = false;
