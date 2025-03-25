@@ -48,18 +48,18 @@ void AmlTSensor::UpdateRiseThresholdIrq(uint32_t irq) {
   auto reg_value = sensor_ctl.reg_value();
 
   // Disable the IRQ
-  reg_value &= ~(1 << (IRQ_RISE_ENABLE_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_RISE_ENABLE_SHIFT + irq));
   // Enable corresponding Fall IRQ
-  reg_value |= (1 << (IRQ_FALL_ENABLE_SHIFT + irq));
+  reg_value |= (1U << (IRQ_FALL_ENABLE_SHIFT + irq));
   // Clear Rise IRQ Stat.
-  reg_value |= (1 << (IRQ_RISE_STAT_CLR_SHIFT + irq));
+  reg_value |= (1U << (IRQ_RISE_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 
   // Write 0 to CLR_STAT bit.
   sensor_ctl = TsCfgReg1::Get().ReadFrom(&*sensor_base_mmio_);
   reg_value = sensor_ctl.reg_value();
-  reg_value &= ~(1 << (IRQ_RISE_STAT_CLR_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_RISE_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 }
@@ -70,18 +70,18 @@ void AmlTSensor::UpdateFallThresholdIrq(uint32_t irq) {
   auto reg_value = sensor_ctl.reg_value();
 
   // Disable the IRQ
-  reg_value &= ~(1 << (IRQ_FALL_ENABLE_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_FALL_ENABLE_SHIFT + irq));
   // Enable corresponding Rise IRQ
   reg_value |= (1 << (IRQ_RISE_ENABLE_SHIFT + irq));
   // Clear Fall IRQ Stat.
-  reg_value |= (1 << (IRQ_FALL_STAT_CLR_SHIFT + irq));
+  reg_value |= (1U << (IRQ_FALL_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 
   // Write 0 to CLR_STAT bit.
   sensor_ctl = TsCfgReg1::Get().ReadFrom(&*sensor_base_mmio_);
   reg_value = sensor_ctl.reg_value();
-  reg_value &= ~(1 << (IRQ_FALL_STAT_CLR_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_FALL_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 }
