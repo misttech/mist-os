@@ -221,8 +221,7 @@ class ScreenshotImage:
             red=self.data[offset + 0],
             green=self.data[offset + 1],
             blue=self.data[offset + 2],
-            # TODO(b/399391948): Ignore pixel alpha values until we remove opacity-based brightness.
-            alpha=255,
+            alpha=self.data[offset + 3],
         )
 
     def _pixel_count(self) -> int:
