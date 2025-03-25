@@ -4,7 +4,7 @@
 
 use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::{zx_utc_reference_get, UtcTimeline};
-use starnix_logging::log_warn;
+use starnix_logging::{log_info, log_warn};
 use starnix_sync::Mutex;
 use std::sync::LazyLock;
 use zx::{self as zx, AsHandleRef, Unowned};
@@ -86,7 +86,7 @@ impl UtcClock {
     fn poll_transform(&mut self) {
         if !self.real_utc_clock_started {
             if self.check_real_utc_clock_started() {
-                log_warn!("Real UTC clock has started");
+                log_info!("Real UTC clock has started");
                 self.real_utc_clock_started = true;
             }
         }

@@ -8,7 +8,7 @@ use fidl_fuchsia_scheduler::{
     RoleManagerMarker, RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
-use starnix_logging::{impossible_error, log_debug, log_info, log_warn, track_stub};
+use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
     errno, error, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL,
@@ -31,10 +31,10 @@ impl SchedulerManager {
             &*fuchsia_runtime::thread_self(),
             SchedulerPolicyKind::default().role_name(),
         ) {
-            log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
+            log_debug!("Setting thread role failed ({e:?}), will not set thread priority.");
             None
         } else {
-            log_info!("Thread role set successfully, scheduler manager initialized.");
+            log_debug!("Thread role set successfully, scheduler manager initialized.");
             Some(role_manager)
         };
 
@@ -107,7 +107,7 @@ impl SchedulerManager {
             ..Default::default()
         };
         let _ = role_manager.set_role(request, zx::MonotonicInstant::INFINITE).map_err(|err| {
-            log_warn!(err:?; "Unable to set thread role.");
+            log_warn!(err:%; "Unable to set thread role.");
             errno!(EINVAL)
         })?;
         Ok(())

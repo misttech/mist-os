@@ -475,7 +475,7 @@ async fn create_container(
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    log_info!(
+    log_debug!(
         "Creating container {:#?}, kernel config {:#?}",
         start_info.program,
         kernel_structured_config,
@@ -484,6 +484,7 @@ async fn create_container(
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
     let features = parse_features(&start_info, kernel_structured_config)?;
+    log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {
         match get_serial_number().await {
