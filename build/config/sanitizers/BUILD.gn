@@ -150,15 +150,11 @@ sanitizer_default_options("lsan_default_options") {
 sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   visibility = [
     "//src/cobalt/bin/system-metrics/*",
-    "//src/devices/usb/drivers/xhci/*",
     "//src/fonts/*",
-    "//src/graphics/drivers/msd-vsi-vip/tests/integration/*",
-    "//src/graphics/lib/compute/*",
     "//src/graphics/lib/compute/forma/*",
     "//src/graphics/lib/compute/surpass/*",
     "//src/media/audio/drivers/intel-hda/controller/*",
     "//src/media/codec/factory/*",
-    "//src/settings/*",
     "//third_party/alacritty/alacritty_terminal/*",
     "//third_party/crashpad/src/*",
     "//vendor/*",
