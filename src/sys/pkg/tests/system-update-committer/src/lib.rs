@@ -35,6 +35,7 @@ struct TestEnvBuilder {
     reboot_service: Option<MockRebootService>,
     health_verification_service: Option<MockHealthVerificationService>,
     idle_timeout_millis: Option<i64>,
+    commit_timeout_seconds: Option<i64>,
 }
 impl TestEnvBuilder {
     fn paver_service_builder(self, paver_service_builder: MockPaverServiceBuilder) -> Self {
@@ -55,6 +56,11 @@ impl TestEnvBuilder {
     fn idle_timeout_millis(self, idle_timeout_millis: i64) -> Self {
         assert_eq!(self.idle_timeout_millis, None);
         Self { idle_timeout_millis: Some(idle_timeout_millis), ..self }
+    }
+
+    fn commit_timeout_seconds(self, commit_timeout_seconds: i64) -> Self {
+        assert_eq!(self.commit_timeout_seconds, None);
+        Self { commit_timeout_seconds: Some(commit_timeout_seconds), ..self }
     }
 
     async fn build(self) -> TestEnv {
@@ -144,28 +150,32 @@ impl TestEnvBuilder {
             )
             .await
             .unwrap();
-        for (config_name, value) in [(
-            "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
-            self.idle_timeout_millis.unwrap_or(-1).into(),
-        )] {
+        for (config_name, value) in [
+            (
+                "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+                self.idle_timeout_millis.unwrap_or(-1i64).into(),
+            ),
+            (
+                "fuchsia.system-update-committer.CommitTimeoutSeconds",
+                self.commit_timeout_seconds.unwrap_or(-1i64).into(),
+            ),
+        ] {
             builder
                 .add_capability(
                     cm_rust::ConfigurationDecl { name: config_name.parse().unwrap(), value }.into(),
                 )
                 .await
                 .unwrap();
+            builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::configuration(config_name))
+                        .from(Ref::self_())
+                        .to(&system_update_committer),
+                )
+                .await
+                .unwrap();
         }
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration(
-                        "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
-                    ))
-                    .from(Ref::self_())
-                    .to(&system_update_committer),
-            )
-            .await
-            .unwrap();
         builder
             .add_route(
                 Route::new()
@@ -224,6 +234,7 @@ impl TestEnv {
             reboot_service: None,
             health_verification_service: None,
             idle_timeout_millis: None,
+            commit_timeout_seconds: None,
         }
     }
 
@@ -576,7 +587,63 @@ async fn paver_failure_causes_reboot(idle_timeout_millis: i64) {
         hierarchy,
         root: {
             "structured_config": contains {},
-            "verification": {},
+            "verification": {
+                "ota_verification_duration": { "failure_internal" : AnyProperty },
+                "ota_verification_failure": { "internal": 1u64 },
+            },
+            "fuchsia.inspect.Health": {
+                "message": AnyProperty,
+                "start_timestamp_nanos": AnyProperty,
+                "status": "UNHEALTHY"
+            },
+            "commit": {}
+        }
+    );
+}
+
+#[test_case(-1i64; "never idle")]
+#[test_case(0i64; "rapid idle")]
+#[fasync::run_singlethreaded(test)]
+async fn paver_timeout_causes_reboot(idle_timeout_millis: i64) {
+    let (throttle_hook, _throttler) = mphooks::throttle();
+    let (reboot_sender, reboot_recv) = oneshot::channel();
+    let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
+    let env = TestEnv::builder()
+        .idle_timeout_millis(idle_timeout_millis)
+        .commit_timeout_seconds(5)
+        // We will never release the paver responses.
+        .paver_service_builder(
+            MockPaverServiceBuilder::new().insert_hook(throttle_hook).insert_hook(
+                mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((ConfigurationStatus::Pending, Some(1)))
+                }),
+            ),
+        )
+        // Handle the reboot requests.
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
+            Ok(())
+        })))
+        .build()
+        .await;
+
+    assert_eq!(
+        reboot_recv.await,
+        Ok(RebootOptions {
+            reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+            ..Default::default()
+        })
+    );
+
+    let hierarchy = env.system_update_committer_inspect_hierarchy().await;
+    assert_data_tree!(
+        hierarchy,
+        root: {
+            "structured_config": contains {},
+            "verification": {
+                "ota_verification_duration": { "failure_timeout" : AnyProperty },
+                "ota_verification_failure": { "timeout": 1u64 },
+            },
             "fuchsia.inspect.Health": {
                 "message": AnyProperty,
                 "start_timestamp_nanos": AnyProperty,

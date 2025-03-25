@@ -42,6 +42,13 @@
             type: "int64",
         },
         {
+            config: "fuchsia.system-update-committer.CommitTimeoutSeconds",
+            key: "commit_timeout_seconds",
+
+            // Negative value indicates an infinite timeout, i.e. the commit will never timeout.
+            type: "int64",
+        },
+        {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",

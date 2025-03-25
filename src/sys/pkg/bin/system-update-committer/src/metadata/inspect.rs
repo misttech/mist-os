@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::errors::MetadataError;
 use fuchsia_inspect as finspect;
 use std::time::Duration;
 
@@ -9,7 +10,7 @@ use std::time::Duration;
 /// constructed in a way that's compatible with Lapis.
 pub(super) fn write_to_inspect(
     node: &finspect::Node,
-    res: &Result<zx::Status, fidl::Error>,
+    res: Result<(), &MetadataError>,
     total_duration: Duration,
 ) {
     // We need to convert duration to a u64 because that's the largest size integer that inspect
@@ -18,10 +19,18 @@ pub(super) fn write_to_inspect(
     let total_duration_u64 = total_duration.as_micros().try_into().unwrap_or(u64::MAX);
 
     match res {
-        Ok(zx::Status::OK) => node.record_child("ota_verification_duration", |duration_node| {
+        Ok(()) => node.record_child("ota_verification_duration", |duration_node| {
             duration_node.record_uint("success", total_duration_u64)
         }),
-        Ok(_health_check_error) => {
+        Err(MetadataError::Timeout) => {
+            node.record_child("ota_verification_duration", |duration_node| {
+                duration_node.record_uint("failure_timeout", total_duration_u64);
+            });
+            node.record_child("ota_verification_failure", |reason_node| {
+                reason_node.record_uint("timeout", 1);
+            });
+        }
+        Err(MetadataError::HealthVerification(_)) => {
             node.record_child("ota_verification_duration", |duration_node| {
                 duration_node.record_uint("failure_health_check", total_duration_u64);
             });
@@ -29,12 +38,12 @@ pub(super) fn write_to_inspect(
                 reason_node.record_uint("verify", 1);
             });
         }
-        Err(_fidl_error) => {
+        Err(_) => {
             node.record_child("ota_verification_duration", |duration_node| {
-                duration_node.record_uint("failure_health_check", total_duration_u64);
+                duration_node.record_uint("failure_internal", total_duration_u64);
             });
             node.record_child("ota_verification_failure", |reason_node| {
-                reason_node.record_uint("fidl", 1);
+                reason_node.record_uint("internal", 1);
             });
         }
     };
@@ -45,13 +54,12 @@ mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::Inspector;
-    use proptest::prelude::*;
 
     #[test]
     fn success() {
         let inspector = Inspector::default();
 
-        let () = write_to_inspect(inspector.root(), &Ok(zx::Status::OK), Duration::from_micros(2));
+        let () = write_to_inspect(inspector.root(), Ok(()), Duration::from_micros(2));
 
         assert_data_tree! {
             inspector,
@@ -67,8 +75,13 @@ mod tests {
     fn failure_verify() {
         let inspector = Inspector::default();
 
-        let () =
-            write_to_inspect(inspector.root(), &Ok(zx::Status::INTERNAL), Duration::from_micros(2));
+        let () = write_to_inspect(
+            inspector.root(),
+            Err(&MetadataError::HealthVerification(
+                crate::metadata::errors::HealthVerificationError::Unhealthy(zx::Status::INTERNAL),
+            )),
+            Duration::from_micros(2),
+        );
 
         assert_data_tree! {
             inspector,
@@ -84,12 +97,12 @@ mod tests {
     }
 
     #[test]
-    fn failure_fidl() {
+    fn failure_timeout() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(
             inspector.root(),
-            &Err(fidl::Error::Invalid),
+            Err(&MetadataError::Timeout),
             Duration::from_micros(2),
         );
 
@@ -97,35 +110,50 @@ mod tests {
             inspector,
             root: {
                 "ota_verification_duration": {
-                    "failure_health_check" : 2u64,
+                    "failure_timeout" : 2u64,
                 },
                 "ota_verification_failure": {
-                    "fidl": 1u64,
+                    "timeout": 1u64,
                 }
             }
         }
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig{
-            failure_persistence: None,
-            ..Default::default()
-        })]
+    #[test]
+    fn failure_internal() {
+        let inspector = Inspector::default();
 
-         /// Check the largest reported duration is u64::MAX, even if the actual duration is longer.
-        #[test]
-        fn success_duration_max_u64(nanos in 0u32..1_000_000_000) {
-            let inspector = Inspector::default();
+        let () = write_to_inspect(
+            inspector.root(),
+            Err(&MetadataError::Unblock),
+            Duration::from_micros(2),
+        );
 
-            let () =
-                write_to_inspect(inspector.root(), &Ok(zx::Status::OK), Duration::new(u64::MAX, nanos));
+        assert_data_tree! {
+            inspector,
+            root: {
+                "ota_verification_duration": {
+                    "failure_internal" : 2u64,
+                },
+                "ota_verification_failure": {
+                    "internal": 1u64,
+                }
+            }
+        }
+    }
 
-            assert_data_tree! {
-                inspector,
-                root: {
-                    "ota_verification_duration": {
-                        "success" : u64::MAX,
-                    }
+    /// Verify the reported duration is u64::MAX (millis), even if the actual duration is longer.
+    #[test]
+    fn success_duration_max_u64() {
+        let inspector = Inspector::default();
+
+        let () = write_to_inspect(inspector.root(), Ok(()), Duration::new(u64::MAX, 0));
+
+        assert_data_tree! {
+            inspector,
+            root: {
+                "ota_verification_duration": {
+                    "success" : u64::MAX,
                 }
             }
         }
