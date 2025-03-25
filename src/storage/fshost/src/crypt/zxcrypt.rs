@@ -135,6 +135,10 @@ impl Device for ZxcryptDevice {
         self.inner_device.path()
     }
 
+    fn source(&self) -> &str {
+        "zxcrypt"
+    }
+
     async fn partition_label(&mut self) -> Result<&str, Error> {
         self.inner_device.partition_label().await
     }

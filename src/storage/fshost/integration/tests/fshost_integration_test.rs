@@ -1440,3 +1440,43 @@ async fn health_check_service() {
 
     fixture.tear_down().await;
 }
+
+#[fuchsia::test]
+async fn debug_block_directory() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    // Make sure the filesystems are enumerated before trying to access the block devices. The
+    // debug directory is populated as the devices are emitted by the watcher.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let block = fuchsia_fs::directory::open_directory(
+        fixture.exposed_dir(),
+        "debug_block",
+        fio::PERM_READABLE,
+    )
+    .await
+    .unwrap();
+
+    // Check that the block directory contains some of the required things for the shell tools
+    let source =
+        fuchsia_fs::directory::open_file(&block, "000/source", fio::PERM_READABLE).await.unwrap();
+    // This is a smoke check - we can't check for a concrete source because it's different (and
+    // potentially unstable) depending on the configuration, and it's not that useful to be a
+    // change detector.
+    assert!(fuchsia_fs::file::read_to_string(&source).await.unwrap().len() > 0);
+
+    let volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+        &block,
+        "000/fuchsia.hardware.block.volume.Volume",
+    )
+    .unwrap();
+    assert_eq!(
+        volume.get_info().await.unwrap().map_err(zx::Status::from_raw).unwrap().block_size,
+        512,
+    );
+
+    fixture.tear_down().await;
+}

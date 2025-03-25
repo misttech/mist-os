@@ -62,6 +62,7 @@ bootstrap_user_platform_aib_names = [
   "fshost_fvm_fxfs",
   "fshost_fvm_minfs",
   "fshost_fvm_minfs_migration",
+  "fshost_non_eng",
   "fshost_storage",
   "paver_legacy",
 
@@ -145,6 +146,7 @@ bootstrap_eng_platform_aib_names = [
   "power_test_platform_drivers",
 
   # Storage
+  "fshost_eng",
   "fshost_storage_host_fxfs",
   "fshost_storage_host_gpt_fvm_minfs",
   "fshost_storage_host_fvm_minfs",

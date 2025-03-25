@@ -168,6 +168,13 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 }
             }
         }
+
+        if context.build_type == &BuildType::Eng {
+            builder.platform_bundle("fshost_eng");
+        } else {
+            builder.platform_bundle("fshost_non_eng");
+        }
+
         // Inform pkg-cache when fxfs_blob should be used.
         builder.set_config_capability(
             "fuchsia.pkgcache.UseFxblob",

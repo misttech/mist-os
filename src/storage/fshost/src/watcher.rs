@@ -89,12 +89,15 @@ impl WatchSource for PathSource {
 #[derive(Clone, Debug)]
 pub struct DirSource {
     dir: fio::DirectoryProxy,
+    // The name of the source of these devices, for example the moniker of a component providing
+    // them. Used for logging and debugging.
+    source: String,
 }
 
 impl DirSource {
     /// Creates a `DirSource` that connects a `VolumeProtocolDevice` to each entry in `dir`.
-    pub fn new(dir: fio::DirectoryProxy) -> Self {
-        Self { dir }
+    pub fn new(dir: fio::DirectoryProxy, source: impl ToString) -> Self {
+        Self { dir, source: source.to_string() }
     }
 }
 
@@ -105,13 +108,15 @@ impl WatchSource for DirSource {
             .await
             .with_context(|| format!("Failed to watch dir"))?;
         let dir = Arc::new(fuchsia_fs::directory::clone(&self.dir)?);
+        let source = self.source.clone();
         Ok(Box::pin(common_filters(watcher).filter_map(move |filename| {
             let dir = dir.clone();
+            let source = source.clone();
             async move {
                 let dir_clone = fuchsia_fs::directory::clone(&dir)
                     .map_err(|err| log::warn!(err:?; "Failed to clone dir"))
                     .ok()?;
-                VolumeProtocolDevice::new(dir_clone, filename)
+                VolumeProtocolDevice::new(dir_clone, filename, source)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
                         log::warn!(err:?; "Failed to create device (maybe it went away?)");
@@ -274,7 +279,7 @@ mod tests {
         let (_watcher, mut device_stream) = Watcher::new(vec![
             Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block)),
             Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)),
-            Box::new(DirSource::new(client)),
+            Box::new(DirSource::new(client, "test-dir-source")),
         ])
         .await
         .expect("failed to make watcher");

@@ -653,6 +653,9 @@ mod tests {
         fn path(&self) -> &str {
             &self.topological_path
         }
+        fn source(&self) -> &str {
+            &self.topological_path
+        }
         async fn partition_label(&mut self) -> Result<&str, Error> {
             match self.partition_label.as_ref() {
                 Some(label) => Ok(label.as_str()),

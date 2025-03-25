@@ -218,6 +218,14 @@
             source_availability: "unknown",
         },
         {
+            directory: "debug_block",
+            from: "#fshost",
+            as: "block",
+            to: "#console-launcher",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             directory: [
                 "blob",
                 "data",

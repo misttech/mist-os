@@ -114,6 +114,11 @@
             from: "#fshost",
         },
         {
+            directory: "debug_block",
+            from: "#fshost",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.fs.startup.Volumes",
                 "fuchsia.fshost.Admin",

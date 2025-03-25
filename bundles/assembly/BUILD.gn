@@ -602,11 +602,6 @@ assembly_input_bundle("bootstrap_eng") {
   bootfs_files_labels = [
     # tools
     "//src/devices/acpi/bin/acpidump:bootfs",
-    "//src/devices/block/bin/biotime:bootfs",
-    "//src/devices/block/bin/gpt:bootfs",
-    "//src/devices/block/bin/iochk:bootfs",
-    "//src/devices/block/bin/iotime:bootfs",
-    "//src/devices/block/bin/lsblk:bootfs",
     "//src/devices/block/bin/sdio:bootfs",
     "//src/devices/cpu/bin/cpuctl:bootfs",
     "//src/devices/gpio/bin/gpioutil:bootfs",
@@ -2898,6 +2893,56 @@ assembly_input_bundle("fshost_common") {
         {
           source = "//sdk/lib/trace/use.shard.cml"
           destination = "trace/use.shard.cml"
+        },
+      ]
+    },
+  ]
+}
+
+# AIB adding eng-build debug capabilities to fshost.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: eng
+#
+assembly_input_bundle("fshost_eng") {
+  testonly = true
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/eng_fshost.cml" ]
+        },
+      ]
+    },
+  ]
+  bootfs_files_labels = [
+    "//src/devices/block/bin/biotime:bootfs",
+    "//src/devices/block/bin/gpt:bootfs",
+    "//src/devices/block/bin/iochk:bootfs",
+    "//src/devices/block/bin/iotime:bootfs",
+    "//src/devices/block/bin/lsblk:bootfs",
+  ]
+}
+
+# AIB that stubs out eng-build debug capabilities for non-eng builds
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: eng
+#
+assembly_input_bundle("fshost_non_eng") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/non_eng_fshost.cml" ]
         },
       ]
     },

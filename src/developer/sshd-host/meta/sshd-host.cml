@@ -65,6 +65,7 @@
         },
         {
             directory: [
+                "block",
                 "boot-bin",
                 "mnt",
             ],

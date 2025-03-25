@@ -31,6 +31,12 @@
             path: "/blob",
         },
         {
+            directory: "block",
+            rights: [ "r*" ],
+            path: "/block",
+            availability: "optional",
+        },
+        {
             directory: "boot",
             rights: [ "rx*" ],
             path: "/boot",

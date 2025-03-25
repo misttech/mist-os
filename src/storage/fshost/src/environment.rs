@@ -712,15 +712,13 @@ impl Environment for FshostEnvironment {
             // separate the system GPT and other GPTs.
             bail!("GPT already bound");
         }
-        let filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
             device.block_connector()?,
             Box::new(fs_management::Gpt::dynamic_child()),
-        )
-        .serve_multi_volume()
-        .await
-        .context("Failed to start GPT")?;
+        );
+        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
         let queue = self.gpt.queue().unwrap();
-        let exposed_dir = filesystem.exposed_dir();
+        let exposed_dir = serving.exposed_dir();
         for server in queue.drain(..) {
             exposed_dir.clone(server.into_channel().into())?;
         }
@@ -732,10 +730,13 @@ impl Environment for FshostEnvironment {
         .await
         .context("Failed to open partitions dir")?;
         self.watcher
-            .add_source(Box::new(DirSource::new(partitions_dir)))
+            .add_source(Box::new(DirSource::new(
+                partitions_dir,
+                filesystem.get_component_moniker().unwrap(),
+            )))
             .await
             .context("Failed to watch gpt partitions dir")?;
-        self.gpt = Filesystem::ServingGpt(filesystem);
+        self.gpt = Filesystem::ServingGpt(serving);
         Ok(())
     }
 

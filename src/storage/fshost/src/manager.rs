@@ -6,12 +6,52 @@ use crate::device::Device;
 use crate::environment::Environment;
 use crate::{matcher, service};
 use anyhow::{format_err, Error};
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_fuchsia_hardware_block_volume::VolumeMarker;
 use fs_management::format::DiskFormat;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::sync::Arc;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::simple::Simple;
+use vfs::service::endpoint;
+
+pub struct DevicePublisher {
+    dir: Arc<Simple>,
+    next_name: u64,
+}
+
+impl DevicePublisher {
+    pub fn new() -> Self {
+        Self { dir: vfs::pseudo_directory! {}, next_name: 0 }
+    }
+
+    pub fn block_dir(&self) -> Arc<Simple> {
+        self.dir.clone()
+    }
+
+    pub fn register_device(&mut self, device: &dyn Device) -> Result<(), Error> {
+        let name = format!("{:03}", self.next_name);
+        let volume = device.block_connector()?;
+        self.dir.add_entry(
+            name,
+            vfs::pseudo_directory! {
+                VolumeMarker::PROTOCOL_NAME => endpoint(move |_scope, channel| {
+                    volume
+                        .connect_channel_to_volume(channel.into_zx_channel().into())
+                        .unwrap_or_else(|error| {
+                            log::error!(error:%; "failed to open volume");
+                        });
+                }),
+                "source" => vfs::file::read_only(device.source()),
+            },
+        )?;
+        self.next_name += 1;
+        Ok(())
+    }
+}
 
 pub struct Manager {
     matcher: matcher::Matchers,
@@ -20,6 +60,7 @@ pub struct Manager {
     /// should be ignored when matching. When matched, the ignored paths are removed from the set.
     /// (i.e. The device is ignored only once.)
     matcher_lock: Arc<Mutex<HashSet<String>>>,
+    device_manager: DevicePublisher,
 }
 
 impl Manager {
@@ -27,8 +68,14 @@ impl Manager {
         config: &fshost_config::Config,
         environment: Arc<Mutex<dyn Environment>>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
+        device_manager: DevicePublisher,
     ) -> Self {
-        Manager { matcher: matcher::Matchers::new(config), environment, matcher_lock }
+        Manager {
+            matcher: matcher::Matchers::new(config),
+            environment,
+            matcher_lock,
+            device_manager,
+        }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,
@@ -74,7 +121,7 @@ impl Manager {
             let type_guid =
                 device.partition_type().await.ok().map(|guid| uuid::Uuid::from_bytes(guid.clone()));
             log::info!(
-                topological_path=topological_path.as_str(),
+                source:% = device.source(),
                 path:% = device.path(),
                 content_format:?,
                 label:?,
@@ -82,6 +129,12 @@ impl Manager {
                 is_ramdisk = device.is_fshost_ramdisk();
                 "Matching device"
             );
+
+            // Add all the devices we find to the debug directory for shell tool access. If we get
+            // an error from this just log a warning and continue.
+            self.device_manager.register_device(device.as_ref()).unwrap_or_else(|error| {
+                log::warn!(error:?; "failed to add device to debug block dir");
+            });
 
             let device_path = device.path().to_string();
             match self.matcher.match_device(device, &mut *self.environment.lock().await).await {

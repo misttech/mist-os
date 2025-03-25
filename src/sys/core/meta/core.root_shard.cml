@@ -161,6 +161,12 @@
             from: "#bootstrap",
             to: "#core",
         },
+        {
+            directory: "debug_block",
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+        },
 
         // Non-zircon services for bootstrap
         {

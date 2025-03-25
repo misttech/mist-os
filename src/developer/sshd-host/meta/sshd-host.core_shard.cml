@@ -61,6 +61,14 @@
             to: "#sshd-host",
         },
         {
+            directory: "debug_block",
+            from: "parent",
+            as: "block",
+            to: "#sshd-host",
+            source_availability: "unknown",
+            availability: "optional",
+        },
+        {
             directory: [ "boot-bin" ],
             from: "parent",
             to: "#sshd-host",
