@@ -119,7 +119,7 @@ enum KernelServices {
 async fn build_container(
     stream: frunner::ComponentRunnerRequestStream,
     returned_config: &mut Option<ContainerServiceConfig>,
-    structured_config: &starnix_kernel_structured_config::Config,
+    structured_config: starnix_kernel_structured_config::Config,
 ) -> Result<Container, Error> {
     let (container, config) = create_component_from_stream(stream, structured_config).await?;
     *returned_config = Some(config);
@@ -174,6 +174,7 @@ async fn main() -> Result<(), Error> {
     inspector
         .root()
         .record_child("config", |config_node| structured_config.record_inspect(config_node));
+    let mut structured_config = Some(structured_config);
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;
@@ -183,41 +184,58 @@ async fn main() -> Result<(), Error> {
     // are ready for use before any restricted-mode/Linux processes are created.
     init_usercopy();
 
-    fs.for_each_concurrent(None, |request: KernelServices| async {
+    while let Some(request) = fs.next().await {
         match request {
             KernelServices::ContainerRunner(stream) => {
-                let mut config: Option<ContainerServiceConfig> = None;
-                let container = container
-                    .get_or_try_init(|| build_container(stream, &mut config, &structured_config))
-                    .await
-                    .expect("failed to start container");
-                if let Some(config) = config {
-                    container
-                        .serve(config)
+                let container = container.clone();
+                let structured_config =
+                    structured_config.take().expect("can only run one container per kernel");
+                fuchsia_async::Task::local(async move {
+                    let mut config: Option<ContainerServiceConfig> = None;
+                    let container = container
+                        .get_or_try_init(|| build_container(stream, &mut config, structured_config))
                         .await
-                        .expect("failed to serve the expected services from the container");
-                } else {
-                    log_error!("No config provided for container, not running it.");
-                }
+                        .expect("failed to start container");
+                    if let Some(config) = config {
+                        container
+                            .serve(config)
+                            .await
+                            .expect("failed to serve the expected services from the container");
+                    } else {
+                        log_error!("No config provided for container, not running it.");
+                    }
+                })
+                .detach();
             }
             KernelServices::ComponentRunner(stream) => {
-                serve_component_runner(stream, container.wait().await.system_task())
-                    .await
-                    .expect("failed to start component runner");
+                let container = container.clone();
+                fuchsia_async::Task::local(async move {
+                    serve_component_runner(stream, container.wait().await.system_task())
+                        .await
+                        .expect("failed to start component runner");
+                })
+                .detach();
             }
             KernelServices::ContainerController(stream) => {
-                serve_container_controller(stream, container.wait().await.system_task())
-                    .await
-                    .expect("failed to start container controller");
+                let container = container.clone();
+                fuchsia_async::Task::local(async move {
+                    serve_container_controller(stream, container.wait().await.system_task())
+                        .await
+                        .expect("failed to start container controller");
+                })
+                .detach();
             }
             KernelServices::MemoryAttributionProvider(stream) => {
-                serve_memory_attribution_provider_elfkernel(stream, container.wait().await)
-                    .await
-                    .expect("failed to start memory attribution provider");
+                let container = container.clone();
+                fuchsia_async::Task::local(async move {
+                    serve_memory_attribution_provider_elfkernel(stream, container.wait().await)
+                        .await
+                        .expect("failed to start memory attribution provider");
+                })
+                .detach();
             }
         }
-    })
-    .await;
+    }
 
     Ok(())
 }

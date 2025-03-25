@@ -1,0 +1,21 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    use: [
+        {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            key: "extra_features",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            default: [],
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+    ],
+}

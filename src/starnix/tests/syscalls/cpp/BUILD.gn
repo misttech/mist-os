@@ -220,6 +220,50 @@ template("syscall_test") {
     _disable_sanitizers_on_host = invoker.disable_sanitizers_on_host
   }
 
+  _container_config_capabilities = [
+    {
+      config = "fuchsia.starnix.config.container.ExtraFeatures"
+      type = "vector"
+      element = {
+        type = "string"
+        max_size = 1024
+      }
+      max_count = 1024
+      value = []
+    },
+  ]
+
+  _config_component_exposes = []
+  _config_component_offers = []
+  foreach(_capability, _container_config_capabilities) {
+    _config_component_exposes += [
+      {
+        config = _capability.config
+        from = "self"
+      },
+    ]
+    _config_component_offers += [
+      {
+        config = _capability.config
+        from = "#config"
+        to = "#container"
+        availability = "transitional"
+      },
+    ]
+  }
+
+  # Generate the configuration component
+  _config_manifest_label = "${test_name}_config.cml"
+  _config_manifest_file = "$target_gen_dir/${_config_manifest_label}"
+  generated_file(_config_manifest_label) {
+    outputs = [ _config_manifest_file ]
+    output_conversion = "json"
+    contents = {
+      capabilities = _container_config_capabilities
+      expose = _config_component_exposes
+    }
+  }
+
   # Generate the manifest
   _manifest_label = "${test_name}.cml"
   _manifest_file = "$target_gen_dir/${_manifest_label}"
@@ -232,6 +276,13 @@ template("syscall_test") {
       program = {
         binary = "data/tests/${test_name}_bin"
       }
+      children = [
+        {
+          name = "config"
+          url = "#meta/${test_name}_config.cm"
+        },
+      ]
+      offer = _config_component_offers
     }
   }
 
@@ -299,6 +350,11 @@ template("syscall_test") {
         ":host_runtime_deps",
       ]
     }
+  }
+
+  fuchsia_component("${target_name}_config") {
+    manifest = _config_manifest_file
+    deps = [ ":${_config_manifest_label}" ]
   }
 
   starnix_linux_test_component(target_name) {
@@ -504,8 +560,10 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":syslog_non_root_test",
     ":crash_test",
   ]
+  deps = []
   foreach(test_name, syscall_tests + arch64_syscall_tests_names) {
     test_components += [ ":${test_name}" ]
+    deps += [ ":${test_name}_config" ]
   }
 
   subpackages = starnix_test_subpackages
@@ -517,7 +575,7 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
   }
 
-  deps = [
+  deps += [
     ":extended_pstate_initial_state_child_resource",
     "//src/lib/testing/expectation:expectation_comparer",
   ]

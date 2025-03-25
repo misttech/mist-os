@@ -20,6 +20,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
+use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
@@ -53,7 +54,7 @@ use zx::{
 };
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
@@ -138,6 +139,8 @@ pub struct ContainerStartInfo {
     /// Configuration specified by the component's `program` block.
     pub program: ContainerProgram,
 
+    pub config: ContainerStructuredConfig,
+
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
@@ -158,11 +161,27 @@ pub struct ContainerStartInfo {
     component_instance: Option<zx::Event>,
 }
 
+const MISSING_CONFIG_VMO_CONTEXT: &str = concat!(
+    "Retrieving container config VMO. ",
+    "If this fails, make sure your container CML includes ",
+    "//src/starnix/containers/container.shard.cml.",
+);
+
 impl ContainerStartInfo {
     fn new(mut start_info: frunner::ComponentStartInfo) -> Result<Self, Error> {
         let program = start_info.program.as_ref().context("retrieving program block")?;
         let program: ContainerProgram =
             runner::serde::deserialize_program(&program).context("parsing program block")?;
+
+        let encoded_config =
+            start_info.encoded_config.as_ref().context(MISSING_CONFIG_VMO_CONTEXT)?;
+        let config = match encoded_config {
+            fmem::Data::Bytes(b) => ContainerStructuredConfig::from_bytes(b),
+            fmem::Data::Buffer(b) => ContainerStructuredConfig::from_vmo(&b.vmo),
+            other => anyhow::bail!("unknown Data variant {other:?}"),
+        }
+        .context("parsing container structured config")?;
+
         let ns = start_info.ns.take().context("retrieving container namespace")?;
         let container_namespace = ContainerNamespace::from(ns);
 
@@ -171,6 +190,7 @@ impl ContainerStartInfo {
 
         Ok(Self {
             program,
+            config,
             outgoing_dir,
             container_namespace,
             component_instance,
@@ -431,7 +451,7 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-    kernel_structured_config: &KernelStructuredConfig,
+    kernel_structured_config: KernelStructuredConfig,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
@@ -474,15 +494,16 @@ pub async fn create_component_from_stream(
 async fn create_container(
     start_info: &mut ContainerStartInfo,
     task_complete: oneshot::Sender<TaskResult>,
-    kernel_structured_config: &KernelStructuredConfig,
+    kernel_structured_config: KernelStructuredConfig,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
     log_debug!(
-        "Creating container {:#?}, kernel config {:#?}",
+        "Creating container {:#?}, kernel config {:#?}, container config {:#?}",
         start_info.program,
         kernel_structured_config,
+        start_info.config,
     );
     let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
@@ -556,7 +577,7 @@ async fn create_container(
     //
     // `config.enable_utc_time_adjustment` is set through config capability
     // `fuchsia.time.config.WritableUTCTime`.
-    let time_adjustment_proxy = if kernel_structured_config.enable_utc_time_adjustment {
+    let time_adjustment_proxy = if features.enable_utc_time_adjustment {
         connect_to_protocol_sync::<AdjustMarker>()
             .map_err(|e| log_error!("could not connect to fuchsia.time.external/Adjust: {:?}", e))
             .ok()
