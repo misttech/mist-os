@@ -5,12 +5,13 @@
 use crate::diagnostics::{Diagnostics, Event};
 use crate::enums::{
     ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason, InitializeRtcOutcome, Role,
-    SampleValidationError, TimeSourceError, Track, WriteRtcOutcome,
+    SampleValidationError, TimeSourceError, Track, UserAdjustUtcOutcome, WriteRtcOutcome,
 };
 use crate::{MonitorTrack, PrimaryTrack, TimeSource};
 use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
-    Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
+    BoolProperty, Inspector, IntProperty, Node, NumericProperty, Property, StringProperty,
+    UintProperty,
 };
 use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcDuration, UtcInstant};
 use fuchsia_sync::Mutex;
@@ -187,6 +188,49 @@ impl RealTimeClockNode {
     }
 }
 
+/// An inspect `Node` and properties used to describe the history of user UTC
+/// adjustments.
+struct UserAdjustUtcNode {
+    /// The count of successful user adjustment UTC attempts.
+    success_count: UintProperty,
+    /// The count of failed user adjustment UTC attempts.
+    failure_count: UintProperty,
+    /// The value of the offset resulting from the last successful proposal.
+    last_allowed_offset_nanos: IntProperty,
+    /// Was last update was a failure?
+    last_update_failure: BoolProperty,
+    /// The inspect node these fields are exported to.
+    _node: Node,
+}
+
+impl UserAdjustUtcNode {
+    pub fn new(node: Node) -> Self {
+        Self {
+            success_count: node.create_uint("success_count", 0),
+            failure_count: node.create_uint("failure_count", 0),
+            last_allowed_offset_nanos: node.create_int("last_proposed_offset_nanos", 0),
+            last_update_failure: node.create_bool("last_updated_failure", false),
+            _node: node,
+        }
+    }
+}
+
+impl UserAdjustUtcNode {
+    fn update_user_adjust_utc(&mut self, outcome: UserAdjustUtcOutcome, offset: UtcDuration) {
+        match outcome {
+            UserAdjustUtcOutcome::Succeeded => {
+                self.success_count.add(1);
+                self.last_update_failure.set(false);
+                self.last_allowed_offset_nanos.set(offset.into_nanos());
+            }
+            UserAdjustUtcOutcome::Failed => {
+                self.failure_count.add(1);
+                self.last_update_failure.set(true);
+            }
+        }
+    }
+}
+
 /// An inspect `Node` and properties used to describe the health of a time source.
 struct TimeSourceNode {
     /// The most recent status of the time source.
@@ -210,7 +254,7 @@ impl TimeSourceNode {
             status_change: node.create_int("status_change_reference", reference_time()),
             failure_counters: HashMap::new(),
             rejection_counters: HashMap::new(),
-            node: node,
+            node,
         }
     }
 
@@ -395,6 +439,8 @@ pub struct InspectDiagnostics {
     tracks: Mutex<HashMap<Track, TrackNode>>,
     /// Details of interactions with the real time clock.
     rtc: Mutex<Option<RealTimeClockNode>>,
+    /// Details of user utc adjustments.
+    user_utc_adjustments: Mutex<Option<UserAdjustUtcNode>>,
     /// The inspect node used to export the contents of this `InspectDiagnostics`.
     node: Node,
 }
@@ -406,6 +452,7 @@ impl InspectDiagnostics {
         node: &Node,
         primary: &PrimaryTrack,
         optional_monitor: &Option<MonitorTrack>,
+        allow_user_utc_adjustments: bool,
     ) -> Self {
         // Record fixed data directly into the node without retaining any references.
         node.record_child("initialization", |child| TimeSet::now(&primary.clock).record(child));
@@ -434,11 +481,18 @@ impl InspectDiagnostics {
             );
         }
 
+        let user_utc_adjustments = Mutex::new(if allow_user_utc_adjustments {
+            Some(UserAdjustUtcNode::new(node.create_child("user_utc_adjustments")))
+        } else {
+            None
+        });
+
         let diagnostics = InspectDiagnostics {
             time_sources: Mutex::new(time_sources_hashmap),
             tracks: Mutex::new(tracks_hashmap),
             rtc: Mutex::new(None),
             node: node.clone_weak(),
+            user_utc_adjustments,
         };
         let clock = Arc::clone(&primary.clock);
         node.record_lazy_child("current", move || {
@@ -512,6 +566,11 @@ impl Diagnostics for InspectDiagnostics {
             }
             Event::UpdateClock { track, reason } => {
                 self.update_track(track, |tn| tn.update_clock(Some(reason)));
+            }
+            Event::UserAdjustUtc { outcome, offset } => {
+                if let Some(ref mut utc_node) = *self.user_utc_adjustments.lock() {
+                    utc_node.update_user_adjust_utc(outcome, offset);
+                }
             }
         }
     }
@@ -589,7 +648,7 @@ mod tests {
             false => None,
         };
 
-        (InspectDiagnostics::new(inspector.root(), &primary, &monitor), primary.clock)
+        (InspectDiagnostics::new(inspector.root(), &primary, &monitor, false), primary.clock)
     }
 
     #[fuchsia::test]

@@ -4,7 +4,8 @@
 
 use crate::diagnostics::{Diagnostics, Event};
 use crate::enums::{
-    ClockCorrectionStrategy, ClockUpdateReason, StartClockSource, Track, WriteRtcOutcome,
+    ClockCorrectionStrategy, ClockUpdateReason, StartClockSource, Track, UserAdjustUtcOutcome,
+    WriteRtcOutcome,
 };
 use crate::estimator::Estimator;
 use crate::rtc::Rtc;
@@ -504,8 +505,20 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 None => estimate_transform,
                 Some(ref proposal) => adjust_decision
                     .try_adjust(&estimate_transform, proposal.reference, proposal.utc)
-                    .map(|(tr, _)| tr)
+                    .map(|(tr, offset)| {
+                        self.diagnostics
+                            .record(Event::WriteRtc { outcome: WriteRtcOutcome::Succeeded });
+                        self.diagnostics.record(Event::UserAdjustUtc {
+                            outcome: UserAdjustUtcOutcome::Succeeded,
+                            offset,
+                        });
+                        tr
+                    })
                     .map_err(|e| {
+                        self.diagnostics.record(Event::UserAdjustUtc {
+                            outcome: UserAdjustUtcOutcome::Failed,
+                            offset: UtcDuration::from_nanos(0),
+                        });
                         error!("time adjustmend rejected: {:?}", e);
                     })
                     .unwrap_or(estimate_transform),

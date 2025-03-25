@@ -308,6 +308,9 @@ impl Diagnostics for CobaltDiagnostics {
             Event::UpdateClock { track, reason } => {
                 self.record_clock_update(track, reason);
             }
+            Event::UserAdjustUtc { .. } => {
+                // Don't record anything to Cobalt.
+            }
         }
     }
 }

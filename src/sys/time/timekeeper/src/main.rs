@@ -261,10 +261,17 @@ async fn main() -> Result<()> {
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
+    let enable_user_utc_adjustment = config.serve_fuchsia_time_external_adjust();
+
     info!("initializing diagnostics and serving inspect on servicefs");
     let cobalt_experiment = COBALT_EXPERIMENT;
     let diagnostics = Arc::new(CompositeDiagnostics::new(
-        InspectDiagnostics::new(inspector_root, &primary_track, &monitor_track),
+        InspectDiagnostics::new(
+            inspector_root,
+            &primary_track,
+            &monitor_track,
+            enable_user_utc_adjustment,
+        ),
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
@@ -287,7 +294,6 @@ async fn main() -> Result<()> {
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
-    let serve_adjust = config.serve_fuchsia_time_external_adjust();
     let ps = persistent_state.clone();
 
     if config.has_always_on_counter() {
@@ -356,7 +362,7 @@ async fn main() -> Result<()> {
         fs.dir("svc").add_fidl_service(Rpcs::Wake);
         info!("serving protocol: fuchsia.time.alarms/Wake");
     }
-    if serve_adjust {
+    if enable_user_utc_adjustment {
         fs.dir("svc").add_fidl_service(Rpcs::Adjust);
         info!("serving protocol: fuchsia.time.alarms/Adjust");
     }
@@ -388,7 +394,7 @@ async fn main() -> Result<()> {
 
     let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
 
-    let adjust_server = Rc::new(if serve_adjust {
+    let adjust_server = Rc::new(if enable_user_utc_adjustment {
         let cmd_send_clone = cmd_send.clone();
         Some(time_adjust::Server::new(cmd_send_clone))
     } else {

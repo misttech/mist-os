@@ -17,7 +17,7 @@ pub use self::inspect::{InspectDiagnostics, INSPECTOR};
 use crate::enums::{
     ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason, InitialClockState,
     InitializeRtcOutcome, Role, SampleValidationError, StartClockSource, TimeSourceError, Track,
-    WriteRtcOutcome,
+    UserAdjustUtcOutcome, WriteRtcOutcome,
 };
 use fidl_fuchsia_time_external::Status;
 use fuchsia_runtime::{UtcDuration, UtcInstant};
@@ -79,6 +79,8 @@ pub enum Event {
     StartClock { track: Track, source: StartClockSource },
     /// The userspace clock has been updated.
     UpdateClock { track: Track, reason: ClockUpdateReason },
+    /// The UTC clock user adjustment result.
+    UserAdjustUtc { outcome: UserAdjustUtcOutcome, offset: UtcDuration },
 }
 
 /// A standard interface for systems that record events for diagnostic purposes.
