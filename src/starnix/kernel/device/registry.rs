@@ -391,7 +391,7 @@ impl DeviceRegistry {
     /// registrations with these device numbers, use this function instead to register the device.
     ///
     /// Note: We do not currently allocate from this entire range because we have mistakenly
-    /// hardcoded some device registrations from the dynamic range. Once we fix these regirations
+    /// hardcoded some device registrations from the dynamic range. Once we fix these registrations
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.

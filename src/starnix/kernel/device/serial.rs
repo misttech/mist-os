@@ -38,8 +38,15 @@ impl ForwardTask {
             let _result = move || -> Result<(), Error> {
                 let waiter = Waiter::new();
                 loop {
+                    // Register edge triggered waiter for POLLOUT on terminal main side
+                    // This is waiting for the terminal to flag it can receive data
                     terminal.main_wait_async(&waiter, FdEvents::POLLOUT, EventHandler::None);
-                    waiter.wait(locked, current_task)?;
+
+                    // Only await the event if it is not already asserted
+                    if !terminal.main_query_events().contains(FdEvents::POLLOUT) {
+                        waiter.wait(locked, current_task)?;
+                    }
+
                     let data = serial_proxy
                         .read(zx::MonotonicInstant::INFINITE)?
                         .map_err(|e: i32| from_status_like_fdio!(zx::Status::from_raw(e)))?;
@@ -56,8 +63,15 @@ impl ForwardTask {
             let _result = move || -> Result<(), Error> {
                 let waiter = Waiter::new();
                 loop {
+                    // Register edge triggered waiter for POLLIN on terminal main side
+                    // This is waiting for the terminal to flag it has data to send
                     terminal.main_wait_async(&waiter, FdEvents::POLLIN, EventHandler::None);
-                    waiter.wait(locked, current_task)?;
+
+                    // Only await the event if it is not already asserted
+                    if !terminal.main_query_events().contains(FdEvents::POLLIN) {
+                        waiter.wait(locked, current_task)?;
+                    }
+
                     let size = terminal.read().get_available_read_size(true);
                     let mut buffer = VecOutputBuffer::new(size);
                     terminal.main_read(locked, &mut buffer)?;
@@ -87,7 +101,6 @@ impl SerialDevice {
     ///
     /// To register the device, call `register_serial_device`.
     pub fn new(
-        _locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         serial_device: ClientEnd<fserial::DeviceMarker>,
     ) -> Result<Arc<Self>, Errno> {

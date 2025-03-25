@@ -28,12 +28,18 @@ rustc_library("nanohub") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",
     "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_rust",
     "//sdk/rust/zx",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",
+    "//third_party/rust_crates:futures",
   ]
 }

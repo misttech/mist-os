@@ -61,6 +61,12 @@
             availability: "optional",
         },
         {
+            directory: "dev-serial",
+            rights: [ "r*" ],
+            path: "/dev/class/serial",
+            availability: "optional",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",

@@ -144,6 +144,13 @@
             subdir: "gpu",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-serial",
+            to: [ "#starnix_runner" ],
+            subdir: "serial",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             from: "parent",

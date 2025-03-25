@@ -152,6 +152,11 @@
             to: [ "#kernels" ],
         },
         {
+            directory: "dev-serial",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             from: "parent",
