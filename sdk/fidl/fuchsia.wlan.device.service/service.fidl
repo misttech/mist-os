@@ -178,14 +178,4 @@ closed protocol DeviceMonitor {
         iface_id uint16;
         telemetry_server server_end:fuchsia.wlan.sme.Telemetry;
     }) -> () error zx.Status;
-    /// Attempt to establish a new connection to feature queries for an SME.
-    /// Connections may be established for the whole lifetime of the SME, and
-    /// concurrent connections are safe since this is a read-only API.
-    /// Likely errors include:
-    ///     * NOT_FOUND: The given iface_id does not exist.
-    ///     * PEER_CLOSED: The underlying SME is shutting down.
-    strict GetFeatureSupport(resource struct {
-        iface_id uint16;
-        feature_support_server server_end:fuchsia.wlan.sme.FeatureSupport;
-    }) -> () error zx.Status;
 };
