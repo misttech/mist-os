@@ -93,7 +93,9 @@ def main():
 
     if extra_files or extra_dirs:
         print(
-            f"NOTE: *** Repeating the incremental build is recommended! ***",
+            f"NOTE: *** Unexpected files were found and removed. This may "
+            f"affect build results, so please re-run the build to ensure "
+            f"everything is up to date. ***",
             file=sys.stderr,
         )
 
