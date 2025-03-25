@@ -69,7 +69,7 @@ func mainImpl() error {
 	}
 
 	if len(allTestsSkipped) > 0 {
-		return fmt.Errorf("Some tests could not be uploaded due to testname exceeding byte limit %d.", resultdb.MAX_TEST_ID_SIZE_BYTES)
+		return fmt.Errorf("Some tests could not be uploaded due to testname exceeding byte limit %d.", resultdb.MaxTestIDLength)
 	}
 	return nil
 }
