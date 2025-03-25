@@ -175,7 +175,8 @@ template("sdk_shared_library") {
       "Libraries in the IDK must specify a name that is meaningful in that context.")
   atom_name = invoker.sdk_name
 
-  sdk_id = "sdk://pkg/${atom_name}"
+  sdk_root_path = "pkg/${atom_name}"
+  sdk_id = "sdk://${sdk_root_path}"
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
@@ -253,9 +254,6 @@ template("sdk_shared_library") {
     deps += [ "//build/sdk:partner_idk_shared_libraries_allowlist" ]
   }
 
-  # Base path for source files of this library in SDKs.
-  file_base = "pkg/${atom_name}"
-
   # Identify dependencies and their metadata files.
   sdk_deps = []
   sdk_metas = []
@@ -317,13 +315,18 @@ template("sdk_shared_library") {
 
   sdk_metadata_headers = []
   sdk_header_files = []
-  foreach(header, all_headers) {
+
+  if (defined(invoker.include_base)) {
+    include_base = invoker.include_base
+  } else if (!no_headers) {
     include_base = "include"
-    if (defined(invoker.include_base)) {
-      include_base = invoker.include_base
-    }
+  }
+
+  include_dest = "${sdk_root_path}/include"
+
+  foreach(header, all_headers) {
     destination = rebase_path(header, include_base)
-    header_dest = "${file_base}/include/${destination}"
+    header_dest = "${include_dest}/${destination}"
     sdk_metadata_headers += [ header_dest ]
     sdk_header_files += [
       {
@@ -373,7 +376,7 @@ template("sdk_shared_library") {
     assert(rebase_path(invoker.symbols_api, "//") ==
            rebase_path(ifs_golden_file, "//"))
 
-    packaged_ifs_file = "${file_base}/${ifs_file_name}"
+    packaged_ifs_file = "${sdk_root_path}/${ifs_file_name}"
   }
 
   link_lib = "${link_lib_dir}/${lib_name}"
@@ -427,7 +430,7 @@ template("sdk_shared_library") {
                                "all_deps",
                                "sdk_headers_for_internal_use",
                              ])
-      file_base = file_base
+      file_base = sdk_root_path
     }
   } else {
     not_needed([
@@ -454,9 +457,9 @@ template("sdk_shared_library") {
       "--format",
       "shared",
       "--root",
-      file_base,
+      sdk_root_path,
       "--include-dir",
-      "${file_base}/include",
+      include_dest,
       "--dist-path",
       "lib/${lib_name}",
       "--arch",
@@ -532,7 +535,7 @@ template("sdk_shared_library") {
 
     meta = {
       source = metadata_file
-      dest = "${file_base}/meta.json"
+      dest = "${sdk_root_path}/meta.json"
       schema = "cc_prebuilt_library"
     }
 
