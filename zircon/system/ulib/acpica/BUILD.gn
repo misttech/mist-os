@@ -6,11 +6,6 @@ import("//zircon/system/ulib/acpica/acpica.gni")
 
 config("acpica-config") {
   include_dirs = [ "include" ]
-
-  # TODO(https://fxbug.dev/42084914): UBSan is detecting a cast to a pointer type from
-  # a misaligned object. This is UB in C. We can temporarily disable this check
-  # to unblock the clang roll, but we should come back and fix them.
-  cflags_c = [ "-fno-sanitize=alignment" ]
 }
 
 if (is_fuchsia) {
