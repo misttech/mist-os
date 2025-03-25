@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
@@ -49,6 +49,40 @@ namespace fake_display {
 
 namespace {
 
+class TestDisplayEngineListener
+    : public ddk::DisplayEngineListenerProtocol<TestDisplayEngineListener> {
+ public:
+  // fuchsia.hardware.display.controller/DisplayEngineListener:
+  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
+    display_added_.Signal();
+  }
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id) {
+    GTEST_FAIL() << "Unexpected call to OnDisplayRemoved";
+  }
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
+                                           const config_stamp_t* config_stamp) {
+    // VSync signals are ignored for now.
+  }
+  void DisplayEngineListenerOnCaptureComplete() { capture_completed_.Signal(); }
+
+  display_engine_listener_protocol_t GetProtocol() {
+    return {
+        .ops = &display_engine_listener_protocol_ops_,
+        .ctx = this,
+    };
+  }
+
+  // Signaled when the driver signals that a display was added.
+  libsync::Completion& display_added() { return display_added_; }
+
+  // Signaled when the driver signals that a capture was completed.
+  libsync::Completion& capture_completed() { return capture_completed_; }
+
+ private:
+  libsync::Completion display_added_;
+  libsync::Completion capture_completed_;
+};
+
 class FakeDisplayTest : public testing::Test {
  public:
   FakeDisplayTest() = default;
@@ -57,6 +91,7 @@ class FakeDisplayTest : public testing::Test {
     zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
         FakeSysmemDeviceHierarchy::Create();
     ASSERT_OK(create_sysmem_provider_result);
+
     fake_display_stack_ = std::make_unique<FakeDisplayStack>(
         std::move(create_sysmem_provider_result).value(), GetFakeDisplayDeviceConfig());
   }
@@ -71,6 +106,9 @@ class FakeDisplayTest : public testing::Test {
   }
 
  protected:
+  TestDisplayEngineListener engine_listener_;
+  display_engine_listener_protocol_t engine_listener_banjo_protocol_ =
+      engine_listener_.GetProtocol();
   std::unique_ptr<FakeDisplayStack> fake_display_stack_;
 };
 
@@ -212,35 +250,6 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 
  private:
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
-};
-
-// A completion semaphore indicating the display capture is completed.
-class DisplayCaptureCompletion {
- public:
-  // Tests can import the display controller interface protocol to set up the
-  // callback to trigger the semaphore.
-  display_engine_listener_protocol_t GetDisplayEngineListenerProtocol() {
-    static constexpr display_engine_listener_protocol_ops_t kDisplayEngineListenerProtocolOps = {
-        .on_display_added = [](void* ctx, const raw_display_info_t* display_info) {},
-        .on_display_removed = [](void* ctx, uint64_t display_id) {},
-        .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
-                               const config_stamp_t* config_stamp) {},
-        .on_capture_complete =
-            [](void* ctx) {
-              reinterpret_cast<DisplayCaptureCompletion*>(ctx)->OnCaptureComplete();
-            },
-    };
-    return display_engine_listener_protocol_t{
-        .ops = &kDisplayEngineListenerProtocolOps,
-        .ctx = this,
-    };
-  }
-
-  libsync::Completion& completed() { return completed_; }
-
- private:
-  void OnCaptureComplete() { completed().Signal(); }
-  libsync::Completion completed_;
 };
 
 // Creates a BufferCollectionConstraints that tests can use to configure their
@@ -579,13 +588,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   auto [framebuffer_collection_client, framebuffer_token] =
       std::move(new_framebuffer_buffer_collection_result.value());
 
-  DisplayCaptureCompletion display_capture_completion = {};
-  const display_engine_listener_protocol_t& controller_protocol =
-      display_capture_completion.GetDisplayEngineListenerProtocol();
-
   engine_info_t banjo_engine_info;
   fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
-      &controller_protocol, &banjo_engine_info);
+      &engine_listener_banjo_protocol_, &banjo_engine_info);
   ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
@@ -723,10 +728,10 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
                                                                         &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
-  EXPECT_FALSE(display_capture_completion.completed().signaled());
+  ASSERT_FALSE(engine_listener_.capture_completed().signaled());
   EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineStartCapture(capture_handle));
-  display_capture_completion.completed().Wait();
-  EXPECT_TRUE(display_capture_completion.completed().signaled());
+  engine_listener_.capture_completed().Wait();
+  EXPECT_TRUE(engine_listener_.capture_completed().signaled());
 
   // Verify the captured image has the same content as the original image.
   constexpr int kCaptureBytesPerPixel = 4;
@@ -805,13 +810,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   auto [framebuffer_collection_client, framebuffer_token] =
       std::move(new_framebuffer_buffer_collection_result.value());
 
-  DisplayCaptureCompletion display_capture_completion = {};
-  const display_engine_listener_protocol_t& controller_protocol =
-      display_capture_completion.GetDisplayEngineListenerProtocol();
-
   engine_info_t banjo_engine_info;
   fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
-      &controller_protocol, &banjo_engine_info);
+      &engine_listener_banjo_protocol_, &banjo_engine_info);
   ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
@@ -918,10 +919,10 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
                                                                         &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
-  EXPECT_FALSE(display_capture_completion.completed().signaled());
+  ASSERT_FALSE(engine_listener_.capture_completed().signaled());
   EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineStartCapture(capture_handle));
-  display_capture_completion.completed().Wait();
-  EXPECT_TRUE(display_capture_completion.completed().signaled());
+  engine_listener_.capture_completed().Wait();
+  EXPECT_TRUE(engine_listener_.capture_completed().signaled());
 
   // Verify the captured image has the same content as the original image.
   constexpr int kCaptureBytesPerPixel = 4;
