@@ -295,7 +295,7 @@ enum StrictCheckErrorEnum {
     MustHaveMachineSpecified,
     #[error("ffx strict requires that the target be explicitly specified")]
     MustHaveTarget,
-    #[error("ffx strict requires that the Target be specified by address or serial. Actually passed: \"{}\"", .0)]
+    #[error("ffx strict requires that the Target be specified by address or have the prefix \"serial:\". Actually passed: \"{}\"", .0)]
     TargetMustBeAddressOrSerial(String),
     #[error("ffx strict requires that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
@@ -348,8 +348,7 @@ pub fn check_strict_constraints(ffx: &Ffx, requires_target: bool) -> Result<()> 
             None => errors.push(StrictCheckErrorEnum::MustHaveTarget),
             Some(t) => match netext::parse_address_parts(t.as_str()) {
                 Err(_) => {
-                    let re = regex::Regex::new(r"^\w{14}$").unwrap();
-                    if !re.is_match(t) {
+                    if !t.starts_with("serial:") {
                         errors.push(StrictCheckErrorEnum::TargetMustBeAddressOrSerial(t.clone()));
                     }
                 }
@@ -685,6 +684,24 @@ mod test {
                 inputs: vec![
                     "ffx",
                     "--strict",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--target",
+                    "1234567890ABCD",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Target cannot be bare serial".into(),
+                expected_errors: vec![StrictCheckErrorEnum::TargetMustBeAddressOrSerial(
+                    "1234567890ABCD".into(),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--strict",
                     "--isolate-dir",
                     "/tmp/foo",
                     "--machine",
@@ -701,20 +718,45 @@ mod test {
                     PathBuf::from("/tmp/foo"),
                 )],
             },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--strict",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--target",
+                    "serial:1234567890AB",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "serial prefix is okay".into(),
+                expected_errors: vec![],
+            },
         ];
 
         for case in cases {
             let cmd_line =
                 FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
-            let res = check_strict_constraints(&cmd_line.global, true);
-            assert!(res.is_err(), "Test Case {} was not an error", case.name);
-
-            let Error::User(got_err) = res.unwrap_err() else { panic!() };
-            match got_err.downcast_ref::<StrictCheckError>() {
-                Some(StrictCheckError::User(inner_errs)) => {
+            match check_strict_constraints(&cmd_line.global, true) {
+                Err(Error::User(got_err)) => match got_err.downcast_ref::<StrictCheckError>() {
+                    Some(StrictCheckError::User(inner_errs)) => {
+                        assert_eq!(
+                            case.expected_errors, *inner_errs,
+                            "Test Case {} had the wrong errors",
+                            case.name
+                        );
+                    }
+                    _ => {
+                        unreachable!();
+                    }
+                },
+                Ok(_) => {
                     assert_eq!(
-                        case.expected_errors, *inner_errs,
-                        "Test Case {} had the wrong errors",
+                        case.expected_errors,
+                        vec![],
+                        "Test Case {} should not have had an error",
                         case.name
                     );
                 }
