@@ -90,9 +90,7 @@ __EXPORT zx_status_t svc_directory_remove_entry(svc_dir_t* dir, const char* path
 // returns ZX_OK.
 __EXPORT zx_status_t svc_directory_destroy(svc_dir_t* dir) ZX_AVAILABLE_SINCE(10);
 
-// All the functions listed below are deprecated as of Fuchsia API level 10. They should not be used
-// by new clients.
-
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
 __EXPORT zx_status_t svc_dir_create(async_dispatcher_t* dispatcher, zx_handle_t directory_request,
                                     svc_dir_t** out_result)
     ZX_REMOVED_SINCE(
@@ -147,6 +145,7 @@ __EXPORT zx_status_t svc_dir_remove_entry_by_path(svc_dir_t* dir, const char* pa
                                                   const char* name)
     ZX_REMOVED_SINCE(/*added=*/9, /*deprecated=*/10, /*removed=*/10,
                      "Use |svc_directory_remove_entry|");
+#endif
 
 __END_CDECLS
 
