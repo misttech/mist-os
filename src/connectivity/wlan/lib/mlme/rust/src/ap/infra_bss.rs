@@ -2163,7 +2163,7 @@ mod tests {
     async fn handle_probe_req_has_offload() {
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
             FakeDeviceConfig::default().with_mock_probe_response_offload(
-                fidl_common::ProbeResponseOffloadExtension { supported: true },
+                fidl_softmac::ProbeResponseOffloadExtension { supported: true },
             ),
         )
         .await;

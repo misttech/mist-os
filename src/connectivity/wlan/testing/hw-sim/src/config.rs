@@ -7,7 +7,8 @@ use wlan_common::ie::*;
 use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_device,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as wlantap,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fidl_fuchsia_wlan_tap as wlantap,
 };
 
 pub(crate) fn create_wlantap_config(
@@ -30,12 +31,14 @@ pub(crate) fn create_wlantap_config(
         bands: vec![create_2_4_ghz_band_info()],
         name,
         quiet: false,
-        discovery_support: fidl_common::DiscoverySupport {
-            scan_offload: fidl_common::ScanOffloadExtension {
+        discovery_support: fidl_softmac::DiscoverySupport {
+            scan_offload: fidl_softmac::ScanOffloadExtension {
                 supported: true,
                 scan_cancel_supported: false,
             },
-            probe_response_offload: fidl_common::ProbeResponseOffloadExtension { supported: false },
+            probe_response_offload: fidl_softmac::ProbeResponseOffloadExtension {
+                supported: false,
+            },
         },
         mac_sublayer_support: fidl_common::MacSublayerSupport {
             rate_selection_offload: fidl_common::RateSelectionOffloadExtension { supported: false },

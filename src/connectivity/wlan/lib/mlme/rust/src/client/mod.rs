@@ -295,9 +295,6 @@ impl<D: DeviceOps> ClientMlme<D> {
                 self.on_sme_get_iface_histogram_stats(responder)
             }
             Req::QueryDeviceInfo(responder) => self.on_sme_query_device_info(responder).await,
-            Req::QueryDiscoverySupport(responder) => {
-                self.on_sme_query_discovery_support(responder).await
-            }
             Req::QueryMacSublayerSupport(responder) => {
                 self.on_sme_query_mac_sublayer_support(responder).await
             }
@@ -458,15 +455,6 @@ impl<D: DeviceOps> ClientMlme<D> {
             device::try_query(&mut self.ctx.device).await?,
         )?;
         responder.respond(info);
-        Ok(())
-    }
-
-    async fn on_sme_query_discovery_support(
-        &mut self,
-        responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
-    ) -> Result<(), Error> {
-        let support = device::try_query_discovery_support(&mut self.ctx.device).await?;
-        responder.respond(support);
         Ok(())
     }
 
@@ -2578,20 +2566,6 @@ mod tests {
                 qos_capable: false,
             }
         );
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn mlme_respond_to_query_discovery_support() {
-        let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme().await;
-
-        let (responder, receiver) = Responder::new();
-        me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder))
-            .await
-            .expect("Failed to send MlmeRequest::Connect");
-        let resp = receiver.await.unwrap();
-        assert_eq!(resp.scan_offload.supported, true);
-        assert_eq!(resp.probe_response_offload.supported, false);
     }
 
     #[fuchsia::test(allow_stalls = false)]

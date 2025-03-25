@@ -134,7 +134,7 @@ class BasicWlanSoftmacServer : public UnimplementedWlanSoftmacServer {
   }
 
   void QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& completer) override {
-    fuchsia_wlan_common::DiscoverySupport response;
+    fuchsia_wlan_softmac::DiscoverySupport response;
     completer.Reply(fit::ok(response));
   }
 

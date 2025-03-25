@@ -619,7 +619,7 @@ closed protocol WlanSoftmacBase {
     @available(added=HEAD)
     @selector("fuchsia.wlan.softmac/WlanSoftmac.QueryDiscoverySupport")
     strict QueryDiscoverySupport() -> (struct {
-        resp fuchsia.wlan.common.DiscoverySupport;
+        resp DiscoverySupport;
     }) error zx.Status;
 
     /// Gets information about the MAC features supported by the device. This

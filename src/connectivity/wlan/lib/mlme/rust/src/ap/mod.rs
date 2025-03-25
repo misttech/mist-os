@@ -296,15 +296,6 @@ impl<D: DeviceOps> Ap<D> {
         Ok(())
     }
 
-    pub async fn handle_mlme_query_discovery_support(
-        &mut self,
-        responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
-    ) -> Result<(), Error> {
-        let support = device::try_query_discovery_support(&mut self.ctx.device).await?;
-        responder.respond(support);
-        Ok(())
-    }
-
     pub async fn handle_mlme_query_mac_sublayer_support(
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
@@ -339,9 +330,6 @@ impl<D: DeviceOps> Ap<D> {
             Req::Stop(req) => self.handle_mlme_stop_req(req).await,
             Req::SetKeys(req) => self.handle_mlme_setkeys_req(req).await,
             Req::QueryDeviceInfo(responder) => self.handle_mlme_query_device_info(responder).await,
-            Req::QueryDiscoverySupport(responder) => {
-                self.handle_mlme_query_discovery_support(responder).await
-            }
             Req::QueryMacSublayerSupport(responder) => {
                 self.handle_mlme_query_mac_sublayer_support(responder).await
             }
@@ -1485,20 +1473,6 @@ mod tests {
                 qos_capable: false,
             }
         );
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn ap_mlme_respond_to_query_discovery_support() {
-        let (mut ap, _, _) = make_ap().await;
-
-        let (responder, receiver) = Responder::new();
-        assert_variant!(
-            ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder)).await,
-            Ok(())
-        );
-        let resp = receiver.await.unwrap();
-        assert_eq!(resp.scan_offload.supported, true);
-        assert_eq!(resp.probe_response_offload.supported, false);
     }
 
     #[fuchsia::test(allow_stalls = false)]

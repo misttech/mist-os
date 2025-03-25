@@ -97,7 +97,7 @@ pub trait DeviceOps {
     ) -> impl Future<Output = Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>;
     fn discovery_support(
         &mut self,
-    ) -> impl Future<Output = Result<fidl_common::DiscoverySupport, zx::Status>>;
+    ) -> impl Future<Output = Result<fidl_softmac::DiscoverySupport, zx::Status>>;
     fn mac_sublayer_support(
         &mut self,
     ) -> impl Future<Output = Result<fidl_common::MacSublayerSupport, zx::Status>>;
@@ -232,7 +232,7 @@ pub async fn try_query_iface_mac(device: &mut impl DeviceOps) -> Result<MacAddr,
 
 pub async fn try_query_discovery_support(
     device: &mut impl DeviceOps,
-) -> Result<fidl_common::DiscoverySupport, Error> {
+) -> Result<fidl_softmac::DiscoverySupport, Error> {
     device.discovery_support().await.map_err(|status| {
         Error::Status(String::from("Failed to query discovery support for device."), status)
     })
@@ -272,7 +272,7 @@ impl DeviceOps for Device {
         Self::flatten_and_log_error("Query", self.wlan_softmac_bridge_proxy.query().await)
     }
 
-    async fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+    async fn discovery_support(&mut self) -> Result<fidl_softmac::DiscoverySupport, zx::Status> {
         Self::flatten_and_log_error(
             "QueryDiscoverySupport",
             self.wlan_softmac_bridge_proxy.query_discovery_support().await,
@@ -676,7 +676,7 @@ pub mod test_utils {
 
     pub struct FakeDeviceConfig {
         mock_query_response: Option<Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>,
-        mock_discovery_support: Option<Result<fidl_common::DiscoverySupport, zx::Status>>,
+        mock_discovery_support: Option<Result<fidl_softmac::DiscoverySupport, zx::Status>>,
         mock_mac_sublayer_support: Option<Result<fidl_common::MacSublayerSupport, zx::Status>>,
         mock_security_support: Option<Result<fidl_common::SecuritySupport, zx::Status>>,
         mock_spectrum_management_support:
@@ -722,7 +722,7 @@ pub mod test_utils {
 
     impl FakeDeviceConfig {
         with_mock_func!(query_response, fidl_softmac::WlanSoftmacQueryResponse);
-        with_mock_func!(discovery_support, fidl_common::DiscoverySupport);
+        with_mock_func!(discovery_support, fidl_softmac::DiscoverySupport);
         with_mock_func!(mac_sublayer_support, fidl_common::MacSublayerSupport);
         with_mock_func!(security_support, fidl_common::SecuritySupport);
         with_mock_func!(spectrum_management_support, fidl_common::SpectrumManagementSupport);
@@ -781,7 +781,7 @@ pub mod test_utils {
 
         pub fn with_mock_probe_response_offload(
             mut self,
-            mock_field: fidl_common::ProbeResponseOffloadExtension,
+            mock_field: fidl_softmac::ProbeResponseOffloadExtension,
         ) -> Self {
             if let None = self.mock_discovery_support {
                 let mut mock_value = Self::default_mock_discovery_support();
@@ -798,13 +798,13 @@ pub mod test_utils {
             self
         }
 
-        fn default_mock_discovery_support() -> Result<fidl_common::DiscoverySupport, zx::Status> {
-            Ok(fidl_common::DiscoverySupport {
-                scan_offload: fidl_common::ScanOffloadExtension {
+        fn default_mock_discovery_support() -> Result<fidl_softmac::DiscoverySupport, zx::Status> {
+            Ok(fidl_softmac::DiscoverySupport {
+                scan_offload: fidl_softmac::ScanOffloadExtension {
                     supported: true,
                     scan_cancel_supported: false,
                 },
-                probe_response_offload: fidl_common::ProbeResponseOffloadExtension {
+                probe_response_offload: fidl_softmac::ProbeResponseOffloadExtension {
                     supported: false,
                 },
             })
@@ -971,7 +971,9 @@ pub mod test_utils {
             }
         }
 
-        async fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
+        async fn discovery_support(
+            &mut self,
+        ) -> Result<fidl_softmac::DiscoverySupport, zx::Status> {
             let state = self.state.lock();
             match state.config.mock_discovery_support.as_ref() {
                 Some(discovery_support) => discovery_support.clone(),
@@ -1355,12 +1357,12 @@ mod tests {
         let discovery_support = fake_device.discovery_support().await.unwrap();
         assert_eq!(
             discovery_support,
-            fidl_common::DiscoverySupport {
-                scan_offload: fidl_common::ScanOffloadExtension {
+            fidl_softmac::DiscoverySupport {
+                scan_offload: fidl_softmac::ScanOffloadExtension {
                     supported: true,
                     scan_cancel_supported: false,
                 },
-                probe_response_offload: fidl_common::ProbeResponseOffloadExtension {
+                probe_response_offload: fidl_softmac::ProbeResponseOffloadExtension {
                     supported: false,
                 },
             }

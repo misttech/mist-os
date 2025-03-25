@@ -164,7 +164,6 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                     fullmac_to_mlme::convert_device_info(self.device.query_device_info()?)?;
                 responder.respond(device_info);
             }
-            QueryDiscoverySupport(..) => info!("QueryDiscoverySupport is unsupported"),
             QueryMacSublayerSupport(responder) => {
                 responder.respond(self.device.query_mac_sublayer_support()?)
             }
