@@ -23,6 +23,8 @@ declare_args() {
   #  * 'legacy_default' => The standard RBE configuration used if not otherwise
   #                        specified. This contains a mix of enabled/disabled
   #                        remote services.
+  #  * 'remote_full' => Run as many actions remotely as possible, including
+  #                  cache-misses, which reduces use of local resources.
   #  * 'cloudtop' => An RBE configuration that's optimized for running on a
   #                  cloudtop. Suitable for high-bandwidth connections to
   #                  remote services and downloading remote outputs.
@@ -101,15 +103,32 @@ _default_rbe_settings = {
     bazel_enable = false
   }
 
-  # The "Cloudtop" development environment has very high
+  # The "remote_full" mode builds the maximum set of actions remotely.
+  # This mode runs cache-misses remotely, and takes full advantage
+  # of fully parallelized remote execution (saving local resources),
+  # and will self-warm the remote caches.
+  # This is a good option when you expect a high number of cache-misses.
+  remote_full = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+
+    link_enable = true
+
+    rust_enable = true
+    rust_exec_strategy = "remote"
+
+    bazel_enable = true
+    bazel_exec_strategy = "remote"
+  }
+
+  # The "cloudtop" development environment has very high
   # network bandwidth, which makes for faster remote cache
   # hits and downloading of cached artifacts.
-  # It is expected for CI to warm remote caches.
   # Cache hit rates are subject to differences in build
   # configuration, commands, and local source modifications.
   #
   # This currently uses the same configuration as
-  # remote_cache_only.
+  # remote_cache_only, and thus does not self-warm the remote cache.
   cloudtop = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
@@ -125,7 +144,7 @@ _default_rbe_settings = {
     bazel_exec_strategy = "local"
   }
 
-  # The workstation and cloudtop are currently the same, but
+  # The "workstation" and "cloudtop" are currently the same, but
   # defining workstation separately heads off questions of
   # "why is my workstation using the cloudtop config?" (a
   # valid question on the surface).
