@@ -35,6 +35,8 @@ fuchsia_microbenchmark_sources = [
   "stdcompat.cc",
 ]
 
+fuchsia_microbenchmark_shared_process_sources = [ "main.cc" ]
+
 if (is_linux) {
   fuchsia_microbenchmark_sources += [
     "fork.cc",
@@ -56,6 +58,7 @@ if (is_fuchsia) {
     "events.cc",
     "fdio_spawn.cc",
     "fifos.cc",
+    "futex.cc",
     "get_info.cc",
     "handle.cc",
     "handle_creation.cc",
@@ -86,6 +89,8 @@ if (is_fuchsia) {
       "syscalls.cc",
     ]
   }
+
+  fuchsia_microbenchmark_shared_process_sources += [ "futex.cc" ]
 }
 
 fuchsia_microbenchmark_deps = [
@@ -129,6 +134,25 @@ executable("fuchsia_microbenchmarks_bin") {
   # benchmarking.
   board_is_vim3 = board_name == "vim3"
   defines = [ "BOARD_IS_VIM3=${board_is_vim3}" ]
+
+  deps = fuchsia_microbenchmark_deps
+}
+
+# Like fuchsia_microbenchmark_bin, except:
+#   - runs a subset of the benchmarks
+#   - does not support RunSubprocess.
+executable("fuchsia_microbenchmarks_shared_process_bin") {
+  output_name = "fuchsia_microbenchmarks_shared_process"
+  testonly = true
+  sources = fuchsia_microbenchmark_shared_process_sources
+  defines = [ "NO_SUBPROCESS=1" ]
+
+  # Check if the board is the vim3 to set a build define that will ultimately be used to control
+  # the affinity of the benchmarking threads.
+  # TODO(https://fxbug.dev/42050716): Find a better way of controlling what cores are used for
+  # benchmarking.
+  board_is_vim3 = board_name == "vim3"
+  defines += [ "BOARD_IS_VIM3=${board_is_vim3}" ]
 
   deps = fuchsia_microbenchmark_deps
 }
@@ -218,6 +242,16 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
   test_type = "system"
 }
 
+# Like fuchsia_microbenchmarks, but runs in a shared process.
+fuchsia_unittest_package("fuchsia_microbenchmarks_shared_process") {
+  package_name = "fuchsia_microbenchmarks_shared_process"
+
+  manifest = "meta/fuchsia_microbenchmarks_shared_process.cml"
+
+  deps = [ ":fuchsia_microbenchmarks_shared_process_bin" ]
+  test_type = "system"
+}
+
 fuchsia_component_perf_test("fuchsia_microbenchmarks_test") {
   package = ":fuchsia_microbenchmarks"
   component_name = "fuchsia_microbenchmarks"
@@ -243,6 +277,34 @@ fuchsia_component_perf_test("fuchsia_microbenchmarks_test") {
   results_path_test_arg = "--out"
 
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.txt"
+}
+
+# Like fuchsia_microbenchmarks_test, but uses a shared process.
+fuchsia_component_perf_test("fuchsia_microbenchmarks_shared_process_test") {
+  package = ":fuchsia_microbenchmarks_shared_process"
+  component_name = "fuchsia_microbenchmarks_shared_process"
+  test_type = "system"
+
+  # We run the fuchsia_microbenchmarks process multiple times.  That is useful
+  # for tests that exhibit between-process variation in results (e.g. due to
+  # memory layout chosen when a process starts) -- it reduces the variation in
+  # the average that we report.
+  process_runs = 6
+
+  # Runs: we override the default number of within-process iterations of each
+  # test case and use a lower value.  This reduces the overall time taken and
+  # reduces the chance that these invocations hit Infra Swarming tasks' IO
+  # timeout (swarming_io_timeout_secs -- the amount of time that a task is
+  # allowed to run without producing log output).
+  test_component_args = [
+    "-p",
+    "--quiet",
+    "--runs",
+    "120",
+  ]
+  results_path_test_arg = "--out"
+
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.shared_process.txt"
 }
 
 if (is_linux) {
@@ -342,6 +404,10 @@ if (host_os == "linux" && !is_asan) {
 group("tests") {
   testonly = true
   deps = [ ":fuchsia_microbenchmarks" ]
+  if (!is_asan) {
+    deps += [ ":fuchsia_microbenchmarks_shared_process" ]
+  }
+
   if (host_os == "linux") {
     deps += [ ":fuchsia_microbenchmarks_host($host_toolchain)" ]
 
@@ -367,6 +433,9 @@ group("microbenchmarks") {
 group("benchmarks") {
   testonly = true
   deps = [ ":fuchsia_microbenchmarks_test" ]
+  if (!is_asan) {
+    deps += [ ":fuchsia_microbenchmarks_shared_process_test" ]
+  }
 
   # NOTE: Minfs does not support the POSIX attributes required to run Starnix.
   if (!is_asan && host_os == "linux" && data_filesystem_format != "minfs") {
