@@ -1947,6 +1947,7 @@ mod arch32 {
         sys_getresuid as sys_arch32_getresuid32, sys_getrlimit as sys_arch32_ugetrlimit,
         sys_getuid as sys_arch32_getuid32, sys_sched_getaffinity as sys_arch32_sched_getaffinity,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity, sys_seccomp as sys_arch32_seccomp,
+        sys_setfsuid as sys_arch32_setfsuid, sys_setfsuid as sys_arch32_setfsuid32,
         sys_setgroups as sys_arch32_setgroups32, sys_setpgid as sys_arch32_setpgid,
         sys_setpriority as sys_arch32_setpriority, sys_setresgid as sys_arch32_setresgid32,
         sys_setresuid as sys_arch32_setresuid32, sys_setrlimit as sys_arch32_setrlimit,
