@@ -32,8 +32,6 @@ syscall_tests = [
   "fs_test",
   "futex_test",
   "getrandom_test",
-  "input_test",
-  "ioctl_test",
   "loop_test",
   "memfd_test",
   "mmap_test",
@@ -69,10 +67,8 @@ syscall_tests = [
   "timerfd_test",
   "timers_test",
   "tmpfs_test",
-  "touch_standby_test",
   "trivial_test",
   "tun_test",
-  "udev_test",
   "uio_test",
   "userfaultfd_test",
   "vmsplice_test",
@@ -81,6 +77,40 @@ syscall_tests = [
 
   # go/keep-sorted end
 ]
+
+syscall_tests_etc = [
+  {
+    name = "input_test"
+    features = [ "framebuffer" ]
+  },
+  {
+    name = "ioctl_test"
+    features = [ "framebuffer" ]
+  },
+  {
+    name = "touch_standby_test"
+    features = [ "framebuffer" ]
+  },
+  {
+    name = "udev_test"
+    features = [ "framebuffer" ]
+  },
+]
+if (target_cpu == "x64") {
+  # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
+  # This test requires test-ui-stack.
+  syscall_tests_etc += [
+    {
+      name = "uinput_test"
+      features = [ "framebuffer" ]
+    },
+  ]
+}
+
+arch32_compat_syscall_test_names = syscall_tests
+foreach(test_def, syscall_tests_etc) {
+  arch32_compat_syscall_test_names += [ test_def.name ]
+}
 
 # syscall tests that can only be run on arch64.
 # TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
@@ -97,12 +127,6 @@ arch64_syscall_tests = [
   # go/keep-sorted end
 ]
 
-if (target_cpu == "x64") {
-  # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
-  # This test requires test-ui-stack.
-  syscall_tests += [ "uinput_test" ]
-}
-
 arch64_syscall_tests_etc = [
   {
     name = "mlock_test"
@@ -117,6 +141,7 @@ arch64_syscall_tests_names = arch64_syscall_tests
 foreach(test_def, arch64_syscall_tests_etc) {
   arch64_syscall_tests_names += [ test_def.name ]
 }
+all_test_names = arch32_compat_syscall_test_names + arch64_syscall_tests_names
 
 group("tests") {
   testonly = true
@@ -125,7 +150,7 @@ group("tests") {
     deps += [ ":starnix_arch32_syscalls_cpp_tests" ]
   }
   if (host_os == "linux" && host_cpu == "x64") {
-    foreach(test_name, syscall_tests + arch64_syscall_tests_names) {
+    foreach(test_name, all_test_names) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
         ":starnix_${test_name}_baseline($host_toolchain)",
@@ -219,6 +244,10 @@ template("syscall_test") {
   if (defined(invoker.disable_sanitizers_on_host)) {
     _disable_sanitizers_on_host = invoker.disable_sanitizers_on_host
   }
+  extra_features = []
+  if (defined(invoker.features)) {
+    extra_features = invoker.features
+  }
 
   _container_config_capabilities = [
     {
@@ -229,7 +258,7 @@ template("syscall_test") {
         max_size = 1024
       }
       max_count = 1024
-      value = []
+      value = extra_features
     },
   ]
 
@@ -405,6 +434,14 @@ foreach(test_name, syscall_tests) {
   }
 }
 
+foreach(test_def, syscall_tests_etc) {
+  syscall_test(test_def.name) {
+    test_name = test_def.name
+    arch64_only = false
+    forward_variables_from(test_def, "*", [ "name" ])
+  }
+}
+
 foreach(test_name, arch64_syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
@@ -561,7 +598,7 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":crash_test",
   ]
   deps = []
-  foreach(test_name, syscall_tests + arch64_syscall_tests_names) {
+  foreach(test_name, all_test_names) {
     test_components += [ ":${test_name}" ]
     deps += [ ":${test_name}_config" ]
   }
@@ -598,8 +635,10 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
 if (starnix_enable_arch32) {
   fuchsia_test_package("starnix_arch32_syscalls_cpp_tests") {
     test_components = []
-    foreach(test_name, syscall_tests) {
+    deps = []
+    foreach(test_name, arch32_compat_syscall_test_names) {
       test_components += [ ":${test_name}_arch32" ]
+      deps += [ ":${test_name}_config" ]
     }
 
     subpackages = starnix_test_subpackages
@@ -611,7 +650,7 @@ if (starnix_enable_arch32) {
       subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
     }
 
-    deps = [
+    deps += [
       ":extended_pstate_initial_state_child_resource",
       "//src/lib/testing/expectation:expectation_comparer",
     ]
