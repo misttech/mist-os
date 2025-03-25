@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2122
+From //build/config/BUILDCONFIG.gn:2124
 
 ### allowed_test_device_types
 
@@ -699,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719515425525401953"`
+**Current value for `target_cpu = "arm64"`:** `"8719470118309363761"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719515425525401953"`
+**Current value for `target_cpu = "riscv64"`:** `"8719470118309363761"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719515425525401953"`
+**Current value for `target_cpu = "x64"`:** `"8719470118309363761"`
 
 From //out/not-default/args.gn:10
 
@@ -2786,7 +2786,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1902
+From //build/config/BUILDCONFIG.gn:1904
 
 ### fastboot_product
 
@@ -3677,7 +3677,7 @@ Each element of the list is one variant, which is a scope defining:
   tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
   configs = ["//build/config/profile:profile-rust"]
-  tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
+  tags = ["debugdata", "instrumented", "needs-writable-globals", "profile"]
 }, {
   configs = ["//build/config/profile:profile-use"]
   tags = ["instrumented"]
@@ -5591,7 +5591,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2112
+From //build/config/BUILDCONFIG.gn:2114
 
 ### select_variant_canonical
 
@@ -5601,7 +5601,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2117
+From //build/config/BUILDCONFIG.gn:2119
 
 ### select_variant_shortcuts
 
@@ -5666,7 +5666,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1909
+From //build/config/BUILDCONFIG.gn:1911
 
 ### size_checker_input
 
