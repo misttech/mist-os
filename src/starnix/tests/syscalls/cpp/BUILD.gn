@@ -32,6 +32,7 @@ syscall_tests = [
   "futex_test",
   "getrandom_test",
   "input_test",
+  "ioctl_test",
   "loop_test",
   "memfd_test",
   "mmap_test",
@@ -90,7 +91,6 @@ arch64_syscall_tests = [
   "fs_test",
   "fsverity_test",
   "fuse_test",
-  "ioctl_test",
   "ptrace_test",
   "vdso_test",
 

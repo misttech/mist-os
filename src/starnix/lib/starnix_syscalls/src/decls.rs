@@ -185,6 +185,7 @@ macro_rules! for_each_arch_arch32_syscall {
             sched_getaffinity,
             sched_setaffinity,
             semctl,
+            send,
             sendfile,
             sendmmsg,
             sendmsg,

@@ -189,9 +189,9 @@ pub fn dispatch_syscall(
         pub use crate::vfs::socket::syscalls::{
             sys_arch32_accept, sys_arch32_bind, sys_arch32_getsockname, sys_arch32_getsockopt,
             sys_arch32_listen, sys_arch32_recv, sys_arch32_recvfrom, sys_arch32_recvmmsg,
-            sys_arch32_recvmsg, sys_arch32_sendmsg, sys_arch32_sendto, sys_arch32_setsockopt,
-            sys_arch32_shutdown, sys_arch32_socketpair, sys_connect as sys_arch32_connect,
-            sys_socket as sys_arch32_socket,
+            sys_arch32_recvmsg, sys_arch32_send, sys_arch32_sendmsg, sys_arch32_sendto,
+            sys_arch32_setsockopt, sys_arch32_shutdown, sys_arch32_socketpair,
+            sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
         };
         pub use crate::vfs::syscalls::{
             sys_arch32__llseek, sys_arch32_access, sys_arch32_chmod, sys_arch32_chown32,
@@ -366,6 +366,7 @@ pub fn dispatch_syscall(
             sched_setaffinity[3],
             sched_yield[0],
             seccomp[3],
+            send[4],
             sendfile[4],
             sendmsg[3],
             sendto[6],

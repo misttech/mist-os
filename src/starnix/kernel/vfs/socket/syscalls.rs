@@ -975,6 +975,26 @@ mod arch32 {
         sys_socketpair as sys_arch32_socketpair,
     };
 
+    pub fn sys_arch32_send(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buffer: UserAddress,
+        user_buffer_length: usize,
+        flags: u32,
+    ) -> Result<usize, Errno> {
+        super::sys_sendto(
+            locked,
+            current_task,
+            fd,
+            user_buffer,
+            user_buffer_length,
+            flags,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
     pub fn sys_arch32_recv(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
