@@ -128,7 +128,7 @@ impl AdbConnectArgs {
 
         eprintln!("adb is connected!");
         eprintln!("See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.");
-        eprintln!("This connection's \"serial number\" for adb is `{adb_address}`.");
+        eprintln!("This connection's \"serial number\" for adb is '{adb_address}'.");
         Ok(())
     }
 }
