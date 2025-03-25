@@ -196,7 +196,7 @@ macro_rules! translate_data {
         $(#[$meta:meta])*
         TryFrom<$type_name1:ty> for $type_name2:ty {
             $(
-                $field2:ident = $field1:ident;
+                $field2:ident = $field1:ident $( ( $field1_default:expr ))?;
             )*
             $(..$d:expr)?
         }
@@ -207,12 +207,22 @@ macro_rules! translate_data {
             type Error = ();
             fn try_from(src: $type_name1) -> Result<Self, ()> {
                 Ok(Self {
-                    $( $field2: src.$field1.try_into().map_err(|_| ())?, )*
+                    $( $field2: $crate::translate_data_expr!( src.$field1 $( ( $field1_default ) )? ), )*
                     $(..$d)?
                 })
             }
         }
         $crate::translate_data! { $($token)* }
+    };
+}
+
+#[macro_export]
+macro_rules! translate_data_expr {
+    ( $src:ident . $field:ident ) => {
+        $src.$field.try_into().map_err(|_| ())?
+    };
+    ( $src:ident . $field:ident ( $field1_default:expr ) ) => {
+        $src.$field.try_into().unwrap_or($field1_default)
     };
 }
 

@@ -4,7 +4,7 @@
 
 use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-use crate::syscalls::time::ITimerSpecPtr;
+use crate::syscalls::time::{ITimerSpecPtr, TimeSpecPtr};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
@@ -2804,14 +2804,14 @@ pub fn sys_utimensat(
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    user_times: UserRef<[timespec; 2]>,
+    user_times: TimeSpecPtr,
     flags: u32,
 ) -> Result<(), Errno> {
     let (atime, mtime) = if user_times.addr().is_null() {
         // If user_times is null, the timestamps are updated to the current time.
         (TimeUpdateType::Now, TimeUpdateType::Now)
     } else {
-        let ts: [timespec; 2] = current_task.read_object(user_times)?;
+        let ts = current_task.read_multi_arch_objects_to_vec(user_times, 2)?;
         let atime = ts[0];
         let mtime = ts[1];
         let parse_timespec = |spec: timespec| match spec.tv_nsec {
@@ -3502,6 +3502,7 @@ mod arch32 {
         sys_splice as sys_arch32_splice, sys_tee as sys_arch32_tee,
         sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
+        sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
     };
 }

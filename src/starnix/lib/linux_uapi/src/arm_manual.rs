@@ -91,9 +91,9 @@ arch_translate_data! {
 }
 
 translate_data! {
-    TryFrom<crate::stat> for  crate::arch32::stat64 {
+    TryFrom<crate::stat> for crate::arch32::stat64 {
         st_dev = st_dev;
-        __st_ino = st_ino;
+        __st_ino = st_ino(0);
         st_mode = st_mode;
         st_nlink = st_nlink;
         st_uid = st_uid;

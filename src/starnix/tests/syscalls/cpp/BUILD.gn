@@ -29,6 +29,7 @@ syscall_tests = [
   "custom_artifact_test",
   "epoll_test",
   "fcntl_test",
+  "fs_test",
   "futex_test",
   "getrandom_test",
   "input_test",
@@ -88,7 +89,6 @@ arch64_syscall_tests = [
 
   "bpf_test",
   "extended_pstate_test",
-  "fs_test",
   "fsverity_test",
   "fuse_test",
   "ptrace_test",
