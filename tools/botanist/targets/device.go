@@ -341,6 +341,8 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 
 				target = ipv6.String()
 				tcpFlash = true
+			} else {
+				target = "serial:" + target
 			}
 			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)

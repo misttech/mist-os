@@ -61,6 +61,8 @@ const (
 type ffxCmdBuilder interface {
 	// Build an ffx command with appropriate additional arguments
 	command(ffxPath string, supportsStrict bool, args []string) []string
+	// Build an ffx command with appropriate additional arguments and specific config values
+	commandWithConfigs(ffxPath string, supportsStrict bool, args []string, configs map[string]any) []string
 	// Store the configuration for future ffx invocations
 	setConfigMap(user, global map[string]any) error
 	// Get the config map
@@ -91,7 +93,16 @@ func newLegacyFfxCmdBuilder(
 	}
 }
 
-func (b *legacyFfxCmdBuilder) command(ffxPath string, _supportsStrict bool, args []string) []string {
+func (b *legacyFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args []string) []string {
+	return b.commandWithConfigs(ffxPath, supportsStrict, args, map[string]any{})
+}
+
+func (b *legacyFfxCmdBuilder) commandWithConfigs(ffxPath string, _supportsStrict bool, args []string, configs map[string]any) []string {
+	configArgs := []string{}
+	for key, val := range configs {
+		configArgs = append(configArgs, []string{"-c", fmt.Sprintf("%s=%v", key, val)}...)
+	}
+	args = append(configArgs, args...)
 	return append([]string{ffxPath, "--isolate-dir", b.isolateDir}, args...)
 }
 
@@ -164,6 +175,12 @@ func (b *strictFfxCmdBuilder) tempSetIsolateDir(dir string) {
 // Build the required command for a strict invocation. Note that the command
 // may require the target, but the caller should have set that if so.
 func (b *strictFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args []string) []string {
+	return b.commandWithConfigs(ffxPath, supportsStrict, args, map[string]any{})
+}
+
+// Build the required command for a strict invocation, including any invocation-specific config options.
+// Note that the command may require the target, but the caller should have set that if so.
+func (b *strictFfxCmdBuilder) commandWithConfigs(ffxPath string, supportsStrict bool, args []string, configs map[string]any) []string {
 	cmd := []string{ffxPath, "-o", b.outputFile}
 
 	if supportsStrict {
@@ -183,9 +200,16 @@ func (b *strictFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args 
 	// particular commands. Unfortunately that information is not
 	// available from ffx yet.
 	for k, v := range b.configs {
-		cmd = append(cmd, "-c", fmt.Sprintf("%s=%v", k, v))
+		// The caller may have already provided the config
+		if _, exists := configs[k]; !exists {
+			cmd = append(cmd, "-c", fmt.Sprintf("%s=%v", k, v))
+		}
+
 	}
 
+	for k, v := range configs {
+		cmd = append(cmd, "-c", fmt.Sprintf("%s=%v", k, v))
+	}
 	return append(cmd, args...)
 }
 
@@ -572,6 +596,7 @@ type ffxInvoker struct {
 	stdout         io.Writer
 	stderr         io.Writer
 	noMachine      bool
+	configs        map[string]any
 	supportsStrict bool // TODO(slgrady) Remove once all required commands support --strict
 }
 
@@ -580,7 +605,7 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
 	}
-	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, f.supportsStrict, args)
+	ffx_cmd := f.ffx.cmdBuilder.commandWithConfigs(f.ffx.ffxPath, f.supportsStrict, args, f.configs)
 	if f.noMachine {
 		// Strip out the "--machine", "json" flags if they exist
 		for i, arg := range ffx_cmd {
@@ -653,6 +678,11 @@ func (i *ffxInvoker) setStderr(stderr io.Writer) *ffxInvoker {
 
 func (i *ffxInvoker) setStrict() *ffxInvoker {
 	i.supportsStrict = true
+	return i
+}
+
+func (i *ffxInvoker) setConfigs(configs map[string]any) *ffxInvoker {
+	i.configs = configs
 	return i
 }
 
@@ -776,18 +806,17 @@ func (f *FFXInstance) Stop() error {
 // BootloaderBoot RAM boots the target.
 func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle string, tcpFlash bool) error {
 	logger.Infof(ctx, "running bootloader boot with tcp flash: %t ", tcpFlash)
-	args := []string{
-		"--target", target, "-c", "discovery.mdns.enabled=false", "-c", "fastboot.usb.disabled=true", "-c", "discovery.timeout=12000",
+	configs := map[string]any{
+		"discovery.mdns.enabled": false,
+		"fastboot.usb.disabled":  true,
+		"discovery.timeout":      12000,
 	}
 
 	if !tcpFlash {
-		args = append(args, "--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}")
+		configs["ffx.fastboot.inline_target"] = true
 	}
 
-	args = append(args, "target", "bootloader")
-	args = append(args, "--product-bundle", productBundle)
-	args = append(args, "boot")
-	return f.RunWithTimeout(ctx, 0, args...)
+	return f.invoker([]string{"target", "bootloader", "--product-bundle", productBundle, "boot"}).setTarget(target).setStrict().setTimeout(0).setConfigs(configs).run(ctx)
 }
 
 // List lists all available targets.
