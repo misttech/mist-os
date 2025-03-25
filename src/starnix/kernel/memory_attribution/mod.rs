@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod sync;
-
 use std::collections::HashSet;
 use std::iter;
 use std::sync::{mpsc, Arc, Weak};
@@ -11,6 +9,7 @@ use std::sync::{mpsc, Arc, Weak};
 use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
 use fidl_fuchsia_memory_attribution as fattribution;
+use starnix_logging::log_error;
 use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use zx::HandleBased;
@@ -22,10 +21,39 @@ use crate::task::{Kernel, ThreadGroup};
 /// it once, to reduce overhead.
 const MINIMUM_RESCAN_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
 
-/// If a new code path is added which mutates the PID table without notifying
-/// the scanner thread, this timeout ensures we will at least eventually unpark
-/// and process the changes, albeit with a larger latency.
-const MAXIMUM_RESCAN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+enum MemoryAttributionLifecycleEventType {
+    Creation,
+    NameChange,
+    Destruction,
+}
+
+pub struct MemoryAttributionLifecycleEvent {
+    pid: pid_t,
+    event_type: MemoryAttributionLifecycleEventType,
+}
+
+impl MemoryAttributionLifecycleEvent {
+    pub fn creation(pid: pid_t) -> Self {
+        MemoryAttributionLifecycleEvent {
+            pid,
+            event_type: MemoryAttributionLifecycleEventType::Creation,
+        }
+    }
+
+    pub fn name_change(pid: pid_t) -> Self {
+        MemoryAttributionLifecycleEvent {
+            pid,
+            event_type: MemoryAttributionLifecycleEventType::NameChange,
+        }
+    }
+
+    pub fn destruction(pid: pid_t) -> Self {
+        MemoryAttributionLifecycleEvent {
+            pid,
+            event_type: MemoryAttributionLifecycleEventType::Destruction,
+        }
+    }
+}
 
 pub struct MemoryAttributionManager {
     /// Holds state for the hanging-get attribution protocol.
@@ -60,10 +88,13 @@ impl MemoryAttributionManager {
                 let (initial_state_tx, initial_state_rx) = mpsc::sync_channel(1);
                 initial_state_tx.send(InitialState { processes }).unwrap();
                 let weak_kernel = weak_kernel.clone();
-                let notifier = sync::spawn_thread(&kernel, move |waiter| {
-                    Self::run(weak_kernel, publisher_rx, initial_state_rx, waiter);
+
+                let (pid_sender, pid_receiver) = std::sync::mpsc::channel();
+
+                kernel.kthreads.spawn(move |_, _| {
+                    Self::run(weak_kernel, publisher_rx, initial_state_rx, pid_receiver);
                 });
-                kernel.pids.write().set_thread_group_notifier(notifier);
+                kernel.pids.write().set_thread_group_notifier(pid_sender);
             }
             events
         }));
@@ -95,51 +126,120 @@ impl MemoryAttributionManager {
         kernel: Weak<Kernel>,
         publisher: mpsc::Receiver<attribution_server::Publisher>,
         initial_state: mpsc::Receiver<InitialState>,
-        waiter: sync::Waiter,
+        pid_receiver: mpsc::Receiver<MemoryAttributionLifecycleEvent>,
     ) {
         let publisher = publisher.recv().unwrap();
         let initial_state = initial_state.recv().unwrap();
-        let InitialState { mut processes } = initial_state;
+        let InitialState { processes } = initial_state;
+
+        let Some(kernel) = kernel.upgrade() else {
+            return;
+        };
+
+        let (mut processes, updates) = scan_processes(&kernel, processes);
+        // If there are updates to send, send them now.
+        if !updates.is_empty() {
+            _ = publisher.on_update(updates);
+        }
 
         loop {
-            waiter.wait(MAXIMUM_RESCAN_INTERVAL);
-
-            let Some(kernel) = kernel.upgrade() else { break };
+            // There may be multiple pending notifications in the receiving channel. We would like
+            // to process them all at once. For that, we first wait up to the timeout for any event,
+            // then we try to pull as many events as available from the channel, until it is empty.
+            // We keep track whether we hit a timeout to do a full scan; if the full scan finds some
+            // updates to send, it means we have uninstrumented sources of changes that need to be
+            // fixed.
+            let events = match pid_receiver.recv() {
+                Ok(v) => itertools::chain(std::iter::once(v), pid_receiver.try_iter()),
+                Err(_) => {
+                    return;
+                }
+            };
 
             let mut updates = vec![];
-            // Find removed processes.
-            let mut new_processes = HashSet::new();
-            {
-                let pids = kernel.pids.read();
-
-                // Find added processes.
-                for thread_group in pids.get_thread_groups() {
-                    let pid = thread_group.leader;
-                    new_processes.insert(pid);
-                    // TODO(https://fxbug.dev/379733655): Remove this
-                    #[allow(clippy::set_contains_or_insert)]
-                    if !processes.contains(&pid) {
+            let pids = kernel.pids.read();
+            for event in events {
+                let pid = event.pid;
+                match event.event_type {
+                    MemoryAttributionLifecycleEventType::Creation => {
+                        if !processes.insert(pid) {
+                            log_error!(
+                                "{} is already known, memory attribution is likely incorrect",
+                                pid
+                            );
+                        }
+                        let thread_group = match pids.get_thread_group(pid) {
+                            Some(tg) => tg,
+                            None => {
+                                // The thread group is missing. This can happen if it has already
+                                // exited.
+                                continue;
+                            }
+                        };
                         let name = get_thread_group_identifier(&thread_group);
                         let mut update = attribution_info_for_thread_group(name, &thread_group);
-                        processes.insert(pid);
                         updates.append(&mut update);
+                    }
+                    MemoryAttributionLifecycleEventType::NameChange => {
+                        if !processes.contains(&pid) {
+                            log_error!(
+                                "{} is unknown, memory attribution is likely incorrect",
+                                pid
+                            );
+                        }
+                        let thread_group = match pids.get_thread_group(pid) {
+                            Some(tg) => tg,
+                            None => continue,
+                        };
+                        let name = get_thread_group_identifier(&thread_group);
+                        let mut update = attribution_info_for_thread_group(name, &thread_group);
+                        updates.append(&mut update);
+                    }
+                    MemoryAttributionLifecycleEventType::Destruction => {
+                        if !processes.remove(&pid) {
+                            log_error!(
+                                "{} is unknown, memory attribution is likely incorrect",
+                                pid
+                            );
+                        }
+                        updates.push(fattribution::AttributionUpdate::Remove(pid as u64));
                     }
                 }
             }
-
-            for pid in processes.difference(&new_processes) {
-                updates.push(fattribution::AttributionUpdate::Remove(*pid as u64));
-            }
-            processes = new_processes;
-
             // If there are updates to send, send them now.
             if !updates.is_empty() {
                 _ = publisher.on_update(updates);
             }
-
             zx::MonotonicInstant::after(MINIMUM_RESCAN_INTERVAL).sleep();
         }
     }
+}
+
+/// Do a full scan of the current Starnix processes. This is useful to establish an initial state.
+fn scan_processes(
+    kernel: &Kernel,
+    mut processes: HashSet<pid_t>,
+) -> (HashSet<pid_t>, Vec<fattribution::AttributionUpdate>) {
+    let mut updates = vec![];
+    let pids = kernel.pids.read();
+    let mut new_processes = HashSet::new();
+    for thread_group in pids.get_thread_groups() {
+        let pid = thread_group.leader;
+        new_processes.insert(pid);
+        // TODO(https://fxbug.dev/379733655): Remove this
+        #[allow(clippy::set_contains_or_insert)]
+        if !processes.contains(&pid) {
+            let name = get_thread_group_identifier(&thread_group);
+            let mut update = attribution_info_for_thread_group(name, &thread_group);
+            processes.insert(pid);
+            updates.append(&mut update);
+        }
+    }
+
+    for pid in processes.difference(&new_processes) {
+        updates.push(fattribution::AttributionUpdate::Remove(*pid as u64));
+    }
+    (new_processes, updates)
 }
 
 fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
@@ -176,9 +276,19 @@ fn new_principal(pid: i32, name: String) -> fattribution::AttributionUpdate {
 
 /// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
 fn updated_principal(thread_group: &ThreadGroup) -> Option<fattribution::AttributionUpdate> {
-    let Some(process_koid) = thread_group.process.get_koid().ok() else { return None };
-    let Some(mm) = get_mm(thread_group) else { return None };
-    let Some(vmar_info) = mm.get_restricted_vmar_info() else { return None };
+    let Some(process_koid) = thread_group.process.get_koid().ok() else {
+        return None;
+    };
+    let Some(mm) = get_mm(thread_group) else {
+        log_error!(
+            "No memory manager for ThreadGroup {}, this should not happen.",
+            thread_group.leader
+        );
+        return None;
+    };
+    let Some(vmar_info) = mm.get_restricted_vmar_info() else {
+        return None;
+    };
     let update = fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
         identifier: Some(thread_group.leader as u64),
         resources: Some(fattribution::Resources::Data(fattribution::Data {
