@@ -109,11 +109,15 @@ zx_status_t AmlNnaDevice::PowerDomainControl(bool turn_on) {
 zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
-  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "Could not get platform device protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result pdev_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                        "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   auto reset_register_client =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent,
@@ -122,34 +126,31 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     return reset_register_client.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> hiu_mmio;
-  status = pdev.MapMmio(kHiu, &hiu_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed %d\n", status);
-    return status;
+  zx::result hiu_mmio = pdev.MapMmio(kHiu);
+  if (hiu_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map hiu mmio: %s", hiu_mmio.status_string());
+    return hiu_mmio.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> power_mmio;
-  status = pdev.MapMmio(kPowerDomain, &power_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed %d\n", status);
-    return status;
+  zx::result power_mmio = pdev.MapMmio(kPowerDomain);
+  if (power_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map power domain mmio: %s", power_mmio.status_string());
+    return power_mmio.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> memory_pd_mmio;
-  status = pdev.MapMmio(kMemoryDomain, &memory_pd_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio failed %d\n", status);
-    return status;
+  zx::result memory_pd_mmio = pdev.MapMmio(kMemoryDomain);
+  if (memory_pd_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map memory domain mmio: %s", memory_pd_mmio.status_string());
+    return memory_pd_mmio.status_value();
   }
 
-  pdev_board_info_t info;
   // TODO(fxb/318736574) : Replace with GetDeviceInfo.
-  status = pdev.GetBoardInfo(&info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.GetDeviceInfo failed %d\n", status);
-    return status;
+  zx::result info_result = pdev.GetBoardInfo();
+  if (info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get board info: %s", info_result.status_string());
+    return info_result.status_value();
   }
+  const auto& info = info_result.value();
 
   uint32_t nna_pid = 0;
   if (info.vid == PDEV_VID_AMLOGIC) {
@@ -191,14 +192,16 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     case PDEV_PID_AMLOGIC_S905D3:
       nna_block = S905d3NnaBlock;
       break;
-    case PDEV_PID_AMLOGIC_A5:
+    case PDEV_PID_AMLOGIC_A5: {
       nna_block = A5NnaBlock;
-      status = pdev.GetSmc(0, &smc_monitor);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "unable to get sip monitor handle: %s", zx_status_get_string(status));
-        return status;
+      zx::result result = pdev.GetSmc(0);
+      if (result.is_error()) {
+        zxlogf(ERROR, "unable to get sip monitor handle: %s", result.status_string());
+        return result.status_value();
       }
+      smc_monitor = std::move(result.value());
       break;
+    }
     default:
       zxlogf(ERROR, "unhandled PID 0x%x", nna_pid);
       return ZX_ERR_INVALID_ARGS;

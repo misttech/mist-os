@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/fidl.h>
 
@@ -60,8 +60,8 @@ class AmlNnaDevice : public AmlNnaDeviceType {
 
   explicit AmlNnaDevice(zx_device_t* parent, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer power_mmio,
                         fdf::MmioBuffer memory_pd_mmio,
-                        fidl::ClientEnd<fuchsia_hardware_registers::Device> reset,
-                        ddk::PDevFidl pdev, NnaBlock nna_block, zx::resource smc_monitor)
+                        fidl::ClientEnd<fuchsia_hardware_registers::Device> reset, fdf::PDev pdev,
+                        NnaBlock nna_block, zx::resource smc_monitor)
       : AmlNnaDeviceType(parent),
         pdev_(std::move(pdev)),
         hiu_mmio_(std::move(hiu_mmio)),
@@ -81,7 +81,7 @@ class AmlNnaDevice : public AmlNnaDeviceType {
   void DdkRelease();
 
  private:
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
   fdf::MmioBuffer hiu_mmio_;
   fdf::MmioBuffer power_mmio_;
   fdf::MmioBuffer memory_pd_mmio_;
