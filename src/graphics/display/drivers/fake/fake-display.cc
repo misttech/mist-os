@@ -974,6 +974,11 @@ void FakeDisplay::SendVsync() {
     std::lock_guard lock(mutex_);
     vsync_config_stamp = applied_config_stamp_;
   }
+  if (vsync_config_stamp == display::kInvalidDriverConfigStamp) {
+    // No configuration was applied yet.
+    return;
+  }
+
   const config_stamp_t banjo_vsync_config_stamp =
       display::ToBanjoDriverConfigStamp(vsync_config_stamp);
 
