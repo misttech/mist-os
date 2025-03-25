@@ -76,6 +76,7 @@ rustc_library("lib") {
     "src/colors.rs",
     "src/lib.rs",
     "src/log.rs",
+    "src/logo.rs",
     "src/session_manager.rs",
     "src/terminal.rs",
     "src/text_grid.rs",

@@ -110,6 +110,7 @@
                 "fuchsia.virtcon.KeyRepeat",
                 "fuchsia.virtcon.RoundedCorners",
                 "fuchsia.virtcon.ScrollbackRows",
+                "fuchsia.virtcon.ShowLogo",
             ],
             from: "#config",
             to: "#bootstrap",

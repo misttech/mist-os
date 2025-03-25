@@ -16,6 +16,7 @@ pub const MAX_FONT_SIZE: f32 = 160.0;
 pub struct VirtualConsoleArgs {
     pub disable: bool,
     pub keep_log_visible: bool,
+    pub show_logo: bool,
     pub keyrepeat: bool,
     pub rounded_corners: bool,
     pub boot_animation: bool,
@@ -43,6 +44,7 @@ impl TryFrom<Config> for VirtualConsoleArgs {
         Ok(VirtualConsoleArgs {
             disable: config.disable,
             keep_log_visible: config.keep_log_visible,
+            show_logo: config.show_logo,
             keyrepeat: config.keyrepeat,
             rounded_corners: config.rounded_corners,
             boot_animation: config.boot_animation,
@@ -73,6 +75,7 @@ mod tests {
             dpi: vec![],
             font_size: "16.0".into(),
             keep_log_visible: false,
+            show_logo: false,
             keyrepeat: false,
             key_map: "qwerty".into(),
             rounded_corners: false,
@@ -102,6 +105,19 @@ mod tests {
         let config = Config { keep_log_visible: false, ..new_config() };
         let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keep_log_visible, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn check_show_logo() -> Result<(), Error> {
+        let config = Config { show_logo: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
+        assert_eq!(args.show_logo, true);
+
+        let config = Config { show_logo: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
+        assert_eq!(args.show_logo, false);
 
         Ok(())
     }

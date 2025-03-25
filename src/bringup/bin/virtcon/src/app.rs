@@ -5,6 +5,7 @@
 use crate::args::VirtualConsoleArgs;
 use crate::colors::ColorScheme;
 use crate::log::{Log, LogClient};
+use crate::logo::Logo;
 use crate::session_manager::{SessionManager, SessionManagerClient};
 use crate::terminal::Terminal;
 use crate::view::{ViewMessages, VirtualConsoleViewAssistant};
@@ -20,7 +21,8 @@ use std::collections::BTreeMap;
 use term_model::event::{Event, EventListener};
 
 const DEBUGLOG_ID: u32 = 0;
-const FIRST_SESSION_ID: u32 = 1;
+const LOGO_ID: u32 = 1;
+const FIRST_SESSION_ID: u32 = 2;
 
 pub struct EventProxy {
     app_sender: AppSender,
@@ -90,7 +92,7 @@ impl LogClient for VirtualConsoleClient {
     type Listener = EventProxy;
 
     fn create_terminal(&self, id: u32, title: String) -> Result<Terminal<Self::Listener>, Error> {
-        VirtualConsoleClient::create_terminal(self, id, title, false, None)
+        VirtualConsoleClient::create_terminal(self, id, title, true, None)
     }
 
     fn request_update(&self, id: u32) {
@@ -132,7 +134,8 @@ impl VirtualConsoleAppAssistant {
         read_only_debuglog: Option<zx::DebugLog>,
     ) -> Result<VirtualConsoleAppAssistant, Error> {
         let app_sender = app_sender.clone();
-        let session_manager = SessionManager::new(args.keep_log_visible, FIRST_SESSION_ID);
+        let session_manager =
+            SessionManager::new(args.keep_log_visible || args.show_logo, FIRST_SESSION_ID);
         let terminals = BTreeMap::new();
 
         Ok(VirtualConsoleAppAssistant {
@@ -153,6 +156,14 @@ impl VirtualConsoleAppAssistant {
         Log::start(read_only_debuglog, &client, DEBUGLOG_ID)
     }
 
+    fn start_logo(&self) {
+        let app_sender = self.app_sender.clone();
+        let color_scheme = self.args.color_scheme;
+        let scrollback_rows = self.args.scrollback_rows;
+        let client = VirtualConsoleClient { app_sender, color_scheme, scrollback_rows };
+        Logo::start(&client, LOGO_ID).unwrap();
+    }
+
     #[cfg(test)]
     fn new_for_test() -> Result<VirtualConsoleAppAssistant, Error> {
         let app_sender = AppSender::new_for_testing_purposes_only();
@@ -165,6 +176,10 @@ impl AppAssistant for VirtualConsoleAppAssistant {
         if let Some(read_only_debuglog) = self.read_only_debuglog.take() {
             self.start_log(read_only_debuglog).expect("failed to start debuglog");
         }
+        if self.args.show_logo {
+            self.start_logo();
+        }
+
         Ok(())
     }
 
