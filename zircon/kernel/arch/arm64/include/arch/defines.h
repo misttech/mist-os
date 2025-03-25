@@ -22,7 +22,12 @@
 #endif
 #define USER_PAGE_SIZE_SHIFT SHIFT_4K
 
+#ifndef PAGE_SIZE
 #define PAGE_SIZE (1L << PAGE_SIZE_SHIFT)
+#else
+static_assert(PAGE_SIZE == (1L << PAGE_SIZE_SHIFT), "Page size mismatch!");
+#endif
+
 #define PAGE_MASK (PAGE_SIZE - 1)
 
 #define USER_PAGE_SIZE (1L << USER_PAGE_SIZE_SHIFT)
