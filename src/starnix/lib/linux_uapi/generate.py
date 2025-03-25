@@ -294,6 +294,8 @@ REPLACEMENTS = [
     (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
     # Remove __bindgen_missing from the start of constants defined in missing_includes.h
     (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
+    # Workaround for https://github.com/rust-lang/rust-bindgen/issues/3068.
+    (r"pub __bindgen_padding_0: \[u8; 1844[0-9]+usize\],\n", ""),
 ]
 
 REPLACEMENTS_PTR = [

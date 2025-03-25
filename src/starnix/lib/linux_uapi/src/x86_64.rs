@@ -10721,7 +10721,6 @@ impl Default for ff_effect {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct io_uring_sqe {
     pub opcode: __u8,
     pub flags: __u8,
@@ -10856,11 +10855,11 @@ impl Default for io_uring_sqe__bindgen_ty_5 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub union io_uring_sqe__bindgen_ty_6 {
-    pub __bindgen_anon_1: io_uring_sqe__bindgen_ty_6__bindgen_ty_1,
-    pub optval: __u64,
-    pub cmd: [__u8; 8usize],
+pub struct io_uring_sqe__bindgen_ty_6 {
+    pub __bindgen_anon_1: __BindgenUnionField<io_uring_sqe__bindgen_ty_6__bindgen_ty_1>,
+    pub optval: __BindgenUnionField<__u64>,
+    pub cmd: __BindgenUnionField<[__u8; 0usize]>,
+    pub bindgen_union_field: [u64; 2usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
