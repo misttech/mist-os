@@ -1227,6 +1227,7 @@ impl DynamicFileSource for StatusFile {
             if let Some(mm) = task.mm() {
                 let mem_stats = mm.get_stats();
                 writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
+                writeln!(sink, "VmLck:\t{} kB", mem_stats.vm_lck / 1024)?;
                 writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
                 writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;
                 writeln!(sink, "RssFile:\t{} kB", mem_stats.rss_file / 1024)?;

@@ -77,9 +77,9 @@ pub fn dispatch_syscall(
     use crate::bpf::syscalls::sys_bpf;
     use crate::mm::syscalls::{
         sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
-        sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock,
-        sys_munmap, sys_process_mrelease, sys_process_vm_readv, sys_process_vm_writev,
-        sys_set_robust_list, sys_userfaultfd,
+        sys_mlock, sys_mlock2, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync,
+        sys_munlock, sys_munlockall, sys_munmap, sys_process_mrelease, sys_process_vm_readv,
+        sys_process_vm_writev, sys_set_robust_list, sys_userfaultfd,
     };
     use crate::signals::syscalls::{
         sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction, sys_rt_sigpending,
@@ -564,6 +564,7 @@ pub fn dispatch_syscall(
         mincore[3],
         mkdirat[3],
         mknodat[4],
+        mlock2[3],
         mlock[2],
         mlockall[1],
         mmap[6],
@@ -572,6 +573,7 @@ pub fn dispatch_syscall(
         mremap[5],
         msync[3],
         munlock[2],
+        munlockall[1],
         munmap[2],
         nanosleep[2],
         newfstatat[4],

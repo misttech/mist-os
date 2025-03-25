@@ -103,6 +103,21 @@ if (target_cpu == "x64") {
   syscall_tests += [ "uinput_test" ]
 }
 
+arch64_syscall_tests_etc = [
+  {
+    name = "mlock_test"
+
+    # Sanitizer runtimes stub out mlock() because it is incompatible with their virtual memory
+    # management.
+    disable_sanitizers_on_host = true
+  },
+]
+
+arch64_syscall_tests_names = arch64_syscall_tests
+foreach(test_def, arch64_syscall_tests_etc) {
+  arch64_syscall_tests_names += [ test_def.name ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscalls_cpp_tests" ]
@@ -110,7 +125,7 @@ group("tests") {
     deps += [ ":starnix_arch32_syscalls_cpp_tests" ]
   }
   if (host_os == "linux" && host_cpu == "x64") {
-    foreach(test_name, syscall_tests + arch64_syscall_tests) {
+    foreach(test_name, syscall_tests + arch64_syscall_tests_names) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
         ":starnix_${test_name}_baseline($host_toolchain)",
@@ -200,6 +215,10 @@ config("march") {
 
 template("syscall_test") {
   test_name = invoker.test_name
+  _disable_sanitizers_on_host = false
+  if (defined(invoker.disable_sanitizers_on_host)) {
+    _disable_sanitizers_on_host = invoker.disable_sanitizers_on_host
+  }
 
   # Generate the manifest
   _manifest_label = "${test_name}.cml"
@@ -255,6 +274,9 @@ template("syscall_test") {
     }
 
     test(_host_test_label) {
+      if (_disable_sanitizers_on_host) {
+        exclude_toolchain_tags = [ "instrumented" ]
+      }
       sources = [ "${test_name}.cc" ]
       deps = _test_deps
       configs += _test_configs
@@ -263,6 +285,7 @@ template("syscall_test") {
     not_needed([
                  "_target_test_label",
                  "_host_test_label",
+                 "_disable_sanitizers_on_host",
                ])
   }
 
@@ -330,6 +353,14 @@ foreach(test_name, arch64_syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
     arch64_only = true
+  }
+}
+
+foreach(test_def, arch64_syscall_tests_etc) {
+  syscall_test(test_def.name) {
+    test_name = test_def.name
+    arch64_only = true
+    forward_variables_from(test_def, "*", [ "name" ])
   }
 }
 
@@ -473,7 +504,7 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":syslog_non_root_test",
     ":crash_test",
   ]
-  foreach(test_name, syscall_tests + arch64_syscall_tests) {
+  foreach(test_name, syscall_tests + arch64_syscall_tests_names) {
     test_components += [ ":${test_name}" ]
   }
 

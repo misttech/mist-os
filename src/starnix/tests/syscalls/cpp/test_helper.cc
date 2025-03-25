@@ -365,6 +365,22 @@ std::optional<MemoryMappingExt> find_memory_mapping_ext(uintptr_t addr, std::str
       maps);
 }
 
+std::ostream &operator<<(std::ostream &os, const MemoryMappingExt &mapping) {
+  os << "\tstart:\t0x" << std::hex << mapping.start << "\n";
+  os << "\tend:\t0x" << std::hex << mapping.end << "\n";
+  os << "\tperms:\t" << mapping.perms << "\n";
+  os << "\toffset:\t0x" << mapping.offset << "\n";
+  os << "\tdevice:\t" << mapping.device << "\n";
+  os << "\tinode:\t" << mapping.inode << "\n";
+  os << "\tpath:\t" << mapping.pathname << "\n";
+  os << "\trss:\t" << mapping.rss << "\n";
+  os << "\tflags:\t";
+  for (auto &vm_flag : mapping.vm_flags) {
+    os << vm_flag << " ";
+  }
+  return os;
+}
+
 std::string RandomHexString(size_t length) {
   constexpr char kHexCharacters[] = "0123456789ABCDEF";
   constexpr size_t kRadix = sizeof(kHexCharacters) - 1;

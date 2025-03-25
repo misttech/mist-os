@@ -448,25 +448,15 @@
                 "MincoreTest.InvalidLengthFails",
 
                 // mlock_test
-                "MlockTest.Basic",
                 "MapLockedTest.Basic",
                 "MapLockedTest.RlimitMemlockZero",
-                "MlockTest.MsyncInvalidate",
-                "MlockTest.ProtNone",
-                "MlockTest.Fork",
-                "MlockTest.RlimitMemlockZero",
                 "MunlockTest.Basic",
-                "MlockTest.RlimitMemlockInsufficient",
                 "MlockallTest.Future",
                 "MunlockallTest.Basic",
-                "Mlock2Test.NoFlags",
                 "MapLockedTest.RlimitMemlockInsufficient",
                 "MremapLockedTest.Basic",
-                "Mlock2Test.UnknownFlags",
                 "MremapLockedTest.RlimitMemlockZero",
-                "Mlock2Test.MlockOnfault",
                 "MremapLockedTest.RlimitMemlockInsufficient",
-                "MlockTest.MadviseDontneed",
 
                 // mmap_test
                 "MMapDeathTest.TruncateAfterCOWBreak",

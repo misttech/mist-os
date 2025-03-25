@@ -231,6 +231,9 @@ impl Mapping {
         // pf   -   pure PFN range
         // dw   -   disabled write to the mapped file
         // lo   -   pages are locked in memory
+        if self.flags.contains(MappingFlags::LOCKED) {
+            string.push_str("lo ");
+        }
         // io   -   memory mapped I/O area
         // sr   -   sequential read advise provided
         // rr   -   random read advise provided
@@ -427,6 +430,7 @@ bitflags! {
         const WIPEONFORK  = 1 <<  9;
         const DONT_SPLIT  = 1 << 10;
         const DONT_EXPAND = 1 << 11;
+        const LOCKED      = 1 << 12;
     }
 }
 

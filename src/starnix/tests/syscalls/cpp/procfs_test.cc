@@ -450,6 +450,7 @@ TEST_F(ProcTaskDirTest, SelfStatusSensibleOutput) {
   EXPECT_THAT(contents, testing::HasSubstr("\nGid:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nGroups:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nVmSize:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmLck:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nVmRSS:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nRssAnon:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nRssFile:"));

@@ -196,6 +196,14 @@ impl ops::Sub<UserAddress> for UserAddress {
     }
 }
 
+impl ops::Rem<u64> for UserAddress {
+    type Output = u64;
+
+    fn rem(self, rhs: u64) -> Self::Output {
+        self.0 % rhs
+    }
+}
+
 impl fmt::Display for UserAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#x}", self.0)
