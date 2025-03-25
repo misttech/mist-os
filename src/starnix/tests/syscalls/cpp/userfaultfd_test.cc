@@ -147,7 +147,7 @@ TEST_F(UffdProcTest, Register) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
 
   uffd.register_range(start, len, UFFDIO_REGISTER_MODE_MISSING);
 
@@ -164,7 +164,7 @@ TEST_F(UffdProcTest, RegisterPart) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
 
   uffd.register_range(start + page_size, page_size, UFFDIO_REGISTER_MODE_MISSING);
 
@@ -187,7 +187,7 @@ TEST(UffdTest, RegisterEmpty) {
   // Identify an empty page by mapping and then unmapping
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
   full_range.Unmap();
 
   uffdio_register uffdio_register;
@@ -205,7 +205,7 @@ TEST(UffdTest, TwoUffdCantOverlap) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
   uffdio_register uffdio_register;
 
   // Register the mapping with uffd_a
@@ -235,7 +235,7 @@ TEST_F(UffdProcTest, SmapsOnFork) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
 
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
@@ -262,7 +262,7 @@ TEST_F(UffdProcTest, Unregister) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
   reinterpret_cast<char *>(full_range.mapping())[0] = 'a';
 
   EXPECT_EQ(uffd_a.unregister_range(start, len), 0);
@@ -286,7 +286,7 @@ TEST_F(UffdProcTest, Close) {
 
   auto full_range = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-  intptr_t start = reinterpret_cast<intptr_t>(full_range.mapping());
+  uintptr_t start = reinterpret_cast<uintptr_t>(full_range.mapping());
   memset(full_range.mapping(), 'a', len);
   UffdWrapper uffd_a;
   uffd_a.api(UFFD_FEATURE_SIGBUS);

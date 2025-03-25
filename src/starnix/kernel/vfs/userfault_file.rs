@@ -16,12 +16,70 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, uffdio_api, uffdio_range, uffdio_register, UFFDIO, UFFDIO_API, UFFDIO_MOVE,
+    errno, error, uapi, uffdio_api, uffdio_range, uffdio_register, UFFDIO, UFFDIO_API, UFFDIO_MOVE,
     UFFDIO_POISON, UFFDIO_REGISTER, UFFDIO_UNREGISTER, _UFFDIO_API, _UFFDIO_REGISTER,
     _UFFDIO_UNREGISTER,
 };
 use static_assertions::const_assert_eq;
 use std::sync::Arc;
+
+uapi::check_arch_independent_layout! {
+    uffdio_api {
+        api,
+        features,
+        ioctls,
+    }
+
+    uffdio_range {
+        start,
+        len,
+    }
+
+    uffdio_register {
+        range,
+        mode,
+        ioctls,
+    }
+
+    uffdio_copy {
+        dst,
+        src,
+        len,
+        mode,
+        copy,
+    }
+
+    uffdio_zeropage {
+        range,
+        mode,
+        zeropage,
+    }
+
+    uffdio_writeprotect {
+        range,
+        mode,
+    }
+
+    uffdio_continue {
+        range,
+        mode,
+        mapped,
+    }
+
+    uffdio_poison {
+        range,
+        mode,
+        updated,
+    }
+
+    uffdio_move {
+        dst,
+        src,
+        len,
+        mode,
+        move_,
+    }
+}
 
 pub struct UserFaultFile {
     inner: Arc<UserFault>,
