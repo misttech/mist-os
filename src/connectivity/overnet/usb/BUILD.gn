@@ -12,10 +12,19 @@ fuchsia_driver_package("overnet-usb-package") {
   ]
 }
 
+fuchsia_driver_package("usb-vsock-package") {
+  package_name = "usb-vsock"
+  driver_components = [
+    "overnet-usb",
+    "usb-vsock-service",
+  ]
+}
+
 group("drivers") {
   deps = [
     "overnet-usb",
     "overnet-usb-service",
+    "usb-vsock-service",
   ]
 }
 
@@ -24,5 +33,6 @@ group("tests") {
   deps = [
     "overnet-usb:tests",
     "overnet-usb-service:tests",
+    "usb-vsock-service:tests",
   ]
 }

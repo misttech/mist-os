@@ -417,6 +417,7 @@ struct VsockConnection {
 /// A handle for the state of a connection established with either [`Connection::connect`] or
 /// [`Connection::accept`]. Use this to get notified when the connection has been closed without
 /// needing to hold on to the Socket end.
+#[derive(Debug)]
 pub struct ConnectionState(mpsc::Receiver<Result<(), Error>>);
 
 impl ConnectionState {
@@ -432,6 +433,7 @@ impl ConnectionState {
 
 /// An outstanding connection request that needs to be either [`Connection::accept`]ed or
 /// [`Connection::reject`]ed.
+#[derive(Debug)]
 pub struct ConnectionRequest {
     address: Address,
 }
