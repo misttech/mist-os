@@ -9,6 +9,7 @@ load(
     "fuchsia_board_input_bundle",
     "fuchsia_board_input_bundle_set",
     "fuchsia_prebuilt_board_input_bundle",
+    "fuchsia_prebuilt_board_input_bundle_set",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -50,6 +51,11 @@ fuchsia_prebuilt_board_input_bundle(
 fuchsia_prebuilt_board_input_bundle(
     name = "rtc_driver",
     files = "@gn_targets//boards/vim3:rtc_driver",
+)
+
+fuchsia_prebuilt_board_input_bundle_set(
+    name = "rtc_driver_bibs",
+    files = "//:rtc_driver_bib_set",
 )
 
 _COMMON_BOARD_INPUT_BUNDLES = [

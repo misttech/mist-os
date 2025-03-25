@@ -101,6 +101,12 @@ filegroup(
     visibility = ["//build/bazel/toolchains/python:__pkg__"],
 )
 
+filegroup(
+    name = "rtc_driver_bib_set",
+    srcs = glob(["prebuilt/drivers/rtc/pcf8563/board_input_bundle_set/rtc_set/**/*"]),
+    visibility = ["//visibility:public"],
+)
+
 fuchsia_devicetree_toolchain_info(
     name = "fuchsia_devicetree_toolchain_info",
     dtc = "//:prebuilt/third_party/dtc/%s/dtc" % build_config.host_tag,
