@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <lib/fit/result.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/inotify.h>
 #include <sys/signalfd.h>
 #include <sys/syscall.h>
 #include <sys/timerfd.h>
-#include <sys/xattr.h>
 #include <unistd.h>
 
 #include <string>
@@ -22,16 +20,6 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 namespace {
-
-fit::result<int, std::string> GetLabel(int fd) {
-  char buf[256];
-  ssize_t result = fgetxattr(fd, "security.selinux", buf, sizeof(buf));
-  if (result < 0) {
-    return fit::error(errno);
-  }
-  // Use `c_str()` to strip off the trailing NUL if present.
-  return fit::ok(std::string(buf, result).c_str());
-}
 
 // TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
 TEST(AnonInodeTest, DISABLED_EventFdIsUnlabeled) {

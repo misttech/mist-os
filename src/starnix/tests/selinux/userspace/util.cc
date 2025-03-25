@@ -8,6 +8,7 @@
 #include <lib/fit/defer.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/xattr.h>
 
 #include <string>
 
@@ -55,6 +56,16 @@ std::string ReadFile(const std::string& name) {
   }
   EXPECT_THAT(read_len, SyscallSucceeds()) << "error reading " << name;
   return contents;
+}
+
+fit::result<int, std::string> GetLabel(int fd) {
+  char buf[256];
+  ssize_t result = fgetxattr(fd, "security.selinux", buf, sizeof(buf));
+  if (result < 0) {
+    return fit::error(errno);
+  }
+  // Use `c_str()` to strip off the trailing NUL if present.
+  return fit::ok(std::string(buf, result).c_str());
 }
 
 ScopedEnforcement ScopedEnforcement::SetEnforcing() {

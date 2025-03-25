@@ -5,6 +5,7 @@
 #ifndef SRC_STARNIX_TESTS_SELINUX_USERSPACE_UTIL_H_
 #define SRC_STARNIX_TESTS_SELINUX_USERSPACE_UTIL_H_
 
+#include <lib/fit/result.h>
 #include <string.h>
 
 #include <string>
@@ -19,6 +20,9 @@ void WriteContents(const std::string& file, const std::string& contents, bool cr
 
 // Reads |file|, or fail the test.
 std::string ReadFile(const std::string& file);
+
+// Reads the security label of the specified `fd`, returning the `errno` on failure.
+fit::result<int, std::string> GetLabel(int fd);
 
 // Runs the given action in a forked process after transitioning to |label|. This requires some
 // rules to be set-up. For transitions from unconfined_t (the starting label for tests), giving
