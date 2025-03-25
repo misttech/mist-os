@@ -8,6 +8,7 @@ use super::{
 };
 use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
+use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -238,6 +239,27 @@ where
 pub struct FsNodeSecurityXattr {
     pub name: &'static FsStr,
     pub value: FsString,
+}
+
+/// Checks whether the `current_task` is allowed to mmap `file` or memory using the given
+/// [`ProtectionFlags`] and [`MappingOptions`].
+/// Corresponds to the `mmap_file()` LSM hook.
+pub fn mmap_file(
+    current_task: &CurrentTask,
+    file: &Option<FileHandle>,
+    protection_flags: ProtectionFlags,
+    options: MappingOptions,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.mmap_file");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file::mmap_file(
+            security_server,
+            current_task,
+            file,
+            protection_flags,
+            options,
+        )
+    })
 }
 
 /// Checks whether the `current_task` has the specified `permission_flags` to the `file`.

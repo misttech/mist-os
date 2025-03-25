@@ -754,6 +754,8 @@ common_permission_enum! {
         Ioctl("ioctl"),
         /// Permission to set and unset file or socket locks.
         Lock("lock"),
+        /// Permission to map a file.
+        Map("map"),
         /// Permission to read content from a file or socket, as well as reading or following links.
         Read("read"),
         /// Permission checked against the existing label when updating a node's security label.
@@ -1260,6 +1262,8 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to dynamically transition a process to a different security domain.
         DynTransition("dyntransition"),
+        /// Permission to execute arbitrary code from memory.
+        ExecMem("execmem"),
         /// Permission to fork the current running process.
         Fork("fork"),
         /// Permission to get the process group ID.

@@ -9,16 +9,19 @@ use super::{
     fs_node_effective_sid_and_class, has_file_permissions, permissions_from_flags,
     todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass, PermissionFlags,
 };
-use crate::security::selinux_hooks::todo_has_file_permissions;
+use crate::mm::{MappingOptions, ProtectionFlags};
+use crate::security::selinux_hooks::{
+    todo_check_permission, todo_has_file_permissions, CommonFilePermission, ProcessPermission,
+};
 use crate::task::CurrentTask;
-use crate::vfs::FileObject;
+use crate::vfs::{FileHandle, FileObject};
 use crate::TODO_DENY;
-use selinux::{CommonFsNodePermission, Permission, SecurityServer};
+use selinux::{CommonFsNodePermission, FsNodeClass, Permission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
-    FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION, FS_IOC_SETFLAGS,
-    FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
+    error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
+    FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
 };
 
 /// Returns the security state for a new file object created by `current_task`.
@@ -197,6 +200,66 @@ pub(in crate::security) fn check_file_fcntl_access(
             subject_sid,
             file.node(),
             &permissions_from_flags(PermissionFlags::WRITE, fs_node_class),
+            current_task.into(),
+        )?;
+    }
+    Ok(())
+}
+
+/// This function checks:
+/// * `execmem` when mapping with `PROT_EXEC` an anonymous mapping.
+/// * `execmem` when mapping with `PROT_EXEC` a writable private mapping.
+/// * `map` and `read` when mapping a file.
+/// * `write` when mapping a shared file with `PROT_WRITE`.
+/// * `execute` when mapping a file with `PROT_EXEC`.
+pub fn mmap_file(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &Option<FileHandle>,
+    protection_flags: ProtectionFlags,
+    options: MappingOptions,
+) -> Result<(), Errno> {
+    if protection_flags.contains(ProtectionFlags::EXEC) {
+        let anonymous_mapping = options.contains(MappingOptions::ANONYMOUS);
+        let private_writable_mapping = !options.contains(MappingOptions::SHARED)
+            && protection_flags.contains(ProtectionFlags::WRITE);
+        if anonymous_mapping || private_writable_mapping {
+            let current_sid = current_task.security_state.lock().current_sid;
+            todo_check_permission(
+                TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
+                &security_server.as_permission_check(),
+                current_sid,
+                current_sid,
+                ProcessPermission::ExecMem,
+                current_task.into(),
+            )?;
+        }
+    }
+
+    if let Some(file) = file {
+        let node_class = file.node().security_state.lock().class;
+        let mut permissions: Vec<Permission> = vec![
+            CommonFsNodePermission::Read.for_class(node_class),
+            CommonFsNodePermission::Map.for_class(node_class),
+        ];
+        if protection_flags.contains(ProtectionFlags::WRITE)
+            && options.contains(MappingOptions::SHARED)
+        {
+            permissions.push(CommonFsNodePermission::Write.for_class(node_class));
+        }
+        if protection_flags.contains(ProtectionFlags::EXEC) {
+            let FsNodeClass::File(file_class) = node_class else {
+                return error!(EPERM);
+            };
+            permissions.push(CommonFilePermission::Execute.for_class(file_class));
+        }
+        let current_sid = current_task.security_state.lock().current_sid;
+        todo_has_file_permissions(
+            TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
+            &security_server.as_permission_check(),
+            current_sid,
+            file,
+            &permissions,
             current_task.into(),
         )?;
     }

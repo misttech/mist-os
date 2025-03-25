@@ -153,6 +153,8 @@ where
         options |= MappingOptions::POPULATE;
     }
 
+    security::mmap_file(current_task, &file, prot_flags, options)?;
+
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
         profile_duration!("AnonymousMmap");
