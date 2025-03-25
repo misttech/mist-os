@@ -586,7 +586,7 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 }  // namespace internal
 
 // The global ktrace state.
-internal::KTraceState KTrace::state_;
+internal::KTraceState KTrace::internal_state_;
 KTrace::CpuContextMap KTrace::cpu_context_map_;
 
 zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
@@ -596,14 +596,14 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return GetInstance().Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return GetInternalState().Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
-      return GetInstance().Stop();
+      return GetInternalState().Stop();
 
     case KTRACE_ACTION_REWIND:
-      return GetInstance().Rewind();
+      return GetInternalState().Rewind();
 
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -640,13 +640,13 @@ void KTrace::InitHook(unsigned) {
   // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
   fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
     fxt::WriteStringRecord(
-        &GetInstance(), interned_string.id(), interned_string.string(),
+        &GetInternalState(), interned_string.id(), interned_string.string(),
         strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
   });
 
   // Initialize the singleton data structures.
   cpu_context_map_.Init();
-  state_.Init(bufsize, initial_grpmask);
+  internal_state_.Init(bufsize, initial_grpmask);
 }
 
 // Finish initialization before starting userspace (i.e. before debug syscalls can occur).

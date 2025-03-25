@@ -652,7 +652,7 @@ class KTrace {
   // On success, this function returns the number of bytes that were read into the buffer.
   // On failure, a zx_status_t error code is returned.
   static zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) {
-    const ssize_t ret = GetInstance().ReadUser(ptr, off, len);
+    const ssize_t ret = GetInternalState().ReadUser(ptr, off, len);
     if (ret < 0) {
       return zx::error(static_cast<zx_status_t>(ret));
     }
@@ -663,7 +663,7 @@ class KTrace {
   static zx_instant_boot_ticks_t Timestamp() { return current_boot_ticks(); }
 
   static bool CategoryEnabled(const fxt::InternedCategory& category) {
-    return GetInstance().IsCategoryEnabled(category);
+    return GetInternalState().IsCategoryEnabled(category);
   }
 
   // Generates an instant event record that contains the given arguments if the kernel:probe
@@ -672,7 +672,7 @@ class KTrace {
     if (CategoryEnabled("kernel:probe"_category)) {
       const fxt::StringRef name_ref = fxt::StringRef{label};
       fxt::WriteInstantEventRecord(
-          &GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
+          &GetInternalState(), KTrace::Timestamp(), ThreadRefFromContext(context),
           fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
           fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
     }
@@ -686,7 +686,7 @@ class KTrace {
                                const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(koid), obj_type, name,
+          fxt::WriteKernelObjectRecord(&GetInternalState(), fxt::Koid(koid), obj_type, name,
                                        unpacked_args...);
         },
         args);
@@ -699,7 +699,7 @@ class KTrace {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationCompleteEventRecord(
-              &GetInstance(), start_time, ThreadRefFromContext(context),
+              &GetInternalState(), start_time, ThreadRefFromContext(context),
               fxt::StringRef{category.label()}, label, end_time, unpacked_args...);
         },
         args);
@@ -711,7 +711,8 @@ class KTrace {
                           Context context, Unused, const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteInstantEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
+          fxt::WriteInstantEventRecord(&GetInternalState(), timestamp,
+                                       ThreadRefFromContext(context),
                                        fxt::StringRef{category.label()}, label, unpacked_args...);
         },
         args);
@@ -724,7 +725,7 @@ class KTrace {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationBeginEventRecord(
-              &GetInstance(), timestamp, ThreadRefFromContext(context),
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
               fxt::StringRef{category.label()}, label, unpacked_args...);
         },
         args);
@@ -736,9 +737,9 @@ class KTrace {
                               Context context, Unused, const ktl::tuple<Ts...> args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteDurationEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
-                                           fxt::StringRef{category.label()}, label,
-                                           unpacked_args...);
+          fxt::WriteDurationEndEventRecord(
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, unpacked_args...);
         },
         args);
   }
@@ -749,9 +750,9 @@ class KTrace {
                           Context context, uint64_t counter_id, const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteCounterEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
-                                       fxt::StringRef{category.label()}, label, counter_id,
-                                       unpacked_args...);
+          fxt::WriteCounterEventRecord(
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, counter_id, unpacked_args...);
         },
         args);
   }
@@ -762,9 +763,9 @@ class KTrace {
                             Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteFlowBeginEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
-                                         fxt::StringRef{category.label()}, label, flow_id,
-                                         unpacked_args...);
+          fxt::WriteFlowBeginEventRecord(
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, flow_id, unpacked_args...);
         },
         args);
   }
@@ -775,9 +776,9 @@ class KTrace {
                            Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteFlowStepEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
-                                        fxt::StringRef{category.label()}, label, flow_id,
-                                        unpacked_args...);
+          fxt::WriteFlowStepEventRecord(
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, flow_id, unpacked_args...);
         },
         args);
   }
@@ -788,9 +789,9 @@ class KTrace {
                           Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteFlowEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
-                                       fxt::StringRef{category.label()}, label, flow_id,
-                                       unpacked_args...);
+          fxt::WriteFlowEndEventRecord(
+              &GetInternalState(), timestamp, ThreadRefFromContext(context),
+              fxt::StringRef{category.label()}, label, flow_id, unpacked_args...);
         },
         args);
   }
@@ -803,7 +804,7 @@ class KTrace {
                                const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteThreadWakeupRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
+          fxt::WriteThreadWakeupRecord(&GetInternalState(), Timestamp(), static_cast<uint16_t>(cpu),
                                        thread_ref, unpacked_args...);
         },
         args);
@@ -816,9 +817,9 @@ class KTrace {
                                 const ktl::tuple<Ts...>& args) {
     ktl::apply(
         [&](const Ts&... unpacked_args) {
-          fxt::WriteContextSwitchRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
-                                        outgoing_thread_state, outgoing_thread, incoming_thread,
-                                        unpacked_args...);
+          fxt::WriteContextSwitchRecord(&GetInternalState(), Timestamp(),
+                                        static_cast<uint16_t>(cpu), outgoing_thread_state,
+                                        outgoing_thread, incoming_thread, unpacked_args...);
         },
         args);
   }
@@ -870,7 +871,7 @@ class KTrace {
     }
   }
 
-  static internal::KTraceState& GetInstance() { return state_; }
+  static internal::KTraceState& GetInternalState() { return internal_state_; }
 
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
@@ -882,7 +883,7 @@ class KTrace {
   KTrace(KTrace&&) = delete;
   KTrace& operator=(KTrace&&) = delete;
 
-  static internal::KTraceState state_;
+  static internal::KTraceState internal_state_;
   static CpuContextMap cpu_context_map_;
 };
 
