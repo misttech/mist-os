@@ -865,14 +865,14 @@ magma::Status MsdArmDevice::ProcessJobInterrupt(uint64_t time) {
       uint64_t job_tail = regs.Tail().ReadFrom(register_io_.get()).reg_value();
 
       scheduler_->JobCompleted(slot, static_cast<ArmMaliResultCode>(result), job_tail);
-      failed &= ~(1 << slot);
+      failed &= ~(1U << slot);
     }
 
     uint32_t finished = irq_status.finished_slots();
     while (finished) {
       uint32_t slot = __builtin_ffs(finished) - 1;
       scheduler_->JobCompleted(slot, kArmMaliResultSuccess, 0u);
-      finished &= ~(1 << slot);
+      finished &= ~(1U << slot);
     }
   }
   job_interrupt_->Complete();
@@ -933,7 +933,7 @@ magma::Status MsdArmDevice::ProcessMmuInterrupt() {
         address_manager_->ReleaseSpaceMappings(connection->const_address_space());
       }
     }
-    faulted_slots &= ~(1 << slot);
+    faulted_slots &= ~(1U << slot);
   }
 
   mmu_interrupt_->Complete();
