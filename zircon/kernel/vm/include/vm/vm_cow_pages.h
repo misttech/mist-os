@@ -78,6 +78,20 @@ struct VmCowRange {
   VmCowRange TrimedFromStart(uint64_t amount) const {
     return VmCowRange(offset + amount, len - amount);
   }
+  // Returns the minimal range that covers both |this| and |other|. If these ranges are disjoint
+  // then the returned range will be larger than combined length of |this| and |other| in order to
+  // span both using a single range.
+  VmCowRange Cover(VmCowRange other) const {
+    if (is_empty()) {
+      return other;
+    }
+    if (other.is_empty()) {
+      return *this;
+    }
+    const uint64_t start = ktl::min(offset, other.offset);
+    const uint64_t end = ktl::max(offset + len, other.offset + other.len);
+    return VmCowRange(start, end - start);
+  }
   VmCowRange WithLength(uint64_t new_length) const { return VmCowRange(offset, new_length); }
   bool IsBoundedBy(uint64_t max) const;
 };
@@ -173,6 +187,7 @@ class VmCowPages final : public VmHierarchyBase,
     fbl::RefPtr<VmCowPages> ptr_;
     Guard<VmoLockType>::Adoptable lock_;
   };
+  class DeferredOps;
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
@@ -720,23 +735,15 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
   using RangeChangeOp = VmObject::RangeChangeOp;
-  // Applies the specific operation to all mappings in the given range against this object. The
-  // operations is not applied to descendants/cow children.
-  enum class RangeChangeChildren : bool {
-    // The caller acknowledges that they may need to apply updates to mappings in the children, and
-    // promise to do so. A failure to actually perform the child range updates cannot be detected,
-    // but by requiring callers to explicitly acknowledge that they need to is intended to minimize
-    // errors.
-    Deferred,
-    // The caller states that they know that they have no children and therefore do not need to
-    // perform a range change on them. It is an error, and will trigger an assertion failure, to
-    // supply this if there are children.
-    AssumeNone,
-  };
-  void RangeChangeUpdateSelfLocked(VmCowRange range, RangeChangeOp op, RangeChangeChildren children)
+  // Applies the specific operation to all mappings in the given range. The mappings for the current
+  // object are operated on immediately, with any children being operated on using |deferred|. If
+  // the caller knows that no |DeferredOps| is needed (e.g. the VMO has no children and is not pager
+  // backed) then a nullptr can be provided.
+  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
-  // Applies the specific operation to all mappings in the given range for against descendants/cow
-  // children. The operation is not applied for this object.
+  // Applies the specific operation to all mappings in the given range against descendants/cow
+  // children. The operation is not applied for this object. Only the DeferredOps is expected to
+  // call this.
   // Takes ownership, and will drop, the lock for this object as children are iterated.
   void RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
                                     Guard<VmoLockType>::Adoptable adopt) TA_EXCL(lock());
@@ -2020,6 +2027,89 @@ class VmCowPages::LookupCursor {
   list_node_t* alloc_list_ = nullptr;
 
   friend VmCowPages;
+};
+
+class ScopedPageFreedList {
+ public:
+  explicit ScopedPageFreedList() { list_initialize(&list_); }
+
+  ~ScopedPageFreedList() { ASSERT(list_is_empty(&list_)); }
+
+  void FreePagesLocked(VmCowPages* cow_pages) TA_REQ(cow_pages->lock()) {
+    cow_pages->FreePagesLocked(&list_, owned_pages_);
+  }
+
+  bool owned_pages_ = true;
+  list_node_t list_;
+};
+
+// Helper object for finishing VmCowPages operations that must occur after the lock is dropped. This
+// is necessary due to some operations being externally locked. It is expected that this object is
+// stack allocated using the __UNINITIALIZED tag in a sequence like this:
+//
+//     __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_object_);
+//     Guard<VmoLockType> guard{cow_object_->lock()};
+//     cow_object_->DoOperationLocked(&deferred);
+//
+// The destruction order will then allow |deferred| to perform its actions after |guard| is
+// destructed and the lock is dropped.
+class VmCowPages::DeferredOps {
+ public:
+  // Construct a DeferredOps for the given VmCowPages. Must be constructed, and deconstructed,
+  // without the lock held. It is the callers responsibility to ensure the pointer remains valid
+  // over the lifetime of the object.
+  explicit DeferredOps(VmCowPages* self) TA_EXCL(self->lock());
+  // TODO(https://fxbug.dev/338300943): This is a transitional constructor to allow for the range
+  // change updates, and by extension this helper object, to be gradually moved outside the lock.
+  // Using this constructor instructs the DeferredOps that the lock is already held during both
+  // construction and destruction and it should not attempt to reacquire.
+  struct LockedTag {};
+  DeferredOps(VmCowPages* self, LockedTag tag) TA_REQ(self->lock())
+      : locked_range_update_(true), self_(self) {}
+  ~DeferredOps();
+
+  DeferredOps(const DeferredOps&) = delete;
+  DeferredOps(DeferredOps&&) = delete;
+  DeferredOps& operator=(const DeferredOps&) = delete;
+  DeferredOps& operator=(DeferredOps&&) = delete;
+
+ private:
+  // Methods are private as they are only intended for use by the VmCowPages and not the external
+  // caller holding this object on their stack.
+  friend VmCowPages;
+
+  // Indicate that the given range change operation should be performed later. Multiple ranges can
+  // be specified, although only a single range that covers all of them will actually be invalidated
+  // later, and the requested ops must all be the same (a mix of Unmap and UnmapZeroPage can be
+  // given, with the entire operation upgraded to Unmap).
+  void AddRange(VmCowPages* self, VmCowRange range, RangeChangeOp op);
+
+  // Retrieves the underlying resource containers. Any pages (loaned or otherwise) that are added
+  // will be freed *after* any range change operations are first performed.
+  ScopedPageFreedList& FreeList(VmCowPages* self) {
+    DEBUG_ASSERT(self == self_);
+    return free_list_;
+  }
+  FreeLoanedPagesHolder& Flph(VmCowPages* self);
+
+  // TODO(https://fxbug.dev/338300943): Tracks whether the locked temporary constructor was used.
+  bool locked_range_update_ = false;
+
+  // A reference to the VmCowPages for any deferred operations to be run against.
+  VmCowPages* const self_;
+
+  // Track any potential range change update that should be run over the cow children.
+  struct DeferredRangeOp {
+    RangeChangeOp op;
+    VmCowRange range;
+  };
+  ktl::optional<DeferredRangeOp> range_op_;
+
+  // Track any resources that need to be freed after the range change update.
+  ScopedPageFreedList free_list_;
+  // The FLPH is a moderately large object and is wrapped in an optional to defer its construction
+  // unless it is actually needed.
+  ktl::optional<FreeLoanedPagesHolder> flph_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_
