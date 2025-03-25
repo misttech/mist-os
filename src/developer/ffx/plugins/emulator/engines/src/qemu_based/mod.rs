@@ -342,6 +342,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     .use_fxfs(true)
                     .vbmeta(vbmeta_path)
                     .zbi(updated_guest.zbi_image);
+                tracing::debug!("Building image with {image:#?}");
                 image.build(&env).await?;
             }
             // Since the one multi-partition GPT image is passed to qemu, no kernel and zbi images
