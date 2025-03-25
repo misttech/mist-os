@@ -326,19 +326,27 @@ pub struct NandFvm {
 
 /// The parameters describing how to create an Fxfs image.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(default)]
 pub struct Fxfs {
     /// The size of Fxfs image to generate.  The base system's contents must not exceed this size.
     /// If unset, there's no limit, and the image will be an arbitrary size greater than or equal to
     /// the space needed for the base system's contents.
-    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
 
     /// Maximum amount of contents for an assembled Fxfs image.  Must be no greater than
     /// `size_bytes`.
-    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub maximum_contents_size: Option<u64>,
+
+    /// Whether blobs in fxblob should be compressed during assembly. Defaults to true.
+    pub compression_enabled: bool,
+}
+
+impl Default for Fxfs {
+    fn default() -> Self {
+        Self { size_bytes: None, maximum_contents_size: None, compression_enabled: true }
+    }
 }
 
 impl ImagesConfig {
@@ -384,6 +392,7 @@ impl ImagesConfig {
                     images.push(Image::Fxfs(Fxfs {
                         size_bytes,
                         maximum_contents_size: board.fxfs.size_checker_maximum_bytes,
+                        compression_enabled: board.fxfs.compression_enabled,
                     }));
                 }
                 pfc::VolumeConfig::Fvm(fvm) => {
@@ -497,7 +506,11 @@ mod tests {
                 key_metadata: "path/to/metadata".into(),
                 additional_descriptors: vec![],
             }),
-            fxfs: bfc::Fxfs { size_bytes: Some(1234), size_checker_maximum_bytes: Some(5678) },
+            fxfs: bfc::Fxfs {
+                size_bytes: Some(1234),
+                size_checker_maximum_bytes: Some(5678),
+                compression_enabled: true,
+            },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
                 truncate_to_length: None,
@@ -537,7 +550,11 @@ mod tests {
                 key_metadata: "path/to/metadata".into(),
                 additional_descriptors: vec![],
             }),
-            fxfs: bfc::Fxfs { size_bytes: Some(1234), size_checker_maximum_bytes: Some(5678) },
+            fxfs: bfc::Fxfs {
+                size_bytes: Some(1234),
+                size_checker_maximum_bytes: Some(5678),
+                compression_enabled: false,
+            },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
                 truncate_to_length: None,
@@ -638,7 +655,11 @@ mod tests {
                         key_metadata: "path/to/metadata".into(),
                         additional_descriptors: vec![],
                     }),
-                    Image::Fxfs(Fxfs { size_bytes: Some(1234), maximum_contents_size: Some(5678) }),
+                    Image::Fxfs(Fxfs {
+                        size_bytes: Some(1234),
+                        maximum_contents_size: Some(5678),
+                        compression_enabled: true,
+                    }),
                 ],
             }
         );

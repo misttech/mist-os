@@ -36,6 +36,9 @@ pub async fn construct_fxfs(
     if let Some(size) = fxfs_config.size_bytes {
         fxfs_builder.set_size(size);
     }
+    if !fxfs_config.compression_enabled {
+        fxfs_builder.disable_compression();
+    }
 
     // Add the base and cache packages.
     for package_manifest_path in &image_config.base {
@@ -171,7 +174,7 @@ mod tests {
                     dir,
                     &image_config,
                     &base_package,
-                    &Fxfs { size_bytes, maximum_contents_size: None },
+                    &Fxfs { size_bytes, ..Default::default() },
                 )
                 .await
                 .unwrap();

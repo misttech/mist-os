@@ -308,22 +308,29 @@ pub struct VBMetaDescriptor {
 }
 
 /// The parameters describing how to create an Fxfs image.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(deny_unknown_fields, default)]
 pub struct Fxfs {
     /// If `target_size` bytes is set, the raw image will be set to exactly this
     /// size (and an error is returned if the contents exceed that size).  If
     /// unset (or 0), the image will be truncated to twice the size of its
     /// contents, which is a heuristic that gives us roughly enough space for
     /// normal usage of the image.
-    #[serde(default)]
     pub size_bytes: Option<u64>,
 
     /// The maximum number of bytes we can place in Fxfs during assembly.
     /// This value must be smaller than `size_bytes` which is the absolute maximum amount of space
     /// we can use in Fxfs.
-    #[serde(default)]
     pub size_checker_maximum_bytes: Option<u64>,
+
+    /// Whether blobs in fxblob should be compressed during assembly. Defaults to true.
+    pub compression_enabled: bool,
+}
+
+impl Default for Fxfs {
+    fn default() -> Self {
+        Self { size_bytes: None, size_checker_maximum_bytes: None, compression_enabled: true }
+    }
 }
 
 /// The parameters describing how to create a FVM image.

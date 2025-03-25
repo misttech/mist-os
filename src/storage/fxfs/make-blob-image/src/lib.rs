@@ -59,6 +59,7 @@ pub async fn make_blob_image(
     blobs: Vec<(Hash, PathBuf)>,
     json_output_path: &str,
     target_size: Option<u64>,
+    compression_enabled: bool,
 ) -> Result<(), Error> {
     let output_image = std::fs::OpenOptions::new()
         .read(true)
@@ -101,16 +102,18 @@ pub async fn make_blob_image(
         .open(device)
         .await
         .context("Failed to format filesystem")?;
-    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await.map_err(|e| {
-        if target_size != 0 && FxfsError::NoSpace.matches(&e) {
-            e.context(format!(
-                "Configured image size {} is too small to fit the base system image.",
-                target_size
-            ))
-        } else {
-            e
-        }
-    })?;
+    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs, compression_enabled)
+        .await
+        .map_err(|e| {
+            if target_size != 0 && FxfsError::NoSpace.matches(&e) {
+                e.context(format!(
+                    "Configured image size {} is too small to fit the base system image.",
+                    target_size
+                ))
+            } else {
+                e
+            }
+        })?;
     let (_device, actual_size) = filesystem.finalize().await?;
 
     if target_size == 0 {
@@ -208,6 +211,7 @@ async fn install_blobs(
     filesystem: Arc<FxFilesystem>,
     volume_name: &str,
     blobs: Vec<(Hash, PathBuf)>,
+    compression_enabled: bool,
 ) -> Result<BlobsJsonOutput, Error> {
     let root_volume = root_volume(filesystem.clone()).await?;
     let vol = root_volume
@@ -227,7 +231,8 @@ async fn install_blobs(
     let generate = fasync::unblock(move || {
         thread_pool.install(|| {
             blobs.par_iter().try_for_each(|(hash, path)| {
-                let blob = generate_blob(hash.clone(), path.clone(), fs_block_size)?;
+                let blob =
+                    generate_blob(hash.clone(), path.clone(), fs_block_size, compression_enabled)?;
                 futures::executor::block_on(tx.clone().send(blob))
                     .context("send blob to install task")
             })
@@ -308,7 +313,12 @@ async fn install_blob(
     })
 }
 
-fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<BlobToInstall, Error> {
+fn generate_blob(
+    hash: Hash,
+    path: PathBuf,
+    fs_block_size: usize,
+    compression_enabled: bool,
+) -> Result<BlobToInstall, Error> {
     let mut contents = Vec::new();
     std::fs::File::open(&path)
         .with_context(|| format!("Unable to open `{:?}'", &path))?
@@ -331,7 +341,11 @@ fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<Blob
 
     let uncompressed_size = contents.len();
 
-    let data = maybe_compress(contents, fuchsia_merkle::BLOCK_SIZE, fs_block_size);
+    let data = if compression_enabled {
+        maybe_compress(contents, fuchsia_merkle::BLOCK_SIZE, fs_block_size)
+    } else {
+        BlobData::Uncompressed(contents)
+    };
 
     // We only need to store metadata with the blob if it's large enough or was compressed.
     let serialized_metadata: Vec<u8> =
@@ -408,7 +422,8 @@ mod tests {
             Some(sparse_path.as_os_str().to_str().unwrap()),
             blobs_in,
             blobs_json_path.as_os_str().to_str().unwrap(),
-            None,
+            /*target_size=*/ None,
+            /*compression_enabled=*/ true,
         )
         .await
         .expect("make_blob_image failed");
@@ -520,5 +535,47 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_make_uncompressed_blob_image() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path();
+        let path = dir.join("large_blob.txt");
+        let mut file = File::create(&path).unwrap();
+        let data = vec![0xabu8; 32 * 1024 * 1024];
+        file.write_all(&data).unwrap();
+        let tree = fuchsia_merkle::from_slice(data.as_slice());
+        let blobs_in = vec![(tree.root(), path)];
+
+        let compressed_path = dir.join("fxfs-compressed.blk");
+        let blobs_json_path = dir.join("blobs.json");
+        make_blob_image(
+            compressed_path.as_os_str().to_str().unwrap(),
+            None,
+            blobs_in.clone(),
+            blobs_json_path.as_os_str().to_str().unwrap(),
+            /*target_size=*/ None,
+            /*compression_enabled=*/ true,
+        )
+        .await
+        .expect("make_blob_image failed");
+
+        let uncompressed_path = dir.join("fxfs-uncompressed.blk");
+        make_blob_image(
+            uncompressed_path.as_os_str().to_str().unwrap(),
+            None,
+            blobs_in,
+            blobs_json_path.as_os_str().to_str().unwrap(),
+            /*target_size=*/ None,
+            /*compression_enabled=*/ false,
+        )
+        .await
+        .expect("make_blob_image failed");
+
+        assert!(
+            std::fs::metadata(compressed_path).unwrap().len()
+                < std::fs::metadata(uncompressed_path).unwrap().len()
+        )
     }
 }
