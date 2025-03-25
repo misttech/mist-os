@@ -122,12 +122,6 @@ async fn start<D: DeviceOps + 'static>(
         }
     };
 
-    let mac_sublayer_support = device.mac_sublayer_support().await?;
-    let mac_implementation_type = &mac_sublayer_support.device.mac_implementation_type;
-    if *mac_implementation_type != fidl_common::MacImplementationType::Softmac {
-        error!("Wrong MAC implementation type: {:?}", mac_implementation_type);
-        return Err(zx::Status::INTERNAL);
-    }
     let security_support = device.security_support().await?;
     let spectrum_management_support = device.spectrum_management_support().await?;
 
@@ -160,7 +154,6 @@ async fn start<D: DeviceOps + 'static>(
         config,
         mlme_event_stream,
         &device_info,
-        mac_sublayer_support,
         security_support,
         spectrum_management_support,
         inspector,
@@ -771,8 +764,6 @@ mod tests {
     }
 
     #[test_case(FakeDeviceConfig::default().with_mock_query_response(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
-    #[test_case(FakeDeviceConfig::default().with_mock_mac_sublayer_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
-    #[test_case(FakeDeviceConfig::default().with_mock_mac_implementation_type(fidl_common::MacImplementationType::Fullmac), zx::Status::INTERNAL)]
     #[test_case(FakeDeviceConfig::default().with_mock_security_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
     #[test_case(FakeDeviceConfig::default().with_mock_spectrum_management_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
     #[test_case(FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::__SourceBreaking { unknown_ordinal: 0 }), zx::Status::INTERNAL)]
@@ -1323,22 +1314,6 @@ mod tests {
     }
 
     // Exhaustive feature tests are unit tested on start()
-    #[fuchsia::test(allow_stalls = false)]
-    async fn start_and_serve_fails_with_wrong_mac_implementation_type() {
-        let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
-            FakeDeviceConfig::default()
-                .with_mock_mac_implementation_type(fidl_common::MacImplementationType::Fullmac),
-        )
-        .await;
-
-        match start_and_serve_with_device(fake_device).await {
-            Ok(_) => panic!(
-                "start_and_serve() future did not terminate before attempting bootstrap SME."
-            ),
-            Err(status) => assert_eq!(status, zx::Status::INTERNAL),
-        };
-    }
-
     #[fuchsia::test(allow_stalls = false)]
     async fn start_and_serve_fails_on_dropped_mlme_event_stream() {
         let (mut fake_device, _fake_device_state) = FakeDevice::new().await;

@@ -322,25 +322,6 @@ async fn start<D: DeviceOps + Send + 'static>(
     let device_info = fullmac_to_mlme::convert_device_info(device_info)
         .map_err(FullmacMlmeError::FailedToConvertVendorDriverQuery)?;
 
-    let mac_sublayer_support =
-        device.query_mac_sublayer_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
-
-    if mac_sublayer_support.device.mac_implementation_type
-        != fidl_common::MacImplementationType::Fullmac
-    {
-        return Err(FullmacMlmeError::InvalidMacImplementationType(
-            mac_sublayer_support.device.mac_implementation_type,
-        ));
-    }
-
-    if mac_sublayer_support.data_plane.data_plane_type
-        != fidl_common::DataPlaneType::GenericNetworkDevice
-    {
-        return Err(FullmacMlmeError::InvalidDataPlaneType(
-            mac_sublayer_support.data_plane.data_plane_type,
-        ));
-    }
-
     let security_support =
         device.query_security_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
 
@@ -360,7 +341,6 @@ async fn start<D: DeviceOps + Send + 'static>(
         cfg.into(),
         mlme_event_receiver,
         &device_info,
-        mac_sublayer_support,
         security_support,
         spectrum_management_support,
         inspector,
@@ -466,65 +446,9 @@ mod tests {
     }
 
     #[test]
-    fn test_mlme_startup_fails_due_to_wrong_mac_implementation_type() {
-        let (mut h, mut test_fut) = TestHelper::set_up();
-        h.fake_device
-            .lock()
-            .unwrap()
-            .query_mac_sublayer_support_mock
-            .as_mut()
-            .unwrap()
-            .device
-            .mac_implementation_type = fidl_common::MacImplementationType::Softmac;
-        assert_variant!(
-            h.exec.run_until_stalled(&mut test_fut),
-            Poll::Ready(Err(zx::Status::INTERNAL))
-        );
-
-        let startup_result =
-            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_variant!(startup_result, Err(FullmacMlmeError::InvalidMacImplementationType(_)));
-    }
-
-    #[test]
-    fn test_mlme_startup_fails_due_to_wrong_data_plane_type() {
-        let (mut h, mut test_fut) = TestHelper::set_up();
-        h.fake_device
-            .lock()
-            .unwrap()
-            .query_mac_sublayer_support_mock
-            .as_mut()
-            .unwrap()
-            .data_plane
-            .data_plane_type = fidl_common::DataPlaneType::EthernetDevice;
-        assert_variant!(
-            h.exec.run_until_stalled(&mut test_fut),
-            Poll::Ready(Err(zx::Status::INTERNAL))
-        );
-
-        let startup_result =
-            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_variant!(startup_result, Err(FullmacMlmeError::InvalidDataPlaneType(_)));
-    }
-
-    #[test]
     fn test_mlme_startup_fails_due_to_query_device_info_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_device_info_mock = None;
-        assert_variant!(
-            h.exec.run_until_stalled(&mut test_fut),
-            Poll::Ready(Err(zx::Status::INTERNAL))
-        );
-
-        let startup_result =
-            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
-    }
-
-    #[test]
-    fn test_mlme_startup_fails_due_to_query_mac_sublayer_support_error() {
-        let (mut h, mut test_fut) = TestHelper::set_up();
-        h.fake_device.lock().unwrap().query_mac_sublayer_support_mock = None;
         assert_variant!(
             h.exec.run_until_stalled(&mut test_fut),
             Poll::Ready(Err(zx::Status::INTERNAL))

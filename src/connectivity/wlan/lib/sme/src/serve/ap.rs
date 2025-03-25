@@ -12,21 +12,17 @@ use log::error;
 use std::pin::pin;
 use std::sync::Arc;
 use wlan_common::RadioConfig;
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-};
+use {fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme};
 
 pub type Endpoint = fidl::endpoints::ServerEnd<fidl_sme::ApSmeMarker>;
 type Sme = ap_sme::ApSme;
 
 pub fn serve(
     device_info: fidl_mlme::DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     event_stream: MlmeEventStream,
     new_fidl_clients: mpsc::UnboundedReceiver<Endpoint>,
 ) -> (MlmeSink, MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
-    let (sme, mlme_sink, mlme_stream, time_stream) = Sme::new(device_info, mac_sublayer_support);
+    let (sme, mlme_sink, mlme_stream, time_stream) = Sme::new(device_info);
     let fut = async move {
         let sme = Arc::new(Mutex::new(sme));
         let mlme_sme = super::serve_mlme_sme(event_stream, Arc::clone(&sme), time_stream);

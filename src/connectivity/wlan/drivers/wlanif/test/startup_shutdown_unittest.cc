@@ -145,17 +145,6 @@ TEST(StartupShutdownTest, StartFailsIfQueryFails) {
   ASSERT_FALSE(driver_test.StartDriver().is_ok());
 }
 
-TEST(StartupShutdownTest, StartFailsIfQueryMacSublayerSupportFails) {
-  struct QueryMacSublayerSupportFails : public BaseWlanFullmacServerForStartup {
-    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
-    void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-      completer.Reply(zx::error(ZX_ERR_INTERNAL));
-    }
-  };
-  DriverTestType<QueryMacSublayerSupportFails> driver_test;
-  ASSERT_FALSE(driver_test.StartDriver().is_ok());
-}
-
 TEST(StartupShutdownTest, StartFailsIfQuerySecuritySupport) {
   struct QuerySecuritySupportFails : public BaseWlanFullmacServerForStartup {
     using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;

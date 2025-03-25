@@ -118,7 +118,6 @@ pub fn create_sme(
     cfg: crate::Config,
     mlme_event_stream: MlmeEventStream,
     device_info: &fidl_mlme::DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     inspector: fuchsia_inspect::Inspector,
@@ -156,7 +155,7 @@ pub fn create_sme(
         fidl_common::WlanMacRole::Ap => {
             let (sender, receiver) = mpsc::unbounded();
             let (mlme_req_sink, mlme_req_stream, fut) =
-                ap::serve(device_info, mac_sublayer_support, mlme_event_stream, receiver);
+                ap::serve(device_info, mlme_event_stream, receiver);
             (
                 SmeServer::Ap(sender),
                 mlme_req_sink,
@@ -277,7 +276,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::test_utils::fake_features::{
-        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
+        fake_security_support, fake_spectrum_management_support_empty,
     };
 
     #[test]
@@ -297,7 +296,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &device_info,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector,
@@ -321,7 +319,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &test_utils::fake_device_info([0; 6].into()),
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector,
@@ -372,7 +369,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &device_info,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector.clone(),
