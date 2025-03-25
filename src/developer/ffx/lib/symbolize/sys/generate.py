@@ -41,8 +41,7 @@ bindgen.function_allowlist = [
     "symbolizer_resolve_address",
 ]
 
-# Right now we only build host tools in CQ for x64.
 bindgen.run(
     "src/developer/ffx/lib/symbolize/sys/wrapper.h",
-    "src/developer/ffx/lib/symbolize/sys/src/x86_64.rs",
+    "src/developer/ffx/lib/symbolize/sys/src/lib.rs",
 )
