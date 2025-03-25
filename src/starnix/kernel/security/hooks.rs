@@ -825,13 +825,14 @@ pub fn check_exec_access(
 }
 
 /// Computes and updates the socket security class for the `FsNode` associated with a new socket.
+/// Corresponds to the `socket_post_create()` LSM hooks.
 pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
     profile_duration!("security.hooks.socket_post_create");
     selinux_hooks::socket::socket_post_create(socket, socket_node);
 }
 
 /// Updates the SELinux thread group state on exec.
-/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` hooks.
+/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
     track_hook_duration!(c"security.hooks.update_state_on_exec");
     if_selinux_else(
