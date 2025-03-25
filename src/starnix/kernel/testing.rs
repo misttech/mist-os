@@ -166,7 +166,6 @@ fn create_test_kernel(
         SchedulerManager::empty_for_tests(),
         None,
         fuchsia_inspect::Node::default(),
-        None,
         security::testing::kernel_state(security_server),
         Vec::new(),
         /* time_adjustment_proxy=*/ None,

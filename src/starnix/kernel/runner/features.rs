@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
-use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
+use starnix_core::device::framebuffer::{AspectRatio, Framebuffer};
 use starnix_core::device::remote_block_device::remote_block_device_init;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
@@ -39,18 +39,32 @@ use {
 /// A collection of parsed features, and their arguments.
 #[derive(Default, Debug)]
 pub struct Features {
+    /// Features that must be available to the kernel after initialization.
     pub kernel: KernelFeatures,
 
+    /// SELinux configuration.
     pub selinux: SELinuxFeature,
 
+    /// Whether to enable ashmem.
     pub ashmem: bool,
 
+    /// Whether to enable a framebuffer device.
     pub framebuffer: bool,
 
+    /// Display aspect ratio.
+    pub aspect_ratio: Option<AspectRatio>,
+
+    /// This controls whether or not the default framebuffer background is black or colorful, to
+    /// aid debugging.
+    pub enable_visual_debugging: bool,
+
+    /// Whether to enable gralloc.
     pub gralloc: bool,
 
+    /// Supported magma vendor IDs.
     pub magma_supported_vendors: Option<Vec<u16>>,
 
+    /// Whether to enable gfxstream.
     pub gfxstream: bool,
 
     /// Include the /container directory in the root file system.
@@ -62,20 +76,25 @@ pub struct Features {
     /// Include the /custom_artifacts directory in the root file system.
     pub custom_artifacts: bool,
 
+    /// Whether to provide android with a serial number.
     pub android_serialno: bool,
 
+    /// Whether to enable Starnix's self-profiling. Results are visible in inspect.
     pub self_profile: bool,
 
-    pub aspect_ratio: Option<AspectRatio>,
-
+    /// Optional perfetto configuration.
     pub perfetto: Option<FsString>,
 
+    /// Whether to enable support for Android's Factory Data Reset.
     pub android_fdr: bool,
 
+    /// Whether to allow the root filesystem to be read/write.
     pub rootfs_rw: bool,
 
+    /// Whether to enable network manager and its filesystem.
     pub network_manager: bool,
 
+    /// Whether to enable the nanohub module.
     pub nanohub: bool,
 
     pub enable_utc_time_adjustment: bool,
@@ -100,7 +119,6 @@ impl Features {
                         enable_suid,
                         io_uring,
                         error_on_failed_reboot,
-                        enable_visual_debugging,
                         default_uid,
                         default_seclabel,
                         default_ns_mount_options,
@@ -108,6 +126,8 @@ impl Features {
                 selinux,
                 ashmem,
                 framebuffer,
+                aspect_ratio,
+                enable_visual_debugging,
                 gralloc,
                 magma_supported_vendors,
                 gfxstream,
@@ -116,7 +136,6 @@ impl Features {
                 custom_artifacts,
                 android_serialno,
                 self_profile,
-                aspect_ratio,
                 perfetto,
                 android_fdr,
                 rootfs_rw,
@@ -265,7 +284,7 @@ pub fn parse_features(
     }
 
     if ui_visual_debugging_level > 0 {
-        features.kernel.enable_visual_debugging = true;
+        features.enable_visual_debugging = true;
     }
     features.enable_utc_time_adjustment = enable_utc_time_adjustment;
 
@@ -300,7 +319,13 @@ pub fn run_container_features(
 
     let mut enabled_profiling = false;
     if features.framebuffer {
-        fb_device_init(locked, system_task);
+        let framebuffer = Framebuffer::device_init(
+            locked,
+            system_task,
+            features.aspect_ratio,
+            features.enable_visual_debugging,
+        )
+        .context("initializing framebuffer")?;
 
         let (touch_source_client, touch_source_server) = fidl::endpoints::create_endpoints();
         let (mouse_source_client, mouse_source_server) = fidl::endpoints::create_endpoints();
@@ -330,13 +355,13 @@ pub fn run_container_features(
         //
         // In the future, we would like to avoid initializing a framebuffer unconditionally on the
         // Kernel, at which point this logic will need to change.
-        *kernel.framebuffer.view_identity.lock() = Some(view_identity);
-        *kernel.framebuffer.view_bound_protocols.lock() = Some(view_bound_protocols);
+        *framebuffer.view_identity.lock() = Some(view_identity);
+        *framebuffer.view_bound_protocols.lock() = Some(view_bound_protocols);
 
-        let framebuffer = kernel.framebuffer.info.read();
+        let framebuffer_info = framebuffer.info.read();
 
-        let display_width = framebuffer.xres as i32;
-        let display_height = framebuffer.yres as i32;
+        let display_width = framebuffer_info.xres as i32;
+        let display_height = framebuffer_info.yres as i32;
 
         let touch_device =
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
@@ -384,7 +409,7 @@ pub fn run_container_features(
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
-        kernel.framebuffer.start_server(kernel, None).expect("Failed to start framebuffer server");
+        framebuffer.start_server(kernel, None);
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
@@ -447,10 +472,7 @@ pub fn run_component_features(
     for entry in entries {
         match entry.as_str() {
             "framebuffer" => {
-                kernel
-                    .framebuffer
-                    .start_server(kernel, incoming_dir.take())
-                    .expect("Failed to start framebuffer server");
+                Framebuffer::get(kernel)?.start_server(kernel, incoming_dir.take());
             }
             feature => {
                 return error!(ENOSYS, format!("Unsupported feature: {}", feature));

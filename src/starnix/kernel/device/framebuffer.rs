@@ -41,7 +41,7 @@ fn get_display_size() -> Result<fmath::SizeU, Errno> {
     Ok(extent_in_px)
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct AspectRatio {
     pub width: u32,
     pub height: u32,
@@ -56,13 +56,49 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
+    /// Returns the current fraembuffer if one was created for this kernel.
+    pub fn get(kernel: &Kernel) -> Result<Arc<Self>, Errno> {
+        kernel.expando.get_or_try_init(|| error!(EINVAL))
+    }
+
+    /// Initialize the framebuffer device. Should only be called once per kernel.
+    pub fn device_init<L>(
+        locked: &mut Locked<'_, L>,
+        system_task: &CurrentTask,
+        aspect_ratio: Option<AspectRatio>,
+        enable_visual_debugging: bool,
+    ) -> Result<Arc<Framebuffer>, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        let kernel = system_task.kernel();
+        let registry = &kernel.device_registry;
+
+        let framebuffer = kernel
+            .expando
+            .get_or_try_init(|| Framebuffer::new(aspect_ratio, enable_visual_debugging))?;
+
+        let graphics_class = registry.objects.graphics_class();
+        registry.register_device(
+            locked,
+            system_task,
+            "fb0".into(),
+            DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
+            graphics_class,
+            DeviceDirectory::new,
+            framebuffer.clone(),
+        );
+
+        Ok(framebuffer)
+    }
+
     /// Creates a new `Framebuffer` fit to the screen, while maintaining the provided aspect ratio.
     ///
     /// If the `aspect_ratio` is `None`, the framebuffer will be scaled to the display.
-    pub fn new(
-        aspect_ratio: Option<&AspectRatio>,
+    fn new(
+        aspect_ratio: Option<AspectRatio>,
         enable_visual_debugging: bool,
-    ) -> Result<Arc<Self>, Errno> {
+    ) -> Result<Self, Errno> {
         let mut info = fb_var_screeninfo::default();
 
         let display_size = get_display_size().unwrap_or(fmath::SizeU { width: 700, height: 1200 });
@@ -104,21 +140,21 @@ impl Framebuffer {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
-            Ok(Arc::new(Self {
+            Ok(Self {
                 server: Some(server),
                 memory: Mutex::new(Some(memory)),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
-            }))
+            })
         } else {
-            Ok(Arc::new(Self {
+            Ok(Self {
                 server: None,
                 memory: Default::default(),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
-            }))
+            })
         }
     }
 
@@ -127,11 +163,7 @@ impl Framebuffer {
     /// # Parameters
     /// * `incoming_dir`: the incoming service directory under which the
     ///   `fuchsia.element.GraphicalPresenter` protocol can be retrieved.
-    pub fn start_server(
-        &self,
-        kernel: &Arc<Kernel>,
-        incoming_dir: Option<fio::DirectoryProxy>,
-    ) -> Result<(), anyhow::Error> {
+    pub fn start_server(&self, kernel: &Arc<Kernel>, incoming_dir: Option<fio::DirectoryProxy>) {
         if let Some(server) = &self.server {
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();
@@ -144,8 +176,6 @@ impl Framebuffer {
                 incoming_dir,
             );
         }
-
-        Ok(())
     }
 
     /// Starts presenting a child view instead of the framebuffer.
@@ -259,23 +289,4 @@ impl FileOps for Framebuffer {
             }
         }
     }
-}
-
-pub fn fb_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
-    let kernel = system_task.kernel();
-    let registry = &kernel.device_registry;
-
-    let graphics_class = registry.objects.graphics_class();
-    registry.register_device(
-        locked,
-        system_task,
-        "fb0".into(),
-        DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
-        graphics_class,
-        DeviceDirectory::new,
-        kernel.framebuffer.clone(),
-    );
 }

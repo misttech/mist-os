@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use crate::Container;
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsHandleRef;
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
 use futures::channel::oneshot;
-use futures::{AsyncReadExt, AsyncWriteExt, Future, TryStreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt, Future, StreamExt, TryStreamExt};
+use starnix_core::device::framebuffer::Framebuffer;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::devpts::create_main_and_replica;
 use starnix_core::fs::fuchsia::create_fuchsia_pipe;
@@ -319,31 +320,29 @@ fn forward_to_pty(
 }
 
 pub async fn serve_graphical_presenter(
-    request_stream: felement::GraphicalPresenterRequestStream,
+    mut request_stream: felement::GraphicalPresenterRequestStream,
     kernel: &Kernel,
 ) -> Result<(), Error> {
-    request_stream
-        .try_for_each_concurrent(None, |event| async {
-            match event {
-                felement::GraphicalPresenterRequest::PresentView {
-                    view_spec,
-                    annotation_controller: _,
-                    view_controller_request: _,
-                    responder,
-                } => match view_spec.viewport_creation_token {
-                    Some(token) => {
-                        kernel.framebuffer.present_view(token);
-                        let _ = responder.send(Ok(()));
-                    }
-                    None => {
-                        let _ = responder.send(Err(felement::PresentViewError::InvalidArgs));
-                    }
-                },
-            }
-            Ok(())
-        })
-        .await
-        .map_err(Error::from)
+    while let Some(request) = request_stream.next().await {
+        match request.context("reading graphical presenter request")? {
+            felement::GraphicalPresenterRequest::PresentView {
+                view_spec,
+                annotation_controller: _,
+                view_controller_request: _,
+                responder,
+            } => match view_spec.viewport_creation_token {
+                Some(token) => {
+                    let fb = Framebuffer::get(kernel).context("getting framebuffer from kernel")?;
+                    fb.present_view(token);
+                    let _ = responder.send(Ok(()));
+                }
+                None => {
+                    let _ = responder.send(Err(felement::PresentViewError::InvalidArgs));
+                }
+            },
+        }
+    }
+    Ok(())
 }
 
 /// Serves the memory attribution provider for the Kernel ELF component.

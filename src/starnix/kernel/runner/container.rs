@@ -594,7 +594,6 @@ async fn create_container(
         scheduler_manager,
         Some(crash_reporter),
         kernel_node,
-        features.aspect_ratio.as_ref(),
         security_state,
         procfs_device_tree_setup,
         time_adjustment_proxy,

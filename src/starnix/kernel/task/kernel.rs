@@ -6,7 +6,6 @@ use crate::bpf::attachments::CgroupEbpfProgramSet;
 use crate::container_namespace::ContainerNamespace;
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::binder::BinderDevice;
-use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
@@ -87,10 +86,6 @@ pub struct KernelFeatures {
     /// Whether the kernel should return an error to userspace, rather than panicking, if `reboot()`
     /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
     pub error_on_failed_reboot: bool,
-
-    /// This controls whether or not the default framebuffer background is black or colorful, to
-    /// aid debugging.
-    pub enable_visual_debugging: bool,
 
     /// The default seclabel that is applied to components that are run in this kernel.
     ///
@@ -182,13 +177,6 @@ pub struct Kernel {
     /// for Android, we need to be able to peek into these messages.
     /// Note that this might never be initialized (if the "misc" device never gets registered).
     pub bootloader_message_store: OnceLock<AndroidBootloaderMessageStore>,
-
-    /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
-    /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
-    ///
-    /// When a component is run in that container and also specifies the `framebuffer` feature, the
-    /// framebuffer will be served as the view of the component.
-    pub framebuffer: Arc<Framebuffer>,
 
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
@@ -389,7 +377,6 @@ impl Kernel {
         scheduler: SchedulerManager,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
-        framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_state: security::KernelState,
         procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
         time_adjustment_proxy: Option<AdjustSynchronousProxy>,
@@ -397,9 +384,6 @@ impl Kernel {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
-        let framebuffer =
-            Framebuffer::new(framebuffer_aspect_ratio, features.enable_visual_debugging)
-                .expect("Failed to create framebuffer");
 
         let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
@@ -420,7 +404,6 @@ impl Kernel {
             container_namespace,
             remote_block_device_registry: Default::default(),
             bootloader_message_store: OnceLock::new(),
-            framebuffer,
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
