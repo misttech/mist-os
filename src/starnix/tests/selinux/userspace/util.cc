@@ -58,6 +58,22 @@ std::string ReadFile(const std::string& name) {
   return contents;
 }
 
+std::string RemoveTrailingNul(std::string in) {
+  if (in.size() > 0 && in[in.size() - 1] == 0) {
+    in.pop_back();
+  }
+  return in;
+}
+
+fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name) {
+  constexpr char procattr_prefix[] = "/proc/self/attr/";
+  std::string attr_path(procattr_prefix);
+  attr_path.append(attr_name);
+
+  auto attr = ReadFile(attr_path);
+  return fit::ok(RemoveTrailingNul(attr));
+}
+
 fit::result<int, std::string> GetLabel(int fd) {
   char buf[256];
   ssize_t result = fgetxattr(fd, "security.selinux", buf, sizeof(buf));
@@ -65,7 +81,7 @@ fit::result<int, std::string> GetLabel(int fd) {
     return fit::error(errno);
   }
   // Use `c_str()` to strip off the trailing NUL if present.
-  return fit::ok(std::string(buf, result).c_str());
+  return fit::ok(RemoveTrailingNul(std::string(buf, result)));
 }
 
 ScopedEnforcement ScopedEnforcement::SetEnforcing() {
