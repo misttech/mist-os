@@ -150,6 +150,9 @@ pub struct ContainerStartInfo {
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
 
+    /// An eventpair that debuggers can use to defer the launch of the container.
+    break_on_start: Option<zx::EventPair>,
+
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
@@ -171,6 +174,7 @@ impl ContainerStartInfo {
             outgoing_dir,
             container_namespace,
             component_instance,
+            break_on_start: start_info.break_on_start,
             runtime_dir: start_info.runtime_dir,
         })
     }
@@ -669,6 +673,24 @@ async fn create_container(
     };
 
     let rlimits = parse_rlimits(&start_info.program.rlimits)?;
+
+    // Serve the runtime directory.
+    if let Some(runtime_dir) = start_info.runtime_dir.take() {
+        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
+    }
+
+    // At this point the runtime environment has been prepared but nothing is actually running yet.
+    // Pause here if a debugger needs time to attach to the job.
+    if let Some(break_on_start) = start_info.break_on_start.take() {
+        log_debug!("Waiting for signal from debugger before spawning init process...");
+        if let Err(e) =
+            fuchsia_async::OnSignals::new(break_on_start, zx::Signals::EVENTPAIR_PEER_CLOSED).await
+        {
+            log_warn!(e:%; "Received break_on_start eventpair but couldn't wait for PEER_CLOSED.");
+        }
+    }
+
+    log_debug!("Creating init process.");
     let init_task = CurrentTask::create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
@@ -701,11 +723,6 @@ async fn create_container(
         Arc::downgrade(&kernel),
         start_info.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
-
-    // Serve the runtime directory.
-    if let Some(runtime_dir) = start_info.runtime_dir.take() {
-        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
-    }
 
     Ok(Container {
         kernel,
@@ -911,6 +928,12 @@ async fn wait_for_init_file(
 
 async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
     let mut fs = fuchsia_component::server::ServiceFs::new();
+    match create_job_id_vmo() {
+        Ok(vmo) => {
+            fs.dir("elf").add_vmo_file_at("job_id", vmo);
+        }
+        Err(e) => log_error!(e:%; "failed to create vmo with job id for debuggers"),
+    }
     match fs.serve_connection(runtime_dir) {
         Ok(_) => {
             fs.add_fidl_service(|job_requests: TaskProviderRequestStream| {
@@ -925,6 +948,14 @@ async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
         }
         Err(e) => log_error!("Couldn't serve runtime directory: {e:?}"),
     }
+}
+
+fn create_job_id_vmo() -> Result<zx::Vmo, Error> {
+    let job_id = fuchsia_runtime::job_default().get_koid().context("reading own job koid")?;
+    let job_id_str = job_id.raw_koid().to_string();
+    let job_id_vmo = zx::Vmo::create(job_id_str.len() as u64).context("creating job id vmo")?;
+    job_id_vmo.write(job_id_str.as_bytes(), 0).context("write job id to vmo")?;
+    Ok(job_id_vmo)
 }
 
 async fn serve_task_provider(mut job_requests: TaskProviderRequestStream) -> Result<(), Error> {
