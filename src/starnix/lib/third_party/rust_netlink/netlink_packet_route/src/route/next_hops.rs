@@ -62,6 +62,13 @@ impl<T: AsRef<[u8]>> RouteNextHopBuffer<T> {
                 buffer_len: self.length() as usize,
             });
         }
+        if (self.length() as usize) < PAYLOAD_OFFSET {
+            return Err(DecodeError::InvalidBufferLength {
+                name: "RouteNextHopBuffer",
+                len: self.length() as usize,
+                buffer_len: PAYLOAD_OFFSET,
+            });
+        }
         Ok(())
     }
 }
