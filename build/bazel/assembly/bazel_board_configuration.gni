@@ -9,7 +9,7 @@ import("//build/bazel/bazel_build_action.gni")
 #
 # Parameters
 #
-#  board_name (optional)
+#  name (optional)
 #    Name of the board.
 #    Type: string
 #    Default: $target_name
@@ -28,8 +28,8 @@ template("bazel_board_configuration") {
          "bazel_board_configuration_target is required")
 
   board_name = target_name
-  if (defined(invoker.board_name)) {
-    board_name = invoker.board_name
+  if (defined(invoker.name)) {
+    board_name = invoker.name
   }
 
   board_configuration_target = target_name

@@ -213,7 +213,7 @@ bazel_board_configuration("vim3") {
 }
 
 bazel_board_configuration("reduced_perf_variation") {
-  board_name = "vim3"
+  name = "vim3"
   bazel_board_configuration_target = "//boards/vim3:reduced_perf_variation"
   deps = [ ":bazel_inputs" ]
 }
