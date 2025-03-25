@@ -11,7 +11,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/time.h>
@@ -1040,36 +1040,39 @@ zx_status_t AmlRawNand::Bind() {
 }
 
 zx_status_t AmlRawNand::Create(void* ctx, zx_device_t* parent) {
-  ddk::PDevFidl pdev(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "%s: ZX_PROTOCOL_PDEV not available", __FILE__);
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                        "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
 
-  zx::bti bti;
-  if (zx_status_t status = pdev.GetBti(0, &bti); status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_get_bti failed", __FILE__);
-    return status;
+  static constexpr uint32_t kNandRegWindow = 0;
+  zx::result mmio_nandreg = pdev.MapMmio(kNandRegWindow);
+  if (mmio_nandreg.is_error()) {
+    zxlogf(ERROR, "Failed to map nand reg window mmio: %s", mmio_nandreg.status_string());
+    return mmio_nandreg.status_value();
   }
 
-  static constexpr uint32_t NandRegWindow = 0;
-  static constexpr uint32_t ClockRegWindow = 1;
-  std::optional<fdf::MmioBuffer> mmio_nandreg;
-  if (zx_status_t status = pdev.MapMmio(NandRegWindow, &mmio_nandreg); status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev.MapMmio nandreg failed", __FILE__);
-    return status;
-  }
-
-  std::optional<fdf::MmioBuffer> mmio_clockreg;
-  if (zx_status_t status = pdev.MapMmio(ClockRegWindow, &mmio_clockreg); status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev.MapMmio clockreg failed", __FILE__);
-    return status;
+  static constexpr uint32_t kClockRegWindow = 1;
+  zx::result mmio_clockreg = pdev.MapMmio(kClockRegWindow);
+  if (mmio_clockreg.is_error()) {
+    zxlogf(ERROR, "Failed to map clock reg window mmio: %s", mmio_clockreg.status_string());
+    return mmio_clockreg.status_value();
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<AmlRawNand> device(new (&ac) AmlRawNand(parent, *std::move(mmio_nandreg),
-                                                          *std::move(mmio_clockreg), std::move(bti),
-                                                          std::make_unique<Onfi>()));
+  std::unique_ptr<AmlRawNand> device(new (&ac) AmlRawNand(
+      parent, std::move(mmio_nandreg.value()), std::move(mmio_clockreg.value()),
+      std::move(bti.value()), std::make_unique<Onfi>()));
 
   if (!ac.check()) {
     zxlogf(ERROR, "%s: AmlRawNand alloc failed", __FILE__);
