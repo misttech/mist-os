@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/view_tree/geometry_provider.h"
 
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>

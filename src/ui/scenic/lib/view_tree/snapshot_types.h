@@ -5,6 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_VIEW_TREE_SNAPSHOT_TYPES_H_
 #define SRC_UI_SCENIC_LIB_VIEW_TREE_SNAPSHOT_TYPES_H_
 
+// TODO(https://fxbug.dev/404958102): delete mentions of GFX in `ViewNode`, then delete this.
+#include <fuchsia/math/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <zircon/types.h>
@@ -15,8 +17,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include "src/ui/scenic/lib/utils/helpers.h"
 
 #include <glm/glm.hpp>
 
@@ -59,14 +59,17 @@ struct ViewNode {
 
   // Set to true when a GFX view has generated the |is_rendering| signal. For flatland views, this
   // field is set to |std::nullopt|.
+  // TODO(https://fxbug.dev/404958102): delete mentions of GFX.
   std::optional<bool> gfx_is_rendering;
 
   // The conversion ratio from physical pixels (of a display) to logical pixels (of the coordinate
   // system of the view). For flatland views, this field is set to |std::nullopt|.
+  // TODO(https://fxbug.dev/404958102): delete mentions of GFX.
   std::optional<std::array<float, 2>> gfx_pixel_scale;
 
   // The offset data for the view's bounding box, in the coordinate system of that view. For
   // flatland views, this field is set to |std::nullopt|.
+  // TODO(https://fxbug.dev/404958102): delete mentions of GFX.
   std::optional<fuchsia::math::InsetF> gfx_inset;
 
   bool operator==(const ViewNode& other) const;

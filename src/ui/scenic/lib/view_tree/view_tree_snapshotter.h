@@ -9,7 +9,6 @@
 
 #include <vector>
 
-#include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
 #include "src/ui/scenic/lib/view_tree/snapshot_types.h"
 
 namespace view_tree {
