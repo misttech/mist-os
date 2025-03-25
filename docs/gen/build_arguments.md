@@ -699,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719470118309363761"`
+**Current value for `target_cpu = "arm64"`:** `"8719424812387265329"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719470118309363761"`
+**Current value for `target_cpu = "riscv64"`:** `"8719424812387265329"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719470118309363761"`
+**Current value for `target_cpu = "x64"`:** `"8719424812387265329"`
 
 From //out/not-default/args.gn:10
 
@@ -1109,7 +1109,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1167,7 +1167,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1783,7 +1783,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -5024,6 +5024,8 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'legacy_default' => The standard RBE configuration used if not otherwise
                        specified. This contains a mix of enabled/disabled
                        remote services.
+ * 'remote_full' => Run as many actions remotely as possible, including
+                 cache-misses, which reduces use of local resources.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services and downloading remote outputs.
@@ -5041,7 +5043,7 @@ The overall mode for RBE to be operating in.  The valid values are:
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:40
+From //build/toolchain/rbe_modes.gni:42
 
 ### rbe_settings_overrides
 
@@ -5050,7 +5052,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:44
+From //build/toolchain/rbe_modes.gni:46
 
 ### recovery_board_configuration_label
 
