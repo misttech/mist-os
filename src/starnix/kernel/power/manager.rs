@@ -242,7 +242,10 @@ impl SuspendResumeManager {
                         (wake_time - suspend_start_time).into();
                     suspend_stats.last_time_in_sleep =
                         zx::BootDuration::from_nanos(res.suspend_time.unwrap_or(0));
-                    suspend_stats.last_resume_reason = res.resume_reason;
+                    // The "0" here is to mimic the expected power management success string,
+                    // while we don't have IRQ numbers to report.
+                    suspend_stats.last_resume_reason =
+                        res.resume_reason.map(|s| format!("0 {}", s));
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
@@ -268,6 +271,10 @@ impl SuspendResumeManager {
                 self.update_suspend_stats(|suspend_stats| {
                     suspend_stats.fail_count += 1;
                     suspend_stats.last_failed_errno = Some(errno!(EINVAL));
+                    // Power analysis tools require `Abort: ` in the case of failed suspends.
+                    suspend_stats.last_resume_reason = wake_lock_names
+                        .as_ref()
+                        .map(|reasons| format!("Abort: {}", reasons.join(" ")));
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
