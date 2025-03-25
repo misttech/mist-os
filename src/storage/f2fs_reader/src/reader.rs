@@ -227,13 +227,7 @@ mod test {
     use storage_device::fake_device::FakeDevice;
 
     fn open_test_image(path: &str) -> FakeDevice {
-        let base_path = std::env::vars()
-            .find(|(k, _)| k == "FUCHSIA_DIR")
-            .unwrap_or_else(|| {
-                panic!("FUCHSIA_DIR environment variable is not set.");
-            })
-            .1;
-        let path = std::path::PathBuf::from(base_path).join(path);
+        let path = std::path::PathBuf::from(path);
         println!("path is {path:?}");
         FakeDevice::from_image(
             zstd::Decoder::new(std::fs::File::open(&path).expect("open image"))
@@ -245,7 +239,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_open_fs() {
-        let device = open_test_image("src/storage/f2fs_reader/testdata/f2fs.img.zst");
+        let device = open_test_image("/pkg/testdata/f2fs.img.zst");
 
         let f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
         // Root inode is a known constant.
@@ -276,7 +270,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_basic_dirs() {
-        let device = open_test_image("src/storage/f2fs_reader/testdata/f2fs.img.zst");
+        let device = open_test_image("/pkg/testdata/f2fs.img.zst");
 
         let f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
         let root_ino = f2fs.root_ino();

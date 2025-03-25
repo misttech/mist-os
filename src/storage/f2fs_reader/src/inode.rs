@@ -175,7 +175,7 @@ pub struct Inode {
     pub footer: InodeFooter,
 
     // These are loaded from additional nodes.
-    pub nid_pages: HashMap<u32, RawAddrBlock>,
+    pub nid_pages: HashMap<u32, Box<RawAddrBlock>>,
 }
 
 /// Both direct and indirect node address pages use this same format.
@@ -188,6 +188,16 @@ pub struct RawAddrBlock {
     _reserved:
         [u8; BLOCK_SIZE - std::mem::size_of::<InodeFooter>() - 4 * ADDR_BLOCK_NUM_ADDR as usize],
     pub footer: InodeFooter,
+}
+
+impl TryFrom<Buffer<'_>> for Box<RawAddrBlock> {
+    type Error = Error;
+    fn try_from(block: Buffer<'_>) -> Result<Self, Self::Error> {
+        Ok(Box::new(
+            RawAddrBlock::read_from_bytes(block.as_slice())
+                .map_err(|_| anyhow!("RawAddrBlock read failed"))?,
+        ))
+    }
 }
 
 impl Debug for Inode {
@@ -209,133 +219,119 @@ impl Debug for Inode {
 
 impl Inode {
     /// Attempt to load (and validate) an inode at a given nid.
-    pub async fn try_load(f2fs: &F2fsReader, ino: u32) -> Result<Inode, Error> {
+    pub async fn try_load(f2fs: &F2fsReader, ino: u32) -> Result<Box<Inode>, Error> {
         let block = f2fs.read_node(ino).await?;
-        // Layout:
-        //   header: InodeHeader
-        //   extra: InodeExtraAttr # optional, based on header flag.
-        //   i_addr: [u32; N]       # N = <=923 i_addr pointing at data or repurposed for inline fields.
-        //   [u8; 200]      # optional, inline_xattr.
-        //   [u32; 5]       # nids (for large block maps)
-        //   InodeFooter
-        let (header, rest): (Ref<_, InodeHeader>, _) = Ref::from_prefix(block.as_slice()).unwrap();
-        let (rest, footer): (_, Ref<_, InodeFooter>) = Ref::from_suffix(rest).unwrap();
-        ensure!(footer.ino == ino, "Footer ino doesn't match.");
 
-        // nids are additional nodes holding addresses to data blocks. index has a specific meaning:
-        //  - 0..2 => nid of nodes that contain addresses to data blocks.
-        //  - 2..4 => nid of nodes that contain addresses to addresses of data blocks.
-        //  - 5 => nid of a node that contains double-indirect addresses ot data blocks.
-        let mut nids = [0u32; 5];
-        nids.as_mut_bytes()
-            .copy_from_slice(&rest[INODE_BLOCK_MAX_ADDR * 4..(INODE_BLOCK_MAX_ADDR + 5) * 4]);
-        let rest = &rest[..INODE_BLOCK_MAX_ADDR * 4];
+        let mut this = {
+            // Layout:
+            //   header: InodeHeader
+            //   extra: InodeExtraAttr # optional, based on header flag.
+            //   i_addr: [u32; N]       # N = <=923 addr data or repurposed for inline fields.
+            //   [u8; 200]      # optional, inline_xattr.
+            //   [u32; 5]       # nids (for large block maps)
+            //   InodeFooter
+            let (header, rest): (Ref<_, InodeHeader>, _) =
+                Ref::from_prefix(block.as_slice()).unwrap();
+            let (rest, footer): (_, Ref<_, InodeFooter>) = Ref::from_suffix(rest).unwrap();
+            ensure!(footer.ino == ino, "Footer ino doesn't match.");
 
-        let (extra, rest) = if header.inline_flags.contains(InlineFlags::ExtraAttr) {
-            let (extra, _): (Ref<_, InodeExtraAttr>, _) = Ref::from_prefix(rest).unwrap();
-            let extra_size = extra.extra_size as usize;
-            ensure!(extra_size <= rest.len(), "Bad extra_size in inode");
-            (Some((*extra).clone()), &rest[extra_size..])
-        } else {
-            (None, rest)
-        };
-        let (inline_xattr, rest) = if header.inline_flags.contains(InlineFlags::Xattr) {
-            // xattr always take up the last 50 i_addr slots. i.e. 200 bytes.
-            (Some(&rest[rest.len() - 200..]), &rest[..rest.len() - 200])
-        } else {
-            (None, rest)
-        };
+            // nids are additional nodes pointing to data blocks. index has a specific meaning:
+            //  - 0..2 => nid of nodes that contain addresses to data blocks.
+            //  - 2..4 => nid of nodes that contain addresses to addresses of data blocks.
+            //  - 5 => nid of a node that contains double-indirect addresses ot data blocks.
+            let mut nids = [0u32; 5];
+            nids.as_mut_bytes()
+                .copy_from_slice(&rest[INODE_BLOCK_MAX_ADDR * 4..(INODE_BLOCK_MAX_ADDR + 5) * 4]);
+            let rest = &rest[..INODE_BLOCK_MAX_ADDR * 4];
 
-        let mut inline_data = None;
-        let mut inline_dentry = None;
-        let mut i_addrs: Vec<u32> = Vec::new();
+            let (extra, rest) = if header.inline_flags.contains(InlineFlags::ExtraAttr) {
+                let (extra, _): (Ref<_, InodeExtraAttr>, _) = Ref::from_prefix(rest).unwrap();
+                let extra_size = extra.extra_size as usize;
+                ensure!(extra_size <= rest.len(), "Bad extra_size in inode");
+                (Some((*extra).clone()), &rest[extra_size..])
+            } else {
+                (None, rest)
+            };
+            let (inline_xattr, rest) = if header.inline_flags.contains(InlineFlags::Xattr) {
+                // xattr always take up the last 50 i_addr slots. i.e. 200 bytes.
+                (Some(&rest[rest.len() - 200..]), &rest[..rest.len() - 200])
+            } else {
+                (None, rest)
+            };
 
-        if header.inline_flags.contains(InlineFlags::Data) {
-            // Inline data skips the first address slot then repurposes the remainder as data.
-            ensure!(header.size as usize + 4 < rest.len(), "Invalid or corrupt inode.");
-            inline_data = Some(rest[4..4 + header.size as usize].to_vec().into_boxed_slice());
-        } else if header.inline_flags.contains(InlineFlags::Dentry) {
-            // Repurposes i_addr to store a set of directory entry records.
-            inline_dentry = Some(InlineDentry::try_from_bytes(rest)?);
-        } else {
-            // &rest[..] is not necessarily 4-byte aligned so can't simply cast to [u32].
-            i_addrs.resize(rest.len() / 4, 0);
-            i_addrs.as_mut_bytes().copy_from_slice(&rest[..rest.len() / 4 * 4]);
+            let mut inline_data = None;
+            let mut inline_dentry = None;
+            let mut i_addrs: Vec<u32> = Vec::new();
+
+            if header.inline_flags.contains(InlineFlags::Data) {
+                // Inline data skips the first address slot then repurposes the remainder as data.
+                ensure!(header.size as usize + 4 < rest.len(), "Invalid or corrupt inode.");
+                inline_data = Some(rest[4..4 + header.size as usize].to_vec().into_boxed_slice());
+            } else if header.inline_flags.contains(InlineFlags::Dentry) {
+                // Repurposes i_addr to store a set of directory entry records.
+                inline_dentry = Some(InlineDentry::try_from_bytes(rest)?);
+            } else {
+                // &rest[..] is not necessarily 4-byte aligned so can't simply cast to [u32].
+                i_addrs.resize(rest.len() / 4, 0);
+                i_addrs.as_mut_bytes().copy_from_slice(&rest[..rest.len() / 4 * 4]);
+            };
+
+            Box::new(Self {
+                header: (*header).clone(),
+                extra,
+                inline_xattr: inline_xattr.map(|x| x.into()).clone(),
+                inline_data: inline_data.map(|x| x.into()).clone(),
+                inline_dentry,
+                i_addrs,
+                nids,
+                footer: (*footer).clone(),
+
+                nid_pages: HashMap::new(),
+            })
         };
 
         // The set of blocks making up the file begin with i_addrs. If more blocks are required
         // nids[0..5] are used. Zero pages (nid == NULL_ADDR) can be omitted at any level.
-
-        let mut nid_pages = HashMap::new();
-        for (i, nid) in nids.into_iter().enumerate() {
+        for (i, nid) in this.nids.into_iter().enumerate() {
             if nid == NULL_ADDR {
                 continue;
             }
             match i {
                 0..2 => {
-                    let block = f2fs.read_node(nid).await?;
-                    nid_pages.insert(
-                        nid,
-                        RawAddrBlock::read_from_bytes(block.as_slice())
-                            .map_err(|_| anyhow!("addrblock read failed"))?,
-                    );
+                    this.nid_pages.insert(nid, f2fs.read_node(nid).await?.try_into()?);
                 }
                 2..4 => {
-                    let block = f2fs.read_node(nid).await?;
-                    let indirect = RawAddrBlock::read_from_bytes(block.as_slice())
-                        .map_err(|_| anyhow!("addrblock read failed"))?;
+                    let indirect = Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
                     for nid in indirect.addrs {
                         if nid != NULL_ADDR {
-                            let block = f2fs.read_node(nid).await?;
-                            nid_pages.insert(
-                                nid,
-                                RawAddrBlock::read_from_bytes(block.as_slice())
-                                    .map_err(|_| anyhow!("addrblock read failed"))?,
-                            );
+                            this.nid_pages.insert(nid, f2fs.read_node(nid).await?.try_into()?);
                         }
                     }
-                    nid_pages.insert(nid, indirect);
+                    this.nid_pages.insert(nid, indirect);
                 }
                 4 => {
-                    let block = f2fs.read_node(nid).await?;
-                    let double_indirect = RawAddrBlock::read_from_bytes(block.as_slice())
-                        .map_err(|_| anyhow!("addrblock read failed"))?;
+                    let double_indirect =
+                        Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
                     for nid in double_indirect.addrs {
                         if nid != NULL_ADDR {
-                            let block = f2fs.read_node(nid).await?;
-                            let indirect = RawAddrBlock::read_from_bytes(block.as_slice())
-                                .map_err(|_| anyhow!("addrblock read failed"))?;
+                            let indirect =
+                                Box::<RawAddrBlock>::try_from(f2fs.read_node(nid).await?)?;
                             for nid in indirect.addrs {
                                 if nid != NULL_ADDR {
-                                    let block = f2fs.read_node(nid).await?;
-                                    nid_pages.insert(
-                                        nid,
-                                        RawAddrBlock::read_from_bytes(block.as_slice())
-                                            .map_err(|_| anyhow!("addrblock read failed"))?,
-                                    );
+                                    this.nid_pages
+                                        .insert(nid, f2fs.read_node(nid).await?.try_into()?);
                                 }
                             }
-                            nid_pages.insert(nid, indirect);
+                            this.nid_pages.insert(nid, indirect);
                         }
                     }
-                    nid_pages.insert(nid, double_indirect);
+                    this.nid_pages.insert(nid, double_indirect);
                 }
                 _ => unreachable!(),
             }
         }
 
-        Ok(Self {
-            header: (*header).clone(),
-            extra,
-            inline_xattr: inline_xattr.map(|x| x.into()).clone(),
-            inline_data: inline_data.map(|x| x.into()).clone(),
-            inline_dentry,
-            i_addrs,
-            nids,
-            footer: (*footer).clone(),
-
-            nid_pages,
-        })
+        Ok(this)
     }
 
     /// Calls 'f' for each non-zero data block in order, passing block_num and block_addr.
