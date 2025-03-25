@@ -5,12 +5,25 @@
 use fidl_fuchsia_kernel::{
     CpuStats, MemoryStats, MemoryStatsCompression, MemoryStatsExtended, StatsProxyInterface,
 };
+use stalls::{MemoryStallRate, StallProviderTrait};
 use std::future::{self, Ready};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Once};
 use tokio::sync::watch::{self};
 use traces::watcher::Watcher;
+
+struct FakeStallProvider {}
+
+impl StallProviderTrait for FakeStallProvider {
+    fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
+        Ok(zx::MemoryStall { stall_time_some: 1, stall_time_full: 2 })
+    }
+
+    fn get_stall_rate(&self) -> Option<MemoryStallRate> {
+        unimplemented!();
+    }
+}
 struct FakeStatsProxy {
     counter: Arc<AtomicU64>,
 }
@@ -51,7 +64,7 @@ impl StatsProxyInterface for FakeStatsProxy {
     fn get_memory_stats_extended(
         &self,
     ) -> <Self as StatsProxyInterface>::GetMemoryStatsExtendedResponseFut {
-        todo!()
+        unimplemented!();
     }
     type GetMemoryStatsCompressionResponseFut = Ready<Result<MemoryStatsCompression, fidl::Error>>;
     fn get_memory_stats_compression(
@@ -87,17 +100,18 @@ impl StatsProxyInterface for FakeStatsProxy {
     }
     type GetCpuStatsResponseFut = Ready<Result<CpuStats, fidl::Error>>;
     fn get_cpu_stats(&self) -> <Self as StatsProxyInterface>::GetCpuStatsResponseFut {
-        todo!()
+        unimplemented!();
     }
     type GetCpuLoadResponseFut = Ready<Result<Vec<f32>, fidl::Error>>;
     fn get_cpu_load(&self, _: i64) -> <Self as StatsProxyInterface>::GetCpuLoadResponseFut {
-        todo!()
+        unimplemented!();
     }
 }
 
 async fn actual_main(watcher: Watcher) {
+    let stall_provider = FakeStallProvider {};
     let kernel_stats = FakeStatsProxy::new();
-    traces::kernel::serve_forever(watcher, kernel_stats).await;
+    traces::kernel::serve_forever(watcher, kernel_stats, stall_provider.into()).await;
 }
 
 static LOGGER_ONCE: Once = Once::new();

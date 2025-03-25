@@ -67,12 +67,18 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
+    let stall_provider = Arc::new(stalls::StallProvider::new(
+        MonotonicDuration::from_minutes(5),
+        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
+    )?);
+
     // Serves Fuchsia performance trace system.
     // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
     // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
     let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
         traces::watcher::subscribe(),
         kernel_stats.clone(),
+        stall_provider.clone(),
     ));
 
     let root_job: Mutex<Box<dyn Job>> = Mutex::new(Box::new(
@@ -83,11 +89,6 @@ async fn main() -> Result<(), Error> {
     ));
 
     let attribution_data_provider = AttributionDataProviderImpl::new(attribution_client, root_job);
-
-    let stall_provider = stalls::StallProvider::new(
-        MonotonicDuration::from_minutes(5),
-        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
-    )?;
 
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect

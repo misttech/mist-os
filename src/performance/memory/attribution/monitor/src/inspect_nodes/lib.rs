@@ -22,7 +22,7 @@ pub struct ServiceTask {
 pub fn start_service(
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
-    stall_provider: impl StallProviderTrait + 'static,
+    stall_provider: Arc<impl StallProviderTrait>,
 ) -> Result<ServiceTask> {
     debug!("Start serving inspect tree.");
 
@@ -43,7 +43,7 @@ pub fn start_service(
 fn build_inspect_tree(
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
-    stall_provider: impl StallProviderTrait + 'static,
+    stall_provider: Arc<impl StallProviderTrait>,
     inspector: &Inspector,
 ) {
     // Lazy evaluation is unregistered when the `LazyNode` is dropped.
@@ -351,7 +351,12 @@ mod tests {
             }
         }
 
-        build_inspect_tree(data_provider, stats_provider, FakeStallProvider {}, &inspector);
+        build_inspect_tree(
+            data_provider,
+            stats_provider,
+            Arc::new(FakeStallProvider {}),
+            &inspector,
+        );
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))

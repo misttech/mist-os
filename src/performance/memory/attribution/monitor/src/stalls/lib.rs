@@ -19,7 +19,7 @@ pub struct MemoryStallRate {
     pub rate_full: zx::sys::zx_duration_mono_t,
 }
 
-pub trait StallProviderTrait: Sync + Send {
+pub trait StallProviderTrait: Sync + Send + 'static {
     /// Return the current memory stall values from the kernel.
     fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error>;
     /// Return the

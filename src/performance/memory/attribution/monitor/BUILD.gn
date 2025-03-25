@@ -93,6 +93,7 @@ rustc_library("traces") {
     "src/traces/watcher.rs",
   ]
   deps = [
+    ":stalls",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//src/lib/fuchsia-async",
     "//src/lib/trace/rust:trace",
@@ -151,11 +152,14 @@ rustc_staticlib("memory-monitor2-trace-rust-cpp-lib") {
   testonly = true
 
   deps = [
+    ":stalls",
     ":traces",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tokio",
   ]
 

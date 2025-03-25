@@ -1,14 +1,15 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::watcher::Watcher;
 use anyhow::Result;
 use fuchsia_async::{Interval, MonotonicDuration};
 use fuchsia_trace::{category_enabled, counter};
 use futures::StreamExt;
 use log::debug;
+use stalls::StallProviderTrait;
 use std::ffi::CStr;
-
-use crate::watcher::Watcher;
+use std::sync::Arc;
 const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
 
 // Continuously monitors the 'memory:kernel' trace category.
@@ -17,6 +18,7 @@ const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
 pub async fn serve_forever(
     mut trace_watcher: Watcher,
     kernel_stats: impl fidl_fuchsia_kernel::StatsProxyInterface,
+    stall_provider: Arc<impl StallProviderTrait>,
 ) {
     eprintln!("Start serving traces");
     debug!("Start serving traces");
@@ -24,7 +26,7 @@ pub async fn serve_forever(
         let delay_in_secs = 1;
         let mut interval = Interval::new(MonotonicDuration::from_seconds(1));
         while category_enabled(CATEGORY_MEMORY_KERNEL) {
-            if let Err(err) = publish_one_sample(&kernel_stats).await {
+            if let Err(err) = publish_one_sample(&kernel_stats, stall_provider.clone()).await {
                 log::warn!("Failed to trace on category {:?} : {:?}", CATEGORY_MEMORY_KERNEL, err);
             }
             debug!("Wait for {} second(s)", delay_in_secs);
@@ -38,6 +40,7 @@ pub async fn serve_forever(
 
 async fn publish_one_sample(
     kernel_stats: &impl fidl_fuchsia_kernel::StatsProxyInterface,
+    stall_provider: Arc<impl StallProviderTrait>,
 ) -> Result<()> {
     debug!("Publish trace records for category {:?}", CATEGORY_MEMORY_KERNEL);
     let mem_stats = kernel_stats.get_memory_stats().await?;
@@ -96,5 +99,14 @@ async fn publish_one_sample(
             "pages_decompressed_within_log_time[7]"=>pd[7]
         );
     }
+
+    let stall_info = stall_provider.get_stall_info()?;
+    counter!(
+        CATEGORY_MEMORY_KERNEL,
+        c"memory_stall",0,
+        "stall_time_some_ns"=>stall_info.stall_time_some,
+        "stall_time_full_ns"=>stall_info.stall_time_full
+    );
+
     Ok(())
 }
