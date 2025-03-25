@@ -626,6 +626,32 @@ using fxt::operator""_intern;
 
 class KTrace {
  public:
+  // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
+  // should be a no-op.
+  void Init(uint32_t bufsize, uint32_t initial_grpmask) {
+    cpu_context_map_.Init();
+    internal_state_.Init(bufsize, initial_grpmask);
+  }
+
+  // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
+  //
+  // The meaning of the options changes based on the action. If the action is to start tracing,
+  // then the options field functions as the group mask.
+  zx_status_t Control(uint32_t action, uint32_t options);
+
+  // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
+  // buffer.
+  //
+  // On success, this function returns the number of bytes that were read into the buffer.
+  // On failure, a zx_status_t error code is returned.
+  zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) {
+    const ssize_t ret = internal_state_.ReadUser(ptr, off, len);
+    if (ret < 0) {
+      return zx::error(static_cast<zx_status_t>(ret));
+    }
+    return zx::ok(ret);
+  }
+
   // Sentinel type for unused arguments.
   struct Unused {};
 
@@ -636,28 +662,9 @@ class KTrace {
     // TODO(eieio): Support process?
   };
 
-  // Initializes all of the internal state needed to support kernel tracing.
-  // This is a no-op if tracing has been disabled.
+  // Initializes all of the state needed to support kernel tracing. This includes, but is not
+  // limited to, calling Init on the KTrace instance. This is a no-op if tracing has been disabled.
   static void InitHook(unsigned);
-
-  // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
-  //
-  // The meaning of the options changes based on the action. If the action is to start tracing,
-  // then the options field functions as the group mask.
-  static zx_status_t Control(uint32_t action, uint32_t options);
-
-  // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
-  // buffer.
-  //
-  // On success, this function returns the number of bytes that were read into the buffer.
-  // On failure, a zx_status_t error code is returned.
-  static zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) {
-    const ssize_t ret = GetInternalState().ReadUser(ptr, off, len);
-    if (ret < 0) {
-      return zx::error(static_cast<zx_status_t>(ret));
-    }
-    return zx::ok(ret);
-  }
 
   // Returns the timestamp that should be used to annotate ktrace records.
   static zx_instant_boot_ticks_t Timestamp() { return current_boot_ticks(); }
@@ -824,13 +831,28 @@ class KTrace {
         args);
   }
 
+  // Retrieves a reference to the global KTrace instance.
+  static KTrace& GetInstance() { return instance_; }
+
   // Retrieves the pseudo-KOID generated for the given CPU number.
-  static zx_koid_t GetCpuKoid(cpu_num_t cpu_num) { return cpu_context_map_.GetCpuKoid(cpu_num); }
+  static zx_koid_t GetCpuKoid(cpu_num_t cpu_num) {
+    return GetInstance().cpu_context_map_.GetCpuKoid(cpu_num);
+  }
 
   // A special KOID used to signify the lack of an associated process.
   constexpr static fxt::Koid kNoProcess{0u};
 
  private:
+  // Set this class up as a singleton by:
+  // * Making the constructor and destructor private
+  // * Preventing copies and moves
+  constexpr KTrace() = default;
+  ~KTrace() = default;
+  KTrace(const KTrace&) = delete;
+  KTrace& operator=(const KTrace&) = delete;
+  KTrace(KTrace&&) = delete;
+  KTrace& operator=(KTrace&&) = delete;
+
   // Maintains the mapping from CPU numbers to pre-allocated KOIDs.
   class CpuContextMap {
    public:
@@ -865,26 +887,21 @@ class KTrace {
       case Context::Thread:
         return Thread::Current::Get()->fxt_ref();
       case Context::Cpu:
-        return cpu_context_map_.GetCurrentCpuRef();
+        return GetInstance().cpu_context_map_.GetCurrentCpuRef();
       default:
         return {kNoProcess, fxt::Koid{0}};
     }
   }
 
-  static internal::KTraceState& GetInternalState() { return internal_state_; }
+  static internal::KTraceState& GetInternalState() { return GetInstance().internal_state_; }
 
-  // Set this class up as a singleton by:
-  // * Making the constructor and destructor private
-  // * Preventing copies and moves
-  constexpr KTrace() = default;
-  ~KTrace() = default;
-  KTrace(const KTrace&) = delete;
-  KTrace& operator=(const KTrace&) = delete;
-  KTrace(KTrace&&) = delete;
-  KTrace& operator=(KTrace&&) = delete;
+  // The global KTrace singleton.
+  static KTrace instance_;
 
-  static internal::KTraceState internal_state_;
-  static CpuContextMap cpu_context_map_;
+  // The internal ring buffer implementation. It also currently Stops, Starts, and Rewinds tracing.
+  internal::KTraceState internal_state_;
+  // A mapping of KOIDs to CPUs, used to annotate trace records.
+  CpuContextMap cpu_context_map_;
 };
 
 void ktrace_report_live_threads();

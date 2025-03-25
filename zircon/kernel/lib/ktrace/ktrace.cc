@@ -586,8 +586,7 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 }  // namespace internal
 
 // The global ktrace state.
-internal::KTraceState KTrace::internal_state_;
-KTrace::CpuContextMap KTrace::cpu_context_map_;
+KTrace KTrace::instance_;
 
 zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
   using StartMode = ::internal::KTraceState::StartMode;
@@ -596,14 +595,14 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return GetInternalState().Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return internal_state_.Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
-      return GetInternalState().Stop();
+      return internal_state_.Stop();
 
     case KTRACE_ACTION_REWIND:
-      return GetInternalState().Rewind();
+      return internal_state_.Rewind();
 
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -645,8 +644,7 @@ void KTrace::InitHook(unsigned) {
   });
 
   // Initialize the singleton data structures.
-  cpu_context_map_.Init();
-  internal_state_.Init(bufsize, initial_grpmask);
+  GetInstance().Init(bufsize, initial_grpmask);
 }
 
 // Finish initialization before starting userspace (i.e. before debug syscalls can occur).
