@@ -12,6 +12,7 @@
 #include <lib/zx/profile.h>
 #include <threads.h>
 #include <zircon/threads.h>
+#include <cstdint>
 
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
@@ -870,7 +871,7 @@ uint16_t Gt6853Device::Checksum16(const uint8_t* data, const size_t size) {
     checksum += be16toh(entry);
   }
 
-  return ~checksum + 1;
+  return static_cast<uint16_t>(~checksum) + static_cast<uint16_t>(1);
 }
 
 zx_status_t Gt6853Device::SendFirmwarePacket(const uint8_t type, const uint8_t* packet,
