@@ -36,8 +36,10 @@ class PixelFormat {
   /// `banjo_pixel_format` must be a format supported by the display stack.
   explicit constexpr PixelFormat(fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format);
 
-  PixelFormat(const PixelFormat&) = default;
-  PixelFormat& operator=(const PixelFormat&) = default;
+  constexpr PixelFormat(const PixelFormat&) noexcept = default;
+  constexpr PixelFormat(PixelFormat&&) noexcept = default;
+  constexpr PixelFormat& operator=(const PixelFormat&) noexcept = default;
+  constexpr PixelFormat& operator=(PixelFormat&&) noexcept = default;
   ~PixelFormat() = default;
 
   constexpr fuchsia_images2::wire::PixelFormat ToFidl() const;

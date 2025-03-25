@@ -24,8 +24,10 @@ class ModeAndId {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr ModeAndId(const ModeAndId::ConstructorArgs& args);
 
-  ModeAndId(const ModeAndId&) = default;
-  ModeAndId& operator=(const ModeAndId&) = default;
+  constexpr ModeAndId(const ModeAndId&) noexcept = default;
+  constexpr ModeAndId(ModeAndId&&) noexcept = default;
+  constexpr ModeAndId& operator=(const ModeAndId&) noexcept = default;
+  constexpr ModeAndId& operator=(ModeAndId&&) noexcept = default;
   ~ModeAndId() = default;
 
   friend constexpr bool operator==(const ModeAndId& lhs, const ModeAndId& rhs);

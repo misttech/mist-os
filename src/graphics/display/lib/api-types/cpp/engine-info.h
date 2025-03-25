@@ -60,8 +60,10 @@ class EngineInfo {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr EngineInfo(const EngineInfo::ConstructorArgs& args);
 
-  EngineInfo(const EngineInfo&) = default;
-  EngineInfo& operator=(const EngineInfo&) = default;
+  constexpr EngineInfo(const EngineInfo&) noexcept = default;
+  constexpr EngineInfo(EngineInfo&&) noexcept = default;
+  constexpr EngineInfo& operator=(const EngineInfo&) noexcept = default;
+  constexpr EngineInfo& operator=(EngineInfo&&) noexcept = default;
   ~EngineInfo() = default;
 
   friend constexpr bool operator==(const EngineInfo& lhs, const EngineInfo& rhs);

@@ -63,8 +63,10 @@ class Dimensions {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr Dimensions(const Dimensions::ConstructorArgs& args);
 
-  Dimensions(const Dimensions&) = default;
-  Dimensions& operator=(const Dimensions&) = default;
+  constexpr Dimensions(const Dimensions&) noexcept = default;
+  constexpr Dimensions(Dimensions&&) noexcept = default;
+  constexpr Dimensions& operator=(const Dimensions&) noexcept = default;
+  constexpr Dimensions& operator=(Dimensions&&) noexcept = default;
   ~Dimensions() = default;
 
   friend constexpr bool operator==(const Dimensions& lhs, const Dimensions& rhs);

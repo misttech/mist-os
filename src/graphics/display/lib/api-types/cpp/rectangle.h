@@ -61,8 +61,10 @@ class Rectangle {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr Rectangle(const Rectangle::ConstructorArgs& args);
 
-  Rectangle(const Rectangle&) = default;
-  Rectangle& operator=(const Rectangle&) = default;
+  constexpr Rectangle(const Rectangle&) noexcept = default;
+  constexpr Rectangle(Rectangle&&) noexcept = default;
+  constexpr Rectangle& operator=(const Rectangle&) noexcept = default;
+  constexpr Rectangle& operator=(Rectangle&&) noexcept = default;
   ~Rectangle() = default;
 
   friend constexpr bool operator==(const Rectangle& lhs, const Rectangle& rhs);

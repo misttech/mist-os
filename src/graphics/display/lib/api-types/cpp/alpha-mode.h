@@ -34,8 +34,10 @@ class AlphaMode {
 
   explicit constexpr AlphaMode(alpha_t banjo_alpha_mode);
 
-  AlphaMode(const AlphaMode&) = default;
-  AlphaMode& operator=(const AlphaMode&) = default;
+  constexpr AlphaMode(const AlphaMode&) noexcept = default;
+  constexpr AlphaMode(AlphaMode&&) noexcept = default;
+  constexpr AlphaMode& operator=(const AlphaMode&) noexcept = default;
+  constexpr AlphaMode& operator=(AlphaMode&&) noexcept = default;
   ~AlphaMode() = default;
 
   constexpr fuchsia_hardware_display_types::wire::AlphaMode ToFidl() const;
