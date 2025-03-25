@@ -10,6 +10,7 @@ use crate::superblock::{
     SUPERBLOCK_OFFSET,
 };
 use anyhow::{anyhow, bail, ensure, Error};
+use async_trait::async_trait;
 use std::collections::HashMap;
 use storage_device::buffer::Buffer;
 use storage_device::Device;
@@ -20,6 +21,18 @@ pub const NULL_ADDR: u32 = 0;
 // Used to indicate a new page that hasn't been allocated yet.
 #[allow(unused)]
 pub const NEW_ADDR: u32 = 0xffffffff;
+
+/// This trait is exposed to allow unit testing of Inode and other structs.
+/// It is implemented by F2fsReader.
+#[async_trait]
+pub(super) trait Reader {
+    /// Read a raw block from disk.
+    /// `block_addr` is the physical block offset on the device.
+    async fn read_raw_block(&self, block_addr: u32) -> Result<Buffer<'_>, Error>;
+
+    /// Reads a logical 'node' block from the disk (i.e. via NAT indirection)
+    async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error>;
+}
 
 pub struct F2fsReader {
     pub device: Box<dyn Device>,
@@ -162,26 +175,9 @@ impl F2fsReader {
         .unwrap())
     }
 
-    /// Read a raw block from disk.
-    /// `block_addr` is the physical block offset on the device.
-    pub(super) async fn read_raw_block(&self, block_addr: u32) -> Result<Buffer<'_>, Error> {
-        let mut block = self.device.allocate_buffer(BLOCK_SIZE).await;
-        self.device
-            .read(block_addr as u64 * BLOCK_SIZE as u64, block.as_mut())
-            .await
-            .map_err(|_| anyhow!("device read failed"))?;
-        Ok(block)
-    }
-
-    /// Reads a logical 'node' block from the disk (i.e. via NAT indirection)
-    pub(super) async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error> {
-        let nat_entry = self.get_nat_entry(nid).await?;
-        self.read_raw_block(nat_entry.block_addr).await
-    }
-
     /// Read an inode for a directory and return entries.
     pub async fn readdir(&self, ino: u32) -> Result<Vec<DirEntry>, Error> {
-        let inode = Inode::try_load(&self, ino).await?;
+        let inode = Inode::try_load(self, ino).await?;
         let mode = inode.header.mode;
         ensure!(mode.contains(Mode::Directory), "not a directory");
         if let Some(entries) = inode.get_inline_dir_entries()? {
@@ -218,10 +214,31 @@ impl F2fsReader {
     }
 }
 
+#[async_trait]
+impl Reader for F2fsReader {
+    /// Read a raw block from disk.
+    /// `block_addr` is the physical block offset on the device.
+    async fn read_raw_block(&self, block_addr: u32) -> Result<Buffer<'_>, Error> {
+        let mut block = self.device.allocate_buffer(BLOCK_SIZE).await;
+        self.device
+            .read(block_addr as u64 * BLOCK_SIZE as u64, block.as_mut())
+            .await
+            .map_err(|_| anyhow!("device read failed"))?;
+        Ok(block)
+    }
+
+    /// Reads a logical 'node' block from the disk (i.e. via NAT indirection)
+    async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error> {
+        let nat_entry = self.get_nat_entry(nid).await?;
+        self.read_raw_block(nat_entry.block_addr).await
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::dir::FileType;
+    use crate::xattr;
     use std::path::PathBuf;
 
     use storage_device::fake_device::FakeDevice;
@@ -357,5 +374,30 @@ mod test {
         assert_eq!(data_blocks[6].0, 104671684);
         let block = f2fs.read_raw_block(data_blocks[6].1).await.expect("read sparse");
         assert_eq!(&block.as_slice()[..3], b"bar");
+    }
+
+    #[fuchsia::test]
+    async fn test_xattr() {
+        let device = open_test_image("/pkg/testdata/f2fs.img.zst");
+
+        let f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
+        let sparse_dat =
+            resolve_inode_path(&f2fs, "/sparse.dat").await.expect("resolve sparse.dat");
+        let inode = Inode::try_load(&f2fs, sparse_dat).await.expect("load inode");
+        assert_eq!(
+            inode.xattr,
+            vec![
+                xattr::XattrEntry {
+                    index: xattr::Index::User,
+                    name: Box::new(b"a".to_owned()),
+                    value: Box::new(b"value".to_owned())
+                },
+                xattr::XattrEntry {
+                    index: xattr::Index::User,
+                    name: Box::new(b"c".to_owned()),
+                    value: Box::new(b"value".to_owned())
+                },
+            ]
+        );
     }
 }

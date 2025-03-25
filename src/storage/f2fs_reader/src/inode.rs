@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::dir::InlineDentry;
-use crate::reader::{F2fsReader, NULL_ADDR};
+use crate::reader::{Reader, NULL_ADDR};
 use crate::superblock::BLOCK_SIZE;
+use crate::xattr::{decode_xattr, XattrEntry};
 use anyhow::{anyhow, bail, ensure, Error};
 use bitflags::bitflags;
 use std::collections::HashMap;
@@ -167,7 +168,6 @@ pub struct InodeFooter {
 pub struct Inode {
     pub header: InodeHeader,
     pub extra: Option<InodeExtraAttr>,
-    pub inline_xattr: Option<Box<[u8]>>,
     pub inline_data: Option<Box<[u8]>>,
     pub inline_dentry: Option<InlineDentry>,
     pub i_addrs: Vec<u32>,
@@ -176,6 +176,7 @@ pub struct Inode {
 
     // These are loaded from additional nodes.
     pub nid_pages: HashMap<u32, Box<RawAddrBlock>>,
+    pub xattr: Vec<XattrEntry>,
 }
 
 /// Both direct and indirect node address pages use this same format.
@@ -207,22 +208,21 @@ impl Debug for Inode {
         if let Some(extra) = &self.extra {
             out.field("extra", &extra);
         }
-        if let Some(inline_xattr) = self.inline_xattr.as_deref() {
-            out.field("inline_xattr", &inline_xattr);
-        }
         if let Some(inline_dentry) = &self.inline_dentry {
             out.field("inline_dentry", &inline_dentry);
         }
-        out.field("i_addrs", &self.i_addrs).field("footer", &self.footer).finish()
+        out.field("i_addrs", &self.i_addrs).field("footer", &self.footer);
+        out.field("xattr", &self.xattr);
+        out.finish()
     }
 }
 
 impl Inode {
     /// Attempt to load (and validate) an inode at a given nid.
-    pub async fn try_load(f2fs: &F2fsReader, ino: u32) -> Result<Box<Inode>, Error> {
-        let block = f2fs.read_node(ino).await?;
-
+    pub(super) async fn try_load(f2fs: &impl Reader, ino: u32) -> Result<Box<Inode>, Error> {
+        let mut raw_xattr = vec![];
         let mut this = {
+            let block = f2fs.read_node(ino).await?;
             // Layout:
             //   header: InodeHeader
             //   extra: InodeExtraAttr # optional, based on header flag.
@@ -252,11 +252,16 @@ impl Inode {
             } else {
                 (None, rest)
             };
-            let (inline_xattr, rest) = if header.inline_flags.contains(InlineFlags::Xattr) {
+            let rest = if header.inline_flags.contains(InlineFlags::Xattr) {
                 // xattr always take up the last 50 i_addr slots. i.e. 200 bytes.
-                (Some(&rest[rest.len() - 200..]), &rest[..rest.len() - 200])
+                ensure!(
+                    rest.len() >= 200,
+                    "Insufficient space for inline xattr. Likely bad extra_size."
+                );
+                raw_xattr.extend_from_slice(&rest[rest.len() - 200..]);
+                &rest[..rest.len() - 200]
             } else {
-                (None, rest)
+                rest
             };
 
             let mut inline_data = None;
@@ -279,7 +284,6 @@ impl Inode {
             Box::new(Self {
                 header: (*header).clone(),
                 extra,
-                inline_xattr: inline_xattr.map(|x| x.into()).clone(),
                 inline_data: inline_data.map(|x| x.into()).clone(),
                 inline_dentry,
                 i_addrs,
@@ -287,8 +291,16 @@ impl Inode {
                 footer: (*footer).clone(),
 
                 nid_pages: HashMap::new(),
+                xattr: vec![],
             })
         };
+
+        // Note that this call is done outside the above block to reduce the size of the future
+        // that '.await' produces by ensuring any unnecessary local variables are out of scope.
+        if this.header.xattr_nid != 0 {
+            raw_xattr.extend_from_slice(f2fs.read_node(this.header.xattr_nid).await?.as_slice());
+        }
+        this.xattr = decode_xattr(&raw_xattr)?;
 
         // The set of blocks making up the file begin with i_addrs. If more blocks are required
         // nids[0..5] are used. Zero pages (nid == NULL_ADDR) can be omitted at any level.
@@ -420,9 +432,9 @@ impl Inode {
     /// Note that performance of this method is poor.
     /// We shouldn't need this outside of tests.
     #[cfg(test)]
-    pub async fn read_data_block<'a>(
+    pub(super) async fn read_data_block<'a>(
         &self,
-        f2fs: &'a F2fsReader,
+        f2fs: &'a impl Reader,
         block_num: u32,
     ) -> Result<Buffer<'a>, Error> {
         let mut addr = None;
@@ -436,5 +448,100 @@ impl Inode {
         } else {
             bail!("Not found");
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{reader, BLOCK_SIZE};
+    use anyhow;
+    use async_trait::async_trait;
+    use storage_device::buffer_allocator::{BufferAllocator, BufferSource};
+    use zerocopy::FromZeros;
+
+    /// A simple reader that can be filled explicitly with blocks to exercise inode.
+    struct FakeReader {
+        data: HashMap<u32, Box<[u8; 4096]>>,
+        nids: HashMap<u32, Box<[u8; 4096]>>,
+        allocator: BufferAllocator,
+    }
+
+    #[async_trait]
+    impl reader::Reader for FakeReader {
+        async fn read_raw_block(&self, block_addr: u32) -> Result<Buffer<'_>, Error> {
+            match self.data.get(&block_addr) {
+                None => Err(anyhow!("unexpected block {block_addr}")),
+                Some(value) => {
+                    let mut block = self.allocator.allocate_buffer(BLOCK_SIZE).await;
+                    block.as_mut_slice().copy_from_slice(value.as_ref());
+                    Ok(block)
+                }
+            }
+        }
+
+        async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error> {
+            match self.nids.get(&nid) {
+                None => Err(anyhow!("unexpected nid {nid}")),
+                Some(value) => {
+                    let mut block = self.allocator.allocate_buffer(BLOCK_SIZE).await;
+                    block.as_mut_slice().copy_from_slice(value.as_ref());
+                    Ok(block)
+                }
+            }
+        }
+    }
+
+    // Builds a bare-bones inode block.
+    fn build_inode(ino: u32) -> Box<[u8; BLOCK_SIZE]> {
+        let mut header = InodeHeader::new_zeroed();
+        let mut footer = InodeFooter::new_zeroed();
+        let mut extra = InodeExtraAttr::new_zeroed();
+
+        extra.extra_size = std::mem::size_of::<InodeExtraAttr>().try_into().unwrap();
+
+        header.mode = Mode::RegularFile;
+        header.inline_flags.set(InlineFlags::ExtraAttr, true);
+        header.inline_flags.set(InlineFlags::Xattr, true);
+        footer.ino = ino;
+
+        let mut out = [0u8; BLOCK_SIZE];
+        out[..std::mem::size_of::<InodeHeader>()].copy_from_slice(&header.as_bytes());
+        out[std::mem::size_of::<InodeHeader>()
+            ..std::mem::size_of::<InodeHeader>() + std::mem::size_of::<InodeExtraAttr>()]
+            .copy_from_slice(&extra.as_bytes());
+        out[BLOCK_SIZE - std::mem::size_of::<InodeFooter>()..].copy_from_slice(&footer.as_bytes());
+        Box::new(out)
+    }
+
+    #[fuchsia::test]
+    async fn test_xattr_bounds() {
+        let mut reader = FakeReader {
+            data: [].into(),
+            nids: [(1, build_inode(1)), (2, [0u8; 4096].into()), (3, [0u8; 4096].into())].into(),
+            allocator: BufferAllocator::new(BLOCK_SIZE, BufferSource::new(BLOCK_SIZE * 10)),
+        };
+        assert!(Inode::try_load(&reader, 1).await.is_ok());
+
+        let header_len = std::mem::size_of::<InodeHeader>();
+        let footer_len = std::mem::size_of::<InodeFooter>();
+        let nids_len = std::mem::size_of::<u32>() * 5;
+        let overheads = header_len + footer_len + nids_len;
+
+        // Just enough room for xattrs.
+        let mut extra = InodeExtraAttr::new_zeroed();
+        extra.extra_size = (BLOCK_SIZE - overheads - 200) as u16;
+        reader.nids.get_mut(&1).unwrap()[std::mem::size_of::<InodeHeader>()
+            ..std::mem::size_of::<InodeHeader>() + std::mem::size_of::<InodeExtraAttr>()]
+            .copy_from_slice(&extra.as_bytes());
+        assert!(Inode::try_load(&reader, 1).await.is_ok());
+
+        // No room for xattrs.
+        let mut extra = InodeExtraAttr::new_zeroed();
+        extra.extra_size = (BLOCK_SIZE - overheads - 199) as u16;
+        reader.nids.get_mut(&1).unwrap()[std::mem::size_of::<InodeHeader>()
+            ..std::mem::size_of::<InodeHeader>() + std::mem::size_of::<InodeExtraAttr>()]
+            .copy_from_slice(&extra.as_bytes());
+        assert!(Inode::try_load(&reader, 1).await.is_err());
     }
 }

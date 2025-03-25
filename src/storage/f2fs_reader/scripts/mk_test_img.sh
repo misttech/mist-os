@@ -64,5 +64,12 @@ dd conv=notrunc if=/dev/zero bs=4096 count=1 seek=1039283 of=${MOUNT_PATH}/spars
 dd conv=notrunc if=/dev/zero bs=4096 count=1 seek=104671683 of=${MOUNT_PATH}/sparse.dat
 echo -n "bar" >> ${MOUNT_PATH}/sparse.dat
 
+# xattr
+attr -s a -V "value" ${MOUNT_PATH}/sparse.dat
+attr -s b -V "value" ${MOUNT_PATH}/sparse.dat
+attr -s c -V "value" ${MOUNT_PATH}/sparse.dat
+attr -r b ${MOUNT_PATH}/sparse.dat
+
+
 umount ${MOUNT_PATH}
 zstd /tmp/f2fs.img -o ../testdata/f2fs.img.zst

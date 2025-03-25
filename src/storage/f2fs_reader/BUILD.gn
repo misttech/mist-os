@@ -17,10 +17,12 @@ rustc_library("lib") {
     "src/nat.rs",
     "src/reader.rs",
     "src/superblock.rs",
+    "src/xattr.rs",
   ]
   deps = [
     "//src/storage/lib/storage_device",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:enumn",
     "//third_party/rust_crates:zerocopy",

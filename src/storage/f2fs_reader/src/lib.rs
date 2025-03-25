@@ -7,9 +7,11 @@ mod inode;
 mod nat;
 mod reader;
 mod superblock;
+mod xattr;
 
 // Explicitly re-export things we want to expose.
 pub use dir::DirEntry;
 pub use inode::Inode;
 pub use reader::F2fsReader;
 pub use superblock::BLOCK_SIZE;
+pub use xattr::XattrEntry;
