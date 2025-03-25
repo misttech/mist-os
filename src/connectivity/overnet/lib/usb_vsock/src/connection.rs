@@ -261,7 +261,10 @@ impl<B: PacketBuffer> Connection<B> {
                 warn!("Received data packet for connection that didn't exist at {address:?}");
                 return Ok(());
             }
-            payload_socket.lock().await.write_all(payload).await.expect("BOOM do not submit");
+            if let Err(err) = payload_socket.lock().await.write_all(payload).await {
+                debug!("Write to socket address {address:?} failed, resetting connection immediately: {err:?}");
+                self.reset(&address).await.inspect_err(|err| warn!("Attempt to reset connection to {address:?} failed after write error: {err:?}")).ok();
+            }
             Ok(())
         }
     }
