@@ -267,8 +267,8 @@ void gfx_line(gfx_surface* surface, uint32_t x1, uint32_t y1, uint32_t x2, uint3
   int sdx = (0 < dx) - (dx < 0);
   int sdy = (0 < dy) - (dy < 0);
 
-  uint32_t dxabs = (dx > 0) ? dx : -dx;
-  uint32_t dyabs = (dy > 0) ? dy : -dy;
+  uint32_t dxabs = (dx > 0) ? dx : static_cast<uint32_t>(-dx);
+  uint32_t dyabs = (dy > 0) ? dy : static_cast<uint32_t>(-dy);
 
   uint32_t x = dyabs >> 1;
   uint32_t y = dxabs >> 1;
