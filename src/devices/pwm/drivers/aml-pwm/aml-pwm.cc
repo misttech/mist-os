@@ -7,7 +7,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -109,7 +109,8 @@ DutyCycleClockCount DutyCycleToClockCount(int divider, float duty_cycle, int64_t
   constexpr int64_t kNanosecondsPerClock = kNsecPerSec / kReferenceClockFrequencyHz;
 
   // Calculate the high and low count first based on the duty cycle requested.
-  const int64_t high_time_ns = DivideRounded((duty_cycle * static_cast<float>(period_ns)), 100.0);
+  const int64_t high_time_ns =
+      DivideRounded(static_cast<int64_t>(duty_cycle * static_cast<float>(period_ns)), 100);
   const int64_t period_count = DivideRounded(period_ns, kNanosecondsPerClock * divider);
   const int64_t duty_count = DivideRounded(high_time_ns, kNanosecondsPerClock * divider);
 
@@ -347,15 +348,15 @@ void AmlPwm::SetDutyCycle(uint32_t idx, int divider, uint32_t period_ns, float d
     fbl::AutoLock lock(&locks_[REG_B]);
     DutyCycleReg::GetB()
         .ReadFrom(&mmio_)
-        .set_high(clock_count.high_count)
-        .set_low(clock_count.low_count)
+        .set_high(static_cast<unsigned int>(clock_count.high_count))
+        .set_low(static_cast<unsigned int>(clock_count.low_count))
         .WriteTo(&mmio_);
   } else {
     fbl::AutoLock lock(&locks_[REG_A]);
     DutyCycleReg::GetA()
         .ReadFrom(&mmio_)
-        .set_high(clock_count.high_count)
-        .set_low(clock_count.low_count)
+        .set_high(static_cast<unsigned int>(clock_count.high_count))
+        .set_low(static_cast<unsigned int>(clock_count.low_count))
         .WriteTo(&mmio_);
   }
 }
@@ -381,15 +382,15 @@ void AmlPwm::SetDutyCycle2(uint32_t idx, int divider, uint32_t period_ns, float 
     fbl::AutoLock lock(&locks_[REG_B2]);
     DutyCycleReg::GetB2()
         .ReadFrom(&mmio_)
-        .set_high(clock_count.high_count)
-        .set_low(clock_count.low_count)
+        .set_high(static_cast<unsigned int>(clock_count.high_count))
+        .set_low(static_cast<unsigned int>(clock_count.low_count))
         .WriteTo(&mmio_);
   } else {
     fbl::AutoLock lock(&locks_[REG_A2]);
     DutyCycleReg::GetA2()
         .ReadFrom(&mmio_)
-        .set_high(clock_count.high_count)
-        .set_low(clock_count.low_count)
+        .set_high(static_cast<unsigned int>(clock_count.high_count))
+        .set_low(static_cast<unsigned int>(clock_count.low_count))
         .WriteTo(&mmio_);
   }
 }
@@ -452,7 +453,7 @@ void AmlPwm::SetClock(uint32_t idx, uint8_t sel) {
 void AmlPwm::SetClockDivider(uint32_t idx, int divider) {
   ZX_ASSERT(divider >= 1);
   ZX_ASSERT(divider <= 128);
-  uint8_t divider_select = divider - 1;
+  int divider_select = divider - 1;
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -535,22 +536,27 @@ zx_status_t AmlPwmDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t AmlPwmDevice::Init(zx_device_t* parent) {
-  ddk::PDevFidl pdev(parent);
+  zx::result pdev_client_end =
+      DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev_device_info_t device_info;
-  auto status = pdev.GetDeviceInfo(&device_info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get GetDeviceInfo : %s", zx_status_get_string(status));
-    return status;
+  zx::result device_info = pdev.GetDeviceInfo();
+  if (device_info.is_error()) {
+    zxlogf(ERROR, "Failed to get device info : %s", device_info.status_string());
+    ;
+    return device_info.status_value();
   }
 
   std::vector<fdf::MmioBuffer> mmios;
-  for (uint32_t i = 0; i < device_info.mmio_count; i++) {
-    std::optional<fdf::MmioBuffer> mmio;
-    status = pdev.MapMmio(i, &mmio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get mmio for index %d : %s", i, zx_status_get_string(status));
-      return status;
+  for (uint32_t i = 0; i < device_info->mmio_count; i++) {
+    zx::result mmio = pdev.MapMmio(i);
+    if (mmio.is_error()) {
+      zxlogf(ERROR, "Failed to get mmio for index %d: %s", i, mmio.status_string());
+      return mmio.status_value();
     }
     mmios.push_back(std::move(*mmio));
   }
@@ -579,7 +585,7 @@ zx_status_t AmlPwmDevice::Init(std::vector<fdf::MmioBuffer> mmios,
   // for the rest of pwms which are not part of the metadata.
   for (auto& channel : *metadata.channels()) {
     if (channel.id() > max_pwm_id_) {
-      zxlogf(ERROR, "Invalid PWM ID - %d in metadata. Maximum valid PWM ID is %d", *channel.id(),
+      zxlogf(ERROR, "Invalid PWM ID - %d in metadata. Maximum valid PWM ID is %lu", *channel.id(),
              max_pwm_id_);
       return ZX_ERR_INVALID_ARGS;
     }
