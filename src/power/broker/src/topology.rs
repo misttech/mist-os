@@ -373,32 +373,33 @@ impl Topology {
     }
 
     /// Gets direct, assertive dependencies for the given Element and PowerLevel.
-    pub fn direct_assertive_dependencies(&self, element_level: &ElementLevel) -> Vec<Dependency> {
+    pub fn direct_assertive_dependencies<'a>(
+        &'a self,
+        element_level: &'a ElementLevel,
+    ) -> impl Iterator<Item = Dependency> + 'a {
         self.assertive_dependencies
             .get(&element_level)
-            .unwrap_or(&Vec::<ElementLevel>::new())
-            .iter()
+            .into_iter()
+            .flat_map(|required_levels| required_levels.iter())
             .map(|required| Dependency {
                 dependent: element_level.clone(),
                 requires: required.clone(),
             })
-            .collect()
     }
 
     /// Gets direct, opportunistic dependencies for the given Element and IndexedPowerLevel.
-    pub fn direct_opportunistic_dependencies(
-        &self,
-        element_level: &ElementLevel,
-    ) -> Vec<Dependency> {
+    pub fn direct_opportunistic_dependencies<'a>(
+        &'a self,
+        element_level: &'a ElementLevel,
+    ) -> impl Iterator<Item = Dependency> + 'a {
         self.opportunistic_dependencies
             .get(&element_level)
-            .unwrap_or(&Vec::<ElementLevel>::new())
-            .iter()
+            .into_iter()
+            .flat_map(|required_levels| required_levels.iter())
             .map(|required| Dependency {
                 dependent: element_level.clone(),
                 requires: required.clone(),
             })
-            .collect()
     }
 
     /// Gets direct and transitive dependencies for the given Element and
@@ -1282,18 +1283,21 @@ mod tests {
                         },
         }}}});
 
-        let mut a_deps =
-            t.direct_assertive_dependencies(&ElementLevel { element_id: a.clone(), level: ONE });
+        let mut a_deps = t
+            .direct_assertive_dependencies(&ElementLevel { element_id: a.clone(), level: ONE })
+            .collect::<Vec<_>>();
         a_deps.sort();
         assert_eq!(a_deps, []);
 
-        let mut b_deps =
-            t.direct_assertive_dependencies(&ElementLevel { element_id: b.clone(), level: ONE });
+        let mut b_deps = t
+            .direct_assertive_dependencies(&ElementLevel { element_id: b.clone(), level: ONE })
+            .collect::<Vec<_>>();
         b_deps.sort();
         assert_eq!(b_deps, [ba]);
 
-        let mut c_deps =
-            t.direct_assertive_dependencies(&ElementLevel { element_id: c.clone(), level: ONE });
+        let mut c_deps = t
+            .direct_assertive_dependencies(&ElementLevel { element_id: c.clone(), level: ONE })
+            .collect::<Vec<_>>();
         let mut want_c_deps = [cb, cd];
         c_deps.sort();
         want_c_deps.sort();
