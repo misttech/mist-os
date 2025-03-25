@@ -117,7 +117,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_SmallBlob_DataCorrupted) {
   auto merkle_tree = GenerateTree(buf, sizeof(buf));
 
   // Invert one character
-  buf[42] = ~(buf[42]);
+  buf[42] = static_cast<uint8_t>(~(buf[42]));
 
   auto verifier_or = BlobVerifier::CreateWithoutTree(merkle_tree->root, GetMetrics(), sizeof(buf));
   ASSERT_TRUE(verifier_or.is_ok());
@@ -166,7 +166,7 @@ TEST_P(BlobVerifierTest, CreateAndVerify_BigBlob_DataCorrupted) {
   BlockMerkleTreeInfo info = GenerateMerkleTreeBlocks(*layout, buf.get(), sz);
 
   // Invert a char in the first block. All other blocks are still valid.
-  buf.get()[42] = ~(buf.get()[42]);
+  buf.get()[42] = static_cast<uint8_t>(~(buf.get()[42]));
 
   auto verifier_or =
       BlobVerifier::Create(info.root, GetMetrics(), info.GetMerkleDataBlocks(), *layout);
