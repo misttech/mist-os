@@ -119,7 +119,7 @@ pub async fn pb_create_with_sdk_version(
 
     // Generate a size report for the images after mapping them to partitions.
     if let Some(size_report) = cmd.gerrit_size_report {
-        let mut mapper = PartitionImageMapper::new(partitions.clone());
+        let mut mapper = PartitionImageMapper::new(partitions.clone())?;
         if let Some(system) = &system_a {
             mapper.map_images_to_slot(&system.images, PartitionSlot::A)?;
             ensure_system_board(system)?;

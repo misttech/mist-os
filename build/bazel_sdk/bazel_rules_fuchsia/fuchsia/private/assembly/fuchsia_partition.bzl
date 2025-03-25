@@ -17,7 +17,9 @@ SLOT = struct(
 
 PARTITION_TYPE = struct(
     ZBI = "ZBI",
+    RECOVERY_ZBI = "RecoveryZBI",
     VBMETA = "VBMeta",
+    RECOVERY_VBMETA = "RecoveryVBMeta",
     DTBO = "Dtbo",
     FVM = "FVM",
     FXFS = "Fxfs",
@@ -58,7 +60,7 @@ fuchsia_partition = rule(
         "type": attr.string(
             doc = "Type of this partition",
             mandatory = True,
-            values = [PARTITION_TYPE.ZBI, PARTITION_TYPE.VBMETA, PARTITION_TYPE.DTBO, PARTITION_TYPE.FVM, PARTITION_TYPE.FXFS],
+            values = [PARTITION_TYPE.ZBI, PARTITION_TYPE.RECOVERY_ZBI, PARTITION_TYPE.VBMETA, PARTITION_TYPE.RECOVERY_VBMETA, PARTITION_TYPE.DTBO, PARTITION_TYPE.FVM, PARTITION_TYPE.FXFS],
         ),
     },
 )

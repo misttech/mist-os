@@ -14,12 +14,31 @@ use url::Url;
 
 /// The type of the image used to correlate a partition with an image in the
 /// assembly manifest.
+///
+/// This supports two recovery styles:
+///
+/// - R-slotted recovery
+///     Slot::R
+///     ImageType::ZBI
+///
+/// - A/B-slotted recovery
+///     Slot::A | Slot::B
+///     ImageType::RecoveryZBI
+///
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum ImageType {
     /// Zircon Boot Image.
     ZBI,
+    /// Recovery Zircon Boot Image.
+    /// This is used for recoveries that have A/B slots.
+    /// R-slotted recoveries should use ImageType::ZBI with Slot::R.
+    RecoveryZBI,
     /// Verified Boot Metadata.
     VBMeta,
+    /// Recovery Verified Boot Metadata.
+    /// This is used for recoveries that have A/B slots.
+    /// R-slotted recoveries should use ImageType::VBMeta with Slot::R.
+    RecoveryVBMeta,
     /// Fuchsia Volume Manager.
     FVM,
     /// Fuchsia Filesystem.
@@ -32,7 +51,9 @@ impl fmt::Display for ImageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::ZBI => "ZBI",
+            Self::RecoveryZBI => "RecoveryZBI",
             Self::VBMeta => "VBMeta",
+            Self::RecoveryVBMeta => "RecoveryVBMeta",
             Self::FVM => "FVM",
             Self::Fxfs => "Fxfs",
             Self::Dtbo => "Dtbo",
@@ -54,27 +75,73 @@ pub struct PartitionAndImage {
 pub struct PartitionImageMapper {
     partitions: PartitionsConfig,
     images: BTreeMap<Slot, BTreeMap<ImageType, Utf8PathBuf>>,
+    recovery_style: RecoveryStyle,
+}
+
+#[derive(Debug, PartialEq)]
+enum RecoveryStyle {
+    /// No recovery images are present.
+    NoRecovery,
+    /// Recovery lives in a separate R slot.
+    R,
+    /// Recovery is updated alongside the "main" images in AB slots.
+    AB,
 }
 
 impl PartitionImageMapper {
     /// Construct a new mapper that targets the `partitions`.
-    pub fn new(partitions: PartitionsConfig) -> Self {
-        Self { partitions, images: BTreeMap::new() }
+    pub fn new(partitions: PartitionsConfig) -> Result<Self> {
+        // Determine which recovery style we will be using, and throw an error
+        // if we find both AB and R style recoveries.
+        let mut recovery_style = RecoveryStyle::NoRecovery;
+        for partition in &partitions.partitions {
+            if partition.slot() == Some(&Slot::R) {
+                if recovery_style == RecoveryStyle::AB {
+                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
+                }
+                recovery_style = RecoveryStyle::R;
+            }
+
+            if matches!(partition, Partition::RecoveryZBI { .. }) {
+                if recovery_style == RecoveryStyle::R {
+                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
+                }
+                recovery_style = RecoveryStyle::AB;
+            }
+        }
+        Ok(Self { partitions, images: BTreeMap::new(), recovery_style })
     }
 
     /// Map a set images that are intended for a specific slot to partitions.
     pub fn map_images_to_slot(&mut self, images: &Vec<Image>, slot: Slot) -> Result<()> {
         log::debug!("Mapping images: {:#?} to slot: {}", images, slot);
-        let slot_entry = self.images.entry(slot).or_insert(BTreeMap::new());
+
+        // AB-slotted recoveries get redirected to slot A.
+        let slot_entry = if slot == Slot::R && self.recovery_style == RecoveryStyle::AB {
+            self.images.entry(Slot::A).or_insert(BTreeMap::new())
+        } else {
+            self.images.entry(slot).or_insert(BTreeMap::new())
+        };
+
         for image in images.iter() {
             match image {
                 Image::ZBI { path, .. } => {
-                    let image_type = ImageType::ZBI;
+                    let image_type = if slot == Slot::R && self.recovery_style == RecoveryStyle::AB
+                    {
+                        ImageType::RecoveryZBI
+                    } else {
+                        ImageType::ZBI
+                    };
                     log::debug!("Adding image type: {} from path {}", image_type, path.clone());
                     slot_entry.insert(image_type, path.clone());
                 }
                 Image::VBMeta(path) => {
-                    let image_type = ImageType::VBMeta;
+                    let image_type = if slot == Slot::R && self.recovery_style == RecoveryStyle::AB
+                    {
+                        ImageType::RecoveryVBMeta
+                    } else {
+                        ImageType::VBMeta
+                    };
                     log::debug!("Adding image type: {} from path {}", image_type, path.clone());
                     slot_entry.insert(image_type, path.clone());
                 }
@@ -135,7 +202,9 @@ impl PartitionImageMapper {
         for p in &self.partitions.partitions {
             let (image_type, slot) = match &p {
                 Partition::ZBI { slot, .. } => (ImageType::ZBI, slot),
+                Partition::RecoveryZBI { slot, .. } => (ImageType::RecoveryZBI, slot),
                 Partition::VBMeta { slot, .. } => (ImageType::VBMeta, slot),
+                Partition::RecoveryVBMeta { slot, .. } => (ImageType::RecoveryVBMeta, slot),
                 Partition::Dtbo { slot, .. } => (ImageType::Dtbo, slot),
 
                 // Arbitrarily, take the fvm from the slot A system.
@@ -245,7 +314,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
         mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
@@ -336,7 +405,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
         mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
@@ -422,7 +491,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
         mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
@@ -481,7 +550,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         assert!(mapper.map().is_empty());
     }
@@ -526,7 +595,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
         mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
@@ -588,7 +657,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
@@ -631,7 +700,7 @@ mod tests {
             images: vec![Image::Dtbo("path/to/r/dtbo".into())],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         assert!(mapper.map_images_to_slot(&images_r.images, Slot::R).is_err());
     }
 
@@ -667,7 +736,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let mut mapper = PartitionImageMapper::new(partitions);
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.generate_gerrit_size_report(&size_report_path, &"prefix".to_string()).unwrap();
 
@@ -687,5 +756,80 @@ mod tests {
             "prefix-zbi_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-zbi_a",
         });
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_ab_slotted_recovery() {
+        let partitions = PartitionsConfig {
+            partitions: vec![
+                Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
+                Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::RecoveryZBI { name: "recovery_a".into(), slot: Slot::A, size: None },
+                Partition::RecoveryVBMeta {
+                    name: "vbmeta_recovery_a".into(),
+                    slot: Slot::A,
+                    size: None,
+                },
+            ],
+            ..Default::default()
+        };
+        let images_a = AssemblyManifest {
+            images: vec![
+                Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
+                Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+            ],
+            board_name: "my_board".into(),
+        };
+        let images_r = AssemblyManifest {
+            images: vec![
+                Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
+                Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+            ],
+            board_name: "my_board".into(),
+        };
+        let mut mapper = PartitionImageMapper::new(partitions).unwrap();
+        assert_eq!(RecoveryStyle::AB, mapper.recovery_style);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
+
+        let expected = vec![
+            PartitionAndImage {
+                partition: Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/fuchsia.zbi".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/fuchsia.vbmeta".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::RecoveryZBI {
+                    name: "recovery_a".into(),
+                    slot: Slot::A,
+                    size: None,
+                },
+                path: "path/to/r/fuchsia.zbi".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::RecoveryVBMeta {
+                    name: "vbmeta_recovery_a".into(),
+                    slot: Slot::A,
+                    size: None,
+                },
+                path: "path/to/r/fuchsia.vbmeta".into(),
+            },
+        ];
+        assert_eq!(expected, mapper.map());
+    }
+
+    #[test]
+    fn test_invalid_ab_and_r_slotted_recovery() {
+        let partitions = PartitionsConfig {
+            partitions: vec![
+                Partition::RecoveryZBI { name: "recovery_a".into(), slot: Slot::A, size: None },
+                Partition::ZBI { name: "recovery_r".into(), slot: Slot::R, size: None },
+            ],
+            ..Default::default()
+        };
+        assert!(PartitionImageMapper::new(partitions).is_err());
     }
 }
