@@ -504,7 +504,6 @@ impl FileSystemState {
     ///
     /// Example output:
     ///     ",context=foo,root_context=bar"
-    /// TODO(357876133): Write "seclabel" when relevant.
     fn write_mount_options(
         &self,
         security_server: &SecurityServer,
@@ -512,40 +511,48 @@ impl FileSystemState {
     ) -> Result<(), Errno> {
         let security_state = self.0.lock();
 
-        let mut write_options = |mount_options: &FileSystemMountOptions| -> Result<(), Errno> {
-            let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| -> Result<(), Errno> {
-                if let Some(value) = option {
-                    let _ = buf.write_all(prefix)?;
-                    let _ = buf.write_all(value)?;
-                }
-                Ok(())
-            };
-            write_option(b",context=", &mount_options.context)?;
-            write_option(b",fscontext=", &mount_options.fs_context)?;
-            write_option(b",defcontext=", &mount_options.def_context)?;
-            write_option(b",rootcontext=", &mount_options.root_context)
-        };
-
-        match &*security_state {
-            FileSystemLabelState::Unlabeled { mount_options, name: _, pending_entries: _ } => {
-                write_options(mount_options)
+        match *security_state {
+            FileSystemLabelState::Unlabeled { ref mount_options, .. } => {
+                Self::write_mount_options_to_buf(buf, mount_options)
             }
-            FileSystemLabelState::Labeled { label } => {
-                let get_option = |sid_opt: Option<_>| -> Option<Vec<u8>> {
-                    if let Some(sid) = sid_opt {
-                        return security_server.sid_to_security_context(sid);
-                    }
-                    Option::None
-                };
+            FileSystemLabelState::Labeled { ref label } => {
+                let to_context = |sid| security_server.sid_to_security_context(sid);
                 let mount_options = FileSystemMountOptions {
-                    context: get_option(label.mount_sids.context),
-                    fs_context: get_option(label.mount_sids.fs_context),
-                    def_context: get_option(label.mount_sids.def_context),
-                    root_context: get_option(label.mount_sids.root_context),
+                    context: label.mount_sids.context.and_then(to_context),
+                    fs_context: label.mount_sids.fs_context.and_then(to_context),
+                    def_context: label.mount_sids.def_context.and_then(to_context),
+                    root_context: label.mount_sids.root_context.and_then(to_context),
                 };
-                write_options(&mount_options)
+
+                // TODO: https://fxbug.dev/357876133 - Fix this to be consistent with observed
+                // behaviour under Linux.
+                let has_configurable_labels =
+                    matches!(label.scheme, FileSystemLabelingScheme::FsUse { .. });
+                if has_configurable_labels {
+                    buf.write_all(b",seclabel").map(|_| ())?;
+                }
+
+                Self::write_mount_options_to_buf(buf, &mount_options)
             }
         }
+    }
+
+    /// Writes the supplied `mount_options` to the `OutputBuffer`.
+    fn write_mount_options_to_buf(
+        buf: &mut impl OutputBuffer,
+        mount_options: &FileSystemMountOptions,
+    ) -> Result<(), Errno> {
+        let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| -> Result<(), Errno> {
+            let Some(value) = option else {
+                return Ok(());
+            };
+            buf.write_all(prefix).map(|_| ())?;
+            buf.write_all(value).map(|_| ())
+        };
+        write_option(b",context=", &mount_options.context)?;
+        write_option(b",fscontext=", &mount_options.fs_context)?;
+        write_option(b",defcontext=", &mount_options.def_context)?;
+        write_option(b",rootcontext=", &mount_options.root_context)
     }
 }
 
