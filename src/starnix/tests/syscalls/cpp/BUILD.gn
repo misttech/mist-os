@@ -61,6 +61,7 @@ syscall_tests = [
   "sysfs_power_test",
   "syslog_test",
   "task_test",
+  "terminal_test",
   "test_helper_test",
   "time_test",
   "timerfd_test",
@@ -91,7 +92,6 @@ arch64_syscall_tests = [
   "fuse_test",
   "ioctl_test",
   "ptrace_test",
-  "terminal_test",
   "vdso_test",
 
   # go/keep-sorted end

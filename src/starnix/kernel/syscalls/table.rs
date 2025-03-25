@@ -149,8 +149,8 @@ pub fn dispatch_syscall(
         };
         pub use crate::signals::syscalls::{
             sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
-            sys_arch32_signalfd, sys_arch32_signalfd4, sys_kill as sys_arch32_kill,
-            sys_restart_syscall as sys_arch32_restart_syscall,
+            sys_arch32_signalfd, sys_arch32_signalfd4, sys_arch32_waitid,
+            sys_kill as sys_arch32_kill, sys_restart_syscall as sys_arch32_restart_syscall,
             sys_rt_sigpending as sys_arch32_rt_sigpending,
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
             sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
@@ -174,7 +174,7 @@ pub fn dispatch_syscall(
         pub use crate::task::syscalls::{
             sys_arch32_execve, sys_arch32_geteuid32, sys_arch32_getppid, sys_arch32_getresgid32,
             sys_arch32_getresuid32, sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity,
-            sys_arch32_seccomp, sys_arch32_setgroups32, sys_arch32_setpriority,
+            sys_arch32_seccomp, sys_arch32_setgroups32, sys_arch32_setpgid, sys_arch32_setpriority,
             sys_arch32_setresgid32, sys_arch32_setresuid32, sys_arch32_setrlimit,
             sys_arch32_setsid, sys_arch32_syslog, sys_arch32_ugetrlimit,
             sys_capget as sys_arch32_capget, sys_capset as sys_arch32_capset,
@@ -373,6 +373,7 @@ pub fn dispatch_syscall(
             set_tid_address[1],
             setgroups32[2],
             setitimer[3],
+            setpgid[2],
             setpriority[3],
             setresgid32[3],
             setresuid32[3],
@@ -411,6 +412,7 @@ pub fn dispatch_syscall(
             vfork[0],
             vmsplice[4],
             wait4[4],
+            waitid[5],
             write[3],
             writev[3],
 

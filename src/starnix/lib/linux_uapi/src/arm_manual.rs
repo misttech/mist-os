@@ -69,6 +69,25 @@ arch_translate_data! {
         uid,
         gid,
     }
+
+    BidiFrom<rusage> {
+        ru_utime,
+        ru_stime,
+        ru_maxrss,
+        ru_ixrss,
+        ru_idrss,
+        ru_isrss,
+        ru_minflt,
+        ru_majflt,
+        ru_nswap,
+        ru_inblock,
+        ru_oublock,
+        ru_msgsnd,
+        ru_msgrcv,
+        ru_nsignals,
+        ru_nvcsw,
+        ru_nivcsw,
+    }
 }
 
 translate_data! {

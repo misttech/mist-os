@@ -774,7 +774,7 @@ pub fn sys_waitid(
     id: i32,
     user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: UserRef<uapi::rusage>,
+    user_rusage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -810,7 +810,7 @@ pub fn sys_waitid(
             };
 
             track_stub!(TODO("https://fxbug.dev/322874712"), "real rusage from waitid");
-            current_task.write_object(user_rusage, &usage)?;
+            current_task.write_multi_arch_object(user_rusage, usage)?;
         }
 
         if !user_info.is_null() {
@@ -911,6 +911,7 @@ mod arch32 {
         sys_rt_sigaction as sys_arch32_rt_sigaction,
         sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
         sys_sigaltstack as sys_arch32_sigaltstack, sys_signalfd4 as sys_arch32_signalfd4,
+        sys_waitid as sys_arch32_waitid,
     };
 }
 
@@ -1740,7 +1741,7 @@ mod tests {
                 id,
                 MultiArchUserRef::null(&current_task),
                 0,
-                UserRef::default()
+                UserRef::default().into()
             ),
             error!(EINVAL)
         );
@@ -1752,7 +1753,7 @@ mod tests {
                 id,
                 MultiArchUserRef::null(&current_task),
                 0xffff,
-                UserRef::default()
+                UserRef::default().into()
             ),
             error!(EINVAL)
         );
@@ -2031,7 +2032,7 @@ mod tests {
                 child2_pid,
                 address.into(),
                 WEXITED,
-                UserRef::default()
+                UserRef::default().into()
             ),
             Ok(())
         );
@@ -2046,7 +2047,7 @@ mod tests {
                 0,
                 address.into(),
                 WEXITED,
-                UserRef::default()
+                UserRef::default().into()
             ),
             Ok(())
         );
