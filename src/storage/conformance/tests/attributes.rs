@@ -171,7 +171,9 @@ async fn get_attributes_file_query_all() {
     // All of the attributes are requested. Filesystems are allowed to return None for attributes
     // they don't support.
     let (mutable_attrs, immutable_attrs) = file_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .unwrap()
         .expect("get_attributes failed");
@@ -239,7 +241,9 @@ async fn get_attributes_directory_query_all() {
     // All of the attributes are requested. Filesystems are allowed to return None for attributes
     // they don't support.
     let (mutable_attrs, immutable_attrs) = dir_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .unwrap()
         .expect("get_attributes failed");
@@ -516,7 +520,9 @@ async fn update_attributes_directory_with_sufficient_rights() {
         .expect("update_attributes failed");
 
     let (mutable_attrs, _) = dir_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .expect("FIDL call failed")
         .map_err(zx::Status::from_raw)

@@ -116,6 +116,29 @@ type NodeAttributesQuery = flexible bits : uint64 {
     /// fscrypt attribute.
     @available(added=HEAD)
     WRAPPING_KEY_ID = 0x80000;
+
+    /// When this is queried in [`fuchsia.io/Node.GetAttributes`], it indicates to the filesystem
+    /// that this node has been accessed and is pending an access time update given that any one of
+    /// the following conditions are met:
+    ///   * current_access_time <= current_modification_time
+    ///   * current_access_time <= current_change_time
+    ///   * current_access_time < current_time - duration(1 day)
+    ///
+    /// If any of the above conditions are met, `access_time` is updated to the current time before
+    /// any queried node attributes are returned.
+    ///
+    /// This is compatible with Linux relatime mount.
+    ///
+    /// The rationale behind adding this `NodeAttributesQuery` is that some filesystems, e.g. Fxfs,
+    /// are unable to identify when a file access has occured and thus update the access time. We
+    /// allow for clients to communicate to the underlying filesystem that a file access has
+    /// occurred and that it awaits for an update to access time.
+    ///
+    /// WARNING: If this is queried without a prior file access, as long as the above conditions
+    /// are met, the node's access time will be updated. Not all filesystems will support this. The
+    /// query will be ignored if the filesystem does not support this.
+    @available(added=HEAD)
+    PENDING_ACCESS_TIME_UPDATE = 0x100000;
 };
 
 type MutableNodeAttributes = table {
