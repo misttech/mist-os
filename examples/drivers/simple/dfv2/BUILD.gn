@@ -3,20 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/bazel/drivers/bazel_driver_package.gni")
-import("//build/bazel/wrappers.gni")
 
 bazel_driver_package("bazel_package") {
   bazel_target = "//examples/drivers/simple/dfv2:pkg"
   package_name = "simple_driver"
-}
-
-bazel_fuchsia_test_package("simple-driver-test") {
-  test_package_name = "simple-driver-test"
-  test_component_names = [ "simple-driver-test-bin" ]
-  test_specs = {
-    environments = basic_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }

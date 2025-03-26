@@ -6,7 +6,6 @@ group("tests") {
   testonly = true
 
   deps = [
-    "examples/example-board:tests",
     "manager:tests",
     "visitors:tests",
   ]

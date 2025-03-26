@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_test_package_group.gni")
+
 group("drivers") {
   testonly = true
   deps = [
@@ -23,9 +25,7 @@ group("hermetic_tests") {
   deps = [
     "driver_test_realm:hermetic_tests",
     "metadata:hermetic_tests",
-    "simple/dfv2:simple-driver-test",
     "simple/rust:hermetic_tests",
-    "template:template-test",
     "transport:hermetic_tests",
   ]
 }
