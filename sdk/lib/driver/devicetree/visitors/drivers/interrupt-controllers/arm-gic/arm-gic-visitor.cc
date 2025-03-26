@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "arm-gicv2.h"
-#include "arm-gicv3.h"
 
 namespace {
 
@@ -179,7 +178,7 @@ zx::result<> ArmGicVisitor::ParseInterrupt(fdf_devicetree::Node& child,
                                            fdf_devicetree::ReferenceNode& parent,
                                            fdf_devicetree::PropertyCells interrupt_cells,
                                            std::optional<std::string> interrupt_name) {
-  auto compatible_strings = *parent.properties().at("compatible").AsStringList();
+  auto compatible_strings = parent.properties().at("compatible").AsStringList().value();
 
   if (IsArmGicV1V2(compatible_strings) && (interrupt_cells.size() != (3 * sizeof(uint32_t)))) {
     // For GIC v2 3 cells are expected.

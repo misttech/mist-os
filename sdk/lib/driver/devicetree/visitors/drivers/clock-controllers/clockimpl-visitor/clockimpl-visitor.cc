@@ -70,8 +70,7 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
 
   // Parse clocks and clock-names
   if (parser_output->find(kClockReference) != parser_output->end()) {
-    if (parser_output->find(kClockNames) == parser_output->end() &&
-        (*parser_output)[kClockReference].size() != 1u) {
+    if (!parser_output->contains(kClockNames) && (*parser_output)[kClockReference].size() != 1u) {
       FDF_LOG(
           ERROR,
           "Clock reference '%s' does not have valid clock names property. Name is required to generate bind rules, especially when more than one clock is referenced.",
@@ -198,8 +197,7 @@ zx::result<> ClockImplVisitor::AddInitChildNodeSpec(fdf_devicetree::Node& child)
 
 ClockImplVisitor::ClockController& ClockImplVisitor::GetController(
     fdf_devicetree::Phandle phandle) {
-  auto controller_iter = clock_controllers_.find(phandle);
-  if (controller_iter == clock_controllers_.end()) {
+  if (!clock_controllers_.contains(phandle)) {
     clock_controllers_[phandle] = ClockController();
   }
   return clock_controllers_[phandle];

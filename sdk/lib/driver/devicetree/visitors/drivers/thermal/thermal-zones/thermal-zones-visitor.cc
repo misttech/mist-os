@@ -48,7 +48,7 @@ zx::result<> ThermalZonesVisitor::Visit(fdf_devicetree::Node& node,
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kThermalSensorReference) == parser_output->end()) {
+  if (!parser_output->contains(kThermalSensorReference)) {
     return zx::ok();
   }
 
@@ -86,7 +86,7 @@ zx::result<> ThermalZonesVisitor::ParseTrips(fdf_devicetree::Node& node,
 
     if (trips_output->at(kType)[0].AsString() == "critical") {
       sensor.trip_metadata->critical_temp_celsius() =
-          static_cast<float>(*trips_output->at(kTemperature)[0].AsUint32()) / 1000.0f;
+          static_cast<float>(trips_output->at(kTemperature)[0].AsUint32().value()) / 1000.0f;
       FDF_LOG(DEBUG, "Set critical temperature to '%.2f' for sensor '%s'",
               sensor.trip_metadata->critical_temp_celsius(), reference.name().c_str());
     }

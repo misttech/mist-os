@@ -45,7 +45,7 @@ zx::result<> UsbPhyVisitor::Visit(fdf_devicetree::Node& node,
   }
 
   if (parser_output->find(kPhys) != parser_output->end()) {
-    if (parser_output->find(kPhyNames) == parser_output->end()) {
+    if (!parser_output->contains(kPhyNames)) {
       FDF_LOG(ERROR, "Node '%s' is missing phy-names.", node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
@@ -65,8 +65,8 @@ zx::result<> UsbPhyVisitor::Visit(fdf_devicetree::Node& node,
                 index);
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
-      auto name = (*parser_output)[kPhyNames][index].AsString();
 
+      auto name = (*parser_output)[kPhyNames][index].AsString();
       if (!name) {
         FDF_LOG(ERROR, "Node '%s' has invalid phy-name property.", node.name().c_str());
         return zx::error(ZX_ERR_INVALID_ARGS);

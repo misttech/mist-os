@@ -92,7 +92,7 @@ zx::result<> RegistersVisitor::Visit(fdf_devicetree::Node& node,
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kRegisterReference) == parser_output->end()) {
+  if (!parser_output->contains(kRegisterReference)) {
     return zx::ok();
   }
 

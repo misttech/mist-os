@@ -106,9 +106,9 @@ zx::result<amlogic_cpu::perf_domain_t> PerformanceDomainVisitor::ParsePerformanc
   }
 
   amlogic_cpu::perf_domain_t performance_domain;
-  performance_domain.id = *parser_output->at(kDomainID)[0].AsUint32();
+  performance_domain.id = parser_output->at(kDomainID)[0].AsUint32().value();
   performance_domain.relative_performance =
-      static_cast<uint8_t>(*parser_output->at(kRelativePerformance)[0].AsUint32());
+      static_cast<uint8_t>(parser_output->at(kRelativePerformance)[0].AsUint32().value());
   performance_domain.core_count = static_cast<uint32_t>(parser_output->at(kCpus).size());
 
   auto opp_table =
@@ -141,8 +141,9 @@ zx::result<std::vector<amlogic_cpu::operating_point_t>> PerformanceDomainVisitor
     }
 
     opp_table.push_back({
-        .freq_hz = static_cast<uint32_t>(*parser_output->at(kOperatingFrequency)[0].AsUint64()),
-        .volt_uv = *parser_output->at(kOperatingMicrovolt)[0].AsUint32(),
+        .freq_hz =
+            static_cast<uint32_t>(parser_output->at(kOperatingFrequency)[0].AsUint64().value()),
+        .volt_uv = parser_output->at(kOperatingMicrovolt)[0].AsUint32().value(),
         .pd_id = domain_id,
     });
   }

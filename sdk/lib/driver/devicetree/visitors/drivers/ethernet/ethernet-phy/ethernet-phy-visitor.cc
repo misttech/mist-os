@@ -34,7 +34,7 @@ zx::result<> EthPhyVisitor::Visit(fdf_devicetree::Node& node,
   }
 
   // ethernet-phy references only have one entry.
-  if (parser_output->find(kPhys) == parser_output->end() || (*parser_output)[kPhys].size() != 1u) {
+  if (!parser_output->contains(kPhys) || (*parser_output)[kPhys].size() != 1u) {
     return zx::ok();
   }
 

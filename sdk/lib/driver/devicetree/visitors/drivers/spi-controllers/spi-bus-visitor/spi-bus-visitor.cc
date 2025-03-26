@@ -66,8 +66,7 @@ zx::result<> SpiBusVisitor::Visit(fdf_devicetree::Node& node,
 }
 
 zx::result<> SpiBusVisitor::CreateController(const std::string& node_name) {
-  auto controller_iter = spi_controllers_.find(node_name);
-  if (controller_iter != spi_controllers_.end()) {
+  if (spi_controllers_.contains(node_name)) {
     FDF_LOG(ERROR, "Duplicate SPI controller '%s'", node_name.c_str());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }

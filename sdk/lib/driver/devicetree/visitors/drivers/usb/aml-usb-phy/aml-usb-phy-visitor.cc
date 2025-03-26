@@ -36,10 +36,10 @@ zx::result<> AmlUsbPhyVisitor::DriverVisit(fdf_devicetree::Node& node,
   }
 
   PhyType phy_type;
-  if (*parser_output->at(kCompatible)[0].AsStringList()->begin() == "amlogic,g12a-usb-phy") {
+  if (*parser_output->at(kCompatible)[0].AsStringList().value().begin() == "amlogic,g12a-usb-phy") {
     phy_type = kG12A;
   }
-  if (*parser_output->at(kCompatible)[0].AsStringList()->begin() == "amlogic,g12b-usb-phy") {
+  if (*parser_output->at(kCompatible)[0].AsStringList().value().begin() == "amlogic,g12b-usb-phy") {
     phy_type = kG12B;
   } else {
     FDF_LOG(ERROR, "Node '%s' has invalid compatible string. Cannot determine PHY type. ",

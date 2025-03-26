@@ -88,7 +88,7 @@ zx::result<> RegulatorVisitor::Visit(fdf_devicetree::Node& node,
 
 zx::result<> RegulatorVisitor::AddRegulatorMetadata(fdf_devicetree::Node& node,
                                                     fdf_devicetree::PropertyValues& values) {
-  if (values.find(kRegulatorName) == values.end()) {
+  if (!values.contains(kRegulatorName)) {
     FDF_LOG(ERROR, "Regulator node '%s' does not have a name.", node.name().c_str());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -106,15 +106,15 @@ zx::result<> RegulatorVisitor::AddRegulatorMetadata(fdf_devicetree::Node& node,
 
   if (values.find(kRegulatorMaxMicrovolt) != values.end() && metadata.voltage_step_uv() &&
       metadata.min_voltage_uv()) {
-    if (*values.at(kRegulatorMaxMicrovolt)[0].AsUint32() < *metadata.min_voltage_uv()) {
+    if (values.at(kRegulatorMaxMicrovolt)[0].AsUint32().value() < *metadata.min_voltage_uv()) {
       FDF_LOG(ERROR, "Regulator max voltage (%d) is not more than min voltage (%d) in node '%s'",
-              *values.at(kRegulatorMaxMicrovolt)[0].AsUint32(), *metadata.min_voltage_uv(),
+              values.at(kRegulatorMaxMicrovolt)[0].AsUint32().value(), *metadata.min_voltage_uv(),
               node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     auto voltage_range =
-        (*values.at(kRegulatorMaxMicrovolt)[0].AsUint32() - *metadata.min_voltage_uv());
+        (values.at(kRegulatorMaxMicrovolt)[0].AsUint32().value() - *metadata.min_voltage_uv());
 
     if (voltage_range % (*metadata.voltage_step_uv()) != 0) {
       FDF_LOG(ERROR, "Voltage range (%d) is not a multiple of step size (%d) for node '%s'",
@@ -156,13 +156,14 @@ zx::result<> RegulatorVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
               fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
                                       bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia_regulator::NAME,
-                                      *regulator_name->second.AsString()),
+                                      regulator_name->second.AsString().value()),
           },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
                                 bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia_regulator::NAME, *regulator_name->second.AsString()),
+              fdf::MakeProperty(bind_fuchsia_regulator::NAME,
+                                regulator_name->second.AsString().value()),
           },
   }};
 

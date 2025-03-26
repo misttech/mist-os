@@ -137,7 +137,7 @@ zx::result<> MailboxVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (*mbox_cells->second.AsUint32() != 1) {
+  if (mbox_cells->second.AsUint32().value() != 1) {
     FDF_LOG(ERROR, "Invalid #mbox-cells property for node \"%s\"", node.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }

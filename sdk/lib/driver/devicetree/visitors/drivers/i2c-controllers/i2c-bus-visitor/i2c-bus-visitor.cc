@@ -65,8 +65,7 @@ zx::result<> I2cBusVisitor::AddChildNodeSpec(fdf_devicetree::ChildNode& child, u
 }
 
 zx::result<> I2cBusVisitor::CreateController(std::string node_name) {
-  auto controller_iter = i2c_controllers_.find(node_name);
-  if (controller_iter != i2c_controllers_.end()) {
+  if (i2c_controllers_.contains(node_name)) {
     FDF_LOG(ERROR,
             "Failed to create I2C Controller. An I2C controller with name '%s' already exists.",
             node_name.c_str());
