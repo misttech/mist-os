@@ -294,7 +294,7 @@ pub enum ResolutionError {
     #[error("Provided an override which is not mutable in the component's configuration schema.")]
     FieldIsNotMutable { key: String },
 
-    #[error("Received invalid value for `{key}`.")]
+    #[error("Received invalid value for `{key}`:\n\t{source}")]
     InvalidValue {
         key: String,
         #[source]
