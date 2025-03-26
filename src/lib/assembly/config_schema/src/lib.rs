@@ -11,7 +11,6 @@ mod board_input_bundle_set;
 pub mod common;
 pub mod developer_overrides;
 pub mod image_assembly_config;
-pub mod merge;
 pub mod platform_config;
 pub mod product_config;
 
@@ -22,7 +21,6 @@ pub use common::{
     DriverDetails, FeatureControl, PackageDetails, PackageSet, PackagedDriverDetails,
 };
 pub use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig};
-pub use merge::try_merge_into;
 pub use platform_config::example_config::ExampleConfig;
 pub use platform_config::icu_config::{ICUConfig, Revision};
 pub use platform_config::intl_config::IntlConfig;
