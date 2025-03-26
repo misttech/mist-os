@@ -10,67 +10,175 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass, fields
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, Dict, List
 
 # TODO(b/379766709) (comment 21): Rewrite this in Go.
 
-
-# Output schema for a single FIDL method call: sender and receiver URL, and the path
-# to the test's output directory (from which the test name can be extracted)
-class Call:
-    def __init__(
-        self,
-        sender: Dict[str, Any],
-        receiver: Dict[str, Any],
-        test_path: str,
-        direction: str,
-    ):
-        self.sender = sender
-        self.receiver = receiver
-        self.test_path = test_path
-        self.direction = direction
+# The dataclasses form the output schemas of the script.
+#
+# The "expanded" schema has full info about endpoints on every call,
+# and its schema is a list of `ExpandedMessage`.
+#
+# The "condensed" schema stores a dict of interned endpoints that calls refer into,
+# and its schema is `CondensedSchema`.
+#
+# The "summary" schema is a dict from "fuchsia.library/Protocol/Message" to a dict with
+# keys: "incoming", "outgoing", "intra"; values: int number of calls.
 
 
-UNWANTED_CALL_KEYS = ["pid", "is_test"]
+@dataclass(frozen=True)
+class Endpoint:
+    name: str
+    url: str = ""
+    moniker: str = ""
 
 
-def cleanup_call(call: Dict[str, Any]) -> Dict[str, Any]:
-    for key in UNWANTED_CALL_KEYS:
-        if key in call:
-            del call[key]
-    return call
+@dataclass
+class CondensedCall:
+    sender: int
+    receiver: int
+    direction: str
 
 
-# Output schema for a single FIDL message. `name` is the name of the message, as
+@dataclass
+class CondensedMessage:
+    name: str
+    ordinal: str
+    calls: List[CondensedCall]
+
+
+@dataclass
+class CondensedSchema:
+    endpoints: Dict[int, Endpoint]
+    messages: List[CondensedMessage]
+
+
+@dataclass
+class ExpandedCall:
+    sender: Endpoint
+    receiver: Endpoint
+    direction: str
+
+
+@dataclass
+class ExpandedMessage:
+    name: str
+    ordinal: str
+    calls: List[ExpandedCall]
+
+
+@dataclass
+class CallsSummary:
+    incoming: int
+    outgoing: int
+    intra: int
+
+
+# Maintain an interned set of `Endpoint`s and return a different key for
+# each unique `Endpoint`.
+class Endpoints:
+    def __init__(self) -> None:
+        # This will be written to the condensed JSON file.
+        self.endpoints_by_key: Dict[int, Endpoint] = {}
+        # This interns endpoints we've seen before.
+        self.keys_by_endpoint: Dict[Endpoint, int] = {}
+        self.next_key = 101
+
+    def get_key(self, endpoint: Endpoint) -> int:
+        if endpoint in self.keys_by_endpoint:
+            return self.keys_by_endpoint[endpoint]
+        key = self.next_key
+        self.next_key += 1
+        self.keys_by_endpoint[endpoint] = key
+        self.endpoints_by_key[key] = endpoint
+        return key
+
+    def data_to_write(self) -> Dict[int, Endpoint]:
+        return self.endpoints_by_key
+
+
+# The one-and-only intern-er for `Endpoint`s
+ENDPOINTS = Endpoints()
+
+
+# The endpoint info from the snoop files has fields we don't care about.
+# ENDPOINT_FIELDS helps `cleanup_endpoint()` scrub the unwanted fields.
+ENDPOINT_FIELDS = [f.name for f in fields(Endpoint)]
+
+
+def cleanup_endpoint(endpoint: Dict[str, Any]) -> Dict[str, Any]:
+    for key in list(endpoint.keys()):
+        if key not in ENDPOINT_FIELDS:
+            del endpoint[key]
+    return endpoint
+
+
+# Stores a single FIDL message. `name` is the name of the message, as
 # `fuchsia.library/Protocol.Message` - unless the name is not in the CTF ordinal<>message
-# map, in which case `name` is the same as `ordinal`. `calls` is a list of Call.
+# map, in which case `name` is the same as `ordinal`. Accumulates both "expanded" and "condensed"
+# versions of the call info for its message, and can supply output-schema classes for either.
 class Message:
     def __init__(self, name: str, ordinal: str) -> None:
         self.name = name
         self.ordinal = ordinal
-        self.calls: List[Call] = []
+        self.condensed_calls: List[CondensedCall] = []
+        self.expanded_calls: List[ExpandedCall] = []
 
     def add_calls(
         self, calls: List[Dict[str, Any]], test_path: Path, direction: str
     ) -> None:
         for call in calls:
-            self.calls.append(
-                Call(
-                    sender=cleanup_call(call["sender"]),
-                    receiver=cleanup_call(call["receiver"]),
-                    test_path=str(test_path.parent),
+            sender = Endpoint(**cleanup_endpoint(call["sender"]))
+            receiver = Endpoint(**cleanup_endpoint(call["receiver"]))
+            self.expanded_calls.append(
+                ExpandedCall(
+                    sender=sender,
+                    receiver=call["receiver"],
                     direction=direction,
                 )
             )
+            self.condensed_calls.append(
+                CondensedCall(
+                    sender=ENDPOINTS.get_key(sender),
+                    receiver=ENDPOINTS.get_key(receiver),
+                    direction=direction,
+                )
+            )
+
+    def summary(self) -> CallsSummary:
+        counts = {"incoming": 0, "outgoing": 0, "intra": 0}
+        for call in self.condensed_calls:
+            counts[call.direction] += 1
+        return CallsSummary(**counts)
+
+    def condensed_version(self) -> CondensedMessage:
+        return CondensedMessage(
+            name=self.name, ordinal=self.ordinal, calls=self.condensed_calls
+        )
+
+    def expanded_version(self) -> ExpandedMessage:
+        return ExpandedMessage(
+            name=self.name, ordinal=self.ordinal, calls=self.expanded_calls
+        )
+
+
+# Tells json how to write classes. Use by passing `default=vars_or_obj` to json.dump().
+def vars_or_obj(obj: Any) -> Any:
+    """Extracts fields from classes, or passes through built-in data types."""
+    try:
+        return vars(obj)
+    except:
+        return obj
 
 
 # Main data structure of the program. Gathers data from all input files and outputs it
 # to JSON in the correct schema - a list of Message with an item for every entry in the
 # SDK API name<>ordinal map file (whether or not it has calls) and for every event in
 # every scanned FIDL-snoop file (whether or not it's in the API).
-class Methods:
+class Messages:
     def __init__(self, message_file: TextIOWrapper) -> None:
         self.setup_data_structures(message_file)
 
@@ -109,47 +217,74 @@ class Methods:
                         calls=call_list, test_path=path, direction=direction
                     )
 
-    def write_to_json(self, path: Path) -> None:
-        """Writes the desired data to stdout in JSON format."""
+    def data_to_write(self) -> list[Message]:
+        return list(self.name_lookup.values())
 
-        def vars_or_obj(obj: Any) -> Any:
-            """Extracts fields from classes, and passes through built-in data types."""
-            try:
-                return vars(obj)
-            except:
-                return obj
+    def write_expanded_to_json(self, path: Path) -> None:
+        """Writes the desired data to the path in JSON format."""
 
         with open(path, "w") as f:
             json.dump(
-                list(self.name_lookup.values()),
+                [
+                    message.expanded_version()
+                    for message in self.data_to_write()
+                ],
                 f,
-                indent=2,
                 default=vars_or_obj,
+                indent=2,
             )
 
+    def write_condensed_to_json(self, path: Path) -> None:
+        data = CondensedSchema(
+            endpoints=ENDPOINTS.data_to_write(),
+            messages=[
+                message.condensed_version() for message in self.data_to_write()
+            ],
+        )
+        with open(path, "w") as f:
+            json.dump(data, f, default=vars_or_obj, indent=2)
 
-# The core of this script. Scans for intra_calls files, accumulates calls from them, and writes
-# the accumulated information to stdout in the correct schema.
+    def write_summary_to_json(self, path: Path) -> None:
+        data = dict(
+            [
+                (message.name, message.summary())
+                for message in self.data_to_write()
+            ]
+        )
+        with open(path, "w") as f:
+            json.dump(data, f, default=vars_or_obj, indent=2)
+
+
+# The core of this script. Scans for FIDL-snoop files, accumulates calls from them, and writes
+# the accumulated information to specified files in the correct schema.
 def check_coverage(args: argparse.Namespace) -> None:
     api_path = Path(args.api_file)
     with open(api_path) as f:
-        methods = Methods(f)
+        messages = Messages(f)
     for root_dir in args.results_dir:
         for dir_path, _, file_names in os.walk(root_dir):
             for name in file_names:
                 if name.endswith("intra_calls.freeform.json"):
-                    methods.process_calls(Path(dir_path) / name, "intra")
+                    messages.process_calls(Path(dir_path) / name, "intra")
                 elif name.endswith("incoming_calls.freeform.json"):
-                    methods.process_calls(Path(dir_path) / name, "incoming")
+                    messages.process_calls(Path(dir_path) / name, "incoming")
                 elif name.endswith("outgoing_calls.freeform.json"):
-                    methods.process_calls(Path(dir_path) / name, "outgoing")
-    methods.write_to_json(Path(args.json_output))
+                    messages.process_calls(Path(dir_path) / name, "outgoing")
+    if args.json_output:
+        messages.write_expanded_to_json(Path(args.json_output))
+    if args.expanded_json_output:
+        messages.write_expanded_to_json(Path(args.expanded_json_output))
+    if args.condensed_json_output:
+        messages.write_condensed_to_json(Path(args.condensed_json_output))
+    if args.summary_json_output:
+        messages.write_summary_to_json(Path(args.summary_json_output))
 
 
 def main(argv: List[str]) -> None:
     """This script takes an API file summarizing SDK FIDL methods (name <-> ordinal) and one or
     more directories containing test outputs, which should include FIDL-snoop files named
-    `intra_calls.freeform.json`."""
+    `intra_calls.freeform.json`. It can write either of two schemas. (For soft-migration reasons,
+    `--json_output` is the same as `--expanded_json_output`.)"""
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
 
@@ -164,11 +299,25 @@ def main(argv: List[str]) -> None:
     )
     subparser.add_argument(
         "--json_output",
-        required=True,
-        help="Path to write FIDL coverage summary to.",
+        help="Path to write (expanded/legacy) FIDL coverage summary to.",
     )
     subparser.add_argument(
-        "--results_dir", nargs="+", help="Root directories of test outputs"
+        "--expanded_json_output",
+        help="Path to write expanded FIDL coverage summary to.",
+    )
+    subparser.add_argument(
+        "--condensed_json_output",
+        help="Path to write condensed FIDL coverage summary to.",
+    )
+    subparser.add_argument(
+        "--summary_json_output",
+        help="Path to write a brief FIDL coverage summary to.",
+    )
+    subparser.add_argument(
+        "--results_dir",
+        nargs="+",
+        help="Root directories of test outputs",
+        required=True,
     )
     subparser.set_defaults(func=check_coverage)
 
