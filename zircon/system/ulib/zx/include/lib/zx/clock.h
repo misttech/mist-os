@@ -109,12 +109,12 @@ class clock final : public object<clock> {
   static time get_monotonic() ZX_AVAILABLE_SINCE(7) { return time(zx_clock_get_monotonic()); }
   static time_boot get_boot() ZX_AVAILABLE_SINCE(24) { return time_boot(zx_clock_get_boot()); }
 
-  static zx_status_t read_mapped(const void* addr, zx_time_t* out_now) ZX_AVAILABLE_SINCE(HEAD) {
+  static zx_status_t read_mapped(const void* addr, zx_time_t* out_now) ZX_AVAILABLE_SINCE(NEXT) {
     return zx_clock_read_mapped(addr, out_now);
   }
 
   static zx_status_t get_details_mapped(const void* addr, zx_clock_details_v1_t* details_out)
-      ZX_AVAILABLE_SINCE(HEAD) {
+      ZX_AVAILABLE_SINCE(NEXT) {
     return zx_clock_get_details_mapped(addr, ZX_CLOCK_ARGS_VERSION(1), details_out);
   }
 } ZX_AVAILABLE_SINCE(7);

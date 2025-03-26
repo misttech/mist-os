@@ -47,7 +47,7 @@ class vmar final : public object<vmar> {
   }
 
   zx_status_t map_clock(zx_vm_option_t options, size_t vmar_offset, const clock& clock_handle,
-                        size_t len, zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(HEAD) {
+                        size_t len, zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(NEXT) {
     return zx_vmar_map_clock(get(), options, vmar_offset, clock_handle.get(), len, ptr);
   }
 
@@ -70,7 +70,7 @@ class vmar final : public object<vmar> {
   zx_status_t allocate(uint32_t options, size_t offset, size_t size, vmar* child,
                        uintptr_t* child_addr) const ZX_AVAILABLE_SINCE(7);
 
-  static inline unowned<vmar> root_self() ZX_AVAILABLE_SINCE(7) {
+  static unowned<vmar> root_self() ZX_AVAILABLE_SINCE(7) {
     return unowned<vmar>(zx_vmar_root_self());
   }
 } ZX_AVAILABLE_SINCE(7);

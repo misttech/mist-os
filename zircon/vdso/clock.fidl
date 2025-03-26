@@ -324,7 +324,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_read()`]: clock_read.md
     /// [`zx_clock_get_details_mapped()`]: clock_get_details_mapped.md
     /// [`zx_vmar_map_clock()`]: vmar_map_clock.md
-    // @available(added=HEAD)
+    // @available(added=NEXT)
     @vdsocall
     strict ClockReadMapped(struct {
         @voidptr
@@ -470,7 +470,7 @@ closed protocol Clockfuncs {
     /// [`zx_clock_create()`]: clock_create.md
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_vmar_map_clock()`]: vmar_map_clock.md
-    // @available(added=HEAD)
+    // @available(added=NEXT)
     @vdsocall
     strict ClockGetDetailsMapped(struct {
         @voidptr
