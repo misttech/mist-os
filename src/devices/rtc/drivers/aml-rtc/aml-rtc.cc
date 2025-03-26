@@ -8,7 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -24,18 +24,20 @@ namespace rtc {
 
 zx_status_t AmlRtc::Bind(void* ctx, zx_device_t* device) {
   uint32_t reg_val;
-  ddk::PDevFidl pdev(device);
-  if (!pdev.is_valid()) {
-    return ZX_ERR_NO_RESOURCES;
+
+  zx::result pdev_client_end =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          device);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev.ShowInfo();
-
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map MMIO: %s", zx_status_get_string(status));
-    return status;
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
 
   mmio->SetBit<uint32_t>(RTC_OSC_SEL_BIT, RTC_CTRL);
@@ -67,7 +69,7 @@ zx_status_t AmlRtc::Bind(void* ctx, zx_device_t* device) {
   // Retrieve and sanitize the RTC value. Set the RTC to the value.
   FidlRtc::wire::Time rtc = SecondsToRtc(MmioRead32(&amlrtc_device->regs_->real_time));
   rtc = SanitizeRtc(device, rtc);
-  status = amlrtc_device->SetRtc(rtc);
+  zx_status_t status = amlrtc_device->SetRtc(rtc);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to set rtc: %s", zx_status_get_string(status));
   }
