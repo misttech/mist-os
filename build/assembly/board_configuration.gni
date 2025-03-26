@@ -282,6 +282,7 @@ template("board_configuration") {
     }
 
     metadata = {
+      board_input_bundle_sets_barrier = []
       board_configs = [
         {
           label =

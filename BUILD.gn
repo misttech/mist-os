@@ -526,21 +526,22 @@ build_api_module("boards") {
   deps = assembly_board_configs
 }
 
-# Lists the board input bundles that are defined in this build.
+# Lists the board input bundle sets that are defined in this build.
 #
 # Type: list (scope)
 #
 #  label
-#    Required: The GN label for the board_configuration target
+#    Required: The GN label for the board_input_bundle_set target
 #
 #  outdir
 #    Required: The path (relative to the root out dir) of the directory that
-#    contains the board input bundle.
+#    contains the board input bundle set.
 #
-build_api_module("board_input_bundles") {
+build_api_module("board_input_bundle_sets") {
   testonly = true
-  data_keys = [ "board_input_bundles" ]
-  deps = [ "//boards" ]
+  data_keys = [ "board_input_bundle_sets" ]
+  walk_keys = [ "board_input_bundle_sets_barrier" ]
+  deps = assembly_board_configs
 }
 
 # Describes the configuration of the build in the file:

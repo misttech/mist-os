@@ -23,7 +23,6 @@ template("bazel_board_input_bundle") {
          "bazel_board_input_bundle_target is required")
 
   board_input_bundle_target = target_name
-  board_input_bundle_out = "${target_out_dir}/${board_input_bundle_target}"
   bazel_target = invoker.bazel_board_input_bundle_target
 
   bazel_build_action(board_input_bundle_target) {
@@ -48,21 +47,5 @@ template("bazel_board_input_bundle") {
         tracked_files = [ "board_input_bundle.json" ]
       },
     ]
-
-    metadata = {
-      board_input_bundles = [
-        {
-          label = get_label_info(":${board_input_bundle_target}",
-                                 "label_with_toolchain")
-          outdir = rebase_path(board_input_bundle_out, root_build_dir)
-        },
-      ]
-      board_assembly_artifacts = [
-        {
-          source = rebase_path(board_input_bundle_out, root_build_dir)
-          destination = "built/artifacts/$source"
-        },
-      ]
-    }
   }
 }

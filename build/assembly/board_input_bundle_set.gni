@@ -65,6 +65,17 @@ template("board_input_bundle_set") {
         rebase_path(bib, root_build_dir),
       ]
     }
+
+    metadata = {
+      board_input_bundle_sets_barrier = []
+      board_input_bundle_sets = [
+        {
+          label =
+              get_label_info(":${labels.main_target}", "label_with_toolchain")
+          outdir = rebase_path(files.output_dir, root_build_dir)
+        },
+      ]
+    }
   }
 
   bazel_input_directory(labels.bazel_input) {

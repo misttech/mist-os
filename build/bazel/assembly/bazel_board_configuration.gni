@@ -61,6 +61,7 @@ template("bazel_board_configuration") {
     ]
 
     metadata = {
+      board_input_bundle_sets_barrier = []
       board_configs = [
         {
           label = get_label_info(":${board_configuration_target}",

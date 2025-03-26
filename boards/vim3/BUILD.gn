@@ -6,6 +6,7 @@ import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
 import("//build/bazel/assembly/bazel_board_configuration.gni")
 import("//build/bazel/assembly/bazel_board_input_bundle.gni")
+import("//build/bazel/assembly/bazel_board_input_bundle_set.gni")
 
 assert(current_toolchain == default_toolchain,
        "The vim3 board can only be defined in the default toolchain.")
@@ -205,6 +206,11 @@ board_input_bundle("paver") {
 # TODO(jayzhuang): Remove after vim3-vg is migrated.
 bazel_board_input_bundle("bazel_drivers") {
   bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
+}
+
+bazel_board_input_bundle_set("vim3_bibs") {
+  bazel_board_input_bundle_set_target = "//boards/vim3:vim3_bibs"
+  deps = [ ":bazel_inputs" ]
 }
 
 bazel_board_configuration("vim3") {
