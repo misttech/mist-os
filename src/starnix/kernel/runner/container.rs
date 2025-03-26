@@ -31,7 +31,6 @@ use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{
     FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
 };
-use starnix_kernel_structured_config::Config as KernelStructuredConfig;
 use starnix_logging::{
     log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
     NAME_CREATE_CONTAINER,
@@ -135,6 +134,7 @@ fn attribution_info_for_kernel(
     ]
 }
 
+#[derive(Debug)]
 pub struct ContainerStartInfo {
     /// Configuration specified by the component's `program` block.
     pub program: ContainerProgram,
@@ -451,7 +451,6 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-    kernel_structured_config: KernelStructuredConfig,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
@@ -459,9 +458,8 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream();
                 let mut start_info = ContainerStartInfo::new(start_info)?;
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut start_info, sender, kernel_structured_config)
-                    .await
-                    .with_source_context(|| {
+                let container =
+                    create_container(&mut start_info, sender).await.with_source_context(|| {
                         format!("creating container \"{}\"", start_info.program.name)
                     })?;
                 let service_config =
@@ -494,21 +492,15 @@ pub async fn create_component_from_stream(
 async fn create_container(
     start_info: &mut ContainerStartInfo,
     task_complete: oneshot::Sender<TaskResult>,
-    kernel_structured_config: KernelStructuredConfig,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    log_debug!(
-        "Creating container {:#?}, kernel config {:#?}, container config {:#?}",
-        start_info.program,
-        kernel_structured_config,
-        start_info.config,
-    );
+    log_debug!("Creating container {start_info:#?}");
     let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
-    let features = parse_features(&start_info, kernel_structured_config)?;
+    let features = parse_features(&start_info)?;
     log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {

@@ -36,5 +36,24 @@
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
         },
+        {
+            config: "fuchsia.time.config.WritableUTCTime",
+            key: "enable_utc_time_adjustment",
+            type: "bool",
+            default: false,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            key: "ui_visual_debugging_level",
+            type: "uint8",
+            default: 0,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
     ],
 }

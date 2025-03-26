@@ -12,7 +12,6 @@ use starnix_core::device::remote_block_device::remote_block_device_init;
 use starnix_core::mm::MlockPinFlavor;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
-use starnix_kernel_structured_config::Config as KernelStructuredConfig;
 use starnix_logging::log_error;
 use starnix_modules_ashmem::ashmem_device_init;
 use starnix_modules_gpu::gpu_device_init;
@@ -214,15 +213,14 @@ impl Features {
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
-pub fn parse_features(
-    start_info: &ContainerStartInfo,
-    KernelStructuredConfig {
+pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error> {
+    let ContainerStructuredConfig {
         enable_utc_time_adjustment,
+        extra_features,
+        mlock_always_onfault,
+        mlock_pin_flavor,
         ui_visual_debugging_level,
-    }: KernelStructuredConfig,
-) -> Result<Features, Error> {
-    let ContainerStructuredConfig { extra_features, mlock_always_onfault, mlock_pin_flavor } =
-        &start_info.config;
+    } = &start_info.config;
 
     let mut features = Features::default();
     for entry in start_info.program.features.iter().chain(extra_features.iter()) {
@@ -290,10 +288,10 @@ pub fn parse_features(
         };
     }
 
-    if ui_visual_debugging_level > 0 {
+    if *ui_visual_debugging_level > 0 {
         features.enable_visual_debugging = true;
     }
-    features.enable_utc_time_adjustment = enable_utc_time_adjustment;
+    features.enable_utc_time_adjustment = *enable_utc_time_adjustment;
 
     features.kernel.default_uid = start_info.program.default_uid.0;
     features.kernel.default_seclabel = start_info.program.default_seclabel.clone();
