@@ -4,7 +4,7 @@
 
 use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-use crate::syscalls::time::{ITimerSpecPtr, TimeSpecPtr};
+use crate::syscalls::time::{ITimerSpecPtr, TimeSpecPtr, TimeValPtr};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
@@ -2077,6 +2077,20 @@ pub fn sys_timerfd_settime(
     Ok(())
 }
 
+fn deadline_after_timespec(
+    current_task: &CurrentTask,
+    user_timespec: TimeSpecPtr,
+) -> Result<zx::MonotonicInstant, Errno> {
+    if user_timespec.is_null() {
+        Ok(zx::MonotonicInstant::INFINITE)
+    } else {
+        let timespec = current_task.read_multi_arch_object(user_timespec)?;
+        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
+    }
+}
+
+static_assertions::assert_eq_size!(uapi::__kernel_fd_set, uapi::arch32::__kernel_fd_set);
+
 fn select(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2196,18 +2210,6 @@ fn select(
     Ok(num_fds)
 }
 
-fn deadline_after_timespec(
-    current_task: &CurrentTask,
-    user_timespec: UserRef<timespec>,
-) -> Result<zx::MonotonicInstant, Errno> {
-    if user_timespec.is_null() {
-        Ok(zx::MonotonicInstant::INFINITE)
-    } else {
-        let timespec = current_task.read_object(user_timespec)?;
-        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
-    }
-}
-
 pub fn sys_pselect6(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2215,7 +2217,7 @@ pub fn sys_pselect6(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<timespec>,
+    timeout_addr: TimeSpecPtr,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
     let deadline = deadline_after_timespec(current_task, timeout_addr)?;
@@ -2236,13 +2238,12 @@ pub fn sys_pselect6(
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
-        current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
+        current_task.write_multi_arch_object(timeout_addr, timespec_from_duration(remaining))?;
     }
 
     Ok(num_fds)
 }
 
-#[cfg(target_arch = "x86_64")]
 pub fn sys_select(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2250,14 +2251,14 @@ pub fn sys_select(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<starnix_uapi::timeval>,
+    timeout_addr: TimeValPtr,
 ) -> Result<i32, Errno> {
     let start_time = zx::MonotonicInstant::get();
 
     let deadline = if timeout_addr.is_null() {
         zx::MonotonicInstant::INFINITE
     } else {
-        let timeval = current_task.read_object(timeout_addr)?;
+        let timeval = current_task.read_multi_arch_object(timeout_addr)?;
         start_time + starnix_types::time::duration_from_timeval(timeval)?
     };
 
@@ -2277,8 +2278,10 @@ pub fn sys_select(
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
-        current_task
-            .write_object(timeout_addr, &starnix_types::time::timeval_from_duration(remaining))?;
+        current_task.write_multi_arch_object(
+            timeout_addr,
+            starnix_types::time::timeval_from_duration(remaining),
+        )?;
     }
 
     Ok(num_fds)
@@ -2409,7 +2412,7 @@ pub fn sys_epoll_pwait2(
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     max_events: i32,
-    user_timespec: UserRef<timespec>,
+    user_timespec: TimeSpecPtr,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let deadline = deadline_after_timespec(current_task, user_timespec)?;
@@ -3011,7 +3014,7 @@ pub fn sys_io_getevents(
     min_nr: i64,
     nr: i64,
     events_ref: UserRef<io_event>,
-    user_timeout: UserRef<timespec>,
+    user_timeout: TimeSpecPtr,
 ) -> Result<i32, Errno> {
     if min_nr < 0 || min_nr > nr || nr < 0 {
         return error!(EINVAL);
@@ -3532,7 +3535,8 @@ mod arch32 {
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,
         sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
         sys_pidfd_open as sys_arch32_pidfd_open, sys_preadv as sys_arch32_preadv,
-        sys_readv as sys_arch32_readv, sys_renameat2 as sys_arch32_renameat2,
+        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
+        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
         sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
         sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,

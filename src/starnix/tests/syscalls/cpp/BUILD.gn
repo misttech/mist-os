@@ -23,6 +23,7 @@ syscall_tests = [
   "abort_test",
   "ashmem_test",
   "aspace_test",
+  "bpf_test",
   "capabilities_test",
   "cgroup_freezer_test",
   "cgroup_test",
@@ -163,7 +164,6 @@ foreach(test_def, syscall_tests_etc) {
 arch64_syscall_tests = [
   # go/keep-sorted start
 
-  "bpf_test",
   "extended_pstate_test",
   "fuse_test",
   "ptrace_test",

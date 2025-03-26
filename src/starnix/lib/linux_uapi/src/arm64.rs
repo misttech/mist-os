@@ -7797,8 +7797,8 @@ pub struct flock {
     pub l_type: crate::types::c_short,
     pub l_whence: crate::types::c_short,
     pub __bindgen_padding_0: [u8; 4usize],
-    pub l_start: __kernel_off_t,
-    pub l_len: __kernel_off_t,
+    pub l_start: __kernel_loff_t,
+    pub l_len: __kernel_loff_t,
     pub l_pid: pid_t,
     pub __bindgen_padding_1: [u8; 4usize],
 }

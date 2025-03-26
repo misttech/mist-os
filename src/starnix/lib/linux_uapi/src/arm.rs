@@ -7521,9 +7521,11 @@ pub struct epoll_event {
 pub struct flock {
     pub l_type: crate::types::arch32::c_short,
     pub l_whence: crate::types::arch32::c_short,
-    pub l_start: __kernel_off_t,
-    pub l_len: __kernel_off_t,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub l_start: __kernel_loff_t,
+    pub l_len: __kernel_loff_t,
     pub l_pid: pid_t,
+    pub __bindgen_padding_1: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
