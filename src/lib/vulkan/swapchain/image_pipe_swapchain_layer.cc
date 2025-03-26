@@ -4,19 +4,7 @@
 
 #define FUCHSIA_LAYER 1
 
-#if USE_SWAPCHAIN_SURFACE_COPY
-
-#include "swapchain_copy_surface.h"  // nogncheck
-
-#if defined(VK_USE_PLATFORM_FUCHSIA)
-#define SWAPCHAIN_SURFACE_NAME "VK_LAYER_FUCHSIA_imagepipe_swapchain_copy"
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-#define SWAPCHAIN_SURFACE_NAME "VK_LAYER_wayland_swapchain_copy"
-#else
-#error Unsupported
-#endif
-
-#elif USE_IMAGEPIPE_SURFACE_FB
+#if USE_IMAGEPIPE_SURFACE_FB
 
 #include "image_pipe_surface_display.h"  // nogncheck
 
@@ -638,9 +626,7 @@ CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR
 #error Unsupported
 #endif
 
-#if USE_SWAPCHAIN_SURFACE_COPY
-  auto out_surface = std::make_unique<SwapchainCopySurface>();
-#elif USE_IMAGEPIPE_SURFACE_FB
+#if USE_IMAGEPIPE_SURFACE_FB
   auto out_surface = std::make_unique<ImagePipeSurfaceDisplay>();
 #else
 auto out_surface = std::make_unique<ImagePipeSurfaceAsync>(pCreateInfo->imagePipeHandle);
