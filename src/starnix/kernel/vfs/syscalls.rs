@@ -58,7 +58,7 @@ use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
     io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
     io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, off_t,
-    pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, AT_EACCESS,
+    pid_t, pollfd, pselect6_sigmask, sigset_t, statx, timespec, uapi, uid_t, AT_EACCESS,
     AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
     CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
@@ -80,6 +80,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::{atomic, Arc};
 use std::usize;
+use zerocopy::{Immutable, IntoBytes};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -510,13 +511,13 @@ pub fn sys_pwritev2(
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, offset, flags)
 }
 
-type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
+type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs>;
 
-pub fn sys_fstatfs(
+pub fn fstatfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_buf: StatFsPtr,
+    user_buf: MultiArchUserRef<uapi::statfs, T32>,
 ) -> Result<(), Errno> {
     // O_PATH allowed for:
     //
@@ -530,20 +531,37 @@ pub fn sys_fstatfs(
     Ok(())
 }
 
-pub fn sys_statfs(
+pub fn sys_fstatfs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    user_buf: StatFsPtr,
+) -> Result<(), Errno> {
+    fstatfs(locked, current_task, fd, user_buf)
+}
+
+fn statfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
-    user_buf: UserRef<statfs>,
+    user_buf: MultiArchUserRef<uapi::statfs, T32>,
 ) -> Result<(), Errno> {
     let name =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     let fs = name.entry.node.fs();
     let mut stat = fs.statfs(locked, current_task)?;
     stat.f_flags |= name.mount.flags().bits() as i64;
-    current_task.write_object(user_buf, &stat)?;
-
+    current_task.write_multi_arch_object(user_buf, stat)?;
     Ok(())
+}
+
+pub fn sys_statfs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_path: UserCString,
+    user_buf: StatFsPtr,
+) -> Result<(), Errno> {
+    statfs(locked, current_task, user_path, user_buf)
 }
 
 pub fn sys_sendfile(
@@ -3152,7 +3170,7 @@ mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
         lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags, OpenFlags, StatFsPtr,
+        sys_unlinkat, LookupFlags, OpenFlags,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3162,9 +3180,11 @@ mod arch32 {
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::signals::SigSet;
-    use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+    use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
     use starnix_uapi::vfs::EpollEvent;
     use starnix_uapi::{errno, error, uapi, AT_REMOVEDIR};
+
+    type StatFs64Ptr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3284,19 +3304,6 @@ mod arch32 {
         user_path: UserCString,
     ) -> Result<(), Errno> {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
-    }
-
-    pub fn sys_arch32_fstatfs64(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        fd: FdNumber,
-        user_buf_len: u32,
-        user_buf: StatFsPtr,
-    ) -> Result<(), Errno> {
-        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
-            return error!(EINVAL);
-        }
-        super::sys_fstatfs(locked, current_task, fd, user_buf)
     }
 
     pub fn sys_arch32_pread64(
@@ -3487,20 +3494,47 @@ mod arch32 {
         )
     }
 
+    pub fn sys_arch32_fstatfs64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buf_len: u32,
+        user_buf: StatFs64Ptr,
+    ) -> Result<(), Errno> {
+        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
+            return error!(EINVAL);
+        }
+        super::fstatfs(locked, current_task, fd, user_buf)
+    }
+
+    pub fn sys_arch32_statfs64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        user_buf_len: u32,
+        user_buf: StatFs64Ptr,
+    ) -> Result<(), Errno> {
+        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
+            return error!(EINVAL);
+        }
+        super::statfs(locked, current_task, user_path, user_buf)
+    }
+
     pub use super::{
         sys_chroot as sys_arch32_chroot, sys_dup3 as sys_arch32_dup3,
         sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
         sys_eventfd2 as sys_arch32_eventfd2, sys_fchmod as sys_arch32_fchmod,
         sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
-        sys_fstatat64 as sys_arch32_fstatat64, sys_ftruncate as sys_arch32_ftruncate,
+        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
+        sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,
         sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
         sys_pidfd_open as sys_arch32_pidfd_open, sys_preadv as sys_arch32_preadv,
         sys_readv as sys_arch32_readv, sys_renameat2 as sys_arch32_renameat2,
-        sys_splice as sys_arch32_splice, sys_tee as sys_arch32_tee,
-        sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
+        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
@@ -3646,7 +3680,7 @@ mod tests {
 
         let user_path = UserCString::new(&current_task, path_addr);
 
-        assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat), Ok(()));
+        assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat.into()), Ok(()));
 
         let returned_stat = current_task.read_object(user_stat).expect("failed to read struct");
         assert_eq!(

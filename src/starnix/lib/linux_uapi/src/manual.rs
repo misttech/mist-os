@@ -76,3 +76,19 @@ impl Default for fscrypt_add_key_arg {
         }
     }
 }
+
+crate::check_same_layout! {
+    crate::statfs64 = crate::statfs {
+        f_type => f_type,
+        f_bsize => f_bsize,
+        f_blocks => f_blocks,
+        f_bfree => f_bfree,
+        f_bavail => f_bavail,
+        f_files => f_files,
+        f_ffree => f_ffree,
+        f_fsid => f_fsid,
+        f_namelen => f_namelen,
+        f_frsize => f_frsize,
+        f_flags => f_flags,
+    }
+}

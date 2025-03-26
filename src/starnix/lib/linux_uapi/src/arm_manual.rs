@@ -112,6 +112,21 @@ translate_data! {
         ..Default::default()
     }
 
+    TryFrom<crate::statfs> for crate::arch32::statfs {
+        f_type = f_type;
+        f_bsize = f_bsize;
+        f_blocks = f_blocks;
+        f_bfree = f_bfree;
+        f_bavail = f_bavail;
+        f_files = f_files;
+        f_ffree = f_ffree;
+        f_fsid = f_fsid;
+        f_namelen = f_namelen;
+        f_frsize = f_frsize;
+        f_flags = f_flags;
+        ..Default::default()
+    }
+
     TryFrom<crate::statfs> for crate::arch32::statfs64 {
         f_type = f_type;
         f_bsize = f_bsize;

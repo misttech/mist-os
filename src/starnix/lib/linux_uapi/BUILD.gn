@@ -39,7 +39,10 @@ rustc_library("linux_uapi") {
     features += [ "arch32" ]
   }
 
-  deps = [ "//third_party/rust_crates:zerocopy" ]
+  deps = [
+    "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:zerocopy",
+  ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   disable_clippy = true

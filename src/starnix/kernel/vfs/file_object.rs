@@ -19,6 +19,7 @@ use crate::vfs::{
     FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
     FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
+use starnix_uapi::user_address::MultiArchUserRef;
 
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -47,10 +48,9 @@ use starnix_uapi::{
     errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIGETBSZ,
     FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER,
     FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_ENABLE_VERITY,
-    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
-    FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS,
-    FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
-    TCGETS,
+    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA,
+    FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS, FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL,
+    SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -954,9 +954,10 @@ pub fn default_ioctl(
             let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
-        FS_IOC_GETFLAGS => {
+        #[allow(unreachable_patterns)]
+        uapi::FS_IOC_GETFLAGS | uapi::arch32::FS_IOC_GETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322874935"), "FS_IOC_GETFLAGS");
-            let arg = UserAddress::from(arg).into();
+            let arg = MultiArchUserRef::<u64, u32>::new(current_task, arg);
             let mut flags: u32 = 0;
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
@@ -964,7 +965,7 @@ pub fn default_ioctl(
             if file.node().info().casefold {
                 flags |= FS_CASEFOLD_FL;
             }
-            current_task.write_object(arg, &flags)?;
+            current_task.write_multi_arch_object(arg, flags.into())?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
