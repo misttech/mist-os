@@ -375,6 +375,8 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SerializeError = packet_formats::error::ParseError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    // TODO(https://fxbug.dev/42081990): Add per-socket ICMP counters.
+    type Counters<I: Ip> = ();
     type SocketWritableListener = BT::SocketWritableListener;
 
     // NB: `make_packet` does not add any extra bytes because applications send
@@ -1003,9 +1005,13 @@ where
     where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        for<'a> N::ChildInspector<'a>:
+            InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
-            socket_state.record_common_info(inspector, socket_id);
+            inspector.record_debug_child(socket_id, |inspector| {
+                socket_state.record_common_info(inspector);
+            });
         });
     }
 }

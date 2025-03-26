@@ -17,7 +17,9 @@ mod internal {
     pub(super) mod counters;
 }
 
-pub use internal::counters::UdpCounters;
+pub use internal::counters::{
+    CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
+};
 
 pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,

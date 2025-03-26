@@ -134,7 +134,7 @@ pub struct TcpCountersWithSocketInner<C = Counter> {
     pub established_timedout: C,
 }
 
-/// A union of the TCP Counters with and without a socket.
+/// A composition of the TCP Counters with and without a socket.
 pub struct CombinedTcpCounters<'a, I: Ip> {
     /// The TCP Counters that can be associated with a socket.
     pub with_socket: &'a TcpCountersWithSocket<I>,

@@ -9,8 +9,8 @@
 
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{
-    AnyDevice, CounterContext, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers,
-    RngContext, TimerBindingsTypes, TxMetadataBindingsTypes,
+    AnyDevice, DeviceIdContext, InstantBindingsTypes, ReferenceNotifiers, RngContext,
+    TimerBindingsTypes, TxMetadataBindingsTypes,
 };
 use netstack3_datagram as datagram;
 use netstack3_device::ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId};
@@ -36,7 +36,7 @@ use netstack3_ip::{
     self as ip, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, NdpBindingsContext,
 };
 use netstack3_tcp::{self as tcp, TcpBindingsContext, TcpBindingsTypes, TcpContext};
-use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounters};
+use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounterContext};
 
 use crate::transport::TxMetadata;
 use crate::TimerId;
@@ -78,7 +78,7 @@ impl<I> BaseIpExt for I where
 /// objects vended by [`crate::api::CoreApi`].
 pub trait CoreContext<I, BC>:
     udp::StateContext<I, BC>
-    + CounterContext<UdpCounters<I>>
+    + UdpCounterContext<I, WeakDeviceId<BC>, BC>
     + TcpContext<I, BC>
     + IcmpEchoStateContext<I, BC>
     + ip::icmp::IcmpStateContext
@@ -106,7 +106,7 @@ where
     I: IpExt,
     BC: IpBindingsContext<I>,
     O: udp::StateContext<I, BC>
-        + CounterContext<UdpCounters<I>>
+        + UdpCounterContext<I, WeakDeviceId<BC>, BC>
         + TcpContext<I, BC>
         + IcmpEchoStateContext<I, BC>
         + ip::icmp::IcmpStateContext

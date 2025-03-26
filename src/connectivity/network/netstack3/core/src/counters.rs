@@ -19,7 +19,7 @@ use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
 use netstack3_tcp::{CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket};
-use netstack3_udp::UdpCounters;
+use netstack3_udp::{CombinedUdpCounters, UdpCountersWithSocket, UdpCountersWithoutSocket};
 
 /// An API struct for accessing all stack counters.
 pub struct CountersApi<C>(C);
@@ -39,8 +39,10 @@ where
         + CounterContext<MulticastForwardingCounters<Ipv6>>
         + CounterContext<RawIpSocketCounters<Ipv4>>
         + CounterContext<RawIpSocketCounters<Ipv6>>
-        + CounterContext<UdpCounters<Ipv4>>
-        + CounterContext<UdpCounters<Ipv6>>
+        + CounterContext<UdpCountersWithSocket<Ipv4>>
+        + CounterContext<UdpCountersWithSocket<Ipv6>>
+        + CounterContext<UdpCountersWithoutSocket<Ipv4>>
+        + CounterContext<UdpCountersWithoutSocket<Ipv6>>
         + CounterContext<TcpCountersWithSocket<Ipv4>>
         + CounterContext<TcpCountersWithSocket<Ipv6>>
         + CounterContext<TcpCountersWithoutSocket<Ipv4>>
@@ -156,14 +158,24 @@ where
         });
         inspector.record_child("UDP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspector.delegate_inspectable(
-                    CounterContext::<UdpCounters<Ipv4>>::counters(self.core_ctx()).as_ref(),
-                );
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<UdpCountersWithSocket<Ipv4>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<UdpCountersWithoutSocket<Ipv4>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedUdpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
             inspector.record_child("V6", |inspector| {
-                inspector.delegate_inspectable(
-                    CounterContext::<UdpCounters<Ipv6>>::counters(self.core_ctx()).as_ref(),
-                );
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<UdpCountersWithSocket<Ipv6>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<UdpCountersWithoutSocket<Ipv6>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedUdpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
         });
         inspector.record_child("TCP", |inspector| {

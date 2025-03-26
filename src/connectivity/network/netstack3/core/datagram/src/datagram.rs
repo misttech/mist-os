@@ -64,6 +64,7 @@ pub struct ReferenceState<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSp
     pub(crate) state: RwLock<SocketState<I, D, S>>,
     pub(crate) external_data: S::ExternalData<I>,
     pub(crate) send_buffer: SendBufferTracking<S>,
+    pub(crate) counters: S::Counters<I>,
 }
 
 // Local aliases for brevity.
@@ -92,6 +93,11 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> ReferenceState<I,
     #[cfg(any(test, feature = "testutils"))]
     pub fn state(&self) -> &RwLock<SocketState<I, D, S>> {
         &self.state
+    }
+
+    /// Provides access to the socket's counters.
+    pub fn counters(&self) -> &S::Counters<I> {
+        &self.counters
     }
 }
 
@@ -173,54 +179,52 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
     }
 
     /// Record inspect information generic to each datagram protocol.
-    pub fn record_common_info<N>(&self, inspector: &mut N, socket_id: &S::SocketId<I, D>)
+    pub fn record_common_info<N>(&self, inspector: &mut N)
     where
         N: Inspector + InspectorDeviceExt<D>,
     {
-        inspector.record_debug_child(socket_id, |node| {
-            node.record_str("TransportProtocol", S::NAME);
-            node.record_str("NetworkProtocol", I::NAME);
+        inspector.record_str("TransportProtocol", S::NAME);
+        inspector.record_str("NetworkProtocol", I::NAME);
 
-            let socket_info = self.to_socket_info();
-            let (local, remote) = match socket_info {
-                SocketInfo::Unbound => (None, None),
-                SocketInfo::Listener(ListenerInfo { local_ip, local_identifier }) => (
-                    Some((
-                        local_ip.map_or_else(
-                            || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
-                            |addr| addr.into_inner_without_witness(),
-                        ),
-                        local_identifier,
-                    )),
-                    None,
-                ),
-                SocketInfo::Connected(ConnInfo {
-                    local_ip,
+        let socket_info = self.to_socket_info();
+        let (local, remote) = match socket_info {
+            SocketInfo::Unbound => (None, None),
+            SocketInfo::Listener(ListenerInfo { local_ip, local_identifier }) => (
+                Some((
+                    local_ip.map_or_else(
+                        || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                        |addr| addr.into_inner_without_witness(),
+                    ),
                     local_identifier,
-                    remote_ip,
-                    remote_identifier,
-                }) => (
-                    Some((local_ip.into_inner_without_witness(), local_identifier)),
-                    Some((remote_ip.into_inner_without_witness(), remote_identifier)),
-                ),
-            };
-            node.record_local_socket_addr::<N, _, _, _>(local);
-            node.record_remote_socket_addr::<N, _, _, _>(remote);
+                )),
+                None,
+            ),
+            SocketInfo::Connected(ConnInfo {
+                local_ip,
+                local_identifier,
+                remote_ip,
+                remote_identifier,
+            }) => (
+                Some((local_ip.into_inner_without_witness(), local_identifier)),
+                Some((remote_ip.into_inner_without_witness(), remote_identifier)),
+            ),
+        };
+        inspector.record_local_socket_addr::<N, _, _, _>(local);
+        inspector.record_remote_socket_addr::<N, _, _, _>(remote);
 
-            let IpOptions {
-                multicast_memberships: MulticastMemberships(multicast_memberships),
-                socket_options: _,
-                other_stack: _,
-                common: _,
-            } = self.as_ref();
-            node.record_child("MulticastGroupMemberships", |node| {
-                for (index, (multicast_addr, device)) in multicast_memberships.iter().enumerate() {
-                    node.record_debug_child(index, |node| {
-                        node.record_ip_addr("MulticastGroup", multicast_addr.get());
-                        N::record_device(node, "Device", device);
-                    })
-                }
-            });
+        let IpOptions {
+            multicast_memberships: MulticastMemberships(multicast_memberships),
+            socket_options: _,
+            other_stack: _,
+            common: _,
+        } = self.as_ref();
+        inspector.record_child("MulticastGroupMemberships", |node| {
+            for (index, (multicast_addr, device)) in multicast_memberships.iter().enumerate() {
+                node.record_debug_child(index, |node| {
+                    node.record_ip_addr("MulticastGroup", multicast_addr.get());
+                    N::record_device(node, "Device", device);
+                })
+            }
         });
     }
 
@@ -1426,6 +1430,9 @@ pub trait DatagramSocketSpec: Sized + 'static {
     /// inside the socket references.
     type ExternalData<I: Ip>: Debug + Send + Sync + 'static;
 
+    /// Per-socket counters tracked by datagram sockets.
+    type Counters<I: Ip>: Debug + Default + Send + Sync + 'static;
+
     /// The listener type that is notified about the socket writable state.
     type SocketWritableListener: SocketWritableListener + Debug + Send + Sync + 'static;
 
@@ -1515,6 +1522,7 @@ pub fn create_primary_id<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpe
         state: RwLock::new(SocketState::Unbound(UnboundSocketState::default())),
         external_data,
         send_buffer: SendBufferTracking::new(writable_listener),
+        counters: Default::default(),
     })
 }
 
@@ -5458,6 +5466,7 @@ mod test {
         type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
         type ConnStateExtra = ();
         type ConnState<I: IpExt, D: WeakDeviceIdentifier> = I::DualStackConnState<D, Self>;
+        type Counters<I: Ip> = ();
         type ExternalData<I: Ip> = ();
         type SocketWritableListener = FakeSocketWritableListener;
 

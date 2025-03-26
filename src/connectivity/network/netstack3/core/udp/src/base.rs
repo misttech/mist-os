@@ -32,8 +32,9 @@ use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
-    MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext, RngContext,
-    SocketError, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
+    MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
+    ResourceCounterContext as _, RngContext, SocketError, StrongDeviceIdentifier,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
@@ -63,7 +64,9 @@ use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
 
-use crate::internal::counters::UdpCounters;
+use crate::internal::counters::{
+    CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
+};
 
 /// A builder for UDP layer state.
 #[derive(Clone)]
@@ -106,7 +109,8 @@ impl UdpStateBuilder {
         UdpState {
             sockets: Default::default(),
             send_port_unreachable: self.send_port_unreachable,
-            counters: Default::default(),
+            counters_with_socket: Default::default(),
+            counters_without_socket: Default::default(),
         }
     }
 }
@@ -163,8 +167,10 @@ pub struct UdpState<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
     pub sockets: Sockets<I, D, BT>,
     /// Whether or not the stack is configured to send UDP port unreachable.
     pub send_port_unreachable: bool,
-    /// Stack-wide UDP counters.
-    pub counters: UdpCounters<I>,
+    /// Stack-wide UDP "with socket" counters.
+    pub counters_with_socket: UdpCountersWithSocket<I>,
+    /// Stack-wide UDP "without socket" counters.
+    pub counters_without_socket: UdpCountersWithoutSocket<I>,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Default for UdpState<I, D, BT> {
@@ -542,6 +548,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     type SerializeError = UdpSerializeError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Counters<I: Ip> = UdpCountersWithSocket<I>;
     type SocketWritableListener = BT::SocketWritableListener;
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
@@ -1033,6 +1040,12 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, 
         let Self(rc) = self;
         rc.external_data()
     }
+
+    /// Returns the counters tracked for this socket.
+    pub fn counters(&self) -> &UdpCountersWithSocket<I> {
+        let Self(rc) = self;
+        rc.counters()
+    }
 }
 
 /// A weak reference to a UDP socket.
@@ -1348,7 +1361,10 @@ fn receive_ip_packet<
     B: BufferMut,
     H: IpHeaderInfo<I>,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
-    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
+    CC: StateContext<I, BC>
+        + StateContext<I::OtherVersion, BC>
+        + UdpCounterContext<I, CC::WeakDeviceId, BC>
+        + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1362,7 +1378,7 @@ fn receive_ip_packet<
     let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
 
     trace_duration!(c"udp::receive_ip_packet");
-    core_ctx.counters().rx.increment();
+    CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx.increment();
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();
 
@@ -1373,7 +1389,7 @@ fn receive_ip_packet<
     } else {
         // There isn't much we can do if the UDP packet is
         // malformed.
-        core_ctx.counters().rx_malformed.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_malformed.increment();
         return Ok(());
     };
 
@@ -1381,7 +1397,9 @@ fn receive_ip_packet<
         match src_ip.try_into() {
             Ok(addr) => Some(addr),
             Err(AddrIsMappedError {}) => {
-                core_ctx.counters().rx_mapped_addr.increment();
+                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+                    .rx_mapped_addr
+                    .increment();
                 trace!("udp::receive_ip_packet: mapped source address");
                 return Ok(());
             }
@@ -1399,7 +1417,9 @@ fn receive_ip_packet<
     let delivery_ip = match delivery_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
-            core_ctx.counters().rx_mapped_addr.increment();
+            CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+                .rx_mapped_addr
+                .increment();
             trace!("udp::receive_ip_packet: mapped destination address");
             return Ok(());
         }
@@ -1460,15 +1480,14 @@ fn receive_ip_packet<
             require_transparent,
             &buffer,
         );
-        if delivered {
-            core_ctx.counters().rx_delivered.increment();
-        }
         was_delivered | delivered
     });
 
     if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(core_ctx) {
         buffer.undo_parse(parse_meta);
-        core_ctx.counters().rx_unknown_dest_port.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+            .rx_unknown_dest_port
+            .increment();
         Err((buffer, TransportReceiveError::PortUnreachable))
     } else {
         Ok(())
@@ -1478,7 +1497,7 @@ fn receive_ip_packet<
 /// Tries to deliver the given UDP packet to the given UDP socket.
 fn try_deliver<
     I: IpExt,
-    CC: StateContext<I, BC>,
+    CC: StateContext<I, BC> + UdpCounterContext<I, CC::WeakDeviceId, BC>,
     BC: UdpBindingsContext<I, CC::DeviceId>,
     B: BufferMut,
 >(
@@ -1490,7 +1509,7 @@ fn try_deliver<
     require_transparent: bool,
     buffer: &B,
 ) -> bool {
-    core_ctx.with_socket_state(&id, |core_ctx, state| {
+    let delivered = core_ctx.with_socket_state(&id, |core_ctx, state| {
         let should_deliver = match state {
             DatagramSocketState::Bound(DatagramBoundSocketState {
                 socket_type,
@@ -1527,7 +1546,12 @@ fn try_deliver<
             bindings_ctx.receive_udp(id, device_id, meta, buffer);
         }
         should_deliver
-    })
+    });
+
+    if delivered {
+        core_ctx.increment_both(id, |c| &c.rx_delivered);
+    }
+    delivered
 }
 
 /// A wrapper for [`try_deliver`] that supports dual stack delivery.
@@ -1535,7 +1559,10 @@ fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
-    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC>,
+    CC: StateContext<I, BC>
+        + StateContext<I::OtherVersion, BC>
+        + UdpCounterContext<I, CC::WeakDeviceId, BC>
+        + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1617,7 +1644,8 @@ impl<
         CC: StateContext<I, BC>
             + StateContext<I::OtherVersion, BC>
             + UseUdpIpTransportContextBlanket
-            + CounterContext<UdpCounters<I>>,
+            + UdpCounterContext<I, CC::WeakDeviceId, BC>
+            + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
     > IpTransportContext<I, BC, CC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
@@ -1629,7 +1657,7 @@ impl<
         _original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
-        core_ctx.counters().rx_icmp_error.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_icmp_error.increment();
         // NB: At the moment bindings has no need to consume ICMP errors, so we
         // swallow them here.
         // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
@@ -1722,7 +1750,11 @@ where
     I: IpExt,
     C: ContextPair,
     C::CoreContext: StateContext<I, C::BindingsContext>
-        + CounterContext<UdpCounters<I>>
+        + UdpCounterContext<
+            I,
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            C::BindingsContext,
+        >
         // NB: This bound is somewhat redundant to StateContext but it helps the
         // compiler know we're using UDP datagram sockets.
         + DatagramStateContext<I, C::BindingsContext, Udp<C::BindingsContext>>,
@@ -2401,9 +2433,9 @@ where
         id: &UdpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
-        self.core_ctx().counters().tx.increment();
+        self.core_ctx().increment_both(id, |c| &c.tx);
         self.datagram().send_conn(id, body).map_err(|err| {
-            self.core_ctx().counters().tx_error.increment();
+            self.core_ctx().increment_both(id, |c| &c.tx_error);
             match err {
                 DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
                 DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
@@ -2445,9 +2477,9 @@ where
             UdpRemotePort::Set(_) => {}
         }
 
-        self.core_ctx().counters().tx.increment();
+        self.core_ctx().increment_both(id, |c| &c.tx);
         self.datagram().send_to(id, remote_ip, remote_port, body).map_err(|e| {
-            self.core_ctx().counters().tx_error.increment();
+            self.core_ctx().increment_both(id, |c| &c.tx_error);
             match e {
                 Either::Left(e) => Either::Left(e),
                 Either::Right(e) => {
@@ -2487,9 +2519,19 @@ where
     where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        for<'a> N::ChildInspector<'a>:
+            InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
-            socket_state.record_common_info(inspector, socket_id);
+            inspector.record_debug_child(socket_id, |inspector| {
+                socket_state.record_common_info(inspector);
+                inspector.record_child("Counters", |inspector| {
+                    inspector.delegate_inspectable(&CombinedUdpCounters {
+                        with_socket: socket_id.counters(),
+                        without_socket: None,
+                    });
+                });
+            });
         });
     }
 }
@@ -2739,7 +2781,8 @@ mod tests {
         TestIpExt as _,
     };
     use netstack3_base::{
-        CtxPair, RemoteAddressError, SendFrameErrorReason, UninstantiableWrapper,
+        CtxPair, RemoteAddressError, ResourceCounterContext, SendFrameErrorReason,
+        UninstantiableWrapper,
     };
     use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_ip::device::IpDeviceStateIpExt;
@@ -2749,7 +2792,9 @@ mod tests {
     use packet::Buf;
     use test_case::test_case;
 
-    use crate::internal::counters::testutil::CounterExpectations;
+    use crate::internal::counters::testutil::{
+        CounterExpectationsWithSocket, CounterExpectationsWithoutSocket,
+    };
 
     use super::*;
 
@@ -3194,8 +3239,10 @@ mod tests {
     struct FakeDualStackSocketState<D: StrongDeviceIdentifier> {
         v4: UdpSocketSet<Ipv4, D::Weak, FakeUdpBindingsCtx<D>>,
         v6: UdpSocketSet<Ipv6, D::Weak, FakeUdpBindingsCtx<D>>,
-        udpv4_counters: UdpCounters<Ipv4>,
-        udpv6_counters: UdpCounters<Ipv6>,
+        udpv4_counters_with_socket: UdpCountersWithSocket<Ipv4>,
+        udpv6_counters_with_socket: UdpCountersWithSocket<Ipv6>,
+        udpv4_counters_without_socket: UdpCountersWithoutSocket<Ipv4>,
+        udpv6_counters_without_socket: UdpCountersWithoutSocket<Ipv6>,
     }
 
     impl<D: StrongDeviceIdentifier> FakeDualStackSocketState<D> {
@@ -3209,8 +3256,19 @@ mod tests {
             I::map_ip_out(self, |dual| &mut dual.v4, |dual| &mut dual.v6)
         }
 
-        fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-            I::map_ip_out(self, |dual| &dual.udpv4_counters, |dual| &dual.udpv6_counters)
+        fn udp_counters_with_socket<I: Ip>(&self) -> &UdpCountersWithSocket<I> {
+            I::map_ip_out(
+                self,
+                |dual| &dual.udpv4_counters_with_socket,
+                |dual| &dual.udpv6_counters_with_socket,
+            )
+        }
+        fn udp_counters_without_socket<I: Ip>(&self) -> &UdpCountersWithoutSocket<I> {
+            I::map_ip_out(
+                self,
+                |dual| &dual.udpv4_counters_without_socket,
+                |dual| &dual.udpv6_counters_without_socket,
+            )
         }
     }
     struct FakeUdpCoreCtx<D: FakeStrongDeviceId> {
@@ -3220,9 +3278,31 @@ mod tests {
         all_sockets: FakeDualStackSocketState<D>,
     }
 
-    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpCoreCtx<D> {
-        fn counters(&self) -> &UdpCounters<I> {
-            &self.all_sockets.udp_counters()
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCountersWithSocket<I>> for FakeUdpCoreCtx<D> {
+        fn counters(&self) -> &UdpCountersWithSocket<I> {
+            &self.all_sockets.udp_counters_with_socket()
+        }
+    }
+
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCountersWithoutSocket<I>>
+        for FakeUdpCoreCtx<D>
+    {
+        fn counters(&self) -> &UdpCountersWithoutSocket<I> {
+            &self.all_sockets.udp_counters_without_socket()
+        }
+    }
+
+    impl<I: DualStackIpExt, D: FakeStrongDeviceId>
+        ResourceCounterContext<
+            UdpSocketId<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>,
+            UdpCountersWithSocket<I>,
+        > for FakeUdpCoreCtx<D>
+    {
+        fn per_resource_counters<'a>(
+            &'a self,
+            resource: &'a UdpSocketId<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>,
+        ) -> &'a UdpCountersWithSocket<I> {
+            resource.counters()
         }
     }
 
@@ -3346,6 +3426,41 @@ mod tests {
         I: TestIpExt,
     {
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: None }, device }.into()
+    }
+
+    #[track_caller]
+    fn assert_counters<
+        'a,
+        I: IpExt,
+        D: WeakDeviceIdentifier,
+        BT: UdpBindingsTypes,
+        CC: UdpCounterContext<I, D, BT>,
+    >(
+        core_ctx: &CC,
+        with_socket_expects: CounterExpectationsWithSocket,
+        without_socket_expects: CounterExpectationsWithoutSocket,
+        per_socket_expects: impl IntoIterator<
+            Item = (&'a UdpSocketId<I, D, BT>, CounterExpectationsWithSocket),
+        >,
+    ) {
+        assert_eq!(
+            CounterExpectationsWithSocket::from(
+                CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).as_ref()
+            ),
+            with_socket_expects
+        );
+        assert_eq!(
+            CounterExpectationsWithoutSocket::from(
+                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).as_ref()
+            ),
+            without_socket_expects
+        );
+        for (id, expects) in per_socket_expects.into_iter() {
+            assert_eq!(
+                CounterExpectationsWithSocket::from(core_ctx.per_resource_counters(id).as_ref()),
+                expects
+            );
+        }
     }
 
     #[ip_test(I)]
@@ -3561,11 +3676,14 @@ mod tests {
         assert_eq!(udp_packet.dst_port(), REMOTE_PORT);
         assert_eq!(udp_packet.body(), &body[..]);
 
-        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
-        assert_eq!(
-            CounterExpectations { rx: 1, rx_delivered: 1, tx: 1, ..Default::default() },
-            counters.as_ref().into()
-        );
+        let expects_with_socket =
+            || CounterExpectationsWithSocket { rx_delivered: 1, tx: 1, ..Default::default() };
+        assert_counters(
+            api.core_ctx(),
+            expects_with_socket(),
+            CounterExpectationsWithoutSocket { rx: 1, ..Default::default() },
+            [(&socket, expects_with_socket())],
+        )
     }
 
     /// Tests that UDP connections fail with an appropriate error for
@@ -3945,11 +4063,14 @@ mod tests {
         let send_err = api.send(&socket, Buf::new(Vec::new(), ..)).unwrap_err();
         assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
 
-        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
-        assert_eq!(
-            CounterExpectations { tx: 1, tx_error: 1, ..Default::default() },
-            counters.as_ref().into()
-        );
+        let expects_with_socket =
+            || CounterExpectationsWithSocket { tx: 1, tx_error: 1, ..Default::default() };
+        assert_counters(
+            api.core_ctx(),
+            expects_with_socket(),
+            Default::default(),
+            [(&socket, expects_with_socket())],
+        )
     }
 
     #[ip_test(I)]
@@ -4411,11 +4532,25 @@ mod tests {
             ]),
         );
 
-        let counters = CounterContext::<UdpCounters<I>>::counters(api.core_ctx());
-        assert_eq!(
-            CounterExpectations { rx: 3, rx_delivered: 7, ..Default::default() },
-            counters.as_ref().into()
-        );
+        assert_counters(
+            api.core_ctx(),
+            CounterExpectationsWithSocket { rx_delivered: 7, ..Default::default() },
+            CounterExpectationsWithoutSocket { rx: 3, ..Default::default() },
+            [
+                (
+                    &any_listener,
+                    CounterExpectationsWithSocket { rx_delivered: 3, ..Default::default() },
+                ),
+                (
+                    &specific_listeners[0],
+                    CounterExpectationsWithSocket { rx_delivered: 2, ..Default::default() },
+                ),
+                (
+                    &specific_listeners[1],
+                    CounterExpectationsWithSocket { rx_delivered: 2, ..Default::default() },
+                ),
+            ],
+        )
     }
 
     type UdpMultipleDevicesCtx = FakeUdpCtx<MultipleDevicesId>;
@@ -7068,7 +7203,12 @@ mod tests {
         where
             I: TestIpExt,
             C: ContextPair,
-            C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
+            C::CoreContext: StateContext<I, C::BindingsContext>
+                + UdpCounterContext<
+                    I,
+                    <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                    C::BindingsContext,
+                >,
             C::BindingsContext:
                 UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
             <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>: Default,

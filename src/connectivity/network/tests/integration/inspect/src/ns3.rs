@@ -663,17 +663,43 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
     // NB: The sockets are keyed by an opaque debug identifier.
     let sockets = data.get_child("Sockets").unwrap();
     let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
-    diagnostics_assertions::assert_data_tree!(data, "root": contains {
-        Sockets: {
-            sock_name => {
-                LocalAddress: want_local,
-                RemoteAddress: want_remote,
-                TransportProtocol: want_proto,
-                NetworkProtocol: I::NAME,
-                MulticastGroupMemberships: {},
-            },
+    match proto {
+        fposix_socket::DatagramSocketProtocol::Udp => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                Sockets: {
+                    sock_name => {
+                        LocalAddress: want_local,
+                        RemoteAddress: want_remote,
+                        TransportProtocol: want_proto,
+                        NetworkProtocol: I::NAME,
+                        MulticastGroupMemberships: {},
+                        Counters: {
+                            Rx: {
+                                "Delivered": 0u64,
+                            },
+                            Tx: {
+                                "Sent": 0u64,
+                                "Errors": 0u64,
+                            },
+                        },
+                    },
+                }
+            })
         }
-    })
+        fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                Sockets: {
+                    sock_name => {
+                        LocalAddress: want_local,
+                        RemoteAddress: want_remote,
+                        TransportProtocol: want_proto,
+                        NetworkProtocol: I::NAME,
+                        MulticastGroupMemberships: {},
+                    },
+                }
+            })
+        }
+    }
 }
 
 #[netstack_test]
@@ -726,6 +752,8 @@ async fn inspect_multicast_group_memberships<I: TestIpExt>(name: &str) {
                 RemoteAddress: "[NOT CONNECTED]",
                 TransportProtocol: "UDP",
                 NetworkProtocol: I::NAME,
+                // NB: The "Counters" schema is verified elsewhere; ignore it.
+                Counters: contains {},
                 MulticastGroupMemberships: {
                     "0": {
                         MulticastGroup: format!("{multicast_addr}"),

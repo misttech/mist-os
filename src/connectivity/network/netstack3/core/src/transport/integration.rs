@@ -17,7 +17,10 @@ use netstack3_tcp::{
     TcpDemuxContext, TcpDualStackContext, TcpSocketId, TcpSocketSet, TcpSocketState,
     WeakTcpSocketId,
 };
-use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSocketState};
+use netstack3_udp::{
+    self as udp, UdpCountersWithSocket, UdpCountersWithoutSocket, UdpSocketId, UdpSocketSet,
+    UdpSocketState,
+};
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
@@ -615,8 +618,34 @@ impl<BC: BindingsContext, I: netstack3_tcp::DualStackIpExt, L>
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
-    fn counters(&self) -> &UdpCounters<I> {
-        self.unlocked_access::<crate::lock_ordering::UnlockedState>().transport.udp_counters::<I>()
+impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCountersWithSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn counters(&self) -> &UdpCountersWithSocket<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .udp_counters_with_socket::<I>()
+    }
+}
+
+impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCountersWithoutSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn counters(&self) -> &UdpCountersWithoutSocket<I> {
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .udp_counters_without_socket::<I>()
+    }
+}
+
+impl<BC: BindingsContext, I: netstack3_datagram::IpExt, L>
+    ResourceCounterContext<UdpSocketId<I, WeakDeviceId<BC>, BC>, UdpCountersWithSocket<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn per_resource_counters<'a>(
+        &'a self,
+        resource: &'a UdpSocketId<I, WeakDeviceId<BC>, BC>,
+    ) -> &'a UdpCountersWithSocket<I> {
+        resource.counters()
     }
 }
