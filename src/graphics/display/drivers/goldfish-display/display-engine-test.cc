@@ -133,7 +133,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       &config_, results_.data(), results_.size(), &actual_result_size);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
+  EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
             results_[0] & LAYER_COMPOSITION_OPERATIONS_USE_IMAGE);
