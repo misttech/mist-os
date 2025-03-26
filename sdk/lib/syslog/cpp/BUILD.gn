@@ -74,16 +74,11 @@ target(target_type, "cpp") {
   public_configs = [ "//sdk/config" ]
 }
 
-# TODO(b/300157652): Transitional no-op target
-# Remove once all drivers have been migrated off
-# syslog.
+# Transitional no-op target
+# TODO(https://fxbug.dev/300157652): Convert `amlogic_decoder` to DFv2 and
+# remove this target.
 group("backend") {
-  visibility = [
-    "//src/camera/drivers/hw_accel/ge2d:*",
-    "//src/media/drivers/amlogic_decoder:*",
-    "//src/storage/fvm/driver:*",
-    "//vendor/*",
-  ]
+  visibility = [ "//src/media/drivers/amlogic_decoder:*" ]
 }
 
 sdk_shared_library("backend_fuchsia_globals") {
