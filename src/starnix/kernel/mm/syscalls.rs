@@ -774,7 +774,10 @@ mod arch32 {
 
     pub use super::{
         sys_futex as sys_arch32_futex, sys_madvise as sys_arch32_madvise,
+        sys_mincore as sys_arch32_mincore, sys_mlock as sys_arch32_mlock,
+        sys_mlock2 as sys_arch32_mlock2, sys_mlockall as sys_arch32_mlockall,
         sys_mremap as sys_arch32_mremap, sys_msync as sys_arch32_msync,
+        sys_munlock as sys_arch32_munlock, sys_munlockall as sys_arch32_munlockall,
         sys_process_vm_readv as sys_arch32_process_vm_readv,
         sys_userfaultfd as sys_arch32_userfaultfd,
     };

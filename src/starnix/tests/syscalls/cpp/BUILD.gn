@@ -96,38 +96,6 @@ syscall_tests_etc = [
     name = "udev_test"
     features = [ "framebuffer" ]
   },
-]
-if (target_cpu == "x64") {
-  # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
-  # This test requires test-ui-stack.
-  syscall_tests_etc += [
-    {
-      name = "uinput_test"
-      features = [ "framebuffer" ]
-    },
-  ]
-}
-
-arch32_compat_syscall_test_names = syscall_tests
-foreach(test_def, syscall_tests_etc) {
-  arch32_compat_syscall_test_names += [ test_def.name ]
-}
-
-# syscall tests that can only be run on arch64.
-# TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
-arch64_syscall_tests = [
-  # go/keep-sorted start
-
-  "bpf_test",
-  "extended_pstate_test",
-  "fuse_test",
-  "ptrace_test",
-  "vdso_test",
-
-  # go/keep-sorted end
-]
-
-arch64_syscall_tests_etc = [
   {
     name = "mlock_test"
 
@@ -152,12 +120,38 @@ arch64_syscall_tests_etc = [
     ]
   },
 ]
-
-arch64_syscall_tests_names = arch64_syscall_tests
-foreach(test_def, arch64_syscall_tests_etc) {
-  arch64_syscall_tests_names += [ test_def.name ]
+if (target_cpu == "x64") {
+  # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
+  # This test requires test-ui-stack.
+  syscall_tests_etc += [
+    {
+      name = "uinput_test"
+      features = [ "framebuffer" ]
+    },
+  ]
 }
-all_test_names = arch32_compat_syscall_test_names + arch64_syscall_tests_names
+
+arch32_compat_syscall_test_names = syscall_tests
+foreach(test_def, syscall_tests_etc) {
+  arch32_compat_syscall_test_names += [ test_def.name ]
+}
+
+# syscall tests that can only be run on arch64.
+# TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
+# DO NOT ADD MORE TESTS IN THIS CATEGORY
+arch64_syscall_tests = [
+  # go/keep-sorted start
+
+  "bpf_test",
+  "extended_pstate_test",
+  "fuse_test",
+  "ptrace_test",
+  "vdso_test",
+
+  # go/keep-sorted end
+]
+
+all_test_names = arch32_compat_syscall_test_names + arch64_syscall_tests
 
 group("tests") {
   testonly = true
@@ -473,14 +467,6 @@ foreach(test_name, arch64_syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
     arch64_only = true
-  }
-}
-
-foreach(test_def, arch64_syscall_tests_etc) {
-  syscall_test(test_def.name) {
-    test_name = test_def.name
-    arch64_only = true
-    forward_variables_from(test_def, "*", [ "name" ])
   }
 }
 
