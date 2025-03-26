@@ -337,7 +337,10 @@ impl CategoryCounter {
         for category in &input_categories {
             // Skip categories starting with '#' since they represent groups.
             // We don't check them because it's not explicitly specified.
-            if !category.starts_with("#") {
+            //
+            // In addition, "kernel:meta" produces process and thread names rather than events with
+            // a category, so we ignore it as well.
+            if !category.starts_with("#") && category != "kernel:meta" {
                 category_counter.insert(category.clone(), 0);
             }
         }
@@ -389,7 +392,17 @@ mod test {
         counter.increment_category("some");
         counter.increment_category("other");
         counter.increment_category("categories");
-        counter.increment_category("kernel:meta");
+        counter.increment_category("kernel:sched");
+        assert!(counter.get_invalid_category_list().is_empty());
+    }
+
+    #[fuchsia::test]
+    async fn test_verify_kernel_meta() {
+        // Kernel meta doesn't produce events with categories, so we ignore it.
+        let mut counter = CategoryCounter::new(vec!["kernel:meta".into()]);
+        counter.increment_category("some");
+        counter.increment_category("other");
+        counter.increment_category("categories");
         assert!(counter.get_invalid_category_list().is_empty());
     }
 }
