@@ -37,7 +37,6 @@ fuchsia_cc_driver("aml-trip-driver") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/logging/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",

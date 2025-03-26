@@ -87,7 +87,7 @@ entry_deps = [
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/runtime:driver_runtime",
   "//sdk/lib/fidl_driver:fidl_driver_transport",
-  "//src/devices/bin/driver_runtime",
+  "//src/devices/lib/driver:driver_runtime",
   "//src/graphics/magma/lib/magma/platform:trace",
   "//src/graphics/magma/lib/magma/platform/zircon:device_dfv2",
   "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",

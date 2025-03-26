@@ -27,7 +27,7 @@ source_set("cpp") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
   ]
   public_configs = [ ":includes" ]
 }

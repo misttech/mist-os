@@ -36,6 +36,7 @@ rustc_library("wlansoftmac-rust") {
 
   test_deps = [
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
+    "//src/devices/bin/driver_runtime",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:anyhow",

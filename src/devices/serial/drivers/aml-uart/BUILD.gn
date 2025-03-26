@@ -39,7 +39,7 @@ source_set("aml-uart-source") {
   ]
   deps = [
     "//sdk/lib/driver/compat/cpp:logging",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
   ]
   public_deps = [
     ":aml-uart-config",

@@ -36,8 +36,8 @@ source_set("pmem_lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.virtio.pmem:fuchsia.hardware.virtio.pmem_cpp",
     "//sdk/lib/driver/component/cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/virtio",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/zx",
   ]
   deps = [ "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp" ]

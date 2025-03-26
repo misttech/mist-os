@@ -53,10 +53,10 @@ source_set("block_lib") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/block/lib/common",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/dma-buffer",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/listnode",
   ]
 }
@@ -67,10 +67,10 @@ source_set("scsi_lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/block/lib/scsi",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/dma-buffer",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/third_party/ulib/safemath",
@@ -147,6 +147,7 @@ test("virtio-scsi-test-bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//zircon/system/ulib/zxtest",

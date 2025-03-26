@@ -33,7 +33,7 @@ static_library("guest-ethernet") {
     "//src/connectivity/network/drivers/network-device/device:banjo_shims",
     "//src/connectivity/network/drivers/network-device/device:device",
     "//src/connectivity/network/lib/net_interfaces/cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/virtio",

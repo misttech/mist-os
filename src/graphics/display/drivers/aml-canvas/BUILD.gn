@@ -37,7 +37,7 @@ source_set("common_srcs") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:logging",
     "//sdk/lib/driver/component/cpp",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",

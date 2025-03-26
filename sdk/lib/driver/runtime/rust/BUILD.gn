@@ -15,11 +15,14 @@ rustc_library("rust") {
     "//sdk/lib/async",
     "//sdk/lib/driver/runtime/rust/fdf_sys",
     "//sdk/rust/zx",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
     "//third_party/rust_crates:futures",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/devices/bin/driver_runtime",
+    "//src/lib/fuchsia-async",
+  ]
 
   sources = [
     "src/arena.rs",

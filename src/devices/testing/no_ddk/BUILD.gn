@@ -11,4 +11,7 @@ source_set("no_ddk") {
     "//src/lib/ddk",
     "//zircon/system/ulib/zx",
   ]
+  if (is_fuchsia) {
+    deps += [ "//src/devices/bin/driver_runtime" ]
+  }
 }

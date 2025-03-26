@@ -31,7 +31,7 @@ source_set("zxtest") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
   ]

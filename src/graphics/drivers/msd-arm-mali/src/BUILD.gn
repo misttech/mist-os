@@ -87,7 +87,7 @@ source_set("src") {
     "//sdk/lib/driver/power/cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/fit",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:barriers",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",

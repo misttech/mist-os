@@ -48,7 +48,6 @@ _DEPS = [
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/inspect/component/cpp",
   "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
-  "//src/devices/bin/driver_runtime",
   "//src/devices/bus/lib/device-protocol-pdev",
   "//src/devices/lib/driver:driver_runtime",
   "//src/devices/lib/mmio",
