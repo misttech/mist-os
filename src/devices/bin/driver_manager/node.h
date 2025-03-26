@@ -507,6 +507,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
 
+  bool owned_by_parent_ = true;
+
   // The device's inspect information.
   DeviceInspect inspect_;
 
