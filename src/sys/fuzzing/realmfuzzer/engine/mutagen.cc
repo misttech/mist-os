@@ -5,6 +5,7 @@
 #include "src/sys/fuzzing/realmfuzzer/engine/mutagen.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <cstdint>
 
 namespace fuzzing {
 namespace {
@@ -195,7 +196,7 @@ static T MutateUnsigned(const uint8_t* data, size_t size, T randval) {
     T adjustment = ((randval >> 2) & 0x1f) - 16;
     memcpy(&val, data, sizeof(val));
     if (!adjustment) {
-      val = -val;
+      val = static_cast<uint8_t>(-val);
     } else if (do_bswap) {
       val = Bswap<T>(Bswap<T>(val) + adjustment);
     } else {
