@@ -24,8 +24,8 @@ async fn link_with_sufficient_rights() {
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = open_rw_dir(&dir, "dest").await;
+        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
 
         // Link src/old.txt -> dest/new.txt.
@@ -54,8 +54,8 @@ async fn link_with_insufficient_rights() {
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = open_rw_dir(&dir, "dest").await;
+        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
 
         // Link src/old.txt -> dest/new.txt.
@@ -86,7 +86,7 @@ async fn io2_link() {
 
     for rights in all_rights.combinations() {
         let dir =
-            dir.open3_node::<fio::DirectoryMarker>(".", rights, None).await.expect("open3 failed");
+            dir.open_node::<fio::DirectoryMarker>(".", rights, None).await.expect("open failed");
 
         let (status, token) = dir.get_token().await.unwrap();
         let status = zx::Status::ok(status);

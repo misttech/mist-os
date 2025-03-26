@@ -51,15 +51,18 @@ async fn watch_dir_added_removed() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ =
-        open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE, "foo")
-            .await;
+    let _ = deprecated_open_dir_with_flags(
+        &dir,
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        "foo",
+    )
+    .await;
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
     );
 
-    let _ = open_dir_with_flags(
+    let _ = deprecated_open_dir_with_flags(
         &dir,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
         "dir",
@@ -99,9 +102,12 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ =
-        open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE, "foo")
-            .await;
+    let _ = deprecated_open_dir_with_flags(
+        &dir,
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        "foo",
+    )
+    .await;
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
@@ -149,9 +155,12 @@ async fn watch_dir_rename() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ =
-        open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE, "foo")
-            .await;
+    let _ = deprecated_open_dir_with_flags(
+        &dir,
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        "foo",
+    )
+    .await;
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },

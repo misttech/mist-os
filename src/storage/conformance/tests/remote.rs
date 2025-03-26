@@ -10,7 +10,7 @@ use io_conformance_util::*;
 
 /// Creates a directory with a remote mount inside of it, and checks that the remote can be opened.
 #[fuchsia::test]
-async fn open_remote_directory_test() {
+async fn deprecated_open_remote_directory_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -23,7 +23,7 @@ async fn open_remote_directory_test() {
     let entries = vec![remote_directory(remote_name, remote_dir)];
     let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
-    open_node::<fio::DirectoryMarker>(
+    deprecated_open_node::<fio::DirectoryMarker>(
         &dir,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
         remote_name,
@@ -34,7 +34,7 @@ async fn open_remote_directory_test() {
 /// Creates a directory with a remote mount containing a file inside of it, and checks that the
 /// file can be opened through the remote.
 #[fuchsia::test]
-async fn open_remote_file_test() {
+async fn deprecated_open_remote_file_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -49,17 +49,21 @@ async fn open_remote_file_test() {
     let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     // Test opening file by opening the remote directory first and then opening the file.
-    let remote_dir_proxy = open_node::<fio::DirectoryMarker>(
+    let remote_dir_proxy = deprecated_open_node::<fio::DirectoryMarker>(
         &dir,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         remote_name,
     )
     .await;
-    open_node::<fio::NodeMarker>(&remote_dir_proxy, fio::OpenFlags::RIGHT_READABLE, TEST_FILE)
-        .await;
+    deprecated_open_node::<fio::NodeMarker>(
+        &remote_dir_proxy,
+        fio::OpenFlags::RIGHT_READABLE,
+        TEST_FILE,
+    )
+    .await;
 
     // Test opening file directly though local directory by crossing remote automatically.
-    open_node::<fio::NodeMarker>(
+    deprecated_open_node::<fio::NodeMarker>(
         &dir,
         fio::OpenFlags::RIGHT_READABLE,
         [remote_name, "/", TEST_FILE].join("").as_str(),
@@ -81,7 +85,7 @@ async fn open_remote_file_test() {
 /// remote_dir_server as RW (and NOT RWX, which can occur if both flags are passed directly to the
 /// remote instead of being removed).
 #[fuchsia::test]
-async fn open_remote_directory_right_escalation_test() {
+async fn deprecated_open_remote_directory_right_escalation_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -122,7 +126,7 @@ async fn open_remote_directory_right_escalation_test() {
 
 /// Creates a directory with a remote mount inside of it, and checks that the remote can be opened.
 #[fuchsia::test]
-async fn open3_remote_directory_test() {
+async fn open_remote_directory_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -134,7 +138,7 @@ async fn open3_remote_directory_test() {
     let entries = vec![remote_directory(remote_name, remote_dir)];
     let dir = harness.get_directory(entries, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
-    dir.open3_node::<fio::DirectoryMarker>(
+    dir.open_node::<fio::DirectoryMarker>(
         remote_name,
         fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
         None,
@@ -146,7 +150,7 @@ async fn open3_remote_directory_test() {
 /// Creates a directory with a remote mount containing a file inside of it, and checks that the
 /// file can be opened through the remote.
 #[fuchsia::test]
-async fn open3_remote_file_test() {
+async fn open_remote_file_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -162,7 +166,7 @@ async fn open3_remote_file_test() {
 
     // Test opening file by opening the remote directory first and then opening the file.
     let remote_dir_proxy = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             remote_name,
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ,
             None,
@@ -171,7 +175,7 @@ async fn open3_remote_file_test() {
         .expect("failed to open remote directory");
 
     remote_dir_proxy
-        .open3_node::<fio::NodeMarker>(
+        .open_node::<fio::NodeMarker>(
             TEST_FILE,
             fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ,
             None,
@@ -180,7 +184,7 @@ async fn open3_remote_file_test() {
         .expect("failed to open file in remote directory");
 
     // Test opening file directly though local directory by crossing remote automatically.
-    dir.open3_node::<fio::NodeMarker>(
+    dir.open_node::<fio::NodeMarker>(
         [remote_name, "/", TEST_FILE].join("").as_str(),
         fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ,
         None,
@@ -201,7 +205,7 @@ async fn open3_remote_file_test() {
 /// It then verifies that opening `remote_dir` through `root_proxy` will remove any specified
 /// optional rights not present during any intermediate opening steps.
 #[fuchsia::test]
-async fn open3_remote_directory_right_escalation_test() {
+async fn open_remote_directory_right_escalation_test() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_remote_dir {
         return;
@@ -220,7 +224,7 @@ async fn open3_remote_directory_right_escalation_test() {
 
     // Open the remote with read rights as required, but write/execute as optional.
     let proxy = root_proxy
-        .open3_node::<fio::NodeMarker>(
+        .open_node::<fio::NodeMarker>(
             mount_point,
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::PERM_READ

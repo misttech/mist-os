@@ -10,14 +10,16 @@ use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
 
 #[fuchsia::test]
-async fn clone_file_with_same_or_fewer_rights() {
+async fn deprecated_clone_file_with_same_or_fewer_rights() {
     let harness = TestHarness::new().await;
 
     for rights in harness.file_rights.rights_combinations() {
         let file_rights = Rights::new(rights);
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_rights.all_flags_deprecated(), TEST_FILE).await;
+        let file =
+            deprecated_open_file_with_flags(&dir, file_rights.all_flags_deprecated(), TEST_FILE)
+                .await;
 
         // Clone using every subset of flags.
         for clone_flags in file_rights.combinations_deprecated() {
@@ -37,13 +39,13 @@ async fn clone_file_with_same_or_fewer_rights() {
 }
 
 #[fuchsia::test]
-async fn clone_file_with_same_rights_flag() {
+async fn deprecated_clone_file_with_same_rights_flag() {
     let harness = TestHarness::new().await;
 
     for file_flags in harness.file_rights.combinations_deprecated() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
@@ -61,14 +63,16 @@ async fn clone_file_with_same_rights_flag() {
 }
 
 #[fuchsia::test]
-async fn clone_file_with_additional_rights() {
+async fn deprecated_clone_file_with_additional_rights() {
     let harness = TestHarness::new().await;
 
     for rights in harness.file_rights.rights_combinations() {
         let file_rights = Rights::new(rights);
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_rights.all_flags_deprecated(), TEST_FILE).await;
+        let file =
+            deprecated_open_file_with_flags(&dir, file_rights.all_flags_deprecated(), TEST_FILE)
+                .await;
 
         // Clone using every superset of flags, should fail.
         for clone_flags in
@@ -87,14 +91,15 @@ async fn clone_file_with_additional_rights() {
 }
 
 #[fuchsia::test]
-async fn clone_directory_with_same_or_fewer_rights() {
+async fn deprecated_clone_directory_with_same_or_fewer_rights() {
     let harness = TestHarness::new().await;
 
     for rights in harness.dir_rights.rights_combinations() {
         let dir_rights = Rights::new(rights);
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_rights.all_flags_deprecated(), "dir").await;
+        let dir =
+            deprecated_open_dir_with_flags(&dir, dir_rights.all_flags_deprecated(), "dir").await;
 
         // Clone using every subset of flags.
         for clone_flags in Rights::new(dir_rights.all_rights()).combinations_deprecated() {
@@ -113,13 +118,13 @@ async fn clone_directory_with_same_or_fewer_rights() {
 }
 
 #[fuchsia::test]
-async fn clone_directory_with_same_rights_flag() {
+async fn deprecated_clone_directory_with_same_rights_flag() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
+        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
@@ -137,14 +142,15 @@ async fn clone_directory_with_same_rights_flag() {
 }
 
 #[fuchsia::test]
-async fn clone_directory_with_additional_rights() {
+async fn deprecated_clone_directory_with_additional_rights() {
     let harness = TestHarness::new().await;
 
     for rights in harness.dir_rights.rights_combinations() {
         let dir_rights = Rights::new(rights);
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_rights.all_flags_deprecated(), "dir").await;
+        let dir =
+            deprecated_open_dir_with_flags(&dir, dir_rights.all_flags_deprecated(), "dir").await;
 
         // Clone using every superset of flags, should fail.
         for clone_flags in
@@ -163,13 +169,13 @@ async fn clone_directory_with_additional_rights() {
 }
 
 #[fuchsia::test]
-async fn clone2_file() {
+async fn clone_file() {
     let harness = TestHarness::new().await;
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
     let file = dir
-        .open3_node::<fio::FileMarker>(
+        .open_node::<fio::FileMarker>(
             &TEST_FILE,
             fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
             None,
@@ -196,13 +202,13 @@ async fn clone2_file() {
 }
 
 #[fuchsia::test]
-async fn clone2_file_node_reference() {
+async fn clone_file_node_reference() {
     let harness = TestHarness::new().await;
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
     let node = dir
-        .open3_node::<fio::NodeMarker>(
+        .open_node::<fio::NodeMarker>(
             &TEST_FILE,
             fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
             None,
@@ -227,13 +233,13 @@ async fn clone2_file_node_reference() {
 }
 
 #[fuchsia::test]
-async fn clone2_directory() {
+async fn clone_directory() {
     let harness = TestHarness::new().await;
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
     let dir = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_TRAVERSE,
             None,
@@ -249,19 +255,19 @@ async fn clone2_directory() {
     );
     // Make sure the directory protocol was served by invoking a directory method.
     assert_matches!(
-        clone_proxy.open3_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
+        clone_proxy.open_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
         Ok(_)
     );
 }
 
 #[fuchsia::test]
-async fn clone2_directory_node_reference() {
+async fn clone_directory_node_reference() {
     let harness = TestHarness::new().await;
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
     let node = dir
-        .open3_node::<fio::NodeMarker>(
+        .open_node::<fio::NodeMarker>(
             "dir",
             fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
             None,
@@ -280,7 +286,7 @@ async fn clone2_directory_node_reference() {
     // We should fail to invoke directory methods since this isn't a directory connection.
     let wrong_protocol = fio::DirectoryProxy::from_channel(clone_proxy.into_channel().unwrap());
     assert_matches!(
-        wrong_protocol.open3_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
+        wrong_protocol.open_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
         Err(zx::Status::PEER_CLOSED)
     );
 }

@@ -24,13 +24,13 @@ async fn file_get_flags() {
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
 
     let file = dir
-        .open3_node::<fio::FileMarker>(
+        .open_node::<fio::FileMarker>(
             &TEST_FILE,
             fio::Flags::PERM_READ | fio::Flags::FILE_APPEND,
             None,
         )
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     let flags =
         file.get_flags().await.expect("get_flags failed").expect("Failed to get node flags");
@@ -45,13 +45,13 @@ async fn node_reference_get_flags() {
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
 
     let node_reference = dir
-        .open3_node::<fio::NodeMarker>(
+        .open_node::<fio::NodeMarker>(
             &TEST_FILE,
             fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
             None,
         )
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     let flags = node_reference
         .get_flags()
@@ -63,9 +63,9 @@ async fn node_reference_get_flags() {
     // Unless `fio::Flags::PERM_GET_ATTRIBUTES` is specified, the opened connection will not have
     // that right.
     let node_reference = dir
-        .open3_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PROTOCOL_NODE, None)
+        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PROTOCOL_NODE, None)
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     let flags = node_reference
         .get_flags()
@@ -82,9 +82,9 @@ async fn file_set_flags() {
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
     let file = dir
-        .open3_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::empty(), None)
+        .open_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::empty(), None)
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     // Check that no rights were set.
     let flags =
@@ -110,9 +110,9 @@ async fn file_set_flags_empty_clears_append_mode() {
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
     let file = dir
-        .open3_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::FILE_APPEND, None)
+        .open_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::FILE_APPEND, None)
         .await
-        .expect("open3 failed");
+        .expect("open failed");
     let flags =
         file.get_flags().await.expect("get_flags failed").expect("Failed to get node flags");
     assert_eq!(flags, fio::Flags::PROTOCOL_FILE | fio::Flags::FILE_APPEND);
@@ -134,9 +134,9 @@ async fn file_set_flags_invalid_flags() {
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
     let file = dir
-        .open3_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::empty(), None)
+        .open_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::empty(), None)
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     // The only valid flag to set with fuchsia.io/Node.SetFlags is fuchsia.io/Flags.FILE_APPEND.
     let err = file
@@ -171,9 +171,9 @@ async fn node_reference_set_flags_not_supported() {
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
 
     let node_reference = dir
-        .open3_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PROTOCOL_NODE, None)
+        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PROTOCOL_NODE, None)
         .await
-        .expect("open3 failed");
+        .expect("open failed");
 
     let err = node_reference
         .set_flags(fio::Flags::empty())

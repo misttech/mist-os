@@ -22,8 +22,8 @@ async fn rename_with_sufficient_rights() {
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = open_rw_dir(&dir, "dest").await;
+        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
 
         // Rename src/old.txt -> dest/new.txt.
@@ -55,8 +55,8 @@ async fn rename_with_insufficient_rights() {
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = open_rw_dir(&dir, "dest").await;
+        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
 
         // Try renaming src/old.txt -> dest/new.txt.
@@ -85,8 +85,8 @@ async fn rename_with_slash_in_path_fails() {
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = open_rw_dir(&dir, "dest").await;
+        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
 
         // Including a slash in the src or dest path should fail.
         let status = dir
