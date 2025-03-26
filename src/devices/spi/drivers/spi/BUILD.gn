@@ -87,6 +87,7 @@ test("spi-test-bin") {
     ":common",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/metadata/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",

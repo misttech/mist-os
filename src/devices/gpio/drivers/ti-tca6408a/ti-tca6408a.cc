@@ -38,10 +38,7 @@ zx::result<> TiTca6408aDevice::Start() {
 
   ZX_ASSERT(compat_server_
                 .Initialize(incoming(), outgoing(), node_name(), kDeviceName,
-                            compat::ForwardMetadata::Some(
-                                {// TODO(b/395140408): Don't forward
-                                 // DEVICE_METADATA_SCHEDULER_ROLE_NAME once no longer retrieved.
-                                 DEVICE_METADATA_SCHEDULER_ROLE_NAME}))
+                            compat::ForwardMetadata::None())
                 .is_ok());
 
   device_ = std::make_unique<TiTca6408a>(std::move(i2c));

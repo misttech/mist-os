@@ -91,13 +91,13 @@ zx_status_t CreateGpioHPlatformDevice(
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO),   DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK),   DECL_GPIO_PIN(GPIO_SOC_SELINA_OSC_EN)};
 
-  const fuchsia_scheduler::RoleName kRole{kGpioHSchedulerRole};
+  const fuchsia_scheduler::RoleName kRoleName{kGpioHSchedulerRole};
 
-  fit::result role_metadata = fidl::Persist(kRole);
-  if (role_metadata.is_error()) {
-    zxlogf(ERROR, "Failed to persist scheduler role: %s",
-           role_metadata.error_value().FormatDescription().c_str());
-    return role_metadata.error_value().status();
+  fit::result persisted_role_name = fidl::Persist(kRoleName);
+  if (persisted_role_name.is_error()) {
+    zxlogf(ERROR, "Failed to persist scheduler role name: %s",
+           persisted_role_name.error_value().FormatDescription().c_str());
+    return persisted_role_name.error_value().status();
   }
 
   fuchsia_hardware_pinimpl::Metadata pin_metadata{{.pins = kGpioHPins}};
@@ -114,14 +114,9 @@ zx_status_t CreateGpioHPlatformDevice(
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
           .data = std::move(persisted_pin_metadata.value()),
       }},
-      // TODO(b/395140408): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
-          .data = role_metadata.value(),
-      }},
       {{
           .id = fuchsia_scheduler::RoleName::kSerializableName,
-          .data = std::move(role_metadata.value()),
+          .data = std::move(persisted_role_name.value()),
       }},
   };
 

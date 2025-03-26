@@ -319,20 +319,14 @@ zx_status_t Nelson::Spi1Init() {
   }());
 
   {
-    const fuchsia_scheduler::RoleName role(kSpi1SchedulerRole);
+    const fuchsia_scheduler::RoleName kRoleName(kSpi1SchedulerRole);
 
-    fit::result persisted = fidl::Persist(role);
+    fit::result persisted = fidl::Persist(kRoleName);
     if (persisted.is_error()) {
-      zxlogf(ERROR, "Failed to persist scheduler role: %s",
+      zxlogf(ERROR, "Failed to persist scheduler role name: %s",
              persisted.error_value().FormatDescription().c_str());
       return persisted.error_value().status();
     }
-
-    // TODO(b/395140408): Remove once no longer retrieved.
-    spi_1_metadata.emplace_back(fpbus::Metadata{{
-        .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
-        .data = persisted.value(),
-    }});
 
     spi_1_metadata.emplace_back(fpbus::Metadata{{
         .id = fuchsia_scheduler::RoleName::kSerializableName,

@@ -123,9 +123,7 @@ fpromise::promise<void, zx_status_t> AmlGpioDriver::InitCompatServer() {
 
         completer.complete_ok();
       },
-      // TODO(b/395140408): Don't forward DEVICE_METADATA_SCHEDULER_ROLE_NAME once no longer
-      // retrieved.
-      compat::ForwardMetadata::Some({DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
+      compat::ForwardMetadata::None());
 
   return bridge.consumer.promise_or(fpromise::error(ZX_ERR_INTERNAL));
 }

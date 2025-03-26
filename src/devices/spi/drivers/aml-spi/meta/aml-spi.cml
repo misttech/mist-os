@@ -17,6 +17,7 @@
     capabilities: [
         { service: 'fuchsia.hardware.spiimpl.Service' },
         { service: "fuchsia.hardware.spi.businfo.SpiBusMetadata" },
+        { service: "fuchsia.scheduler.RoleName" },
     ],
     use: [
         { service: "fuchsia.hardware.gpio.Service" },
@@ -30,6 +31,10 @@
         },
         {
             service: "fuchsia.hardware.spi.businfo.SpiBusMetadata",
+            from: "self",
+        },
+        {
+            service: "fuchsia.scheduler.RoleName",
             from: "self",
         },
     ],

@@ -175,11 +175,11 @@ class MockPinImpl : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
 class GpioTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    compat_.Init(component::kDefaultInstance, "root");
-    EXPECT_OK(compat_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
     EXPECT_OK(pinimpl_.Serve(to_driver_vfs));
     EXPECT_OK(pin_metadata_server_.Serve(to_driver_vfs,
                                          fdf::Dispatcher::GetCurrent()->async_dispatcher()));
+    EXPECT_OK(scheduler_role_name_metadata_server_.Serve(
+        to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher()));
     return zx::ok();
   }
 
@@ -187,13 +187,16 @@ class GpioTestEnvironment : public fdf_testing::Environment {
     return pin_metadata_server_.SetMetadata(metadata);
   }
 
-  compat::DeviceServer& compat() { return compat_; }
+  zx::result<> SetSchedulerRoleName(const fuchsia_scheduler::RoleName& role_name) {
+    return scheduler_role_name_metadata_server_.SetMetadata(role_name);
+  }
+
   MockPinImpl& pinimpl() { return pinimpl_; }
 
  private:
-  compat::DeviceServer compat_;
   MockPinImpl pinimpl_;
   fdf_metadata::MetadataServer<fuchsia_hardware_pinimpl::Metadata> pin_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_scheduler::RoleName> scheduler_role_name_metadata_server_;
 };
 
 class FixtureConfig final {
@@ -719,11 +722,8 @@ TEST_F(GpioTest, SchedulerRole) {
     // Add scheduler role metadata that will cause the core driver to create a new driver
     // dispatcher. Verify that FIDL calls can still be made, and that dispatcher shutdown using the
     // unbind hook works.
-    fuchsia_scheduler::RoleName role("no.such.scheduler.role");
-    const auto result = fidl::Persist(role);
-    ASSERT_TRUE(result.is_ok());
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME, result->data(),
-                                       result->size()));
+    fuchsia_scheduler::RoleName kRoleName("no.such.scheduler.role");
+    EXPECT_OK(env.SetSchedulerRoleName(kRoleName));
   });
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
