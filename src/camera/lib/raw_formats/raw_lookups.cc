@@ -148,7 +148,7 @@ void SetPixel(const RawFormatInstance& format_instance, uint32_t pixel_index, ui
       mask <<= shift;
       new_byte_segment = (pixel_value & mask) >> shift;
     } else {
-      shift = -shift;
+      shift = static_cast<int8_t>(-shift);
       mask >>= shift;
       new_byte_segment = (pixel_value & mask) << shift;
     }
