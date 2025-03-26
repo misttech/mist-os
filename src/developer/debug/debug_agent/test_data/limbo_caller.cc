@@ -1,6 +1,7 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/exception/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -39,7 +40,7 @@ zx::channel OpenServiceRoot() {
   auto status = zx::channel::create(0, &request, &service_root);
   FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
 
-  status = fdio_service_connect("/ns/svc", request.release());
+  status = fdio_open3("/ns/svc", uint64_t{fuchsia_io::wire::kPermReadable}, request.release());
   FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
 
   return service_root;
