@@ -2202,6 +2202,7 @@ mod tests {
                     crypt.shutdown();
                 },
             );
+            volumes_directory.terminate().await;
         }
         filesystem.close().await.expect("Filesystem close");
         let device = filesystem.take_device().await;
