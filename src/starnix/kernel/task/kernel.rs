@@ -102,6 +102,9 @@ pub struct KernelFeatures {
     ///
     /// Components can override this by setting the `uid` field in their program block.
     pub default_uid: u32,
+
+    /// mlock() never prefaults pages.
+    pub mlock_always_onfault: bool,
 }
 
 /// Contains an fscrypt wrapping key id.

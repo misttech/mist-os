@@ -17,5 +17,14 @@
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
         },
+        {
+            config: "fuchsia.starnix.config.container.MlockAlwaysOnFault",
+            key: "mlock_always_onfault",
+            type: "bool",
+            default: true,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
     ],
 }

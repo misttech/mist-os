@@ -135,6 +135,22 @@ arch64_syscall_tests_etc = [
     # management.
     disable_sanitizers_on_host = true
   },
+  {
+    name = "mlock_test_always_onfault"
+    sources = [ "mlock_test.cc" ]
+
+    # Sanitizer runtimes map large amounts of virtual memory and mlock() interacts poorly with that.
+    # Disabling instrumentation on individual test functions isn't enough to make mlock() work in
+    # the instrumented toolchain -- we need to disable instrumentation entirely.
+    disable_sanitizers_on_host = true
+    config_capabilities = [
+      {
+        config = "fuchsia.starnix.config.container.MlockAlwaysOnFault"
+        type = "bool"
+        value = true
+      },
+    ]
+  },
 ]
 
 arch64_syscall_tests_names = arch64_syscall_tests
@@ -249,6 +265,13 @@ template("syscall_test") {
     extra_features = invoker.features
   }
 
+  _test_sources = []
+  if (defined(invoker.sources)) {
+    _test_sources = invoker.sources
+  } else {
+    _test_sources = [ "${test_name}.cc" ]
+  }
+
   _container_config_capabilities = [
     {
       config = "fuchsia.starnix.config.container.ExtraFeatures"
@@ -261,6 +284,10 @@ template("syscall_test") {
       value = extra_features
     },
   ]
+
+  if (defined(invoker.config_capabilities)) {
+    _container_config_capabilities += invoker.config_capabilities
+  }
 
   _config_component_exposes = []
   _config_component_offers = []
@@ -348,7 +375,7 @@ template("syscall_test") {
     test(_target_test_label) {
       # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
       exclude_toolchain_tags = [ "instrumented" ]
-      sources = [ "${test_name}.cc" ]
+      sources = _test_sources
       deps = _test_deps
       configs += _test_configs
     }
@@ -357,7 +384,7 @@ template("syscall_test") {
       if (_disable_sanitizers_on_host) {
         exclude_toolchain_tags = [ "instrumented" ]
       }
-      sources = [ "${test_name}.cc" ]
+      sources = _test_sources
       deps = _test_deps
       configs += _test_configs
     }

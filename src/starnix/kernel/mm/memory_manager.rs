@@ -1575,7 +1575,7 @@ impl MemoryManagerState {
         current_task: &CurrentTask,
         desired_addr: UserAddress,
         desired_length: usize,
-        _on_fault: bool,
+        on_fault: bool,
     ) -> Result<(), Errno> {
         let desired_end_addr =
             desired_addr.checked_add(desired_length).ok_or_else(|| errno!(EINVAL))?;
@@ -1629,11 +1629,37 @@ impl MemoryManagerState {
             }
         }
 
-        for (range, mapping) in updates {
-            self.mappings.insert(range, mapping);
+        // ONFAULT only locks the pages that are already resident.
+        if !(on_fault || current_task.kernel().features.mlock_always_onfault) {
+            if let Err(e) = self.user_vmar.op_range(
+                zx::VmarOp::PREFETCH,
+                start_addr.ptr(),
+                end_addr - start_addr,
+            ) {
+                match e {
+                    zx::Status::BAD_STATE | zx::Status::NOT_SUPPORTED => {
+                        return Err(errno!(ENOMEM))
+                    }
+                    zx::Status::INVALID_ARGS | zx::Status::OUT_OF_RANGE => {
+                        return Err(errno!(EINVAL))
+                    }
+                    zx::Status::ACCESS_DENIED => {
+                        unreachable!("user vmar should always have needed rights")
+                    }
+                    zx::Status::BAD_HANDLE => {
+                        unreachable!("user vmar should always be a valid handle")
+                    }
+                    zx::Status::WRONG_TYPE => unreachable!("user vmar handle should be a vmar"),
+                    _ => unreachable!("unknown error when prefetching memory for mlock: {e}"),
+                }
+            }
         }
 
         track_stub!(TODO("https://fxbug.dev/297591218"), "mlock() vmar op range");
+
+        for (range, mapping) in updates {
+            self.mappings.insert(range, mapping);
+        }
 
         if failed_to_lock {
             error!(ENOMEM)

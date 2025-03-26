@@ -122,6 +122,7 @@ impl Features {
                         default_uid,
                         default_seclabel,
                         default_ns_mount_options,
+                        mlock_always_onfault,
                     },
                 selinux,
                 ashmem,
@@ -199,6 +200,7 @@ impl Features {
                     );
                     inspect_node
                         .record_bool("enable_utc_time_adjustment", *enable_utc_time_adjustment);
+                    inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
                 });
             }
         });
@@ -215,7 +217,7 @@ pub fn parse_features(
         ui_visual_debugging_level,
     }: KernelStructuredConfig,
 ) -> Result<Features, Error> {
-    let ContainerStructuredConfig { extra_features } = &start_info.config;
+    let ContainerStructuredConfig { extra_features, mlock_always_onfault } = &start_info.config;
 
     let mut features = Features::default();
     for entry in start_info.program.features.iter().chain(extra_features.iter()) {
@@ -305,6 +307,8 @@ pub fn parse_features(
         } else {
             None
         };
+
+    features.kernel.mlock_always_onfault = *mlock_always_onfault;
 
     Ok(features)
 }
