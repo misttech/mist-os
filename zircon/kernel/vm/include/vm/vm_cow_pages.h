@@ -2110,14 +2110,6 @@ class VmCowPages::DeferredOps {
   // The FLPH is a moderately large object and is wrapped in an optional to defer its construction
   // unless it is actually needed.
   ktl::optional<FreeLoanedPagesHolder> flph_;
-
-  // When operating on a VMO from a hierarchy that has a page source the page source lock is held
-  // over both the operation and our deferred operations. This serves to serialize operations
-  // against all VMOs in the hierarchy. This serialization is necessary since a hierarchy with a
-  // page source has parent VMOs whose contents is able to change, and if we had parallelism
-  // between multiple mutating operations with range change updates user space would be able to see
-  // inconsistent views of memory.
-  ktl::optional<Guard<Mutex>> page_source_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_
