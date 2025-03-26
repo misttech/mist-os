@@ -2119,18 +2119,6 @@ alias(
 )
 
 alias(
-    name = "rend-0.5.2",
-    actual = "//third_party/rust_crates/vendor/rend-0.5.2:rend",
-    tags = ["manual"],
-)
-
-alias(
-    name = "rend",
-    actual = "//third_party/rust_crates/vendor/rend-0.5.2:rend",
-    tags = ["manual"],
-)
-
-alias(
     name = "ring-0.17.8",
     actual = "//third_party/rust_crates/vendor/ring-0.17.8:ring",
     tags = ["manual"],
@@ -2383,14 +2371,14 @@ alias(
 )
 
 alias(
-    name = "scopeguard-1.1.0",
-    actual = "//third_party/rust_crates/vendor/scopeguard-1.1.0:scopeguard",
+    name = "scopeguard-1.2.0",
+    actual = "//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard",
     tags = ["manual"],
 )
 
 alias(
     name = "scopeguard",
-    actual = "//third_party/rust_crates/vendor/scopeguard-1.1.0:scopeguard",
+    actual = "//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard",
     tags = ["manual"],
 )
 
@@ -3283,14 +3271,14 @@ alias(
 )
 
 alias(
-    name = "zerocopy-0.8.14",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.14:zerocopy",
+    name = "zerocopy-0.8.25-alpha",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
     tags = ["manual"],
 )
 
 alias(
     name = "zerocopy",
-    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.14:zerocopy",
+    actual = "//third_party/rust_crates/vendor/zerocopy-0.8.25-alpha:zerocopy",
     tags = ["manual"],
 )
 

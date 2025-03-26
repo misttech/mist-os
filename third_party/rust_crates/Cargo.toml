@@ -191,7 +191,6 @@ rayon = "1.10.0"
 ref-cast = "1.0.23"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
-rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
 ring = "0.17.8"
 rsa = { version = "0.9.7", default-features = false }
 rustc-hash = "1.0.1"
@@ -255,7 +254,7 @@ vte = "0.3"
 walkdir = "2.2.7"
 which = "4.0.2"
 xml-rs = "0.8"
-zerocopy = { version = "0.8.14", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.25-alpha", features = ["derive", "simd"] }
 zstd = "0.11.2"
 # keep-sorted end
 
@@ -1144,7 +1143,7 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.14"]
+[gn.package.zerocopy."0.8.25-alpha"]
 rustflags = [
   "--cfg=zerocopy_core_error_1_81_0",
   "--cfg=zerocopy_diagnostic_on_unimplemented_1_78_0",
@@ -1154,7 +1153,7 @@ rustflags = [
   "--cfg=zerocopy_panic_in_const_and_vec_try_reserve_1_57_0"
 ]
 
-[gn.package.zerocopy-derive."0.8.14"]
+[gn.package.zerocopy-derive."0.8.25-alpha"]
 # See https://github.com/google/zerocopy/issues/1792
 rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 
