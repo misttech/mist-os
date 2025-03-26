@@ -1727,20 +1727,24 @@ assembly_input_bundle("mdns_fuchsia_device_wired_service") {
 assembly_input_bundle("core_realm_development_access_rcs_usb") {
   base_driver_packages = [
     {
-      package_target = "//src/connectivity/overnet/usb:overnet-usb-package"
+      package_target = "//src/connectivity/overnet/usb:usb-vsock-package"
       driver_components = [
-        "meta/overnet-usb-service.cm",
+        "meta/usb-vsock-service.cm",
         "meta/overnet-usb.cm",
       ]
     },
   ]
+  base_packages = [ "//src/paravirtualization/vsock:vsock_service" ]
   compiled_packages = [
     {
       name = "core"
       components = [
         {
           component_name = "core"
-          shards = [ "//src/developer/remote-control/meta/remote-control-with-usb.core_shard.cml" ]
+          shards = [
+            "//src/developer/remote-control/meta/remote-control.core_shard.cml",
+            "//src/paravirtualization/vsock/meta/vsock_service.core_shard.cml",
+          ]
         },
       ]
     },

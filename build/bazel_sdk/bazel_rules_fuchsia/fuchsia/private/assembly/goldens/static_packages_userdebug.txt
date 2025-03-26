@@ -71,7 +71,6 @@ forensics
 ?network-socket-proxy
 ?network-tun
 ?omaha-client
-?overnet-usb
 pkg-resolver
 ?pkg-shell-commands
 ?pkgctl
@@ -116,6 +115,7 @@ system-update-committer
 ?tzdata-provider
 ?uart
 ?ui
+?usb-vsock
 ?virtual_keyboard_manager
 ?vmm_launcher
 ?vsock_service
