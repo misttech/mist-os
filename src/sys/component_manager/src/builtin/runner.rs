@@ -144,13 +144,13 @@ mod tests {
         let server = server.into_channel();
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server);
         provider
             .open(
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     Path::dot(),
                     &mut object_request,
                 ),

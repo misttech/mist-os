@@ -189,7 +189,7 @@ mod tests {
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         fixture
             .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
@@ -197,7 +197,7 @@ mod tests {
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -230,7 +230,7 @@ mod tests {
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         fixture
             .provider(moniker, Moniker::root())
             .await
@@ -238,7 +238,7 @@ mod tests {
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     VfsPath::dot(),
                     &mut object_request,
                 ),

@@ -31,10 +31,8 @@ use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 // TODO: The `use` declaration for storage implicitly carries these rights. While this is
 // correct, it would be more consistent to get the rights from `CapabilityState`.
-const OPEN_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::RIGHT_WRITABLE);
-const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_WRITABLE);
+const FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::Flags::PROTOCOL_DIRECTORY);
 
 /// Information returned by the route_storage_capability function on the backing directory source
 /// of a storage capability.
@@ -86,11 +84,11 @@ async fn open_storage_root(
         // plumbed in all the details needed to use it.
         dir_source_component.ensure_started(&StartReason::StorageAdmin).await?;
         let path = path.try_into().map_err(|_| ModelError::BadPath)?;
-        let mut object_request = OPEN_FLAGS.to_object_request(local_server_end.into_channel());
+        let mut object_request = FLAGS.to_object_request(local_server_end.into_channel());
         dir_source_component
             .open_outgoing(OpenRequest::new(
                 dir_source_component.execution_scope.clone(),
-                OPEN_FLAGS | fio::OpenFlags::DIRECTORY,
+                FLAGS,
                 path,
                 &mut object_request,
             ))

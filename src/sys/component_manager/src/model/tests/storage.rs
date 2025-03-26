@@ -587,8 +587,7 @@ async fn use_restricted_storage_open_failure() {
     // `parent_consumer` should be able to open its storage because its not restricted
     let (_client_end, server_end) = zx::Channel::create();
     let scope = ExecutionScope::new();
-    let flags =
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
     let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
@@ -622,8 +621,7 @@ async fn use_restricted_storage_open_failure() {
     // `parent_consumer` should NOT be able to open its storage because its IS restricted
     let (_client_end, server_end) = zx::Channel::create();
     let scope = ExecutionScope::new();
-    let flags =
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
     let mut object_request = flags.to_object_request(server_end);
     let result = route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
@@ -713,8 +711,7 @@ async fn open_storage_subdirectory() {
     let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let server_end = server_end.into_channel();
     let scope = ExecutionScope::new();
-    let flags =
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
     let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {
@@ -742,8 +739,7 @@ async fn open_storage_subdirectory() {
     // `consumer` should be able to open its storage at "foo/bar"
     let (bar_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
-    let flags =
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY;
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
     let mut object_request = flags.to_object_request(server_end);
     route_and_open_capability(
         &RouteRequest::UseStorage(UseStorageDecl {

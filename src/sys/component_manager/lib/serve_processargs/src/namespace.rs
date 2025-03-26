@@ -471,7 +471,7 @@ mod tests {
                 _relative_path: path::Path,
                 _server_end: ServerEnd<fio::NodeMarker>,
             ) {
-                panic!("open is deprecated, use open3 instead")
+                panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
             fn open3(
@@ -534,13 +534,11 @@ mod tests {
             fn open(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
-                flags: fio::OpenFlags,
-                relative_path: path::Path,
+                _flags: fio::OpenFlags,
+                _relative_path: path::Path,
                 _server_end: ServerEnd<fio::NodeMarker>,
             ) {
-                assert_eq!(relative_path.into_string(), "");
-                assert_eq!(flags, fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE);
-                self.0.clone().try_send(()).unwrap();
+                panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
             fn open3(

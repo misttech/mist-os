@@ -527,15 +527,11 @@ mod tests {
     fn serve_vfs_dir(root: Arc<impl Directory>) -> (Task<()>, fio::DirectoryProxy) {
         let fs_scope = ExecutionScope::new();
         let (client, server) = create_proxy::<fio::DirectoryMarker>();
-        root.open(
-            fs_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            VfsPath::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-
+        const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
+        FLAGS
+            .to_object_request(server.into_channel())
+            .handle(|request| root.open3(fs_scope.clone(), VfsPath::dot(), FLAGS, request));
         let vfs_task = Task::spawn(async move { fs_scope.wait().await });
-
         (vfs_task, client)
     }
 
@@ -623,13 +619,13 @@ mod tests {
         let (client_channel, server_channel) = create_endpoints::<fresolution::ResolverMarker>();
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_channel);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_channel);
         resolver_provider
             .open(
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     VfsPath::dot(),
                     &mut object_request,
                 ),

@@ -1539,6 +1539,8 @@ pub mod tests {
     use zx::{self as zx, AsHandleRef};
     use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
+    const FLAGS: fio::Flags = fio::PERM_READABLE;
+
     #[fuchsia::test]
     async fn started_event_timestamp_matches_component() {
         let test =
@@ -2602,10 +2604,10 @@ pub mod tests {
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         root.open_outgoing(OpenRequest::new(
             execution_scope.clone(),
-            fio::OpenFlags::empty(),
+            fio::Flags::PROTOCOL_SERVICE,
             "svc/foo".try_into().unwrap(),
             &mut object_request,
         ))
@@ -2644,11 +2646,11 @@ pub mod tests {
         let (client_end, server_end) = zx::Channel::create();
 
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 execution_scope.clone(),
-                fio::OpenFlags::empty(),
+                fio::Flags::PROTOCOL_SERVICE,
                 "svc/foo".try_into().unwrap(),
                 &mut object_request,
             ))
@@ -2707,11 +2709,11 @@ pub mod tests {
         // Open the outgoing directory. This should not block.
         let (_, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = FLAGS.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 VfsPath::dot(),
                 &mut object_request
             ))
@@ -2726,11 +2728,11 @@ pub mod tests {
         // Open the outgoing directory. This should still not block.
         let (_, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = FLAGS.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 VfsPath::dot(),
                 &mut object_request
             ))

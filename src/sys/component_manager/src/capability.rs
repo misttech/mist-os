@@ -99,11 +99,11 @@ pub async fn open_framework(
 ) -> Result<(), CapabilityProviderError> {
     let task_group = instance.nonblocking_task_group();
     let weak_instance = instance.as_weak();
-    let flags = fio::OpenFlags::empty();
-    let mut object_request = flags.to_object_request(server);
+    const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+    let mut object_request = FLAGS.to_object_request(server);
     let open_request = OpenRequest::new(
         instance.execution_scope.clone(),
-        flags,
+        FLAGS,
         vfs::path::Path::dot(),
         &mut object_request,
     );

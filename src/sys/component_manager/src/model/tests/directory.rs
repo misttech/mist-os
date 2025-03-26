@@ -135,13 +135,11 @@ async fn open_requests_go_to_the_same_directory_connection() {
         fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            relative_path: vfs::path::Path,
+            _flags: fio::OpenFlags,
+            _relative_path: vfs::path::Path,
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            assert_eq!(relative_path.into_string(), "");
-            assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY);
-            self.0.clone().try_send(()).unwrap();
+            panic!("fuchsia.io/Directory.DeprecatedOpen should never be called in these tests.");
         }
 
         fn open3(

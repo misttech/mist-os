@@ -633,11 +633,11 @@ async fn create_scoped_logger(
         .try_into_directory_entry(component.execution_scope.clone())
         .context("LogSink could not convert to DirEntry?")?;
     let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>();
-    let flags = fio::OpenFlags::empty();
-    flags.to_object_request(server.into_channel()).handle(|object_request| {
+    const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+    FLAGS.to_object_request(server.into_channel()).handle(|object_request| {
         dir_entry.clone().open_entry(OpenRequest::new(
             component.execution_scope.clone(),
-            flags,
+            FLAGS,
             vfs::path::Path::dot(),
             object_request,
         ))

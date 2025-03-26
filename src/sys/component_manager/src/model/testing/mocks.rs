@@ -11,7 +11,7 @@ use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage,
 use anyhow::format_err;
 use async_trait::async_trait;
 use cm_rust::{ComponentDecl, ConfigValuesData};
-use fidl::endpoints::{create_endpoints, ClientEnd, RequestStream, ServerEnd};
+use fidl::endpoints::{create_endpoints, Proxy, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_diagnostics_types::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
@@ -25,8 +25,6 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::sync::{Arc, Mutex as SyncMutex};
 use vfs::directory::entry::OpenRequest;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use vfs::service::endpoint;
@@ -81,22 +79,13 @@ impl MockResolver {
                     ),
                 },
             };
-            let (client, server): (
-                ClientEnd<fio::DirectoryMarker>,
-                ServerEnd<fio::DirectoryMarker>,
-            ) = create_endpoints();
 
             let sub_dir = pseudo_directory!(
                 "fake_file" => read_only(b"content"),
             );
-            sub_dir.open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
-                vfs::path::Path::dot(),
-                ServerEnd::new(server.into_channel()),
-            );
+            let sub_dir_proxy =
+                vfs::directory::serve(sub_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
+            let client = sub_dir_proxy.into_client_end().unwrap();
 
             let maybe_blocker = { guard.blockers.get_mut(name).and_then(|b| b.take()) };
             (name, decl, config_values, maybe_blocker, client)

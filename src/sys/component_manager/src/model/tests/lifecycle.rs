@@ -759,10 +759,10 @@ async fn open_then_stop_with_escrow() {
     // Queue an open request.
     let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
     let execution_scope = ExecutionScope::new();
-    let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+    let mut object_request = fio::Flags::empty().to_object_request(server_end);
     root.open_outgoing(OpenRequest::new(
         execution_scope.clone(),
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
         "echo".try_into().unwrap(),
         &mut object_request,
     ))
