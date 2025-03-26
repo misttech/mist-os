@@ -138,6 +138,7 @@ pub async fn list_devices(
         }
     }
     .into_iter()
+    .filter(|d| !cmd.unbound || d.bound_driver_url == Some("unbound".to_string()))
     .map(|device_info| Device::from(device_info))
     .collect();
 

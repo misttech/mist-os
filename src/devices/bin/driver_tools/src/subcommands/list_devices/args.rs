@@ -34,4 +34,8 @@ pub struct ListDevicesCommand {
     /// return a non-zero exit code if no matching devices are found.
     #[argh(switch, long = "fail-on-missing")]
     pub fail_on_missing: bool,
+
+    /// list only unbound nodes.
+    #[argh(switch, short = 'u', long = "unbound")]
+    pub unbound: bool,
 }
