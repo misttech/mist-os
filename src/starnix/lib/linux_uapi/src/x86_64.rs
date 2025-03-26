@@ -13027,7 +13027,7 @@ pub const perf_event_read_format_PERF_FORMAT_LOST: perf_event_read_format = 16;
 pub const perf_event_read_format_PERF_FORMAT_MAX: perf_event_read_format = 32;
 pub type perf_event_read_format = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub struct perf_event_attr {
     pub type_: __u32,
     pub size: __u32,
@@ -13055,7 +13055,7 @@ pub struct perf_event_attr {
     pub config3: __u64,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_1 {
     pub sample_period: __u64,
     pub sample_freq: __u64,
@@ -13070,7 +13070,7 @@ impl Default for perf_event_attr__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_2 {
     pub wakeup_events: __u32,
     pub wakeup_watermark: __u32,
@@ -13085,7 +13085,7 @@ impl Default for perf_event_attr__bindgen_ty_2 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_3 {
     pub bp_addr: __u64,
     pub kprobe_func: __u64,
@@ -13102,7 +13102,7 @@ impl Default for perf_event_attr__bindgen_ty_3 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_4 {
     pub bp_len: __u64,
     pub kprobe_addr: __u64,

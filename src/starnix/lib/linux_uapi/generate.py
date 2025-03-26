@@ -214,6 +214,7 @@ AUTO_DERIVE_TRAITS = [
         r"nf_nat(_ipv4)?(_multi)?_range(_compat)?",
         ["KnownLayout", "FromBytes", "Immutable"],
     ),
+    (r"perf_event_attr", ["FromBytes", "Immutable"]),
     (r"robust_list_head", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"robust_list", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"sigevent", ["KnownLayout", "FromBytes", "Immutable"]),
