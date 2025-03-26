@@ -19,5 +19,5 @@ open protocol Device {
 };
 
 service Service {
-    download_firmware client_end:Device;
+    nanohub client_end:Device;
 };
