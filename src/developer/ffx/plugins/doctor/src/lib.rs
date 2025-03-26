@@ -1491,15 +1491,14 @@ mod test {
     use async_trait::async_trait;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_doctor_test_utils::MockWriter;
-    use fidl::endpoints::{
-        spawn_local_stream_handler, ProtocolMarker, Request, RequestStream, ServerEnd,
-    };
+    use fidl::endpoints::{ProtocolMarker, Request, RequestStream, ServerEnd};
     use fidl::Channel;
     use fidl_fuchsia_developer_ffx::{
         DaemonProxy, DaemonRequest, OpenTargetError, RemoteControlState, TargetCollectionRequest,
         TargetCollectionRequestStream, TargetConnectionError, TargetRequest,
     };
     use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlRequest};
+    use fidl_test_util::spawn_local_stream_handler;
     use fuchsia_async as fasync;
     use futures::channel::oneshot::{self, Receiver};
     use futures::future::Shared;

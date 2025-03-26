@@ -68,6 +68,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
   ]

@@ -831,8 +831,9 @@ fn name_key() -> felement::AnnotationKey {
 mod tests {
     use super::{CollectionConfig, ElementManager, ElementManagerError};
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler};
+    use fidl::endpoints::create_proxy_and_stream;
     use fidl::prelude::*;
+    use fidl_test_util::spawn_stream_handler;
     use futures::FutureExt;
     use maplit::hashmap;
     use session_testing::spawn_directory_server;

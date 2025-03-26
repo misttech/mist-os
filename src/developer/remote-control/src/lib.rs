@@ -681,7 +681,7 @@ mod tests {
     }
 
     fn setup_fake_lifecycle_controller() -> fsys::LifecycleControllerProxy {
-        fidl::endpoints::spawn_stream_handler(
+        fidl_test_util::spawn_stream_handler(
             move |request: fsys::LifecycleControllerRequest| async move {
                 match request {
                     fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
@@ -707,7 +707,7 @@ mod tests {
     /// (ie. incoming namespace, outgoing directory, etc) the capability is
     /// expected to be requested from.
     fn setup_fake_realm_query(capability_set: fsys::OpenDirType) -> fsys::RealmQueryProxy {
-        fidl::endpoints::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
+        fidl_test_util::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
                 fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,

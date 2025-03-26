@@ -80,6 +80,7 @@ icu_rustc_library("input_pipeline") {
   test_deps = [
     "//src/intl:icudtl",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
     "//src/lib/ui/fidl_fuchsia_ui_focus_ext:lib",

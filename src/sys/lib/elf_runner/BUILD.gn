@@ -75,6 +75,7 @@ rustc_library("elf_runner") {
 
   test_deps = [
     "//src/lib/diagnostics/log/message/rust",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/scoped_task",

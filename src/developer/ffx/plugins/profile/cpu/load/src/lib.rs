@@ -174,7 +174,7 @@ mod tests {
     async fn test_cpu_load_duration() {
         let (duration_request_sender, mut duration_request_receiver) = mpsc::channel(1);
 
-        let proxy = fidl::endpoints::spawn_stream_handler(move |req| {
+        let proxy = fidl_test_util::spawn_stream_handler(move |req| {
             let mut duration_request_sender = duration_request_sender.clone();
             async move {
                 match req {
@@ -199,7 +199,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_cpu_load_output() {
-        let proxy = fidl::endpoints::spawn_stream_handler(move |req| async move {
+        let proxy = fidl_test_util::spawn_stream_handler(move |req| async move {
             let data = vec![0.66f32, 1.56, 0.83, 0.71];
             match req {
                 fstats::StatsRequest::GetCpuLoad { responder, .. } => {

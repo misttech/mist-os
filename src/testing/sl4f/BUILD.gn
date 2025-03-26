@@ -118,6 +118,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/connectivity/lowpan/lib/lowpan_driver_common",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:lazy_static",

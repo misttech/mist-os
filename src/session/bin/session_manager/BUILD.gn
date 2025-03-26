@@ -59,6 +59,7 @@ rustc_library("lib") {
   test_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
     "//src/session/testing",

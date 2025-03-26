@@ -704,7 +704,7 @@ pub async fn list_registry(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
     use std::sync::Arc;
     use test_case::test_case;
     use vfs::pseudo_directory;

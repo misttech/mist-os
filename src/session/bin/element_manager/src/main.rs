@@ -92,8 +92,9 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use crate::element_manager::{CollectionConfig, ElementManager};
-    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, Proxy};
+    use fidl::endpoints::{create_proxy_and_stream, Proxy};
     use fidl_connector::Connect;
+    use fidl_test_util::spawn_stream_handler;
     use futures::channel::mpsc;
     use futures::{SinkExt, StreamExt};
     use lazy_static::lazy_static;

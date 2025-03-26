@@ -551,7 +551,8 @@ mod tests {
     use super::SessionManager;
     use anyhow::{anyhow, Error};
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd};
+    use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
+    use fidl_test_util::spawn_stream_handler;
     use futures::channel::mpsc;
     use futures::prelude::*;
     use session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server};

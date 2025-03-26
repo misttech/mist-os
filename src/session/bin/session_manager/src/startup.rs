@@ -289,7 +289,8 @@ async fn set_session(
 mod tests {
     use super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME};
     use anyhow::Error;
-    use fidl::endpoints::{create_endpoints, spawn_stream_handler};
+    use fidl::endpoints::create_endpoints;
+    use fidl_test_util::spawn_stream_handler;
     use session_testing::{spawn_directory_server, spawn_server};
     use std::sync::LazyLock;
     use test_util::Counter;

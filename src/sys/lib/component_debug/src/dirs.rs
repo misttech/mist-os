@@ -184,7 +184,7 @@ pub async fn open_in_instance_dir(
 
 #[cfg(test)]
 mod tests {
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
     use moniker::Moniker;
     use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 

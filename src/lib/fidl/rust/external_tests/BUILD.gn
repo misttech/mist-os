@@ -29,7 +29,6 @@ rustc_test("fidl_rust_external_tests_bin") {
       "//sdk/rust/zx",
       "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_rust",
       "//src/lib/fuchsia-async",
-      "//src/testing/fidl:placeholders_rust",
       "//third_party/rust_crates:futures",
     ]
   }
@@ -40,7 +39,6 @@ rustc_test("fidl_rust_external_tests_bin") {
     "src/lib.rs",
     "src/message.rs",
     "src/persistence.rs",
-    "src/stream_handler_test.rs",
     "src/unknown_interactions.rs",
   ]
 }

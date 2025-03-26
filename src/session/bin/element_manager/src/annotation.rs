@@ -365,9 +365,8 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use async_utils::hanging_get::error::HangingGetServerError;
-    use fidl::endpoints::{
-        create_proxy_and_stream, spawn_stream_handler, ControlHandle, RequestStream,
-    };
+    use fidl::endpoints::{create_proxy_and_stream, ControlHandle, RequestStream};
+    use fidl_test_util::spawn_stream_handler;
     use futures::stream::FusedStream;
     use futures::{StreamExt, TryStreamExt};
     use std::cmp::Ordering;
