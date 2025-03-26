@@ -11,7 +11,7 @@ use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encode, EncodeError, Encoder, EncoderExt as _,
-    Slot, WireU16, WireU32, CHUNK_SIZE,
+    Slot, WireU16, WireU32, ZeroPadding, CHUNK_SIZE,
 };
 
 #[derive(Clone, Copy)]
@@ -31,14 +31,17 @@ pub union WireEnvelope {
     decoded_out_of_line: *mut (),
 }
 
+unsafe impl ZeroPadding for WireEnvelope {
+    unsafe fn zero_padding(_: *mut Self) {}
+}
+
 impl WireEnvelope {
     const IS_INLINE_BIT: u16 = 1;
 
     /// Encodes a zero envelope into a slot.
     #[inline]
-    pub fn encode_zero(slot: Slot<'_, Self>) {
-        munge!(let Self { mut zero } = slot);
-        *zero = [0; 8];
+    pub fn encode_zero(out: &mut MaybeUninit<Self>) {
+        out.write(WireEnvelope { zero: [0; 8] });
     }
 
     /// Encodes a `'static` value into an envelope with an encoder.
@@ -46,16 +49,16 @@ impl WireEnvelope {
     pub fn encode_value_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
         value: &mut T,
         encoder: &mut E,
-        slot: Slot<'_, Self>,
+        out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
-                    mut maybe_num_bytes,
-                    mut num_handles,
-                    mut flags,
+                    maybe_num_bytes,
+                    num_handles,
+                    flags,
                 },
-            } = slot;
+            } = out;
         }
 
         let handles_before = encoder.__internal_handle_count();
@@ -64,12 +67,13 @@ impl WireEnvelope {
             return Err(EncodeError::ExpectedInline(size_of::<T::Encoded>()));
         }
 
-        let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
-        value.encode(encoder, slot)?;
+        let value_out = unsafe { &mut *maybe_num_bytes.as_mut_ptr().cast() };
+        value.encode(encoder, value_out)?;
 
-        **flags = Self::IS_INLINE_BIT;
+        flags.write(WireU16(Self::IS_INLINE_BIT));
 
-        **num_handles = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
+        let handle_count = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
+        num_handles.write(WireU16(handle_count));
 
         Ok(())
     }
@@ -79,35 +83,36 @@ impl WireEnvelope {
     pub fn encode_value<E: Encoder + ?Sized, T: Encode<E>>(
         value: &mut T,
         encoder: &mut E,
-        slot: Slot<'_, Self>,
+        out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
         munge! {
             let Self {
                 encoded: Encoded {
-                    mut maybe_num_bytes,
-                    mut num_handles,
-                    mut flags,
+                    maybe_num_bytes,
+                    num_handles,
+                    flags,
                 },
-            } = slot;
+            } = out;
         }
 
         let handles_before = encoder.__internal_handle_count();
 
         if size_of::<T::Encoded>() <= 4 {
-            let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
-            value.encode(encoder, slot)?;
-
-            **flags = Self::IS_INLINE_BIT;
+            let value_out = unsafe { &mut *maybe_num_bytes.as_mut_ptr().cast() };
+            value.encode(encoder, value_out)?;
+            flags.write(WireU16(Self::IS_INLINE_BIT));
         } else {
             let bytes_before = encoder.bytes_written();
 
             encoder.encode_next(value)?;
 
-            **maybe_num_bytes = (encoder.bytes_written() - bytes_before).try_into().unwrap();
-            **flags = 0;
+            let bytes_count = (encoder.bytes_written() - bytes_before).try_into().unwrap();
+            maybe_num_bytes.write(WireU32(bytes_count));
+            flags.write(WireU16(0));
         }
 
-        **num_handles = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
+        let handle_count = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
+        num_handles.write(WireU16(handle_count));
 
         Ok(())
     }

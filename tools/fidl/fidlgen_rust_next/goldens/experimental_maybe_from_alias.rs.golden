@@ -208,7 +208,7 @@ impl ::fidl_next::Encodable for Testing {
     type Encoded = WireTesting;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Testing
+unsafe impl<___E> ::fidl_next::Encode<___E> for Testing
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -220,7 +220,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -253,7 +253,7 @@ where
                 aa2,
                 aa3,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.u1, encoder, u1)?;
@@ -320,7 +320,7 @@ impl ::fidl_next::EncodableOption for Box<Testing> {
     type EncodedOption = ::fidl_next::WireBox<WireTesting>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<Testing>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Testing>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Testing: ::fidl_next::Encode<___E>,
@@ -329,13 +329,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())

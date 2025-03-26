@@ -15,7 +15,7 @@ impl ::fidl_next::Encodable for FlexibleFoo {
     type Encoded = WireFlexibleFoo;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for FlexibleFoo
+unsafe impl<___E> ::fidl_next::Encode<___E> for FlexibleFoo
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -25,9 +25,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireFlexibleFoo { raw } = slot);
+        ::fidl_next::munge!(let WireFlexibleFoo { raw } = out);
 
         match self {
             Self::S(value) => {
@@ -51,7 +51,7 @@ impl ::fidl_next::EncodableOption for Box<FlexibleFoo> {
     type EncodedOption = WireOptionalFlexibleFoo;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<FlexibleFoo>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<FlexibleFoo>
 where
     ___E: ?Sized,
     FlexibleFoo: ::fidl_next::Encode<___E>,
@@ -60,13 +60,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalFlexibleFoo { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalFlexibleFoo { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -250,7 +250,7 @@ impl ::fidl_next::Encodable for StrictFoo {
     type Encoded = WireStrictFoo;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StrictFoo
+unsafe impl<___E> ::fidl_next::Encode<___E> for StrictFoo
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -260,9 +260,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireStrictFoo { raw } = slot);
+        ::fidl_next::munge!(let WireStrictFoo { raw } = out);
 
         match self {
             Self::S(value) => {
@@ -282,7 +282,7 @@ impl ::fidl_next::EncodableOption for Box<StrictFoo> {
     type EncodedOption = WireOptionalStrictFoo;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StrictFoo>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StrictFoo>
 where
     ___E: ?Sized,
     StrictFoo: ::fidl_next::Encode<___E>,
@@ -291,13 +291,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalStrictFoo { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalStrictFoo { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -477,7 +477,7 @@ impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleRequest {
     type Encoded = WireProtocolRequestStrictResponseFlexibleRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -487,13 +487,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
@@ -506,7 +506,8 @@ impl ::fidl_next::EncodableOption for Box<ProtocolRequestStrictResponseFlexibleR
     type EncodedOption = ::fidl_next::WireBox<WireProtocolRequestStrictResponseFlexibleRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestStrictResponseFlexibleRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ProtocolRequestStrictResponseFlexibleRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ProtocolRequestStrictResponseFlexibleRequest: ::fidl_next::Encode<___E>,
@@ -515,13 +516,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -581,7 +582,7 @@ impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleResponse {
     type Encoded = WireProtocolRequestStrictResponseFlexibleResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -591,13 +592,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 f,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.f, encoder, f)?;
@@ -610,7 +611,8 @@ impl ::fidl_next::EncodableOption for Box<ProtocolRequestStrictResponseFlexibleR
     type EncodedOption = ::fidl_next::WireBox<WireProtocolRequestStrictResponseFlexibleResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestStrictResponseFlexibleResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ProtocolRequestStrictResponseFlexibleResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ProtocolRequestStrictResponseFlexibleResponse: ::fidl_next::Encode<___E>,
@@ -619,13 +621,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -685,7 +687,7 @@ impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictRequest {
     type Encoded = WireProtocolRequestFlexibleResponseStrictRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -695,13 +697,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
@@ -714,7 +716,8 @@ impl ::fidl_next::EncodableOption for Box<ProtocolRequestFlexibleResponseStrictR
     type EncodedOption = ::fidl_next::WireBox<WireProtocolRequestFlexibleResponseStrictRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestFlexibleResponseStrictRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ProtocolRequestFlexibleResponseStrictRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ProtocolRequestFlexibleResponseStrictRequest: ::fidl_next::Encode<___E>,
@@ -723,13 +726,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -789,7 +792,7 @@ impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictResponse {
     type Encoded = WireProtocolRequestFlexibleResponseStrictResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -799,13 +802,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 f,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.f, encoder, f)?;
@@ -818,7 +821,8 @@ impl ::fidl_next::EncodableOption for Box<ProtocolRequestFlexibleResponseStrictR
     type EncodedOption = ::fidl_next::WireBox<WireProtocolRequestFlexibleResponseStrictResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestFlexibleResponseStrictResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ProtocolRequestFlexibleResponseStrictResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ProtocolRequestFlexibleResponseStrictResponse: ::fidl_next::Encode<___E>,
@@ -827,13 +831,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())

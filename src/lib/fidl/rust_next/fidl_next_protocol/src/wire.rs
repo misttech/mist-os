@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
+
 use fidl_next_codec::{
     Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64, ZeroPadding,
 };
@@ -39,10 +41,14 @@ impl Encodable for WireMessageHeader {
     type Encoded = WireMessageHeader;
 }
 
-impl<E: ?Sized> Encode<E> for WireMessageHeader {
+unsafe impl<E: ?Sized> Encode<E> for WireMessageHeader {
     #[inline]
-    fn encode(&mut self, _: &mut E, mut slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
-        slot.write(*self);
+    fn encode(
+        &mut self,
+        _: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        out.write(*self);
         Ok(())
     }
 }

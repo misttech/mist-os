@@ -4,6 +4,7 @@
 
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
@@ -172,7 +173,7 @@ where
     type Encoded = WireFlexibleResult<T::Encoded, E::Encoded>;
 }
 
-impl<Enc, T, E> Encode<Enc> for FlexibleResult<T, E>
+unsafe impl<Enc, T, E> Encode<Enc> for FlexibleResult<T, E>
 where
     Enc: Encoder + ?Sized,
     T: Encode<Enc>,
@@ -181,9 +182,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut Enc,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        munge!(let WireFlexibleResult { raw, _phantom: _ } = slot);
+        munge!(let WireFlexibleResult { raw, _phantom: _ } = out);
 
         match self {
             Self::Ok(value) => RawWireUnion::encode_as::<Enc, T>(value, ORD_OK, encoder, raw)?,

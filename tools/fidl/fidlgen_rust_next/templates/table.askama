@@ -30,7 +30,7 @@ impl ::fidl_next::Encodable for {{ name }} {
     type Encoded = {{ wire_name }};
 }
 
-impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+unsafe impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     {% if table.is_resource %}
@@ -41,17 +41,20 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let {{ wire_name }} { table } = slot);
+        ::fidl_next::munge!(let {{ wire_name }} { table } = out);
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        unsafe {
+            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
+        }
+
         let mut preallocated = ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
-            let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 {% for member in table.members.iter().rev() %}
                     {% let member_name = filters::ident(member.name.snake())? %}
@@ -59,15 +62,17 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             {{ member_name }},
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 {% endfor %}
-                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
             }
-            preallocated.write_next(slot);
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
         }
 
         ::fidl_next::WireTable::encode_len(table, max_ord);

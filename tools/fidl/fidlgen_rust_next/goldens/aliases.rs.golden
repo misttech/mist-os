@@ -33,7 +33,7 @@ impl ::fidl_next::Encodable for ObjType {
     type Encoded = WireObjType;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ObjType
+unsafe impl<___E> ::fidl_next::Encode<___E> for ObjType
 where
     ___E: ?Sized,
 {
@@ -41,14 +41,14 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireObjType { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(match *self {
+        ::fidl_next::munge!(let WireObjType { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(match *self {
             Self::None => 0,
 
             Self::Channel => 4,
-        });
+        }));
 
         Ok(())
     }
@@ -155,7 +155,7 @@ impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
     type Encoded = WireExampleOfUseOfAliases;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ExampleOfUseOfAliases
+unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleOfUseOfAliases
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -167,7 +167,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -180,7 +180,7 @@ where
                 field_of_client_end,
                 field_of_nullable_client_end,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.field_of_u32, encoder, field_of_u32)?;
@@ -227,7 +227,7 @@ impl ::fidl_next::EncodableOption for Box<ExampleOfUseOfAliases> {
     type EncodedOption = ::fidl_next::WireBox<WireExampleOfUseOfAliases>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleOfUseOfAliases>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleOfUseOfAliases>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleOfUseOfAliases: ::fidl_next::Encode<___E>,
@@ -236,13 +236,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())

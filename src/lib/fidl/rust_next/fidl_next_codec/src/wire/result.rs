@@ -4,6 +4,7 @@
 
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use crate::{
     munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
@@ -111,7 +112,7 @@ where
     type Encoded = WireResult<T::Encoded, E::Encoded>;
 }
 
-impl<Enc, T, E> Encode<Enc> for Result<T, E>
+unsafe impl<Enc, T, E> Encode<Enc> for Result<T, E>
 where
     Enc: Encoder + ?Sized,
     T: Encode<Enc>,
@@ -120,9 +121,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut Enc,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        munge!(let WireResult { raw, _phantom: _ } = slot);
+        munge!(let WireResult { raw, _phantom: _ } = out);
 
         match self {
             Ok(value) => RawWireUnion::encode_as::<Enc, T>(value, ORD_OK, encoder, raw)?,

@@ -4,7 +4,7 @@
 
 use core::cell::Cell;
 use core::fmt;
-use core::mem::{replace, ManuallyDrop};
+use core::mem::{replace, ManuallyDrop, MaybeUninit};
 
 use zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
 use zx::{Handle, HandleBased as _};
@@ -36,10 +36,10 @@ unsafe impl ZeroPadding for WireHandle {
 }
 
 impl WireHandle {
-    /// Encodes a handle as present in a slot.
-    pub fn set_encoded_present(slot: Slot<'_, Self>) {
-        munge!(let Self { mut encoded } = slot);
-        *encoded = WireU32(u32::MAX);
+    /// Encodes a handle as present in an output.
+    pub fn set_encoded_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { encoded } = out);
+        encoded.write(WireU32(u32::MAX));
     }
 
     /// Returns whether the underlying `zx_handle_t` is invalid.
@@ -110,15 +110,15 @@ unsafe impl ZeroPadding for WireOptionalHandle {
 
 impl WireOptionalHandle {
     /// Encodes a handle as present in a slot.
-    pub fn set_encoded_present(slot: Slot<'_, Self>) {
-        munge!(let Self { handle } = slot);
+    pub fn set_encoded_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
         WireHandle::set_encoded_present(handle);
     }
 
-    /// Encodes a handle as absent in a slot.
-    pub fn set_encoded_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { handle: WireHandle { mut encoded } } = slot);
-        *encoded = WireU32(ZX_HANDLE_INVALID);
+    /// Encodes a handle as absent in an output.
+    pub fn set_encoded_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle: WireHandle { encoded } } = out);
+        encoded.write(WireU32(ZX_HANDLE_INVALID));
     }
 
     /// Returns whether a handle is present.
@@ -147,18 +147,18 @@ impl Encodable for Handle {
     type Encoded = WireHandle;
 }
 
-impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
+unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         if self.is_invalid() {
             Err(EncodeError::InvalidRequiredHandle)
         } else {
             let handle = replace(self, Handle::invalid());
             encoder.push_handle(handle)?;
-            WireHandle::set_encoded_present(slot);
+            WireHandle::set_encoded_present(out);
             Ok(())
         }
     }
@@ -168,18 +168,18 @@ impl EncodableOption for Handle {
     type EncodedOption = WireOptionalHandle;
 }
 
-impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
+unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption>,
+        out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(handle) = this {
             let handle = replace(handle, Handle::invalid());
             encoder.push_handle(handle)?;
-            WireOptionalHandle::set_encoded_present(slot);
+            WireOptionalHandle::set_encoded_present(out);
         } else {
-            WireOptionalHandle::set_encoded_absent(slot);
+            WireOptionalHandle::set_encoded_absent(out);
         }
         Ok(())
     }

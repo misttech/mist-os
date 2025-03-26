@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
@@ -68,7 +69,7 @@ macro_rules! endpoint {
             type EncodedOption = $name<T::EncodedOption, P>;
         }
 
-        impl<E, T, P> Encode<E> for $name<T, P>
+        unsafe impl<E, T, P> Encode<E> for $name<T, P>
         where
             E: ?Sized,
             T: Encode<E>,
@@ -76,14 +77,14 @@ macro_rules! endpoint {
             fn encode(
                 &mut self,
                 encoder: &mut E,
-                slot: Slot<'_, Self::Encoded>,
+                out: &mut MaybeUninit<Self::Encoded>,
             ) -> Result<(), EncodeError> {
-                munge!(let Self::Encoded { transport, _protocol: _ } = slot);
+                munge!(let Self::Encoded { transport, _protocol: _ } = out);
                 self.transport.encode(encoder, transport)
             }
         }
 
-        impl<E, T, P> EncodeOption<E> for $name<T, P>
+        unsafe impl<E, T, P> EncodeOption<E> for $name<T, P>
         where
             E: ?Sized,
             T: EncodeOption<E>,
@@ -91,9 +92,9 @@ macro_rules! endpoint {
             fn encode_option(
                 this: Option<&mut Self>,
                 encoder: &mut E,
-                slot: Slot<'_, Self::EncodedOption>,
+                out: &mut MaybeUninit<Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
-                munge!(let Self::EncodedOption { transport, _protocol: _ } = slot);
+                munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
                 T::encode_option(this.map(|this| &mut this.transport), encoder, transport)
             }
         }

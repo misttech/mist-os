@@ -18,7 +18,7 @@ impl ::fidl_next::Encodable for StructLargeArray {
     type Encoded = WireStructLargeArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructLargeArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructLargeArray
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -26,13 +26,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 a,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
@@ -45,7 +45,7 @@ impl ::fidl_next::EncodableOption for Box<StructLargeArray> {
     type EncodedOption = ::fidl_next::WireBox<WireStructLargeArray>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructLargeArray>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructLargeArray>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructLargeArray: ::fidl_next::Encode<___E>,
@@ -54,13 +54,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -129,7 +129,7 @@ impl ::fidl_next::Encodable for StructSmallArray {
     type Encoded = WireStructSmallArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructSmallArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructSmallArray
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -137,13 +137,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 a,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
@@ -156,7 +156,7 @@ impl ::fidl_next::EncodableOption for Box<StructSmallArray> {
     type EncodedOption = ::fidl_next::WireBox<WireStructSmallArray>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructSmallArray>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructSmallArray>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructSmallArray: ::fidl_next::Encode<___E>,
@@ -165,13 +165,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -243,7 +243,7 @@ impl ::fidl_next::Encodable for TableLargeArray {
     type Encoded = WireTableLargeArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for TableLargeArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for TableLargeArray
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
@@ -251,34 +251,35 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireTableLargeArray { table } = slot);
+        ::fidl_next::munge!(let WireTableLargeArray { table } = out);
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        unsafe {
+            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
+        }
+
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
-            let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 1 => {
                     if let Some(a) = &mut self.a {
-                        ::fidl_next::WireEnvelope::encode_value(
-                            a,
-                            preallocated.encoder,
-                            slot.as_mut(),
-                        )?;
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
-                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
             }
-            preallocated.write_next(slot);
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
         }
 
         ::fidl_next::WireTable::encode_len(table, max_ord);
@@ -369,7 +370,7 @@ impl ::fidl_next::Encodable for TableSmallArray {
     type Encoded = WireTableSmallArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for TableSmallArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for TableSmallArray
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
@@ -377,34 +378,35 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireTableSmallArray { table } = slot);
+        ::fidl_next::munge!(let WireTableSmallArray { table } = out);
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        unsafe {
+            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
+        }
+
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
-            let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 1 => {
                     if let Some(a) = &mut self.a {
-                        ::fidl_next::WireEnvelope::encode_value(
-                            a,
-                            preallocated.encoder,
-                            slot.as_mut(),
-                        )?;
+                        ::fidl_next::WireEnvelope::encode_value(a, preallocated.encoder, &mut out)?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
-                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
             }
-            preallocated.write_next(slot);
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
         }
 
         ::fidl_next::WireTable::encode_len(table, max_ord);
@@ -485,7 +487,7 @@ impl ::fidl_next::Encodable for UnionLargeArray {
     type Encoded = WireUnionLargeArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnionLargeArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for UnionLargeArray
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -495,9 +497,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionLargeArray { raw } = slot);
+        ::fidl_next::munge!(let WireUnionLargeArray { raw } = out);
 
         match self {
             Self::A(value) => {
@@ -513,7 +515,7 @@ impl ::fidl_next::EncodableOption for Box<UnionLargeArray> {
     type EncodedOption = WireOptionalUnionLargeArray;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionLargeArray>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionLargeArray>
 where
     ___E: ?Sized,
     UnionLargeArray: ::fidl_next::Encode<___E>,
@@ -522,13 +524,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionLargeArray { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionLargeArray { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -695,7 +697,7 @@ impl ::fidl_next::Encodable for UnionSmallArray {
     type Encoded = WireUnionSmallArray;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for UnionSmallArray
+unsafe impl<___E> ::fidl_next::Encode<___E> for UnionSmallArray
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -705,9 +707,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSmallArray { raw } = slot);
+        ::fidl_next::munge!(let WireUnionSmallArray { raw } = out);
 
         match self {
             Self::A(value) => {
@@ -723,7 +725,7 @@ impl ::fidl_next::EncodableOption for Box<UnionSmallArray> {
     type EncodedOption = WireOptionalUnionSmallArray;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSmallArray>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSmallArray>
 where
     ___E: ?Sized,
     UnionSmallArray: ::fidl_next::Encode<___E>,
@@ -732,13 +734,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSmallArray { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSmallArray { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }

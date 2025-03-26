@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use core::fmt;
+use core::mem::MaybeUninit;
 use core::str::from_utf8;
 
 use munge::munge;
@@ -30,15 +31,15 @@ unsafe impl ZeroPadding for WireOptionalString {
 impl WireOptionalString {
     /// Encodes that a string is present in a slot.
     #[inline]
-    pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
-        munge!(let Self { vec } = slot);
+    pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
+        munge!(let Self { vec } = out);
         WireOptionalVector::encode_present(vec, len);
     }
 
     /// Encodes that a string is absent in a slot.
     #[inline]
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { vec } = slot);
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { vec } = out);
         WireOptionalVector::encode_absent(vec);
     }
 
@@ -94,18 +95,18 @@ impl EncodableOption for String {
     type EncodedOption = WireOptionalString;
 }
 
-impl<E: Encoder + ?Sized> EncodeOption<E> for String {
+unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for String {
     #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption>,
+        out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(string) = this {
             encoder.write(string.as_bytes());
-            WireOptionalString::encode_present(slot, string.len() as u64);
+            WireOptionalString::encode_present(out, string.len() as u64);
         } else {
-            WireOptionalString::encode_absent(slot);
+            WireOptionalString::encode_absent(out);
         }
 
         Ok(())

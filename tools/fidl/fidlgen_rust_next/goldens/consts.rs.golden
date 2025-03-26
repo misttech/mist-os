@@ -28,7 +28,7 @@ impl ::fidl_next::Encodable for BitsType {
     type Encoded = WireBitsType;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for BitsType
+unsafe impl<___E> ::fidl_next::Encode<___E> for BitsType
 where
     ___E: ?Sized,
 {
@@ -36,10 +36,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireBitsType { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(self.bits());
+        ::fidl_next::munge!(let WireBitsType { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(self.bits()));
         Ok(())
     }
 }
@@ -115,7 +115,7 @@ impl ::fidl_next::Encodable for EnumType {
     type Encoded = WireEnumType;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EnumType
+unsafe impl<___E> ::fidl_next::Encode<___E> for EnumType
 where
     ___E: ?Sized,
 {
@@ -123,14 +123,14 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireEnumType { mut value } = slot);
-        *value = ::fidl_next::WireI32::from(match *self {
+        ::fidl_next::munge!(let WireEnumType { value } = out);
+        let _ = value.write(::fidl_next::WireI32::from(match *self {
             Self::Value => 1,
 
             Self::True => 2,
-        });
+        }));
 
         Ok(())
     }

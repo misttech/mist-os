@@ -11,7 +11,7 @@ impl ::fidl_next::Encodable for ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     type Encoded = WireExampleUseOfErrorSyntaxCallWhichMayFailRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -21,13 +21,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
@@ -40,7 +40,8 @@ impl ::fidl_next::EncodableOption for Box<ExampleUseOfErrorSyntaxCallWhichMayFai
     type EncodedOption = ::fidl_next::WireBox<WireExampleUseOfErrorSyntaxCallWhichMayFailRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfErrorSyntaxCallWhichMayFailRequest: ::fidl_next::Encode<___E>,
@@ -49,13 +50,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -122,7 +123,7 @@ impl ::fidl_next::Encodable for ExampleUseOfErrorSyntaxCallWhichMayFailResponse 
     type Encoded = WireExampleUseOfErrorSyntaxCallWhichMayFailResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -130,13 +131,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 value,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.value, encoder, value)?;
@@ -149,7 +150,8 @@ impl ::fidl_next::EncodableOption for Box<ExampleUseOfErrorSyntaxCallWhichMayFai
     type EncodedOption = ::fidl_next::WireBox<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfErrorSyntaxCallWhichMayFailResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E>
+    for Box<ExampleUseOfErrorSyntaxCallWhichMayFailResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfErrorSyntaxCallWhichMayFailResponse: ::fidl_next::Encode<___E>,
@@ -158,13 +160,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())

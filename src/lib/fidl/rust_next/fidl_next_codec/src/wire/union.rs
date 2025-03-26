@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
+
 use munge::munge;
 
 use crate::decoder::InternalHandleDecoder;
@@ -28,10 +30,10 @@ unsafe impl ZeroPadding for RawWireUnion {
 impl RawWireUnion {
     /// Encodes that a union is absent in a slot.
     #[inline]
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { mut ordinal, envelope } = slot);
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { ordinal, envelope } = out);
 
-        **ordinal = 0;
+        ordinal.write(WireU64(0));
         WireEnvelope::encode_zero(envelope);
     }
 
@@ -41,11 +43,11 @@ impl RawWireUnion {
         value: &mut T,
         ord: u64,
         encoder: &mut E,
-        slot: Slot<'_, Self>,
+        out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
-        munge!(let Self { mut ordinal, envelope } = slot);
+        munge!(let Self { ordinal, envelope } = out);
 
-        **ordinal = ord;
+        ordinal.write(WireU64(ord));
         WireEnvelope::encode_value_static(value, encoder, envelope)
     }
 
@@ -55,11 +57,11 @@ impl RawWireUnion {
         value: &mut T,
         ord: u64,
         encoder: &mut E,
-        slot: Slot<'_, Self>,
+        out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
-        munge!(let Self { mut ordinal, envelope } = slot);
+        munge!(let Self { ordinal, envelope } = out);
 
-        **ordinal = ord;
+        ordinal.write(WireU64(ord));
         WireEnvelope::encode_value(value, encoder, envelope)
     }
 

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
+
 use munge::munge;
 
 use crate::{DecodeError, Slot, WireU64};
@@ -24,16 +26,16 @@ impl<T> WirePointer<T> {
         }
     }
 
-    /// Encodes that a pointer is present in a slot.
-    pub fn encode_present(slot: Slot<'_, Self>) {
-        munge!(let Self { mut encoded } = slot);
-        **encoded = u64::MAX;
+    /// Encodes that a pointer is present in an output.
+    pub fn encode_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { encoded } = out);
+        encoded.write(WireU64(u64::MAX));
     }
 
     /// Encodes that a pointer is absent in a slot.
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { mut encoded } = slot);
-        **encoded = 0;
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { encoded } = out);
+        encoded.write(WireU64(0));
     }
 
     /// Sets the decoded value of the pointer.

@@ -27,7 +27,7 @@ impl ::fidl_next::Encodable for AllInstants {
     type Encoded = WireAllInstants;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for AllInstants
+unsafe impl<___E> ::fidl_next::Encode<___E> for AllInstants
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -35,7 +35,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -44,7 +44,7 @@ where
                 monotonic_ticks,
                 boot_ticks,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.monotonic, encoder, monotonic)?;
@@ -63,7 +63,7 @@ impl ::fidl_next::EncodableOption for Box<AllInstants> {
     type EncodedOption = ::fidl_next::WireBox<WireAllInstants>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     AllInstants: ::fidl_next::Encode<___E>,
@@ -72,13 +72,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -194,7 +194,7 @@ impl ::fidl_next::Encodable for ComplexInstants {
     type Encoded = WireComplexInstants;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
+unsafe impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
@@ -202,28 +202,31 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComplexInstants { table } = slot);
+        ::fidl_next::munge!(let WireComplexInstants { table } = out);
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        unsafe {
+            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
+        }
+
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
-            let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 4 => {
                     if let Some(boot_ticks) = &mut self.boot_ticks {
                         ::fidl_next::WireEnvelope::encode_value(
                             boot_ticks,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -232,10 +235,10 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic_ticks,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -244,10 +247,10 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             boot,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -256,16 +259,18 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
-                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
             }
-            preallocated.write_next(slot);
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
         }
 
         ::fidl_next::WireTable::encode_len(table, max_ord);
