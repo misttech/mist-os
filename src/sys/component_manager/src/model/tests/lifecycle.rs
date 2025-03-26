@@ -8,7 +8,6 @@ use crate::model::actions::{
 };
 use crate::model::component::instance::InstanceState;
 use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
-use crate::model::events::registry::EventSubscription;
 use crate::model::model::Model;
 use crate::model::start::Start;
 use crate::model::testing::mocks::*;
@@ -20,12 +19,8 @@ use ::routing::policy::PolicyError;
 use assert_matches::assert_matches;
 use async_trait::async_trait;
 use cm_config::AllowlistEntryBuilder;
-use cm_rust::{
-    Availability, ComponentDecl, RegistrationSource, RunnerRegistration, UseEventStreamDecl,
-    UseSource,
-};
+use cm_rust::{ComponentDecl, RegistrationSource, RunnerRegistration};
 use cm_rust_testing::*;
-use cm_types::Name;
 use errors::{ActionError, ModelError, StartActionError};
 use fidl::endpoints::{create_endpoints, ProtocolMarker, ServerEnd};
 use futures::channel::mpsc;
@@ -33,7 +28,7 @@ use futures::future::pending;
 use futures::join;
 use futures::lock::Mutex;
 use futures::prelude::*;
-use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+use hooks::{Event, EventType, Hook, HooksRegistration};
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::sync::{Arc, Weak};
@@ -43,7 +38,8 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use zx::AsHandleRef;
 use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_sync as fsync,
 };
@@ -436,40 +432,25 @@ async fn bind_action_sequence() {
         ("system", component_decl_with_test_runner()),
     ])
     .await;
-    let events = vec![EventType::Resolved.into(), EventType::Started.into()];
-    let mut event_source =
-        builtin_environment.lock().await.event_source_factory.create_for_above_root();
-    let mut event_stream = event_source
-        .subscribe(
-            events
-                .into_iter()
-                .map(|event: Name| EventSubscription {
-                    event_name: UseEventStreamDecl {
-                        source_name: event,
-                        source: UseSource::Parent,
-                        scope: None,
-                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                        filter: None,
-                        availability: Availability::Required,
-                    },
-                })
-                .collect(),
-        )
-        .await
-        .expect("subscribe to event stream");
+    let event_stream = new_event_stream(
+        &*builtin_environment.lock().await,
+        vec![EventType::Resolved, EventType::Started],
+    )
+    .await;
 
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
     model.start().await;
-    event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
-    event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();
+    let events = get_n_events(&event_stream, 2).await;
+    assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, Moniker::root());
+    assert_event_type_and_moniker(&events[1], fcomponent::EventType::Started, Moniker::root());
 
     // Start child and check that it gets resolved, with a Resolve event and action.
     model.root().start_instance(&m, &StartReason::Root).await.unwrap();
-    event_stream.wait_until(EventType::Resolved, m.clone()).await.unwrap();
-
+    let events = get_n_events(&event_stream, 2).await;
+    assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, &m);
     // Check that the child is started, with a Start event and action.
-    event_stream.wait_until(EventType::Started, m.clone()).await.unwrap();
+    assert_event_type_and_moniker(&events[1], fcomponent::EventType::Started, &m);
 }
 
 #[fuchsia::test]
@@ -851,30 +832,15 @@ async fn stop_with_exit_code(expected_code: i64) {
     // Build test realm.
     let (model, builtin_environment, mock_runner) =
         new_model(vec![("root", component_decl_with_test_runner())]).await;
-    let events = vec![EventType::Started.into(), EventType::Stopped.into()];
-    let mut event_source =
-        builtin_environment.lock().await.event_source_factory.create_for_above_root();
-    let mut event_stream = event_source
-        .subscribe(
-            events
-                .into_iter()
-                .map(|event: Name| EventSubscription {
-                    event_name: UseEventStreamDecl {
-                        source_name: event,
-                        source: UseSource::Parent,
-                        scope: None,
-                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                        filter: None,
-                        availability: Availability::Required,
-                    },
-                })
-                .collect(),
-        )
-        .await
-        .expect("subscribe to event stream");
+    let event_stream = new_event_stream(
+        &*builtin_environment.lock().await,
+        vec![EventType::Started, EventType::Stopped],
+    )
+    .await;
 
     model.start().await;
-    event_stream.wait_until(EventType::Started, Moniker::root()).await.unwrap();
+    let events = get_n_events(&event_stream, 1).await;
+    assert_event_type_and_moniker(&events[0], fcomponent::EventType::Started, Moniker::root());
     let url = "test:///root_resolved";
     mock_runner.wait_for_url(url).await;
 
@@ -888,10 +854,13 @@ async fn stop_with_exit_code(expected_code: i64) {
     root.stop().await.unwrap();
 
     // Assert that the event stream contains the exit code.
-    let stopped_event = event_stream.wait_until(EventType::Stopped, Moniker::root()).await.unwrap();
+    let events = get_n_events(&event_stream, 1).await;
+    assert_event_type_and_moniker(&events[0], fcomponent::EventType::Stopped, Moniker::root());
     assert_matches!(
-        stopped_event.event.payload,
-        EventPayload::Stopped { status, exit_code: Some(exit_code), .. }
-        if status == zx::Status::OK && exit_code == expected_code
+        events[0].payload,
+        Some(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
+            status: Some(status), exit_code: Some(exit_code), ..
+        }))
+        if status == zx::Status::OK.into_raw() && exit_code == expected_code
     );
 }

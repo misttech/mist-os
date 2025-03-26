@@ -134,17 +134,16 @@ impl From<fcomponent::EventType> for EventType {
     }
 }
 
-impl TryInto<fcomponent::EventType> for EventType {
-    type Error = anyhow::Error;
-    fn try_into(self) -> Result<fcomponent::EventType, anyhow::Error> {
-        match self {
-            EventType::CapabilityRequested => Ok(fcomponent::EventType::CapabilityRequested),
-            EventType::Destroyed => Ok(fcomponent::EventType::Destroyed),
-            EventType::Resolved => Ok(fcomponent::EventType::Resolved),
-            EventType::Started => Ok(fcomponent::EventType::Started),
-            EventType::Stopped => Ok(fcomponent::EventType::Stopped),
-            EventType::DebugStarted => Ok(fcomponent::EventType::DebugStarted),
-            EventType::Unresolved => Ok(fcomponent::EventType::Unresolved),
+impl From<EventType> for fcomponent::EventType {
+    fn from(event_type: EventType) -> Self {
+        match event_type {
+            EventType::CapabilityRequested => fcomponent::EventType::CapabilityRequested,
+            EventType::Destroyed => fcomponent::EventType::Destroyed,
+            EventType::Resolved => fcomponent::EventType::Resolved,
+            EventType::Started => fcomponent::EventType::Started,
+            EventType::Stopped => fcomponent::EventType::Stopped,
+            EventType::DebugStarted => fcomponent::EventType::DebugStarted,
+            EventType::Unresolved => fcomponent::EventType::Unresolved,
         }
     }
 }

@@ -7,15 +7,12 @@
 mod tests {
     use crate::model::component::testing::wait_until_event_get_timestamp;
     use crate::model::component::{ComponentInstance, StartReason};
-    use crate::model::events::registry::EventSubscription;
     use crate::model::start::Start;
     use crate::model::testing::routing_test_helpers::RoutingTest;
     use crate::model::testing::test_helpers::{
         component_decl_with_test_runner, ActionsTest, ComponentInfo,
     };
-    use cm_rust::{Availability, UseEventStreamDecl, UseSource};
     use cm_rust_testing::*;
-    use cm_types::Name;
     use diagnostics::escrow::DurationStats;
     use diagnostics::lifecycle::ComponentLifecycleTimeStats;
     use diagnostics_assertions::{assert_data_tree, AnyProperty, HistogramAssertion};
@@ -149,33 +146,15 @@ mod tests {
         let stats = Arc::new(DurationStats::new(inspector.root().create_child("escrow")));
         root.hooks.install(stats.hooks()).await;
 
-        let mut event_source =
-            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
-        let mut event_stream = event_source
-            .subscribe(
-                vec![EventType::Started.into(), EventType::Stopped.into()]
-                    .into_iter()
-                    .map(|event: Name| {
-                        EventSubscription::new(UseEventStreamDecl {
-                            source_name: event,
-                            source: UseSource::Parent,
-                            scope: None,
-                            target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                            filter: None,
-                            availability: Availability::Required,
-                        })
-                    })
-                    .collect(),
-            )
-            .await
-            .expect("subscribe to event stream");
+        let event_stream =
+            test.new_event_stream(vec![EventType::Started, EventType::Stopped]).await;
 
         // Start -> no records
         root.ensure_started(&StartReason::Debug).await.unwrap();
         test.runner.wait_for_url(url).await;
         _ = fasync::TestExecutor::poll_until_stalled(future::pending::<()>()).await;
         let start_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Started).await;
+            wait_until_event_get_timestamp(&event_stream, EventType::Started).await;
         assert_data_tree!(inspector, root: {
             escrow: {
                 started_durations: {
@@ -213,7 +192,7 @@ mod tests {
         test.runner.abort_controller(&info.channel_id);
         _ = fasync::TestExecutor::poll_until_stalled(future::pending::<()>()).await;
         let stop_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Stopped).await;
+            wait_until_event_get_timestamp(&event_stream, EventType::Stopped).await;
         started_assertion.insert_values(vec![(stop_timestamp - start_timestamp).into_seconds()]);
         assert_data_tree!(inspector, root: {
             escrow: {
@@ -233,7 +212,7 @@ mod tests {
         test.runner.wait_for_url(url).await;
         _ = fasync::TestExecutor::poll_until_stalled(future::pending::<()>()).await;
         let start_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Started).await;
+            wait_until_event_get_timestamp(&event_stream, EventType::Started).await;
         stopped_assertion.insert_values(vec![(start_timestamp - stop_timestamp).into_seconds()]);
         assert_data_tree!(inspector, root: {
             escrow: {
@@ -254,7 +233,7 @@ mod tests {
         root.stop().await.unwrap();
         _ = fasync::TestExecutor::poll_until_stalled(future::pending::<()>()).await;
         let stop_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Stopped).await;
+            wait_until_event_get_timestamp(&event_stream, EventType::Stopped).await;
         started_assertion.insert_values(vec![(stop_timestamp - start_timestamp).into_seconds()]);
         assert_data_tree!(inspector, root: {
             escrow: {

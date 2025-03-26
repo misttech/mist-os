@@ -31,7 +31,7 @@ use fidl::{self};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
 use futures::prelude::*;
-use hooks::HooksRegistration;
+use hooks::{EventType, HooksRegistration};
 use moniker::{ChildName, Moniker};
 use sandbox::{Capability, Message, RouterResponse};
 use std::collections::{HashMap, HashSet};
@@ -656,6 +656,11 @@ impl RoutingTest {
 
     pub fn resolved_url(component_name: &str) -> String {
         format!("test:///{}_resolved", component_name)
+    }
+
+    /// Create a new event stream for the test components.
+    pub async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+        new_event_stream(&self.builtin_environment, events).await
     }
 }
 

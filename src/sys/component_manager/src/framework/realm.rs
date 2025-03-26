@@ -340,8 +340,6 @@ mod tests {
     use crate::builtin_environment::BuiltinEnvironment;
     use crate::capability;
     use crate::model::component::StartReason;
-    use crate::model::events::source::EventSource;
-    use crate::model::events::stream::EventStream;
     use crate::model::testing::mocks::*;
     use crate::model::testing::out_dir::OutDir;
     use crate::model::testing::test_helpers::*;
@@ -417,12 +415,14 @@ mod tests {
             self.builtin_environment = None;
         }
 
-        async fn new_event_stream(&self, events: Vec<Name>) -> (EventSource, EventStream) {
-            new_event_stream(
-                self.builtin_environment.as_ref().expect("builtin_environment is none").clone(),
-                events,
-            )
-            .await
+        async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+            let builtin_environment_guard = self
+                .builtin_environment
+                .as_ref()
+                .expect("builtin_environment is none")
+                .lock()
+                .await;
+            new_event_stream(&*builtin_environment_guard, events).await
         }
     }
 
@@ -456,8 +456,7 @@ mod tests {
         )
         .await;
 
-        let (_event_source, mut event_stream) =
-            test.new_event_stream(vec![EventType::Started.into()]).await;
+        let event_stream = test.new_event_stream(vec![EventType::Started]).await;
 
         // Test that a dynamic child with a long name can also be created.
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
@@ -488,10 +487,12 @@ mod tests {
                 .unwrap();
 
             // Ensure that an event exists for the new child
-            event_stream
-                .wait_until(EventType::Started, "system/coll:b".try_into().unwrap())
-                .await
-                .unwrap();
+            let events = get_n_events(&event_stream, 1).await;
+            assert_event_type_and_moniker(
+                &events[0],
+                fcomponent::EventType::Started,
+                "system/coll:b",
+            );
         }
         {
             // Create a child (long name)
@@ -894,9 +895,8 @@ mod tests {
         )
         .await;
 
-        let (_event_source, mut event_stream) = test
-            .new_event_stream(vec![EventType::Stopped.into(), EventType::Destroyed.into()])
-            .await;
+        let event_stream =
+            test.new_event_stream(vec![EventType::Stopped, EventType::Destroyed]).await;
 
         // Create children "a" and "b" in collection, and start them.
         for name in &["a", "b"] {
@@ -942,14 +942,13 @@ mod tests {
         fasync::Task::spawn(f).detach();
 
         // The component should be stopped (shut down) before it is destroyed.
-        event_stream
-            .wait_until(EventType::Stopped, vec!["system", "coll:a"].try_into().unwrap())
-            .await
-            .unwrap();
-        event_stream
-            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].try_into().unwrap())
-            .await
-            .unwrap();
+        let events = get_n_events(&event_stream, 2).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Stopped, "system/coll:a");
+        assert_event_type_and_moniker(
+            &events[1],
+            fcomponent::EventType::Destroyed,
+            "system/coll:a",
+        );
 
         // "a" is fully deleted now.
         assert!(!has_child(test.component(), "coll:a").await);
@@ -1054,9 +1053,8 @@ mod tests {
         )
         .await;
 
-        let (_event_source, mut event_stream) = test
-            .new_event_stream(vec![EventType::Started.into(), EventType::Destroyed.into()])
-            .await;
+        let event_stream =
+            test.new_event_stream(vec![EventType::Started, EventType::Destroyed]).await;
 
         // Create child "a" in collection. Expect a Started event.
         let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
@@ -1065,10 +1063,8 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        event_stream
-            .wait_until(EventType::Started, vec!["system", "coll:a"].try_into().unwrap())
-            .await
-            .unwrap();
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Started, "system/coll:a");
 
         // Started action completes.
 
@@ -1082,10 +1078,12 @@ mod tests {
         // The stop should trigger a delete/purge.
         child.stop_instance_internal(false).await.unwrap();
 
-        event_stream
-            .wait_until(EventType::Destroyed, vec!["system", "coll:a"].try_into().unwrap())
-            .await
-            .unwrap();
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(
+            &events[0],
+            fcomponent::EventType::Destroyed,
+            "system/coll:a",
+        );
 
         // Verify that the component topology matches expectations.
         let actual_children = get_live_children(test.component()).await;
@@ -1137,9 +1135,9 @@ mod tests {
             Moniker::root(),
         )
         .await;
-        let (_event_source, mut event_stream) = test
-            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
-            .await;
+        let event_stream =
+            test.new_event_stream(vec![EventType::Resolved, EventType::Started]).await;
+        let event_stream_2 = test.new_event_stream(vec![EventType::Started]).await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
@@ -1151,17 +1149,15 @@ mod tests {
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
-        let event =
-            event_stream.wait_until(EventType::Resolved, vec!["system"].try_into().unwrap()).await;
-        assert!(event.is_some());
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, "system");
 
-        // Assert that event stream doesn't have any outstanding messages.
-        // This ensures that EventType::Started for "system" has not been
-        // registered.
-        let event = event_stream
-            .wait_until(EventType::Started, vec!["system"].try_into().unwrap())
-            .now_or_never();
-        assert!(event.is_none());
+        // Assert that there are no outstanding started messages. This ensures that
+        // EventType::Started for "system" has not been registered.
+        //
+        // We do this on a separate event stream, because the `now_or_never` call leaves the stream
+        // in a weird state and we're unable to pull events from it after this.
+        assert!(event_stream_2.get_next().now_or_never().is_none());
 
         // Check flags on directory opened. This should match the maximum set of rights for every
         // directory connection along the open chain.
@@ -1179,9 +1175,8 @@ mod tests {
         let echo_proxy =
             client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
                 .expect("failed to open hippo service");
-        let event =
-            event_stream.wait_until(EventType::Started, vec!["system"].try_into().unwrap()).await;
-        assert!(event.is_some());
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Started, "system");
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 
@@ -1213,9 +1208,9 @@ mod tests {
         )
         .await;
 
-        let (_event_source, mut event_stream) = test
-            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
-            .await;
+        let event_stream =
+            test.new_event_stream(vec![EventType::Resolved, EventType::Started]).await;
+        let event_stream_2 = test.new_event_stream(vec![EventType::Started]).await;
         let mut out_dir = OutDir::new();
         out_dir.add_echo_protocol("/svc/foo".parse().unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
@@ -1240,28 +1235,23 @@ mod tests {
         res.expect("fidl call failed").expect("open_exposed_dir() failed");
 
         // Assert that child was resolved.
-        let event = event_stream
-            .wait_until(EventType::Resolved, vec!["coll:system"].try_into().unwrap())
-            .await;
-        assert!(event.is_some());
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, "coll:system");
 
-        // Assert that event stream doesn't have any outstanding messages.
-        // This ensures that EventType::Started for "system" has not been
-        // registered.
-        let event = event_stream
-            .wait_until(EventType::Started, vec!["coll:system"].try_into().unwrap())
-            .now_or_never();
-        assert!(event.is_none());
+        // Assert that there are no outstanding started events. This ensures that
+        // EventType::Started for "system" has not been registered.
+        //
+        // We do this on a separate event stream, because the `now_or_never` call leaves the stream
+        // in a weird state and we're unable to pull events from it after this.
+        assert!(event_stream_2.get_next().now_or_never().is_none());
 
         // Now that it was asserted that "system" has yet to start,
         // assert that it starts after making connection below.
         let echo_proxy =
             client::connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&dir_proxy, "hippo")
                 .expect("failed to open hippo service");
-        let event = event_stream
-            .wait_until(EventType::Started, vec!["coll:system"].try_into().unwrap())
-            .await;
-        assert!(event.is_some());
+        let events = get_n_events(&event_stream, 1).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Started, "coll:system");
         let res = echo_proxy.echo_string(Some("hippos")).await;
         assert_eq!(res.expect("failed to use echo service"), Some("hippos".to_string()));
 

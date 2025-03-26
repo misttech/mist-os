@@ -109,8 +109,6 @@ async fn report_routing_failure_to_target(target: WeakComponentInstance, err: Mo
 mod tests {
     use super::*;
     use crate::builtin_environment::BuiltinEnvironment;
-    use crate::model::events::source::EventSource;
-    use crate::model::events::stream::EventStream;
     use crate::model::testing::test_helpers::*;
     use assert_matches::assert_matches;
     use cm_rust::ComponentDecl;
@@ -119,7 +117,6 @@ mod tests {
     use fidl::client::Client;
     use fidl::encoding::DefaultFuchsiaResourceDialect;
     use fidl::handle::AsyncChannel;
-    use fidl_fuchsia_io as fio;
     use futures::lock::Mutex;
     use futures::StreamExt;
     use hooks::EventType;
@@ -129,6 +126,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
@@ -142,8 +140,9 @@ mod tests {
             BinderCapabilityTestFixture { builtin_environment }
         }
 
-        async fn new_event_stream(&self, events: Vec<Name>) -> (EventSource, EventStream) {
-            new_event_stream(self.builtin_environment.clone(), events).await
+        async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+            let builtin_environment_guard = self.builtin_environment.lock().await;
+            new_event_stream(&*builtin_environment_guard, events).await
         }
 
         async fn provider(
@@ -183,9 +182,8 @@ mod tests {
             ("target", component_decl_with_test_runner()),
         ])
         .await;
-        let (_event_source, mut event_stream) = fixture
-            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
-            .await;
+        let event_stream =
+            fixture.new_event_stream(vec![EventType::Resolved, EventType::Started]).await;
         let (_client_end, server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["source"].try_into().unwrap();
 
@@ -208,8 +206,11 @@ mod tests {
             .expect("failed to call open()");
         task_group.join().await;
 
-        assert!(event_stream.wait_until(EventType::Resolved, moniker.clone()).await.is_some());
-        assert!(event_stream.wait_until(EventType::Started, moniker.clone()).await.is_some());
+        let events = get_n_events(&event_stream, 4).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, Moniker::root());
+        assert_event_type_and_moniker(&events[1], fcomponent::EventType::Resolved, &moniker);
+        assert_event_type_and_moniker(&events[2], fcomponent::EventType::Resolved, "target");
+        assert_event_type_and_moniker(&events[3], fcomponent::EventType::Started, &moniker);
     }
 
     // TODO(https://fxbug.dev/42073225): Figure out a way to test this behavior.

@@ -3448,7 +3448,7 @@ impl Hook for BlockingResolvedHook {
 ///  provider   consumer
 ///
 /// root: offers `foo_svc` from provider to consumer, and capability_requested to provider
-/// provider: exposes `foo_svc` and capability_requested
+/// provider: exposes `foo_svc` and uses capability_requested
 /// consumer: uses `foo_svc`
 async fn build_realm_for_capability_requested_tests(delivery: DeliveryType) -> RoutingTest {
     let components = vec![
