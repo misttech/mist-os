@@ -79,7 +79,7 @@ async fn handle(request: hyper::Request<hyper::Body>) -> hyper::Response<hyper::
 fn stream_file(file: &'static str) -> hyper::body::Body {
     let (mut writer, body) = hyper::Body::channel();
     fuchsia_async::Task::spawn(async move {
-        let f = file::open_in_namespace(file, fio::OpenFlags::RIGHT_READABLE).expect("cannot open");
+        let f = file::open_in_namespace(file, fio::PERM_READABLE).expect("cannot open");
         let content_size = f.get_attr().await.unwrap().1.content_size;
         log::info!("file content_size: {:?}", content_size);
         loop {

@@ -11,8 +11,7 @@ use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::{FutureExt as _, StreamExt as _};
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::service;
+use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
@@ -45,19 +44,17 @@ async fn get_driver_info(
 async fn serve_boot_items(handles: LocalComponentHandles) -> Result<(), Error> {
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
-            fboot::ItemsMarker::PROTOCOL_NAME => service::host(move |stream| {
+            fboot::ItemsMarker::PROTOCOL_NAME => vfs::service::host(move |stream| {
                 run_boot_items(stream)
             }),
         },
     };
 
     let scope = ExecutionScope::new();
-    export.open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        Path::dot(),
-        fidl::endpoints::ServerEnd::from(handles.outgoing_dir.into_channel()),
-    );
+    fio::PERM_READABLE.to_object_request(handles.outgoing_dir.into_channel()).handle(|request| {
+        export.open3(scope.clone(), vfs::Path::dot(), fio::PERM_READABLE, request)
+    });
+
     scope.wait().await;
 
     Ok(())

@@ -5,20 +5,15 @@
 #![recursion_limit = "512"]
 
 use anyhow::Error;
-use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fuchsia_component::server as fserver;
 use futures::channel::mpsc;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use log::{info, warn};
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path as pfsPath;
-use vfs::{pseudo_directory, service};
 use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_hardware_hidbus as fhidbus, fidl_fuchsia_hardware_input as finput,
-    fidl_fuchsia_hardware_power_statecontrol as statecontrol, fidl_fuchsia_io as fio,
+    fidl_fuchsia_hardware_power_statecontrol as statecontrol,
     fidl_fuchsia_test_pwrbtn as test_pwrbtn, fuchsia_async as fasync,
 };
 
@@ -104,8 +99,8 @@ async fn main() -> Result<(), Error> {
     });
     // A pseudo_directory must be used here because a ServiceFs does not support portions of
     // fuchsia.io required by `fdio_watch_directory`, which critical-services uses on this directory.
-    let input_dir = pseudo_directory! {
-        "mock_input_device" => service::endpoint(move |_, channel| {
+    let input_dir = vfs::pseudo_directory! {
+        "mock_input_device" => vfs::service::endpoint(move |_, channel| {
             let event = event.duplicate_handle(event_handle_rights()).expect("failed to clone event");
             fasync::Task::spawn(
                 async move {
@@ -180,14 +175,7 @@ async fn main() -> Result<(), Error> {
             ).detach()
         }),
     };
-    let (proxy, server_end) = create_proxy();
-    input_dir.clone().open(
-        ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        pfsPath::dot(),
-        server_end,
-    );
-    fs.add_remote("input", fio::DirectoryProxy::from_channel(proxy.into_channel().unwrap()));
+    fs.add_remote("input", vfs::directory::serve_read_only(input_dir));
     fs.take_and_serve_directory_handle()?;
     fs.collect::<()>().await;
 
