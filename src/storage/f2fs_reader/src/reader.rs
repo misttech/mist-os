@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::checkpoint::*;
+use crate::crypto;
 use crate::dir::{DentryBlock, DirEntry};
-use crate::inode::{Inode, Mode};
+use crate::inode::{self, Inode};
 use crate::nat::{Nat, NatJournal, RawNatEntry, SummaryBlock};
 use crate::superblock::{
     f2fs_crc32, SuperBlock, BLOCKS_PER_SEGMENT, BLOCK_SIZE, F2FS_MAGIC, SEGMENT_SIZE,
@@ -39,6 +40,18 @@ pub struct F2fsReader {
     pub superblock: SuperBlock,     // 1kb, points at checkpoints
     pub checkpoint: CheckpointPack, // pair of a/b segments (alternating versions)
     pub nat: Option<Nat>,
+
+    // A simple key store.
+    keys: HashMap<[u8; 16], [u8; 64]>,
+}
+
+impl Drop for F2fsReader {
+    fn drop(&mut self) {
+        // Zero keys in RAM for extra safety.
+        self.keys.values_mut().for_each(|v| {
+            *v = [0u8; 64];
+        });
+    }
 }
 
 impl F2fsReader {
@@ -50,7 +63,8 @@ impl F2fsReader {
                     .await
                     .map_err(|_| e)?,
             };
-        let mut this = Self { device, superblock, checkpoint, nat: None };
+        let mut this =
+            Self { device, superblock, checkpoint, nat: None, keys: HashMap::with_capacity(16) };
         let nat_journal = this.read_nat_journal().await?;
         this.nat = Some(Nat::new(
             this.superblock.nat_blkaddr,
@@ -96,10 +110,6 @@ impl F2fsReader {
             "Bad segment counts in checkpoint"
         );
         Ok((superblock, checkpoint))
-    }
-
-    pub fn root_ino(&self) -> u32 {
-        self.superblock.root_ino
     }
 
     /// Returns the block address that the checkpoint starts at.
@@ -175,12 +185,48 @@ impl F2fsReader {
         .unwrap())
     }
 
+    /// Attempt to obtain a decryptor for a given crypto context.
+    /// Will return None if the main key is not known.
+    fn get_decryptor_for_inode(&self, inode: &Inode) -> Option<crypto::PerFileDecryptor> {
+        if let Some(context) = inode.context {
+            if let Some(main_key) = self.get_key(&context.main_key_identifier) {
+                return Some(crypto::PerFileDecryptor::new(main_key, &context.nonce));
+            }
+        }
+        None
+    }
+
+    pub fn root_ino(&self) -> u32 {
+        self.superblock.root_ino
+    }
+
+    /// Registers a new main key.
+    /// This 'unlocks' any files using this key.
+    pub fn add_key(&mut self, main_key: &[u8; 64]) -> [u8; 16] {
+        let identifier = crypto::main_key_to_identifier(main_key);
+        println!("Adding key with identifier {}", hex::encode(identifier));
+        self.keys.insert(identifier.clone(), main_key.clone());
+        identifier
+    }
+
+    /// Attempt to retrieve a key given its identifier.
+    pub fn get_key(&self, identifier: &[u8; 16]) -> Option<&[u8; 64]> {
+        self.keys.get(identifier)
+    }
+
     /// Read an inode for a directory and return entries.
     pub async fn readdir(&self, ino: u32) -> Result<Vec<DirEntry>, Error> {
         let inode = Inode::try_load(self, ino).await?;
+        let decryptor = self.get_decryptor_for_inode(&inode);
         let mode = inode.header.mode;
-        ensure!(mode.contains(Mode::Directory), "not a directory");
-        if let Some(entries) = inode.get_inline_dir_entries()? {
+        let advise_flags = inode.header.advise_flags;
+        let flags = inode.header.flags;
+        ensure!(mode.contains(inode::Mode::Directory), "not a directory");
+        if let Some(entries) = inode.get_inline_dir_entries(
+            advise_flags.contains(inode::AdviseFlags::Encrypted),
+            flags.contains(inode::Flags::Casefold),
+            &decryptor,
+        )? {
             Ok(entries)
         } else {
             let mut entries = Vec::new();
@@ -195,7 +241,11 @@ impl F2fsReader {
                 let dentry_block =
                     DentryBlock::read_from_bytes(self.read_raw_block(block_addr).await?.as_slice())
                         .unwrap();
-                entries.append(&mut dentry_block.get_entries()?);
+                entries.append(&mut dentry_block.get_entries(
+                    advise_flags.contains(inode::AdviseFlags::Encrypted),
+                    flags.contains(inode::Flags::Casefold),
+                    &decryptor,
+                )?);
             }
             Ok(entries)
         }
@@ -204,6 +254,20 @@ impl F2fsReader {
     pub fn read_symlink(&self, inode: &Inode) -> Result<Box<[u8]>, Error> {
         if let Some(inline_data) = inode.inline_data.as_deref() {
             let mut filename = inline_data.to_vec();
+            if inode.header.advise_flags.contains(inode::AdviseFlags::Encrypted) {
+                // Encrypted symlinks have a 2-byte length prefix.
+                ensure!(filename.len() >= 2, "invalid encrypted symlink");
+                let symlink_len = u16::read_from_bytes(&filename[..2]).unwrap();
+                filename.drain(..2);
+                ensure!(symlink_len == filename.len() as u16, "invalid encrypted symlink");
+                if let Some(decryptor) = self.get_decryptor_for_inode(inode) {
+                    decryptor.decrypt_filename_data(&mut filename);
+                } else {
+                    let proxy_filename: String =
+                        crypto::ProxyFilename::new([0; 2], &filename).into();
+                    filename = proxy_filename.as_bytes().to_vec();
+                }
+            }
             while let Some(b'\0') = filename.last() {
                 filename.pop();
             }
@@ -292,12 +356,13 @@ mod test {
         let f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
         let root_ino = f2fs.root_ino();
         let root_entries = f2fs.readdir(root_ino).await.expect("readdir");
-        assert_eq!(root_entries.len(), 4);
+        assert_eq!(root_entries.len(), 5);
         assert_eq!(root_entries[0].filename, "a");
         assert_eq!(root_entries[0].file_type, FileType::Directory);
         assert_eq!(root_entries[1].filename, "large_dir");
         assert_eq!(root_entries[2].filename, "large_dir2");
         assert_eq!(root_entries[3].filename, "sparse.dat");
+        assert_eq!(root_entries[4].filename, "fscrypt");
 
         let inlined_file_ino =
             resolve_inode_path(&f2fs, "/a/b/c/inlined").await.expect("resolve inlined");
@@ -364,6 +429,7 @@ mod test {
         assert_eq!(data_blocks[0].0, 0);
         let block = f2fs.read_raw_block(data_blocks[0].1).await.expect("read sparse");
         assert_eq!(&block.as_slice()[..3], b"foo");
+        // The following chain of blocks are designed to land in each of the self.nids[] ranges.
         assert_eq!(data_blocks[1].0, 923);
         assert_eq!(data_blocks[2].0, 1941);
         assert_eq!(data_blocks[3].0, 2959);
@@ -399,5 +465,55 @@ mod test {
                 },
             ]
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_fbe_metadata() {
+        let device = open_test_image("/pkg/testdata/f2fs.img.zst");
+
+        let mut f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
+
+        // First without the key...
+        // (The filenames below have been extracted from the generated image by
+        // mounting it and manually inspecting.)
+        resolve_inode_path(&f2fs, "/fscrypt/a/b/regular")
+            .await
+            .expect_err("resolve fscrypt regular");
+        let fscrypt_dir_ino =
+            resolve_inode_path(&f2fs, "/fscrypt").await.expect("resolve encrypted dir");
+        let entries = f2fs.readdir(fscrypt_dir_ino).await.expect("readdir");
+        println!("entries {entries:?}");
+        resolve_inode_path(&f2fs, "/fscrypt/cDryWQAAAAC2r2Wiva8rXc37LNtT68RS")
+            .await
+            .expect("resolve encrypted dir");
+        let enc_symlink_ino = resolve_inode_path(&f2fs, "/fscrypt/cDryWQAAAAC2r2Wiva8rXc37LNtT68RS/X9wppgAAAAB8U-pbz-IdHG0UEqOCDTWe/KjTgzgAAAABJKjW51UQmpQ9Gz5oMq-9_")
+            .await
+            .expect("resolve encrypted symlink");
+        let symlink_inode =
+            Inode::try_load(&f2fs, enc_symlink_ino).await.expect("load symlink inode");
+        assert_eq!(
+            *f2fs.read_symlink(&symlink_inode).expect("read_symlink"),
+            *b"AAAAAAAAAABv1KhJ2kCMGviXSrK8wnfQ"
+        );
+
+        // ...now try with the key
+        f2fs.add_key(&[0u8; 64]);
+        resolve_inode_path(&f2fs, "/fscrypt/a/b/regular").await.expect("resolve fscrypt regular");
+        let inlined_ino = resolve_inode_path(&f2fs, "/fscrypt/a/b/inlined")
+            .await
+            .expect("resolve fscrypt inlined");
+        let short_file = Inode::try_load(&f2fs, inlined_ino).await.expect("load symlink inode");
+        assert!(
+            !short_file.header.inline_flags.contains(inode::InlineFlags::Data),
+            "encrypted files shouldn't be inlined"
+        );
+        let symlink_ino = resolve_inode_path(&f2fs, "/fscrypt/a/b/symlink")
+            .await
+            .expect("resolve fscrypt symlink");
+        assert_eq!(symlink_ino, enc_symlink_ino);
+
+        let symlink_inode = Inode::try_load(&f2fs, symlink_ino).await.expect("load symlink inode");
+        let symlink = f2fs.read_symlink(&symlink_inode).expect("read_symlink");
+        assert_eq!(*symlink, *b"inlined");
     }
 }

@@ -5,10 +5,17 @@
 #
 # Produces a small test image for use with f2fs_reader.
 #
-# Requires root. Produces ../testdata/f2fs.img.zst
+# Requires:
+#  * root.
+#  * fscryptctl (https://github.com/google/fscryptctl/)
+#
+# Produces ../testdata/f2fs.img.zst
+#
 # Usage:
 #   # sudo ${PWD}/mk_test_img.sh
+#
 set -e
+PATH=${PATH}:/usr/local/bin/
 
 # Prerequisites.
 apt-get install f2fs-tools zstd
@@ -70,6 +77,19 @@ attr -s b -V "value" ${MOUNT_PATH}/sparse.dat
 attr -s c -V "value" ${MOUNT_PATH}/sparse.dat
 attr -r b ${MOUNT_PATH}/sparse.dat
 
+# fscrypt
+#
+# We will use a hard-coded 512-bit key of all zeros for this test.
+KEY_IDENTIFIER=$(dd if=/dev/zero bs=1 count=64 status=none | fscryptctl add_key ${MOUNT_PATH})
+
+mkdir ${MOUNT_PATH}/fscrypt
+fscryptctl set_policy --padding=16 ${KEY_IDENTIFIER} ${MOUNT_PATH}/fscrypt
+
+mkdir -p ${MOUNT_PATH}/fscrypt/a/b
+# Nb: encrypted files should never be inlined.
+echo "test" > ${MOUNT_PATH}/fscrypt/a/b/inlined
+dd if=/dev/zero bs=4096 count=1 of=${MOUNT_PATH}/fscrypt/a/b/regular
+ln -s "inlined" ${MOUNT_PATH}/fscrypt/a/b/symlink
 
 umount ${MOUNT_PATH}
 zstd /tmp/f2fs.img -o ../testdata/f2fs.img.zst

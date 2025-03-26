@@ -1,6 +1,7 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::crypto::{PerFileDecryptor, ProxyFilename};
 use crate::BLOCK_SIZE;
 use anyhow::{anyhow, ensure, Context, Error};
 use enumn::N;
@@ -67,6 +68,9 @@ fn get_dir_entries(
     dentry_bitmap: &[u8],
     dentry: &[RawDirEntry],
     filenames: &[u8],
+    is_encrypted: bool,
+    is_casefolded: bool,
+    decryptor: &Option<PerFileDecryptor>,
 ) -> Result<Vec<DirEntry>, Error> {
     debug_assert!(dentry_bitmap.len() * 8 >= dentry.len(), "bitmap too small");
     debug_assert_eq!(dentry.len() * 8, filenames.len(), "dentry len different to filenames len");
@@ -86,14 +90,41 @@ fn get_dir_entries(
         }
         // Filename slots are 8 bytes long but F2fs allows long filenames to span multiple slots.
         ensure!(i * NAME_LEN + name_len <= filenames.len(), "Filename doesn't fit in buffer");
-        let raw_filename = &filenames[i * NAME_LEN..i * NAME_LEN + name_len];
+        let mut raw_filename = filenames[i * NAME_LEN..i * NAME_LEN + name_len].to_vec();
         // Ignore dot files.
         if raw_filename == b"." || raw_filename == b".." {
             i += 1;
             continue;
         }
         // TODO(b/404680707): Do we need to consider handling devices with badly formed filenames?
-        let filename = str::from_utf8(raw_filename).context("Bad UTF8 filename")?.to_string();
+        let filename = if is_encrypted {
+            if let Some(decryptor) = decryptor {
+                let mut hash_code =
+                    crate::crypto::direntry::tea_hash_filename(&raw_filename[..name_len]);
+                decryptor.decrypt_filename_data(&mut raw_filename);
+                while raw_filename.last() == Some(&0) {
+                    raw_filename.pop();
+                }
+                // If using both encryption and casefold, use hkdf-seeded hash instead.
+                if is_casefolded {
+                    hash_code = crate::crypto::direntry::casefold_encrypt_hash_filename(
+                        raw_filename.as_slice(),
+                        &decryptor.dirhash_key(),
+                    );
+                };
+
+                let target = dentry[i].hash_code;
+                debug_assert_eq!(target, hash_code);
+                String::from_utf8(raw_filename.to_vec()).unwrap_or_else(|_| {
+                    format!("BAD_ENCRYPTED_FILENAME_len_{}", raw_filename.len())
+                })
+            } else {
+                let hash_code = [entry.hash_code, 0];
+                ProxyFilename::new(hash_code, &raw_filename).into()
+            }
+        } else {
+            str::from_utf8(&raw_filename).context("Bad UTF8 filename")?.to_string()
+        };
         let file_type = FileType::n(dentry[i].file_type).ok_or(anyhow!("Bad file type"))?;
         out.push(DirEntry { hash_code: entry.hash_code, ino: entry.ino, filename, file_type });
         i += (name_len + NAME_LEN - 1) / NAME_LEN;
@@ -102,18 +133,38 @@ fn get_dir_entries(
 }
 
 impl DentryBlock {
-    pub fn get_entries(&self) -> Result<Vec<DirEntry>, Error> {
-        get_dir_entries(&self.dentry_bitmap, &self.dentry, &self.filenames)
+    pub fn get_entries(
+        &self,
+        is_encrypted: bool,
+        is_casefolded: bool,
+        decryptor: &Option<PerFileDecryptor>,
+    ) -> Result<Vec<DirEntry>, Error> {
+        get_dir_entries(
+            &self.dentry_bitmap,
+            &self.dentry,
+            &self.filenames,
+            is_encrypted,
+            is_casefolded,
+            decryptor,
+        )
     }
 }
 
 impl crate::inode::Inode {
-    pub fn get_inline_dir_entries(&self) -> Result<Option<Vec<DirEntry>>, Error> {
+    pub fn get_inline_dir_entries(
+        &self,
+        is_encrypted: bool,
+        is_casefolded: bool,
+        decryptor: &Option<PerFileDecryptor>,
+    ) -> Result<Option<Vec<DirEntry>>, Error> {
         if let Some(inline_dentry) = &self.inline_dentry {
             Ok(Some(get_dir_entries(
                 &inline_dentry.dentry_bitmap,
                 &inline_dentry.dentry,
                 &inline_dentry.filenames,
+                is_encrypted,
+                is_casefolded,
+                decryptor,
             )?))
         } else {
             Ok(None)

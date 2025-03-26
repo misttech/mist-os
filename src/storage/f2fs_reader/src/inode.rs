@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use crate::dir::InlineDentry;
 use crate::reader::{Reader, NULL_ADDR};
-use crate::superblock::BLOCK_SIZE;
 use crate::xattr::{decode_xattr, XattrEntry};
+use crate::{crypto, BLOCK_SIZE};
 use anyhow::{anyhow, bail, ensure, Error};
 use bitflags::bitflags;
 use std::collections::HashMap;
@@ -177,6 +177,9 @@ pub struct Inode {
     // These are loaded from additional nodes.
     pub nid_pages: HashMap<u32, Box<RawAddrBlock>>,
     pub xattr: Vec<XattrEntry>,
+
+    // Crypto context, if present in xattr.
+    pub context: Option<crypto::Context>,
 }
 
 /// Both direct and indirect node address pages use this same format.
@@ -292,6 +295,7 @@ impl Inode {
 
                 nid_pages: HashMap::new(),
                 xattr: vec![],
+                context: None,
             })
         };
 
@@ -301,6 +305,8 @@ impl Inode {
             raw_xattr.extend_from_slice(f2fs.read_node(this.header.xattr_nid).await?.as_slice());
         }
         this.xattr = decode_xattr(&raw_xattr)?;
+
+        this.context = crypto::Context::read_from_xattr(&this.xattr)?;
 
         // The set of blocks making up the file begin with i_addrs. If more blocks are required
         // nids[0..5] are used. Zero pages (nid == NULL_ADDR) can be omitted at any level.
