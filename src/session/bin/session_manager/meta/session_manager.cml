@@ -575,6 +575,7 @@
                 "fuchsia.session.window.Collection",
                 "fuchsia.session.window.InitialElementUrl",
                 "fuchsia.session.window.InitialViewIdAnnotation",
+                "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
             ],
             from: "parent",
