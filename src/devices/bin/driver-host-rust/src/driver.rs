@@ -14,10 +14,90 @@ use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::{FutureExt, TryStreamExt};
 use namespace::Namespace;
+use std::ffi::c_char;
 use std::ptr::NonNull;
 use std::sync::{Arc, Weak};
 use zx::Status;
-use {fidl_fuchsia_driver_framework as fidl_fdf, fidl_fuchsia_driver_host as fdh};
+use {
+    fidl_fuchsia_data as fdata, fidl_fuchsia_driver_framework as fidl_fdf,
+    fidl_fuchsia_driver_host as fdh,
+};
+
+extern "C" {
+    fn driver_host_find_symbol(
+        passive_abi: u64,
+        so_name: *const c_char,
+        so_name_len: usize,
+        symbol_name: *const c_char,
+        symbol_name_len: usize,
+    ) -> u64;
+}
+
+struct LoadedDriver(u64);
+
+impl LoadedDriver {
+    fn get_hooks(&self, module_name: &str) -> Result<Hooks, Status> {
+        const SYMBOL: &str = "__fuchsia_driver_registration__";
+        let registration_addr = unsafe {
+            driver_host_find_symbol(
+                self.0,
+                module_name.as_ptr() as *const c_char,
+                module_name.len(),
+                SYMBOL.as_ptr() as *const c_char,
+                SYMBOL.len(),
+            )
+        };
+        if registration_addr == 0 {
+            return Err(Status::NOT_FOUND);
+        }
+        Hooks::new(registration_addr as *mut _)
+    }
+
+    fn get_symbols(
+        &self,
+        program: &fdata::Dictionary,
+    ) -> Result<Vec<fidl_fdf::NodeSymbol>, Status> {
+        let default = Vec::new();
+        let modules = get_program_objvec(program, "modules")?.unwrap_or(&default);
+
+        let mut symbols = Vec::new();
+
+        for module in modules {
+            let mut module_name = get_program_string(module, "module_name")?;
+            // Special case for compat. The syntax could allow more more generic references to other
+            // fields, but we don't need that for now, so we hardcode support for one specific field.
+            if module_name == "#program.compat" {
+                module_name = get_program_string(program, "compat")?;
+            }
+            let so_name = basename(module_name);
+
+            // Lookup symbols specific to this module.
+            let module_symbols = get_program_strvec(module, "symbols")?.ok_or(Status::NOT_FOUND)?;
+            for symbol in module_symbols {
+                let address = unsafe {
+                    driver_host_find_symbol(
+                        self.0,
+                        so_name.as_ptr() as *const c_char,
+                        so_name.len(),
+                        symbol.as_ptr() as *const c_char,
+                        symbol.len(),
+                    )
+                };
+                if address == 0 {
+                    return Err(Status::INVALID_ARGS);
+                }
+                symbols.push(fidl_fdf::NodeSymbol {
+                    name: Some(symbol.to_string()),
+                    address: Some(address),
+                    module_name: Some(module_name.to_string()),
+                    ..Default::default()
+                });
+            }
+        }
+
+        Ok(symbols)
+    }
+}
 
 #[derive(Debug)]
 struct Hooks(NonNull<fdf_sys::DriverRegistration>);
@@ -27,19 +107,15 @@ unsafe impl Send for Hooks {}
 unsafe impl Sync for Hooks {}
 
 impl Hooks {
-    fn new(library: &Library) -> Result<Hooks, Status> {
-        // SAFETY: The symbol is valid as long as the shared library is not closed. So its
-        // lifetime must track that of |library| from above. We also do a null check to ensure
-        // it's a valid pointer.
-        let registration = unsafe {
-            libc::dlsym(library.ptr.as_ptr(), c"__fuchsia_driver_registration__".as_ptr())
-        };
+    fn new(registration: *mut fdf_sys::DriverRegistration) -> Result<Hooks, Status> {
         if registration.is_null() {
             log::error!("__fuchsia_driver_registration__ symbol not available in driver");
         }
         let registration: NonNull<fdf_sys::DriverRegistration> =
             NonNull::new(registration.cast()).ok_or(Status::NOT_FOUND)?;
-        // SAFETY: We already checked for null above and there are no other references to it.
+        // SAFETY: The symbol is valid as long as the shared library is not closed. So its
+        // lifetime must track that of |library| from above. We also do a null check to ensure
+        // it's a valid pointer.
         let hooks = unsafe { registration.as_ref() };
         let version = hooks.version;
         if version < 1 || version > fdf_sys::DRIVER_REGISTRATION_VERSION_MAX as u64 {
@@ -51,6 +127,15 @@ impl Hooks {
             return Err(Status::WRONG_TYPE);
         }
         Ok(Hooks(registration))
+    }
+
+    fn new_from_library(library: &Library) -> Result<Hooks, Status> {
+        // SAFETY: The symbol is valid as long as the shared library is not closed. So its
+        // lifetime must track that of |library| from above. We also do a null check to ensure
+        // it's a valid pointer.
+        Hooks::new(unsafe {
+            libc::dlsym(library.ptr.as_ptr(), c"__fuchsia_driver_registration__".as_ptr())
+        } as *mut _)
     }
 
     fn initialize(&self, channel_handle: fdf::DriverHandle) -> Token {
@@ -81,14 +166,22 @@ impl Hooks {
 struct Token(usize);
 
 #[derive(Debug)]
+struct LegacyDynamicallyLinkedState {
+    #[allow(unused)]
+    library: Library,
+
+    // Modules listed in the program's module section.
+    #[allow(unused)]
+    modules_and_symbols: ModulesAndSymbols,
+}
+
+#[derive(Debug)]
 struct DriverInner {
-    _library: Library,
+    #[allow(unused)]
+    legacy_state: Option<LegacyDynamicallyLinkedState>,
 
     // The hooks to initialize and destroy the driver. Backed by the registration symbol.
     hooks: Hooks,
-
-    // Modules listed in the program's module section.
-    _modules_and_symbols: ModulesAndSymbols,
 
     // The initial dispatcher of the driver.
     // This is where the initialize hook is called for the driver.
@@ -155,17 +248,87 @@ impl Driver {
             }
         }
 
-        let _library = LoaderService::try_load(vmo).await?;
-        let hooks = Hooks::new(&_library)?;
-        let _modules_and_symbols = ModulesAndSymbols::load(program, &incoming).await?;
-        _modules_and_symbols.copy_to_start_args(&mut start_args);
+        let library = LoaderService::try_load(vmo).await?;
+        let hooks = Hooks::new_from_library(&library)?;
+        let modules_and_symbols = ModulesAndSymbols::load(program, &incoming).await?;
+        modules_and_symbols.copy_to_start_args(&mut start_args);
+        let legacy_state = Some(LegacyDynamicallyLinkedState { library, modules_and_symbols });
         let dispatcher_name = basename(&url);
         let driver = Arc::new(Driver {
             _url: url.clone(),
             inner: Mutex::new(DriverInner {
-                _library,
+                legacy_state,
                 hooks,
-                _modules_and_symbols,
+                dispatcher: None,
+                runtime_handle: None,
+                token: None,
+                shutdown_signaler: None,
+            }),
+        });
+        let driver_runtime_handle = env.new_driver(Arc::into_raw(driver.clone()));
+
+        if !scheduler_role.is_empty() {
+            driver_runtime_handle.add_allowed_scheduler_role(&scheduler_role);
+        }
+        if let Some(roles) = allowed_scheduler_roles {
+            for role in roles {
+                driver_runtime_handle.add_allowed_scheduler_role(&role);
+            }
+        }
+
+        // The dispatcher must be shutdown before the dispatcher is destroyed.
+        // Usually we will wait for the callback from |fdf_env::DriverShutdown| before destroying
+        // the driver object (and hence the dispatcher).
+        // In the case where we fail to start the driver, the driver object would be destructed
+        // immediately, so here we hold an extra reference to the driver object to ensure the
+        // dispatcher will not be destructed until shutdown completes.
+        //
+        // We do not destroy the dispatcher in the shutdown callback, to prevent crashes that
+        // would happen if the driver attempts to access the dispatcher in its Stop hook.
+        //
+        // Currently we only support synchronized dispatchers for the default dispatcher.
+        let driver_clone = driver.clone();
+        let dispatcher = fdf::DispatcherBuilder::new()
+            .name(&format!("{dispatcher_name}-default-{driver:p}"))
+            .scheduler_role(&scheduler_role)
+            .shutdown_observer(move |_| {
+                let _ = driver_clone;
+            });
+        let dispatcher = match default_dispatcher_opts {
+            DispatcherOpts::AllowSyncCalls => dispatcher.allow_thread_blocking(),
+            DispatcherOpts::Default => dispatcher,
+        };
+        let dispatcher = driver_runtime_handle.new_dispatcher(dispatcher)?;
+        driver.inner.lock().dispatcher = Some(dispatcher);
+        driver.inner.lock().runtime_handle = Some(driver_runtime_handle);
+
+        Ok((driver, start_args))
+    }
+
+    pub async fn initialize(
+        env: &fdf_env::Environment,
+        mut start_args: fidl_fdf::DriverStartArgs,
+        dynamic_linking_abi: u64,
+    ) -> Result<(Arc<Driver>, fidl_fdf::DriverStartArgs), Status> {
+        // Parse out important fields.
+        let url = start_args.url.clone().ok_or(Status::INVALID_ARGS)?;
+        let program = start_args.program.as_ref().ok_or(Status::INVALID_ARGS)?;
+        let binary = get_program_string(program, "binary")?;
+        let default_dispatcher_opts = DispatcherOpts::from(program);
+        let scheduler_role =
+            get_program_string(program, "default_dispatcher_scheduler_role").unwrap_or("");
+        let allowed_scheduler_roles = get_program_strvec(program, "allowed_scheduler_roles")?;
+
+        let loaded_driver = LoadedDriver(dynamic_linking_abi);
+        let hooks = loaded_driver.get_hooks(basename(binary))?;
+        let mut symbols = loaded_driver.get_symbols(program)?;
+        start_args.symbols.get_or_insert_default().append(&mut symbols);
+        let dispatcher_name = basename(&url);
+        let driver = Arc::new(Driver {
+            _url: url.clone(),
+            inner: Mutex::new(DriverInner {
+                legacy_state: None,
+                hooks,
                 dispatcher: None,
                 runtime_handle: None,
                 token: None,

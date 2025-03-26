@@ -33,6 +33,8 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
  private:
   // fidl::Server<fuchsia_driver_host::DriverHost>
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
+  void StartLoadedDriver(StartLoadedDriverRequest& request,
+                         StartLoadedDriverCompleter::Sync& completer) override;
 
   void GetProcessInfo(GetProcessInfoCompleter::Sync& completer) override;
 

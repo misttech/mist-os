@@ -371,6 +371,7 @@ static_library("standalone") {
   visibility = [
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
+    "//src/devices/lib/driver-host-passive-abi/*",
     "//zircon/kernel/lib/userabi/vdso/*",
   ]
 

@@ -82,6 +82,11 @@ void DriverHost::Start(StartRequest& request, StartCompleter::Sync& completer) {
   LoadDriver(std::move(request.start_args()), loop_.dispatcher(), std::move(callback));
 }
 
+void DriverHost::StartLoadedDriver(StartLoadedDriverRequest& request,
+                                   StartLoadedDriverCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   zx_info_handle_basic_t info;
   zx_status_t status =

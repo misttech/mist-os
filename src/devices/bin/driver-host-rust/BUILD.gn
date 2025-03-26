@@ -35,6 +35,7 @@ rustc_binary("bin") {
     "//sdk/lib/driver/runtime/rust/env",
     "//sdk/lib/driver/runtime/rust/fdf_sys",
     "//sdk/rust/zx",
+    "//src/devices/lib/driver-host-passive-abi",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/driver_symbols:driver_symbols_rust",

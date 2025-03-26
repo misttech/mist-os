@@ -77,6 +77,23 @@ impl DriverHost {
                                 .send(this.start_driver(start_args, driver).await)
                                 .or_else(ignore_peer_closed)?;
                         }
+                        fdh::DriverHostRequest::StartLoadedDriver {
+                            start_args,
+                            dynamic_linking_abi,
+                            driver,
+                            responder,
+                        } => {
+                            responder
+                                .send(
+                                    this.start_loaded_driver(
+                                        start_args,
+                                        dynamic_linking_abi,
+                                        driver,
+                                    )
+                                    .await,
+                                )
+                                .or_else(ignore_peer_closed)?;
+                        }
                         fdh::DriverHostRequest::GetProcessInfo { responder } => {
                             responder.send(get_process_info()).or_else(ignore_peer_closed)?;
                         }
@@ -98,6 +115,42 @@ impl DriverHost {
     ) -> Result<(), i32> {
         let (driver, start_args) =
             Driver::load(&self.env, start_args).await.map_err(Status::into_raw)?;
+        let (shutdown_signaler, shutdown_event) = oneshot::channel();
+        driver
+            .start(start_args, request, shutdown_signaler, &self.scope)
+            .await
+            .map_err(Status::into_raw)?;
+        self.drivers.borrow_mut().insert(WeakDriver(Arc::downgrade(&driver)));
+
+        // We carry a weak reference to avoid accidentally extending the lifetime of the
+        // driver_host.
+        let this = Rc::downgrade(&self);
+        self.scope.spawn_local(async move {
+            let driver = shutdown_event.await.unwrap();
+            if let Some(this) = this.upgrade() {
+                let mut drivers = this.drivers.borrow_mut();
+                drivers.remove(&WeakDriver(driver));
+
+                // If this is the last driver instance running, we should exit.
+                if drivers.is_empty() {
+                    if let Some(signaler) = this.no_more_drivers_signaler.borrow_mut().take() {
+                        signaler.send(()).unwrap();
+                    }
+                }
+            }
+        });
+        Ok(())
+    }
+
+    async fn start_loaded_driver(
+        self: Rc<Self>,
+        start_args: fidl_fdf::DriverStartArgs,
+        dynamic_linking_abi: u64,
+        request: ServerEnd<fdh::DriverMarker>,
+    ) -> Result<(), i32> {
+        let (driver, start_args) = Driver::initialize(&self.env, start_args, dynamic_linking_abi)
+            .await
+            .map_err(Status::into_raw)?;
         let (shutdown_signaler, shutdown_event) = oneshot::channel();
         driver
             .start(start_args, request, shutdown_signaler, &self.scope)
