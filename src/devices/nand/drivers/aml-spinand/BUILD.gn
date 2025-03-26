@@ -35,15 +35,21 @@ source_set("common") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "aml-spifc.cc",
+    "aml-spifc.h",
     "aml-spinand.cc",
+    "aml-spinand.h",
+    "flash-chips.h",
+    "spi-op.h",
+    "spifc-regs.h",
   ]
   public_deps = [
     ":aml-spinand-bind",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
