@@ -11,7 +11,10 @@ source_set("virtio_netdevice_lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.net:fuchsia.net_banjo_cpp",
+    "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/devices/bus/lib/virtio",
+    "//src/lib/vmo_store",
+    "//vendor/misttech/third_party/lwip",
   ]
   configs += [ "//build/config:default_include_dirs" ]
 }

@@ -45,6 +45,7 @@ config("suppress-warning.config") {
     "//sdk/lib/stdcompat/*",
     "//sdk/lib/zbi-format/*",
     "//src/connectivity/ethernet/drivers/virtio/*",
+    "//src/connectivity/lib/network-device/buffer_descriptor/*",
     "//src/devices/block/drivers/virtio/*",
     "//src/devices/block/lib/common/*",
     "//src/devices/board/lib/acpi/*",
