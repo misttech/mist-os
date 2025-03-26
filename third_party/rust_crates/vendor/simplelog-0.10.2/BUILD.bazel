@@ -7,22 +7,35 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "simplelog",
+    package_url = "https://github.com/drakulix/simplelog.rs",
+    package_version = "0.10.2",
+)
+
+license(
+    name = "license",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
+    license_text = "LICENSE.APACHE2",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "simplelog",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,6 +52,10 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "default",
+        "termcolor",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
     rustc_flags = [
@@ -46,7 +63,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=simplelog",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +74,10 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.10.2",
+    deps = [
+        "//third_party/rust_crates/ask2patch/termcolor",
+        "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+        "//third_party/rust_crates/vendor/log-0.4.22:log",
+    ],
 )

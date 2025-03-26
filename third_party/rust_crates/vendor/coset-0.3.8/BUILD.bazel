@@ -7,22 +7,32 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "coset",
+    package_url = "https://github.com/google/coset",
+    package_version = "0.3.8",
+)
+
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:Apache-2.0"],
+    license_text = "LICENSE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "coset",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,6 +49,10 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "default",
+        "std",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
     rustc_flags = [
@@ -46,7 +60,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=coset",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +71,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.3.8",
+    deps = [
+        "//third_party/rust_crates/vendor/ciborium-0.2.2:ciborium",
+        "//third_party/rust_crates/vendor/ciborium-io-0.2.2:ciborium_io",
+    ],
 )

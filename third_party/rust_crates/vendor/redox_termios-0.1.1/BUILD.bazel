@@ -7,22 +7,32 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
+    package_name = "redox_termios",
+    package_url = "https://github.com/redox-os/termios",
     package_version = "0.1.1",
 )
 
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:MIT"],
+    license_text = "LICENSE",
+)
+
 rust_library(
-    name = "fuchsia_cprng",
+    name = "redox_termios",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -40,13 +50,13 @@ rust_library(
         ],
     ),
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=redox_termios",
         "manual",
         "noclippy",
         "norustfmt",
@@ -58,4 +68,7 @@ rust_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     version = "0.1.1",
+    deps = [
+        "//third_party/rust_crates/vendor/redox_syscall-0.1.51:syscall",
+    ],
 )

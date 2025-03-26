@@ -7,22 +7,32 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "rust_icu_uchar",
+    package_url = "https://github.com/google/rust_icu",
+    package_version = "5.0.0",
+)
+
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:Apache-2.0"],
+    license_text = "LICENSE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "rust_icu_uchar",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,14 +49,22 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "icu_version_67_plus",
+        "icu_version_in_env",
+        "renaming",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
+    proc_macro_deps = [
+        "//third_party/rust_crates/vendor/paste-1.0.15:paste",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=rust_icu_uchar",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +75,10 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "5.0.0",
+    deps = [
+        "//third_party/rust_crates/vendor/log-0.4.22:log",
+        "//third_party/rust_crates/vendor/rust_icu_common-5.0.0:rust_icu_common",
+        "//third_party/rust_crates/vendor/rust_icu_sys-5.0.0:rust_icu_sys",
+    ],
 )

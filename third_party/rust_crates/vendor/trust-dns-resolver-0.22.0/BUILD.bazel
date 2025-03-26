@@ -7,22 +7,35 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "trust-dns-resolver",
+    package_url = "https://github.com/bluejekyll/trust-dns",
+    package_version = "0.22.0",
+)
+
+license(
+    name = "license",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
+    license_text = "LICENSE-APACHE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "trust_dns_resolver",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,6 +52,9 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "testing",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
     rustc_flags = [
@@ -46,7 +62,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=trust-dns-resolver",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +73,16 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.22.0",
+    deps = [
+        "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
+        "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
+        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lru-cache-0.1.2:lru_cache",
+        "//third_party/rust_crates/vendor/parking_lot-0.12.0:parking_lot",
+        "//third_party/rust_crates/vendor/smallvec-1.13.1:smallvec",
+        "//third_party/rust_crates/vendor/thiserror-1.0.69:thiserror",
+        "//third_party/rust_crates/vendor/tracing-0.1.40:tracing",
+        "//third_party/rust_crates/vendor/trust-dns-proto-0.22.0:trust_dns_proto",
+    ],
 )

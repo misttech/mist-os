@@ -7,22 +7,34 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "unic-ucd-block",
+    package_url = "https://github.com/open-i18n/rust-unic/",
+    package_version = "0.9.0",
+)
+
+license(
+    name = "license",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "unic_ucd_block",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -46,7 +58,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=unic-ucd-block",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +69,10 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.9.0",
+    deps = [
+        "//third_party/rust_crates/vendor/unic-char-property-0.9.0:unic_char_property",
+        "//third_party/rust_crates/vendor/unic-char-range-0.9.0:unic_char_range",
+        "//third_party/rust_crates/vendor/unic-ucd-version-0.9.0:unic_ucd_version",
+    ],
 )

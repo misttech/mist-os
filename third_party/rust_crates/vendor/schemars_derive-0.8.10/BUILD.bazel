@@ -6,23 +6,33 @@
 #     fx update-rustc-third-party
 ###############################################################################
 
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "schemars_derive",
+    package_url = "https://github.com/GREsau/schemars",
+    package_version = "0.8.10",
 )
 
-rust_library(
-    name = "fuchsia_cprng",
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:MIT"],
+    license_text = "LICENSE",
+)
+
+rust_proc_macro(
+    name = "schemars_derive",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -46,7 +56,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=schemars_derive",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +67,11 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.8.10",
+    deps = [
+        "//third_party/rust_crates/vendor/proc-macro2-1.0.86:proc_macro2",
+        "//third_party/rust_crates/vendor/quote-1.0.38:quote",
+        "//third_party/rust_crates/vendor/serde_derive_internals-0.26.0:serde_derive_internals",
+        "//third_party/rust_crates/vendor/syn-1.0.98:syn",
+    ],
 )

@@ -7,22 +7,35 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "rusty-fork",
+    package_url = "https://github.com/altsysrq/rusty-fork",
+    package_version = "0.3.0",
+)
+
+license(
+    name = "license",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
+    license_text = "LICENSE-APACHE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "rusty_fork",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,6 +52,10 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "timeout",
+        "wait-timeout",
+    ],
     crate_root = "src/lib.rs",
     edition = "2018",
     rustc_flags = [
@@ -46,7 +63,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=rusty-fork",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +74,11 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.3.0",
+    deps = [
+        "//third_party/rust_crates/vendor/fnv-1.0.7:fnv",
+        "//third_party/rust_crates/vendor/quick-error-1.2.2:quick_error",
+        "//third_party/rust_crates/vendor/tempfile-3.2.0:tempfile",
+        "//third_party/rust_crates/vendor/wait-timeout-0.2.0:wait_timeout",
+    ],
 )

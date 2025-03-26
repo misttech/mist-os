@@ -7,22 +7,35 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "aes-gcm-siv",
+    package_url = "https://github.com/RustCrypto/AEADs",
+    package_version = "0.11.1",
+)
+
+license(
+    name = "license",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
+    license_text = "LICENSE-APACHE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "aes_gcm_siv",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,14 +52,21 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "aes",
+        "alloc",
+        "default",
+        "getrandom",
+        "std",
+    ],
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=aes-gcm-siv",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +77,14 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "0.11.1",
+    deps = [
+        "//third_party/rust_crates/forks/zeroize",
+        "//third_party/rust_crates/vendor/aead-0.5.2:aead",
+        "//third_party/rust_crates/vendor/aes-0.8.4:aes",
+        "//third_party/rust_crates/vendor/cipher-0.4.4:cipher",
+        "//third_party/rust_crates/vendor/ctr-0.9.2:ctr",
+        "//third_party/rust_crates/vendor/polyval-0.6.0:polyval",
+        "//third_party/rust_crates/vendor/subtle-2.6.1:subtle",
+    ],
 )

@@ -7,22 +7,32 @@
 ###############################################################################
 
 load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_license//rules:license.bzl", "license")
 load("@rules_license//rules:package_info.bzl", "package_info")
 
 package(
-    default_package_metadata = [":package_info"],
+    default_package_metadata = [
+        ":license",
+        ":package_info",
+    ],
     default_visibility = ["//visibility:public"],
 )
 
 package_info(
     name = "package_info",
-    package_name = "fuchsia-cprng",
-    package_url = "https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/lib/zircon/rust/fuchsia-cprng",
-    package_version = "0.1.1",
+    package_name = "handlebars",
+    package_url = "https://github.com/sunng87/handlebars-rust",
+    package_version = "4.3.5",
+)
+
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:MIT"],
+    license_text = "LICENSE",
 )
 
 rust_library(
-    name = "fuchsia_cprng",
+    name = "handlebars",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -39,14 +49,20 @@ rust_library(
             "WORKSPACE.bazel",
         ],
     ),
+    crate_features = [
+        "default",
+    ],
     crate_root = "src/lib.rs",
-    edition = "2018",
+    edition = "2021",
+    proc_macro_deps = [
+        "//third_party/rust_crates/vendor/pest_derive-2.7.8:pest_derive",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=fuchsia-cprng",
+        "crate-name=handlebars",
         "manual",
         "noclippy",
         "norustfmt",
@@ -57,5 +73,12 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.1.1",
+    version = "4.3.5",
+    deps = [
+        "//third_party/rust_crates/vendor/log-0.4.22:log",
+        "//third_party/rust_crates/vendor/pest-2.7.8:pest",
+        "//third_party/rust_crates/vendor/serde-1.0.204:serde",
+        "//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json",
+        "//third_party/rust_crates/vendor/thiserror-1.0.69:thiserror",
+    ],
 )
