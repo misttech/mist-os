@@ -116,6 +116,7 @@ system-update-committer
 ?tzdata-provider
 ?uart
 ?ui
+?update-bin
 ?virtual_keyboard_manager
 ?vmm_launcher
 ?vsock_service
