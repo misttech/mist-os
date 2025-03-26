@@ -132,7 +132,6 @@ _SDK_TEMPLATES = {
     "select_alias": "//fuchsia/workspace/sdk_templates:select_alias.BUILD.template",
     "sysroot": "//fuchsia/workspace/sdk_templates:sysroot.BUILD.template",
     "sysroot_arch_sub": "//fuchsia/workspace/sdk_templates:sysroot_arch_sub.BUILD.template",
-    "sysroot_arch_sub_variant": "//fuchsia/workspace/sdk_templates:sysroot_arch_sub_variant.BUILD.template",
 }
 
 # Location of template for the top-level BUILD.bazel file in the final repository directory.
@@ -393,10 +392,14 @@ def _generate_sysroot_build_rules(
     # includes artifacts for "HEAD" in "variants".
     for arch in arch_list:
         meta_for_arch = meta["versions"][arch]
-        files.extend(meta_for_arch.get("debug_libs", []))
-        files.extend(meta_for_arch.get("dist_libs", []))
-        files.extend(meta_for_arch.get("headers", []))
-        files.extend(meta_for_arch.get("link_libs", []))
+        if "debug_libs" in meta_for_arch:
+            files.extend(meta_for_arch["debug_libs"])
+        if "dist_libs" in meta_for_arch:
+            files.extend(meta_for_arch["dist_libs"])
+        if "headers" in meta_for_arch:
+            files.extend(meta_for_arch["headers"])
+        if "link_libs" in meta_for_arch:
+            files.extend(meta_for_arch["link_libs"])
 
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files)
 
@@ -410,52 +413,20 @@ def _generate_sysroot_build_rules(
     )
 
     for arch in arch_list:
-        # Maps variant configuration conditions to :dist.{variant} target labels. E.g.:
-        #
-        #   {
-        #     "@fuchsia_clang//:novariant": ":dist.novariant",
-        #     "@fuchsia_clang//:asan_variant": ":dist.asan",
-        #   }
-        #
-        select_variant_targets = {}
-
-        # Map dist.{variant} target names to dictionaries of template substitutions. E.g.
-        #
-        #  {
-        #    "dist.novariant": {
-        #       "{{name}}": "dist.novariant",
-        #       "{{dest}}": "lib/ld.so.1",
-        #       "{{stripped_file}}": "//:arch/x64/sysroot/dist/lib/libc.so",
-        #       "{{unstripped_file}}": "//:arch/x64/sysroot/debug/lib/libc.so",
-        #    },
-        #    "dist.asan_variant": {
-        #       "{{name}}": "dist.asan_variant",
-        #       "{{dest}}": "lib/asan/ld.so.1",
-        #       "{{stripped_file}}": "//:arch/x64/sysroot/dist/lib/asan/libc.so",
-        #       "{{unstripped_file}}": "//:arch/x64/sysroot/debug/lib/asan/libc.so",
-        #  }
-        #
-        variant_targets_map = {}
+        srcs = {}
 
         # Expected dist_dir = "arch/x64/sysroot"
         dist_dir = meta["versions"][arch]["dist_dir"]
 
-        # IMPORTANT: The following assumes that versions.$arch.debug_libs
-        # and versions.$arch.dist_libs are parallel arrays, i.e. they have the
-        # same size, and their entries match each other for the same index.
-        arch_dist_libs = meta["versions"][arch]["dist_libs"]
-        arch_debug_libs = meta["versions"][arch]["debug_libs"]
-        if len(arch_dist_libs) != len(arch_debug_libs):
-            runtime.fail("Mismatched dist and debug list sizes for sysroot.versions.%s:\ndist_libs = %s\ndebug_libs = %s" % (arch, arch_dist_libs, arch_debug_libs))
-
         libs_base = dist_dir + "/dist/lib/"
-        for dist_lib, debug_lib in zip(arch_dist_libs, arch_debug_libs):
+        for dist_lib in meta["versions"][arch]["dist_libs"]:
             if _is_external_file(dist_lib):
                 # Expect dist_lib as @fuchsia_idk//arch/x64/sysroot:dist/lib/FOO
                 # Compute:
                 #    repo_name        = fuchsia_idk
                 #    dist_path        = arch/x64/sysroot/dist/lib/FOO
                 #    dist_lib_subpath = FOO
+                #    strip_prefix     = arch/x64/sysroot/dist/lib/
                 repo_name, _, label = dist_lib.partition("//")
                 repo_name = repo_name[1:]  # Remove initial @
                 dist_path = label.replace(":", "/")
@@ -465,25 +436,17 @@ def _generate_sysroot_build_rules(
                 #    repo_name        = fuchsia_sdk   (current repository name)
                 #    dist_path        = arch/x64/sysroot/dist/lib/FOO
                 #    dist_lib_subpath = FOO
+                #    strip_prefix     = arch/x64/sysroot/dist/lib/
                 repo_name = ctx.attr.name
                 dist_path = dist_lib
 
-            # NOTE: repo_name is currently unused, but is handy when adding debug traces.
-
             dist_lib_subpath = dist_path.removeprefix(libs_base)
+            strip_prefix = "%s/dist/lib/" % (dist_dir)
 
             # dist_lib_subpath can be 'libfoo.so' or '<variant>/libfoo.so'
             variant, _, _ = dist_lib_subpath.rpartition("/")
             variant_config = _FUCHSIA_CLANG_VARIANT_MAP[variant]
-            variant_target = "dist." + _get_variant_suffix(variant)
-            select_variant_targets[variant_config] = ":" + variant_target
-
-            variant_targets_map[variant_target] = {
-                "{{name}}": variant_target,
-                "{{dest}}": "lib/" + dist_lib_subpath,
-                "{{stripped_file}}": _final_bazel_path(dist_lib),
-                "{{unstripped_file}}": _final_bazel_path(debug_lib),
-            }
+            srcs.setdefault(variant_config, []).append(_final_bazel_path(dist_lib))
 
         per_arch_build_file = build_file.dirname.get_child(arch).get_child(
             "BUILD.bazel",
@@ -494,16 +457,10 @@ def _generate_sysroot_build_rules(
             per_arch_build_file,
             _sdk_template_path(runtime, "sysroot_arch_sub"),
             {
-                "{{select_variants}}": _get_starlark_dict(runtime, select_variant_targets),
+                "{{srcs}}": _get_starlark_dict(runtime, srcs),
+                "{{strip_prefix}}": strip_prefix,
             },
         )
-        for variant_target, substitutions in variant_targets_map.items():
-            _merge_template(
-                ctx,
-                per_arch_build_file,
-                _sdk_template_path(runtime, "sysroot_arch_sub_variant"),
-                substitutions,
-            )
 
 def _ffx_tool_files(meta, files_str):
     for name, collection in meta.items():
@@ -967,9 +924,6 @@ _FUCHSIA_CLANG_VARIANT_MAP = {
     "asan": "@fuchsia_clang//:asan_variant",
     "hwasan": "@fuchsia_clang//:hwasan_variant",
 }
-
-def _get_variant_suffix(variant):
-    return variant if variant else "novariant"
 
 def _get_api_level(variant):
     return variant["api_level"]
@@ -1754,7 +1708,7 @@ def _ensure_build_id_file(runtime):
     # target declaration. This directory may not exist when the input
     # IDK is an external repository, so create an empty one if needed.
     if not ctx.path(".build-id").exists:
-        ctx.file(".build-id/.empty-on-purpose", "")
+        ctx.file(".build-id/.empty-on-purpose")
 
 def _export_all_files(runtime):
     ctx = runtime.ctx

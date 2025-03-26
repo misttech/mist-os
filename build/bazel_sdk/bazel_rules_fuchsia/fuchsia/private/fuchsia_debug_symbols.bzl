@@ -69,7 +69,7 @@ def strip_resources(ctx, resources, build_id_path = None, source_dir = None):
     # We need to make sure we have a unique set of inputs. If we have duplicate
     # resources then the ctx.actions.declare_file below will fail because it
     # will try to declare the same file twice. We only need to strip the resource
-    # once so there is no need to attempt to strip duplicates.
+    # once so there is no need to attempt to stip duplicates.
     for r in depset(resources).to_list():
         ids_txt = ctx.actions.declare_file(r.src.path + ".ids_txt")
         all_ids_txt.append(ids_txt)

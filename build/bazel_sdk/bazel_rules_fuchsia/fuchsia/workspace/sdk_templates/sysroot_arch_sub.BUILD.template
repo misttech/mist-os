@@ -1,10 +1,13 @@
 load(
     "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_unstripped_binary",
+    "fuchsia_package_resource_group",
 )
 load("@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
-alias(
+fuchsia_package_resource_group(
     name = "dist",
-    actual = select({{select_variants}}),
+    srcs = select({{srcs}}),
+    dest = "lib",
+    strip_prefix = "{{strip_prefix}}",
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )
