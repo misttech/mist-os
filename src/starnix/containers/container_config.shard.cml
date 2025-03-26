@@ -26,5 +26,15 @@
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
         },
+        {
+            config: "fuchsia.starnix.config.container.MlockPinFlavor",
+            key: "mlock_pin_flavor",
+            type: "string",
+            max_size: 100,
+            default: "noop",
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
     ],
 }

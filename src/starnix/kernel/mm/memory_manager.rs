@@ -5,8 +5,8 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
     FaultRegisterMode, FutexTable, InflightVmsplicedPayloads, Mapping, MappingBacking,
-    MappingFlags, MappingName, PrivateFutexKey, UserFault, UserFaultRegistration, VmsplicePayload,
-    VmsplicePayloadSegment, VMEX_RESOURCE,
+    MappingFlags, MappingName, MlockPinFlavor, MlockShadowProcess, PrivateFutexKey, UserFault,
+    UserFaultRegistration, VmsplicePayload, VmsplicePayloadSegment, VMEX_RESOURCE,
 };
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
@@ -1612,7 +1612,35 @@ impl MemoryManagerState {
 
             if !mapping.flags().contains(MappingFlags::LOCKED) {
                 num_new_locked_bytes += (range.end - range.start) as u64;
-                mapping.set_flags(mapping.flags() | MappingFlags::LOCKED);
+                let mlock_mapping = match current_task.kernel().features.mlock_pin_flavor {
+                    // Pin the memory by mapping the backing memory into the high priority vmar.
+                    MlockPinFlavor::ShadowProcess => {
+                        let shadow_process = current_task
+                            .kernel()
+                            .expando
+                            .get_or_try_init(|| MlockShadowProcess::new())?;
+
+                        let (vmo, offset) = match mapping.backing() {
+                            MappingBacking::Memory(m) => (
+                                m.memory().as_vmo().ok_or_else(|| errno!(ENOMEM))?,
+                                m.memory_offset(),
+                            ),
+                            #[cfg(feature = "alternate_anon_allocs")]
+                            MappingBacking::PrivateAnonymous => (
+                                self.private_anonymous
+                                    .backing
+                                    .as_vmo()
+                                    .ok_or_else(|| errno!(ENOMEM))?,
+                                range.start.ptr() as u64,
+                            ),
+                        };
+                        Some(shadow_process.lock_pages(vmo, offset, range.end - range.start)?)
+                    }
+
+                    // Relying on VMAR-level operations means just flags are set per-mapping.
+                    MlockPinFlavor::Noop | MlockPinFlavor::VmarAlwaysNeed => None,
+                };
+                mapping.set_mlock(mlock_mapping);
                 updates.push((range, mapping));
             }
         }
@@ -1629,33 +1657,34 @@ impl MemoryManagerState {
             }
         }
 
-        // ONFAULT only locks the pages that are already resident.
-        if !(on_fault || current_task.kernel().features.mlock_always_onfault) {
-            if let Err(e) = self.user_vmar.op_range(
-                zx::VmarOp::PREFETCH,
-                start_addr.ptr(),
-                end_addr - start_addr,
-            ) {
-                match e {
-                    zx::Status::BAD_STATE | zx::Status::NOT_SUPPORTED => {
-                        return Err(errno!(ENOMEM))
-                    }
-                    zx::Status::INVALID_ARGS | zx::Status::OUT_OF_RANGE => {
-                        return Err(errno!(EINVAL))
-                    }
-                    zx::Status::ACCESS_DENIED => {
-                        unreachable!("user vmar should always have needed rights")
-                    }
-                    zx::Status::BAD_HANDLE => {
-                        unreachable!("user vmar should always be a valid handle")
-                    }
-                    zx::Status::WRONG_TYPE => unreachable!("user vmar handle should be a vmar"),
-                    _ => unreachable!("unknown error when prefetching memory for mlock: {e}"),
-                }
+        let op_range_status_to_errno = |e| match e {
+            zx::Status::BAD_STATE | zx::Status::NOT_SUPPORTED => errno!(ENOMEM),
+            zx::Status::INVALID_ARGS | zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+            zx::Status::ACCESS_DENIED => {
+                unreachable!("user vmar should always have needed rights")
             }
+            zx::Status::BAD_HANDLE => {
+                unreachable!("user vmar should always be a valid handle")
+            }
+            zx::Status::WRONG_TYPE => unreachable!("user vmar handle should be a vmar"),
+            _ => unreachable!("unknown error from op_range on user vmar for mlock: {e}"),
+        };
+
+        if !on_fault && !current_task.kernel().features.mlock_always_onfault {
+            self.user_vmar
+                .op_range(zx::VmarOp::PREFETCH, start_addr.ptr(), end_addr - start_addr)
+                .map_err(op_range_status_to_errno)?;
         }
 
-        track_stub!(TODO("https://fxbug.dev/297591218"), "mlock() vmar op range");
+        match current_task.kernel().features.mlock_pin_flavor {
+            MlockPinFlavor::VmarAlwaysNeed => {
+                self.user_vmar
+                    .op_range(zx::VmarOp::ALWAYS_NEED, start_addr.ptr(), end_addr - start_addr)
+                    .map_err(op_range_status_to_errno)?;
+            }
+            // The shadow process doesn't use any vmar-level operations to pin memory.
+            MlockPinFlavor::Noop | MlockPinFlavor::ShadowProcess => (),
+        }
 
         for (range, mapping) in updates {
             self.mappings.insert(range, mapping);

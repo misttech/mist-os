@@ -191,6 +191,7 @@ rustc_library("starnix_core") {
     "mm/mapping.rs",
     "mm/memory.rs",
     "mm/memory_manager.rs",
+    "mm/mlock.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
     "mm/userfault.rs",

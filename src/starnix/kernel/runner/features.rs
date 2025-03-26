@@ -9,6 +9,7 @@ use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::framebuffer::{AspectRatio, Framebuffer};
 use starnix_core::device::remote_block_device::remote_block_device_init;
+use starnix_core::mm::MlockPinFlavor;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
 use starnix_kernel_structured_config::Config as KernelStructuredConfig;
@@ -123,6 +124,7 @@ impl Features {
                         default_seclabel,
                         default_ns_mount_options,
                         mlock_always_onfault,
+                        mlock_pin_flavor,
                     },
                 selinux,
                 ashmem,
@@ -201,6 +203,8 @@ impl Features {
                     inspect_node
                         .record_bool("enable_utc_time_adjustment", *enable_utc_time_adjustment);
                     inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
+                    inspect_node
+                        .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
                 });
             }
         });
@@ -217,7 +221,8 @@ pub fn parse_features(
         ui_visual_debugging_level,
     }: KernelStructuredConfig,
 ) -> Result<Features, Error> {
-    let ContainerStructuredConfig { extra_features, mlock_always_onfault } = &start_info.config;
+    let ContainerStructuredConfig { extra_features, mlock_always_onfault, mlock_pin_flavor } =
+        &start_info.config;
 
     let mut features = Features::default();
     for entry in start_info.program.features.iter().chain(extra_features.iter()) {
@@ -309,6 +314,7 @@ pub fn parse_features(
         };
 
     features.kernel.mlock_always_onfault = *mlock_always_onfault;
+    features.kernel.mlock_pin_flavor = MlockPinFlavor::parse(mlock_pin_flavor.as_str())?;
 
     Ok(features)
 }

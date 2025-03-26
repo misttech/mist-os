@@ -41,4 +41,7 @@
     "fuchsia.starnix.realtime": { "capacity": "1ms", "deadline": "1ms", "period": "1ms" },
     // LINT.ThenChange(src/starnix/kernel/task/scheduler/manager.rs)
   },
+  "memory": {
+    "fuchsia.starnix.mlock": { "priority": 24 },
+  },
 }

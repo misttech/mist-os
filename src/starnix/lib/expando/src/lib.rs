@@ -100,6 +100,15 @@ impl Expando {
         assert_eq!(type_id, slot.value.deref().type_id());
         Some(slot.downcast().expect("downcast of expando slot was successful"))
     }
+
+    /// Remove the provided type from the expando if it is present.
+    pub fn remove<T: Any + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        let mut properties = self.properties.lock();
+        let type_id = TypeId::of::<T>();
+        let slot = properties.remove(&type_id)?;
+        assert_eq!(type_id, slot.value.deref().type_id());
+        Some(slot.downcast().expect("downcast of expando slot was successful"))
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +171,16 @@ mod tests {
         let from_peek = expando.peek::<String>().unwrap();
         assert_eq!(from_peek.as_str(), "hello");
         assert_eq!(Arc::as_ptr(&from_init), Arc::as_ptr(&from_peek));
+    }
+
+    #[test]
+    fn remove_works() {
+        let expando = Expando::default();
+        assert_eq!(expando.peek::<String>(), None);
+        let from_init = expando.get_or_init(|| String::from("hello"));
+        let removed = expando.remove::<String>().unwrap();
+        assert_eq!(removed.as_str(), "hello");
+        assert_eq!(Arc::as_ptr(&from_init), Arc::as_ptr(&removed));
+        assert_eq!(expando.peek::<String>(), None);
     }
 }

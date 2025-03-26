@@ -92,6 +92,11 @@ impl Name {
         self.0.splitn(ZX_MAX_NAME_LEN - 1, |b| *b == 0).next().unwrap_or(&[])
     }
 
+    /// Returns a raw pointer to the name for passing to syscalls.
+    pub(crate) fn as_raw(&self) -> *const u8 {
+        self.0.as_ptr()
+    }
+
     /// Returns the length of the name before a terminating null byte.
     #[inline]
     pub fn len(&self) -> usize {

@@ -96,30 +96,8 @@ syscall_tests_etc = [
     name = "udev_test"
     features = [ "framebuffer" ]
   },
-  {
-    name = "mlock_test"
-
-    # Sanitizer runtimes stub out mlock() because it is incompatible with their virtual memory
-    # management.
-    disable_sanitizers_on_host = true
-  },
-  {
-    name = "mlock_test_always_onfault"
-    sources = [ "mlock_test.cc" ]
-
-    # Sanitizer runtimes map large amounts of virtual memory and mlock() interacts poorly with that.
-    # Disabling instrumentation on individual test functions isn't enough to make mlock() work in
-    # the instrumented toolchain -- we need to disable instrumentation entirely.
-    disable_sanitizers_on_host = true
-    config_capabilities = [
-      {
-        config = "fuchsia.starnix.config.container.MlockAlwaysOnFault"
-        type = "bool"
-        value = true
-      },
-    ]
-  },
 ]
+
 if (target_cpu == "x64") {
   # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
   # This test requires test-ui-stack.
@@ -129,6 +107,49 @@ if (target_cpu == "x64") {
       features = [ "framebuffer" ]
     },
   ]
+}
+
+mlock_onfault_behaviors = [
+  true,
+  false,
+]
+mlock_pin_flavors = [
+  "noop",
+  "shadow_process",
+  "vmar_always_need",
+]
+
+foreach(onfault_behavior, mlock_onfault_behaviors) {
+  foreach(pin_flavor, mlock_pin_flavors) {
+    if (onfault_behavior) {
+      onfault_str = "_always_onfault"
+    } else {
+      onfault_str = ""
+    }
+    syscall_tests_etc += [
+      {
+        name = "mlock_test${onfault_str}_${pin_flavor}_pin"
+        sources = [ "mlock_test.cc" ]
+
+        # Sanitizer runtimes stub out mlock() because it is incompatible with their virtual memory
+        # management.
+        disable_sanitizers_on_host = true
+        config_capabilities = [
+          {
+            config = "fuchsia.starnix.config.container.MlockAlwaysOnFault"
+            type = "bool"
+            value = onfault_behavior
+          },
+          {
+            config = "fuchsia.starnix.config.container.MlockPinFlavor"
+            type = "string"
+            max_size = 100
+            value = pin_flavor
+          },
+        ]
+      },
+    ]
+  }
 }
 
 arch32_compat_syscall_test_names = syscall_tests

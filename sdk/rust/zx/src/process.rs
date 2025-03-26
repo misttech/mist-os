@@ -7,8 +7,8 @@
 use crate::sys::{self as sys, zx_handle_t, zx_time_t, ZX_OBJ_TYPE_UPPER_BOUND};
 use crate::{
     object_get_info, object_get_info_single, object_get_info_vec, object_get_property,
-    object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef, Koid, MapInfo,
-    ObjectQuery, Property, PropertyQuery, Rights, Status, Task, Thread, Topic, VmoInfo,
+    object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef, Job, Koid, MapInfo, Name,
+    ObjectQuery, Property, PropertyQuery, Rights, Status, Task, Thread, Topic, Vmar, VmoInfo,
 };
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
@@ -129,6 +129,37 @@ unsafe impl ObjectQuery for ProcessHandleStats {
 }
 
 impl Process {
+    /// Create a new process and its address space.
+    ///
+    /// Wraps the
+    /// [zx_process_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create.md)
+    /// syscall.
+    pub fn create(job: &Job, name: Name, options: ProcessOptions) -> Result<(Self, Vmar), Status> {
+        let mut this = 0;
+        let mut vmar = 0;
+
+        // SAFETY: `job` is a valid handle, `name` is valid to read from for `name.len()` bytes, and
+        // `this` and `vmar` are valid to write to.
+        ok(unsafe {
+            crate::sys::zx_process_create(
+                job.raw_handle(),
+                name.as_raw(),
+                name.len(),
+                options.bits(),
+                &mut this,
+                &mut vmar,
+            )
+        })?;
+
+        // SAFETY: the above call succeeded so `this` is a valid handle.
+        let this = Self(unsafe { Handle::from_raw(this) });
+
+        // SAFETY: the above call succeeded so `vmar` is a valid handle.
+        let vmar = Vmar::from(unsafe { Handle::from_raw(vmar) });
+
+        Ok((this, vmar))
+    }
+
     /// Similar to `Thread::start`, but is used to start the first thread in a process.
     ///
     /// Wraps the

@@ -12,7 +12,7 @@ use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
-use crate::mm::{FutexTable, MappingSummary, SharedFutexKey};
+use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
@@ -105,6 +105,9 @@ pub struct KernelFeatures {
 
     /// mlock() never prefaults pages.
     pub mlock_always_onfault: bool,
+
+    /// Implementation of mlock() to use for this kernel instance.
+    pub mlock_pin_flavor: MlockPinFlavor,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -483,10 +486,11 @@ impl Kernel {
     /// 1. Disable launching new processes
     /// 2. Shut down individual ThreadGroups until only the init and system tasks remain
     /// 3. Repeat the above for the init task
-    /// 4. Ensure this process is the only one running in the kernel job.
-    /// 5. Unmounts the kernel's mounts' FileSystems.
-    /// 6. Tell CF the container component has stopped
-    /// 7. Exit this process
+    /// 4. Clean up kernel-internal structures that can hold processes alive
+    /// 5. Ensure this process is the only one running in the kernel job.
+    /// 6. Unmounts the kernel's mounts' FileSystems.
+    /// 7. Tell CF the container component has stopped
+    /// 8. Exit this process
     ///
     /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
     /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
@@ -550,7 +554,10 @@ impl Kernel {
             log_debug!("init already terminated");
         }
 
-        // Step 4: Make sure this is the only process running in the job. We already should have
+        // Step 4: Clean up any structures that can keep non-Linux processes live in our job.
+        self.expando.remove::<MlockShadowProcess>();
+
+        // Step 5: Make sure this is the only process running in the job. We already should have
         // cleared up all processes other than the system task at this point, but wait on any that
         // might be around for good measure.
         //
@@ -562,25 +569,26 @@ impl Kernel {
 
         log_debug!("waiting for this to be the only process in the job");
         loop {
-            let remaining_processes = kernel_job.processes().unwrap();
-            if remaining_processes.len() == 1 && remaining_processes[0] == own_koid {
+            let mut remaining_processes = kernel_job
+                .processes()
+                .unwrap()
+                .into_iter()
+                // Don't wait for ourselves to exit.
+                .filter(|pid| pid != &own_koid)
+                .peekable();
+            if remaining_processes.peek().is_none() {
                 log_debug!("No stray Zircon processes.");
                 break;
             }
 
             let mut terminated_signals = vec![];
-            for koid in remaining_processes {
-                // Don't wait for ourselves to exit.
-                if koid == own_koid {
-                    continue;
-                }
-                let handle = match kernel_job.get_child(
-                    &koid,
-                    zx::Rights::BASIC | zx::Rights::PROPERTY | zx::Rights::DESTROY,
-                ) {
+            for pid in remaining_processes {
+                let handle = match kernel_job
+                    .get_child(&pid, zx::Rights::BASIC | zx::Rights::PROPERTY | zx::Rights::DESTROY)
+                {
                     Ok(h) => h,
                     Err(e) => {
-                        log_debug!(koid:?, e:?; "failed to get child process from job");
+                        log_debug!(pid:?, e:?; "failed to get child process from job");
                         continue;
                     }
                 };
@@ -591,10 +599,10 @@ impl Kernel {
             futures::future::join_all(terminated_signals).await;
         }
 
-        // Step 5: Forcibly unmounts the mounts' FileSystems.
+        // Step 6: Forcibly unmounts the mounts' FileSystems.
         self.mounts.clear();
 
-        // Step 6: Tell CF the container stopped.
+        // Step 7: Tell CF the container stopped.
         log_debug!("all non-root processes killed, notifying CF container is stopped");
         if let Some(control_handle) = self.container_control_handle.lock().take() {
             log_debug!("Notifying CF that the container has stopped.");
@@ -610,7 +618,7 @@ impl Kernel {
             log_warn!("Shutdown invoked without a container controller control handle.");
         }
 
-        // Step 7: exiting this process.
+        // Step 8: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
         std::process::exit(0);
     }
