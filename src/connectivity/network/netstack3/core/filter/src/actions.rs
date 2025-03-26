@@ -9,13 +9,13 @@ use netstack3_base::Mark;
 pub enum MarkAction {
     /// This action sets the mark specified by the `mark` and `clearing_mask`.
     ///
-    /// If the current mark is [`None`], it will just set it to `mark`.
+    /// If the current mark is [`None`], it sets it to `mark`.
     SetMark {
-        /// This value will be combined with the result of the masking using a
+        /// This value is combined with the result of the masking using a
         /// bitwise OR to get the final mark.
         mark: u32,
-        /// The bits specified by this mask will be cleared out from the
-        /// existing mark.
+        /// The bits specified by this mask are cleared out from the existing
+        /// mark.
         clearing_mask: u32,
     },
 }

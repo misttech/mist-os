@@ -125,11 +125,12 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
     /// Applies the mark action to the given mark domain.
     ///
     /// This is a non-terminal action for both routines and hooks. This is also
-    /// only available in [`IpRoutines`] because [`NatRoutines`] will only run
-    /// on the first packet in a connection and it is likely a misconfiguration
-    /// that packets after the first are marked differently or unmarked. If we
-    /// find use cases that justifies this being in [`NatRoutines`] we should
-    /// relax this limitation and support it.
+    /// only available in [`IpRoutines`] because [`NatRoutines`] only runs on
+    /// the first packet in a connection and it is likely a misconfiguration
+    /// that packets after the first are marked differently or unmarked.
+    ///
+    /// Note: If we find use cases that justify this being in [`NatRoutines`] we
+    /// should relax this limitation and support it.
     ///
     /// This is analogous to the `mark` statement in Netfilter.
     Mark {

@@ -82,6 +82,7 @@ mod type_names {
     pub(super) const ADDRESS_MATCHER_TYPE: &str = "fuchsia.net.filter/AddressMatcherType";
     pub(super) const TRANSPORT_PROTOCOL: &str = "fuchsia.net.filter/TransportProtocol";
     pub(super) const ACTION: &str = "fuchsia.net.filter/Action";
+    pub(super) const MARK_ACTION: &str = "fuchsia.net.filter/MarkAction";
     pub(super) const TRANSPARENT_PROXY: &str = "fuchsia.net.filter/TransparentProxy";
     pub(super) const RESOURCE: &str = "fuchsia.net.filter/Resource";
     pub(super) const EVENT: &str = "fuchsia.net.filter/Event";
@@ -941,6 +942,12 @@ pub enum Action {
     TransparentProxy(TransparentProxy),
     Redirect { dst_port: Option<PortRange> },
     Masquerade { src_port: Option<PortRange> },
+    Mark { domain: fnet::MarkDomain, action: MarkAction },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MarkAction {
+    SetMark { clearing_mask: fnet::Mark, mark: fnet::Mark },
 }
 
 /// Extension type for [`fnet_filter::TransparentProxy_`].
@@ -1005,6 +1012,9 @@ impl From<Action> for fnet_filter::Action {
                 src_port: src_port.map(Into::into),
                 __source_breaking: SourceBreaking,
             }),
+            Action::Mark { domain, action } => {
+                Self::Mark(fnet_filter::Mark { domain, action: action.into() })
+            }
         }
     }
 }
@@ -1051,8 +1061,35 @@ impl TryFrom<fnet_filter::Action> for Action {
                 src_port,
                 __source_breaking,
             }) => Ok(Self::Masquerade { src_port: src_port.map(TryInto::try_into).transpose()? }),
+            fnet_filter::Action::Mark(fnet_filter::Mark { domain, action }) => {
+                Ok(Self::Mark { domain, action: action.try_into()? })
+            }
             fnet_filter::Action::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::ACTION))
+            }
+        }
+    }
+}
+
+impl From<MarkAction> for fnet_filter::MarkAction {
+    fn from(action: MarkAction) -> Self {
+        match action {
+            MarkAction::SetMark { clearing_mask, mark } => {
+                Self::SetMark(fnet_filter::SetMark { clearing_mask, mark })
+            }
+        }
+    }
+}
+
+impl TryFrom<fnet_filter::MarkAction> for MarkAction {
+    type Error = FidlConversionError;
+    fn try_from(action: fnet_filter::MarkAction) -> Result<Self, Self::Error> {
+        match action {
+            fnet_filter::MarkAction::SetMark(fnet_filter::SetMark { clearing_mask, mark }) => {
+                Ok(Self::SetMark { clearing_mask, mark })
+            }
+            fnet_filter::MarkAction::__SourceBreaking { .. } => {
+                Err(FidlConversionError::UnknownUnionVariant(type_names::MARK_ACTION))
             }
         }
     }

@@ -8,9 +8,12 @@ use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::RangeInclusive;
 
+use assert_matches::assert_matches;
+use fidl_fuchsia_net::MarkDomain;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
 use fidl_fuchsia_net_filter_ext::{
-    Action, AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, NatHook, PortRange,
+    Action, AddressMatcher, AddressMatcherType, Change, CommitError, InterfaceMatcher, MarkAction,
+    Matchers, NatHook, PortRange, Resource, Rule, RuleId,
 };
 use fidl_fuchsia_net_routes as fnet_routes;
 use heck::ToSnakeCase as _;
@@ -693,4 +696,41 @@ async fn implicit_snat_ports_of_locally_generated_traffic<I: RouterTestIpExt, S:
         ExpectedConnectivity::TwoWay,
     )
     .await;
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(NatHook::Ingress)]
+#[test_case(NatHook::LocalIngress)]
+#[test_case(NatHook::LocalEgress)]
+#[test_case(NatHook::Egress)]
+async fn invalid_mark_action<I: TestIpExt>(name: &str, nat_hook: NatHook) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let name = format!("{name}_{nat_hook:?}");
+
+    let mut net =
+        TestNet::new::<I>(&sandbox, &network, &name, None /* ip_hook */, Some(nat_hook)).await;
+
+    let id = RuleId {
+        routine: net.server.nat_routine.clone().expect("NAT routine should be installed"),
+        index: LOW_RULE_PRIORITY,
+    };
+    net.server
+        .controller
+        .push_changes(vec![Change::Create(Resource::Rule(Rule {
+            id: id.clone(),
+            matchers: Matchers::default(),
+            action: Action::Mark {
+                domain: MarkDomain::Mark1,
+                action: MarkAction::SetMark { clearing_mask: 0, mark: 0 },
+            },
+        }))])
+        .await
+        .expect("push changes");
+
+    assert_matches!(
+        net.server.controller.commit().await,
+        Err(CommitError::RuleWithInvalidAction(got)) => assert_eq!(got, id)
+    );
 }

@@ -185,6 +185,7 @@ impl UpdateDispatcherInner {
                 tproxy_actions: usize,
                 redirect_actions: usize,
                 masquerade_actions: usize,
+                mark_actions: usize,
             }
 
             let mut counts = Counts { namespaces: new_state.len(), ..Default::default() };
@@ -204,6 +205,7 @@ impl UpdateDispatcherInner {
                             fnet_filter_ext::Action::Masquerade { .. } => {
                                 counts.masquerade_actions += 1
                             }
+                            fnet_filter_ext::Action::Mark { .. } => counts.mark_actions += 1,
                             fnet_filter_ext::Action::Accept | fnet_filter_ext::Action::Return => {}
                         }
                     }
