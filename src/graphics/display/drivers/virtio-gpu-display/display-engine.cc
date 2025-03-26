@@ -17,6 +17,7 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <array>
 #include <cinttypes>
 #include <cstdint>
@@ -62,8 +63,8 @@ constexpr display::EngineInfo kEngineInfo({
     .is_capture_supported = false,
 });
 
-// TODO(https://fxbug.dev/42073721): Support more formats.
-constexpr display::PixelFormat kSupportedPixelFormat = display::PixelFormat::kB8G8R8A8;
+constexpr auto kSupportedPixelFormats = std::to_array<display::PixelFormat>(
+    {display::PixelFormat::kB8G8R8A8, display::PixelFormat::kR8G8B8A8});
 constexpr uint32_t kRefreshRateHz = 30;
 constexpr display::DisplayId kDisplayId(1);
 constexpr display::ModeId kDisplayModeId(1);
@@ -81,9 +82,8 @@ display::EngineInfo DisplayEngine::CompleteCoordinatorConnection() {
   });
 
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
-  const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, current_display_edid_bytes_,
-                                pixel_formats);
+                                kSupportedPixelFormats);
 
   return kEngineInfo;
 }
@@ -118,14 +118,17 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
   SysmemBufferInfo* sysmem_buffer_info = imported_images_.FindSysmemInfoById(image_id);
   ZX_DEBUG_ASSERT(sysmem_buffer_info != nullptr);
 
-  ZX_DEBUG_ASSERT(sysmem_buffer_info->pixel_format == kSupportedPixelFormat);
-  static constexpr int kBytesPerPixel = 4;
+  ZX_DEBUG_ASSERT_MSG(std::ranges::find(kSupportedPixelFormats, sysmem_buffer_info->pixel_format) !=
+                          kSupportedPixelFormats.end(),
+                      "Sysmem negotiation resulted in unsupported pixel format: %" PRIu32,
+                      sysmem_buffer_info->pixel_format.ValueForLogging());
 
   ZX_DEBUG_ASSERT(sysmem_buffer_info->pixel_format_modifier ==
                   fuchsia_images2::wire::PixelFormatModifier::kLinear);
 
   size_t image_size = static_cast<size_t>(image_metadata.width()) *
-                      static_cast<size_t>(image_metadata.height()) * kBytesPerPixel;
+                      static_cast<size_t>(image_metadata.height()) *
+                      sysmem_buffer_info->pixel_format.EncodingSize();
 
   zx::result<ImportedImage> imported_image_result =
       ImportedImage::Create(gpu_device_->bti(), sysmem_buffer_info->image_vmo,
@@ -270,13 +273,19 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .cpu_domain_supported(true)
           .Build());
 
-  const fuchsia_sysmem2::wire::ImageFormatConstraints image_format_constraints[] = {
-      fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-          .pixel_format(kSupportedPixelFormat.ToFidl())
-          .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
-          .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
-          .bytes_per_row_divisor(4)
-          .Build()};
+  static constexpr fuchsia_images2::wire::ColorSpace kColorSpaces[] = {
+      fuchsia_images2::wire::ColorSpace::kSrgb};
+  fuchsia_sysmem2::wire::ImageFormatConstraints
+      image_format_constraints[kSupportedPixelFormats.size()];
+  for (size_t i = 0; i < kSupportedPixelFormats.size(); ++i) {
+    image_format_constraints[i] =
+        fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
+            .pixel_format(kSupportedPixelFormats[i].ToFidl())
+            .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+            .color_spaces(kColorSpaces)
+            .bytes_per_row_divisor(4)
+            .Build();
+  }
   buffer_collection_constraints_builder.image_format_constraints(image_format_constraints);
 
   fidl::OneWayStatus set_constraints_status =
