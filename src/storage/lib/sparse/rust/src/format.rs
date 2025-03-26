@@ -29,7 +29,7 @@ pub struct SparseHeader {
     pub image_checksum: u32,
 }
 
-pub const SPARSE_HEADER_SIZE: usize = std::mem::size_of::<SparseHeader>();
+pub const SPARSE_HEADER_SIZE: u32 = std::mem::size_of::<SparseHeader>() as u32;
 const_assert_eq!(SPARSE_HEADER_SIZE, 28);
 
 impl SparseHeader {
@@ -64,7 +64,7 @@ pub struct ChunkHeader {
     pub total_sz: u32,
 }
 
-pub const CHUNK_HEADER_SIZE: usize = std::mem::size_of::<ChunkHeader>();
+pub const CHUNK_HEADER_SIZE: u32 = std::mem::size_of::<ChunkHeader>() as u32;
 const_assert_eq!(CHUNK_HEADER_SIZE, 12);
 
 pub const CHUNK_TYPE_RAW: u16 = 0xCAC1;

@@ -55,6 +55,6 @@ group("tests") {
   testonly = true
   deps = [
     ":lib_test($host_toolchain)",
-    ":sparse-test($host_toolchain)",
+    ":sparse-test",
   ]
 }
