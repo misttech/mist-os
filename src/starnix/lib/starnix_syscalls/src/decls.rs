@@ -131,6 +131,7 @@ macro_rules! for_each_arch_arch32_syscall {
             get_robust_list,
             getdents,
             geteuid32,
+            getgid32,
             getitimer,
             getresgid32,
             getresuid32,

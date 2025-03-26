@@ -3524,12 +3524,12 @@ mod arch32 {
     }
 
     pub use super::{
-        sys_chroot as sys_arch32_chroot, sys_dup3 as sys_arch32_dup3,
-        sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
-        sys_eventfd2 as sys_arch32_eventfd2, sys_fchmod as sys_arch32_fchmod,
-        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
-        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
-        sys_ftruncate as sys_arch32_ftruncate,
+        sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
+        sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_eventfd2 as sys_arch32_eventfd2,
+        sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
+        sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
+        sys_fstatfs as sys_arch32_fstatfs, sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
         sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,

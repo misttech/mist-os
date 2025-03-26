@@ -32,6 +32,7 @@ syscall_tests = [
   "fcntl_test",
   "fs_test",
   "fsverity_test",
+  "fuse_test",
   "futex_test",
   "getrandom_test",
   "loop_test",
@@ -165,7 +166,6 @@ arch64_syscall_tests = [
   # go/keep-sorted start
 
   "extended_pstate_test",
-  "fuse_test",
   "ptrace_test",
   "vdso_test",
 
