@@ -251,22 +251,15 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
     }
 
     // We should never reach here, but for now enforce it (see above) in debug builds.
-    let fs_name = fs_node.fs().name();
-    if fs_name == "anon" {
-        track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
-    } else if fs_name == "sockfs" {
-        track_stub!(TODO("https://fxbug.dev/364568517"), "Label socket nodes properly");
-    } else {
-        #[cfg(is_debug)]
-        panic!(
-            "Unlabeled FsNode@{} of class {:?} in {}",
-            fs_node.info().ino,
-            file_class_from_file_mode(fs_node.info().mode),
-            fs_node.fs().name()
-        );
-        #[cfg(not(is_debug))]
-        track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
-    }
+    #[cfg(is_debug)]
+    panic!(
+        "Unlabeled FsNode@{} of class {:?} in {}",
+        fs_node.info().ino,
+        file_class_from_file_mode(fs_node.info().mode),
+        fs_node.fs().name()
+    );
+    #[cfg(not(is_debug))]
+    track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
 
     FsNodeSidAndClass {
         sid: SecurityId::initial(InitialSid::Unlabeled),
