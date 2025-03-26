@@ -175,27 +175,6 @@ driver_bind_rules("aml-g12-composite-bind") {
   ]
 }
 
-bazel_fuchsia_test_package("aml-g12-composite-test-package") {
-  test_package_name = "aml-g12-composite-test"
-  inputs = [
-    "aml-tdm-config-device.cc",
-    "aml-tdm-config-device.h",
-    "composite.cc",
-    "composite.h",
-    "composite-server.cc",
-    "composite-server.h",
-    "recorder.cc",
-    "recorder.h",
-    "test/composite-test.cc",
-  ]
-  test_component_names = [ "aml-g12-composite-test-bin" ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
 # Tests.
 # Note: Don't add additional bazel tests into this group as it will introduce
 # more bazel actions into build graph. Instead, add them into
