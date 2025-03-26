@@ -16,7 +16,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::immutable::simple::Simple;
+use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+const SERVE_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 fn to_render2_error(err: fidl::Error) -> Error {
     anyhow::format_err!("Error encountered while calling render2: {:?}", err)
@@ -40,14 +44,9 @@ where
     let blobfs_proxy = wipe_storage_fn().await.context("failed to wipe storage")?;
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    outgoing_dir_vfs.clone().open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
-        out_dir,
-    );
+    SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
+        outgoing_dir_vfs.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+    });
     fasync::Task::local(async move { scope.wait().await }).detach();
 
     ota_progress_proxy
@@ -156,14 +155,10 @@ mod tests {
             "testfile" => read_only("test1")
         };
 
-        dir.open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
-            server.into_channel().into(),
-        );
+        SERVE_FLAGS.to_object_request(server.into_channel()).handle(|request| {
+            dir.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+        });
+
         fasync::Task::local(async move { scope.wait().await }).detach();
 
         Ok(client.into_proxy())
