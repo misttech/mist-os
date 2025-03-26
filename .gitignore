@@ -74,7 +74,6 @@ tables_generator_tests_*.txt
 .fx-sync-from-stem.cache
 
 ### Checkout generated files
-/build/checkout.gni
 /build/cipd.gni
 
 ### Infra files
