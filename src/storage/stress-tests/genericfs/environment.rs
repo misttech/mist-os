@@ -263,7 +263,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         loop {
             timer.next().await;
             match ArchiveReader::inspect()
-                .select_all_for_moniker(&moniker)
+                .select_all_for_component(moniker.to_string())
                 .snapshot()
                 .await
                 .map_err(|e| anyhow!(e))

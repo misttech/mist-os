@@ -72,7 +72,7 @@ fn test_topologytestdaemon_toggle() -> Result<()> {
 
 async fn get_power_broker_inspect() -> Result<DiagnosticsHierarchy, Error> {
     ArchiveReader::inspect()
-        .select_all_for_moniker("test-power-broker")
+        .select_all_for_component("test-power-broker")
         .snapshot()
         .await?
         .into_iter()

@@ -119,7 +119,7 @@ async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
 
 async fn wait_for_starnix_volume_to_be_mounted() {
     let test_fxfs_inspect =
-        ArchiveReader::inspect().select_all_for_moniker("test-fxfs").snapshot().await.unwrap();
+        ArchiveReader::inspect().select_all_for_component("test-fxfs").snapshot().await.unwrap();
     loop {
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
         if test_fxfs_inspect.len() == 0 {

@@ -55,7 +55,7 @@ async fn o_shutdown() {
 
     info!("collecting test-fxfs inspect");
     let test_fxfs_inspect = ArchiveReader::inspect()
-        .select_all_for_moniker(&test_fxfs_moniker)
+        .select_all_for_component(test_fxfs_moniker)
         .snapshot()
         .await
         .unwrap();

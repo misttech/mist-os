@@ -142,6 +142,7 @@ impl ToComponentSelectorArguments for &str {
                     .map(|value| value.to_string())
                     .collect(),
             )
+            .with_tree_selector("[...]root")
         }
     }
 }
@@ -519,12 +520,6 @@ impl ArchiveReader<Inspect> {
         Ok(T::from(data))
     }
 
-    /// Requests all data for the component identified by the given moniker.
-    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
-        self.add_selector(selector)
-    }
-
     /// Adds selectors used for performing filtering inspect hierarchies.
     /// This may be called multiple times to add additional selectors.
     pub fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
@@ -857,7 +852,7 @@ mod tests {
             .expect("component started");
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let results = ArchiveReader::inspect()
-            .select_all_for_moniker(&moniker)
+            .select_all_for_component(moniker)
             .snapshot()
             .await
             .expect("snapshotted");

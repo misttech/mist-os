@@ -28,7 +28,7 @@ macro_rules! block_until_inspect_matches {
         let mut reader = ArchiveReader::inspect();
 
         reader
-            .select_all_for_moniker($moniker)
+            .select_all_for_component($moniker.to_string())
             .with_minimum_schema_count(1);
 
         for i in 1.. {

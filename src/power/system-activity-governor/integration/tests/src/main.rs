@@ -148,7 +148,7 @@ macro_rules! block_until_inspect_matches {
         let mut reader = ArchiveReader::inspect();
 
         reader
-            .select_all_for_moniker(&format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
+            .select_all_for_component(format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
             .with_minimum_schema_count(1);
 
         for i in 1.. {
@@ -1958,7 +1958,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
     let mut reader = ArchiveReader::inspect();
 
     reader
-        .select_all_for_moniker(&format!(
+        .select_all_for_component(format!(
             "{}/{}",
             REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
         ))
@@ -2035,7 +2035,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
     let mut reader = ArchiveReader::inspect();
 
     reader
-        .select_all_for_moniker(&format!(
+        .select_all_for_component(format!(
             "{}/{}",
             REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
         ))

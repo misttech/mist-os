@@ -95,7 +95,7 @@ async fn main() {
     assert!(warnings.is_empty(), "should not encounter any trace parsing warnings");
 
     let kernel_inspect = ArchiveReader::inspect()
-        .select_all_for_moniker("kernel")
+        .select_all_for_component("kernel")
         .with_minimum_schema_count(1)
         .snapshot()
         .await

@@ -55,7 +55,7 @@ async fn test_suspend() -> Result<()> {
         // inspect should have been captured and ought to be available.
         let kernel_inspect = ArchiveReader::inspect()
             // See notes above for moniker.
-            .select_all_for_moniker("test_suite/kernel")
+            .select_all_for_component("test_suite/kernel")
             .with_minimum_schema_count(1)
             .snapshot()
             .await?;
