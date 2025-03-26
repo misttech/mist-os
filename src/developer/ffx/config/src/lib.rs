@@ -249,7 +249,10 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
         }
     }
     match sdk.get_host_tool(name) {
-        Ok(tool_path) if tool_path.exists() => Ok(tool_path),
+        Ok(tool_path) if tool_path.exists() => {
+            tracing::info!("SDK returned {tool_path:?} for {name}");
+            Ok(tool_path)
+        }
         Ok(tool_path) => Err(anyhow!("SDK returned {tool_path:?} for {name}, but does not exist")),
         Err(e) => Err(e),
     }

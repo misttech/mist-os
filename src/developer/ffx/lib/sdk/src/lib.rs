@@ -504,7 +504,17 @@ impl Sdk {
     /// A preferred alternative to this method is ffx_config::get_host_tool() which
     /// also considers configured overrides for the tools.
     pub fn get_host_tool(&self, name: &str) -> Result<PathBuf> {
-        self.get_host_tool_relative_path(name).map(|path| self.path_prefix.join(path))
+        let relative_path = self.get_host_tool_relative_path(name)?;
+
+        let full_path = self.path_prefix.join(relative_path);
+
+        if full_path.exists() {
+            tracing::info!("Path {full_path:?} found for {name}");
+            Ok(full_path)
+        } else {
+            tracing::info!("No path  found for {name}");
+            Err(anyhow!("No path  found for {name}"))
+        }
     }
 
     /// Get the metadata for all host tools
@@ -830,11 +840,12 @@ mod test {
             fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
-
+        let expected = manifest_path.join("host_x64/zxdb");
+        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake zxdb");
         let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
-        assert_eq!(manifest_path.join("host_x64/zxdb"), zxdb);
+        assert_eq!(expected, zxdb);
 
         let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
         assert_eq!(zxdb_cmd.get_program(), manifest_path.join("host_x64/zxdb"));
@@ -849,10 +860,12 @@ mod test {
         ))
         .unwrap();
 
+        let expected = manifest_path.join("host_x64/symbol-index");
+        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake host tool");
         let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::InTree).unwrap();
         let symbol_index = sdk.get_host_tool("symbol-index").unwrap();
 
-        assert_eq!(manifest_path.join("host_x64/symbol-index"), symbol_index);
+        assert_eq!(expected, symbol_index);
 
         let symbol_index_cmd = sdk.get_host_tool_command("symbol-index").unwrap();
         assert_eq!(symbol_index_cmd.get_program(), manifest_path.join("host_x64/symbol-index"));
@@ -911,7 +924,8 @@ mod test {
             fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
-
+        let expected = sdk_root.join("tools/zxdb");
+        fs::write(&expected, "#!/bin/bash\n echo hello").expect("fake host tool");
         let sdk = Sdk {
             path_prefix: sdk_root.to_owned(),
             module: None,
@@ -921,7 +935,7 @@ mod test {
         };
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
-        assert_eq!(sdk_root.join("tools/zxdb"), zxdb);
+        assert_eq!(expected, zxdb);
 
         let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
         assert_eq!(zxdb_cmd.get_program(), sdk_root.join("tools/zxdb"));

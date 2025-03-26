@@ -68,6 +68,9 @@ pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
                 .join(name);
 
             if tool_path.exists() {
+                tracing::info!(
+                    "Using {tool_path:?} based on {ffx_path:?} directory for tool {name}"
+                );
                 Ok(tool_path)
             } else {
                 return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
