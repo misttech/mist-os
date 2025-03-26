@@ -10,6 +10,7 @@
 #include <lib/trace-provider/provider.h>
 #include <lib/trace/observer.h>
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -18,7 +19,6 @@
 #include <perfetto/ext/tracing/core/tracing_service.h>
 
 #include "src/lib/fxl/synchronization/thread_annotations.h"
-#include "src/tracing/core/tracing_service_impl.h"
 
 // Encapsulation of the Fuchsia trace observer and provider protocols,
 // for testing.

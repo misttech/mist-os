@@ -17,9 +17,8 @@ source_set("perfetto_bridge_lib") {
     "//src/lib/fxl",
     "//third_party/perfetto:libperfetto_client_experimental",
     "//third_party/perfetto/include/perfetto/ext/ipc",
-    "//third_party/perfetto/src/base",
-    "//third_party/perfetto/src/tracing/core:service",
-    "//third_party/perfetto/src/tracing/ipc/service",
+    "//third_party/perfetto/include/perfetto/ext/tracing/core",
+    "//third_party/perfetto/include/perfetto/ext/tracing/ipc",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
   ]

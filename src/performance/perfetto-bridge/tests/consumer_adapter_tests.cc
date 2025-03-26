@@ -9,6 +9,7 @@
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
+#include <lib/trace-provider/provider.h>
 #include <lib/zx/time.h>
 
 #include <deque>
@@ -23,11 +24,13 @@
 #include <perfetto/tracing/platform.h>
 #include <rapidjson/document.h>
 
-#include "lib/trace-provider/provider.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/performance/perfetto-bridge/consumer_adapter.h"
 
+#include <third_party/perfetto/protos/perfetto/common/trace_stats.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/chrome/chrome_config.gen.h>
+#include <third_party/perfetto/protos/perfetto/config/data_source_config.gen.h>
+#include <third_party/perfetto/protos/perfetto/config/trace_config.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/track_event/track_event_config.gen.h>
 
 using testing::ElementsAre;
