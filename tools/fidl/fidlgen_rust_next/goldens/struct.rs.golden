@@ -89,9 +89,9 @@ pub struct WireBasicStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireBasicStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }
@@ -222,7 +222,7 @@ pub struct WireSimple {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSimple {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimple

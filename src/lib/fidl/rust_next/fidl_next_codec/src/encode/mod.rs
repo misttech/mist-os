@@ -56,22 +56,17 @@ impl<T: ?Sized> CopyOptimization<T> {
 /// # Safety
 ///
 /// `zero_padding` must write zeroes to at least the padding bytes of the pointed-to memory.
-pub unsafe trait ZeroPadding {
+pub unsafe trait ZeroPadding: Sized {
     /// Writes zeroes to the padding for this type, if any.
-    ///
-    /// # Safety
-    ///
-    /// `ptr` must point to memory suitable for holding this type.
-    unsafe fn zero_padding(ptr: *mut Self);
+    fn zero_padding(out: &mut MaybeUninit<Self>);
 }
 
 unsafe impl<T: ZeroPadding, const N: usize> ZeroPadding for [T; N] {
     #[inline]
-    unsafe fn zero_padding(backing: *mut Self) {
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
         for i in 0..N {
-            unsafe {
-                T::zero_padding(backing.cast::<T>().add(i));
-            }
+            let out_i = unsafe { &mut *out.as_mut_ptr().cast::<MaybeUninit<T>>().add(i) };
+            T::zero_padding(out_i);
         }
     }
 }
@@ -80,7 +75,7 @@ macro_rules! impl_zero_padding_for_primitive {
     ($ty:ty) => {
         unsafe impl ZeroPadding for $ty {
             #[inline]
-            unsafe fn zero_padding(_: *mut Self) {}
+            fn zero_padding(_: &mut MaybeUninit<Self>) {}
         }
     };
 }

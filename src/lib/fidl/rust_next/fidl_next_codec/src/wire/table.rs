@@ -20,7 +20,7 @@ pub struct WireTable {
 
 unsafe impl ZeroPadding for WireTable {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire tables have no padding
     }
 }

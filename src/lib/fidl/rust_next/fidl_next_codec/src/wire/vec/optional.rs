@@ -21,10 +21,9 @@ pub struct WireOptionalVector<T> {
 
 unsafe impl<T> ZeroPadding for WireOptionalVector<T> {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            RawWireVector::<T>::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw } = out);
+        RawWireVector::<T>::zero_padding(raw);
     }
 }
 

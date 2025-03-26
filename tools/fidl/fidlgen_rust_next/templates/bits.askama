@@ -76,7 +76,7 @@ pub struct {{ wire_name }} {
 
 unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }

@@ -26,7 +26,7 @@ pub struct WireMessageHeader {
 
 unsafe impl ZeroPadding for WireMessageHeader {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire message headers have no padding
     }
 }

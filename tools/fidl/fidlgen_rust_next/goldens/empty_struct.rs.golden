@@ -76,7 +76,7 @@ pub struct WireEmpty {}
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmpty {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmpty
@@ -184,7 +184,7 @@ pub struct WireEmptyProtocolSendRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendRequest
@@ -295,7 +295,7 @@ pub struct WireEmptyProtocolReceiveRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolReceiveRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolReceiveRequest
@@ -408,7 +408,7 @@ pub struct WireEmptyProtocolSendAndReceiveRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendAndReceiveRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendAndReceiveRequest
@@ -521,7 +521,7 @@ pub struct WireEmptyProtocolSendAndReceiveResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendAndReceiveResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendAndReceiveResponse

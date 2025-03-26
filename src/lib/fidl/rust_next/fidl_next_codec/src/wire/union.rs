@@ -22,7 +22,7 @@ pub struct RawWireUnion {
 
 unsafe impl ZeroPadding for RawWireUnion {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire unions have no padding
     }
 }

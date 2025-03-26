@@ -78,7 +78,7 @@ pub struct WireSuperFooRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSuperFooRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooRequest
@@ -191,7 +191,7 @@ pub struct WireSuperFooResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSuperFooResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooResponse

@@ -17,7 +17,7 @@ pub struct RawWireVector<T> {
 
 unsafe impl<T> ZeroPadding for RawWireVector<T> {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire vectors have no padding bytes
     }
 }

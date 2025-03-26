@@ -81,7 +81,7 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest
@@ -197,7 +197,7 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailResponse

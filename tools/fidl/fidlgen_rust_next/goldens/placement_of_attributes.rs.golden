@@ -66,7 +66,7 @@ pub struct WireExampleBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -153,7 +153,7 @@ pub struct WireExampleEnum {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleEnum {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -286,7 +286,7 @@ pub struct WireExampleProtocolMethodRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleProtocolMethodRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleProtocolMethodRequest
@@ -548,7 +548,7 @@ pub struct WireExampleStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleStruct
@@ -606,9 +606,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        unsafe {
-            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
-        }
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -655,10 +653,9 @@ pub struct WireExampleTable {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleTable {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { table } = out);
+        ::fidl_next::WireTable::zero_padding(table);
     }
 }
 
@@ -794,10 +791,9 @@ pub struct WireExampleUnion {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleUnion {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -864,10 +860,9 @@ pub struct WireOptionalExampleUnion {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalExampleUnion {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 

@@ -137,10 +137,9 @@ pub struct {{ wire_name }} {
 
 unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -260,10 +259,9 @@ pub struct WireOptional{{ name }} {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptional{{ name }} {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 

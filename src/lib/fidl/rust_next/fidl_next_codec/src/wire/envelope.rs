@@ -32,7 +32,7 @@ pub union WireEnvelope {
 }
 
 unsafe impl ZeroPadding for WireEnvelope {
-    unsafe fn zero_padding(_: *mut Self) {}
+    fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
 
 impl WireEnvelope {

@@ -38,7 +38,7 @@ impl<T> Drop for WireBox<T> {
 
 unsafe impl<T> ZeroPadding for WireBox<T> {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire boxes have no padding
     }
 }

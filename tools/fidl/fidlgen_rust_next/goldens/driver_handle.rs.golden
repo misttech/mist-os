@@ -101,7 +101,7 @@ pub struct WireClientEndWrapper {
 
 unsafe impl ::fidl_next::ZeroPadding for WireClientEndWrapper {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireClientEndWrapper
@@ -269,9 +269,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        unsafe {
-            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
-        }
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -334,10 +332,9 @@ pub struct WireT {
 
 unsafe impl ::fidl_next::ZeroPadding for WireT {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { table } = out);
+        ::fidl_next::WireTable::zero_padding(table);
     }
 }
 
@@ -486,7 +483,7 @@ pub struct WireHandlesInProtocolSendHandlesRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireHandlesInProtocolSendHandlesRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest
@@ -765,7 +762,7 @@ pub struct WireServerEndWrapper {
 
 unsafe impl ::fidl_next::ZeroPadding for WireServerEndWrapper {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireServerEndWrapper

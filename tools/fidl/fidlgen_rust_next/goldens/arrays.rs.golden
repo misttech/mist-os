@@ -89,7 +89,7 @@ pub struct WireStructLargeArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructLargeArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructLargeArray
@@ -200,7 +200,7 @@ pub struct WireStructSmallArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructSmallArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSmallArray
@@ -258,9 +258,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        unsafe {
-            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
-        }
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -303,10 +301,9 @@ pub struct WireTableLargeArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireTableLargeArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { table } = out);
+        ::fidl_next::WireTable::zero_padding(table);
     }
 }
 
@@ -385,9 +382,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        unsafe {
-            ::fidl_next::ZeroPadding::zero_padding(out.as_mut_ptr());
-        }
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -430,10 +425,9 @@ pub struct WireTableSmallArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireTableSmallArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::WireTable::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { table } = out);
+        ::fidl_next::WireTable::zero_padding(table);
     }
 }
 
@@ -571,10 +565,9 @@ pub struct WireUnionLargeArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionLargeArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -633,10 +626,9 @@ pub struct WireOptionalUnionLargeArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionLargeArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -781,10 +773,9 @@ pub struct WireUnionSmallArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionSmallArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -843,10 +834,9 @@ pub struct WireOptionalUnionSmallArray {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSmallArray {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 

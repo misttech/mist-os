@@ -87,9 +87,9 @@ pub struct WirePadding1ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding1ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(3).write_bytes(0, 1);
         }
     }
 }
@@ -203,9 +203,9 @@ pub struct WirePadding1ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding1ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(1).write_bytes(0, 1);
         }
     }
 }
@@ -328,13 +328,13 @@ pub struct WirePadding2ByteAlignmentLength6 {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteAlignmentLength6 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(5).write_bytes(0, 1);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(1).write_bytes(0, 1);
         }
     }
 }
@@ -451,9 +451,9 @@ pub struct WirePadding2ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(6).write_bytes(0, 2);
+            out.as_mut_ptr().cast::<u8>().add(6).write_bytes(0, 2);
         }
     }
 }
@@ -567,9 +567,9 @@ pub struct WirePadding2ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding2ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(2).write_bytes(0, 2);
+            out.as_mut_ptr().cast::<u8>().add(2).write_bytes(0, 2);
         }
     }
 }
@@ -683,9 +683,9 @@ pub struct WirePadding3ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding3ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 3);
+            out.as_mut_ptr().cast::<u8>().add(5).write_bytes(0, 3);
         }
     }
 }
@@ -799,9 +799,9 @@ pub struct WirePadding3ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding3ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 3);
+            out.as_mut_ptr().cast::<u8>().add(1).write_bytes(0, 3);
         }
     }
 }
@@ -933,13 +933,13 @@ pub struct WirePadding4ByteAlignmentLength12 {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteAlignmentLength12 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(10).write_bytes(0, 2);
+            out.as_mut_ptr().cast::<u8>().add(10).write_bytes(0, 2);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(5).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(5).write_bytes(0, 1);
         }
     }
 }
@@ -1059,9 +1059,9 @@ pub struct WirePadding4ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(12).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(12).write_bytes(0, 4);
         }
     }
 }
@@ -1175,9 +1175,9 @@ pub struct WirePadding4ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding4ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }
@@ -1300,9 +1300,9 @@ pub struct WirePadding5ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding5ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(11).write_bytes(0, 5);
+            out.as_mut_ptr().cast::<u8>().add(11).write_bytes(0, 5);
         }
     }
 }
@@ -1428,9 +1428,9 @@ pub struct WirePadding5ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding5ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 5);
+            out.as_mut_ptr().cast::<u8>().add(3).write_bytes(0, 5);
         }
     }
 }
@@ -1547,9 +1547,9 @@ pub struct WirePadding6ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding6ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(10).write_bytes(0, 6);
+            out.as_mut_ptr().cast::<u8>().add(10).write_bytes(0, 6);
         }
     }
 }
@@ -1663,9 +1663,9 @@ pub struct WirePadding6ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding6ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(2).write_bytes(0, 6);
+            out.as_mut_ptr().cast::<u8>().add(2).write_bytes(0, 6);
         }
     }
 }
@@ -1779,9 +1779,9 @@ pub struct WirePadding7ByteEnd {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding7ByteEnd {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(9).write_bytes(0, 7);
+            out.as_mut_ptr().cast::<u8>().add(9).write_bytes(0, 7);
         }
     }
 }
@@ -1895,9 +1895,9 @@ pub struct WirePadding7ByteMiddle {
 
 unsafe impl ::fidl_next::ZeroPadding for WirePadding7ByteMiddle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 7);
+            out.as_mut_ptr().cast::<u8>().add(1).write_bytes(0, 7);
         }
     }
 }

@@ -22,10 +22,9 @@ pub struct WireString {
 
 unsafe impl ZeroPadding for WireString {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireVector::<u8>::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { vec } = out);
+        WireVector::<u8>::zero_padding(vec);
     }
 }
 

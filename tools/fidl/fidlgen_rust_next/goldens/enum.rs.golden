@@ -55,7 +55,7 @@ pub struct WireMyEmptyFlexibleEnum {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMyEmptyFlexibleEnum {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -147,7 +147,7 @@ pub struct WireMyFlexibleEnum {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnum {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -256,7 +256,7 @@ pub struct WireMyFlexibleEnumWithCustomUnknown {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMyFlexibleEnumWithCustomUnknown {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -364,7 +364,7 @@ pub struct WireMyStrictEnum {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMyStrictEnum {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }

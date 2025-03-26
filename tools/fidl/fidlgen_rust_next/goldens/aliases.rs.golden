@@ -82,7 +82,7 @@ pub struct WireObjType {
 
 unsafe impl ::fidl_next::ZeroPadding for WireObjType {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -306,13 +306,13 @@ pub struct WireExampleOfUseOfAliases {
 
 unsafe impl ::fidl_next::ZeroPadding for WireExampleOfUseOfAliases {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(84).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(84).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }

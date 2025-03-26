@@ -140,10 +140,10 @@ pub struct {{ wire_name }} {
 
 unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         {% for range in self.zero_padding_ranges() %}
             unsafe {
-                ptr.cast::<u8>().add({{ range.offset }}).write_bytes(0, {{ range.width }});
+                out.as_mut_ptr().cast::<u8>().add({{ range.offset }}).write_bytes(0, {{ range.width }});
             }
         {% endfor %}
     }

@@ -87,9 +87,9 @@ pub struct WireInt16Int8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireInt16Int8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(3).write_bytes(0, 1);
+            out.as_mut_ptr().cast::<u8>().add(3).write_bytes(0, 1);
         }
     }
 }
@@ -192,7 +192,7 @@ pub struct WireArrayInt16Int8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireArrayInt16Int8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireArrayInt16Int8
@@ -301,9 +301,9 @@ pub struct WireInt8Int32 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireInt8Int32 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(1).write_bytes(0, 3);
+            out.as_mut_ptr().cast::<u8>().add(1).write_bytes(0, 3);
         }
     }
 }
@@ -421,9 +421,9 @@ pub struct WireNonInlineStructTestStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireNonInlineStructTestStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(12).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(12).write_bytes(0, 4);
         }
     }
 }
@@ -550,7 +550,7 @@ pub struct WireStructPaddingTestStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructPaddingTestStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructPaddingTestStruct
@@ -669,7 +669,7 @@ pub struct WireTopLevelStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireTopLevelStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTopLevelStruct

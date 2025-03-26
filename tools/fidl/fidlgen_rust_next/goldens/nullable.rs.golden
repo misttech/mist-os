@@ -89,7 +89,7 @@ pub struct WireInt32Wrapper {
 
 unsafe impl ::fidl_next::ZeroPadding for WireInt32Wrapper {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt32Wrapper
@@ -213,7 +213,7 @@ pub struct WireSimpleProtocolAddRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddRequest
@@ -327,7 +327,7 @@ pub struct WireSimpleProtocolAddResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddResponse
@@ -620,10 +620,9 @@ pub struct WireSimpleUnion {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSimpleUnion {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -701,10 +700,9 @@ pub struct WireOptionalSimpleUnion {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalSimpleUnion {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -873,7 +871,7 @@ pub struct WireStructWithNullableHandle {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableHandle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableHandle
@@ -998,7 +996,7 @@ pub struct WireStructWithNullableProtocol {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableProtocol {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableProtocol
@@ -1123,7 +1121,7 @@ pub struct WireStructWithNullableRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableRequest
@@ -1225,7 +1223,7 @@ pub struct WireStructWithNullableString {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableString {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableString
@@ -1327,7 +1325,7 @@ pub struct WireStructWithNullableStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct
@@ -1442,7 +1440,7 @@ pub struct WireStructWithNullableUnion {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableUnion {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
@@ -1542,7 +1540,7 @@ pub struct WireStructWithNullableVector {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableVector {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector

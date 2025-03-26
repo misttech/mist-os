@@ -22,10 +22,9 @@ pub struct WireChannel {
 
 unsafe impl ZeroPadding for WireChannel {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireHandle::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
+        WireHandle::zero_padding(handle);
     }
 }
 
@@ -75,10 +74,9 @@ pub struct WireOptionalChannel {
 
 unsafe impl ZeroPadding for WireOptionalChannel {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireOptionalHandle::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
+        WireOptionalHandle::zero_padding(handle);
     }
 }
 

@@ -30,7 +30,7 @@ impl Drop for WireHandle {
 
 unsafe impl ZeroPadding for WireHandle {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
         // Wire handles have no padding
     }
 }
@@ -101,10 +101,9 @@ pub struct WireOptionalHandle {
 
 unsafe impl ZeroPadding for WireOptionalHandle {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            WireHandle::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
+        WireHandle::zero_padding(handle);
     }
 }
 

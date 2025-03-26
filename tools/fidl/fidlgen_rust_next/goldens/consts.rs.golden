@@ -66,7 +66,7 @@ pub struct WireBitsType {
 
 unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -164,7 +164,7 @@ pub struct WireEnumType {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }

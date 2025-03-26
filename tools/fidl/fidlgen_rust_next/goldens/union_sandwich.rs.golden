@@ -97,10 +97,9 @@ pub struct WireUnionSize12Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionSize12Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -159,10 +158,9 @@ pub struct WireOptionalUnionSize12Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSize12Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -308,13 +306,13 @@ pub struct WireSandwichUnionSize12Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSandwichUnionSize12Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(28).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(28).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }
@@ -448,7 +446,7 @@ pub struct WireStructSize16Alignment8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructSize16Alignment8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSize16Alignment8
@@ -571,10 +569,9 @@ pub struct WireUnionSize24Alignment8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionSize24Alignment8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -637,10 +634,9 @@ pub struct WireOptionalUnionSize24Alignment8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSize24Alignment8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -788,13 +784,13 @@ pub struct WireSandwichUnionSize24Alignment8 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSandwichUnionSize24Alignment8 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(28).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(28).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }
@@ -923,10 +919,9 @@ pub struct WireUnionSize36Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionSize36Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -985,10 +980,9 @@ pub struct WireOptionalUnionSize36Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSize36Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -1134,13 +1128,13 @@ pub struct WireSandwichUnionSize36Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSandwichUnionSize36Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(28).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(28).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }
@@ -1265,10 +1259,9 @@ pub struct WireUnionSize8Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireUnionSize8Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -1337,10 +1330,9 @@ pub struct WireOptionalUnionSize8Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalUnionSize8Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -1498,13 +1490,13 @@ pub struct WireSandwichUnionSize8Alignment4 {
 
 unsafe impl ::fidl_next::ZeroPadding for WireSandwichUnionSize8Alignment4 {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(28).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(28).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(4).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(4).write_bytes(0, 4);
         }
     }
 }

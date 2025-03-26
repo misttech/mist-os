@@ -61,7 +61,7 @@ pub struct WireBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -154,7 +154,7 @@ pub struct WireBitsType {
 
 unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -241,7 +241,7 @@ pub struct WireEnum {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEnum {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -337,7 +337,7 @@ pub struct WireEnumType {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
     }
 }
@@ -505,13 +505,13 @@ pub struct WireStruct {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStruct {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
-            ptr.cast::<u8>().add(36).write_bytes(0, 4);
+            out.as_mut_ptr().cast::<u8>().add(36).write_bytes(0, 4);
         }
 
         unsafe {
-            ptr.cast::<u8>().add(25).write_bytes(0, 3);
+            out.as_mut_ptr().cast::<u8>().add(25).write_bytes(0, 3);
         }
     }
 }

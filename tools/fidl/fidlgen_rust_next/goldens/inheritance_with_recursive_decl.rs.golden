@@ -103,7 +103,7 @@ pub struct WireParentFirstRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireParentFirstRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentFirstRequest
@@ -381,7 +381,7 @@ pub struct WireChildSecondRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireChildSecondRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChildSecondRequest

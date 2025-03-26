@@ -111,10 +111,9 @@ pub struct WireFlexibleFoo {
 
 unsafe impl ::fidl_next::ZeroPadding for WireFlexibleFoo {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -182,10 +181,9 @@ pub struct WireOptionalFlexibleFoo {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalFlexibleFoo {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -342,10 +340,9 @@ pub struct WireStrictFoo {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStrictFoo {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -411,10 +408,9 @@ pub struct WireOptionalStrictFoo {
 
 unsafe impl ::fidl_next::ZeroPadding for WireOptionalStrictFoo {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            ::fidl_next::RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
     }
 }
 
@@ -547,7 +543,7 @@ pub struct WireProtocolRequestStrictResponseFlexibleRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireProtocolRequestStrictResponseFlexibleRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestStrictResponseFlexibleRequest
@@ -652,7 +648,7 @@ pub struct WireProtocolRequestStrictResponseFlexibleResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireProtocolRequestStrictResponseFlexibleResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestStrictResponseFlexibleResponse
@@ -757,7 +753,7 @@ pub struct WireProtocolRequestFlexibleResponseStrictRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireProtocolRequestFlexibleResponseStrictRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestFlexibleResponseStrictRequest
@@ -862,7 +858,7 @@ pub struct WireProtocolRequestFlexibleResponseStrictResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireProtocolRequestFlexibleResponseStrictResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestFlexibleResponseStrictResponse

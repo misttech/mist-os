@@ -31,10 +31,9 @@ pub struct WireFlexible<T> {
 
 unsafe impl<T> ZeroPadding for WireFlexible<T> {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw, _phantom: _ } = out);
+        RawWireUnion::zero_padding(raw);
     }
 }
 

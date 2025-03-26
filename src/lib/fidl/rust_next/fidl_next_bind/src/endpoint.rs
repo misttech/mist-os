@@ -25,10 +25,9 @@ macro_rules! endpoint {
 
         unsafe impl<T: ZeroPadding, P> ZeroPadding for $name<T, P> {
             #[inline]
-            unsafe fn zero_padding(ptr: *mut Self) {
-                unsafe {
-                    T::zero_padding(ptr.cast());
-                }
+            fn zero_padding(out: &mut MaybeUninit<Self>) {
+                munge!(let Self { transport, _protocol: _ } = out);
+                T::zero_padding(transport);
             }
         }
 

@@ -102,7 +102,7 @@ pub struct WireLocalStructPayload {
 
 unsafe impl ::fidl_next::ZeroPadding for WireLocalStructPayload {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireLocalStructPayload
@@ -229,7 +229,7 @@ pub struct WireMainProtocolOneWayAnonRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOneWayAnonRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOneWayAnonRequest
@@ -356,7 +356,7 @@ pub struct WireMainProtocolTwoWayAnonRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
@@ -483,7 +483,7 @@ pub struct WireMainProtocolTwoWayAnonResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonResponse
@@ -612,7 +612,7 @@ pub struct WireMainProtocolTwoWayAnonWithErrorRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorRequest
@@ -741,7 +741,7 @@ pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolTwoWayAnonWithErrorResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
@@ -868,7 +868,7 @@ pub struct WireMainProtocolOnAnonRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMainProtocolOnAnonRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest

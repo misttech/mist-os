@@ -102,7 +102,7 @@ pub struct WireTwoWayAddRequest {
 
 unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddRequest {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddRequest
@@ -216,7 +216,7 @@ pub struct WireTwoWayAddResponse {
 
 unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddResponse {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddResponse

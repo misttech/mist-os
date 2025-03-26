@@ -20,10 +20,9 @@ pub struct WireResult<T, E> {
 
 unsafe impl<T, E> ZeroPadding for WireResult<T, E> {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {
-        unsafe {
-            RawWireUnion::zero_padding(ptr.cast());
-        }
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw, _phantom: _ } = out);
+        RawWireUnion::zero_padding(raw);
     }
 }
 

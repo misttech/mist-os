@@ -28,7 +28,7 @@ pub struct WireFrameworkError {
 
 unsafe impl ZeroPadding for WireFrameworkError {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {}
+    fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
 
 impl fmt::Debug for WireFrameworkError {

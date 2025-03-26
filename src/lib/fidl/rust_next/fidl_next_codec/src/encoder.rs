@@ -138,9 +138,7 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
         let mut outputs = self.preallocate::<T::Encoded>(values.len());
 
         let mut out = MaybeUninit::<T::Encoded>::uninit();
-        unsafe {
-            <T::Encoded as ZeroPadding>::zero_padding(out.as_mut_ptr());
-        }
+        <T::Encoded as ZeroPadding>::zero_padding(&mut out);
         for value in values {
             value.encode(outputs.encoder, &mut out)?;
             unsafe {

@@ -58,7 +58,7 @@ pub struct WireEmptyBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireEmptyBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -139,7 +139,7 @@ pub struct WireFlexibleBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireFlexibleBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -221,7 +221,7 @@ pub struct WireMyBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireMyBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }
@@ -311,7 +311,7 @@ pub struct WireStrictBits {
 
 unsafe impl ::fidl_next::ZeroPadding for WireStrictBits {
     #[inline]
-    unsafe fn zero_padding(_: *mut Self) {
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
     }
 }

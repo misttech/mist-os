@@ -99,7 +99,7 @@ pub struct WireFoo {
 
 unsafe impl ::fidl_next::ZeroPadding for WireFoo {
     #[inline]
-    unsafe fn zero_padding(ptr: *mut Self) {}
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFoo
