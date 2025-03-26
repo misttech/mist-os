@@ -21,7 +21,7 @@ class BtiVisitor : public Visitor {
   ~BtiVisitor() override = default;
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override;
 
-  bool IsIommu(std::string_view node_name);
+  static bool IsIommu(std::string_view node_name) { return node_name == "iommu"; }
 
  private:
   zx::result<> ReferenceChildVisit(Node& child, ReferenceNode& parent,

@@ -11,10 +11,6 @@
 #include <cstdint>
 #include <optional>
 
-namespace fdf {
-using namespace fuchsia_driver_framework;
-}
-
 namespace fdf_devicetree {
 
 constexpr const char kBtiProp[] = "iommus";
@@ -50,8 +46,6 @@ BtiVisitor::BtiVisitor() {
   reference_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
 }
 
-bool BtiVisitor::IsIommu(std::string_view node_name) { return node_name == "iommu"; }
-
 zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
   zx::result parser_output = reference_parser_->Parse(node);
   if (parser_output.is_error()) {
@@ -59,12 +53,12 @@ zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& de
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kBtiProp) == parser_output->end()) {
+  if (!parser_output->contains(kBtiProp)) {
     return zx::ok();
   }
 
   std::vector<std::optional<std::string>> iommu_names((*parser_output)[kBtiProp].size());
-  if (parser_output->find(kBtiNameProp) != parser_output->end()) {
+  if (parser_output->contains(kBtiNameProp)) {
     if ((*parser_output)[kBtiNameProp].size() > (*parser_output)[kBtiProp].size()) {
       FDF_LOG(ERROR, "Node '%s' has %zu iommu entries but has %zu iommmu names.",
               node.name().c_str(), (*parser_output)[kBtiProp].size(),
@@ -78,7 +72,7 @@ zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& de
   }
 
   for (uint32_t index = 0; index < (*parser_output)[kBtiProp].size(); index++) {
-    auto reference = (*parser_output)[kBtiProp][index].AsReference();
+    std::optional reference = (*parser_output)[kBtiProp][index].AsReference();
     if (reference && IsIommu(reference->first.name())) {
       auto result =
           ReferenceChildVisit(node, reference->first, reference->second, iommu_names[index]);

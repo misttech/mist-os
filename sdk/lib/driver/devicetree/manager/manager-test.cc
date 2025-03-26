@@ -208,33 +208,32 @@ TEST_F(ManagerTest, TestReferences) {
     }
 
     zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
-      auto parser_output = parser_->Parse(node);
+      zx::result<PropertyValues> parser_output = parser_->Parse(node);
       if (parser_output.is_error()) {
         return parser_output.take_error();
       }
 
-      if (parser_output->find("property1") != parser_output->end()) {
-        for (auto& value : (*parser_output)["property1"]) {
+      if (auto iter = parser_output->find("property1"); iter != parser_output->end()) {
+        for (auto& value : iter->second) {
           auto reference = value.AsReference();
           if (reference && is_match(reference->first.properties())) {
-            reference1_specifier =
+            reference1_specifier() =
                 devicetree::PropEncodedArray<Property1Specifier>(reference->second, 1);
-            reference1_count++;
+            reference1_count()++;
           }
         }
       }
 
-      if (parser_output->find("property2") != parser_output->end() &&
-          parser_output->find("property2-names") != parser_output->end()) {
+      if (auto iter = parser_output->find("property2");
+          iter != parser_output->end() && parser_output->contains("property2-names")) {
         size_t index = 0;
-        for (auto& value : (*parser_output)["property2"]) {
+        for (auto& value : iter->second) {
           auto reference = value.AsReference();
           if (reference && is_match(reference->first.properties())) {
-            auto name = (*parser_output)["property2-names"][index].AsString();
-            ZX_ASSERT(name);
-            reference2_names.push_back(std::string(*name));
-            reference2_parent_names.push_back(reference->first.name());
-            reference2_count++;
+            auto name = (*parser_output)["property2-names"][index].AsString().value();
+            reference2_names().emplace_back(name);
+            reference2_parent_names().push_back(reference->first.name());
+            reference2_count()++;
           }
           index++;
         }
@@ -244,26 +243,35 @@ TEST_F(ManagerTest, TestReferences) {
     }
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
-      visit_called++;
+      visit_called()++;
       return zx::ok();
     }
 
     zx::result<> DriverFinalizeNode(Node& node) override {
-      ZX_ASSERT(reference1_count == 1u);
-      ZX_ASSERT(reference2_count == 3u);
-      finalize_called++;
+      ZX_ASSERT(reference1_count() == 1u);
+      ZX_ASSERT(reference2_count() == 3u);
+      finalize_called()++;
       return zx::ok();
     }
 
-    size_t visit_called = 0;
-    size_t finalize_called = 0;
-    size_t reference1_count = 0;
-    size_t reference2_count = 0;
-    devicetree::PropEncodedArray<Property1Specifier> reference1_specifier;
-    std::vector<std::string> reference2_names;
-    std::vector<std::string> reference2_parent_names;
+    size_t& visit_called() { return visit_called_; }
+    size_t& finalize_called() { return finalize_called_; }
+    size_t& reference1_count() { return reference1_count_; }
+    size_t& reference2_count() { return reference2_count_; }
+    devicetree::PropEncodedArray<Property1Specifier>& reference1_specifier() {
+      return reference1_specifier_;
+    }
+    std::vector<std::string>& reference2_names() { return reference2_names_; }
+    std::vector<std::string>& reference2_parent_names() { return reference2_parent_names_; }
 
    private:
+    size_t visit_called_ = 0;
+    size_t finalize_called_ = 0;
+    size_t reference1_count_ = 0;
+    size_t reference2_count_ = 0;
+    devicetree::PropEncodedArray<Property1Specifier> reference1_specifier_;
+    std::vector<std::string> reference2_names_;
+    std::vector<std::string> reference2_parent_names_;
     std::unique_ptr<PropertyParser> parser_;
   };
 
@@ -275,18 +283,18 @@ TEST_F(ManagerTest, TestReferences) {
 
   ASSERT_EQ(ZX_OK, manager.Walk(visitors).status_value());
 
-  ASSERT_EQ(parent_visitor_ptr->visit_called, 3u);
-  ASSERT_EQ(parent_visitor_ptr->finalize_called, 3u);
+  ASSERT_EQ(parent_visitor_ptr->visit_called(), 3u);
+  ASSERT_EQ(parent_visitor_ptr->finalize_called(), 3u);
 
-  ASSERT_EQ(parent_visitor_ptr->reference1_specifier.size(), 1u);
-  ASSERT_EQ(parent_visitor_ptr->reference1_specifier[0][0], PROPERTY1_SPECIFIER);
+  ASSERT_EQ(parent_visitor_ptr->reference1_specifier().size(), 1u);
+  ASSERT_EQ(parent_visitor_ptr->reference1_specifier()[0][0], PROPERTY1_SPECIFIER);
 
-  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[0], "reference-parent-1");
-  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[1], "reference-parent-2");
-  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[2], "reference-parent-3");
-  ASSERT_EQ(parent_visitor_ptr->reference2_names[0], PROPERTY2_NAME1);
-  ASSERT_EQ(parent_visitor_ptr->reference2_names[1], PROPERTY2_NAME2);
-  ASSERT_EQ(parent_visitor_ptr->reference2_names[2], PROPERTY2_NAME3);
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names()[0], "reference-parent-1");
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names()[1], "reference-parent-2");
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names()[2], "reference-parent-3");
+  ASSERT_EQ(parent_visitor_ptr->reference2_names()[0], PROPERTY2_NAME1);
+  ASSERT_EQ(parent_visitor_ptr->reference2_names()[1], PROPERTY2_NAME2);
+  ASSERT_EQ(parent_visitor_ptr->reference2_names()[2], PROPERTY2_NAME3);
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 }
