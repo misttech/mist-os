@@ -552,7 +552,13 @@ impl Sdk {
         if let Some(tool) = found_tool {
             self.get_real_path(tool)
         } else {
-            Ok(PathBuf::from(name))
+            if self.is_host_tools_only() {
+                Ok(PathBuf::from(name))
+            } else {
+                Err(anyhow!(
+                    "No executable provided for tool '{name}' (not found in SDK manifest files)"
+                ))
+            }
         }
     }
 
