@@ -19,7 +19,7 @@ use vfs::node::Node;
 use vfs::path::Path;
 use vfs::remote::RemoteLike;
 use vfs::symlink::Symlink;
-use vfs::{pseudo_directory, ObjectRequestRef, ToObjectRequest};
+use vfs::{pseudo_directory, ObjectRequestRef};
 use zx::{self as zx, HandleBased, Status};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -222,20 +222,12 @@ async fn test_read_link_error() {
     impl RemoteLike for ErrorSymlink {
         fn open(
             self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
+            _path: Path,
+            _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                if !path.is_empty() {
-                    return Err(Status::NOT_DIR);
-                }
-                object_request
-                    .take()
-                    .create_connection_sync::<vfs::symlink::Connection<_>, _>(scope, self, flags);
-                Ok(())
-            });
+            panic!("fuchsia.io/Directory.DeprecatedOpen should not be used in these tests.")
         }
 
         fn open3(

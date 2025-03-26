@@ -252,7 +252,7 @@ mod tests {
     use vfs::directory::traversal_position::TraversalPosition;
     use vfs::execution_scope::ExecutionScope;
     use vfs::node::Node;
-    use vfs::{ObjectRequestRef, ToObjectRequest};
+    use vfs::ObjectRequestRef;
 
     fn one_step<'a, S, OK, ERR>(s: &'a mut S) -> impl Future<Output = OK> + 'a
     where
@@ -375,27 +375,29 @@ mod tests {
     }
 
     impl Directory for MockDirectory {
-        // TODO(https://fxbug.dev/324111518): Mark this as unimplemented and replace with open3.
         fn open(
             self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
             _path: vfs::path::Path,
-            server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
+            _server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
         ) {
-            flags
-                .to_object_request(server_end)
-                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self.clone(), flags);
+            unimplemented!("Not implemented!");
         }
 
         fn open3(
             self: Arc<Self>,
-            _scope: ExecutionScope,
+            scope: ExecutionScope,
             _path: vfs::path::Path,
-            _flags: fio::Flags,
-            _object_request: ObjectRequestRef<'_>,
+            flags: fio::Flags,
+            object_request: ObjectRequestRef<'_>,
         ) -> Result<(), zx::Status> {
-            unimplemented!("Not implemented!");
+            object_request.take().create_connection_sync::<ImmutableConnection<_>, _>(
+                scope,
+                self.clone(),
+                flags,
+            );
+            Ok(())
         }
 
         async fn read_dirents<'a>(
@@ -425,14 +427,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_error() {
         let test_dir = MockDirectory::new();
-        let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        test_dir.open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            server.into_channel().into(),
-        );
+        let client = vfs::directory::serve_read_only(test_dir);
         let mut w = Watcher::new(&client).await.unwrap();
         let msg = w.next().await.expect("the stream yielded no next item");
         assert!(!w.is_terminated());

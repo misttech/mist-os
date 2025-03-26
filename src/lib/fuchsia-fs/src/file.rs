@@ -120,7 +120,7 @@ mod fuchsia {
     {
         async {
             let flags =
-                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::FILE_TRUNCATE | fio::Flags::PERM_WRITE;
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::FILE_TRUNCATE | fio::PERM_WRITABLE;
             let file = open_in_namespace(path, flags)?;
 
             write(&file, data).await?;
@@ -153,7 +153,7 @@ mod fuchsia {
             let file = open_in_namespace(
                 path,
                 fio::Flags::FLAG_SEND_REPRESENTATION
-                    | fio::Flags::PERM_READ
+                    | fio::PERM_READABLE
                     | fio::Flags::PROTOCOL_FILE,
             )?;
             read_file_with_on_open_event(file).await
@@ -770,7 +770,7 @@ mod tests {
         assert!(contents.is_empty());
     }
 
-    fn serve_file(file: Arc<VmoFile>, flags: fio::OpenFlags) -> fio::FileProxy {
+    fn serve_file(file: Arc<VmoFile>, flags: fio::Flags) -> fio::FileProxy {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         flags.to_object_request(server_end).handle(|object_request| {
             vfs::file::serve(file, ExecutionScope::new(), &flags, object_request)
@@ -778,21 +778,20 @@ mod tests {
         proxy
     }
 
-    // TODO(https://fxbug.dev/324111518): Transition this to fuchsia.io/Flags instead of OpenFlags.
     #[fasync::run_singlethreaded(test)]
     async fn read_file_with_on_open_event_with_stream() {
         let data = b"file-contents".repeat(1000);
         let vmo_file = read_only(&data);
-        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
+        const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::FLAG_SEND_REPRESENTATION);
 
         {
             // Ensure that the file supports streams.
-            let file = serve_file(vmo_file.clone(), flags);
+            let file = serve_file(vmo_file.clone(), FLAGS);
             let event = take_on_open_event(&file).await.unwrap();
             extract_stream_from_on_open_event(event).unwrap().expect("Stream not present");
         }
 
-        let file = serve_file(vmo_file.clone(), flags);
+        let file = serve_file(vmo_file.clone(), FLAGS);
         let contents = read_file_with_on_open_event(file).await.unwrap();
         assert_eq!(contents, data);
     }
