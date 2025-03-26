@@ -338,14 +338,12 @@ where
                 }
             }
             IncomingServices::HealthCheck(mut stream) => {
-                let app_set = Rc::clone(&server.borrow().app_set);
-                let app_set_health = app_set.lock().await.all_valid();
                 let valid_url = server.borrow().valid_service_url;
 
                 while let Some(ComponentOtaHealthCheckRequest::GetHealthStatus { responder }) =
                     stream.try_next().await.expect("error running health check service")
                 {
-                    if app_set_health && valid_url {
+                    if valid_url {
                         responder
                             .send(HealthStatus::Healthy)
                             .expect("failed to send healthy status");
@@ -1518,20 +1516,6 @@ mod tests {
             spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
 
         assert_eq!(HealthStatus::Healthy, proxy.get_health_status().await.unwrap());
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_get_health_check_status_bad_app_set() {
-        let app_set = FuchsiaAppSet::new(
-            App::builder().id("id").version([0]).build(),
-            AppMetadata { appid_source: AppIdSource::ChannelConfig },
-        );
-        let fidl = FidlServerBuilder::new().with_service_url().with_app_set(app_set).build().await;
-
-        let proxy =
-            spawn_fidl_server::<ComponentOtaHealthCheckMarker>(fidl, IncomingServices::HealthCheck);
-
-        assert_eq!(HealthStatus::Unhealthy, proxy.get_health_status().await.unwrap());
     }
 
     #[fasync::run_singlethreaded(test)]
