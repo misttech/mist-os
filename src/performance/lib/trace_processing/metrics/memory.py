@@ -6,16 +6,49 @@
 
 import collections
 
-from trace_processing import trace_metrics, trace_model, trace_utils
+from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 MEMORY_SYSTEM_CATEGORY = "memory:kernel"
-KERNEL_EVENT_NAMES = ("kmem_stats_a", "kmem_stats_b", "kmem_stats_compression")
+KERNEL_EVENT_NAMES = (
+    "kmem_stats_a",
+    "kmem_stats_b",
+    "kmem_stats_compression",
+    "memory_stall",
+)
+# Name of the metric that are cumulative, monotonic counters, as opposed to gauges.
+CUMULATIVE_METRIC_NAMES = {
+    "compression_time",
+    "decompression_time",
+    "stall_time_some_ns",
+    "stall_time_full_ns",
+}
 
 
-def standard_metrics_json(values: list[int | float]) -> trace_metrics.JSON:
-    """Returns a json object holding the standard metric value keyed by metric name."""
+def safe_divide(numerator: float, denominator: float) -> float | None:
+    """Divides numerator by denominator, returning None if denominator is 0."""
+    if denominator == 0:
+        return None
+    else:
+        return numerator / denominator
+
+
+def cumulative_metrics_json(
+    values: list[tuple[trace_time.TimePoint, int | float]]
+) -> trace_metrics.JSON:
+    """Returns a JSON object holding the change and the rate for the specified cumulative metric."""
+    (t0, v0), (t1, v1) = values[0], values[-1]
+    return {
+        "Delta": v1 - v0,
+        "Rate": safe_divide(v1 - v0, (t1 - t0).to_nanoseconds()),
+    }
+
+
+def gauges_metrics_json(
+    values: list[tuple[trace_time.TimePoint, int | float]]
+) -> trace_metrics.JSON:
+    """Returns a JSON object holding the standard metric value keyed by metric name."""
     metrics = trace_utils.standard_metrics_set(
-        values=values,
+        values=list(v[1] for v in values),
         label_prefix="",
         unit=trace_metrics.Unit.bytes,
     )
@@ -63,13 +96,15 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
         ):
             if event.name in KERNEL_EVENT_NAMES:
                 for name, value in event.args.items():
-                    series_by_name[name].append(value)
+                    series_by_name[name].append((event.start, value))
 
         return (
             self.FREEFORM_METRICS_FILENAME,
             dict(
                 kernel={
-                    name: standard_metrics_json(series)
+                    name: cumulative_metrics_json(series)
+                    if name in CUMULATIVE_METRIC_NAMES
+                    else gauges_metrics_json(series)
                     for name, series in series_by_name.items()
                 }
             ),
