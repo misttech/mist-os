@@ -943,14 +943,13 @@ mod tests {
     use super::*;
     use anyhow::Error;
     use assert_matches::assert_matches;
-    use fidl::endpoints::ServerEnd;
     use fidl::prelude::*;
     use fidl_test_processbuilder::{UtilMarker, UtilProxy};
     use lazy_static::lazy_static;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
-    use vfs::pseudo_directory;
+    use vfs::{pseudo_directory, ToObjectRequest as _};
     use zerocopy::Ref;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -1397,23 +1396,18 @@ mod tests {
         let dir1 = pseudo_directory! {
             "test_file1" => read_only(test_content1.clone()),
         };
-        dir1.open(
-            dir_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(dir1_server),
-        );
+        const FLAGS: fio::Flags = fio::PERM_READABLE;
+        FLAGS
+            .to_object_request(dir1_server)
+            .handle(|request| dir1.open3(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
 
         let (dir2_server, dir2_client) = zx::Channel::create();
         let dir2 = pseudo_directory! {
             "test_file2" => read_only(test_content2.clone()),
         };
-        dir2.open(
-            dir_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(dir2_server),
-        );
+        FLAGS
+            .to_object_request(dir2_server)
+            .handle(|request| dir2.open3(dir_scope.clone(), vfs::Path::dot(), FLAGS, request));
 
         let (mut builder, proxy) = setup_test_util_builder(true)?;
         builder.add_namespace_entries(vec![
