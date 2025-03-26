@@ -57,6 +57,10 @@ _platform_configuration_base = {
   setui = {
   }
 
+  storage = {
+    storage_host_enabled = true
+  }
+
   ui = {
     supported_input_devices = [
       "button",
