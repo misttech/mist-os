@@ -20,7 +20,7 @@ Fuchsia software packaging, or the [long term SWD goals](https://fuchsia.dev/fuc
 
 All subsystems listed below are written in Rust.
 
-Updated: January 2025
+Updated: March 2025
 
 | Subsystem                 | Purpose                                                                                            | Location                                     |
 |-----------------------    |----------------------------------------------------------------------------------------------------|----------------------------------------------|
@@ -33,6 +33,10 @@ Updated: January 2025
 | system-updater            | Actually [performs system updates.](https://fuchsia.dev/fuchsia-src/concepts/packages/ota#staging-update)                                                                  | `//src/sys/pkg/bin/system-updater`           |
 | update                    | Developer CLI for interacting and configuring system updates.                                      | `//src/sys/pkg/bin/update`     |
 | far                       | Creates Fuchsia archive files.                                                                     | `//src/sys/pkg/bin/far`                      |
+
+**Note**: The CLI tool `update` is not included in default builds, since almost
+all of its functions are covered by `ffx`. If you want to include it in a custom
+build, follow the instructions in the FAQ below.
 
 ### Testing
 
@@ -137,6 +141,48 @@ fuchsia-pkg://fuchsia.com/<package_name>#meta/<component_name>.cm`
 
 See the instructions on
 [publishing a package with ffx](https://fuchsia.dev/fuchsia-src/development/idk/documentation/packages).
+
+#### How to I include the CLI tool update into my build?
+
+You can create a custom build with
+[assembly overrides](https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides)
+to include `update`.
+
+1. Create or add to `${FUCHSIA_DIR}/local/BUILD.gn`:
+```gn
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("enable_swd_cli_tools") {
+  shell_commands = [
+    {
+        package = "update-bin"
+        components = ["update"]
+    },
+  ]
+}
+```
+ 2. Include the CLI tools in the build, for example:
+
+ ```
+ $ fx set core.x64 \
+   --with //src/sys/pkg/bin/update \
+   --assembly-override '//build/images/fuchsia/*=//local:enable_swd_cli_tools'
+ ```
+
+ 3. Build, and OTA to your device or start the emulator (the following warning
+ is expected during build):
+
+ ```
+ $ fx build
+[...]
+WARNING!:  Adding the following via developer overrides from: //local:enable_swd_cli_tools
+
+  Additional shell command stubs:
+    package: "update-bin"
+      bin/update
+[...]
+ ```
+Then perform an `fx ota` to your device or start the emulator (`ffx emu start ...`).
 
 ### More information:
 

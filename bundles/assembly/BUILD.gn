@@ -2100,16 +2100,11 @@ assembly_input_bundle("standard_userdebug_and_eng") {
   base_packages = [
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",
-    "//src/sys/pkg/bin/update",
   ]
   shell_commands = [
     {
       package = "pkgctl"
       components = [ "pkgctl" ]
-    },
-    {
-      package = "update-bin"
-      components = [ "update" ]
     },
   ]
   compiled_packages = [
