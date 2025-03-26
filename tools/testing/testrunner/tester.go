@@ -518,7 +518,7 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 type FFXInstance interface {
 	Run(ctx context.Context, args ...string) error
 	RunWithTarget(ctx context.Context, args ...string) error
-	RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error
+	TestEarlyBootProfile(ctx context.Context, outDir string) error
 	SetTarget(target string)
 	Stdout() io.Writer
 	Stderr() io.Writer
@@ -911,7 +911,7 @@ func (t *FFXTester) getEarlyBootProfiles(ctx context.Context, sinksPerTest map[s
 	if err := os.MkdirAll(testOutDir, os.ModePerm); err != nil {
 		return err
 	}
-	if err := t.ffx.RunWithTargetAndTimeout(ctx, 0, "test", "early-boot-profile", "--output-directory", testOutDir); err != nil {
+	if err := t.ffx.TestEarlyBootProfile(ctx, testOutDir); err != nil {
 		return err
 	}
 	return t.getSinks(ctx, testOutDir, sinksPerTest, false)

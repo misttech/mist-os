@@ -819,6 +819,14 @@ func (f *FFXInstance) BootloaderBoot(ctx context.Context, target, productBundle 
 	return f.invoker([]string{"target", "bootloader", "--product-bundle", productBundle, "boot"}).setTarget(target).setStrict().setTimeout(0).setConfigs(configs).run(ctx)
 }
 
+// TestEarlyBootProfile puts a target's early boot profile in the specified directory
+func (f *FFXInstance) TestEarlyBootProfile(ctx context.Context, outputDirectory string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	return f.invoker([]string{"test", "early-boot-profile", "--output-directory", outputDirectory}).setTarget(f.target).setStrict().setTimeout(0).run(ctx)
+}
+
 // List lists all available targets.
 func (f *FFXInstance) List(ctx context.Context, args ...string) error {
 	return f.Run(ctx, append([]string{"target", "list"}, args...)...)
