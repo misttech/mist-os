@@ -738,6 +738,7 @@ mod tests {
     use futures::join;
     use fxfs::fsck::fsck;
     use fxfs::object_handle::INVALID_OBJECT_ID;
+    use fxfs::object_store::Timestamp;
     use rand::{thread_rng, Rng};
     use std::sync::atomic::{self, AtomicBool};
     use std::sync::Arc;
@@ -2692,6 +2693,75 @@ mod tests {
             assert_eq!(immutable_attributes.link_count.unwrap(), 2);
             close_file_checked(tmpfile).await;
         }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes_persists() {
+        const FILE: &str = "foo";
+        let mtime = Some(Timestamp::now().as_nanos());
+        let atime = Some(Timestamp::now().as_nanos());
+        let mode = Some(111);
+
+        let device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let file = open_file_checked(
+                &root,
+                FILE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            file.update_attributes(&fio::MutableNodeAttributes {
+                modification_time: mtime,
+                access_time: atime,
+                mode: Some(111),
+                ..Default::default()
+            })
+            .await
+            .expect("update_attributes FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+            // Calling close should flush the node attributes to the device.
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            FILE,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &fio::Options::default(),
+        )
+        .await;
+
+        let (mutable_attributes, _immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::MODIFICATION_TIME
+                    | fio::NodeAttributesQuery::ACCESS_TIME
+                    | fio::NodeAttributesQuery::MODE,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.modification_time, mtime);
+        assert_eq!(mutable_attributes.access_time, atime);
+        assert_eq!(mutable_attributes.mode, mode);
         fixture.close().await;
     }
 }
