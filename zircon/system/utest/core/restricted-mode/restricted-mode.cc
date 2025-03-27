@@ -181,7 +181,7 @@ class RestrictedBlob {
         while (!loader_.Allocate(diag, load_info, vmar_offset)) {
           printf("searching for valid ELF allocation offset: %lu\n", vmar_offset);
           vmar_offset = vmar_offset + 0x20000;
-          if (vmar_offset >= blob_info.max_load_address) {
+          if (vmar_offset + load_info.vaddr_size() >= blob_info.max_load_address) {
             ADD_FAILURE() << "failed to allocate restricted addressable memory for "
                           << blob_info.name;
             return false;
