@@ -8,8 +8,8 @@
 use super::{
     check_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
     fs_node_set_label_with_task, has_fs_node_permissions, permissions_from_flags, scoped_fs_create,
-    set_cached_sid, todo_check_permission, todo_has_fs_node_permissions, FileSystemLabelState,
-    FsNodeLabel, FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags, ScopedFsCreate,
+    set_cached_sid, todo_has_fs_node_permissions, FileSystemLabelState, FsNodeLabel,
+    FsNodeSecurityXattr, FsNodeSidAndClass, PermissionFlags, ScopedFsCreate,
 };
 
 use crate::task::CurrentTask;
@@ -814,13 +814,12 @@ pub(in crate::security) fn check_fs_node_read_link_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::Read.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::Read.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -833,13 +832,13 @@ pub(in crate::security) fn fs_node_permission(
     permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let file_class = fs_node.security_state.lock().class;
+    let fs_node_class = fs_node.security_state.lock().class;
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/380855359", "Enforce fs_node_permission checks."),
         &security_server.as_permission_check(),
         current_sid,
         fs_node,
-        &permissions_from_flags(permission_flags, file_class),
+        &permissions_from_flags(permission_flags, fs_node_class),
         current_task.into(),
     )
 }
@@ -850,14 +849,13 @@ pub(in crate::security) fn check_fs_node_getattr_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    todo_check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::GetAttr.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -870,7 +868,7 @@ pub(in crate::security) fn check_fs_node_setattr_access(
     attributes: &zxio_node_attr_has_t,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { class: file_class, .. } = fs_node_effective_sid_and_class(fs_node);
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
 
     let permissions = if attributes.mode
         || attributes.uid
@@ -880,9 +878,9 @@ pub(in crate::security) fn check_fs_node_setattr_access(
         || attributes.change_time
         || attributes.casefold
     {
-        [CommonFsNodePermission::SetAttr.for_class(file_class)]
+        [CommonFsNodePermission::SetAttr.for_class(fs_node_class)]
     } else {
-        [CommonFsNodePermission::Write.for_class(file_class)]
+        [CommonFsNodePermission::Write.for_class(fs_node_class)]
     };
 
     has_fs_node_permissions(
@@ -903,13 +901,12 @@ pub(in crate::security) fn check_fs_node_setxattr_access(
     _op: XattrOp,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::SetAttr.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::SetAttr.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -921,13 +918,12 @@ pub(in crate::security) fn check_fs_node_getxattr_access(
     _name: &FsStr,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::GetAttr.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -938,13 +934,12 @@ pub(in crate::security) fn check_fs_node_listxattr_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::GetAttr.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -958,13 +953,12 @@ pub(in crate::security) fn check_fs_node_removexattr_access(
     // TODO: https://fxbug.dev/364568818 - Verify the correct permission check here; is removing a
     // security.* attribute even allowed?
     let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
-        fs_node_effective_sid_and_class(fs_node);
-    check_permission(
+    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
+    has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_sid,
-        file_sid,
-        CommonFsNodePermission::SetAttr.for_class(file_class),
+        fs_node,
+        &[CommonFsNodePermission::SetAttr.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -1078,35 +1072,26 @@ where
     // Verify that the requested modification is permitted by the loaded policy.
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
-        let audit_context = current_task.into();
+        let audit_context = [current_task.into(), fs_node.into(), fs.as_ref().into()];
+        let audit_context = (&audit_context).into();
 
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
         let task_sid = current_task.security_state.lock().current_sid;
-        let FsNodeSidAndClass { sid: old_sid, class: file_class } =
+        let FsNodeSidAndClass { sid: old_sid, class: fs_node_class } =
             fs_node_effective_sid_and_class(fs_node);
         let permission_check = security_server.as_permission_check();
-        if old_sid == SecurityId::initial(InitialSid::File) {
-            check_permission(
-                &permission_check,
-                task_sid,
-                old_sid,
-                CommonFsNodePermission::RelabelFrom.for_class(file_class),
-                audit_context,
-            )?;
-        } else {
-            check_permission(
-                &permission_check,
-                task_sid,
-                old_sid,
-                CommonFsNodePermission::RelabelFrom.for_class(file_class),
-                audit_context,
-            )?;
-        }
+        check_permission(
+            &permission_check,
+            task_sid,
+            old_sid,
+            CommonFsNodePermission::RelabelFrom.for_class(fs_node_class),
+            audit_context,
+        )?;
         check_permission(
             &permission_check,
             task_sid,
             new_sid,
-            CommonFsNodePermission::RelabelTo.for_class(file_class),
+            CommonFsNodePermission::RelabelTo.for_class(fs_node_class),
             audit_context,
         )?;
         check_permission(
