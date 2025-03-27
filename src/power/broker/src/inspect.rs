@@ -6,7 +6,7 @@ use crate::broker::{Lease, LeaseID};
 use crate::topology::{Dependency, Element, Topology};
 use crate::{ElementID, IndexedPowerLevel};
 use either::Either;
-use fuchsia_inspect::{ArrayProperty, Property};
+use fuchsia_inspect::{ArrayProperty, InspectTypeReparentable, Property};
 use fuchsia_inspect_contrib::graph as igraph;
 use fuchsia_inspect_contrib::graph::{Digraph, DigraphOpts};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
@@ -62,6 +62,7 @@ pub struct ElementData {
 #[derive(Debug)]
 struct LeaseData {
     node: inspect::Node,
+    level: inspect::UintProperty,
     status: Option<inspect::UintProperty>,
 }
 
@@ -142,9 +143,11 @@ impl ElementData {
             Some(_) => unreachable!("We can't call into create lease twice"),
             None => {
                 let lease_node = self.leases_node.create_child(format!("{lease_id}"));
-                lease_node.record_uint(LEVEL, level as u64);
-                self.leases
-                    .insert(lease_id.to_owned(), LeaseData { node: lease_node, status: None });
+                let level = lease_node.create_uint(LEVEL, level as u64);
+                self.leases.insert(
+                    lease_id.to_owned(),
+                    LeaseData { node: lease_node, level, status: None },
+                );
             }
         }
     }
@@ -162,8 +165,8 @@ impl ElementData {
         }
     }
 
-    fn remove_lease(&mut self, lease_id: LeaseID) {
-        self.leases.remove(&lease_id);
+    fn remove_lease(&mut self, lease_id: LeaseID) -> Option<LeaseData> {
+        self.leases.remove(&lease_id)
     }
 
     fn record_valid_levels(node: &inspect::Node, valid_levels: &[IndexedPowerLevel]) {
@@ -456,11 +459,20 @@ impl TopologyInspect {
         let Some(ref inspect_vertex) = element.inspect_vertex else {
             return;
         };
-        inspect_vertex.borrow_mut().meta().remove_lease(lease.id);
+        let Some(lease_data) = inspect_vertex.borrow_mut().meta().remove_lease(lease.id) else {
+            return;
+        };
         self.maybe_record_event(element, REMOVE_LEASE_EVENT, |node| {
             node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(LEASE_ID, *lease.id);
-            node.record_uint(LEVEL, lease.underlying_element_level.level.into());
+
+            let _ = lease_data.level.reparent(&node);
+            node.record(lease_data.level);
+
+            if let Some(status) = lease_data.status {
+                let _ = status.reparent(&node);
+                node.record(status);
+            }
         });
     }
 
