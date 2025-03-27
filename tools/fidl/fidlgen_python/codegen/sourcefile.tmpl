@@ -32,6 +32,16 @@ import {{ . }}
 {{ end -}}
 
 
+{{ range .PythonTables }}
+{{- template "TableDeclaration" . -}}
+{{ end -}}
+
+
+{{ range .PythonUnions }}
+{{- template "UnionDeclaration" . -}}
+{{ end -}}
+
+
 {{ range .PythonEnums }}
 {{- template "EnumDeclaration" . -}}
 {{ end -}}

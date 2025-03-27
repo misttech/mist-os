@@ -45,6 +45,19 @@ type PythonEnumMember struct {
 	PythonValue string
 }
 
+type PythonTable struct {
+	fidlgen.Table
+	Library       string
+	PythonName    string
+	PythonMembers []PythonTableMember
+}
+
+type PythonTableMember struct {
+	fidlgen.TableMember
+	PythonType PythonType
+	PythonName string
+}
+
 type PythonStruct struct {
 	fidlgen.Struct
 	Library       string
@@ -58,6 +71,19 @@ type PythonStructMember struct {
 	PythonName string
 }
 
+type PythonUnion struct {
+	fidlgen.Union
+	Library       string
+	PythonName    string
+	PythonMembers []PythonUnionMember
+}
+
+type PythonUnionMember struct {
+	fidlgen.UnionMember
+	PythonType PythonType
+	PythonName string
+}
+
 type PythonAlias struct {
 	fidlgen.Alias
 	PythonAliasedName string
@@ -67,7 +93,9 @@ type PythonAlias struct {
 type PythonRoot struct {
 	fidlgen.Root
 	PythonModuleName      string
+	PythonTables          []PythonTable
 	PythonStructs         []PythonStruct
+	PythonUnions          []PythonUnion
 	PythonAliases         []PythonAlias
 	PythonBits            []PythonBits
 	PythonEnums           []PythonEnum
@@ -160,6 +188,8 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		}
 	case fidlgen.StringType:
 		name += "str"
+	case fidlgen.HandleType:
+		name += "int"
 	case fidlgen.VectorType, fidlgen.ArrayType:
 		element_type_ptr := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		if element_type_ptr == nil {
@@ -255,6 +285,35 @@ func (c *compiler) compileEnum(val fidlgen.Enum) PythonEnum {
 	return e
 }
 
+func (c *compiler) compileTableMember(val fidlgen.TableMember) PythonTableMember {
+	t := c.compileType(val.Type, val.MaybeFromAlias)
+	if t == nil {
+		log.Fatalf("Type not supported")
+	}
+	return PythonTableMember{
+		TableMember: val,
+		PythonType:  *t,
+		PythonName:  compileSnakeIdentifier(val.Name),
+	}
+}
+
+func (c *compiler) compileTable(val fidlgen.Table) PythonTable {
+	name := *c.compileDeclIdentifier(val.Name)
+	python_table := PythonTable{
+		Table:         val,
+		Library:       string(val.Name.LibraryName()),
+		PythonName:    name,
+		PythonMembers: []PythonTableMember{},
+	}
+
+	for _, v := range val.Members {
+		member := c.compileTableMember(v)
+		python_table.PythonMembers = append(python_table.PythonMembers, member)
+	}
+
+	return python_table
+}
+
 func (c *compiler) compileStructMember(val fidlgen.StructMember) PythonStructMember {
 	t := c.compileType(val.Type, val.MaybeFromAlias)
 	if t == nil {
@@ -284,6 +343,35 @@ func (c *compiler) compileStruct(val fidlgen.Struct) PythonStruct {
 	return python_struct
 }
 
+func (c *compiler) compileUnionMember(val fidlgen.UnionMember) PythonUnionMember {
+	t := c.compileType(val.Type, val.MaybeFromAlias)
+	if t == nil {
+		log.Fatalf("Type not supported")
+	}
+	return PythonUnionMember{
+		UnionMember: val,
+		PythonType:  *t,
+		PythonName:  compileSnakeIdentifier(val.Name),
+	}
+}
+
+func (c *compiler) compileUnion(val fidlgen.Union) PythonUnion {
+	name := *c.compileDeclIdentifier(val.Name)
+	python_union := PythonUnion{
+		Union:         val,
+		Library:       string(val.Name.LibraryName()),
+		PythonName:    name,
+		PythonMembers: []PythonUnionMember{},
+	}
+
+	for _, v := range val.Members {
+		member := c.compileUnionMember(v)
+		python_union.PythonMembers = append(python_union.PythonMembers, member)
+	}
+
+	return python_union
+}
+
 func Compile(root fidlgen.Root) PythonRoot {
 	root = root.ForBindings("python")
 	root = root.ForTransports([]string{"Channel"})
@@ -297,6 +385,10 @@ func Compile(root fidlgen.Root) PythonRoot {
 		decls:           root.DeclInfo(),
 		library:         root.Name,
 		externalModules: map[string]struct{}{},
+	}
+
+	for _, v := range root.Tables {
+		python_root.PythonTables = append(python_root.PythonTables, c.compileTable(v))
 	}
 
 	for _, v := range root.Structs {
@@ -318,6 +410,12 @@ func Compile(root fidlgen.Root) PythonRoot {
 
 	for _, v := range root.Enums {
 		python_root.PythonEnums = append(python_root.PythonEnums, c.compileEnum(v))
+	}
+
+	for _, v := range root.Unions {
+		// TODO(https://fxbug.dev/394421154): If v is a result, then its creation should
+		// be deferred to when the corresponding protocol method is compiled.
+		python_root.PythonUnions = append(python_root.PythonUnions, c.compileUnion(v))
 	}
 
 	// Sort the external modules to make sure the generated file is

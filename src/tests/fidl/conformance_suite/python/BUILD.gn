@@ -10,15 +10,27 @@ import("//build/fidl/fidl.gni")
 # and :conformance_python_fidl targets to co-exist.
 conformance_python_fidl_source_basenames = [
   "alignment.test.fidl",
+  "arrays_and_vectors.test.fidl",
   "bits_flexible.test.fidl",
   "bits_strict.test.fidl",
   "empty_struct.test.fidl",
   "enums_flexible.test.fidl",
   "enums_strict.test.fidl",
+  "golden.test.fidl",
+  "handles.test.fidl",
   "memcpy_compatibility.test.fidl",
+  "optionals.test.fidl",
+  "padding.test.fidl",
+  "ported_from_walker_handles.test.fidl",
   "ported_from_walker_strings.test.fidl",
+  "ported_from_walker_vectors.test.fidl",
   "primitives.test.fidl",
+  "recursive_depth.test.fidl",
+  "recursive_types.test.fidl",
   "strings.test.fidl",
+  "structs.test.fidl",
+  "tables.test.fidl",
+  "union.test.fidl",
   "vectors.test.fidl",
 ]
 foreach(source_basename, conformance_python_fidl_source_basenames) {
@@ -59,4 +71,6 @@ fidl("conformance_python_fidl") {
     sources += [ get_label_info(transplant_target, "target_gen_dir") +
                  "/${source_basename}" ]
   }
+
+  public_deps = [ "//zircon/vdso/zx" ]
 }

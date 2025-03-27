@@ -92,6 +92,7 @@ python_library("fuchsia_controller_py") {
     "tests:*",
     "//src/tests/fidl/conformance_suite/python/*",
     "//tools/fidl/fidlgen_python/tests/*",
+    "//zircon/vdso/*",
   ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
@@ -118,6 +119,7 @@ python_library("fidl_bindings") {
     "//src/testing/end_to_end/honeydew:*",
     "//src/tests/fidl/conformance_suite/python/*",
     "//tools/fidl/fidlgen_python/tests/*",
+    "//zircon/vdso/*",
   ]
 
   library_name = "fidl"
@@ -153,11 +155,20 @@ gidl("static_conformance_tests_py") {
     "//src/tests/fidl/conformance_suite/enums_flexible.gidl",
     "//src/tests/fidl/conformance_suite/enums_strict.gidl",
     "//src/tests/fidl/conformance_suite/float.gidl",
+    "//src/tests/fidl/conformance_suite/golden.gidl",
+    "//src/tests/fidl/conformance_suite/handles.gidl",
     "//src/tests/fidl/conformance_suite/integer.gidl",
     "//src/tests/fidl/conformance_suite/memcpy_compatibility.gidl",
+    "//src/tests/fidl/conformance_suite/padding.gidl",
+    "//src/tests/fidl/conformance_suite/ported_from_walker_handles.gidl",
     "//src/tests/fidl/conformance_suite/ported_from_walker_strings.gidl",
+    "//src/tests/fidl/conformance_suite/ported_from_walker_vectors.gidl",
+    "//src/tests/fidl/conformance_suite/recursive_depth.gidl",
+    "//src/tests/fidl/conformance_suite/recursive_types.gidl",
     "//src/tests/fidl/conformance_suite/strings.gidl",
     "//src/tests/fidl/conformance_suite/strings_utf8.gen.gidl",
+    "//src/tests/fidl/conformance_suite/tables.gidl",
+    "//src/tests/fidl/conformance_suite/union.gidl",
     "//src/tests/fidl/conformance_suite/vectors.gidl",
     "//src/tests/fidl/conformance_suite/python/aliases.gidl",
   ]

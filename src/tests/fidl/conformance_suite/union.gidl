@@ -882,6 +882,7 @@ decode_failure("RequiredFlexibleResourceUnionZeroOrdinalWithPayload") {
 }
 
 success("OptionalStrictValueUnionZeroOrdinalNoPayload") {
+    bindings_denylist = [python],
     value = TestOptionalStrictXUnionInStruct{
         xu: null,
     },
@@ -894,6 +895,7 @@ success("OptionalStrictValueUnionZeroOrdinalNoPayload") {
 }
 
 decode_failure("OptionalStrictValueUnionZeroOrdinalWithPayload") {
+    bindings_denylist = [python],
     type = TestOptionalStrictXUnionInStruct,
     bytes = {
         v2 = [
@@ -906,6 +908,7 @@ decode_failure("OptionalStrictValueUnionZeroOrdinalWithPayload") {
 }
 
 success("OptionalStrictResourceUnionZeroOrdinalNoPayload") {
+    bindings_denylist = [python],
     value = TestOptionalStrictResourceXUnionInStruct{
         xu: null,
     },
@@ -918,6 +921,7 @@ success("OptionalStrictResourceUnionZeroOrdinalNoPayload") {
 }
 
 decode_failure("OptionalStrictResourceUnionZeroOrdinalWithPayload") {
+    bindings_denylist = [python],
     type = TestOptionalStrictResourceXUnionInStruct,
     bytes = {
         v2 = [
@@ -930,6 +934,7 @@ decode_failure("OptionalStrictResourceUnionZeroOrdinalWithPayload") {
 }
 
 success("OptionalFlexibleValueUnionZeroOrdinalNoPayload") {
+    bindings_denylist = [python],
     value = TestOptionalFlexibleXUnionInStruct{
         xu: null,
     },
@@ -942,6 +947,7 @@ success("OptionalFlexibleValueUnionZeroOrdinalNoPayload") {
 }
 
 decode_failure("OptionalFlexibleValueUnionZeroOrdinalWithPayload") {
+    bindings_denylist = [python],
     type = TestOptionalFlexibleXUnionInStruct,
     bytes = {
         v2 = [
@@ -954,6 +960,7 @@ decode_failure("OptionalFlexibleValueUnionZeroOrdinalWithPayload") {
 }
 
 success("OptionalFlexibleResourceUnionZeroOrdinalNoPayload") {
+    bindings_denylist = [python],
     value = TestOptionalFlexibleResourceXUnionInStruct{
         xu: null,
     },
@@ -966,6 +973,7 @@ success("OptionalFlexibleResourceUnionZeroOrdinalNoPayload") {
 }
 
 decode_failure("OptionalFlexibleResourceUnionZeroOrdinalWithPayload") {
+    bindings_denylist = [python],
     type = TestOptionalFlexibleResourceXUnionInStruct,
     bytes = {
         v2 = [

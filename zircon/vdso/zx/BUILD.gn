@@ -20,4 +20,9 @@ fidl("zx") {
 
   enable_banjo = true
   enable_rust = false
+
+  # TODO(https://fxbug.dev/355717613): Temporary argument to enable Python bindings
+  # while implementation of fidlgen_python is in progress. A future change will
+  # enable Python bindings by default.
+  _enable_experimental_python = true
 }
