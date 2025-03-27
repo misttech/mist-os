@@ -6,7 +6,7 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/platform-device/cpp/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>
@@ -352,51 +352,39 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) {
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
                                fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
-  zx::result pdev_client_end =
-      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
-          parent);
-  if (pdev_client_end.is_error()) {
-    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
-    return pdev_client_end.status_value();
+  ddk::PDevFidl pdev{parent};
+  if (!pdev.is_valid()) {
+    zxlogf(ERROR, "aml-thermal: failed to get platform device");
+    return ZX_ERR_INTERNAL;
   }
-  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  zx::result device_info_result = pdev.GetDeviceInfo();
-  if (device_info_result.is_error()) {
-    zxlogf(ERROR, "Failed to get device info: %s", device_info_result.status_string());
-    return device_info_result.status_value();
+  pdev_device_info_t device_info;
+  if (zx_status_t status = pdev.GetDeviceInfo(&device_info); status != ZX_OK) {
+    zxlogf(ERROR, "aml-thermal: failed to get device info: %s", zx_status_get_string(status));
+    return status;
   }
-  fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   // Map amlogic temperature sensor peripheral control registers.
-  zx::result sensor_base_mmio = pdev.MapMmio(kSensorMmio);
-  if (sensor_base_mmio.is_error()) {
-    zxlogf(ERROR, "Failed to map sensor mmio: %s", sensor_base_mmio.status_string());
-    return sensor_base_mmio.status_value();
+  if (zx_status_t status = pdev.MapMmio(kSensorMmio, &sensor_base_mmio_); status != ZX_OK) {
+    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
+    return status;
   }
-  sensor_base_mmio_ = std::move(sensor_base_mmio.value());
 
-  zx::result trim_mmio = pdev.MapMmio(kTrimMmio);
-  if (trim_mmio.is_error()) {
-    zxlogf(ERROR, "Failed to map trim mmio: %s", trim_mmio.status_string());
-    return trim_mmio.status_value();
+  if (zx_status_t status = pdev.MapMmio(kTrimMmio, &trim_mmio_); status != ZX_OK) {
+    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
+    return status;
   }
-  trim_mmio_ = std::move(trim_mmio.value());
 
-  zx::result hiu_mmio = pdev.MapMmio(kHiuMmio);
-  if (hiu_mmio.is_error()) {
-    zxlogf(ERROR, "Failed to map hiu mmio: %s", hiu_mmio.status_string());
-    return hiu_mmio.status_value();
+  if (zx_status_t status = pdev.MapMmio(kHiuMmio, &hiu_mmio_); status != ZX_OK) {
+    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
+    return status;
   }
-  hiu_mmio_ = std::move(trim_mmio.value());
 
   // Map tsensor interrupt.
-  zx::result irq = pdev.GetInterrupt(0);
-  if (irq.is_error()) {
-    zxlogf(ERROR, "Failed to get interrupt: %s", irq.status_string());
-    return irq.status_value();
+  if (zx_status_t status = pdev.GetInterrupt(0, 0, &tsensor_irq_); status != ZX_OK) {
+    zxlogf(ERROR, "aml-tsensor: could not map tsensor interrupt");
+    return status;
   }
-  tsensor_irq_ = std::move(irq.value());
 
   return InitSensor(thermal_config, device_info.pid);
 }

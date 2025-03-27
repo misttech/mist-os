@@ -30,8 +30,7 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlThermal);
   AmlThermal(zx_device_t* device, std::unique_ptr<thermal::AmlTSensor> tsensor,
-             fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config,
-             std::string_view name)
+             fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config, const char* name)
       : DeviceType(device),
         tsensor_(std::move(tsensor)),
         thermal_config_(std::move(thermal_config)),

@@ -17,46 +17,36 @@ driver_bind_rules("aml-thermal-bind") {
   ]
 }
 
-source_set("common") {
+fuchsia_cc_driver("aml-thermal-driver") {
+  legacy = true
+  output_name = "aml-thermal"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
     "aml-thermal.cc",
-    "aml-thermal.h",
-    "aml-tsensor-regs.h",
     "aml-tsensor.cc",
-    "aml-tsensor.h",
   ]
   deps = [
+    ":aml-thermal-bind",
+    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/async:async-cpp",
-    "//sdk/lib/driver/platform-device/cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
+    "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
-  ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/lib/mmio",
     "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_cc_driver("aml-thermal-driver") {
-  legacy = true
-  output_name = "aml-thermal"
-  deps = [
-    ":aml-thermal-bind",
-    ":common",
   ]
 }
 
@@ -76,19 +66,30 @@ fuchsia_driver_package("package") {
 test("aml-thermal-test-bin") {
   output_name = "aml-thermal-test"
   configs += [ "//build/config:all_source" ]
-  sources = [ "aml-thermal-test.cc" ]
+  sources = [
+    "aml-thermal-test.cc",
+    "aml-thermal.cc",
+    "aml-tsensor.cc",
+  ]
   deps = [
     ":aml-thermal-bind",
-    ":common",
+    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mock-function",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
