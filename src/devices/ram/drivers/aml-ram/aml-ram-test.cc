@@ -9,16 +9,15 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 
 #include <atomic>
 #include <memory>
 
 #include <ddktl/device.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_ram {
@@ -31,30 +30,30 @@ class FakeMmio {
 
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
 
-  ddk_fake::FakeMmioReg& reg(size_t ix) {
+  fake_mmio::FakeMmioReg& reg(size_t ix) {
     // AML registers are in virtual address units.
     return mmio_[ix];
   }
 
  private:
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
 class AmlRamDeviceTest : public zxtest::Test {
  public:
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     irq_signaller_ = config.irqs[0].borrow();
     config.mmios[0] = mmio_.mmio();
 
-    config.device_info = pdev_device_info_t{
+    config.device_info = fdf::PDev::DeviceInfo{
         .pid = PDEV_PID_AMLOGIC_T931,
     };
 
