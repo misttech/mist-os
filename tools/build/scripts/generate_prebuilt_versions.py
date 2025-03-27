@@ -11,6 +11,7 @@ import xml.etree.ElementTree
 PACKAGES = [
     "fuchsia/third_party/qemu/${platform}",
     "fuchsia/third_party/android/aemu/release/${platform}",
+    "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
     "fuchsia/third_party/crosvm/${platform}",
     "fuchsia/third_party/edk2",
 ]
