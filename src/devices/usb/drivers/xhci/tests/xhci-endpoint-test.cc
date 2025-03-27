@@ -4,7 +4,7 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-endpoint.h"
 
-#include <lib/fake-bti/bti.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 
 #include <list>
 
@@ -121,7 +121,9 @@ zx::result<> UsbXhci::Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_fac
                               false);
   GetDeviceState()[kDeviceId] = std::move(state);
 
-  EXPECT_OK(fake_bti_create(bti_.reset_and_get_address()));
+  zx::result bti = fake_bti::CreateFakeBti();
+  EXPECT_OK(bti);
+  bti_ = std::move(bti.value());
   return zx::ok();
 }
 void UsbXhci::Shutdown(zx_status_t status) {}

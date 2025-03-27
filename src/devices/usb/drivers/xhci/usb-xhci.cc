@@ -1295,15 +1295,13 @@ zx_status_t UsbXhci::InitPci() {
 }
 
 zx_status_t UsbXhci::InitMmio() {
-  zx_status_t status;
   if (!pdev_.is_valid()) {
     return ZX_ERR_IO_INVALID;
   }
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev_.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "UsbXhci: failed to map MMIO registers (%s)", zx_status_get_string(status));
-    return status;
+  zx::result mmio = pdev_.MapMmio(0);
+  if (mmio.is_error()) {
+    FDF_LOG(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
   mmio_ = std::move(*mmio);
   irq_count_ = static_cast<uint16_t>(HCSPARAMS1::Get().ReadFrom(&mmio_.value()).MaxIntrs());
@@ -1314,12 +1312,13 @@ zx_status_t UsbXhci::InitMmio() {
   }
   for (uint16_t i = 0; i < irq_count_; i++) {
     // Set interrupt to wakeable if suspend is enabled.
-    status = pdev_.GetInterrupt(i, config_.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0,
-                                &interrupter(i).GetIrq());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "UsbXhci: failed fetch interrupt (%s)", zx_status_get_string(status));
-      return status;
+    zx::result interrupt =
+        pdev_.GetInterrupt(i, config_.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0);
+    if (interrupt.is_error()) {
+      FDF_LOG(ERROR, "Failed to get interrupt %u: %s", i, interrupt.status_string());
+      return interrupt.status_value();
     }
+    interrupter(i).GetIrq() = std::move(interrupt.value());
   }
   if (config_.enable_suspend()) {
     zx::result activity_governer = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
@@ -1476,10 +1475,12 @@ zx_status_t UsbXhci::HciFinalize() {
         return ZX_ERR_INTERNAL;
       }
     } else {
-      if (status = pdev_.GetBti(0, &bti); status != ZX_OK) {
-        FDF_LOG(ERROR, "pdev_.GetBti(): %s", zx_status_get_string(status));
-        return ZX_ERR_INTERNAL;
+      zx::result result = pdev_.GetBti(0);
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to get bti: %s", result.status_string());
+        return result.status_value();
       }
+      bti = std::move(result.value());
     }
     bti_ = std::move(bti);
   }
@@ -1686,7 +1687,7 @@ zx::result<> UsbXhci::Start() {
   zx::result pdev_result =
       incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
   if (pdev_result.is_ok() && pdev_result->is_valid()) {
-    pdev_ = ddk::PDevFidl(std::move(*pdev_result));
+    pdev_ = fdf::PDev{std::move(*pdev_result)};
     // We need at least a PDEV, but the PHY is optional for devices not implementing OTG.
     auto phy_result = usb_phy::UsbPhyClient::Create(incoming(), "xhci-phy");
     if (phy_result.is_ok()) {
