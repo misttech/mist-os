@@ -197,8 +197,20 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.memory.heapdump.client/ExecutableRegion.name",
+        "ordinal": "6",
+        "type": "string"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.memory.heapdump.client/ExecutableRegion.size",
         "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.memory.heapdump.client/ExecutableRegion.vaddr",
+        "ordinal": "5",
         "type": "uint64"
     },
     {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use std::ffi::c_void;
+use std::ffi::{c_char, c_void};
 use zx::sys::{zx_handle_t, zx_status_t, zx_vaddr_t};
 use zx::{self as zx, AsHandleRef};
 
@@ -48,7 +48,17 @@ extern "C" {
     // Implemented in elf-search.cc
     fn ElfSearchExecutableRegions(
         process_handle: zx_handle_t,
-        callback: extern "C" fn(u64, u64, u64, *const u8, usize, *mut c_void),
+        callback: extern "C" fn(
+            u64,
+            u64,
+            u64,
+            *const u8,
+            usize,
+            u64,
+            *const c_char,
+            usize,
+            *mut c_void,
+        ),
         callback_arg: *mut c_void,
     ) -> zx_status_t;
 }
@@ -59,6 +69,9 @@ extern "C" fn callback(
     file_offset: u64,
     build_id: *const u8,
     build_id_len: usize,
+    vaddr: u64,
+    name: *const c_char,
+    name_len: usize,
     callback_arg: *mut c_void,
 ) {
     // SAFETY: this is the `callback_arg` value passed by `find_executable_regions`, which sets it
@@ -70,11 +83,22 @@ extern "C" fn callback(
     let mut build_id = unsafe { core::slice::from_raw_parts(build_id, build_id_len) }.to_vec();
     build_id.truncate(fheapdump_client::MAX_BUILD_ID_LENGTH as usize);
 
+    // SAFETY: the address and the length of the `name` come from the elf-search library.
+    let name = unsafe { core::slice::from_raw_parts(name, name_len) };
+    let name = String::from_utf8(name.iter().map(|ch| *ch as u8).collect());
+
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    let _unused = (vaddr, name); // avoid "unused variable" warnings
+
     output_vec.push(fheapdump_client::ExecutableRegion {
         address: Some(address),
         size: Some(size),
         file_offset: Some(file_offset),
         build_id: Some(fheapdump_client::BuildId { value: build_id }),
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        vaddr: Some(vaddr),
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        name: name.ok(),
         ..Default::default()
     })
 }

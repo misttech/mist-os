@@ -108,8 +108,10 @@ mod tests {
     const FAKE_STACK_TRACE_ADDRESSES: [u64; 3] = [11111, 22222, 33333];
     const FAKE_STACK_TRACE_KEY: u64 = 1234;
     const FAKE_REGION_ADDRESS: u64 = 8192;
+    const FAKE_REGION_NAME: &str = "fake-region-name";
     const FAKE_REGION_SIZE: u64 = 28672;
     const FAKE_REGION_FILE_OFFSET: u64 = 4096;
+    const FAKE_REGION_VADDR: u64 = 12288;
     const FAKE_REGION_BUILD_ID: &[u8] = &[0xee; 20];
 
     #[test_case(hashmap! {} ; "empty")]
@@ -146,8 +148,10 @@ mod tests {
             .push_element(fheapdump_client::SnapshotElement::ExecutableRegion(
                 fheapdump_client::ExecutableRegion {
                     address: Some(FAKE_REGION_ADDRESS),
+                    name: Some(FAKE_REGION_NAME.to_string()),
                     size: Some(FAKE_REGION_SIZE),
                     file_offset: Some(FAKE_REGION_FILE_OFFSET),
+                    vaddr: Some(FAKE_REGION_VADDR),
                     build_id: Some(fheapdump_client::BuildId {
                         value: FAKE_REGION_BUILD_ID.to_vec(),
                     }),
@@ -186,8 +190,10 @@ mod tests {
         }
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region = received_snapshot.executable_regions.remove(&FAKE_REGION_ADDRESS).unwrap();
+        assert_eq!(region.name, FAKE_REGION_NAME);
         assert_eq!(region.size, FAKE_REGION_SIZE);
         assert_eq!(region.file_offset, FAKE_REGION_FILE_OFFSET);
+        assert_eq!(region.vaddr.unwrap(), FAKE_REGION_VADDR);
         assert_eq!(region.build_id, FAKE_REGION_BUILD_ID);
         assert!(received_snapshot.executable_regions.is_empty(), "all entries have been removed");
     }
