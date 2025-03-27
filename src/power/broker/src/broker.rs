@@ -2702,6 +2702,7 @@ mod tests {
                         rm_element: {
                             element_id: *unobtanium,
                             name: "Unobtainium",
+                            valid_levels: v01.clone(),
                         }
                     },
                 },

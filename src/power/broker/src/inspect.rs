@@ -40,6 +40,7 @@ const OPPORTUNISTIC: &str = "opportunistic";
 const DEPENDENT_LEVEL: &str = "dependent_level";
 const CURRENT_LEVEL: &str = "current_level";
 const REQUIRED_LEVEL: &str = "required_level";
+const VALID_LEVELS: &str = "valid_levels";
 
 #[derive(Debug)]
 pub struct TopologyInspect {
@@ -56,6 +57,7 @@ pub struct ElementData {
     // { LeaseId  => { Level => LeaseStatus } }
     leases: HashMap<LeaseID, LeaseData>,
     name: inspect::StringProperty,
+    valid_levels: inspect::UintArrayProperty,
     _node: inspect::Node,
     leases_node: inspect::Node,
 }
@@ -86,7 +88,7 @@ impl ElementData {
         required_level: Option<fpb::PowerLevel>,
     ) -> Self {
         let name = node.create_string(ELEMENT_NAME, name);
-        Self::record_valid_levels(&node, valid_levels);
+        let valid_levels = Self::create_valid_levels(&node, valid_levels);
         let leases_node = node.create_child(Self::LEASES);
         Self {
             current_level: current_level
@@ -98,6 +100,7 @@ impl ElementData {
             leases: Default::default(),
             leases_node,
             name,
+            valid_levels,
             _node: node,
         }
     }
@@ -105,13 +108,14 @@ impl ElementData {
     fn synthetic(node: inspect::Node, name: &str, valid_levels: &[IndexedPowerLevel]) -> Self {
         let name = node.create_string(ELEMENT_NAME, name);
         node.record_bool(Self::SYNTHETIC, true);
-        Self::record_valid_levels(&node, valid_levels);
+        let valid_levels = Self::create_valid_levels(&node, valid_levels);
         let leases_node = node.create_child(Self::LEASES);
         Self {
             current_level: None,
             required_level: None,
             _node: node,
             name,
+            valid_levels,
             leases: Default::default(),
             leases_node,
         }
@@ -171,13 +175,15 @@ impl ElementData {
         self.leases.remove(&lease_id)
     }
 
-    fn record_valid_levels(node: &inspect::Node, valid_levels: &[IndexedPowerLevel]) {
-        const VALID_LEVELS: &str = "valid_levels";
+    fn create_valid_levels(
+        node: &inspect::Node,
+        valid_levels: &[IndexedPowerLevel],
+    ) -> inspect::UintArrayProperty {
         let prop = node.create_uint_array(VALID_LEVELS, valid_levels.len());
         for (idx, v) in valid_levels.iter().enumerate() {
             prop.set(idx, v.level);
         }
-        node.record(prop);
+        prop
     }
 }
 
@@ -419,12 +425,20 @@ impl TopologyInspect {
 
     pub fn on_remove_element(&self, element: Element) {
         let mut vertex = element.inspect_vertex.as_ref().unwrap().borrow_mut();
+
+        // Ensure we don't drop the properties when dropping the vertex since we'll be reparenting
+        // them and leaving them in the event. So we swap them for a no-op property.
         let mut name_property = inspect::StringProperty::default();
         std::mem::swap(&mut vertex.meta().name, &mut name_property);
+        let mut valid_levels_prop = inspect::UintArrayProperty::default();
+        std::mem::swap(&mut vertex.meta().valid_levels, &mut valid_levels_prop);
+
         self.maybe_record_event(&element, REMOVE_ELEMENT_EVENT, |node| {
             node.record_uint(ELEMENT_ID, *element.id);
             let _ = name_property.reparent(&node);
             node.record(name_property);
+            let _ = valid_levels_prop.reparent(&node);
+            node.record(valid_levels_prop);
         });
     }
 
