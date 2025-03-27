@@ -13,7 +13,9 @@ source_set("virtio_netdevice_lib") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_banjo_cpp",
     "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/devices/bus/lib/virtio",
+    "//src/lib/ddktl",
     "//src/lib/vmo_store",
+    "//vendor/misttech/src/connectivity/network/drivers/network-device:src",
     "//vendor/misttech/third_party/lwip",
   ]
   configs += [ "//build/config:default_include_dirs" ]

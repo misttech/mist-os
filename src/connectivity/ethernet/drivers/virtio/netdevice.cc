@@ -129,8 +129,8 @@ zx_status_t NetworkDevice::Init() {
     return ZX_ERR_NO_MEMORY;
   }
 
-  ifc_ = netif_add(netif, nullptr, nullptr, nullptr, this, NetworkDevice::NetworkDeviceInit,
-                   tcpip_input);
+  nifc_ = netif_add(netif, nullptr, nullptr, nullptr, this, NetworkDevice::NetworkDeviceInit,
+                    tcpip_input);
 
   return ZX_OK;
 }
@@ -188,7 +188,7 @@ void NetworkDevice::IrqRingUpdate() {
 
 bool NetworkDevice::IrqRingUpdateInternal() {
   Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
-  if (!ifc_) {
+  if (!ifc_.is_valid()) {
     return false;
   }
 
@@ -212,7 +212,7 @@ bool NetworkDevice::IrqRingUpdateInternal() {
     more_work |= tx_.ClearNoInterruptCheckHasWork();
   }
   if (size_t count = std::distance(tx_results.begin(), tx_it); count != 0) {
-    // ifc_.CompleteTx(tx_results.data(), count);
+    ifc_.CompleteTx(tx_results.data(), count);
   }
 
   ktl::array<rx_buffer_t, kMaxDepth> rx_buffers;
@@ -263,7 +263,7 @@ bool NetworkDevice::IrqRingUpdateInternal() {
     more_work |= rx_.ClearNoInterruptCheckHasWork();
   }
   if (size_t count = std::distance(rx_buffers.begin(), rx_it); count != 0) {
-    // ifc_.CompleteRx(rx_buffers.data(), count);
+    ifc_.CompleteRx(rx_buffers.data(), count);
   }
 
   return more_work;
@@ -271,14 +271,17 @@ bool NetworkDevice::IrqRingUpdateInternal() {
 
 void NetworkDevice::IrqConfigChange() {
   Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
+  if (!ifc_.is_valid()) {
+    return;
+  }
 
   const port_status_t status = ReadStatus();
   if (status.flags & STATUS_FLAGS_ONLINE) {
     printf("link up\n");
-    netif_set_link_up(ifc_);
+    netif_set_link_up(nifc_);
   } else {
     printf("link down\n");
-    netif_set_link_down(ifc_);
+    netif_set_link_down(nifc_);
   }
 }
 
@@ -294,21 +297,21 @@ port_status_t NetworkDevice::ReadStatus() const {
 void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
                                           network_device_impl_init_callback callback,
                                           void* cookie) {
-#if 0
-  fbl::AutoLock lock(&state_lock_);
+  Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  using Context = std::tuple<network_device_impl_init_callback, void*>;
-  std::unique_ptr context = std::make_unique<Context>(callback, cookie);
+#if 0
+  //using Context = std::tuple<network_device_impl_init_callback, void*>;
+  //std::unique_ptr context = std::make_unique<Context>(callback, cookie);
 
   ifc_.AddPort(
       kPortId, this, &network_port_protocol_ops_,
       [](void* ctx, zx_status_t status) {
         std::unique_ptr<Context> context(static_cast<Context*>(ctx));
-        auto [callback, cookie] = *context;
+        auto [_callback, _cookie] = *context;
         if (status != ZX_OK) {
-          zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+          TRACEF("failed to add port: %s\n", zx_status_get_string(status));
         }
-        callback(cookie, status);
+        _callback(_cookie, status);
       },
       context.release());
 #endif
@@ -399,7 +402,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
         }
       }
       if (iter != tx_return.begin()) {
-        // ifc_.CompleteTx(tx_return.data(), std::distance(tx_return.begin(), iter));
+        ifc_.CompleteTx(tx_return.data(), std::distance(tx_return.begin(), iter));
       }
     }
     // Pending rx buffers.
@@ -428,7 +431,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
         }
       }
       if (iter != rx_return.begin()) {
-        // ifc_.CompleteRx(rx_return.data(), std::distance(rx_return.begin(), iter));
+        ifc_.CompleteRx(rx_return.data(), std::distance(rx_return.begin(), iter));
       }
     }
   }
@@ -575,9 +578,13 @@ void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
   }
 }
 
-void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, fbl::RefPtr<VmObjectDispatcher> vmo,
+void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, const uint8_t* vmo_list,
+                                                size_t vmo_count,
                                                 network_device_impl_prepare_vmo_callback callback,
                                                 void* cookie) {
+  fbl::RefPtr<VmObjectDispatcher> vmo = fbl::ImportFromRawPtr<VmObjectDispatcher>(
+      (VmObjectDispatcher*)(const_cast<uint8_t*>(vmo_list)));
+
   zx_status_t status = [this, &vmo_id, &vmo]() {
     Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
     return vmo_store_.RegisterWithKey(vmo_id, ktl::move(vmo));

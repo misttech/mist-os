@@ -6,7 +6,7 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_VIRTIO_NETDEVICE_H_
 
-#include <fuchsia/hardware/network/driver/c/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/net/c/banjo.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -19,6 +19,7 @@
 
 #include <bitset>
 
+#include <ddktl/device.h>
 #include <fbl/macros.h>
 #include <kernel/brwlock.h>
 #include <lwip/netif.h>
@@ -55,7 +56,16 @@ struct SessionConfig {
   zx_status_t Validate();
 };
 
-class NetworkDevice : public virtio::Device {
+class NetworkDevice;
+
+// using DeviceType = ddk::Device<NetworkDevice>;
+class NetworkDevice : public Device,
+                      // Mixins for protocol device:
+                      // public DeviceType,
+                      // Mixin for Network device banjo protocol:
+                      public ddk::NetworkDeviceImplProtocol<NetworkDevice, ddk::base_protocol>,
+                      public ddk::NetworkPortProtocol<NetworkDevice>,
+                      public ddk::MacAddrProtocol<NetworkDevice> {
  public:
   class Buffer;
   class BufferData;
@@ -100,7 +110,7 @@ class NetworkDevice : public virtio::Device {
   void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
   void NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t buf_count);
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list, size_t buf_count);
-  void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, fbl::RefPtr<VmObjectDispatcher> vmo,
+  void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, const uint8_t* vmo_list, size_t vmo_count,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
 
@@ -193,6 +203,7 @@ class NetworkDevice : public virtio::Device {
   mac_address mac_;
   uint16_t virtio_hdr_len_;
 
+  ddk::NetworkDeviceIfcProtocolClient ifc_ __TA_GUARDED(state_lock_);
   VmoStore vmo_store_ __TA_GUARDED(state_lock_);
   mac_addr_protocol_t mac_addr_proto_;
 
@@ -223,7 +234,7 @@ class NetworkDevice : public virtio::Device {
   Buffer AllocTx();
   zx_status_t Send(Buffer* buffer);
   zx_status_t FetchTx();
-  netif* ifc_ __TA_GUARDED(state_lock_);
+  netif* nifc_ __TA_GUARDED(state_lock_);
 
   device_impl_info_t dev_info_;
   SessionConfig session_config_;
