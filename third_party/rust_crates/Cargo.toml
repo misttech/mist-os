@@ -215,7 +215,7 @@ signature =  "1.4.0"
 simplelog = "0.10.2"
 siphasher = "0.3.10"
 slab = "0.4.9"
-smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union"]}
+smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"

@@ -88,7 +88,7 @@ rust_library(
         "//third_party/rust_crates/vendor/num-iter-0.1.42:num_iter",
         "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
         "//third_party/rust_crates/vendor/rand-0.8.4:rand",
-        "//third_party/rust_crates/vendor/smallvec-1.13.1:smallvec",
+        "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",
     ],
 )
 

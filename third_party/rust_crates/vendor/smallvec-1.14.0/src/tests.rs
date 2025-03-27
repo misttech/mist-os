@@ -996,7 +996,23 @@ fn test_clone_from() {
 #[test]
 fn test_size() {
     use core::mem::size_of;
-    assert_eq!(24, size_of::<SmallVec<[u8; 8]>>());
+    const PTR_SIZE: usize = size_of::<usize>();
+    #[cfg(feature = "union")]
+    {
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; 0]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; 1]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; PTR_SIZE]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; PTR_SIZE + 1]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; 2 * PTR_SIZE]>>());
+        assert_eq!(4 * PTR_SIZE, size_of::<SmallVec<[u8; 2 * PTR_SIZE + 1]>>());
+    }
+    #[cfg(not(feature = "union"))]
+    {
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; 0]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; 1]>>());
+        assert_eq!(3 * PTR_SIZE, size_of::<SmallVec<[u8; PTR_SIZE]>>());
+        assert_eq!(4 * PTR_SIZE, size_of::<SmallVec<[u8; PTR_SIZE + 1]>>());
+    }
 }
 
 #[cfg(feature = "drain_filter")]
@@ -1022,4 +1038,37 @@ fn drain_keep_rest() {
     df.keep_rest();
 
     assert_eq!(a, SmallVec::<[i32; 3]>::from_slice(&[1i32, 3, 5, 6, 7, 8]));
+}
+
+/// This assortment of tests, in combination with miri, verifies we handle UB on fishy arguments
+/// given to SmallVec. Draining and extending the allocation are fairly well-tested earlier, but
+/// `smallvec.insert(usize::MAX, val)` once slipped by!
+///
+/// All code that indexes into SmallVecs should be tested with such "trivially wrong" args.
+#[test]
+fn max_dont_panic() {
+    let mut sv: SmallVec<[i32; 2]> = smallvec![0];
+    let _ = sv.get(usize::MAX);
+    sv.truncate(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn max_remove() {
+    let mut sv: SmallVec<[i32; 2]> = smallvec![0];
+    sv.remove(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn max_swap_remove() {
+    let mut sv: SmallVec<[i32; 2]> = smallvec![0];
+    sv.swap_remove(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn test_insert_out_of_bounds() {
+    let mut v: SmallVec<[i32; 4]> = SmallVec::new();
+    v.insert(10, 6);
 }

@@ -985,7 +985,7 @@ group("slab") {
 }
 
 group("smallvec") {
-  public_deps = [ ":smallvec-v1_13_1" ]
+  public_deps = [ ":smallvec-v1_14_0" ]
 }
 
 group("socket2") {
@@ -10032,7 +10032,7 @@ rust_library("num-bigint-dig-v0_8_4") {
   deps += [ ":num-iter-v0_1_42" ]
   deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand-v0_8_4" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
 
   rustenv = []
 
@@ -10846,7 +10846,7 @@ rust_library("parking_lot_core-v0_8_3") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":instant-v0_1_9" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
   if (false) {
     deps += [ ":redox_syscall-v0_2_13" ]
   }
@@ -10891,7 +10891,7 @@ rust_library("parking_lot_core-v0_9_9") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
   if (false) {
     deps += [ ":redox_syscall-v0_4_1" ]
   }
@@ -15660,18 +15660,18 @@ rust_library("slab-v0_4_9") {
   applicable_licenses = [ ":slab-v0_4_9.license" ]
 }
 
-license("smallvec-v1_13_1.license") {
+license("smallvec-v1_14_0.license") {
   public_package_name = "smallvec"
   license_files = [
-    "//third_party/rust_crates/vendor/smallvec-1.13.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/smallvec-1.13.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/smallvec-1.14.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/smallvec-1.14.0/LICENSE-MIT",
   ]
 }
 
-rust_library("smallvec-v1_13_1") {
+rust_library("smallvec-v1_14_0") {
   crate_name = "smallvec"
-  crate_root = "//third_party/rust_crates/vendor/smallvec-1.13.1/src/lib.rs"
-  output_name = "smallvec-2f4657a8c7175b85"
+  crate_root = "//third_party/rust_crates/vendor/smallvec-1.14.0/src/lib.rs"
+  output_name = "smallvec-f9fe58d66a6f5c7e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15681,8 +15681,8 @@ rust_library("smallvec-v1_13_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=2f4657a8c7175b85",
-    "-Cextra-filename=-2f4657a8c7175b85",
+    "-Cmetadata=f9fe58d66a6f5c7e",
+    "-Cextra-filename=-f9fe58d66a6f5c7e",
     "--cfg=feature=\"const_generics\"",
     "--cfg=feature=\"const_new\"",
     "--cfg=feature=\"union\"",
@@ -15690,7 +15690,7 @@ rust_library("smallvec-v1_13_1") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":smallvec-v1_13_1.license" ]
+  applicable_licenses = [ ":smallvec-v1_14_0.license" ]
 }
 
 license("socket2-v0_5_5.license") {
@@ -17496,7 +17496,7 @@ rust_library("tracing-subscriber-v0_3_18") {
   deps += [ ":once_cell-v1_20_2" ]
   deps += [ ":regex-v1_7_3" ]
   deps += [ ":sharded-slab-v0_1_4" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
   deps += [ ":thread_local-v1_1_7" ]
   deps += [ ":tracing-log-v0_2_0" ]
   deps += [ ":tracing-v0_1_40" ]
@@ -17585,7 +17585,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   deps += [ ":ipnet-v2_3_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":rand-v0_8_4" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
   deps += [ ":thiserror-v1_0_69" ]
   deps += [ ":tinyvec-v1_3_1" ]
   deps += [ ":tracing-v0_1_40" ]
@@ -17627,7 +17627,7 @@ rust_library("trust-dns-resolver-v0_22_0") {
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":lru-cache-v0_1_2" ]
   deps += [ ":parking_lot-v0_12_0" ]
-  deps += [ ":smallvec-v1_13_1" ]
+  deps += [ ":smallvec-v1_14_0" ]
   deps += [ ":thiserror-v1_0_69" ]
   deps += [ ":tracing-v0_1_40" ]
   deps += [ ":trust-dns-proto-v0_22_0" ]

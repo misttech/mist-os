@@ -126,6 +126,9 @@ use core::ops::{self, Range, RangeBounds};
 use core::ptr::{self, NonNull};
 use core::slice::{self, SliceIndex};
 
+#[cfg(feature = "malloc_size_of")]
+use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
+
 #[cfg(feature = "serde")]
 use serde::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
@@ -1372,13 +1375,14 @@ impl<A: Array> SmallVec<A> {
             }
             let mut ptr = ptr.as_ptr();
             let len = *len_ptr;
+            if index > len {
+                panic!("index exceeds length");
+            }
+            // SAFETY: add is UB if index > len, but we panicked first
             ptr = ptr.add(index);
             if index < len {
+                // Shift element to the right of `index`.
                 ptr::copy(ptr, ptr.add(1), len - index);
-            } else if index == len {
-                // No elements need shifting.
-            } else {
-                panic!("index exceeds length");
             }
             *len_ptr = len + 1;
             ptr::write(ptr, element);
@@ -1967,6 +1971,32 @@ where
         }
 
         Ok(values)
+    }
+}
+
+#[cfg(feature = "malloc_size_of")]
+impl<A: Array> MallocShallowSizeOf for SmallVec<A> {
+    fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        if self.spilled() {
+            unsafe { ops.malloc_size_of(self.as_ptr()) }
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(feature = "malloc_size_of")]
+impl<A> MallocSizeOf for SmallVec<A>
+where
+    A: Array,
+    A::Item: MallocSizeOf,
+{
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        let mut n = self.shallow_size_of(ops);
+        for elem in self.iter() {
+            n += elem.size_of(ops);
+        }
+        n
     }
 }
 

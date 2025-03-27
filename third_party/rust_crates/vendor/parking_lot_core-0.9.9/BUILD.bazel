@@ -75,7 +75,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/cfg-if-1.0.0:cfg_if",
         "//third_party/rust_crates/vendor/parking_lot_core-0.9.9:build_script_build",
-        "//third_party/rust_crates/vendor/smallvec-1.13.1:smallvec",
+        "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",
     ] + select({
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
             "//third_party/rust_crates/vendor/libc-0.2.169:libc",  # cfg(unix)

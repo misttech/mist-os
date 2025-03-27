@@ -102,7 +102,7 @@ rust_library(
         "//third_party/rust_crates/vendor/tracing-log-0.2.0:tracing_log",
     ] + select({
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
-            "//third_party/rust_crates/vendor/smallvec-1.13.1:smallvec",  # x86_64-unknown-linux-gnu
+            "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",  # x86_64-unknown-linux-gnu
         ],
         "//conditions:default": [],
     }),
