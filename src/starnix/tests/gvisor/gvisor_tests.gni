@@ -4,6 +4,7 @@
 
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/starnix/build/starnix_container_config_component.gni")
 import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
@@ -62,7 +63,6 @@ gvisor_tests = [
   "mincore_test",
   "mkdir_test",
   "mknod_test",
-  "mlock_test",
   "mmap_test",
   "mremap_test",
   "msgqueue_test",
@@ -271,6 +271,36 @@ gvisor_tests_custom_manifest = [
   },
 ]
 
+gvisor_tests_container_config = []
+
+mlock_onfault_behaviors = [
+  true,
+  false,
+]
+mlock_pin_flavors = [
+  "noop",
+  "shadow_process",
+  "vmar_always_need",
+]
+foreach(onfault_behavior, mlock_onfault_behaviors) {
+  foreach(pin_flavor, mlock_pin_flavors) {
+    onfault_str = ""
+    if (onfault_behavior) {
+      onfault_str = "_always_onfault"
+    }
+    gvisor_tests_container_config += [
+      {
+        test_name = "mlock_test${onfault_str}_${pin_flavor}_pin"
+        binary = "mlock_test"
+        container_config = {
+          mlock_always_onfault = onfault_behavior
+          mlock_pin_flavor = pin_flavor
+        }
+      },
+    ]
+  }
+}
+
 # Creates a fuchsia_test_package for a gVisor binary.
 #
 # Parameters
@@ -289,6 +319,11 @@ gvisor_tests_custom_manifest = [
 #     Extra parameters to add to the `program` section of the manifest.
 #   container_shard (optional)
 #     Manifest shard that defines the container for the test.
+#   container_config (optional)
+#     Configuration capabilities that should be offered to the Starnix container for this test.
+#     Accepts a list of scopes, where each scope is suitable to use in a generated_file template
+#     as the JSON to define a config capability:
+#     https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/configuration?hl=en#defining_configuration_capabilities
 template("gvisor_test_package") {
   _container_shard =
       "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml"
@@ -312,6 +347,12 @@ template("gvisor_test_package") {
   _container_package = "//src/starnix/containers/debian:debian_package"
   if (defined(invoker.container_package)) {
     _container_package = invoker.container_package
+  }
+
+  _container_config = {
+  }
+  if (defined(invoker.container_config)) {
+    _container_config = invoker.container_config
   }
 
   _manifest_label = "${target_name}.cml"
@@ -339,6 +380,19 @@ template("gvisor_test_package") {
     if (defined(invoker.test_specs)) {
       forward_variables_from(invoker.test_specs, "*", [ "log_settings" ])
     }
+  }
+
+  _config_component = "${target_name}_config"
+  starnix_container_config_component(_config_component) {
+    config = _container_config
+  }
+
+  _config_shard_label = "${_config_component}_shard"
+  _config_shard = "${target_gen_dir}/${_config_shard_label}.cml"
+  starnix_container_config_offers(_config_shard_label) {
+    output = _config_shard
+    offer_from = "#config"
+    offer_to = "#container"
   }
 
   _bin_resource_label = "${target_name}_bin"
@@ -369,9 +423,17 @@ template("gvisor_test_package") {
         rebase_path(_container_shard, root_build_dir),
         rebase_path(_base_shard, root_build_dir),
         rebase_path(_storage_shard, root_build_dir),
+        rebase_path(_config_shard, root_build_dir),
       ]
       program = _program
+      children = [
+        {
+          name = "config"
+          url = "#meta/${_config_component}.cm"
+        },
+      ]
     }
+    deps = [ ":${_config_shard_label }" ]
   }
 
   _component_label = target_name + "_component"
@@ -390,14 +452,20 @@ template("gvisor_test_package") {
 
   if (_is_benchmark) {
     fuchsia_test_package(target_name) {
-      deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
+      deps = [
+        ":${_config_component}",
+        "//src/starnix/tests/gvisor:gvisor_runfiles",
+      ]
       subpackages = starnix_test_subpackages + [ _container_package ]
       test_components = [ ":${_component_label}" ]
       test_specs = _test_specs
     }
   } else {
     fuchsia_test_with_expectations_package(target_name) {
-      deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
+      deps = [
+        ":${_config_component}",
+        "//src/starnix/tests/gvisor:gvisor_runfiles",
+      ]
       subpackages = starnix_test_subpackages + [ _container_package ]
       test_components = [ ":${_component_label}" ]
       expectations = _expectations
@@ -471,6 +539,16 @@ template("gvisor_tests_group") {
                                ])
       }
       run_as_root = false
+    }
+    _tests += [ ":${_label}" ]
+  }
+
+  foreach(test, gvisor_tests_container_config) {
+    _label = "starnix_gvisor_${test.test_name}${_suffix}"
+    gvisor_test_package(_label) {
+      forward_variables_from(invoker, _to_forward)
+      component_name = test.test_name
+      forward_variables_from(test, "*", [ "test_name" ] + _to_forward)
     }
     _tests += [ ":${_label}" ]
   }
