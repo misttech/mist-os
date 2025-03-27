@@ -1416,11 +1416,8 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 }
 
 // perform some sort of copy in/out on a range of the object using a passed in lambda for the copy
-// routine. The copy routine has the expected type signature of: (uint64_t src_offset, uint64_t
-// dest_offset, bool write, Guard<VmoLockType> *guard) -> zx_status_t The passed in guard may have
-// its CallUnlocked member used, but if it does then ZX_OK must not be the return value. A return of
-// ZX_ERR_SHOULD_WAIT implies that the attempted copy should be tried again at the exact same
-// offsets.
+// routine. The copy routine has the expected type signature of: (void *ptr, uint64_t offset,
+//  uint64_t len) -> UserCopyCaptureFaultsResult.
 template <typename T>
 zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
                                                    VmObjectReadWriteOptions options, T copyfunc,
