@@ -165,3 +165,25 @@ pub fn sysfs_create_link(
     // Build a symlink with the relative path.
     SymlinkNode::new(path.build_relative().as_ref(), owner)
 }
+
+/// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
+/// the bus devices directory.
+pub fn sysfs_create_bus_link(
+    from: KObjectHandle,
+    to: KObjectHandle,
+    owner: FsCred,
+) -> (SymlinkNode, impl FnOnce(ino_t) -> FsNodeInfo) {
+    let mut path = PathBuilder::new();
+    path.prepend_element(to.path().as_ref());
+    // Escape two more levels from its subsystem to the root of sysfs.
+    path.prepend_element("..".into());
+    path.prepend_element("..".into());
+
+    let path_to_root = from.path_to_root();
+    if !path_to_root.is_empty() {
+        path.prepend_element(path_to_root.as_ref());
+    }
+
+    // Build a symlink with the relative path.
+    SymlinkNode::new(path.build_relative().as_ref(), owner)
+}

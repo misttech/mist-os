@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::device::kobject::{KObject, KObjectHandle};
-use crate::fs::sysfs::sysfs_create_link;
+use crate::fs::sysfs::sysfs_create_bus_link;
 use crate::task::CurrentTask;
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -112,7 +112,7 @@ impl FsNodeOps for BusDevicesDirectory {
         let kobject = self.kobject();
         match kobject.get_child(name) {
             Some(child_kobject) => {
-                let (link, info) = sysfs_create_link(kobject, child_kobject, FsCred::root());
+                let (link, info) = sysfs_create_bus_link(kobject, child_kobject, FsCred::root());
                 Ok(node.fs().create_node(current_task, link, info))
             }
             None => error!(ENOENT),
