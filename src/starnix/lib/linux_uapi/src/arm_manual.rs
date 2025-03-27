@@ -31,6 +31,14 @@ arch_translate_data! {
         l_pid
     }
 
+    BidiFrom<flock64> {
+        l_type,
+        l_whence,
+        l_start,
+        l_len,
+        l_pid
+    }
+
     BidiFrom<itimerspec> {
         it_interval,
         it_value

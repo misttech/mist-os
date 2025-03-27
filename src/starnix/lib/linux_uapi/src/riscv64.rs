@@ -1481,6 +1481,9 @@ pub const EOWNERDEAD: u32 = 130;
 pub const ENOTRECOVERABLE: u32 = 131;
 pub const ERFKILL: u32 = 132;
 pub const EHWPOISON: u32 = 133;
+pub const F_GETLK64: u32 = 12;
+pub const F_SETLK64: u32 = 13;
+pub const F_SETLKW64: u32 = 14;
 pub const O_ACCMODE: u32 = 3;
 pub const O_RDONLY: u32 = 0;
 pub const O_WRONLY: u32 = 1;
@@ -7731,11 +7734,12 @@ pub struct flock {
     pub l_type: crate::types::c_short,
     pub l_whence: crate::types::c_short,
     pub __bindgen_padding_0: [u8; 4usize],
-    pub l_start: __kernel_loff_t,
-    pub l_len: __kernel_loff_t,
+    pub l_start: __kernel_off_t,
+    pub l_len: __kernel_off_t,
     pub l_pid: pid_t,
     pub __bindgen_padding_1: [u8; 4usize],
 }
+pub type flock64 = flock;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct f_owner_ex {
