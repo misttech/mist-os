@@ -44,7 +44,7 @@ TEST(LogDecoder, DecodesCorrectly) {
   ASSERT_EQ(tags[1].GetString(), std::string("some other tag"));
   ASSERT_EQ(keys["user property"].GetDouble(), 5.2);
   ASSERT_EQ(payload["message"]["value"].GetString(), std::string("test message"));
-  fuchsia_free_decoded_log_message(json);
+  fuchsia_free_decoded_log_message(const_cast<char*>(json));
 }
 
 }  // namespace
