@@ -40,6 +40,9 @@ _PRODUCT_CONFIG_BASE_JSON = {
                 },
             },
         },
+        "driver_framework": {
+            "use_rust_driver_host": True,
+        },
         "fonts": {
             "font_collection": "open-fonts-collection",
         },
