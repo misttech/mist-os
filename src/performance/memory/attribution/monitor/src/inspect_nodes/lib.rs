@@ -7,7 +7,7 @@ use fuchsia_inspect::{ArrayProperty, Inspector};
 use futures::FutureExt;
 use inspect_runtime::PublishedInspectController;
 use log::debug;
-use stalls::StallProviderTrait;
+use stalls::StallProvider;
 use std::sync::Arc;
 use {fidl_fuchsia_kernel as fkernel, fuchsia_inspect as _, inspect_runtime as _};
 
@@ -20,9 +20,9 @@ pub struct ServiceTask {
 /// Begins to serve the inspect tree, and returns an object holding the server's resources.
 /// Dropping the `ServiceTask` stops the service.
 pub fn start_service(
-    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
-    stall_provider: Arc<impl StallProviderTrait>,
+    stall_provider: Arc<impl StallProvider>,
 ) -> Result<ServiceTask> {
     debug!("Start serving inspect tree.");
 
@@ -41,9 +41,9 @@ pub fn start_service(
 }
 
 fn build_inspect_tree(
-    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
-    stall_provider: Arc<impl StallProviderTrait>,
+    stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
 ) {
     // Lazy evaluation is unregistered when the `LazyNode` is dropped.
@@ -337,7 +337,7 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
 
         struct FakeStallProvider {}
-        impl StallProviderTrait for FakeStallProvider {
+        impl StallProvider for FakeStallProvider {
             fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
                 Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
             }

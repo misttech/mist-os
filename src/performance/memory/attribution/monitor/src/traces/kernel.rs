@@ -7,7 +7,7 @@ use fuchsia_async::{Interval, MonotonicDuration};
 use fuchsia_trace::{category_enabled, counter};
 use futures::StreamExt;
 use log::debug;
-use stalls::StallProviderTrait;
+use stalls::StallProvider;
 use std::ffi::CStr;
 use std::sync::Arc;
 const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
@@ -18,7 +18,7 @@ const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
 pub async fn serve_forever(
     mut trace_watcher: Watcher,
     kernel_stats: impl fidl_fuchsia_kernel::StatsProxyInterface,
-    stall_provider: Arc<impl StallProviderTrait>,
+    stall_provider: Arc<impl StallProvider>,
 ) {
     eprintln!("Start serving traces");
     debug!("Start serving traces");
@@ -40,7 +40,7 @@ pub async fn serve_forever(
 
 async fn publish_one_sample(
     kernel_stats: &impl fidl_fuchsia_kernel::StatsProxyInterface,
-    stall_provider: Arc<impl StallProviderTrait>,
+    stall_provider: Arc<impl StallProvider>,
 ) -> Result<()> {
     debug!("Publish trace records for category {:?}", CATEGORY_MEMORY_KERNEL);
     let mem_stats = kernel_stats.get_memory_stats().await?;

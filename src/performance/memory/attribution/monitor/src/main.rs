@@ -67,7 +67,7 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
-    let stall_provider = Arc::new(stalls::StallProvider::new(
+    let stall_provider = Arc::new(stalls::StallProviderImpl::new(
         MonotonicDuration::from_minutes(5),
         Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
     )?);

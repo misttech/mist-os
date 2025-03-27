@@ -19,14 +19,14 @@ pub struct MemoryStallRate {
     pub rate_full: zx::sys::zx_duration_mono_t,
 }
 
-pub trait StallProviderTrait: Sync + Send + 'static {
+pub trait StallProvider: Sync + Send + 'static {
     /// Return the current memory stall values from the kernel.
     fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error>;
     /// Return the
     fn get_stall_rate(&self) -> Option<MemoryStallRate>;
 }
 
-pub struct StallProvider {
+pub struct StallProviderImpl {
     /// Task that regularly polls the memory stall information from the kernel.
     _monitoring_task: fasync::Task<Result<(), anyhow::Error>>,
     /// Last values and rates of memory stalls computed.
@@ -52,13 +52,13 @@ impl StallResource for zx::Resource {
     }
 }
 
-impl StallProvider {
-    /// Create a new [StallProvider]. `stall_rate_interval` represents the polling delay between two
-    /// memory stall measurements, and the interval for memory stall rate computation.
+impl StallProviderImpl {
+    /// Create a new [StallProviderImpl]. `stall_rate_interval` represents the polling delay between
+    /// two memory stall measurements, and the interval for memory stall rate computation.
     pub fn new(
         stall_rate_interval: MonotonicDuration,
         stall_resource: Arc<dyn StallResource>,
-    ) -> Result<StallProvider, anyhow::Error> {
+    ) -> Result<StallProviderImpl, anyhow::Error> {
         let last_stall_info = Arc::new(Mutex::new(StallInformation {
             last_stall_values: stall_resource.get_memory_stall()?,
             stall_rate: None,
@@ -84,7 +84,7 @@ impl StallProvider {
             Ok(())
         });
 
-        Ok(StallProvider {
+        Ok(StallProviderImpl {
             _monitoring_task: monitoring_task,
             last_stall_info,
             stall_resource: stall_resource_clone,
@@ -92,7 +92,7 @@ impl StallProvider {
     }
 }
 
-impl StallProviderTrait for StallProvider {
+impl StallProvider for StallProviderImpl {
     fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
         Ok(self.stall_resource.get_memory_stall()?)
     }
@@ -130,11 +130,11 @@ mod tests {
         stall_value.lock().stall_time_some = 1;
         stall_value.lock().stall_time_full = 2;
 
-        let stall_provider = StallProvider::new(
+        let stall_provider = StallProviderImpl::new(
             MonotonicDuration::from_minutes(1),
             Arc::new(FakeStallResource { stall_value: stall_value.clone() }),
         )
-        .expect("Failed to create StallProvider");
+        .expect("Failed to create StallProviderImpl");
 
         let current_stall_value = stall_provider.get_stall_info().expect("No stall info");
         assert_eq!(stall_value.lock().stall_time_some, current_stall_value.stall_time_some);
