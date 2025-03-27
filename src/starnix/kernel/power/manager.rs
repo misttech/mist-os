@@ -364,6 +364,17 @@ pub fn create_proxy_for_wake_events(
 
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///
+/// The returned counter will be incremented each time there is an incoming message on the proxied
+/// channel. The starnix_kernel is expected to decrement the counter when that incoming message is
+/// handled.
+///
+/// Note that "message" in this context means channel message. This can be either a FIDL event, or
+/// a response to a FIDL message from the platform.
+///
+/// For example, the starnix_kernel may issue a hanging get to retrieve input events. When that
+/// hanging get returns, the counter will be incremented by 1. When the next hanging get has been
+/// scheduled, the input subsystem decrements the counter by 1.
+///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
 /// the container.
 pub fn create_proxy_for_wake_events_counter(
