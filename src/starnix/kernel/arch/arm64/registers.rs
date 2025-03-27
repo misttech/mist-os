@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::arch::LongPtr;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{error, uapi, user_regs_struct};
 
 /// The size of the syscall instruction in bytes in aarch64 and arm mode.
@@ -29,12 +31,14 @@ pub struct RegisterState {
     pub elr: u64,
 }
 
-impl RegisterState {
+impl ArchSpecific for RegisterState {
     fn is_arch32(&self) -> bool {
         (self.real_registers.cpsr as u64) & zx::sys::ZX_REG_CPSR_ARCH_32_MASK
             == zx::sys::ZX_REG_CPSR_ARCH_32_MASK
     }
+}
 
+impl RegisterState {
     fn is_thumb(&self) -> bool {
         const IS_THUMB_MASK: u64 =
             zx::sys::ZX_REG_CPSR_ARCH_32_MASK | zx::sys::ZX_REG_CPSR_THUMB_MASK;
@@ -164,9 +168,10 @@ impl RegisterState {
         offset: usize,
         f: &mut dyn FnMut(&mut u64),
     ) -> Result<(), Errno> {
-        fn reg_offset(index: usize) -> usize {
-            memoffset::offset_of!(user_regs_struct, regs) + index * std::mem::size_of::<u64>()
-        }
+        let reg_offset = |index: usize| -> usize {
+            memoffset::offset_of!(user_regs_struct, regs)
+                + index * LongPtr::size_of_object_for(self)
+        };
 
         let is_arch32: bool = self.is_arch32();
         if offset >= std::mem::size_of::<user_regs_struct>() {
@@ -198,8 +203,8 @@ impl RegisterState {
                 // arm
                 self.real_registers.r[14] = self.real_registers.lr;
             }
-        } else if offset % std::mem::align_of::<u64>() == 0 {
-            let index = (offset - memoffset::offset_of!(user_regs_struct, regs)) >> 3;
+        } else if offset % LongPtr::align_of_object_for(self) == 0 {
+            let index = offset / LongPtr::size_of_object_for(self);
             f(&mut self.real_registers.r[index])
         } else {
             return error!(EINVAL);

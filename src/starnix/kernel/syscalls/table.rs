@@ -175,9 +175,9 @@ pub fn dispatch_syscall(
         };
         pub use crate::task::syscalls::{
             sys_arch32_execve, sys_arch32_geteuid32, sys_arch32_getgid32, sys_arch32_getppid,
-            sys_arch32_getresgid32, sys_arch32_getresuid32, sys_arch32_sched_getaffinity,
-            sys_arch32_sched_setaffinity, sys_arch32_seccomp, sys_arch32_setfsuid,
-            sys_arch32_setfsuid32, sys_arch32_setgroups32, sys_arch32_setpgid,
+            sys_arch32_getresgid32, sys_arch32_getresuid32, sys_arch32_ptrace,
+            sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity, sys_arch32_seccomp,
+            sys_arch32_setfsuid, sys_arch32_setfsuid32, sys_arch32_setgroups32, sys_arch32_setpgid,
             sys_arch32_setpriority, sys_arch32_setresgid32, sys_arch32_setresuid32,
             sys_arch32_setrlimit, sys_arch32_setsid, sys_arch32_syslog, sys_arch32_ugetrlimit,
             sys_capget as sys_arch32_capget, sys_capset as sys_arch32_capset,
@@ -354,6 +354,7 @@ pub fn dispatch_syscall(
             prlimit64[4],
             process_vm_readv[6],
             pselect6[6],
+            ptrace[4],
             pwrite64[6],
             pwritev[4],
             read[3],

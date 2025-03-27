@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/starnix/kernel/args.gni")
 
 rustc_library("starnix_uapi") {
   name = "starnix_uapi"
@@ -43,6 +44,12 @@ rustc_library("starnix_uapi") {
     "src/version.rs",
     "src/vfs.rs",
   ]
+
+  if (starnix_enable_arch32) {
+    if (current_cpu == "arm64") {
+      sources += [ "src/arm.rs" ]
+    }
+  }
 
   deps = [
     "//sdk/rust/zx-status",

@@ -96,6 +96,11 @@ arch_translate_data! {
         ru_nvcsw,
         ru_nivcsw,
     }
+
+    BidiFrom<iovec> {
+        iov_base,
+        iov_len,
+    }
 }
 
 translate_data! {

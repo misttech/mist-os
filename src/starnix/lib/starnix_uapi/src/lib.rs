@@ -35,6 +35,9 @@ pub mod vfs;
 pub mod arm64;
 
 #[cfg(target_arch = "aarch64")]
+pub mod arm;
+
+#[cfg(target_arch = "aarch64")]
 pub use arm64::*;
 
 #[cfg(target_arch = "x86_64")]
@@ -49,5 +52,20 @@ pub mod riscv64;
 #[cfg(target_arch = "riscv64")]
 #[allow(unused_imports)]
 pub use riscv64::*;
+
+pub mod arch32 {
+
+    #[cfg(target_arch = "aarch64")]
+    pub use super::arm::*;
+
+    #[cfg(target_arch = "x86_64")]
+    pub use super::x64::*;
+
+    #[cfg(target_arch = "riscv64")]
+    #[allow(unused_imports)]
+    pub use super::riscv64::*;
+
+    pub use super::uapi::arch32::*;
+}
 
 pub use uapi::*;

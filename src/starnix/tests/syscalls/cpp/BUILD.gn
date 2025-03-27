@@ -48,6 +48,7 @@ syscall_tests = [
   "prctl_test",
   "procfs_mem_test",
   "procfs_test",
+  "ptrace_test",
   "read_write_test",
   "reboot_test",
   "restart_read_test",
@@ -166,7 +167,6 @@ arch64_syscall_tests = [
   # go/keep-sorted start
 
   "extended_pstate_test",
-  "ptrace_test",
   "vdso_test",
 
   # go/keep-sorted end

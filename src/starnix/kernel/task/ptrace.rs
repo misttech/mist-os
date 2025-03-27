@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::arch::execution::new_syscall_from_state;
-use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt};
+use crate::arch::LongPtr;
+use crate::mm::{DumpPolicy, IOVecPtr, MemoryAccessor, MemoryAccessorExt};
 use crate::security;
 use crate::signals::syscalls::WaitingOptions;
 use crate::signals::{
@@ -30,15 +31,15 @@ use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, S
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::{
-    clone_args, errno, error, iovec, pid_t, ptrace_syscall_info, uapi, user_regs_struct,
-    PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC, PTRACE_EVENT_EXIT,
-    PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP, PTRACE_EVENT_VFORK,
-    PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET, PTRACE_GETSIGINFO,
-    PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN,
-    PTRACE_O_EXITKILL, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT,
-    PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE,
-    PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT,
-    PTRACE_POKEUSR, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
+    clone_args, errno, error, pid_t, ptrace_syscall_info, uapi, PTRACE_CONT, PTRACE_DETACH,
+    PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC, PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK,
+    PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP, PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE,
+    PTRACE_GETEVENTMSG, PTRACE_GETREGSET, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK,
+    PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_LISTEN, PTRACE_O_EXITKILL,
+    PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK,
+    PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA,
+    PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_POKEUSR,
+    PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
     PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
@@ -49,6 +50,41 @@ use zerocopy::FromBytes;
 
 #[cfg(any(target_arch = "x86_64"))]
 use starnix_uapi::{user, PTRACE_GETREGS};
+
+type UserRegsStructPtr =
+    MultiArchUserRef<starnix_uapi::user_regs_struct, starnix_uapi::arch32::user_regs_struct>;
+
+uapi::check_arch_independent_layout! {
+    ptrace_syscall_info {
+        op,
+        arch,
+        instruction_pointer,
+        stack_pointer,
+        __bindgen_anon_1,
+    }
+
+    ptrace_syscall_info__bindgen_ty_1 {
+        entry,
+        exit,
+        seccomp,
+    }
+
+    ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1 {
+        nr,
+        args,
+    }
+
+    ptrace_syscall_info__bindgen_ty_1__bindgen_ty_2 {
+        rval,
+        is_error,
+    }
+
+    ptrace_syscall_info__bindgen_ty_1__bindgen_ty_3 {
+        nr,
+        args,
+        ret_data,
+    }
+}
 
 /// For most of the time, for the purposes of ptrace, a tracee is either "going"
 /// or "stopped".  However, after certain ptrace calls, there are special rules
@@ -778,29 +814,38 @@ pub fn ptrace_dispatch(
 
     match request {
         PTRACE_PEEKDATA | PTRACE_PEEKTEXT => {
+            let Some(ref mut captured) = &mut state.captured_thread_state else {
+                return error!(ESRCH);
+            };
+
             // NB: The behavior of the syscall is different from the behavior in ptrace(2),
             // which is provided by libc.
-            let src: UserRef<usize> = UserRef::from(addr);
-            let val = tracee.read_object(src)?;
+            let src = LongPtr::new(captured, addr);
+            let val = tracee.read_multi_arch_object(src)?;
 
-            let dst: UserRef<usize> = UserRef::from(data);
-            current_task.write_object(dst, &val)?;
+            let dst = LongPtr::new(&src, data);
+            current_task.write_multi_arch_object(dst, val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_POKEDATA | PTRACE_POKETEXT => {
-            let ptr: UserRef<usize> = UserRef::from(addr);
-            let val = data.ptr() as usize;
-            tracee.write_object(ptr, &val)?;
+            let Some(ref mut captured) = &mut state.captured_thread_state else {
+                return error!(ESRCH);
+            };
+
+            let src = LongPtr::new(captured, addr);
+            let val = data.ptr() as u64;
+            tracee.write_multi_arch_object(src, val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_PEEKUSR => {
-            if let Some(ref mut captured) = &mut state.captured_thread_state {
-                let val = ptrace_peekuser(&mut captured.thread_state, addr.ptr() as usize)?;
-                let dst: UserRef<usize> = UserRef::from(data);
-                current_task.write_object(dst, &val)?;
-                return Ok(starnix_syscalls::SUCCESS);
-            }
-            error!(ESRCH)
+            let Some(ref mut captured) = &mut state.captured_thread_state else {
+                return error!(ESRCH);
+            };
+
+            let dst = LongPtr::new(captured, data);
+            let val = ptrace_peekuser(&mut captured.thread_state, addr.ptr() as usize)?;
+            current_task.write_multi_arch_object(dst, val as u64)?;
+            return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_POKEUSR => {
             ptrace_pokeuser(&mut *state, data.ptr() as usize, addr.ptr() as usize)?;
@@ -808,8 +853,8 @@ pub fn ptrace_dispatch(
         }
         PTRACE_GETREGSET => {
             if let Some(ref mut captured) = state.captured_thread_state {
-                let uiv: UserRef<iovec> = UserRef::from(data);
-                let iv = current_task.read_object(uiv)?;
+                let uiv = IOVecPtr::new(current_task, data);
+                let mut iv = current_task.read_multi_arch_object(uiv)?;
                 let base = iv.iov_base.addr;
                 let mut len = iv.iov_len as usize;
                 ptrace_getregset(
@@ -819,12 +864,8 @@ pub fn ptrace_dispatch(
                     base,
                     &mut len,
                 )?;
-                current_task.write_object(
-                    UserRef::<usize>::new(UserAddress::from_ptr(
-                        uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_len),
-                    )),
-                    &(len as usize),
-                )?;
+                iv.iov_len = len as u64;
+                current_task.write_multi_arch_object(uiv, iv)?;
                 return Ok(starnix_syscalls::SUCCESS);
             }
             error!(ESRCH)
@@ -954,8 +995,8 @@ pub fn ptrace_dispatch(
         PTRACE_GETEVENTMSG => {
             if let Some(ptrace) = &state.ptrace {
                 if let Some(event_data) = &ptrace.event_data {
-                    let dst: UserRef<u64> = UserRef::from(data);
-                    current_task.write_object(dst, &event_data.msg)?;
+                    let dst = LongPtr::new(current_task, data);
+                    current_task.write_multi_arch_object(dst, event_data.msg)?;
                     return Ok(starnix_syscalls::SUCCESS);
                 }
             }
@@ -1148,7 +1189,7 @@ pub fn ptrace_peekuser(thread_state: &mut ThreadState, offset: usize) -> Result<
     if offset >= std::mem::size_of::<user>() {
         return error!(EIO);
     }
-    if offset < std::mem::size_of::<user_regs_struct>() {
+    if offset < UserRegsStructPtr::size_of_object_for(thread_state) {
         let result = thread_state.get_user_register(offset)?;
         return Ok(result);
     }
@@ -1167,7 +1208,7 @@ pub fn ptrace_pokeuser(
         if offset >= std::mem::size_of::<user>() {
             return error!(EIO);
         }
-        if offset < std::mem::size_of::<user_regs_struct>() {
+        if offset < UserRegsStructPtr::size_of_object_for(thread_state) {
             return thread_state.thread_state.set_user_register(offset, value);
         }
     }
@@ -1183,23 +1224,23 @@ pub fn ptrace_getregset(
 ) -> Result<(), Errno> {
     match regset_type {
         ElfNoteType::PrStatus => {
-            if *len < std::mem::size_of::<user_regs_struct>() {
+            let user_regs_struct_len = UserRegsStructPtr::size_of_object_for(thread_state);
+            if *len < user_regs_struct_len {
                 return error!(EINVAL);
             }
-            *len = std::cmp::min(*len, std::mem::size_of::<user_regs_struct>());
+            *len = std::cmp::min(*len, user_regs_struct_len);
             let mut i: usize = 0;
+            let mut reg_ptr = LongPtr::new(thread_state, base);
             while i < *len {
                 let mut val = None;
                 thread_state
                     .registers
                     .apply_user_register(i, &mut |register| val = Some(*register as usize))?;
                 if let Some(val) = val {
-                    current_task.write_object(
-                        UserRef::<usize>::new(UserAddress::from_ptr((base as usize) + i)),
-                        &val,
-                    )?;
+                    current_task.write_multi_arch_object(reg_ptr, val as u64)?;
                 }
-                i += std::mem::size_of::<usize>();
+                i += reg_ptr.size_of_object();
+                reg_ptr = reg_ptr.next();
             }
             Ok(())
         }

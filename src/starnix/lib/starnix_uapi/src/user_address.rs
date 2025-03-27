@@ -437,6 +437,14 @@ impl<T, T64: FromBytes, T32: FromBytes> MappingMultiArchUserRef<T, T64, T32> {
         }
     }
 
+    pub fn align_of_object_for<A: ArchSpecific>(a: &A) -> usize {
+        if a.is_arch32() {
+            std::mem::align_of::<T32>()
+        } else {
+            std::mem::align_of::<T64>()
+        }
+    }
+
     pub fn next(&self) -> Self {
         Self::new(self, self.addr() + self.size_of_object())
     }

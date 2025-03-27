@@ -23,7 +23,7 @@
 #include <linux/prctl.h>
 #include <linux/sched.h>
 
-#ifdef __riscv
+#if defined(__riscv)
 #include <asm/ptrace.h>
 #endif  // __riscv
 
@@ -36,6 +36,13 @@
 constexpr int kOriginalSigno = SIGUSR1;
 constexpr int kInjectedSigno = SIGUSR2;
 constexpr int kInjectedErrno = EIO;
+
+// user_regs_struct is not defined on __arm__
+#if defined(__arm__)
+struct user_regs_struct {
+  unsigned long regs[18];
+};
+#endif  // defined(__arm__)
 
 TEST(PtraceTest, SetSigInfo) {
   test_helper::ForkHelper helper;
@@ -410,7 +417,7 @@ TEST(PtraceTest, GetGeneralRegs) {
 
 #if defined(__x86_64__)
 #define __REG rsi
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm__)
 #define __REG regs[1]
 #elif defined(__riscv)
 #define __REG a1
@@ -464,7 +471,7 @@ TEST(PtraceTest, GetGeneralRegs) {
 namespace {
 // As of this writing, our sysroot's syscall.h lacks the SYS_clone3 definition.
 #ifndef SYS_clone3
-#if defined(__aarch64__) || defined(__x86_64__) || defined(__riscv)
+#if defined(__aarch64__) || defined(__arm__) || defined(__x86_64__) || defined(__riscv)
 constexpr int SYS_clone3 = 435;
 #else
 #error SYS_clone3 needs a definition for this architecture.

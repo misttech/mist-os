@@ -193,6 +193,12 @@ impl ThreadState {
     }
 }
 
+impl ArchSpecific for ThreadState {
+    fn is_arch32(&self) -> bool {
+        self.arch_width.is_arch32()
+    }
+}
+
 type SyscallRestartFunc = dyn FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<SyscallResult, Errno>
     + Send
     + Sync;
@@ -2149,7 +2155,7 @@ impl CurrentTask {
 
 impl ArchSpecific for CurrentTask {
     fn is_arch32(&self) -> bool {
-        self.thread_state.arch_width.is_arch32()
+        self.thread_state.is_arch32()
     }
 }
 

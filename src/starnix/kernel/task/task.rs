@@ -31,7 +31,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{
     sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
 };
-use starnix_uapi::user_address::{MappingMultiArchUserRef, UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
@@ -319,6 +319,12 @@ pub struct CapturedThreadState {
     /// Indicates that the last ptrace operation changed the thread state, so it
     /// should be written back to the original thread.
     pub dirty: bool,
+}
+
+impl ArchSpecific for CapturedThreadState {
+    fn is_arch32(&self) -> bool {
+        self.thread_state.is_arch32()
+    }
 }
 
 #[derive(Debug)]
