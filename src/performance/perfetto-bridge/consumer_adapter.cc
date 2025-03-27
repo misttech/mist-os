@@ -37,6 +37,24 @@
 #include <third_party/perfetto/protos/perfetto/config/track_event/track_event_config.gen.h>
 
 namespace {
+
+// TODO(b/406517919) This is a disgusting work around for a breaking perfetto roll that changes the
+// type of a member function we call. This adds a temporary overload to support both versions at the
+// same time. Remove this once perfetto rolls.
+[[maybe_unused]]
+void CallQuery(
+    void (perfetto::ConsumerEndpoint::*f)(perfetto::ConsumerEndpoint::QueryServiceStateCallback),
+    const std::unique_ptr<perfetto::ConsumerEndpoint>& ptr,
+    perfetto::ConsumerEndpoint::QueryServiceStateCallback cb) {
+  ((*ptr).*f)(std::move(cb));
+}
+
+template <typename T>
+void CallQuery(T f, const std::unique_ptr<perfetto::ConsumerEndpoint>& ptr,
+               perfetto::ConsumerEndpoint::QueryServiceStateCallback cb) {
+  ((*ptr).*f)({false}, std::move(cb));
+}
+
 // The size of the consumer buffer.
 constexpr size_t kConsumerBufferSizeKb = 20ul * 1024ul;  // 20MB.
 
@@ -494,7 +512,8 @@ std::vector<trace::KnownCategory> ConsumerAdapter::GetKnownCategories() {
     }
     latch.count_down();
   };
-  consumer_endpoint->QueryServiceState(std::move(on_service_state));
+  CallQuery(&perfetto::ConsumerEndpoint::QueryServiceState, consumer_endpoint,
+            std::move(on_service_state));
   // Querying the service state triggers an ipc, the categories may not actually be filled in yet.
   latch.wait();
   return known_categories;
