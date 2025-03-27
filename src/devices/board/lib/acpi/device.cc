@@ -700,19 +700,6 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
                   result = status;
                   break;
                 }
-
-                fit::result encoded_metadata = fidl::Persist(metadata);
-                if (encoded_metadata.is_error()) {
-                  zxlogf(ERROR, "Failed to encode i2c bus metadata: %s",
-                         encoded_metadata.error_value().FormatDescription().c_str());
-                  result = encoded_metadata.error_value().status();
-                  break;
-                }
-                // TODO(b/385164506): Don't serve DEVICE_METADATA_I2C_CHANNELS once no longer
-                // referenced.
-                result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_I2C_CHANNELS,
-                                             encoded_metadata.value().data(),
-                                             encoded_metadata.value().size());
                 break;
               }
               default:

@@ -74,6 +74,7 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI
 
 // type: FIDL fuchsia.hardware.i2c/I2CBusMetadata
+// TODO(b/385164506): Remove once no longer used.
 #define DEVICE_METADATA_I2C_CHANNELS 0x43433249  // I2CC
 
 // type: FIDL fuchsia.hardware.spi.SpiBusMetadata

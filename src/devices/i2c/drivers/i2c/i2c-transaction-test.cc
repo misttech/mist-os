@@ -44,12 +44,9 @@ class I2cDriverTransactionTest : public ::testing::Test {
     metadata.channels(kChannels);
     metadata.bus_id(kTestBusId);
 
-    fidl::Arena arena;
-    auto metadata_wire = fidl::ToWire(arena, metadata);
-
     test_runner.RunInEnvironmentTypeContext(
-        [on_transact = std::move(on_transact), metadata_wire](TestEnvironment& env) {
-          env.AddMetadata(metadata_wire);
+        [on_transact = std::move(on_transact), metadata](TestEnvironment& env) {
+          env.AddMetadata(metadata);
           env.i2c_impl().set_on_transact(std::move(on_transact));
         });
     EXPECT_TRUE(test_runner.StartDriver().is_ok());

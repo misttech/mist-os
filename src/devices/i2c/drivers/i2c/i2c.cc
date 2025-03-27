@@ -6,9 +6,9 @@
 
 #include <fidl/fuchsia.hardware.i2c/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/fidl.h>
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/trace/event.h>
 
 namespace i2c {
@@ -30,14 +30,13 @@ zx::result<> I2cDriver::Start() {
 
   fidl::Arena arena;
   zx::result i2c_bus_metadata =
-      compat::GetMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-          incoming(), arena, DEVICE_METADATA_I2C_CHANNELS);
+      fdf_metadata::GetMetadata<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(*incoming());
   if (i2c_bus_metadata.is_error()) {
     FDF_LOG(ERROR, "Failed to get i2c_bus_metadata  %s", i2c_bus_metadata.status_string());
     return i2c_bus_metadata.take_error();
   }
 
-  if (!i2c_bus_metadata->has_channels()) {
+  if (!i2c_bus_metadata->channels().has_value()) {
     FDF_LOG(ERROR, "No channels supplied from the metadata");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
@@ -64,10 +63,11 @@ zx::result<> I2cDriver::Start() {
   }
 
   i2c_node_ = std::move(child->node_);
-  return AddI2cChildren(fidl::ToNatural(*i2c_bus_metadata.value()));
+  return AddI2cChildren(i2c_bus_metadata.value());
 }
 
-zx::result<> I2cDriver::AddI2cChildren(fuchsia_hardware_i2c_businfo::I2CBusMetadata metadata) {
+zx::result<> I2cDriver::AddI2cChildren(
+    const fuchsia_hardware_i2c_businfo::I2CBusMetadata& metadata) {
   if (!metadata.channels()) {
     FDF_LOG(ERROR, "Failed to find number of channels in metadata: %s",
             zx_status_get_string(ZX_ERR_NOT_FOUND));

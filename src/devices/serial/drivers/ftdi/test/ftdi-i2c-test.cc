@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <stdio.h>
 
@@ -268,53 +267,55 @@ TEST_F(FtdiI2cTest, NackReadTest) {
   mock_ddk::GetDriverRuntime()->Run();
 }
 
-TEST_F(FtdiI2cTest, MetadataTest) {
-  FtdiI2c::I2cLayout layout = {0, 1, 2};
-  std::vector<FtdiI2c::I2cDevice> i2c_devices(1);
-  i2c_devices[0].address = 0x3c;
-  i2c_devices[0].vid = 0;
-  i2c_devices[0].pid = 0;
-  i2c_devices[0].did = 31;
-  FtdiI2c* device(new FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices));
+// TODO(b/333883481): Test that the ftdi-i2c driver is correctly forwarding its I2C bus metadata
+// once the driver is converted to DFv2.
+// TEST_F(FtdiI2cTest, MetadataTest) {
+//   FtdiI2c::I2cLayout layout = {0, 1, 2};
+//   std::vector<FtdiI2c::I2cDevice> i2c_devices(1);
+//   i2c_devices[0].address = 0x3c;
+//   i2c_devices[0].vid = 0;
+//   i2c_devices[0].pid = 0;
+//   i2c_devices[0].did = 31;
+//   FtdiI2c* device(new FtdiI2c(fake_parent_.get(), &serial_, layout, i2c_devices));
 
-  std::vector<uint8_t> first_write(1);
-  first_write[0] = 0xAB;
-  serial_.PushExpectedWrite(std::move(first_write));
+//   std::vector<uint8_t> first_write(1);
+//   first_write[0] = 0xAB;
+//   serial_.PushExpectedWrite(std::move(first_write));
 
-  std::vector<uint8_t> first_read(2);
-  first_read[0] = 0xFA;
-  first_read[1] = 0xAB;
+//   std::vector<uint8_t> first_read(2);
+//   first_read[0] = 0xFA;
+//   first_read[1] = 0xAB;
 
-  serial_.PushExpectedRead(std::move(first_read));
+//   serial_.PushExpectedRead(std::move(first_read));
 
-  // Check that bind works.
-  ASSERT_OK(device->Bind());
+//   // Check that bind works.
+//   ASSERT_OK(device->Bind());
 
-  auto* child = fake_parent_->GetLatestChild();
-  child->InitOp();
-  child->WaitUntilInitReplyCalled();
-  EXPECT_OK(child->InitReplyCallStatus());
+//   auto* child = fake_parent_->GetLatestChild();
+//   child->InitOp();
+//   child->WaitUntilInitReplyCalled();
+//   EXPECT_OK(child->InitReplyCallStatus());
 
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-      child, DEVICE_METADATA_I2C_CHANNELS);
-  ASSERT_TRUE(decoded.is_ok());
+//   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
+//       child, DEVICE_METADATA_I2C_CHANNELS);
+//   ASSERT_TRUE(decoded.is_ok());
 
-  ASSERT_TRUE(decoded->has_bus_id());
-  EXPECT_EQ(decoded->bus_id(), 0u);
+//   ASSERT_TRUE(decoded->has_bus_id());
+//   EXPECT_EQ(decoded->bus_id(), 0u);
 
-  ASSERT_TRUE(decoded->has_channels());
-  ASSERT_EQ(decoded->channels().count(), 1u);
+//   ASSERT_TRUE(decoded->has_channels());
+//   ASSERT_EQ(decoded->channels().count(), 1u);
 
-  ASSERT_TRUE(decoded->channels()[0].has_address());
-  ASSERT_TRUE(decoded->channels()[0].has_vid());
-  ASSERT_TRUE(decoded->channels()[0].has_pid());
-  ASSERT_TRUE(decoded->channels()[0].has_did());
+//   ASSERT_TRUE(decoded->channels()[0].has_address());
+//   ASSERT_TRUE(decoded->channels()[0].has_vid());
+//   ASSERT_TRUE(decoded->channels()[0].has_pid());
+//   ASSERT_TRUE(decoded->channels()[0].has_did());
 
-  // Should match the I2cDevice passed above.
-  EXPECT_EQ(decoded->channels()[0].address(), 0x3c);
-  EXPECT_EQ(decoded->channels()[0].vid(), 0u);
-  EXPECT_EQ(decoded->channels()[0].pid(), 0u);
-  EXPECT_EQ(decoded->channels()[0].did(), 31u);
-}
+//   // Should match the I2cDevice passed above.
+//   EXPECT_EQ(decoded->channels()[0].address(), 0x3c);
+//   EXPECT_EQ(decoded->channels()[0].vid(), 0u);
+//   EXPECT_EQ(decoded->channels()[0].pid(), 0u);
+//   EXPECT_EQ(decoded->channels()[0].did(), 31u);
+// }
 
 }  // namespace ftdi_mpsse

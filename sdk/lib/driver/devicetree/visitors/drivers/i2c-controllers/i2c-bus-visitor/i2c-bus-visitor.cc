@@ -5,7 +5,6 @@
 #include "i2c-bus-visitor.h"
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -176,10 +175,6 @@ zx::result<> I2cBusVisitor::FinalizeNode(fdf_devicetree::Node& node) {
               node.name().c_str(), encoded_bus_metadata.error_value().status_string());
       return zx::ok();
     }
-    node.AddMetadata({{
-        .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
-        .data = encoded_bus_metadata.value(),
-    }});
     node.AddMetadata({{
         .id = fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName,
         .data = std::move(encoded_bus_metadata.value()),

@@ -349,10 +349,8 @@ void AmlI2c::Transact(TransactRequestView request, fdf::Arena& arena,
 zx::result<> AmlI2c::Start() {
   // Initialize our compat server.
   {
-    // TODO(b/385164506): Don't forward DEVICE_METADATA_I2C_CHANNELS once no longer referenced.
-    zx::result<> result =
-        device_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}));
+    zx::result<> result = device_server_.Initialize(
+        incoming(), outgoing(), node_name(), kChildNodeName, compat::ForwardMetadata::None());
     if (result.is_error()) {
       return result.take_error();
     }

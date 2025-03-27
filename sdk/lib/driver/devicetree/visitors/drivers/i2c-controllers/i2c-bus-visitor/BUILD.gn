@@ -30,7 +30,6 @@ source_set("i2c-bus") {
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
     "//zircon/system/ulib/fbl",
   ]
   public_deps = [
@@ -50,7 +49,6 @@ test("i2c-bus-visitor-test-bin") {
     "//sdk/lib/driver/devicetree/visitors/default/mmio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
