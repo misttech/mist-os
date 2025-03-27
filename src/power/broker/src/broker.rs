@@ -2701,7 +2701,7 @@ mod tests {
                         "@time": AnyProperty,
                         rm_element: {
                             element_id: *unobtanium,
-                            element_name: "Unobtainium",
+                            name: "Unobtainium",
                         }
                     },
                 },

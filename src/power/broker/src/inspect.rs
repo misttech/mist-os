@@ -28,7 +28,7 @@ const UPDATE_LEASE_STATUS_EVENT: &str = "update_lease";
 const UNSET: &str = "unset";
 
 const ELEMENT_ID: &str = "element_id";
-const ELEMENT_NAME: &str = "element_name";
+const ELEMENT_NAME: &str = "name";
 const LEVEL: &str = "level";
 const LEASE_ID: &str = "lease_id";
 const STATUS: &str = "status";
@@ -55,6 +55,7 @@ pub struct ElementData {
     required_level: Option<Either<inspect::UintProperty, inspect::StringProperty>>,
     // { LeaseId  => { Level => LeaseStatus } }
     leases: HashMap<LeaseID, LeaseData>,
+    name: inspect::StringProperty,
     _node: inspect::Node,
     leases_node: inspect::Node,
 }
@@ -74,7 +75,6 @@ impl igraph::VertexMetadata for ElementData {
 impl ElementData {
     const CURRENT_LEVEL: &str = "current_level";
     const REQUIRED_LEVEL: &str = "required_level";
-    const NAME: &str = "name";
     const LEASES: &str = "leases";
     const SYNTHETIC: &str = "synthetic";
 
@@ -85,7 +85,7 @@ impl ElementData {
         current_level: Option<fpb::PowerLevel>,
         required_level: Option<fpb::PowerLevel>,
     ) -> Self {
-        node.record_string(Self::NAME, name);
+        let name = node.create_string(ELEMENT_NAME, name);
         Self::record_valid_levels(&node, valid_levels);
         let leases_node = node.create_child(Self::LEASES);
         Self {
@@ -97,12 +97,13 @@ impl ElementData {
                 .or_else(|| Some(Either::Right(node.create_string(Self::REQUIRED_LEVEL, UNSET)))),
             leases: Default::default(),
             leases_node,
+            name,
             _node: node,
         }
     }
 
     fn synthetic(node: inspect::Node, name: &str, valid_levels: &[IndexedPowerLevel]) -> Self {
-        node.record_string(Self::NAME, name);
+        let name = node.create_string(ELEMENT_NAME, name);
         node.record_bool(Self::SYNTHETIC, true);
         Self::record_valid_levels(&node, valid_levels);
         let leases_node = node.create_child(Self::LEASES);
@@ -110,6 +111,7 @@ impl ElementData {
             current_level: None,
             required_level: None,
             _node: node,
+            name,
             leases: Default::default(),
             leases_node,
         }
@@ -415,10 +417,14 @@ impl TopologyInspect {
         });
     }
 
-    pub fn on_remove_element(&self, element: &Element) {
-        self.maybe_record_event(element, REMOVE_ELEMENT_EVENT, |node| {
+    pub fn on_remove_element(&self, element: Element) {
+        let mut vertex = element.inspect_vertex.as_ref().unwrap().borrow_mut();
+        let mut name_property = inspect::StringProperty::default();
+        std::mem::swap(&mut vertex.meta().name, &mut name_property);
+        self.maybe_record_event(&element, REMOVE_ELEMENT_EVENT, |node| {
             node.record_uint(ELEMENT_ID, *element.id);
-            node.record_string(ELEMENT_NAME, &element.name);
+            let _ = name_property.reparent(&node);
+            node.record(name_property);
         });
     }
 
