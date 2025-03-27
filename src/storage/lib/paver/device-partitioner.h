@@ -157,8 +157,8 @@ struct BlockAndController {
 
 class DevicePartitionerFactory {
  public:
-  // Factory method which automatically returns the correct DevicePartitioner
-  // implementation based factories registered with it.
+  // Factory method which automatically returns the correct DevicePartitioner implementation based
+  // factories registered with it.
   // |block_device| is root block device which contains the logical partitions we wish to operate
   // against. It's only meaningful for EFI and CROS devices which may have multiple storage devices.
   static zx::result<std::unique_ptr<DevicePartitioner>> Create(

@@ -119,6 +119,10 @@ impl Device for ZxcryptDevice {
         self.inner_device.get_block_info().await
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     fn is_nand(&self) -> bool {
         self.parent_is_nand
     }

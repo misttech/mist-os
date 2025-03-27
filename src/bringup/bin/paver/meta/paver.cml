@@ -26,6 +26,13 @@
             rights: [ "r*" ],
             path: "/dev",
         },
+
+        // Routed from fshost to expose unmanaged block devices.
+        {
+            directory: "block",
+            rights: [ "r*" ],
+            path: "/block",
+        },
         {
             protocol: [
                 // Services from bootsvc
@@ -54,7 +61,7 @@
             availability: "optional",
         },
         {
-            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            service: "fuchsia.storage.partitions.PartitionService",
             availability: "optional",
         },
     ],

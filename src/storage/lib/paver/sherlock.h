@@ -41,9 +41,11 @@ class SherlockPartitioner : public DevicePartitioner {
   zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
-  explicit SherlockPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
+  SherlockPartitioner(std::unique_ptr<GptDevicePartitioner> gpt, BlockDevices non_gpt_devices)
+      : gpt_(std::move(gpt)), non_gpt_devices_(std::move(non_gpt_devices)) {}
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
+  BlockDevices non_gpt_devices_;
 };
 
 class SherlockPartitionerFactory : public DevicePartitionerFactory {

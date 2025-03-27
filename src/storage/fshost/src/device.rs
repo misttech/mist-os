@@ -27,6 +27,14 @@ pub trait Device: Send + Sync {
     /// Returns BlockInfo (the result of calling fuchsia.hardware.block/Block.Query).
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error>;
 
+    /// True if the device is managed by fshost (such as devices within the system GPT).
+    /// Devices are considered managed if either of the following hold:
+    /// - The device was matched by fshost, or
+    /// - The device comes from a component launched by fshost (e.g. the GPT component).
+    /// In practice, this means that low-level block drivers which fshost doesn't bind to are
+    /// unmanaged.
+    fn is_managed(&self) -> bool;
+
     /// True if this is a NAND device.
     fn is_nand(&self) -> bool;
 
@@ -129,6 +137,10 @@ impl NandDevice {
 impl Device for NandDevice {
     fn is_nand(&self) -> bool {
         true
+    }
+
+    fn is_managed(&self) -> bool {
+        false
     }
 
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
@@ -285,6 +297,10 @@ impl Device for BlockDevice {
         Ok(info)
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     fn is_nand(&self) -> bool {
         false
     }
@@ -411,6 +427,7 @@ impl Device for BlockDevice {
 pub struct VolumeProtocolDevice {
     connector: Box<DirBasedBlockConnector>,
     source: String,
+    is_managed: bool,
 
     // Cache a proxy to the device's Volume interface so we can use it internally.  (This assumes
     // that devices speak Volume, which is currently always true).
@@ -428,6 +445,7 @@ impl VolumeProtocolDevice {
         dir: fio::DirectoryProxy,
         path: impl ToString,
         source: impl ToString,
+        is_managed: bool,
     ) -> Result<Self, Error> {
         let source = format!("{}/{}", source.to_string(), path.to_string());
         let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/volume"));
@@ -435,6 +453,7 @@ impl VolumeProtocolDevice {
         Ok(Self {
             connector,
             source,
+            is_managed,
             volume_proxy,
             content_format: None,
             partition_label: None,
@@ -450,6 +469,10 @@ impl Device for VolumeProtocolDevice {
         let block_proxy = self.block_proxy()?;
         let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
+    }
+
+    fn is_managed(&self) -> bool {
+        self.is_managed
     }
 
     fn is_nand(&self) -> bool {
@@ -566,6 +589,10 @@ impl Device for RamdiskDevice {
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
         let info = self.volume_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
+    }
+
+    fn is_managed(&self) -> bool {
+        true
     }
 
     fn is_nand(&self) -> bool {

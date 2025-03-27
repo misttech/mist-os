@@ -196,6 +196,7 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::protocol::<BlobReaderMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::directory("block").rights(fio::R_STAR_DIR))
                     .capability(Capability::directory("debug_block").rights(fio::R_STAR_DIR))
                     .capability(Capability::directory("data").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("tmp").rights(fio::RW_STAR_DIR))

@@ -147,11 +147,29 @@ class CurrentSlotUuidTest : public PaverTest {
     return args;
   }
 
+  fbl::unique_fd BlockDirFd() {
+    fbl::unique_fd fd;
+    auto [block, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    EXPECT_OK(fdio_open3_at(devmgr_.RealmExposedDir().handle()->get(), "block",
+                            static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                            server.TakeChannel().release()));
+    EXPECT_OK(fdio_fd_create(block.TakeChannel().release(), fd.reset_and_get_address()));
+    return fd;
+  }
+
   zx::result<paver::BlockDevices> CreateBlockDevices() {
-    if (DevmgrArgs().enable_storage_host) {
-      return paver::BlockDevices::CreateFromPartitionService(devmgr_.RealmExposedDir().borrow());
-    }
-    return paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
+    return DevmgrArgs().enable_storage_host
+               ? paver::BlockDevices::CreateFromFshostBlockDir(BlockDirFd())
+               : paver::BlockDevices::CreateDevfs(devmgr_.devfs_root().duplicate());
+  }
+
+  void CreatePartitioner(std::unique_ptr<paver::GptDevicePartitioner>& out) {
+    zx::result devices = CreateBlockDevices();
+    ASSERT_OK(devices);
+    zx::result gpt =
+        paver::GptDevicePartitioner::InitializeGpt(*devices, devmgr_.RealmExposedDir(), {});
+    ASSERT_OK(gpt);
+    out = std::move(gpt->gpt);
   }
 
   void CreateGptDevice(const std::vector<PartitionDescription>& partitions) {
@@ -168,9 +186,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
       PartitionDescription{"zircon_a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -180,9 +198,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
       PartitionDescription{"zircon_a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -192,9 +210,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
       PartitionDescription{"ZiRcOn_A", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -204,9 +222,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconB) {
       PartitionDescription{"zircon_b", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kB);
 }
@@ -216,9 +234,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconR) {
       PartitionDescription{"ZIRCON_R", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kRecovery);
 }
@@ -228,9 +246,9 @@ TEST_F(CurrentSlotUuidTest, TestInvalid) {
       PartitionDescription{"ZERCON_R", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
-  zx::result devices = CreateBlockDevices();
-  ASSERT_OK(devices);
-  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
+  std::unique_ptr<paver::GptDevicePartitioner> partitioner;
+  ASSERT_NO_FATAL_FAILURE(CreatePartitioner(partitioner));
+  auto result = abr::PartitionUuidToConfiguration(partitioner->devices(), uuid::Uuid(kTestUuid));
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }

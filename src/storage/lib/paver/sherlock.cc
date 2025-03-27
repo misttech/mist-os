@@ -32,13 +32,15 @@ zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
   auto status_or_gpt =
       GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status_or_gpt.is_error()) {
+    ERROR("Failed to initialize GPT partitioner: %s\n", status_or_gpt.status_string());
     return status_or_gpt.take_error();
   }
   // NOTE: We explicitly ignore status_or_gpt->initialize_partition_tables here, as it just tells
   // us that we failed to find the FVM, and the FVM might simply have a different type GUID than
   // we expect.
 
-  auto partitioner = WrapUnique(new SherlockPartitioner(std::move(status_or_gpt->gpt)));
+  auto partitioner =
+      WrapUnique(new SherlockPartitioner(std::move(status_or_gpt->gpt), devices.Duplicate()));
 
   LOG("Successfully initialized SherlockPartitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
@@ -98,8 +100,8 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
 
   switch (spec.partition) {
     case Partition::kBootloaderA: {
-      auto boot0_part =
-          OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      auto boot0_part = OpenBlockPartition(non_gpt_devices_, std::nullopt,
+                                           Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
       if (boot0_part.is_error()) {
         return boot0_part.take_error();
       }
@@ -109,8 +111,8 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
         return boot0.take_error();
       }
 
-      auto boot1_part =
-          OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      auto boot1_part = OpenBlockPartition(non_gpt_devices_, std::nullopt,
+                                           Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
       if (boot1_part.is_error()) {
         return boot1_part.take_error();
       }

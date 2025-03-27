@@ -733,6 +733,7 @@ impl Environment for FshostEnvironment {
             .add_source(Box::new(DirSource::new(
                 partitions_dir,
                 filesystem.get_component_moniker().unwrap(),
+                /*is_managed=*/ true,
             )))
             .await
             .context("Failed to watch gpt partitions dir")?;

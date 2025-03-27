@@ -75,8 +75,12 @@ async fn main() -> Result<(), Error> {
             Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)) as Box<dyn WatchSource>,
         ];
         sources.extend(
-            fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty())
-                .map(|d| Box::new(DirSource::new(d, VOLUME_SERVICE_PATH)) as Box<dyn WatchSource>),
+            fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty()).map(
+                |d| {
+                    Box::new(DirSource::new(d, VOLUME_SERVICE_PATH, /*is_managed=*/ false))
+                        as Box<dyn WatchSource>
+                },
+            ),
         );
         sources
     } else {
@@ -115,7 +119,8 @@ async fn main() -> Result<(), Error> {
     let data_exposed_dir = env.data_exposed_dir()?;
     let device_publisher = DevicePublisher::new();
     let export = vfs::pseudo_directory! {
-        "debug_block" => device_publisher.block_dir(),
+        "block" => device_publisher.block_dir(),
+        "debug_block" => device_publisher.debug_block_dir(),
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
             "data" => remote_dir(data_exposed_dir),

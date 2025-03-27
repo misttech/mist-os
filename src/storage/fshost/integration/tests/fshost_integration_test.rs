@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
-use fidl::endpoints::create_proxy;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _};
 use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
 use fidl_fuchsia_fshost::AdminMarker;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
@@ -12,13 +12,15 @@ use fidl_fuchsia_update_verify::HealthStatus;
 use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
-use fshost_test_fixture::disk_builder::{DataSpec, VolumesSpec, FVM_SLICE_SIZE};
+use fshost_test_fixture::disk_builder::{
+    DataSpec, VolumesSpec, FVM_SLICE_SIZE, TEST_DISK_BLOCK_SIZE,
+};
 use fshost_test_fixture::{
     round_down, TestFixture, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS,
     VFS_TYPE_MINFS,
 };
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use futures::FutureExt;
+use futures::FutureExt as _;
 use regex::Regex;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -1477,6 +1479,40 @@ async fn debug_block_directory() {
         volume.get_info().await.unwrap().map_err(zx::Status::from_raw).unwrap().block_size,
         512,
     );
+
+    fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/399197713): Enable this test when extra disks don't flake
+#[ignore]
+#[fuchsia::test]
+async fn expose_unmanaged_block_devices() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk().set_uninitialized().size(8192);
+    let fixture = builder.build().await;
+
+    // Make sure the filesystems are enumerated before trying to access the block devices. The block
+    // directory is populated as the devices are emitted by the watcher.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let block_dir =
+        fuchsia_fs::directory::open_directory(fixture.exposed_dir(), "block", fio::PERM_READABLE)
+            .await
+            .unwrap();
+    let mut dirents = fuchsia_fs::directory::readdir(&block_dir).await.expect("readdir failed");
+    let device_path = dirents.pop().unwrap().name;
+    assert!(dirents.is_empty(), "Multiple devices published");
+
+    let path = format!("{}/{}", &device_path, VolumeMarker::PROTOCOL_NAME);
+    let volume = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+        &block_dir, &path,
+    )
+    .unwrap();
+    let metadata =
+        volume.get_metadata().await.expect("FIDL error").expect("Failed to get metadata");
+    assert_eq!(metadata.num_blocks, Some(8192 / TEST_DISK_BLOCK_SIZE as u64));
 
     fixture.tear_down().await;
 }

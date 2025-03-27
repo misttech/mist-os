@@ -40,7 +40,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitioner::Initialize(
   // us that we failed to find the FVM, and the FVM might simply have a different type GUID than
   // we expect.
 
-  auto partitioner = WrapUnique(new NelsonPartitioner(std::move(status_or_gpt->gpt)));
+  auto partitioner =
+      WrapUnique(new NelsonPartitioner(std::move(status_or_gpt->gpt), devices.Duplicate()));
 
   LOG("Successfully initialized NelsonPartitioner Device Partitioner\n");
   return zx::ok(std::move(partitioner));
@@ -73,7 +74,7 @@ bool NelsonPartitioner::SupportsPartition(const PartitionSpec& spec) const {
 
 zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      OpenBlockPartition(non_gpt_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
   if (boot0_part.is_error()) {
     return boot0_part.take_error();
   }
@@ -83,7 +84,7 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetEmmcBootParti
   }
 
   auto boot1_part =
-      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      OpenBlockPartition(non_gpt_devices_, std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
   if (boot1_part.is_error()) {
     return boot1_part.take_error();
   }

@@ -101,9 +101,8 @@ impl Matchers {
         Matchers { matchers }
     }
 
-    /// Using the set of matchers we created, figure out if this block device matches any of our
-    /// expected partitions. If it does, return the information needed to launch the filesystem,
-    /// such as the component url or the shared library to pass to the driver binding.
+    /// Using the set of configured matchers, match and process a block device.
+    /// Returns whether the device was matched or not.
     pub async fn match_device(
         &mut self,
         mut device: Box<dyn Device>,
@@ -640,6 +639,9 @@ mod tests {
                     flags: self.block_flags,
                 })
             }
+        }
+        fn is_managed(&self) -> bool {
+            false
         }
         fn is_nand(&self) -> bool {
             self.is_nand

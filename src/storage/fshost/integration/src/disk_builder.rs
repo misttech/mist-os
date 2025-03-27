@@ -31,7 +31,7 @@ use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
-const TEST_DISK_BLOCK_SIZE: u32 = 512;
+pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 
 // The default disk size is about 110MiB, with about 106MiB dedicated to the data volume. This size
