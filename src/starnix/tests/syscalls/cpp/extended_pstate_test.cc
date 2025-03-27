@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// AArch32 doesn't have extneded pstate
+#if !defined(__arm__)
+
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -304,3 +307,5 @@ TEST(ExtendedPstate, Signals) {
 }
 
 }  // namespace
+
+#endif  // defined(__arm__)

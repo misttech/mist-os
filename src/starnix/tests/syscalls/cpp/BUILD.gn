@@ -29,6 +29,7 @@ syscall_tests = [
   "cgroup_test",
   "custom_artifact_test",
   "epoll_test",
+  "extended_pstate_test",
   "fcntl_test",
   "fs_test",
   "fsverity_test",
@@ -156,23 +157,10 @@ foreach(onfault_behavior, mlock_onfault_behaviors) {
   }
 }
 
-arch32_compat_syscall_test_names = syscall_tests
+all_test_names = syscall_tests
 foreach(test_def, syscall_tests_etc) {
-  arch32_compat_syscall_test_names += [ test_def.name ]
+  all_test_names += [ test_def.name ]
 }
-
-# syscall tests that can only be run on arch64.
-# TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
-# DO NOT ADD MORE TESTS IN THIS CATEGORY
-arch64_syscall_tests = [
-  # go/keep-sorted start
-
-  "extended_pstate_test",
-
-  # go/keep-sorted end
-]
-
-all_test_names = arch32_compat_syscall_test_names + arch64_syscall_tests
 
 group("tests") {
   testonly = true
@@ -446,7 +434,7 @@ template("syscall_test") {
     test_type = "starnix"
   }
 
-  if (!invoker.arch64_only && starnix_enable_arch32) {
+  if (starnix_enable_arch32) {
     starnix_linux_test_component("${target_name}_arch32") {
       test_toolchain = target_linux_arch32_toolchain
       test_label = ":${_target_test_label}"
@@ -472,22 +460,13 @@ template("syscall_test") {
 foreach(test_name, syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
-    arch64_only = false
   }
 }
 
 foreach(test_def, syscall_tests_etc) {
   syscall_test(test_def.name) {
     test_name = test_def.name
-    arch64_only = false
     forward_variables_from(test_def, "*", [ "name" ])
-  }
-}
-
-foreach(test_name, arch64_syscall_tests) {
-  syscall_test(test_name) {
-    test_name = test_name
-    arch64_only = true
   }
 }
 
@@ -670,7 +649,7 @@ if (starnix_enable_arch32) {
   fuchsia_test_package("starnix_arch32_syscalls_cpp_tests") {
     test_components = []
     deps = []
-    foreach(test_name, arch32_compat_syscall_test_names) {
+    foreach(test_name, all_test_names) {
       test_components += [ ":${test_name}_arch32" ]
       deps += [ ":${test_name}_config" ]
     }
