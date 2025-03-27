@@ -915,14 +915,7 @@ impl FsNodeOps for RemoteNode {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        // TODO(https://fxbug.dev/360171961): Add symlink support for fscrypt.
-        // Fail if user tries to create a symlink inside an encrypted directory.
-        {
-            let node_info = node.fetch_and_refresh_info(locked, current_task)?;
-            if node_info.wrapping_key_id.is_some() {
-                return error!(ENOTSUP);
-            }
-        }
+        node.fail_if_locked(locked, current_task)?;
 
         let name = get_name_str(name)?;
         let zxio = Arc::new(

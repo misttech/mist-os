@@ -94,7 +94,9 @@ impl ObjectStore {
             ObjectKind::File { .. } | ObjectKind::Directory { .. } => (),
             // For now, we don't support attributes on symlink objects, so setting a project id
             // doesn't make sense.
-            ObjectKind::Symlink { .. } => return Err(FxfsError::NotSupported.into()),
+            ObjectKind::Symlink { .. } | ObjectKind::EncryptedSymlink { .. } => {
+                return Err(FxfsError::NotSupported.into())
+            }
             ObjectKind::Graveyard => return Err(FxfsError::Inconsistent.into()),
         }
         let storage_size = attributes.allocated_size.try_into().map_err(|_| FxfsError::TooBig)?;
@@ -168,7 +170,9 @@ impl ObjectStore {
             ObjectKind::File { .. } | ObjectKind::Directory { .. } => (),
             // For now, we don't support attributes on symlink objects, so setting a project id
             // doesn't make sense.
-            ObjectKind::Symlink { .. } => return Err(FxfsError::NotSupported.into()),
+            ObjectKind::Symlink { .. } | ObjectKind::EncryptedSymlink { .. } => {
+                return Err(FxfsError::NotSupported.into())
+            }
             ObjectKind::Graveyard => return Err(FxfsError::Inconsistent.into()),
         }
         let old_project_id = attributes.project_id;

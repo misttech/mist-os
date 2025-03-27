@@ -78,9 +78,36 @@ impl FxSymlink {
                 sub_dirs: 0,
                 posix_attributes,
                 casefold: false,
-                // TODO: https://fxbug.dev/360171961: Add fscrypt support for symlinks
                 wrapping_key_id: None,
             }),
+            ObjectValue::Object {
+                kind: ObjectKind::EncryptedSymlink { refs, link },
+                attributes:
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        access_time,
+                        change_time,
+                        ..
+                    },
+            } => {
+                let link_len = store.read_encrypted_symlink(self.object_id(), link).await?.len();
+                Ok(ObjectProperties {
+                    refs,
+                    allocated_size: 0,
+                    // For POSIX compatibility we report the target length as file size.
+                    data_attribute_size: link_len as u64,
+                    creation_time,
+                    modification_time,
+                    access_time,
+                    change_time,
+                    sub_dirs: 0,
+                    posix_attributes,
+                    casefold: false,
+                    wrapping_key_id: None,
+                })
+            }
             ObjectValue::None => Err(FxfsError::NotFound.into()),
             _ => Err(FxfsError::NotFile.into()),
         }
@@ -166,10 +193,6 @@ impl Node for FxSymlink {
         name: Name,
     ) -> Result<(), zx::Status> {
         let dir = destination_dir.into_any().downcast::<FxDirectory>().unwrap();
-        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
-        if dir.directory().wrapping_key_id().is_some() {
-            return Err(zx::Status::INVALID_ARGS);
-        }
         let store = self.handle.store();
         let transaction = store
             .filesystem()

@@ -3305,6 +3305,331 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_link_symlink_into_encrypted_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        {
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
+                root.open(
+                    path,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+                let representation = proxy
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
+
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
+
+                proxy
+            }
+
+            let proxy = open_symlink(&root, "symlink").await;
+
+            let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            proxy
+                .link_into(zx::Event::from(dst_token.unwrap()), "symlink2")
+                .await
+                .expect("link_into (FIDL) failed")
+                .expect("link_into failed");
+
+            open_symlink(&parent, "symlink2").await;
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_link_symlink_into_locked_directory_fails() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        {
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
+                root.open(
+                    path,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+                let representation = proxy
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
+
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
+
+                proxy
+            }
+
+            let proxy = open_symlink(&root, "symlink").await;
+
+            let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            proxy
+                .link_into(zx::Event::from(dst_token.unwrap()), "symlink2")
+                .await
+                .expect("link_into (FIDL) failed")
+                .expect_err("linking into a locked directory should fail");
+        }
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_stat_locked_symlink() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        // This is where we create the symlink
+        parent
+            .create_symlink("symlink", b"target", None)
+            .await
+            .expect("FIDL call failed")
+            .expect("create_symlink failed");
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let (status, buf) = parent.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("read_dirents failed");
+        let mut encrypted_entries = vec![];
+        for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+            encrypted_entries.push(res.expect("Failed to parse entry"));
+        }
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::Symlink)
+            }
+        }
+        {
+            let (symlink, server_end) = create_proxy::<fio::SymlinkMarker>();
+            parent
+                .open(
+                    &encrypted_name,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+            let representation = symlink
+                .take_event_stream()
+                .next()
+                .await
+                .expect("missing Symlink event")
+                .expect("failed to read Symlink event")
+                .into_on_representation()
+                .expect("failed to decode OnRepresentation");
+            let mut encrypted_target = None;
+            if let fio::Representation::Symlink(fio::SymlinkInfo { target: Some(target), .. }) =
+                representation
+            {
+                encrypted_target = Some(target)
+            };
+
+            let (_mutable, immutable) = symlink
+                .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+                .await
+                .expect("transport error on get_attributes")
+                .expect("failed to get attributes on a locked symlink");
+
+            assert_eq!(immutable.content_size, encrypted_target.map(|x| x.len() as u64));
+        }
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_symlink_in_locked_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        parent
+            .create_symlink("symlink", b"target", None)
+            .await
+            .expect("FIDL call failed")
+            .expect_err("creating a symlink in a locked directory should fail");
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
     async fn test_symlink() {
         let fixture = TestFixture::new().await;
 

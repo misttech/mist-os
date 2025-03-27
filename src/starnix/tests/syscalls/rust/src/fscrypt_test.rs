@@ -936,6 +936,107 @@ mod tests {
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
+    fn stat_encrypted_symlink() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
+        std::fs::create_dir_all(dir_path.clone()).unwrap();
+        let dir = std::fs::File::open(dir_path.clone()).unwrap();
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+        let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        let target_path = dir_path.clone().join("foo.txt");
+        let link = dir_path.clone().join("blah.txt");
+        {
+            let _ = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&target_path)
+                .unwrap();
+        }
+        std::os::unix::fs::symlink(target_path, &link).expect("failed to create symlink");
+        drop(dir);
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        let entries = std::fs::read_dir(dir_path.clone()).expect("readdir failed");
+        for entry in entries {
+            let entry = entry.expect("invalid entry");
+            if entry.file_type().unwrap().is_symlink() {
+                let encrypted_target_path =
+                    std::fs::read_link(entry.path()).expect("read_link failed");
+                let encrypted_target_len = encrypted_target_path.as_path().to_str().unwrap().len();
+                let symlink_met = std::fs::symlink_metadata(entry.path())
+                    .expect("failed to read metadata of symlink");
+                assert_eq!(encrypted_target_len as u64, symlink_met.len());
+                std::fs::metadata(encrypted_target_path)
+                    .expect_err("there should be no existing directory at this gibberish path");
+            }
+        }
+        std::fs::remove_dir_all(dir_path).expect("failed to remove my_dir");
+    }
+
+    #[test]
+    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
+    #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
+    fn create_symlink_in_locked_directory_fails() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
+        std::fs::create_dir_all(dir_path.clone()).unwrap();
+        let dir = std::fs::File::open(dir_path.clone()).unwrap();
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+        let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        let target_path = dir_path.clone().join("foo.txt");
+        let link = dir_path.clone().join("blah.txt");
+        {
+            let _ = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&target_path)
+                .unwrap();
+        }
+
+        drop(dir);
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        std::os::unix::fs::symlink(target_path, &link)
+            .expect_err("creating a symlink in locked directory should fail");
+        std::fs::remove_dir_all(dir_path).expect("failed to remove my_dir");
+    }
+
+    #[test]
+    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
+    #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn stat_locked_file() {
         let Some(root_path) = get_root_path() else { return };
         let root_dir = std::fs::File::open(&root_path).expect("open failed");

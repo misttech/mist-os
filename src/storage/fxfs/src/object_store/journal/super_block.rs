@@ -34,7 +34,9 @@ use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
 use crate::object_store::journal::reader::{JournalReader, ReadResult};
 use crate::object_store::journal::writer::JournalWriter;
 use crate::object_store::journal::{JournalCheckpoint, JournalCheckpointV32, BLOCK_SIZE};
-use crate::object_store::object_record::{ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43};
+use crate::object_store::object_record::{
+    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46,
+};
 use crate::object_store::transaction::{AssocObj, Options};
 use crate::object_store::tree::MajorCompactable;
 use crate::object_store::{
@@ -216,22 +218,32 @@ impl<'de> Deserialize<'de> for UuidWrapper {
     }
 }
 
-pub type SuperBlockRecord = SuperBlockRecordV43;
+pub type SuperBlockRecord = SuperBlockRecordV46;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub enum SuperBlockRecordV43 {
+pub enum SuperBlockRecordV46 {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
     Extent(Range<u64>),
 
     // Following the super-block header are ObjectItem records that are to be replayed into the root
     // parent object store.
-    ObjectItem(ObjectItemV43),
+    ObjectItem(ObjectItemV46),
 
     // Marks the end of the full super-block.
     End,
 }
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(SuperBlockRecordV46)]
+pub enum SuperBlockRecordV43 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV43),
+    End,
+}
+
 #[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[migrate_to_version(SuperBlockRecordV43)]
 pub enum SuperBlockRecordV41 {

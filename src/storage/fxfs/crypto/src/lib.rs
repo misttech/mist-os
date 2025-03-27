@@ -238,6 +238,10 @@ pub struct Key {
 }
 
 impl Key {
+    pub fn new(keys: Arc<CipherSet>, index: usize) -> Self {
+        Self { keys, index }
+    }
+
     fn key(&self) -> &Aes256 {
         self.keys.0[self.index].cipher.as_ref().unwrap()
     }

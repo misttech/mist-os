@@ -7,6 +7,7 @@ use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
+use crate::object_store::key_manager::ToCipherSet;
 use crate::object_store::object_record::{
     ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
     ObjectKind, ObjectValue, Timestamp,
@@ -919,25 +920,82 @@ impl<S: HandleOwner> Directory<S> {
         // See _POSIX_SYMLINK_MAX.
         ensure!(link.len() <= 256, FxfsError::BadPath);
         let symlink_id = self.store().get_next_object_id(transaction.txn_guard()).await?;
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::insert_object(
-                ObjectKey::object(symlink_id),
-                ObjectValue::symlink(link, Timestamp::now(), Timestamp::now(), 0),
-            ),
-        );
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name, self.casefold()),
-                ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
-            ),
-        );
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
+        let mut link = link.to_vec();
+
+        if let Some(wrapping_key_id) = wrapping_key_id {
+            if let Some(crypt) = self.store().crypt() {
+                let (wrapped_key, unwrapped_key) =
+                    crypt.create_key_with_id(symlink_id, wrapping_key_id).await?;
+
+                // Note that it's possible that this entry gets inserted into the key manager but
+                // this transaction doesn't get committed. This shouldn't be a problem because
+                // unused keys get purged on a standard timeout interval and this key shouldn't
+                // conflict with any other keys.
+                let unwrapped_keys = vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))];
+                self.store().key_manager.insert(symlink_id, &unwrapped_keys, false);
+                let symlink_key = Key::new(unwrapped_keys.to_cipher_set(), 0);
+
+                let dir_key = if let Some(key) = self.get_fscrypt_key().await? {
+                    key
+                } else {
+                    bail!(FxfsError::NoKey);
+                };
+                let casefold_hash = get_casefold_hash(Some(&dir_key), name, self.casefold());
+                let encrypted_name = encrypt_filename(&dir_key, self.object_id(), name)?;
+                symlink_key.encrypt_filename(symlink_id, &mut link)?;
+
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::insert_object(
+                        ObjectKey::object(symlink_id),
+                        ObjectValue::encrypted_symlink(link, Timestamp::now(), Timestamp::now(), 0),
+                    ),
+                );
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::insert_object(
+                        ObjectKey::keys(symlink_id),
+                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
+                            FSCRYPT_KEY_ID,
+                            wrapped_key,
+                        )]))),
+                    ),
+                );
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::replace_or_insert_object(
+                        ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                        ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
+                    ),
+                );
+            } else {
+                return Err(anyhow!("No crypt"));
+            }
+        } else {
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::insert_object(
+                    ObjectKey::object(symlink_id),
+                    ObjectValue::symlink(link, Timestamp::now(), Timestamp::now(), 0),
+                ),
+            );
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::child(self.object_id(), &name, self.casefold()),
+                    ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
+                ),
+            );
+        };
+
+        let now = Timestamp::now();
         self.update_dir_attributes_internal(
             transaction,
             self.object_id(),
             MutableAttributesInternal {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
+                change_time: Some(now),
                 ..Default::default()
             },
         )
@@ -1006,12 +1064,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
-        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
         if self.wrapping_key_id.lock().is_some() {
-            if !matches!(descriptor, ObjectDescriptor::File | ObjectDescriptor::Directory) {
-                return Err(anyhow!(FxfsError::InvalidArgs)
-                    .context("Encrypted directories can only have file or directory children"));
-            }
             let key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
             let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
             let encrypted_name = encrypt_filename(&key, self.object_id(), name)?;

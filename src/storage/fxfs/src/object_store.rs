@@ -53,6 +53,8 @@ use crate::round::round_up;
 use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
+use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
 use fuchsia_inspect::ArrayProperty;
@@ -62,6 +64,7 @@ use fxfs_crypto::{
     Crypt, KeyPurpose, StreamCipher, UnwrappedKey, WrappedKey, WrappedKeyV32, WrappedKeyV40,
     WrappedKeys,
 };
+use mundane::hash::{Digest, Hasher, Sha256};
 use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -2051,10 +2054,40 @@ impl ObjectStore {
         Ok(())
     }
 
+    // When the symlink is unlocked, this function decrypts `link` and returns a bag of bytes that
+    // is identical to that which was passed in as the target on `create_symlink`.
+    // If the symlink is locked, this function hashes the encrypted `link` with Sha256 in order to
+    // get a standard length and then base64 encodes the hash and returns that to the caller.
+    pub async fn read_encrypted_symlink(
+        &self,
+        object_id: u64,
+        link: Vec<u8>,
+    ) -> Result<Vec<u8>, Error> {
+        let mut link = link;
+        let key = self
+            .key_manager()
+            .get_fscrypt_key(object_id, self.crypt().unwrap().as_ref(), async || {
+                self.get_keys(object_id).await
+            })
+            .await?;
+        if let Some(key) = key {
+            key.decrypt_filename(object_id, &mut link)?;
+            Ok(link)
+        } else {
+            let digest = Sha256::hash(&link).bytes();
+            let encrypted_link = BASE64_URL_SAFE_NO_PAD.encode(&digest);
+            Ok(encrypted_link.into())
+        }
+    }
+
     /// Returns the link of a symlink object.
     pub async fn read_symlink(&self, object_id: u64) -> Result<Vec<u8>, Error> {
         match self.tree.find(&ObjectKey::object(object_id)).await? {
             None => bail!(FxfsError::NotFound),
+            Some(Item {
+                value: ObjectValue::Object { kind: ObjectKind::EncryptedSymlink { link, .. }, .. },
+                ..
+            }) => self.read_encrypted_symlink(object_id, link).await,
             Some(Item {
                 value: ObjectValue::Object { kind: ObjectKind::Symlink { link, .. }, .. },
                 ..

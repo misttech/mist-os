@@ -11,8 +11,8 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectKey, ObjectKeyData, ObjectValue,
-    ProjectProperty,
+    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46, ObjectKey,
+    ObjectKeyData, ObjectValue, ProjectProperty,
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
@@ -77,14 +77,14 @@ pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
-pub type Mutation = MutationV43;
+pub type Mutation = MutationV46;
 
 #[derive(
     Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum MutationV43 {
-    ObjectStore(ObjectStoreMutationV43),
+pub enum MutationV46 {
+    ObjectStore(ObjectStoreMutationV46),
     EncryptedObjectStore(Box<[u8]>),
     Allocator(AllocatorMutationV32),
     // Indicates the beginning of a flush.  This would typically involve sealing a tree.
@@ -93,6 +93,20 @@ pub enum MutationV43 {
     // with compacted ones.
     EndFlush,
     // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKeyV40),
+    CreateInternalDir(u64),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(MutationV46)]
+pub enum MutationV43 {
+    ObjectStore(ObjectStoreMutationV43),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutationV32),
+    BeginFlush,
+    EndFlush,
     DeleteVolume,
     UpdateBorrowed(u64),
     UpdateMutationsKey(UpdateMutationsKeyV40),
@@ -161,11 +175,18 @@ impl Mutation {
 // We have custom comparison functions for mutations that just use the key, rather than the key and
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
-pub type ObjectStoreMutation = ObjectStoreMutationV43;
+pub type ObjectStoreMutation = ObjectStoreMutationV46;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[migrate_nodefault]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct ObjectStoreMutationV46 {
+    pub item: ObjectItemV46,
+    pub op: OperationV32,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_nodefault]
 pub struct ObjectStoreMutationV43 {
     pub item: ObjectItemV43,
     pub op: OperationV32,

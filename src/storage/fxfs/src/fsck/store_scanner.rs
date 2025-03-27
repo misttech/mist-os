@@ -98,6 +98,7 @@ struct ScannedSymlink {
     stored_refs: u64,
     // Attributes for this symlink
     attributes: ScannedAttributes,
+    encrypted: bool,
 }
 
 #[derive(Debug)]
@@ -285,6 +286,39 @@ impl<'a> ScannedStore<'a> {
                             ScannedObject::Symlink(ScannedSymlink {
                                 parents: vec![],
                                 stored_refs: *refs,
+                                encrypted: false,
+                                attributes: ScannedAttributes {
+                                    attributes: Vec::new(),
+                                    tombstoned_attributes: Vec::new(),
+                                    stored_allocated_size: *allocated_size,
+                                    observed_allocated_size: 0,
+                                    in_graveyard: false,
+                                    extended_attributes: Vec::new(),
+                                },
+                            }),
+                        );
+                    }
+                    ObjectValue::Object {
+                        kind: ObjectKind::EncryptedSymlink { refs, .. },
+                        attributes: ObjectAttributes { project_id, allocated_size, .. },
+                    } => {
+                        if *project_id > 0 {
+                            self.used_project_ids.insert(*project_id, key.object_id);
+                            let entry = self.total_project_usages.entry(*project_id).or_default();
+                            // Increment only nodes.
+                            entry.1 += 1;
+                        }
+                        self.current_object = Some(CurrentObject {
+                            object_id: key.object_id,
+                            key_ids: HashSet::default(),
+                            lazy_keys: true,
+                        });
+                        self.objects.insert(
+                            key.object_id,
+                            ScannedObject::Symlink(ScannedSymlink {
+                                parents: vec![],
+                                stored_refs: *refs,
+                                encrypted: true,
                                 attributes: ScannedAttributes {
                                     attributes: Vec::new(),
                                     tombstoned_attributes: Vec::new(),
@@ -922,6 +956,17 @@ impl<'a> ScannedStore<'a> {
                             }
                         }
                     }
+                    Some(ScannedObject::Symlink(ScannedSymlink { encrypted, .. })) => {
+                        if *encrypted {
+                            if !key_ids.contains(&1) {
+                                self.fsck.error(FsckError::MissingKey(
+                                    self.store_id,
+                                    current_file.object_id,
+                                    1,
+                                ))?;
+                            }
+                        }
+                    }
                     Some(_) => {}
                     None => self.fsck.error(FsckError::MissingObjectInfo(
                         self.store_id,
@@ -1404,7 +1449,7 @@ pub(super) async fn scan_store(
                 }
             }
             ScannedObject::Graveyard => other += 1,
-            ScannedObject::Symlink(ScannedSymlink { parents, stored_refs, attributes }) => {
+            ScannedObject::Symlink(ScannedSymlink { parents, stored_refs, attributes, .. }) => {
                 symlinks += 1;
                 let observed_refs = parents.len().try_into().unwrap();
                 // observed_refs == 0 is handled separately to distinguish orphaned objects
