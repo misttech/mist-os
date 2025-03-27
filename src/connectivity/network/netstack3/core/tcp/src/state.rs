@@ -1395,30 +1395,38 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 seg
             }
         };
-        // First calculate the open window, note that if our peer has shrank
+        // First calculate the unused window, note that if our peer has shrank
         // their window (it is strongly discouraged), the following conversion
         // will fail and we return early.
+        let unused_window =
+            u32::try_from(*snd_una + *snd_wnd - next_seg).ok_checked::<TryFromIntError>()?;
         let cwnd = congestion_control.cwnd();
-        let swnd = WindowSize::min(*snd_wnd, cwnd);
-        let open_window =
-            u32::try_from(*snd_una + swnd - next_seg).ok_checked::<TryFromIntError>()?;
+        // If we don't have space in the congestion window return early.
+        let unused_congestion_window =
+            u32::try_from(*snd_una + cwnd - next_seg).ok_checked::<TryFromIntError>()?;
         let offset =
             usize::try_from(next_seg - *snd_una).unwrap_or_else(|TryFromIntError { .. }| {
                 panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
             });
         let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
             .unwrap_or_else(|_| WindowSize::MAX.into());
-        // We can only send the minimum of the open window and the bytes that
-        // are available, additionally, if in zero window probe mode, allow at
-        // least one byte past the limit to be sent.
-        let can_send =
-            open_window.min(available).min(mss).min(limit).max(u32::from(zero_window_probe));
+        // We can only send the minimum of the unused or congestion windows and
+        // the bytes that are available, additionally, if in zero window probe
+        // mode, allow at least one byte past the limit to be sent.
+        let can_send = unused_window
+            .min(unused_congestion_window)
+            .min(available)
+            .min(mss)
+            .min(limit)
+            .max(u32::from(zero_window_probe));
+
         if can_send == 0 {
             if available == 0 && offset == 0 && timer.is_none() && keep_alive.enabled {
                 *timer = Some(SendTimer::KeepAlive(KeepAliveTimer::idle(now, keep_alive)));
             }
             return None;
         }
+
         let has_fin = FIN_QUEUED && can_send == available;
         let seg = buffer.peek_with(offset, |readable| {
             let bytes_to_send = u32::min(
@@ -1470,8 +1478,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 // - negate (3) and combine with D > U, we get U < Fs * Max(SND.WND).
                 // If the overriding timer fired or we are in zero window
                 // probing phase, we override it to send data anyways.
-                if available > open_window
-                    && open_window < u32::min(mss, u32::from(*snd_wnd_max) / SWS_BUFFER_FACTOR)
+                if available > unused_window
+                    && unused_window < u32::min(mss, u32::from(*snd_wnd_max) / SWS_BUFFER_FACTOR)
                     && !override_sws
                     && !zero_window_probe
                 {
@@ -1531,7 +1539,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             "can_send" => can_send,
             "snd_wnd" => u32::from(*snd_wnd),
             "cwnd" => u32::from(cwnd),
-            "open_window" => open_window,
+            "unused_window" => unused_window,
             "available" => available,
         );
         let seq_max = next_seg + seg.len();
