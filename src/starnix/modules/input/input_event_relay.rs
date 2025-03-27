@@ -400,9 +400,9 @@ impl InputEventsRelay {
                     return;
                 }
 
-                let (local_listener_stream, local_resume_event) = match event_proxy_mode {
+                let (local_listener_stream, message_counter) = match event_proxy_mode {
                     EventProxyMode::WakeContainer => {
-                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
+                        let (local_channel, message_counter) = create_proxy_for_wake_events_counter(
                             remote_server.into_channel(),
                             "buttons".to_string(),
                         );
@@ -410,7 +410,7 @@ impl InputEventsRelay {
                             fuipolicy::MediaButtonsListenerRequestStream::from_channel(
                                 fidl::AsyncChannel::from_channel(local_channel),
                             );
-                        (local_listener_stream, Some(local_resume_event))
+                        (local_listener_stream, Some(message_counter))
                     }
                     EventProxyMode::None => (remote_server.into_stream(), None),
                 };
@@ -418,7 +418,7 @@ impl InputEventsRelay {
                     local_listener_stream,
                     default_keyboard_device_opened_files,
                     device_inspect_status,
-                    local_resume_event,
+                    message_counter,
                 )
                 .await;
             })
@@ -430,7 +430,7 @@ impl InputEventsRelay {
         mut local_listener_stream: fuipolicy::MediaButtonsListenerRequestStream,
         default_keyboard_device_opened_files: OpenedFiles,
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
-        local_resume_event: Option<zx::EventPair>,
+        message_counter: Option<zx::Counter>,
     ) {
         let mut power_was_pressed = false;
         let mut function_was_pressed = false;
@@ -444,7 +444,8 @@ impl InputEventsRelay {
         loop {
             let next_event_future = local_listener_stream.next();
 
-            local_resume_event.as_ref().map(clear_wake_proxy_signal);
+            // The previous hanging get has been handled, so decrement the unhandled message counter.
+            message_counter.as_ref().map(|c| c.add(-1));
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
