@@ -85,7 +85,6 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
 #[derive(GenericOverIp, Derivative)]
 #[derivative(Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
 #[generic_over_ip(I, Ip)]
-
 pub struct IcmpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>(
     datagram::StrongRc<I, D, Icmp<BT>>,
 );
@@ -375,7 +374,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SerializeError = packet_formats::error::ParseError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
-    // TODO(https://fxbug.dev/42081990): Add per-socket ICMP counters.
+    // NB: At present, there's no need to track per-socket ICMP counters.
     type Counters<I: Ip> = ();
     type SocketWritableListener = BT::SocketWritableListener;
 
