@@ -683,7 +683,6 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
 
-        // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
         self.directory
             .update_attributes(transaction, Some(&attributes), 0, Some(Timestamp::now()))
             .await
@@ -796,7 +795,15 @@ impl vfs::node::Node for FxDirectory {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.directory.get_properties().await.map_err(map_to_status)?;
+        let mut props = self.directory.get_properties().await.map_err(map_to_status)?;
+
+        if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
+            self.store()
+                .update_access_time(self.directory.object_id(), &mut props)
+                .await
+                .map_err(map_to_status)?;
+        }
+
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -4508,6 +4515,108 @@ mod tests {
         assert_eq!(mutable_attributes.modification_time, mtime);
         assert_eq!(mutable_attributes.access_time, atime);
         assert_eq!(mutable_attributes.mode, mode);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_atime_from_pending_access_time_update_request() {
+        const DIR: &str = "foo";
+
+        let (device, expected_atime, expected_ctime) = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let dir = open_dir_checked(
+                &root,
+                DIR,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                fio::Options {
+                    attributes: Some(fio::NodeAttributesQuery::CHANGE_TIME),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+            let (mutable_attributes, immutable_attributes) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            let initial_ctime = immutable_attributes.change_time;
+            let initial_atime = mutable_attributes.access_time;
+            // When creating a node, ctime, mtime, and atime are all updated to the current time.
+            assert_eq!(initial_atime, initial_ctime);
+            assert_eq!(initial_atime, mutable_attributes.modification_time);
+
+            // Client manages atime and they signal to Fxfs that an access has occurred and it may
+            // require an access time update. They do so by querying with
+            // `fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE`.
+            let (mutable_attributes, immutable_attributes) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be updated as atime <= ctime (or mtime)
+            assert!(initial_atime < mutable_attributes.access_time);
+            let updated_atime = mutable_attributes.access_time;
+            // Calling get_attributes with PENDING_ACCESS_TIME_UPDATE will trigger an update of
+            // object attributes if access_time needs to be updated. Check that ctime isn't updated.
+            assert_eq!(initial_ctime, immutable_attributes.change_time);
+
+            let (mutable_attributes, _) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be not be updated as atime > ctime (or mtime)
+            assert_eq!(updated_atime, mutable_attributes.access_time);
+
+            (fixture.close().await, mutable_attributes.access_time, initial_ctime)
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let dir = open_dir_checked(
+            &root,
+            DIR,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
+
+        let (mutable_attributes, immutable_attributes) = dir
+            .get_attributes(
+                fio::NodeAttributesQuery::CHANGE_TIME | fio::NodeAttributesQuery::ACCESS_TIME,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert_eq!(immutable_attributes.change_time, expected_ctime);
+        assert_eq!(mutable_attributes.access_time, expected_atime);
         fixture.close().await;
     }
 }

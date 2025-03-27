@@ -122,12 +122,22 @@ impl Node for FxSymlink {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let mut props = self.get_properties().await.map_err(map_to_status)?;
+
+        if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
+            self.handle
+                .store()
+                .update_access_time(self.object_id(), &mut props)
+                .await
+                .map_err(map_to_status)?;
+        }
+
         Ok(attributes!(
             requested_attributes,
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                access_time: props.access_time.as_nanos(),
                 mode: props.posix_attributes.map(|a| a.mode),
                 uid: props.posix_attributes.map(|a| a.uid),
                 gid: props.posix_attributes.map(|a| a.gid),

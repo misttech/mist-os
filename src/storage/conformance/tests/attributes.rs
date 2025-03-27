@@ -337,7 +337,9 @@ async fn update_attributes_file_with_sufficient_rights() {
     if !harness.supports_mutable_attrs() {
         return;
     }
-    let supported_attrs = harness.config.supported_attributes;
+    // Don't want to test for `fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE` in this test.
+    let supported_attrs =
+        harness.config.supported_attributes - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE;
 
     let entries = vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());

@@ -39,7 +39,7 @@ use crate::log::*;
 use crate::lsm_tree::cache::{NullCache, ObjectCache};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::{LSMTree, Query};
-use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::Allocator;
 use crate::object_store::graveyard::Graveyard;
 use crate::object_store::journal::{JournalCheckpoint, JournaledTransaction};
@@ -2138,6 +2138,49 @@ impl ObjectStore {
                 .context("ObjectStore.update_attributes: Expected object value"));
         };
         transaction.add(self.store_object_id(), Mutation::ObjectStore(mutation));
+        Ok(())
+    }
+
+    // Updates and commits the changes to access time in ObjectProperties. The update matches
+    // Linux's RELATIME. That is, access time is updated to the current time if access time is less
+    // than or equal to the last modification or status change, or if it has been more than a day
+    // since the last access.
+    pub async fn update_access_time(
+        &self,
+        object_id: u64,
+        props: &mut ObjectProperties,
+    ) -> Result<(), Error> {
+        let access_time = props.access_time.as_nanos();
+        let modification_time = props.modification_time.as_nanos();
+        let change_time = props.change_time.as_nanos();
+        let now = Timestamp::now();
+        if access_time <= modification_time
+            || access_time <= change_time
+            || access_time
+                < now.as_nanos()
+                    - Timestamp::from(std::time::Duration::from_secs(24 * 60 * 60)).as_nanos()
+        {
+            let mut transaction = self
+                .filesystem()
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(self.store_object_id, object_id,)],
+                    Options { borrow_metadata_space: true, ..Default::default() },
+                )
+                .await?;
+            self.update_attributes(
+                &mut transaction,
+                object_id,
+                Some(&fio::MutableNodeAttributes {
+                    access_time: Some(now.as_nanos()),
+                    ..Default::default()
+                }),
+                None,
+            )
+            .await?;
+            transaction.commit().await?;
+            props.access_time = now;
+        }
         Ok(())
     }
 }
