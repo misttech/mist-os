@@ -132,7 +132,7 @@ mod test {
             max_entries: 10,
         };
 
-        let array = Array::new(&schema, None).unwrap();
+        let array = Array::new(&schema).unwrap();
         assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
         assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
 
@@ -143,7 +143,7 @@ mod test {
             max_entries: 10,
         };
 
-        let array = Array::new(&schema, None).unwrap();
+        let array = Array::new(&schema).unwrap();
         assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
         assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
     }

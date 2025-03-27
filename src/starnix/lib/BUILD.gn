@@ -20,6 +20,7 @@ group("tests") {
 
   deps = [
     "ebpf:tests",
+    "ebpf_api:tests",
     "expando:tests",
     "extended_pstate:tests",
     "kernel_manager:tests",

@@ -41,6 +41,7 @@ use std::sync::Arc;
 /// Counter for map identifiers.
 static MAP_IDS: AtomicU32 = AtomicU32::new(1);
 
+#[derive(Debug)]
 pub enum MapError {
     // Equivalent of EINVAL.
     InvalidParam,
