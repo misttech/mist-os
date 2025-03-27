@@ -19,7 +19,6 @@ use {fidl_fuchsia_power_broker as fpb, fuchsia_inspect as inspect};
 
 const ADD_ELEMENT_EVENT: &str = "add_element";
 const ADD_DEPENDENCY_EVENT: &str = "add_dep";
-const UPDATE_DEP_LEVEL_EVENT: &str = "update_dep";
 const REMOVE_DEP_EVENT: &str = "rm_dep";
 const UPDATE_LEVEL_EVENT: &str = "update_level";
 const REMOVE_ELEMENT_EVENT: &str = "rm_element";
@@ -179,7 +178,7 @@ impl ElementData {
 #[derive(Debug)]
 pub struct DependencyData {
     // Map from dp_level => (rq_level, opportunistic)
-    levels: HashMap<fpb::PowerLevel, DepLevelData>,
+    levels: HashMap<fpb::PowerLevel, inspect::Node>,
     node: inspect::Node,
 }
 
@@ -191,8 +190,7 @@ impl DependencyData {
         is_opportunistic: bool,
     ) -> Self {
         let mut levels = HashMap::new();
-        levels
-            .insert(dp_level, DepLevelData::new(&meta_node, dp_level, rq_level, is_opportunistic));
+        levels.insert(dp_level, Self::dep_node(&meta_node, dp_level, rq_level, is_opportunistic));
         Self { levels, node: meta_node }
     }
 
@@ -200,57 +198,35 @@ impl DependencyData {
         self.levels.remove(&dp_level);
     }
 
-    fn update_levels(
+    fn add_new_dep(
         &mut self,
         dp_level: fpb::PowerLevel,
         rq_level: fpb::PowerLevel,
         is_opportunistic: bool,
     ) {
         match self.levels.get_mut(&dp_level) {
-            Some(data) => data.update(rq_level, is_opportunistic),
+            Some(_data) => unreachable!("we never update a dep level"),
             None => {
                 self.levels.insert(
                     dp_level,
-                    DepLevelData::new(&self.node, dp_level, rq_level, is_opportunistic),
+                    Self::dep_node(&self.node, dp_level, rq_level, is_opportunistic),
                 );
             }
         }
     }
-}
 
-#[derive(Debug)]
-struct DepLevelData {
-    rq_level: inspect::UintProperty,
-    opportunistic: Option<inspect::BoolProperty>,
-    node: inspect::Node,
-}
-
-impl DepLevelData {
-    fn new(
+    fn dep_node(
         parent: &inspect::Node,
         dp_level: fpb::PowerLevel,
         rq_level: fpb::PowerLevel,
         is_opportunistic: bool,
-    ) -> Self {
+    ) -> inspect::Node {
         let node = parent.create_child(format!("{dp_level}"));
-        Self {
-            rq_level: node.create_uint(REQUIRED_LEVEL, rq_level as u64),
-            opportunistic: is_opportunistic.then(|| node.create_bool(OPPORTUNISTIC, true)),
-            node,
+        node.record_uint(REQUIRED_LEVEL, rq_level as u64);
+        if is_opportunistic {
+            node.record_bool(OPPORTUNISTIC, true);
         }
-    }
-
-    fn update(&mut self, rq_level: fpb::PowerLevel, is_opportunistic: bool) {
-        self.node.atomic_update(|_| {
-            self.rq_level.set(rq_level as u64);
-            match &self.opportunistic {
-                Some(opportunistic) => opportunistic.set(is_opportunistic),
-                None => {
-                    self.opportunistic =
-                        is_opportunistic.then(|| self.node.create_bool(OPPORTUNISTIC, true))
-                }
-            }
-        })
+        node
     }
 }
 
@@ -355,30 +331,22 @@ impl TopologyInspect {
                     DependencyData::new(meta_node, dp_level.level, rq_level.level, is_opportunistic)
                 });
                 inspect_edges.insert(rq_id, edge);
-                self.maybe_record_event(dp, ADD_DEPENDENCY_EVENT, |node| {
-                    node.record_uint(DEP_ELEMENT, *dp_id);
-                    node.record_uint(REQ_ELEMENT, *rq_id);
-                    node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
-                    node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
-                    if is_opportunistic {
-                        node.record_bool(OPPORTUNISTIC, true);
-                    }
-                });
             }
             Some(edge) => {
                 edge.maybe_update_meta(|meta| {
-                    meta.update_levels(dp_level.level, rq_level.level, is_opportunistic);
-                });
-                self.maybe_record_event(dp, UPDATE_DEP_LEVEL_EVENT, |node| {
-                    node.record_uint(EDGE_ID, edge.id());
-                    node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
-                    node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
-                    if is_opportunistic {
-                        node.record_bool(OPPORTUNISTIC, true);
-                    }
+                    meta.add_new_dep(dp_level.level, rq_level.level, is_opportunistic);
                 });
             }
         }
+        self.maybe_record_event(dp, ADD_DEPENDENCY_EVENT, |node| {
+            node.record_uint(DEP_ELEMENT, *dp_id);
+            node.record_uint(REQ_ELEMENT, *rq_id);
+            node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
+            node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
+            if is_opportunistic {
+                node.record_bool(OPPORTUNISTIC, true);
+            }
+        });
     }
 
     pub fn on_remove_dependency(&self, elements: &HashMap<ElementID, Element>, dep: &Dependency) {
