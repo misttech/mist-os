@@ -924,7 +924,11 @@ fn test_receiving_router_solicitation_validity_check() {
 
 #[test]
 fn test_receiving_router_advertisement_validity_check() {
-    fn router_advertisement_message(src_ip: Ipv6Addr, dst_ip: Ipv6Addr) -> Buf<Vec<u8>> {
+    fn router_advertisement_message(
+        src_ip: Ipv6Addr,
+        dst_ip: Ipv6Addr,
+        hop_limit: u8,
+    ) -> Buf<Vec<u8>> {
         EmptyBuf
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
@@ -939,12 +943,7 @@ fn test_receiving_router_advertisement_validity_check() {
                     0,     /* retransmit_timer */
                 ),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
-                src_ip,
-                dst_ip,
-                REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-                Ipv6Proto::Icmpv6,
-            ))
+            .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_b()
@@ -952,14 +951,18 @@ fn test_receiving_router_advertisement_validity_check() {
 
     let config = Ipv6::TEST_ADDRS;
     let src_mac = [10, 11, 12, 13, 14, 15];
-    let src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
     let device_id: DeviceId<_> = device_ids[0].clone().into();
 
+    let invalid_src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
+    let src_ip = Mac::new(src_mac).to_ipv6_link_local().addr().get();
+    let invalid_hop_limit = 3;
+    let hop_limit = REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
+
     // Test receiving NDP RA where source IP is not a link local address
     // (should not receive).
-
-    let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
+    let icmpv6_packet_buf =
+        router_advertisement_message(invalid_src_ip, config.local_ip.get(), hop_limit);
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
@@ -967,11 +970,19 @@ fn test_receiving_router_advertisement_validity_check() {
     );
     assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 0);
 
-    // Test receiving NDP RA where source IP is a link local address (should
-    // receive).
+    // Test receiving NDP RA where hop limit is not 255 (should not receive).
+    let icmpv6_packet_buf =
+        router_advertisement_message(src_ip, config.local_ip.get(), invalid_hop_limit);
+    ctx.test_api().receive_ip_packet::<Ipv6, _>(
+        &device_id,
+        Some(FrameDestination::Individual { local: true }),
+        icmpv6_packet_buf,
+    );
+    assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 0);
 
-    let src_ip = Mac::new(src_mac).to_ipv6_link_local().addr().get();
-    let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
+    // Test receiving NDP RA where source IP is a link local address and hop
+    // limit is 255 (should receive).
+    let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get(), hop_limit);
     ctx.test_api().receive_ip_packet::<Ipv6, _>(
         &device_id,
         Some(FrameDestination::Individual { local: true }),
