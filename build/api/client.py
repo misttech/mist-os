@@ -342,6 +342,45 @@ def cmd_print_all(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_print_debug_symbols(args: argparse.Namespace) -> int:
+    import json
+
+    import debug_symbols
+
+    module = args.modules.find("debug_symbols")
+    if not module.path.exists():
+        return _printerr(
+            f"Missing input file, please use `fx set` or `fx gen` command: {module.path}"
+        )
+
+    debug_parser = debug_symbols.DebugSymbolsManifestParser(args.build_dir)
+    if args.resolve_build_ids:
+        debug_parser.enable_build_id_resolution()
+        if args.test_mode:
+            # --test-mode is used during regression testing to avoid
+            # using a fake ELF input file. Simply return the file name
+            # as the build-id value for now.
+            def get_build_id(path: Path) -> str:
+                return path.name
+
+            debug_parser.set_build_id_callback_for_test(get_build_id)
+
+    try:
+        debug_parser.parse_manifest_file(module.path)
+    except ValueError as e:
+        return _printerr(str(e))
+
+    result = debug_parser.entries
+
+    if args.pretty:
+        print(
+            json.dumps(result, sort_keys=True, indent=2, separators=(",", ": "))
+        )
+    else:
+        print(json.dumps(result, sort_keys=True))
+    return 0
+
+
 def cmd_last_ninja_artifacts(args: argparse.Namespace) -> int:
     """Implement the `print_last_ninja_artifacts` command."""
     import ninja_artifacts
@@ -562,6 +601,26 @@ def main(main_args: T.Sequence[str]) -> int:
     )
     LastBuildApiFilter.add_parser_arguments(print_all_parser)
     print_all_parser.set_defaults(func=cmd_print_all)
+
+    print_debug_symbols_parser = subparsers.add_parser(
+        "print_debug_symbols",
+        help="Print flattened debug symbol entries",
+        description="Print the content of debug_symbols.json and all the files it includes "
+        "as a single JSON list of entries.",
+    )
+    print_debug_symbols_parser.add_argument(
+        "--pretty", action="store_true", help="Pretty print the JSON output."
+    )
+    print_debug_symbols_parser.add_argument(
+        "--resolve-build-ids",
+        action="store_true",
+        help="Force resolution of build-id values.",
+    )
+    print_debug_symbols_parser.add_argument(
+        "--test-mode", action="store_true", help="For regression tests only."
+    )
+    LastBuildApiFilter.add_parser_arguments(print_debug_symbols_parser)
+    print_debug_symbols_parser.set_defaults(func=cmd_print_debug_symbols)
 
     last_ninja_artifacts_parser = subparsers.add_parser(
         "last_ninja_artifacts",

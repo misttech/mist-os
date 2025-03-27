@@ -15,6 +15,8 @@ template("prebuilt_binaries") {
 
   binary_manifest = "$target_gen_dir/${target_name}_binaries.json"
 
+  rebased_binary_manifest = rebase_path(binary_manifest, root_build_dir)
+
   compiled_action(target_name) {
     testonly = true
 
@@ -47,10 +49,19 @@ template("prebuilt_binaries") {
     ]
 
     metadata = {
+      # Used by //:prebuilt_binaries target.
       prebuilt_binaries = [
         {
           name = target_name
-          manifest = rebase_path(binary_manifest, root_build_dir)
+          manifest = rebased_binary_manifest
+        },
+      ]
+
+      # Used by //:debug_symbols taraget.
+      debug_symbol_manifests = [
+        {
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          manifest = rebased_binary_manifest
         },
       ]
     }

@@ -221,6 +221,7 @@ build_api_module("api") {
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
     ":ctf_fidl_method_summary",
+    ":debug_symbols",
     ":delivery_blob_config",
     ":detailed_size_checker_data",
     ":exported_files",
@@ -506,6 +507,138 @@ build_api_module("bazel_build_events_logs") {
 build_api_module("binaries") {
   testonly = true
   data_keys = [ "binaries" ]
+  deps = [ ":default" ]
+}
+
+# A build API module to describe the debug symbols for all ELF files that are either
+# generated or used (as prebuilts) by the current build configuration. This is useful
+# for infra tools to upload said symbol files to cloud storage.
+#
+# Debug symbols files can come from different sources:
+#
+# - They can be generated directly by GN C++ or Rust link commands, for example see
+#   the tool() definitions in clang_toolchain().
+#
+# - They can be provided directly by certain prebuilts. For example, the Clang and
+#   Rust toolchains provide a lib/debug/.build-id/ directory, whose content is
+#   referenced from lib/runtime.json describing each runtime shared library
+#   and the corresponding debug symbol files. See
+#   //build/toolchain/runtime/toolchain_runtime_deps.gni
+#
+# - Many prebuilt binaries are distributed from CIPD packages that do not include
+#   debug symbols at all. Instead, these debug symbol files are provided by a separate
+#   and *optional* CIPD package that Jiri does not download by default.
+#
+#   For example, the JIRI manifest fragment at //integration/fuchsia/prebuilts
+#   contains entries like:
+#
+#       <package name="fuchsia/prebuilt/bt-host/arm64"
+#                path="prebuilt/connectivity/bluetooth/bt-host/arm64"
+#                version="git_revision:29508f79429cd7610e1a87957d33d8ba8501475c"/>
+#
+#       <package name="fuchsia/prebuilt/bt-host/debug-symbols-arm64"
+#                path="prebuilt/.build-id"
+#                version="git_revision:29508f79429cd7610e1a87957d33d8ba8501475c"
+#                attributes="debug-symbols,debug-symbols-arm64"/>
+#
+#   Note that debug symbols CIPD packages:
+#
+#       - Include "debug-symbols" in their name (either as a prefix or suffix)
+#       - Set the "debug-symbols" JIRI "attributes" value.
+#       - Typically extract to //prebuilt/.build-id/
+#
+#   A Jiri checkout can be configured to download and unpack debug symbols
+#   with the following command:
+#
+#       jiri init -fetch-optional=debug-symbols
+#       jiri update
+#
+#   Note that this adds about 66 GiB of prebuilts to the checkout as of March 2025!
+#
+# - Bazel targets can also generate unstripped ELF binaries, or can
+#   depend on prebuilt ones provided by the @fuchsia_sdk repository.
+#
+# There are two types of entries in this manifest.
+#
+# The first one uses the "debug_symbol_files" metadata key, and describes one
+# individual ELF debug symbol per entry, and is used for GN targets that generate
+# them directly (e.g. C++ or Rust link actions), or from the runtime.json definitions
+# provided with the prebuilt Clang and Rust toolchains. Its schema is:
+#
+# Type: list(scope)
+#
+#   label
+#     Optional: The GN label of the binary target. Only used for debugging or
+#     printing error messages.
+#     Type: label_with_toolchain
+#
+#   dest_path
+#     Optional: The Fuchsia package path for the corresponding stripped
+#     binary, if available. Only used as debugging information, as several entries
+#     can have the same dest_path value.
+#     Type: path relative to Fuchsia package root.
+#
+#   cpu
+#     Required: CPU architecture the binary is for, e.g. "arm64" or "x64".
+#     Type: string
+#
+#   os
+#     Required: OS the binary is for, e.g. "fuchsia", "linux", or "mac".
+#     Type: string
+#
+#   debug
+#     Required: Path to where the unstripped or separate debug file is.
+#     Type: path relative to $root_build_dir
+#
+#   elf_build_id
+#     Optional: Lowercase hexadecimal ASCII representation of the ELF build ID
+#     for this binary, if available at `gn gen` time.
+#     Type: string
+#
+#   elf_build_id_file
+#     Optional: Path to a file containing the lowercase ASCII hexadecimal
+#     representation of the ELF build ID in this binary. This is useful when
+#     the value can be computed at build time, instead of `gn gen` time.
+#     Type: path relative to $root_build_dir
+#
+#   breakpad
+#     Optional: Path to the breakpad symbol file for the debug binary,
+#     if available.
+#
+# Note that it is possible for none of "elf_build_id" or "elf_build_id_file" to be defined.
+# This happens for Go executables for example. In that case, the value must be extracted by
+# post-build tools manually, either by looking at the "debug" path, if it looks like
+# "...../.build-id/xx/yyyyyyyyy.debug", or by parsing the content of the ELF file.
+#
+# If there is no breakpad value for an entry, the corresponding Breakpad symbol must be
+# generated post-build, for example with the generate_breakpad tool.
+#
+# The second format, using "debug_symbol_manifests" metadata entries, describes one
+# manifest per entry. This is to be used for prebuilt packages, or Bazel build targets.
+#
+#   label
+#     Optional: The GN label of the target generating the manifest.
+#     Type: label_with_toolchain
+#
+#   manifest
+#     Required: Path to a manifest file listing all debug symbols corresponding
+#     to a given target. The file must follow the same schema, and thus can include
+#     entries pointing to other manifests (cycles are forbidden).
+#
+# Due to the way GN metadata collection works, the content of this manifest will
+# reflect all possible debug symbols used/generated by the current build configuration,
+# which is a superset of the symbols used/generated by the last build command.
+#
+# To filter its content properly, one should use the
+# `//build/api/client print_debug_symbols --last-build-only` command instead, which will
+# also flatten all nested manifest definitions into a single list of file entries.
+#
+build_api_module("debug_symbols") {
+  testonly = true
+  data_keys = [
+    "debug_symbol_files",
+    "debug_symbol_manifests",
+  ]
   deps = [ ":default" ]
 }
 

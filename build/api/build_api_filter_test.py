@@ -28,6 +28,7 @@ class BuildApiModulesFilterTest(unittest.TestCase):
             "obj/foo",
             "gen/bar",
             "obj/build/images/fuchsia/product_bundle/product_bundle.json",
+            "obj/some_prebuilt_package/qux.debug_symbols.json",
         ]
         module_filter = build_api_filter.BuildApiFilter(ninja_artifacts)
 
@@ -106,6 +107,45 @@ class BuildApiModulesFilterTest(unittest.TestCase):
                             "product_version": "24.99991231.0.1",
                             "transfer_manifest_path": "obj/build/images/fuchsia/terminal.x64.transfer.json",
                             "transfer_manifest_url": "file://obj/build/images/fuchsia/terminal.x64.transfer.json",
+                        },
+                    ],
+                ),
+                "debug_symbols": (
+                    [
+                        {
+                            "debug": "obj/foo",
+                            "elf_build_id": "0123456789abcdef",
+                            "cpu": "x64",
+                            "os": "fuchsia",
+                            "label": "//src/foo:bin(//build/toolchain/fuchsia:x64)",
+                        },
+                        {
+                            "manifest": "obj/some_prebuilt_package/zoo.debug_symbols.json",
+                            "label": "//src/subsystem/zoo:zoo.prebuilt(//build/toolchain/fuchsia:x64)",
+                        },
+                        {
+                            "manifest": "obj/some_prebuilt_package/qux.debug_symbols.json",
+                            "label": "//src/subsystem/qux:qux.prebuilt(//build/toolchain/fuchsia:x64)",
+                        },
+                        {
+                            "debug": "obj/exe.unstripped/cranberry",
+                            "elf_build_id": "fedcba987654321",
+                            "cpu": "x64",
+                            "os": "fuchsia",
+                            "label": "//src/subsystem/cranberry:bin(//build/toolchain/fuchsia:x64)",
+                        },
+                    ],
+                    [
+                        {
+                            "cpu": "x64",
+                            "debug": "obj/foo",
+                            "elf_build_id": "0123456789abcdef",
+                            "label": "//src/foo:bin(//build/toolchain/fuchsia:x64)",
+                            "os": "fuchsia",
+                        },
+                        {
+                            "label": "//src/subsystem/qux:qux.prebuilt(//build/toolchain/fuchsia:x64)",
+                            "manifest": "obj/some_prebuilt_package/qux.debug_symbols.json",
                         },
                     ],
                 ),

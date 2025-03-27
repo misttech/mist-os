@@ -25,6 +25,7 @@ _NINJA_LAST_BUILD_SUCCESS_FILE = "last_ninja_build_success.stamp"
 
 
 def _write_file(path: Path, content: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
 
 
@@ -62,6 +63,7 @@ class ClientTest(unittest.TestCase):
             f.write(
                 """args=args.json
 build_info=build_info.json
+debug_symbols=debug_symbols.json
 tests=tests.json
 """
             )
@@ -139,6 +141,45 @@ tests=tests.json
         }
         _write_json(self._build_dir / "ninja_outputs.json", self._ninja_outputs)
 
+        # Fake debug symbols
+        self._debug_symbols_json = json.dumps(
+            [
+                {
+                    "cpu": "x64",
+                    "debug": "obj/src/foo/lib_shared/libfoo.so.unstripped",
+                    "elf_build_id": "00000000000000001",
+                    "label": "//src/foo:lib_shared",
+                    "os": "fuchsia",
+                },
+                {
+                    "cpu": "x64",
+                    "debug": "../../prebuilt/.build-id/aa/bbbbbbbbbbb.debug",
+                    "label": "//prebuilt/foo:symbol_file",
+                    "os": "fuchsia",
+                },
+                {
+                    "cpu": "x64",
+                    "debug": "obj/src/bar/binary.unstripped",
+                    "elf_build_id_file": "obj/src/bar/binary.elf_build_id",
+                    "label": "//src/bar:binary",
+                    "os": "fuchsia",
+                },
+                {
+                    "cpu": "x64",
+                    "debug": "obj/src/zoo/binary.unstripped",
+                    "label": "//src/zoo:binary",
+                    "os": "fuchsia",
+                },
+            ]
+        )
+        _write_file(
+            self._build_dir / "debug_symbols.json", self._debug_symbols_json
+        )
+        _write_file(
+            self._build_dir / "obj/src/bar/binary.elf_build_id",
+            "build_id_for_bar",
+        )
+
     def tearDown(self):
         self._temp_dir.cleanup()
 
@@ -204,7 +245,7 @@ tests=tests.json
         self.assert_output(args, "", expected_err, expected_status=1, msg=msg)
 
     def test_list(self):
-        self.assert_output(["list"], "args\nbuild_info\ntests\n")
+        self.assert_output(["list"], "args\nbuild_info\ndebug_symbols\ntests\n")
 
     def test_print(self):
         MODULES = {
@@ -224,6 +265,10 @@ tests=tests.json
             "build_info": {
                 "file": "build_info.json",
                 "json": json.loads(self._build_info_json),
+            },
+            "debug_symbols": {
+                "file": "debug_symbols.json",
+                "json": json.loads(self._debug_symbols_json),
             },
             "tests": {
                 "file": "tests.json",
@@ -245,6 +290,10 @@ tests=tests.json
                 "file": "build_info.json",
                 "json": json.loads(self._build_info_json),
             },
+            "debug_symbols": {
+                "file": "debug_symbols.json",
+                "json": json.loads(self._debug_symbols_json),
+            },
             "tests": {
                 "file": "tests.json",
                 "json": json.loads(self._tests_json),
@@ -253,6 +302,92 @@ tests=tests.json
         self.assert_output(["print_all"], json.dumps(expected) + "\n")
         self.assert_output(
             ["print_all", "--pretty"], json.dumps(expected, indent=2) + "\n"
+        )
+
+    def test_print_debug_symbols(self):
+        self.maxDiff = None
+        expected = [
+            {
+                "cpu": "x64",
+                "debug": "obj/src/foo/lib_shared/libfoo.so.unstripped",
+                "elf_build_id": "00000000000000001",
+                "label": "//src/foo:lib_shared",
+                "os": "fuchsia",
+            },
+            {
+                "cpu": "x64",
+                "debug": "../../prebuilt/.build-id/aa/bbbbbbbbbbb.debug",
+                "label": "//prebuilt/foo:symbol_file",
+                "os": "fuchsia",
+            },
+            {
+                "cpu": "x64",
+                "debug": "obj/src/bar/binary.unstripped",
+                "elf_build_id_file": "obj/src/bar/binary.elf_build_id",
+                "label": "//src/bar:binary",
+                "os": "fuchsia",
+            },
+            {
+                "cpu": "x64",
+                "debug": "obj/src/zoo/binary.unstripped",
+                "label": "//src/zoo:binary",
+                "os": "fuchsia",
+            },
+        ]
+        self.assert_output(["print_debug_symbols"], json.dumps(expected) + "\n")
+        self.assert_output(
+            ["print_debug_symbols", "--pretty"],
+            json.dumps(expected, indent=2) + "\n",
+        )
+
+    def test_print_debug_symbols_with_build_id_resolution(self):
+        self.maxDiff = None
+        expected = [
+            {
+                "cpu": "x64",
+                "debug": "obj/src/foo/lib_shared/libfoo.so.unstripped",
+                "elf_build_id": "00000000000000001",
+                "label": "//src/foo:lib_shared",
+                "os": "fuchsia",
+            },
+            {
+                "cpu": "x64",
+                "debug": "../../prebuilt/.build-id/aa/bbbbbbbbbbb.debug",
+                "elf_build_id": "aabbbbbbbbbbb",
+                "label": "//prebuilt/foo:symbol_file",
+                "os": "fuchsia",
+            },
+            {
+                "cpu": "x64",
+                "debug": "obj/src/bar/binary.unstripped",
+                "elf_build_id": "build_id_for_bar",
+                "elf_build_id_file": "obj/src/bar/binary.elf_build_id",
+                "label": "//src/bar:binary",
+                "os": "fuchsia",
+            },
+            # NOTE: Because of the --test-mode flag used below, the build-id value for the
+            # file obj/src/zoo/binary.unstripped is just its file name. This avoids creating
+            # a fake ELF file in the test build directory.
+            {
+                "cpu": "x64",
+                "debug": "obj/src/zoo/binary.unstripped",
+                "elf_build_id": "binary.unstripped",
+                "label": "//src/zoo:binary",
+                "os": "fuchsia",
+            },
+        ]
+        self.assert_output(
+            ["print_debug_symbols", "--resolve-build-ids", "--test-mode"],
+            json.dumps(expected) + "\n",
+        )
+        self.assert_output(
+            [
+                "print_debug_symbols",
+                "--resolve-build-ids",
+                "--test-mode",
+                "--pretty",
+            ],
+            json.dumps(expected, indent=2) + "\n",
         )
 
     def test_ninja_path_to_gn_label(self):
