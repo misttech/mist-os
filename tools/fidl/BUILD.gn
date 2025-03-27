@@ -52,6 +52,7 @@ group("tests") {
     "fidlgen_go:tests",
     "fidlgen_hlcpp:tests",
     "fidlgen_libfuzzer:tests",
+    "fidlgen_python:tests",
     "fidlgen_rust:tests",
     "fidlgen_rust_next:tests",
     "fidlgen_syzkaller:tests",

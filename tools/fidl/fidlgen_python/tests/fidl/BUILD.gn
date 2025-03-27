@@ -1,0 +1,21 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("test.python.struct") {
+  testonly = true
+  _enable_experimental_python = true
+
+  public_deps = [ ":test.python.otherstruct" ]
+
+  sources = [ "test.python.struct/struct.test.fidl" ]
+}
+
+fidl("test.python.otherstruct") {
+  testonly = true
+  _enable_experimental_python = true
+
+  sources = [ "test.python.otherstruct/otherstruct.test.fidl" ]
+}

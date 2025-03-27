@@ -91,6 +91,7 @@ python_library("fuchsia_controller_py") {
   visibility += [
     "tests:*",
     "//src/tests/fidl/conformance_suite/python/*",
+    "//tools/fidl/fidlgen_python/tests/*",
   ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
@@ -116,6 +117,7 @@ python_library("fidl_bindings") {
     "tests:*",
     "//src/testing/end_to_end/honeydew:*",
     "//src/tests/fidl/conformance_suite/python/*",
+    "//tools/fidl/fidlgen_python/tests/*",
   ]
 
   library_name = "fidl"

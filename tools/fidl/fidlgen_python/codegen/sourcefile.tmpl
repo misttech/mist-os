@@ -23,6 +23,9 @@ import fidl
 _ir_path = fidl._library.get_fidl_ir_map()["{{ .Name }}"]
 add_ir_path(_ir_path)
 
+{{ range .PythonExternalModules -}}
+import {{ . }}
+{{ end }}
 
 {{ range .PythonStructs }}
 {{- template "StructDeclaration" . -}}

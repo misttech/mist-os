@@ -51,7 +51,6 @@ template("fidl_python") {
     not_needed(invoker,
                [
                  "deps",
-                 "public_deps",
                  "visibility",
                  "library_name",
                ])
@@ -62,6 +61,7 @@ template("fidl_python") {
                                "testonly",
                                "fidl_ir_json",
                                "fidl_ir_target",
+                               "public_deps",
                              ])
       visibility = [
         ":*",
@@ -94,7 +94,6 @@ template("fidl_python") {
                [
                  "fidl_ir_json",
                  "fidl_ir_target",
-                 "public_deps",
                ])
 
     python_library(target_name) {
@@ -118,6 +117,12 @@ template("fidl_python") {
         "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
         "//src/developer/ffx/lib/fuchsia-controller/cpp:fidl_codec",
       ]
+      if (defined(invoker.public_deps)) {
+        foreach(dep, invoker.public_deps) {
+          label = get_label_info(dep, "label_no_toolchain")
+          library_deps += [ "${label}_python" ]
+        }
+      }
       sources = [ "__init__.py" ]
       if (!defined(deps)) {
         deps = []

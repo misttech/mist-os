@@ -7,6 +7,7 @@ package codegen
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
@@ -65,16 +66,18 @@ type PythonAlias struct {
 
 type PythonRoot struct {
 	fidlgen.Root
-	PythonModuleName string
-	PythonStructs    []PythonStruct
-	PythonAliases    []PythonAlias
-	PythonBits       []PythonBits
-	PythonEnums      []PythonEnum
+	PythonModuleName      string
+	PythonStructs         []PythonStruct
+	PythonAliases         []PythonAlias
+	PythonBits            []PythonBits
+	PythonEnums           []PythonEnum
+	PythonExternalModules []string
 }
 
 type compiler struct {
-	decls   fidlgen.DeclInfoMap
-	library fidlgen.EncodedLibraryIdentifier
+	decls           fidlgen.DeclInfoMap
+	library         fidlgen.EncodedLibraryIdentifier
+	externalModules map[string]struct{}
 }
 
 func (c *compiler) lookupDeclInfo(val fidlgen.EncodedCompoundIdentifier) *fidlgen.DeclInfo {
@@ -106,11 +109,18 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 
 	if c.lookupDeclInfo(val).Type == fidlgen.ConstDeclType {
 		log.Fatalf("ConstDeclType not supported")
-	} else {
-		name := compileCamelIdentifier(ci.Name)
+		return nil
+	}
+	name := compileCamelIdentifier(ci.Name)
+
+	if val.LibraryName() == c.library {
 		return &name
 	}
-	return nil
+
+	externalModule := ToPythonModuleName(val.LibraryName())
+	c.externalModules[externalModule] = struct{}{}
+	externalName := fmt.Sprintf("%s.%s", externalModule, name)
+	return &externalName
 }
 
 func compileSnakeIdentifier(val fidlgen.Identifier) string {
@@ -284,8 +294,9 @@ func Compile(root fidlgen.Root) PythonRoot {
 		PythonBits:       []PythonBits{},
 	}
 	c := compiler{
-		decls:   root.DeclInfo(),
-		library: root.Name,
+		decls:           root.DeclInfo(),
+		library:         root.Name,
+		externalModules: map[string]struct{}{},
 	}
 
 	for _, v := range root.Structs {
@@ -307,6 +318,18 @@ func Compile(root fidlgen.Root) PythonRoot {
 
 	for _, v := range root.Enums {
 		python_root.PythonEnums = append(python_root.PythonEnums, c.compileEnum(v))
+	}
+
+	// Sort the external modules to make sure the generated file is
+	// consistent across builds.
+	var externalModules []string
+	for k := range c.externalModules {
+		externalModules = append(externalModules, k)
+	}
+	sort.Strings(externalModules)
+
+	for _, k := range externalModules {
+		python_root.PythonExternalModules = append(python_root.PythonExternalModules, k)
 	}
 
 	return python_root
