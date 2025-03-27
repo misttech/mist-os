@@ -720,7 +720,6 @@ mod tests {
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element_id().to_string() => {
@@ -785,7 +784,6 @@ mod tests {
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            topology: {
-            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -865,7 +863,6 @@ mod tests {
         .expect("remove_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            topology: {
-            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -953,7 +950,6 @@ mod tests {
 
         assert_data_tree!(inspect, root: {
            topology: {
-            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1012,7 +1008,6 @@ mod tests {
 
         assert_data_tree!(inspect, root: {
            topology: {
-            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1060,7 +1055,6 @@ mod tests {
         )
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: { topology: {
-            "fuchsia.inspect.synthetic.Graph": contains {},
             "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
@@ -1104,7 +1098,7 @@ mod tests {
 
         t.remove_element(&earth);
         assert_eq!(t.element_exists(&earth), false);
-        assert_data_tree!(inspect, root: { topology: { "fuchsia.inspect.synthetic.Graph": contains {}, "fuchsia.inspect.Graph": { "topology": {
+        assert_data_tree!(inspect, root: { topology: { "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
                     name: t.get_unsatisfiable_element().name,
@@ -1183,7 +1177,6 @@ mod tests {
             .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1309,7 +1302,6 @@ mod tests {
         let e = t.add_element_with_inspect("E", vec![0, 1], 0, 0).expect("add_element failed");
         assert_data_tree!(inspect, root: {
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1433,7 +1425,6 @@ mod tests {
             .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {

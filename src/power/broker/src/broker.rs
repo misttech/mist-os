@@ -2312,7 +2312,6 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: {
                         "0": {
                             "@time": AnyProperty,
@@ -2389,7 +2388,6 @@ mod tests {
         test: {
             leases: {},
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         broker.get_unsatisfiable_element_id().to_string() => {
@@ -2479,7 +2477,6 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: contains {},
                     stats: contains {},
                     "fuchsia.inspect.Graph": {
@@ -2545,7 +2542,6 @@ mod tests {
         test: {
             leases: {},
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 events: contains {},
                 stats: contains {},
                 "fuchsia.inspect.Graph": {
@@ -2632,7 +2628,6 @@ mod tests {
         test: {
             leases: {},
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         broker.get_unsatisfiable_element_id().to_string() => {
@@ -2685,7 +2680,6 @@ mod tests {
         test: {
             leases: {},
             topology: {
-                "fuchsia.inspect.synthetic.Graph": contains {},
                 events: {
                     "0": {
                         "@time": AnyProperty,
@@ -2910,7 +2904,6 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: contains {},
                     stats: contains {},
                     "fuchsia.inspect.Graph": {
@@ -3006,13 +2999,18 @@ mod tests {
         broker_status.lease.update(&lease.id, LeaseStatus::Satisfied, false);
         broker_status.assert_matches(&broker);
 
+        // We expect one synthetic element.
+        let mut synthetic_elements =
+            broker.catalog.topology.elements.iter().filter(|(_, e)| e.synthetic);
+        let (_, synthetic) = synthetic_elements.next().unwrap();
+        assert!(synthetic_elements.next().is_none());
+
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
                     lease.id.to_string() => "Satisfied",
                 },
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     // TODO(b/348700341): Re-enable this section of the data tree
                     // when we can avoid explicitly marking the event number. As
                     // broker changes, the exact order of creation / status
@@ -3055,6 +3053,15 @@ mod tests {
                                     leases: {},
                                 },
                                 relationships: {}
+                            },
+                            synthetic.id.to_string() => {
+                                meta: {
+                                    name: synthetic.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
                             },
                             parent1.to_string() => {
                                 meta: {
@@ -3945,6 +3952,14 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
+
+        // We expect two synthetic elements.
+        let mut synthetic_elements =
+            broker.catalog.topology.elements.iter().filter(|(_, e)| e.synthetic);
+        let (_, synthetic_1) = synthetic_elements.next().unwrap();
+        let (_, synthetic_2) = synthetic_elements.next().unwrap();
+        assert!(synthetic_elements.next().is_none());
+
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
@@ -3952,7 +3967,6 @@ mod tests {
                     lease_c.id.to_string() => "Satisfied",
                 },
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: contains {},
                     stats: contains {},
                     "fuchsia.inspect.Graph": {
@@ -3966,6 +3980,24 @@ mod tests {
                                     leases: {},
                                 },
                                 relationships: {}
+                            },
+                            synthetic_1.id.to_string() => {
+                                meta: {
+                                    name: synthetic_1.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
+                            },
+                            synthetic_2.id.to_string() => {
+                                meta: {
+                                    name: synthetic_2.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
                             },
                             element_a.to_string() => {
                                 meta: {
@@ -4074,7 +4106,6 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: contains {},
                     stats: contains {},
                     "fuchsia.inspect.Graph": {
@@ -7514,7 +7545,6 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
                     events: {
                         "0": {
                             "@time": AnyProperty,

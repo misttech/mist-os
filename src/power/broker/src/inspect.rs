@@ -44,7 +44,6 @@ const REQUIRED_LEVEL: &str = "required_level";
 #[derive(Debug)]
 pub struct TopologyInspect {
     graph: Digraph,
-    synthetic_graph: Digraph,
     events: Option<RefCell<BoundedListNode>>,
     _node: inspect::Node,
     shadow: Arc<Mutex<ShadowBuffer>>,
@@ -76,6 +75,7 @@ impl ElementData {
     const REQUIRED_LEVEL: &str = "required_level";
     const NAME: &str = "name";
     const LEASES: &str = "leases";
+    const SYNTHETIC: &str = "synthetic";
 
     fn new(
         node: inspect::Node,
@@ -102,6 +102,7 @@ impl ElementData {
 
     fn synthetic(node: inspect::Node, name: &str, valid_levels: &[IndexedPowerLevel]) -> Self {
         node.record_string(Self::NAME, name);
+        node.record_bool(Self::SYNTHETIC, true);
         Self::record_valid_levels(&node, valid_levels);
         let leases_node = node.create_child(Self::LEASES);
         Self {
@@ -235,10 +236,6 @@ impl igraph::EdgeMetadata for DependencyData {}
 impl TopologyInspect {
     pub fn new(node: inspect::Node, max_events: usize) -> Self {
         let graph = igraph::Digraph::new(&node, DigraphOpts::default());
-        let synthetic_inspect_node = node.create_child("fuchsia.inspect.synthetic.Graph");
-        let synthetic_graph =
-            igraph::Digraph::new(&synthetic_inspect_node, igraph::DigraphOpts::default());
-        node.record(synthetic_inspect_node);
         let shadow = Arc::new(Mutex::new(ShadowBuffer::new(max_events)));
         let mut events = None;
         if max_events != 0 {
@@ -264,7 +261,7 @@ impl TopologyInspect {
                 .boxed()
             });
         }
-        Self { graph, synthetic_graph, events, shadow, _node: node }
+        Self { graph, events, shadow, _node: node }
     }
 
     fn create_element_vertex(
@@ -277,7 +274,7 @@ impl TopologyInspect {
         required_level: Option<fpb::PowerLevel>,
     ) -> igraph::Vertex<ElementData> {
         if synthetic {
-            self.synthetic_graph.add_vertex(element_id, |meta_node| {
+            self.graph.add_vertex(element_id, |meta_node| {
                 ElementData::synthetic(meta_node, name, &valid_levels)
             })
         } else {
