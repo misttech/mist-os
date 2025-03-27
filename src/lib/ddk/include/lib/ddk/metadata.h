@@ -64,10 +64,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: fuchsia_hardware_thermal_ThermalDeviceInfo
 #define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
 
-// type: FIDL fuchsia.hardware.pinimpl/Metadata
-// TODO(b/388305889): Remove once no longer used.
-#define DEVICE_METADATA_GPIO_CONTROLLER 0x43495047  // GPIC
-
 // type: FIDL fuchsia.hardware.power/DomainMetadata
 #define DEVICE_METADATA_POWER_DOMAINS 0x52574F50  // POWR
 
