@@ -75,6 +75,7 @@ syscall_tests = [
   "tun_test",
   "uio_test",
   "userfaultfd_test",
+  "vdso_test",
   "vmsplice_test",
   "waitpid_exit_signal_test",
   "waitpid_flags_test",
@@ -167,7 +168,6 @@ arch64_syscall_tests = [
   # go/keep-sorted start
 
   "extended_pstate_test",
-  "vdso_test",
 
   # go/keep-sorted end
 ]
