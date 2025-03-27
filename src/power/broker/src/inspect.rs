@@ -267,7 +267,7 @@ impl TopologyInspect {
         Self { graph, synthetic_graph, events, shadow, _node: node }
     }
 
-    fn on_add_element(
+    fn create_element_vertex(
         &self,
         element_id: ElementID,
         name: &str,
@@ -276,43 +276,69 @@ impl TopologyInspect {
         current_level: Option<fpb::PowerLevel>,
         required_level: Option<fpb::PowerLevel>,
     ) -> igraph::Vertex<ElementData> {
-        let instant = zx::BootInstant::get();
-        let inspect_vertex = if synthetic {
+        if synthetic {
             self.synthetic_graph.add_vertex(element_id, |meta_node| {
                 ElementData::synthetic(meta_node, name, &valid_levels)
             })
         } else {
-            let vertex = self.graph.add_vertex(element_id.clone(), |meta_node| {
+            self.graph.add_vertex(element_id.clone(), |meta_node| {
                 ElementData::new(meta_node, name, &valid_levels, current_level, required_level)
-            });
-            if let Some(events) = &self.events {
-                events.borrow_mut().add_entry(|node| {
-                    node.record_int("@time", instant.into_nanos());
-                    node.record_child(ADD_ELEMENT_EVENT, |node| {
-                        node.record_uint(ELEMENT_ID, *element_id);
-                        if let Some(level) = current_level {
-                            node.record_uint(CURRENT_LEVEL, level as u64);
-                        } else {
-                            node.record_string(CURRENT_LEVEL, UNSET);
-                        }
-                        if let Some(level) = required_level {
-                            node.record_uint(REQUIRED_LEVEL, level as u64);
-                        } else {
-                            node.record_string(REQUIRED_LEVEL, UNSET);
-                        }
-                    });
-                });
-            }
-            vertex
-        };
-        inspect_vertex
+            })
+        }
     }
 
-    pub fn on_add_dependency(
+    fn emit_add_element_event(
+        &self,
+        element_id: ElementID,
+        current_level: Option<fpb::PowerLevel>,
+        required_level: Option<fpb::PowerLevel>,
+        dependencies: &[(Dependency, bool)],
+    ) {
+        let Some(ref events) = self.events else {
+            return;
+        };
+        let instant = zx::BootInstant::get();
+        events.borrow_mut().add_entry(|node| {
+            node.record_int("@time", instant.into_nanos());
+            node.record_child(ADD_ELEMENT_EVENT, |node| {
+                node.record_uint(ELEMENT_ID, *element_id);
+                if let Some(level) = current_level {
+                    node.record_uint(CURRENT_LEVEL, level as u64);
+                } else {
+                    node.record_string(CURRENT_LEVEL, UNSET);
+                }
+                if let Some(level) = required_level {
+                    node.record_uint(REQUIRED_LEVEL, level as u64);
+                } else {
+                    node.record_string(REQUIRED_LEVEL, UNSET);
+                }
+                if !dependencies.is_empty() {
+                    let deps_node = node.create_child("dependencies");
+                    for (i, (dep, is_assertive)) in dependencies.iter().enumerate() {
+                        let dep_node = deps_node.create_child(format!("{i}"));
+                        // No need to record the dependent_element event since that must be the
+                        // element we are adding.
+                        // dep_node.record_uint(DEP_ELEMENT, *dep.dependent.element_id);
+                        dep_node.record_uint(REQ_ELEMENT, *dep.requires.element_id);
+                        dep_node.record_uint(DEPENDENT_LEVEL, dep.dependent.level.level as u64);
+                        dep_node.record_uint(REQUIRED_LEVEL, dep.requires.level.level as u64);
+                        if !is_assertive {
+                            dep_node.record_bool(OPPORTUNISTIC, true);
+                        }
+                        deps_node.record(dep_node);
+                    }
+                    node.record(deps_node);
+                }
+            });
+        });
+    }
+
+    fn on_add_dependency(
         &self,
         elements: &HashMap<ElementID, Element>,
         dep: &Dependency,
         is_assertive: bool,
+        write_inspect_event: bool,
     ) {
         let (dp_id, rq_id) = (dep.dependent.element_id, dep.requires.element_id);
         let (Some(dp), Some(rq)) = (elements.get(&dp_id), elements.get(&rq_id)) else {
@@ -338,15 +364,17 @@ impl TopologyInspect {
                 });
             }
         }
-        self.maybe_record_event(dp, ADD_DEPENDENCY_EVENT, |node| {
-            node.record_uint(DEP_ELEMENT, *dp_id);
-            node.record_uint(REQ_ELEMENT, *rq_id);
-            node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
-            node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
-            if is_opportunistic {
-                node.record_bool(OPPORTUNISTIC, true);
-            }
-        });
+        if write_inspect_event {
+            self.maybe_record_event(dp, ADD_DEPENDENCY_EVENT, |node| {
+                node.record_uint(DEP_ELEMENT, *dp_id);
+                node.record_uint(REQ_ELEMENT, *rq_id);
+                node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
+                node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
+                if is_opportunistic {
+                    node.record_bool(OPPORTUNISTIC, true);
+                }
+            });
+        }
     }
 
     pub fn on_remove_dependency(&self, elements: &HashMap<ElementID, Element>, dep: &Dependency) {
@@ -358,7 +386,6 @@ impl TopologyInspect {
         };
         let mut dp_edges = dp.inspect_edges.borrow_mut();
         let Some(edge) = dp_edges.get_mut(rq_id) else {
-            log::error!(rq_id:?; "Missing edge for removal");
             return;
         };
         let dp_level = dep.dependent.level;
@@ -475,6 +502,10 @@ pub trait InspectUpdateLevel {
     ) -> &mut Self;
 }
 
+pub trait InspectAddDependency {
+    fn add_dependency(&mut self, _topology: &Topology, dependency: &Dependency, is_assertive: bool);
+}
+
 #[derive(Default)]
 pub struct UpdateLevelInspectWriter {
     events: HashMap<ElementID, UpdateLevelInfo>,
@@ -558,10 +589,17 @@ impl InspectUpdateLevel for EagerInspectWriter {
     }
 }
 
+impl InspectAddDependency for EagerInspectWriter {
+    fn add_dependency(&mut self, topology: &Topology, dependency: &Dependency, is_assertive: bool) {
+        topology.inspect().on_add_dependency(&topology.elements, dependency, is_assertive, true);
+    }
+}
+
 pub struct AddElementInspectWriter {
     element_id: ElementID,
     current_level: Option<fpb::PowerLevel>,
     required_level: Option<fpb::PowerLevel>,
+    dependencies: Vec<(Dependency, bool)>,
     other_events: UpdateLevelInspectWriter,
 }
 
@@ -572,25 +610,46 @@ impl AddElementInspectWriter {
             current_level: None,
             required_level: None,
             other_events: UpdateLevelInspectWriter::default(),
+            dependencies: Vec::new(),
         }
     }
 
     pub fn commit(self, topology: &mut Topology) {
-        // unwrap: safe, if we are here it means we are just adding an element so we can't have
-        // removed it. Otherwise, it's a bug in the implementation.
-        let inspect_vertex = {
+        // First create the vertex since we'll need it when adding dependencies.
+        let (synthetic, inspect_vertex) = {
+            // unwrap: safe, if we are here it means we are just adding an element so we can't have
+            // removed it. Otherwise, it's a bug in the implementation.
             let element = topology.get_element(&self.element_id).unwrap();
-            topology.inspect().on_add_element(
+            let vertex = topology.inspect().create_element_vertex(
                 element.id,
                 &element.name,
                 element.synthetic,
                 &element.valid_levels,
                 self.current_level,
                 self.required_level,
-            )
+            );
+            (element.synthetic, vertex)
         };
         topology.get_element_mut(&self.element_id).unwrap().inspect_vertex =
             Some(Rc::new(RefCell::new(inspect_vertex)));
+
+        if !synthetic {
+            for (dependency, is_assertive) in &self.dependencies {
+                topology.inspect().on_add_dependency(
+                    &topology.elements,
+                    dependency,
+                    *is_assertive,
+                    false,
+                );
+            }
+            topology.inspect().emit_add_element_event(
+                self.element_id,
+                self.current_level,
+                self.required_level,
+                &self.dependencies,
+            );
+        }
+
         self.other_events.commit(topology);
     }
 }
@@ -622,6 +681,17 @@ impl InspectUpdateLevel for AddElementInspectWriter {
             self.other_events.update_required_level(topology, element_id, level);
         }
         self
+    }
+}
+
+impl InspectAddDependency for AddElementInspectWriter {
+    fn add_dependency(
+        &mut self,
+        _topology: &Topology,
+        dependency: &Dependency,
+        is_assertive: bool,
+    ) {
+        self.dependencies.push((dependency.clone(), is_assertive))
     }
 }
 

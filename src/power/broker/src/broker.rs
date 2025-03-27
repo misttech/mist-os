@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::inspect::{
-    AddElementInspectWriter, EagerInspectWriter, InspectUpdateLevel, UpdateLevelInspectWriter,
+    AddElementInspectWriter, EagerInspectWriter, InspectAddDependency, InspectUpdateLevel,
+    UpdateLevelInspectWriter,
 };
 use anyhow::{anyhow, Context, Error};
 use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
@@ -1097,12 +1098,12 @@ impl Broker {
         self.update_current_level_internal(&id, initial_current_level, &mut inspect_writer);
         let minimum_level = self.catalog.topology.minimum_level(&id);
         self.update_required_level(&id, minimum_level, &mut inspect_writer);
-        inspect_writer.commit(&mut self.catalog.topology);
 
         for dependency in level_dependencies {
             let requires_token = dependency.requires_token.into();
             let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
                 // Clean up by removing the element we just added.
+                inspect_writer.commit(&mut self.catalog.topology);
                 self.remove_element(&id);
                 return Err(AddElementError::NotAuthorized);
             };
@@ -1118,8 +1119,10 @@ impl Broker {
                 dependency.dependent_level,
                 requires_token,
                 requires_level.level,
+                &mut inspect_writer,
             ) {
                 // Clean up by removing the element we just added.
+                inspect_writer.commit(&mut self.catalog.topology);
                 self.remove_element(&id);
                 return Err(match err {
                     ModifyDependencyError::AlreadyExists => AddElementError::Invalid,
@@ -1129,6 +1132,7 @@ impl Broker {
                 });
             };
         }
+        inspect_writer.commit(&mut self.catalog.topology);
         Ok(id)
     }
 
@@ -1168,14 +1172,18 @@ impl Broker {
 
     /// Checks authorization from requires_token, and if valid, adds an assertive
     /// or opportunistic dependency to the Topology, according to dependency_type.
-    pub fn add_dependency(
+    pub fn add_dependency<I>(
         &mut self,
         element_id: &ElementID,
         dependency_type: DependencyType,
         dependent_level: fpb::PowerLevel,
         requires_token: Token,
         requires_level: fpb::PowerLevel,
-    ) -> Result<(), ModifyDependencyError> {
+        inspect_writer: &mut I,
+    ) -> Result<(), ModifyDependencyError>
+    where
+        I: InspectAddDependency,
+    {
         let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
             return Err(ModifyDependencyError::NotAuthorized);
         };
@@ -1201,13 +1209,13 @@ impl Broker {
                 if !requires_cred.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
-                self.catalog.topology.add_assertive_dependency(&dependency)
+                self.catalog.topology.add_assertive_dependency(&dependency, inspect_writer)
             }
             DependencyType::Opportunistic => {
                 if !requires_cred.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
-                self.catalog.topology.add_opportunistic_dependency(&dependency)
+                self.catalog.topology.add_opportunistic_dependency(&dependency, inspect_writer)
             }
             _ => todo!("Support other dependency types"),
         }
@@ -1471,16 +1479,23 @@ impl Catalog {
                 &valid_levels,
             )
             .expect("Failed to create lease element");
-        AddElementInspectWriter::new(lease_element_id).commit(&mut self.topology);
+        let mut inspect_writer = AddElementInspectWriter::new(lease_element_id);
         self.topology
-            .add_assertive_dependency(&Dependency {
-                dependent: ElementLevel {
-                    element_id: lease_element_id.clone(),
-                    level: IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
+            .add_assertive_dependency(
+                &Dependency {
+                    dependent: ElementLevel {
+                        element_id: lease_element_id.clone(),
+                        level: IndexedPowerLevel {
+                            level: LeasePowerLevel::Satisfied as u8,
+                            index: 1,
+                        },
+                    },
+                    requires: ElementLevel { element_id: element_id.clone(), level: level.clone() },
                 },
-                requires: ElementLevel { element_id: element_id.clone(), level: level.clone() },
-            })
+                &mut inspect_writer,
+            )
             .expect("Failed to attach assertive dependency to lease element");
+        inspect_writer.commit(&mut self.topology);
         lease_element_id
     }
 
@@ -3186,6 +3201,7 @@ mod tests {
                     .expect("dup failed")
                     .into(),
                 ON.level,
+                &mut EagerInspectWriter,
             )
             .expect("add_dependency failed");
         let mut broker_status = BrokerStatusMatcher::new();
@@ -7522,17 +7538,15 @@ mod tests {
                                 current_level: OFF.level as u64,
                                 required_level: OFF.level as u64,
                                 element_id: *silver,
+                                dependencies: {
+                                    "0": {
+                                        dependent_level: ON.level as u64,
+                                        required_element: *mithril,
+                                        required_level: ON.level as u64,
+                                    }
+                                }
                             }
                         },
-                        "3": {
-                            "@time": AnyProperty,
-                            add_dep: {
-                                dependent_element: *silver,
-                                dependent_level: ON.level as u64,
-                                required_element: *mithril,
-                                required_level: ON.level as u64,
-                            }
-                        }
                     },
                     stats: contains {},
                     "fuchsia.inspect.Graph": {

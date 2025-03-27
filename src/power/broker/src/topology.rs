@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
-use crate::inspect::{AddElementInspectWriter, DependencyData, ElementData, TopologyInspect};
+use crate::inspect::{
+    AddElementInspectWriter, DependencyData, EagerInspectWriter, ElementData, InspectAddDependency,
+    TopologyInspect,
+};
 use fidl_fuchsia_power_broker::{self as fpb};
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_contrib::graph as igraph;
@@ -170,7 +173,7 @@ impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
 
 #[derive(Debug)]
 pub struct Topology {
-    elements: HashMap<ElementID, Element>,
+    pub(crate) elements: HashMap<ElementID, Element>,
     assertive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     opportunistic_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     unsatisfiable_element_id: ElementID,
@@ -473,13 +476,16 @@ impl Topology {
             })
             .collect();
         for dependent in assertive_dependents_of_invalid_elements {
-            self.add_opportunistic_dependency(&Dependency {
-                dependent: dependent.clone(),
-                requires: ElementLevel {
-                    element_id: self.unsatisfiable_element_id.clone(),
-                    level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
+            self.add_opportunistic_dependency(
+                &Dependency {
+                    dependent: dependent.clone(),
+                    requires: ElementLevel {
+                        element_id: self.unsatisfiable_element_id.clone(),
+                        level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
+                    },
                 },
-            })
+                &mut EagerInspectWriter,
+            )
             .expect("failed to replace assertive dependency with unsatisfiable dependency");
             for requires in self.assertive_dependencies.get(&dependent).unwrap().clone() {
                 if requires.element_id == *invalid_element_id {
@@ -506,13 +512,16 @@ impl Topology {
             })
             .collect();
         for dependent in opportunistic_dependents_of_invalid_elements {
-            self.add_opportunistic_dependency(&Dependency {
-                dependent: dependent.clone(),
-                requires: ElementLevel {
-                    element_id: self.unsatisfiable_element_id.clone(),
-                    level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
+            self.add_opportunistic_dependency(
+                &Dependency {
+                    dependent: dependent.clone(),
+                    requires: ElementLevel {
+                        element_id: self.unsatisfiable_element_id.clone(),
+                        level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
+                    },
                 },
-            })
+                &mut EagerInspectWriter,
+            )
             .expect("failed to replace opportunistic dependency with unsatisfiable dependency");
             for requires in self.opportunistic_dependencies.get(&dependent).unwrap().clone() {
                 if requires.element_id == *invalid_element_id {
@@ -552,10 +561,14 @@ impl Topology {
     }
 
     /// Adds an assertive dependency to the Topology.
-    pub fn add_assertive_dependency(
+    pub fn add_assertive_dependency<I>(
         &mut self,
         dep: &Dependency,
-    ) -> Result<(), ModifyDependencyError> {
+        inspect_writer: &mut I,
+    ) -> Result<(), ModifyDependencyError>
+    where
+        I: InspectAddDependency,
+    {
         self.check_valid_dependency(dep)?;
         let required_levels =
             self.assertive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
@@ -563,7 +576,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.inspect.on_add_dependency(&self.elements, dep, true);
+        inspect_writer.add_dependency(&self, dep, true);
         Ok(())
     }
 
@@ -589,10 +602,14 @@ impl Topology {
     }
 
     /// Adds a opportunistic dependency to the Topology.
-    pub fn add_opportunistic_dependency(
+    pub fn add_opportunistic_dependency<I>(
         &mut self,
         dep: &Dependency,
-    ) -> Result<(), ModifyDependencyError> {
+        inspect_writer: &mut I,
+    ) -> Result<(), ModifyDependencyError>
+    where
+        I: InspectAddDependency,
+    {
         self.check_valid_dependency(dep)?;
         let assertive_required_levels =
             self.assertive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
@@ -605,7 +622,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.inspect.on_add_dependency(&self.elements, dep, false);
+        inspect_writer.add_dependency(&self, dep, false);
         Ok(())
     }
 
@@ -758,10 +775,13 @@ mod tests {
                         },
         }}}});
 
-        t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
-        })
+        t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        )
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            topology: {
@@ -829,10 +849,13 @@ mod tests {
                         },
         }}}});
 
-        let extra_add_dep_res = t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
-        });
+        let extra_add_dep_res = t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        );
         assert!(matches!(extra_add_dep_res, Err(ModifyDependencyError::AlreadyExists { .. })));
 
         t.remove_assertive_dependency(&Dependency {
@@ -908,10 +931,13 @@ mod tests {
         assert!(matches!(extra_remove_dep_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_eq!(t.element_exists(&fire), true);
-        t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
-        })
+        t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        )
         .expect("add_assertive_dependency failed");
         t.remove_element(&fire);
         assert_eq!(t.element_exists(&fire), false);
@@ -966,16 +992,22 @@ mod tests {
                         },
         }}}});
 
-        let element_not_found_res = t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: air.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
-        });
+        let element_not_found_res = t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: air.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        );
         assert!(matches!(element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
-        let req_element_not_found_res = t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
-        });
+        let req_element_not_found_res = t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        );
         assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_data_tree!(inspect, root: {
@@ -1019,10 +1051,13 @@ mod tests {
                         },
         }}}});
 
-        t.add_assertive_dependency(&Dependency {
-            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
-            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
-        })
+        t.add_assertive_dependency(
+            &Dependency {
+                dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+                requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+            },
+            &mut EagerInspectWriter,
+        )
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: { topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
@@ -1126,22 +1161,26 @@ mod tests {
             dependent: ElementLevel { element_id: b.clone(), level: ONE },
             requires: ElementLevel { element_id: a.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&ba).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&ba, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let cb = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel { element_id: b.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&cb).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&cb, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let cd = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel { element_id: d.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&cd).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&cd, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let cd2 = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: TWO },
             requires: ElementLevel { element_id: d.clone(), level: TWO },
         };
-        t.add_assertive_dependency(&cd2).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&cd2, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
@@ -1351,7 +1390,8 @@ mod tests {
             dependent: ElementLevel { element_id: b.clone(), level: ONE },
             requires: ElementLevel { element_id: a.clone(), level: TWO },
         };
-        t.add_opportunistic_dependency(&b1_a2).expect("add_opportunistic_dependency failed");
+        t.add_opportunistic_dependency(&b1_a2, &mut EagerInspectWriter)
+            .expect("add_opportunistic_dependency failed");
         let b5_a3 = Dependency {
             dependent: ElementLevel {
                 element_id: b.clone(),
@@ -1359,7 +1399,8 @@ mod tests {
             },
             requires: ElementLevel { element_id: a.clone(), level: THREE },
         };
-        t.add_opportunistic_dependency(&b5_a3).expect("add_opportunistic_dependency failed");
+        t.add_opportunistic_dependency(&b5_a3, &mut EagerInspectWriter)
+            .expect("add_opportunistic_dependency failed");
         let c1_b5 = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel {
@@ -1367,7 +1408,8 @@ mod tests {
                 level: IndexedPowerLevel { level: 5, index: 2 },
             },
         };
-        t.add_assertive_dependency(&c1_b5).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&c1_b5, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let c1_d3 = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel {
@@ -1375,17 +1417,20 @@ mod tests {
                 level: IndexedPowerLevel { level: 3, index: 2 },
             },
         };
-        t.add_assertive_dependency(&c1_d3).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&c1_d3, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let d1_a1 = Dependency {
             dependent: ElementLevel { element_id: d.clone(), level: ONE },
             requires: ElementLevel { element_id: a.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&d1_a1).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&d1_a1, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let d1_e1 = Dependency {
             dependent: ElementLevel { element_id: d.clone(), level: ONE },
             requires: ElementLevel { element_id: e.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&d1_e1).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&d1_e1, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
@@ -1581,7 +1626,8 @@ mod tests {
             dependent: ElementLevel { element_id: b.clone(), level: ONE },
             requires: ElementLevel { element_id: a.clone(), level: TWO },
         };
-        t.add_opportunistic_dependency(&b1_a2).expect("add_opportunistic_dependency failed");
+        t.add_opportunistic_dependency(&b1_a2, &mut EagerInspectWriter)
+            .expect("add_opportunistic_dependency failed");
         let b5_a3 = Dependency {
             dependent: ElementLevel {
                 element_id: b.clone(),
@@ -1589,7 +1635,8 @@ mod tests {
             },
             requires: ElementLevel { element_id: a.clone(), level: THREE },
         };
-        t.add_opportunistic_dependency(&b5_a3).expect("add_opportunistic_dependency failed");
+        t.add_opportunistic_dependency(&b5_a3, &mut EagerInspectWriter)
+            .expect("add_opportunistic_dependency failed");
         let c1_b5 = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel {
@@ -1597,7 +1644,8 @@ mod tests {
                 level: IndexedPowerLevel { level: 5, index: 2 },
             },
         };
-        t.add_assertive_dependency(&c1_b5).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&c1_b5, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let c1_d3 = Dependency {
             dependent: ElementLevel { element_id: c.clone(), level: ONE },
             requires: ElementLevel {
@@ -1605,17 +1653,20 @@ mod tests {
                 level: IndexedPowerLevel { level: 3, index: 2 },
             },
         };
-        t.add_assertive_dependency(&c1_d3).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&c1_d3, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let d1_a1 = Dependency {
             dependent: ElementLevel { element_id: d.clone(), level: ONE },
             requires: ElementLevel { element_id: a.clone(), level: ONE },
         };
-        t.add_assertive_dependency(&d1_a1).expect("add_assertive_dependency failed");
+        t.add_assertive_dependency(&d1_a1, &mut EagerInspectWriter)
+            .expect("add_assertive_dependency failed");
         let d1_e1 = Dependency {
             dependent: ElementLevel { element_id: d.clone(), level: ONE },
             requires: ElementLevel { element_id: e.clone(), level: ONE },
         };
-        t.add_opportunistic_dependency(&d1_e1).expect("add_opportunistic_dependency failed");
+        t.add_opportunistic_dependency(&d1_e1, &mut EagerInspectWriter)
+            .expect("add_opportunistic_dependency failed");
 
         let (a_assertive_deps, a_opportunistic_deps) =
             t.all_direct_and_indirect_dependencies(&ElementLevel {
