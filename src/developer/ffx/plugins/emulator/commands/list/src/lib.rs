@@ -14,14 +14,11 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-// TODO(https://fxbug.dev/42176105): Update this error message once shut down is more robust.
+// This message is used when the JSON instance file
+// cannot be parsed.
 const BROKEN_MESSAGE: &str = r#"
-One or more emulators are in a 'Broken' state. This is an uncommon state, but usually happens if
-the Fuchsia source tree or SDK is updated while the emulator is still running. Communication with
-a "Broken" emulator may still be possible, but errors will be encountered for any further `ffx emu`
-commands. Running `ffx emu stop` will not shut down a broken emulator (this should be fixed as part
-of https://fxbug.dev/42176105), but it will clear that emulator's state from the system, so this error won't
-appear anymore.
+One or more emulators are in a 'Broken' state. This is an uncommon state.
+Run `ffx emu stop --all` to stop all running emulators and clean up broken instances.
 "#;
 
 #[cfg_attr(test, mockall::automock)]
