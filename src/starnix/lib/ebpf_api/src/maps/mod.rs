@@ -183,6 +183,10 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_ARRAY");
             Ok(Box::pin(array::Array::new(schema)?))
         }
+        bpf_map_type_BPF_MAP_TYPE_SK_STORAGE => {
+            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SK_STORAGE");
+            Ok(Box::pin(array::Array::new(schema)?))
+        }
 
         // Unimplemented types
         bpf_map_type_BPF_MAP_TYPE_UNSPEC => {
@@ -263,10 +267,6 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
         }
         bpf_map_type_BPF_MAP_TYPE_STACK => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_STACK");
-            Err(MapError::InvalidParam)
-        }
-        bpf_map_type_BPF_MAP_TYPE_SK_STORAGE => {
-            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SK_STORAGE");
             Err(MapError::InvalidParam)
         }
         bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS => {
