@@ -1266,10 +1266,7 @@ impl fmt::Display for Claim {
 
 impl Claim {
     fn new(dependency: Dependency, lease_id: &LeaseID) -> Self {
-        let mut id = Uuid::new_v4().as_simple().to_string();
-        if ID_DEBUG_MODE {
-            id = format!("{id:.6}");
-        }
+        let id = Uuid::new_v4().as_simple().to_string();
         Claim { id: ClaimID(id), dependency, lease_id: lease_id.clone() }
     }
 
@@ -2021,42 +2018,48 @@ mod tests {
     fn test_levels() {
         let mut levels = SubscribeMap::<ElementID, IndexedPowerLevel>::new(None);
 
-        levels.update(&"A".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(ON));
-        assert_eq!(levels.get(&"B".into()), None);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        levels.update(&element_a, ON);
+        assert_eq!(levels.get(&element_a), Some(ON));
+        assert_eq!(levels.get(&element_b), None);
 
-        levels.update(&"A".into(), OFF);
-        levels.update(&"B".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(OFF));
-        assert_eq!(levels.get(&"B".into()), Some(ON));
+        levels.update(&element_a, OFF);
+        levels.update(&element_b, ON);
+        assert_eq!(levels.get(&element_a), Some(OFF));
+        assert_eq!(levels.get(&element_b), Some(ON));
 
-        levels.update(&"UD1".into(), IndexedPowerLevel::from_same_level_and_index(145));
+        let element_ud1 = ElementID::new(3);
+        let element_ud2 = ElementID::new(4);
+        levels.update(&element_ud1, IndexedPowerLevel::from_same_level_and_index(145));
         assert_eq!(
-            levels.get(&"UD1".into()),
+            levels.get(&element_ud1),
             Some(IndexedPowerLevel::from_same_level_and_index(145))
         );
-        assert_eq!(levels.get(&"UD2".into()), None);
+        assert_eq!(levels.get(&element_ud2), None);
 
-        levels.update(&"A".into(), ON);
-        levels.remove(&"B".into());
-        assert_eq!(levels.get(&"B".into()), None);
+        levels.update(&element_a, ON);
+        levels.remove(&element_b);
+        assert_eq!(levels.get(&element_b), None);
     }
 
     #[fuchsia::test]
     fn test_levels_subscribe() {
         let mut levels = SubscribeMap::<ElementID, IndexedPowerLevel>::new(None);
 
-        let mut receiver_a = levels.subscribe(&"A".into());
-        let mut receiver_b = levels.subscribe(&"B".into());
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let mut receiver_a = levels.subscribe(&element_a);
+        let mut receiver_b = levels.subscribe(&element_b);
 
-        levels.update(&"A".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(ON));
-        assert_eq!(levels.get(&"B".into()), None);
+        levels.update(&element_a, ON);
+        assert_eq!(levels.get(&element_a), Some(ON));
+        assert_eq!(levels.get(&element_b), None);
 
-        levels.update(&"A".into(), OFF);
-        levels.update(&"B".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(OFF));
-        assert_eq!(levels.get(&"B".into()), Some(ON));
+        levels.update(&element_a, OFF);
+        levels.update(&element_b, ON);
+        assert_eq!(levels.get(&element_a), Some(OFF));
+        assert_eq!(levels.get(&element_b), Some(ON));
 
         let mut received_a = Vec::new();
         while let Ok(Some(level)) = receiver_a.try_next() {
@@ -2095,8 +2098,10 @@ mod tests {
     fn test_claim_lookup_add_remove() {
         let mut lookup = ClaimLookup::new(DependencyType::Assertive, ClaimStatus::Activated);
 
-        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
-        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let claim_a_1_b_1 = create_test_claim(element_a, 1, element_b, 1);
+        let claim_a_2_b_2 = create_test_claim(element_a, 2, element_b, 2);
 
         lookup.add(claim_a_1_b_1.clone());
         lookup.add(claim_a_2_b_2.clone());
@@ -2118,11 +2123,14 @@ mod tests {
         let inspect = fuchsia_inspect::Inspector::default();
         let broker = Broker::new(inspect.root().create_child("test"));
 
-        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
-        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
-        let claim_a_1_c_1 = create_test_claim("A".into(), 1, "C".into(), 1);
-        let claim_b_1_c_1 = create_test_claim("B".into(), 1, "C".into(), 1);
-        let claim_a_2_c_2 = create_test_claim("A".into(), 2, "C".into(), 2);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let element_c = ElementID::new(3);
+        let claim_a_1_b_1 = create_test_claim(element_a, 1, element_b, 1);
+        let claim_a_2_b_2 = create_test_claim(element_a, 2, element_b, 2);
+        let claim_a_1_c_1 = create_test_claim(element_a, 1, element_c, 1);
+        let claim_b_1_c_1 = create_test_claim(element_b, 1, element_c, 1);
+        let claim_a_2_c_2 = create_test_claim(element_a, 2, element_c, 2);
 
         //  A     B
         //  1 ==> 1 (redundant with A@2=>B@2)
@@ -2273,7 +2281,7 @@ mod tests {
                         "0": {
                             "@time": AnyProperty,
                             add_element: {
-                                element_id: broker.get_unsatisfiable_element_id().to_string(),
+                                element_id: *broker.get_unsatisfiable_element_id(),
                                 current_level: "unset",
                                 required_level: "unset",
                             }
@@ -2281,7 +2289,7 @@ mod tests {
                         "1": {
                             "@time": AnyProperty,
                             add_element: {
-                                element_id: latinum.to_string(),
+                                element_id: *latinum,
                                 current_level: 7u64,
                                 required_level: 5u64,
                             }
@@ -2375,7 +2383,7 @@ mod tests {
                     "0": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            element_id: *broker.get_unsatisfiable_element_id() ,
                             current_level: "unset",
                             required_level: "unset",
                         }
@@ -2383,7 +2391,7 @@ mod tests {
                     "1": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: latinum.to_string(),
+                            element_id: *latinum,
                             current_level: 2u64,
                             required_level: 0u64,
                         }
@@ -2391,28 +2399,28 @@ mod tests {
                     "2": {
                         "@time": AnyProperty,
                         update_level: {
-                            element_id: latinum.to_string(),
+                            element_id: *latinum,
                             current_level: 0u64,
                         }
                     },
                     "3": {
                         "@time": AnyProperty,
                         update_level: {
-                            element_id: latinum.to_string(),
+                            element_id: *latinum,
                             required_level: 1u64,
                         }
                     },
                     "4": {
                         "@time": AnyProperty,
                         update_level: {
-                            element_id: latinum.to_string(),
+                            element_id: *latinum,
                             current_level: 1u64,
                         }
                     },
                     "5": {
                         "@time": AnyProperty,
                         update_level: {
-                            element_id: latinum.to_string(),
+                            element_id: *latinum,
                             required_level: 0u64,
                         }
                     },
@@ -2624,7 +2632,7 @@ mod tests {
                     "0": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            element_id: *broker.get_unsatisfiable_element_id(),
                             current_level: "unset",
                             required_level: "unset",
                         }
@@ -2632,7 +2640,7 @@ mod tests {
                     "1": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: unobtanium.to_string(),
+                            element_id: *unobtanium,
                             current_level: OFF.level as u64,
                             required_level: OFF.level as u64,
                         }
@@ -2652,7 +2660,7 @@ mod tests {
                     "0": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            element_id: *broker.get_unsatisfiable_element_id(),
                             current_level: "unset",
                             required_level: "unset",
                         }
@@ -2660,7 +2668,7 @@ mod tests {
                     "1": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: unobtanium.to_string(),
+                            element_id: *unobtanium,
                             current_level: OFF.level as u64,
                             required_level: OFF.level as u64,
                         }
@@ -2668,7 +2676,7 @@ mod tests {
                     "2": {
                         "@time": AnyProperty,
                         rm_element: {
-                            element_id: unobtanium.to_string(),
+                            element_id: *unobtanium,
                             element_name: "Unobtainium",
                         }
                     },

@@ -7,12 +7,11 @@ use crate::inspect::{DependencyData, ElementData, TopologyInspect};
 use fidl_fuchsia_power_broker::{self as fpb};
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_contrib::graph as igraph;
-use rand::distributions::{Alphanumeric, DistString};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt;
 use std::rc::Rc;
+use std::{fmt, ops};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IndexedPowerLevel {
@@ -50,42 +49,29 @@ impl std::cmp::Ord for IndexedPowerLevel {
     }
 }
 
-/// If true, use non-random IDs for ease of debugging.
-pub const ID_DEBUG_MODE: bool = false;
-
-// This may be a token later, but using a String for now for simplicity.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
-pub struct ElementID {
-    id: String,
-}
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+pub struct ElementID(u64);
 
 impl ElementID {
-    pub fn as_str(&self) -> &str {
-        self.id.as_str()
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    fn gen() -> Self {
+        Self(rand::random::<u64>())
     }
 }
 
 impl fmt::Display for ElementID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.id.fmt(f)
+        self.0.fmt(f)
     }
 }
 
-impl From<&str> for ElementID {
-    fn from(s: &str) -> Self {
-        ElementID { id: s.into() }
-    }
-}
-
-impl From<String> for ElementID {
-    fn from(s: String) -> Self {
-        ElementID { id: s }
-    }
-}
-
-impl Into<String> for ElementID {
-    fn into(self) -> String {
-        self.id
+impl ops::Deref for ElementID {
+    type Target = u64;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -201,7 +187,7 @@ impl Topology {
             elements: HashMap::new(),
             assertive_dependencies: HashMap::new(),
             opportunistic_dependencies: HashMap::new(),
-            unsatisfiable_element_id: ElementID::from(""),
+            unsatisfiable_element_id: ElementID::new(0),
             inspect: TopologyInspect::new(
                 parent_inspect_node.create_child("topology"),
                 inspect_max_event,
@@ -277,15 +263,9 @@ impl Topology {
         valid_levels: &[fpb::PowerLevel],
         synthetic: bool,
     ) -> Result<ElementID, AddElementError> {
-        let id: ElementID = if ID_DEBUG_MODE {
-            ElementID::from(name)
-        } else {
+        let id = {
             loop {
-                let element_id = ElementID::from(format!(
-                    "{}-{}",
-                    name,
-                    Alphanumeric.sample_string(&mut rand::thread_rng(), 4)
-                ));
+                let element_id = ElementID::gen();
                 if !self.elements.contains_key(&element_id) {
                     break element_id;
                 }

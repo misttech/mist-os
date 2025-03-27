@@ -193,26 +193,24 @@ mod tests {
 
     #[fuchsia::test]
     fn test_credential_authorizes() {
+        let element_id = ElementID::new(1);
         let gold_credential = Credential {
-            element: "Gold".into(),
+            element: element_id,
             id: DependencyToken::create().get_koid().expect("get_koid failed"),
             permissions: Permissions::MODIFY_ASSERTIVE_DEPENDENT,
         };
         assert_eq!(
-            gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_ASSERTIVE_DEPENDENT),
+            gold_credential.authorizes(&element_id, Permissions::MODIFY_ASSERTIVE_DEPENDENT),
             true
         );
-        assert_eq!(
-            gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_DEPENDENCY),
-            false
-        );
+        assert_eq!(gold_credential.authorizes(&element_id, Permissions::MODIFY_DEPENDENCY), false);
     }
 
     #[fuchsia::test]
     fn test_register_unregister() {
         let mut registry = Registry::new();
         let token_kryptonite = DependencyToken::create();
-        let element_kryptonite: ElementID = "Kryptonite".into();
+        let element_kryptonite: ElementID = ElementID::new(1);
         let credential_to_register = CredentialToRegister {
             broker_token: token_kryptonite
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)

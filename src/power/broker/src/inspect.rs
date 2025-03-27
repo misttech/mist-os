@@ -314,7 +314,7 @@ impl TopologyInspect {
             events.borrow_mut().add_entry(|node| {
                 node.record_int("@time", instant.into_nanos());
                 node.record_child(ADD_ELEMENT_EVENT, |node| {
-                    node.record_string(ELEMENT_ID, id.to_string());
+                    node.record_uint(ELEMENT_ID, *id);
                     node.record_string(CURRENT_LEVEL, UNSET);
                     node.record_string(REQUIRED_LEVEL, UNSET);
                 });
@@ -346,7 +346,7 @@ impl TopologyInspect {
                 events.borrow_mut().add_entry(|node| {
                     node.record_int("@time", instant.into_nanos());
                     node.record_child(ADD_ELEMENT_EVENT, |node| {
-                        node.record_string(ELEMENT_ID, element_id.to_string());
+                        node.record_uint(ELEMENT_ID, *element_id);
                         node.record_uint(CURRENT_LEVEL, current_level as u64);
                         node.record_uint(REQUIRED_LEVEL, required_level as u64);
                     });
@@ -363,8 +363,8 @@ impl TopologyInspect {
         dep: &Dependency,
         is_assertive: bool,
     ) {
-        let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
-        let (Some(dp), Some(rq)) = (elements.get(dp_id), elements.get(rq_id)) else {
+        let (dp_id, rq_id) = (dep.dependent.element_id, dep.requires.element_id);
+        let (Some(dp), Some(rq)) = (elements.get(&dp_id), elements.get(&rq_id)) else {
             // elements[dp_id] and elements[rq_id] guaranteed by prior validation
             log::error!(dep:?; "Failed to add inspect for dependency.");
             return;
@@ -379,10 +379,10 @@ impl TopologyInspect {
                 let edge = dp_vertex.add_edge(&mut rq_vertex, |meta_node| {
                     DependencyData::new(meta_node, dp_level.level, rq_level.level, is_opportunistic)
                 });
-                inspect_edges.insert(rq_id.clone(), edge);
+                inspect_edges.insert(rq_id, edge);
                 self.maybe_record_event(dp, ADD_DEPENDENCY_EVENT, |node| {
-                    node.record_string(DEP_ELEMENT, dp_id.as_str());
-                    node.record_string(REQ_ELEMENT, rq_id.as_str());
+                    node.record_uint(DEP_ELEMENT, *dp_id);
+                    node.record_uint(REQ_ELEMENT, *rq_id);
                     node.record_uint(DEPENDENT_LEVEL, dp_level.level as u64);
                     node.record_uint(REQUIRED_LEVEL, rq_level.level as u64);
                     if is_opportunistic {
@@ -435,7 +435,7 @@ impl TopologyInspect {
         let mut vertex = inspect_vertex.borrow_mut();
         vertex.meta().set_current_level(level);
         self.maybe_record_event(element, UPDATE_LEVEL_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(CURRENT_LEVEL, level.into());
         });
     }
@@ -447,14 +447,14 @@ impl TopologyInspect {
         let mut vertex = inspect_vertex.borrow_mut();
         vertex.meta().set_required_level(level);
         self.maybe_record_event(element, UPDATE_LEVEL_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(REQUIRED_LEVEL, level.into());
         });
     }
 
     pub fn on_remove_element(&self, element: &Element) {
         self.maybe_record_event(element, REMOVE_ELEMENT_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_string(ELEMENT_NAME, &element.name);
         });
     }
@@ -470,7 +470,7 @@ impl TopologyInspect {
         };
         vertex.borrow_mut().meta().create_lease(lease_id, level);
         self.maybe_record_event(element, CREATE_LEASE_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(LEASE_ID, *lease_id);
         });
     }
@@ -486,7 +486,7 @@ impl TopologyInspect {
         };
         inspect_vertex.borrow_mut().meta().set_lease_status(lease.id, *status);
         self.maybe_record_event(element, UPDATE_LEASE_STATUS_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(LEASE_ID, *lease.id);
             node.record_uint(STATUS, status.into_primitive() as u64);
         });
@@ -498,7 +498,7 @@ impl TopologyInspect {
         };
         inspect_vertex.borrow_mut().meta().remove_lease(lease.id);
         self.maybe_record_event(element, REMOVE_LEASE_EVENT, |node| {
-            node.record_string(ELEMENT_ID, element.id.as_str());
+            node.record_uint(ELEMENT_ID, *element.id);
             node.record_uint(LEASE_ID, *lease.id);
             node.record_uint(LEVEL, lease.underlying_element_level.level.into());
         });
