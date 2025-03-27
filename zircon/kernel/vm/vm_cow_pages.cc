@@ -1499,17 +1499,17 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   ChangeSingleHighPriorityCountLocked(-high_priority_count_);
 
   // Drop the child from our list, but don't recurse back into this function. Then
-  // remove ourselves from the clone tree.
+  // remove ourselves from the clone tree and dead transition ourselves.
   DropChildLocked(&sibling.locked());
   if (locked_parent) {
     locked_parent.locked().ReplaceChildLocked(this, &sibling.locked());
   }
   sibling.locked().parent_ = ktl::move(parent_);
-  // We have lost our parent which, if we had a parent, could lead us to now be violating the
-  // invariant that parent_limit_ being non-zero implies we have a parent. Although this generally
-  // should not matter, we have not transitioned to being dead yet, so we should maintain the
-  // correct invariants.
-  parent_offset_ = parent_limit_ = 0;
+  // We just removed our parent, and so we have no parent and no sibling. Performing this dead
+  // transition here ensures that we are not in an alive state, despite being detached from the
+  // rest of the tree.
+  fbl::RefPtr<VmCowPages> deferred = DeadTransitionLocked(LockedPtr(), LockedPtr());
+  ASSERT(!deferred);
 
   // Things should be consistent after dropping one child and merging with the other.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
