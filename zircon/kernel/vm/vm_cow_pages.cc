@@ -1654,11 +1654,10 @@ uint32_t VmCowPages::DebugLookupDepthLocked() const {
   // Count the number of parents we need to traverse to find the root, and call this our lookup
   // depth.
   uint32_t depth = 0;
-  const VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
-  while (cur->parent_) {
+  LockedPtr ptr;
+  while (VmCowPages* parent = ptr.locked_or(this).parent_.get()) {
     depth++;
-    cur = cur->parent_.get();
+    ptr = LockedPtr(parent, VmLockAcquireMode::Reentrant);
   }
   return depth;
 }
