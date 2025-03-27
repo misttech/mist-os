@@ -1,8 +1,5 @@
 # Service capabilities
 
-Caution: service capabilities are experimental and in development. Their
-behavior and APIs could change at any time.
-
 A [service capability][glossary.service-capability] is a capability that
 enables discovery of one or more individually named
 [FIDL service][glossary.service] instances. Service capabilities are backed by
