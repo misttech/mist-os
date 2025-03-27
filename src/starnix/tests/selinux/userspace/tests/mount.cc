@@ -57,8 +57,7 @@ TEST(MountTest, WithContextOption) {
   EXPECT_NE(mount_options.find("context="), std::string::npos);
 }
 
-// TODO: https://fxbug.dev/357876133 - Enable when "seclabel" is implemented.
-TEST(MountTest, DISABLED_WithSeclabel) {
+TEST(MountTest, WithSeclabel) {
   LoadPolicy("minimal_policy.pp");
 
   // Base policy uses "fs_use_trans" labeling scheme for "tmpfs", which should report "seclabel".
