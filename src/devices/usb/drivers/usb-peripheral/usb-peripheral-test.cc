@@ -8,9 +8,12 @@
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/errors.h>
@@ -23,9 +26,6 @@
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
-#include "sdk/lib/async_patterns/testing/cpp/dispatcher_bound.h"
-#include "sdk/lib/component/outgoing/cpp/outgoing_directory.h"
-#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
