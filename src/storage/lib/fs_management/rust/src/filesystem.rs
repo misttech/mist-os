@@ -177,13 +177,13 @@ impl Filesystem {
                 let collection_ref = fdecl::CollectionRef { name: collection_name };
                 let child_decls = vec![
                     fdecl::Child {
-                        name: Some(name.clone()),
+                        name: Some(format!("{}-relative", name)),
                         url: Some(format!("#meta/{}.cm", component_name)),
                         startup: Some(fdecl::StartupMode::Lazy),
                         ..Default::default()
                     },
                     fdecl::Child {
-                        name: Some(format!("{}-relative", name)),
+                        name: Some(name),
                         url: Some(format!(
                             "fuchsia-boot:///{}#meta/{}.cm",
                             component_name, component_name
