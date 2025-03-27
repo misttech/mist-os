@@ -32,6 +32,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_rust",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
     "//sdk/lib/driver/component/rust",
     "//sdk/lib/driver/runtime/rust",
     "//sdk/lib/driver/runtime/rust/env",

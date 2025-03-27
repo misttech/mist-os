@@ -6,6 +6,7 @@ use crate::driver::Driver;
 use anyhow::{Context, Result};
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use fuchsia_component::client;
 use futures::channel::oneshot;
 use futures::{StreamExt, TryStreamExt};
 use std::cell::RefCell;
@@ -15,7 +16,7 @@ use std::sync::{Arc, Weak};
 use zx::{AsHandleRef, Status};
 use {
     fidl_fuchsia_driver_framework as fidl_fdf, fidl_fuchsia_driver_host as fdh,
-    fidl_fuchsia_ldsvc as fldsvc,
+    fidl_fuchsia_ldsvc as fldsvc, fidl_fuchsia_system_state as fss,
 };
 
 /// We use Weak<Driver> to avoid accidentally extending the lifetime of the Driver. Driver must be
@@ -133,6 +134,16 @@ impl DriverHost {
 
                 // If this is the last driver instance running, we should exit.
                 if drivers.is_empty() {
+                    // We only exit if we're not shutting down in order to match DFv1 behavior.
+                    // TODO(https://fxbug.dev/42075187): We should always exit driver hosts when we
+                    // get down to 0 drivers.
+                    let client = client::connect_to_protocol::<fss::SystemStateTransitionMarker>()
+                        .expect("Could not connect to SystemStateTransition protocol.");
+                    match client.get_termination_system_state().await {
+                        Err(_) | Ok(fss::SystemPowerState::FullyOn) => (),
+                        _ => return,
+                    };
+
                     if let Some(signaler) = this.no_more_drivers_signaler.borrow_mut().take() {
                         signaler.send(()).unwrap();
                     }
