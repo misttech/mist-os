@@ -131,6 +131,8 @@ if (is_fuchsia) {
       #
       "//zircon/system/ulib/trace-engine",
     ]
+
+    configs += [ "//build/config/rust:bootfs" ]
   }
 }
 
