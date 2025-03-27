@@ -1,25 +1,30 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "device_interface.h"
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.network.driver/cpp/wire.h>
-#include <lib/async/cpp/task.h>
-#include <lib/fdf/cpp/env.h>
-#include <lib/fidl/cpp/wire/sync_call.h>
-#include <lib/fidl/cpp/wire/traits.h>
+// #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
+// #include <fidl/fuchsia.hardware.network.driver/cpp/wire.h>
+// #include <lib/async/cpp/task.h>
+// #include <lib/fdf/cpp/env.h>
+// #include <lib/fidl/cpp/wire/sync_call.h>
+// #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/defer.h>
 
 #include <fbl/alloc_checker.h>
 
-#include "log.h"
-#include "network_device_shim.h"
+// #include "log.h"
+// #include "network_device_shim.h"
+#include <trace.h>
+
 #include "rx_queue.h"
 #include "session.h"
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
+
+#define LOCAL_TRACE 0
 
 // Static sanity assertions from far-away defined buffer_descriptor_t.
 // A buffer descriptor is always described in 64 bit words.
@@ -35,7 +40,7 @@ static_assert(offsetof(buffer_descriptor_t, inbound_flags) == 32);
 static_assert(sizeof(buffer_descriptor_t) / sizeof(uint64_t) < std::numeric_limits<uint8_t>::max());
 
 namespace {
-
+#if 0
 namespace fnetwork_driver = fuchsia_hardware_network_driver;
 
 // Assert that the batch sizes dictated by the maximum vector lengths in the
@@ -80,9 +85,11 @@ constexpr size_t kRxBufferSize =
     fidl::MaxSizeInChannel<fnetwork_driver::wire::RxBuffer, fidl::MessageDirection::kSending>();
 static_assert(kMaxFidlPayloadSize - kCompleteRxSize < kRxBufferSize);
 
+#endif
 }  // namespace
 
 namespace {
+#if 0
 const char* DeviceStatusToString(network::internal::DeviceStatus status) {
   switch (status) {
     case network::internal::DeviceStatus::STARTING:
@@ -107,11 +114,13 @@ void TeardownAndFreeBinder(std::unique_ptr<network::NetworkDeviceImplBinder>&& b
   // but it's there to explicitly demonstrate the intent of the callback.
   binder_ptr->Teardown([binder = std::move(binder)]() mutable { binder.reset(); });
 }
+#endif
 
 }  // namespace
 
 namespace network {
 
+#if 0
 zx::result<std::unique_ptr<OwnedDeviceInterfaceDispatchers>>
 OwnedDeviceInterfaceDispatchers::Create() {
   fbl::AllocChecker ac;
@@ -227,11 +236,13 @@ void OwnedShimDispatchers::ShutdownSync() {
 
 OwnedShimDispatchers::OwnedShimDispatchers() = default;
 
+
 zx::result<std::unique_ptr<NetworkDeviceInterface>> NetworkDeviceInterface::Create(
     const DeviceInterfaceDispatchers& dispatchers,
     std::unique_ptr<NetworkDeviceImplBinder>&& binder) {
   return internal::DeviceInterface::Create(dispatchers, std::move(binder));
 }
+#endif
 
 namespace internal {
 
@@ -248,16 +259,15 @@ uint16_t TransformFifoDepth(uint16_t device_depth) {
 }
 
 zx::result<std::unique_ptr<DeviceInterface>> DeviceInterface::Create(
-    const DeviceInterfaceDispatchers& dispatchers,
-    std::unique_ptr<NetworkDeviceImplBinder>&& binder) {
+    const network_device_impl_protocol_t* device_impl) {
   fbl::AllocChecker ac;
-  std::unique_ptr<DeviceInterface> device(new (&ac) DeviceInterface(dispatchers));
+  std::unique_ptr<DeviceInterface> device(new (&ac) DeviceInterface());
   if (!ac.check()) {
-    TeardownAndFreeBinder(std::move(binder));
+    // TeardownAndFreeBinder(std::move(binder));
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx_status_t status = device->Init(std::move(binder));
+  zx_status_t status = device->Init(device_impl);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -274,87 +284,89 @@ DeviceInterface::~DeviceInterface() {
   ZX_ASSERT_MSG(dead_sessions_.is_empty(),
                 "can't destroy DeviceInterface with %ld pending dead session(s).",
                 dead_sessions_.size());
-  ZX_ASSERT_MSG(bindings_.is_empty(), "can't destroy device interface with %ld attached bindings.",
-                bindings_.size());
-  size_t active_ports = std::count_if(ports_.begin(), ports_.end(),
-                                      [](const PortSlot& port) { return port.port != nullptr; });
-  ZX_ASSERT_MSG(!active_ports, "can't destroy device interface with %ld ports", active_ports);
+  // ZX_ASSERT_MSG(bindings_.is_empty(), "can't destroy device interface with %ld attached
+  // bindings.",
+  //               bindings_.size());
+  // size_t active_ports = std::count_if(ports_.begin(), ports_.end(),
+  //                                     [](const PortSlot& port) { return port.port != nullptr; });
+  // ZX_ASSERT_MSG(!active_ports, "can't destroy device interface with %ld ports", active_ports);
 }
 
-zx_status_t DeviceInterface::Init(std::unique_ptr<NetworkDeviceImplBinder>&& binder) {
-  LOGF_TRACE("%s", __FUNCTION__);
+zx_status_t DeviceInterface::Init(const network_device_impl_protocol_t* device_impl) {
+  LTRACE_ENTRY;
 
-  if (binder_) {
-    LOGF_ERROR("init: already initialized");
-    TeardownAndFreeBinder(std::move(binder));
+  if (device_impl_.is_valid()) {
+    LTRACEF("init: already initialized");
+    // TeardownAndFreeBinder(std::move(binder));
     return ZX_ERR_BAD_STATE;
   }
-  binder_ = std::move(binder);
+  device_impl_ = ddk::NetworkDeviceImplProtocolClient(device_impl);
 
   // If init fails the binder has to be torn down. The DeviceInterface::Teardown method is not
   // going to be called at that point but the binder might have state that needs to be torn down in
   // an orderly fashion.
-  auto teardown_and_free_binder = fit::defer([this] { TeardownAndFreeBinder(std::move(binder_)); });
+  // auto teardown_and_free_binder = fit::defer([this] { TeardownAndFreeBinder(std::move(binder_));
+  // });
 
-  zx::result<fdf::ClientEnd<netdriver::NetworkDeviceImpl>> device = binder_->Bind();
-  if (device.is_error()) {
-    LOGF_ERROR("init: failed to bind NetworkDeviceImpl: %s", device.status_string());
-    return device.status_value();
-  }
+  // zx::result<fdf::ClientEnd<netdriver::NetworkDeviceImpl>> device = binder_->Bind();
+  // if (device.is_error()) {
+  //   LOGF_ERROR("init: failed to bind NetworkDeviceImpl: %s", device.status_string());
+  //   return device.status_value();
+  // }
 
   // Initialization is synchronous.
-  fdf::WireSyncClient sync_client(std::move(device.value()));
-  fdf::Arena arena('NETD');
+  // fdf::WireSyncClient sync_client(std::move(device.value()));
+  // fdf::Arena arena('NETD');
 
-  fdf::WireUnownedResult info_result = sync_client.buffer(arena)->GetInfo();
-  if (!info_result.ok()) {
-    LOGF_ERROR("init: GetInfo() failed: %s", info_result.FormatDescription().c_str());
-    return info_result.status();
-  }
+  // fdf::WireUnownedResult info_result = sync_client.buffer(arena)->GetInfo();
+  // if (!info_result.ok()) {
+  //   LOGF_ERROR("init: GetInfo() failed: %s", info_result.FormatDescription().c_str());
+  //   return info_result.status();
+  // }
 
-  device_info_ = fidl::ToNatural(info_result.value().info);
+  device_impl_.GetInfo(&device_info_);
 
-  if (device_info_.buffer_alignment().value_or(0) == 0) {
-    LOGF_ERROR("init: device reports invalid zero buffer alignment");
+  if (device_info_.buffer_alignment == 0) {
+    LTRACEF("init: device reports invalid zero buffer alignment");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  const uint16_t rx_depth = device_info_.rx_depth().value_or(0);
-  const uint16_t tx_depth = device_info_.tx_depth().value_or(0);
-  const uint16_t rx_threshold = device_info_.rx_threshold().value_or(0);
+  const uint16_t rx_depth = device_info_.rx_depth;
+  const uint16_t tx_depth = device_info_.tx_depth;
+  const uint16_t rx_threshold = device_info_.rx_threshold;
   if (rx_threshold > rx_depth) {
-    LOGF_ERROR("init: device reports rx_threshold = %u larger than rx_depth %u", rx_threshold,
-               rx_depth);
+    LTRACEF("init: device reports rx_threshold = %u larger than rx_depth %u\n", rx_threshold,
+            rx_depth);
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (rx_depth > kMaxFifoDepth || tx_depth > kMaxFifoDepth) {
-    LOGF_ERROR("init: device reports too large FIFO depths: %u/%u (max=%u)", rx_depth, tx_depth,
-               kMaxFifoDepth);
+    LTRACEF("init: device reports too large FIFO depths: %u/%u (max=%u)\n", rx_depth, tx_depth,
+            kMaxFifoDepth);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   zx::result tx_queue = TxQueue::Create(this);
   if (tx_queue.is_error()) {
-    LOGF_ERROR("init: device failed to start Tx Queue: %s", tx_queue.status_string());
-    return tx_queue.status_value();
+    LTRACEF("init: device failed to start Tx Queue: %d\n", tx_queue.error_value());
+    return tx_queue.error_value();
   }
   tx_queue_ = std::move(tx_queue.value());
 
   zx::result rx_queue = RxQueue::Create(this);
   if (rx_queue.is_error()) {
-    LOGF_ERROR("init: device failed to start Rx Queue: %s", rx_queue.status_string());
-    return rx_queue.status_value();
+    LTRACEF("init: device failed to start Rx Queue: %d\n", rx_queue.error_value());
+    return rx_queue.error_value();
   }
   rx_queue_ = std::move(rx_queue.value());
 
   {
     fbl::AutoLock lock(&control_lock_);
     if (zx_status_t status = vmo_store_.Reserve(MAX_VMOS); status != ZX_OK) {
-      LOGF_ERROR("init: failed to init session identifiers %s", zx_status_get_string(status));
+      LTRACEF("init: failed to init session identifiers %s\n", zx_status_get_string(status));
       return status;
     }
   }
 
-  zx::result endpoints = fdf::CreateEndpoints<netdriver::NetworkDeviceIfc>();
+  /*zx::result endpoints = fdf::CreateEndpoints<netdriver::NetworkDeviceIfc>();
   if (endpoints.is_error()) {
     LOGF_ERROR("init: CreateEndpoints failed: %s", endpoints.status_string());
     return endpoints.status_value();
@@ -396,8 +408,9 @@ zx_status_t DeviceInterface::Init(std::unique_ptr<NetworkDeviceImplBinder>&& bin
     return init_status.value().s;
   }
   // Now that everything succeeded do NOT tear down the factory.
-  teardown_and_free_binder.cancel();
+  teardown_and_free_binder.cancel();*/
 
+  device_impl_.Init(nullptr, &network_device_ifc_protocol_ops_, nullptr, nullptr);
   return ZX_OK;
 }
 
@@ -405,16 +418,17 @@ void DeviceInterface::Teardown(fit::callback<void()> teardown_callback) {
   // stop all rx queue operation immediately.
   rx_queue_->JoinThread();
   tx_queue_->JoinThread();
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
 
-  control_lock_.Acquire();
-  // Can't call teardown again until the teardown process has ended.
-  ZX_ASSERT(teardown_callback_ == nullptr);
-  teardown_callback_ = std::move(teardown_callback);
+  // control_lock_.Acquire();
+  //  Can't call teardown again until the teardown process has ended.
+  //  ZX_ASSERT(teardown_callback_ == nullptr);
+  //  teardown_callback_ = std::move(teardown_callback);
 
-  ContinueTeardown(TeardownState::RUNNING);
+  // ContinueTeardown(TeardownState::RUNNING);
 }
 
+#if 0
 zx_status_t DeviceInterface::Bind(fidl::ServerEnd<netdev::Device> req) {
   fbl::AutoLock lock(&control_lock_);
   // Don't attach new bindings if we're tearing down.
@@ -544,19 +558,19 @@ void DeviceInterface::RemovePort(
              }
            });
 }
+#endif
 
-void DeviceInterface::CompleteRx(
-    fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteRxRequest* request, fdf::Arena&,
-    CompleteRxCompleter::Sync&) {
-  rx_queue_->CompleteRxList(request->rx);
+void DeviceInterface::NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count) {
+  cpp20::span<const rx_buffer_t> rx_buffer_list(rx_list, rx_count);
+  rx_queue_->CompleteRxList(rx_buffer_list);
 }
 
-void DeviceInterface::CompleteTx(
-    fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena&,
-    CompleteTxCompleter::Sync&) {
-  tx_queue_->CompleteTxList(request->tx);
+void DeviceInterface::NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count) {
+  cpp20::span<const tx_result_t> tx_buffer_list(tx_list, tx_count);
+  tx_queue_->CompleteTxList(tx_buffer_list);
 }
 
+#if 0
 void DeviceInterface::DelegateRxLease(
     netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request, fdf::Arena& arena,
     DelegateRxLeaseCompleter::Sync&) {
@@ -581,9 +595,10 @@ void DeviceInterface::DelegateRxLease(
   rx_queue_->AssertParentRxLocked(*this);
   TryDelegateRxLease(rx_queue_->rx_completed_frame_index());
 }
+#endif
 
-void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
-  LOGF_TRACE("%s", __FUNCTION__);
+device_info_t DeviceInterface::GetInfo() {
+  TRACE_ENTRY;
 
   constexpr uint32_t kDefaultBufferAlignment = 0;
   constexpr uint8_t kDefaultMaxBufferParts = 0;
@@ -596,149 +611,127 @@ void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
   const uint8_t descriptor_version = NETWORK_DEVICE_DESCRIPTOR_VERSION;
   const uint16_t rx_depth = rx_fifo_depth();
   const uint16_t tx_depth = tx_fifo_depth();
-  const auto tx_accel = fidl::VectorView<netdev::wire::TxAcceleration>::FromExternal(
-      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->data() : nullptr,
-      device_info_.tx_accel().has_value() ? device_info_.tx_accel()->size() : 0);
-  const auto rx_accel = fidl::VectorView<netdev::wire::RxAcceleration>::FromExternal(
-      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->data() : nullptr,
-      device_info_.rx_accel().has_value() ? device_info_.rx_accel()->size() : 0);
+
+  // const tx_acceleration_t tx_accel = device_info_.tx_accel().has_value() ?
+  // device_info_.tx_accel()->data() : nullptr; const rx_acceleration_t rx_accel =
+  // device_info_.rx_accel().has_value() ? device_info_.rx_accel()->data() : nullptr;
+
   const uint32_t buffer_alignment =
-      device_info_.buffer_alignment().value_or(kDefaultBufferAlignment);
-  const uint8_t max_buffer_parts = device_info_.max_buffer_parts().value_or(kDefaultMaxBufferParts);
+      device_info_.buffer_alignment ? device_info_.buffer_alignment : kDefaultBufferAlignment;
+  const uint8_t max_buffer_parts =
+      device_info_.max_buffer_parts ? device_info_.max_buffer_parts : kDefaultMaxBufferParts;
   const uint32_t min_rx_buffer_length =
-      device_info_.min_rx_buffer_length().value_or(kDefaultMinRxBufLen);
+      device_info_.min_rx_buffer_length ? device_info_.min_rx_buffer_length : kDefaultMinRxBufLen;
   const uint32_t min_tx_buffer_length =
-      device_info_.min_tx_buffer_length().value_or(kDefaultMinTxBufLen);
-  const uint16_t min_tx_buffer_head = device_info_.tx_head_length().value_or(kDefaultTxHeadLength);
-  const uint16_t min_tx_buffer_tail = device_info_.tx_tail_length().value_or(kDefaultTxTailLength);
+      device_info_.min_tx_buffer_length ? device_info_.min_tx_buffer_length : kDefaultMinTxBufLen;
+  const uint16_t min_tx_buffer_head =
+      device_info_.tx_head_length ? device_info_.tx_head_length : kDefaultTxHeadLength;
+  const uint16_t min_tx_buffer_tail =
+      device_info_.tx_tail_length ? device_info_.tx_tail_length : kDefaultTxTailLength;
 
-  fidl::Arena arena;
+  device_base_info_t device_base_info = {
+      .rx_depth = rx_depth,
+      .tx_depth = tx_depth,
+      .buffer_alignment = buffer_alignment,
+      .min_rx_buffer_length = min_rx_buffer_length,
+      .min_tx_buffer_length = min_tx_buffer_length,
+      .min_tx_buffer_head = min_tx_buffer_head,
+      .min_tx_buffer_tail = min_tx_buffer_tail,
+      .max_buffer_parts = max_buffer_parts,
+      //.tx_accel = tx_accel,
+      //.rx_accel = rx_accel,
+  };
 
-  auto device_base_info_builder = netdev::wire::DeviceBaseInfo::Builder(arena)
-                                      .rx_depth(rx_depth)
-                                      .tx_depth(tx_depth)
-                                      .buffer_alignment(buffer_alignment)
-                                      .max_buffer_parts(max_buffer_parts)
-                                      .min_rx_buffer_length(min_rx_buffer_length)
-                                      .min_tx_buffer_length(min_tx_buffer_length)
-                                      .min_tx_buffer_head(min_tx_buffer_head)
-                                      .min_tx_buffer_tail(min_tx_buffer_tail)
-                                      .tx_accel(tx_accel)
-                                      .rx_accel(rx_accel);
-
-  const std::optional<uint32_t>& max_buffer_length = device_info_.max_buffer_length();
-  if (max_buffer_length.has_value() && max_buffer_length.value() != 0) {
-    device_base_info_builder.max_buffer_length(max_buffer_length.value());
+  const uint32_t max_buffer_length = device_info_.max_buffer_length;
+  if (max_buffer_length != 0) {
+    device_base_info.max_buffer_length = max_buffer_length;
   }
 
-  netdev::wire::DeviceBaseInfo device_base_info = device_base_info_builder.Build();
+  device_info_t device_info = {
+      .min_descriptor_length = min_descriptor_length,
+      .descriptor_version = descriptor_version,
+      .base_info = device_base_info,
+  };
 
-  netdev::wire::DeviceInfo device_info = netdev::wire::DeviceInfo::Builder(arena)
-                                             .min_descriptor_length(min_descriptor_length)
-                                             .descriptor_version(descriptor_version)
-                                             .base_info(device_base_info)
-                                             .Build();
+  // device_info = netdev::wire::DeviceInfo::Builder(arena)
+  //                 .min_descriptor_length(min_descriptor_length)
+  //                           .descriptor_version(descriptor_version)
+  //                           .base_info(device_base_info)
+  //                           .Build();
 
-  completer.Reply(device_info);
+  return device_info;
 }
 
-void DeviceInterface::OpenSession(OpenSessionRequestView request,
-                                  OpenSessionCompleter::Sync& completer) {
-  zx::result sync_result = [this, &request]()
-      -> zx::result<std::tuple<netdev::wire::DeviceOpenSessionResponse, uint8_t, zx::vmo>> {
-    fbl::AutoLock tx_lock(&tx_lock_);
-    fbl::AutoLock lock(&control_lock_);
-    // We're currently tearing down and can't open any new sessions.
-    if (teardown_state_ != TeardownState::RUNNING) {
-      return zx::error(ZX_ERR_UNAVAILABLE);
-    }
+zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>>
+DeviceInterface::OpenSession(ktl::string_view name, struct session_info session_info) {
+  fbl::AutoLock tx_lock(&tx_lock_);
+  fbl::AutoLock lock(&control_lock_);
+  // We're currently tearing down and can't open any new sessions.
+  // if (teardown_state_ != TeardownState::RUNNING) {
+  //  return zx::error(ZX_ERR_UNAVAILABLE);
+  //}
 
-    zx::result endpoints = fidl::CreateEndpoints<netdev::Session>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
+  zx::result session_creation = Session::Create(session_info, name, this);
+  if (session_creation.is_error()) {
+    return session_creation.take_error();
+  }
+  auto& [session, fifos] = session_creation.value();
 
-    fidl::StringView& name = request->session_name;
-    netdev::wire::SessionInfo& session_info = request->session_info;
-    zx::result session_creation =
-        Session::Create(dispatchers_.impl_->async_dispatcher(), session_info, name, this);
-
-    if (session_creation.is_error()) {
-      return session_creation.take_error();
-    }
-    auto& [session, fifos] = session_creation.value();
-
-    if (!session_info.has_data()) {
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    zx::vmo& vmo = session_info.data();
-    // NB: It's safe to register the VMO after session creation (and thread start) because sessions
-    // always start in a paused state, so the tx path can't be running while we hold the control
-    // lock.
-    if (vmo_store_.is_full()) {
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-    // Duplicate the VMO to share with the device implementation.
-    zx::vmo device_vmo;
-    if (zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &device_vmo); status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    zx::result registration = vmo_store_.Register(std::move(vmo));
-    if (registration.is_error()) {
-      return registration.take_error();
-    }
-    const uint8_t vmo_id = registration.value();
-    session->SetDataVmo(vmo_id, vmo_store_.GetVmo(vmo_id));
-    session->AssertParentTxLock(*this);
-    session->InstallTx();
-    session->Bind(std::move(endpoints->server));
-
-    if (session->ShouldTakeOverPrimary(primary_session_.get())) {
-      // Set this new session as the primary session.
-      std::swap(primary_session_, session);
-      rx_queue_->TriggerSessionChanged();
-    }
-    if (session) {
-      // Add the new session (or the primary session if it the new session just took over) to
-      // the list of sessions.
-      sessions_.push_back(std::move(session));
-    }
-    return zx::ok(std::make_tuple(
-        netdev::wire::DeviceOpenSessionResponse{
-            .session = std::move(endpoints->client),
-            .fifos = std::move(fifos),
-        },
-        vmo_id, std::move(device_vmo)));
-  }();
-
-  if (sync_result.is_error()) {
-    completer.ReplyError(sync_result.error_value());
-    return;
+  if (!session_info.data_count) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto [response, vmo_id, device_vmo] = std::move(sync_result.value());
-  fdf::Arena arena('NETD');
-  // Use ThenExactlyOnce here to ensure that no matter what the completer is used to respond to the
-  // incoming request. This prevents something in the vendor driver from blocking the FIDL request.
-  device_impl_.buffer(arena)
-      ->PrepareVmo(vmo_id, std::move(device_vmo))
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync(), response = std::move(response)](
-              fdf::WireUnownedResult<
-                  fuchsia_hardware_network_driver::NetworkDeviceImpl::PrepareVmo>& result) mutable {
-            if (!result.ok() || result.value().s != ZX_OK) {
-              LOGF_ERROR("PrepareVmo failed: %s", result.ok()
-                                                      ? zx_status_get_string(result.value().s)
-                                                      : result.FormatDescription().c_str());
-              completer.ReplyError(ZX_ERR_INTERNAL);
-              return;
-            }
+  fbl::RefPtr<VmObjectDispatcher> vmo =
+      fbl::ImportFromRawPtr<VmObjectDispatcher>((VmObjectDispatcher*)(session_info.data_list));
 
-            completer.ReplySuccess(std::move(response.session), std::move(response.fifos));
-          });
+  // NB: It's safe to register the VMO after session creation (and thread start) because sessions
+  // always start in a paused state, so the tx path can't be running while we hold the control
+  // lock.
+  if (vmo_store_.is_full()) {
+    return zx::error(ZX_ERR_NO_RESOURCES);
+  }
+
+  zx::result registration = vmo_store_.Register(std::move(vmo));
+  if (registration.is_error()) {
+    return registration.take_error();
+  }
+  const uint8_t vmo_id = registration.value();
+  session->SetDataVmo(vmo_id, vmo_store_.GetVmo(vmo_id));
+  session->AssertParentTxLock(*this);
+  session->InstallTx();
+
+  // if (session->ShouldTakeOverPrimary(primary_session_.get())) {
+  //   // Set this new session as the primary session.
+  //   std::swap(primary_session_, session);
+  //   rx_queue_->TriggerSessionChanged();
+  // }
+
+  if (session) {
+    // Add the new session (or the primary session if it the new session just took over) to
+    // the list of sessions.
+    sessions_.push_back(std::move(session));
+  }
+
+  // zx_status_t prepare_vmo_status;
+  device_impl_.PrepareVmo(
+      vmo_id, session_info.data_list, session_info.data_count,
+      [](void* cookie, zx_status_t status) {
+        if (status != ZX_OK) {
+          LTRACEF("PrepareVmo failed: %s\n", zx_status_get_string(status));
+        }
+        // prepare_vmo_status = status;
+      },
+      nullptr);
+
+  // TODO (Herrera) : Handle prepare_vmo_status
+  // if (prepare_vmo_status != ZX_OK) {
+  //   return zx::error(prepare_vmo_status);
+  // }
+
+  return zx::ok(ktl::move(fifos));
 }
 
+#if 0
 void DeviceInterface::GetPort(GetPortRequestView request, GetPortCompleter::Sync& _completer) {
   SharedAutoLock lock(&control_lock_);
   WithPort(request->id.base, [req = std::move(request->port), salt = request->id.salt](
@@ -795,13 +788,14 @@ void DeviceInterface::Clone(CloneRequestView request, CloneCompleter::Sync& _com
     LOGF_ERROR("bind failed %s", zx_status_get_string(status));
   }
 }
+#endif
 
 uint16_t DeviceInterface::rx_fifo_depth() const {
-  return TransformFifoDepth(device_info_.rx_depth().value_or(0));
+  return TransformFifoDepth(device_info_.rx_depth);
 }
 
 uint16_t DeviceInterface::tx_fifo_depth() const {
-  return TransformFifoDepth(device_info_.tx_depth().value_or(0));
+  return TransformFifoDepth(device_info_.tx_depth);
 }
 
 void DeviceInterface::SessionStarted(Session& session) {
@@ -831,7 +825,7 @@ void DeviceInterface::SessionStarted(Session& session) {
     control_lock_.Release();
   }
 
-  evt_session_started_.Trigger(session.name());
+  // evt_session_started_.Trigger(session.name());
 }
 
 bool DeviceInterface::SessionStoppedInner(Session& session) {
@@ -864,9 +858,9 @@ bool DeviceInterface::SessionStoppedInner(Session& session) {
       primary_session_ = sessions_.erase(*primary_candidate);
       ZX_ASSERT(primary_session_);
     }
-    if (teardown_state_ == TeardownState::RUNNING) {
+    /*if (teardown_state_ == TeardownState::RUNNING) {
       rx_queue_->TriggerSessionChanged();
-    }
+    }*/
   }
 
   active_primary_sessions_--;
@@ -883,13 +877,13 @@ void DeviceInterface::SessionStopped(Session& session) {
 }
 
 void DeviceInterface::StartDevice() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
   control_lock_.Acquire();
   StartDeviceLocked();
 }
 
 void DeviceInterface::StartDeviceLocked() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
 
   bool start = false;
   // Start the device if we haven't done so already.
@@ -917,8 +911,9 @@ void DeviceInterface::StartDeviceLocked() {
 }
 
 void DeviceInterface::StartDeviceInner() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
 
+#if 0
   fdf::Arena arena('NETD');
   device_impl_.buffer(arena)->Start().Then([this](auto& result) {
     this->control_lock_.Acquire();
@@ -952,10 +947,11 @@ void DeviceInterface::StartDeviceInner() {
     // We have effectively shut down the device, so finish tearing it down.
     this->ContinueTeardown(TeardownState::SESSIONS);
   });
+#endif
 }
 
 void DeviceInterface::StopDevice(std::optional<TeardownState> continue_teardown) {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
   bool stop = false;
   switch (device_status_) {
     case DeviceStatus::STOPPED:
@@ -984,12 +980,14 @@ void DeviceInterface::StopDevice(std::optional<TeardownState> continue_teardown)
 }
 
 void DeviceInterface::StopDeviceInner() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
+#if 0
   fdf::Arena arena('NETD');
   device_impl_.buffer(arena)->Stop().Then(
       [this](fdf::WireUnownedResult<netdriver::NetworkDeviceImpl::Stop>& result) {
         this->DeviceStopped();
       });
+#endif
 }
 
 PendingDeviceOperation DeviceInterface::SetDeviceStatus(DeviceStatus status) {
@@ -1000,7 +998,7 @@ PendingDeviceOperation DeviceInterface::SetDeviceStatus(DeviceStatus status) {
 }
 
 void DeviceInterface::DeviceStarted() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
   switch (SetDeviceStatus(DeviceStatus::STARTED)) {
     case PendingDeviceOperation::STOP:
       StopDevice();
@@ -1016,7 +1014,7 @@ void DeviceInterface::DeviceStarted() {
 }
 
 void DeviceInterface::DeviceStopped() {
-  LOGF_TRACE("%s", __FUNCTION__);
+  LTRACE_ENTRY;
   control_lock_.Acquire();
 
   PendingDeviceOperation pending_op = SetDeviceStatus(DeviceStatus::STOPPED);
@@ -1055,6 +1053,7 @@ bool DeviceInterface::ContinueTeardown(network::internal::DeviceInterface::Teard
   // To protect the linearity of the teardown process, once it has started (the state is no longer
   // RUNNING) no more bindings, watchers, or sessions can be created.
 
+#if 0
   fit::callback<void()> teardown_callback =
       [this, state]() __TA_REQUIRES(control_lock_) -> fit::callback<void()> {
     if (state != teardown_state_) {
@@ -1191,14 +1190,16 @@ bool DeviceInterface::ContinueTeardown(network::internal::DeviceInterface::Teard
         ZX_PANIC("nothing to do if the teardown state is finished.");
     }
   }();
+#endif
   control_lock_.Release();
-  if (teardown_callback) {
-    teardown_callback();
-    return true;
-  }
+  // if (teardown_callback) {
+  //   teardown_callback();
+  //   return true;
+  // }
   return false;
 }
 
+#if 0
 void DeviceInterface::NotifyPortRxFrame(uint8_t base_id, uint64_t frame_length) {
   WithPort(base_id, [&frame_length](const std::unique_ptr<DevicePort>& port) {
     if (port) {
@@ -1252,6 +1253,7 @@ void DeviceInterface::OnPortTeardownComplete(DevicePort& port) {
     ContinueTeardown(TeardownState::PORTS);
   }
 }
+#endif
 
 void DeviceInterface::ReleaseVmo(Session& session, fit::callback<void()>&& on_complete) {
   uint8_t vmo;
@@ -1261,10 +1263,11 @@ void DeviceInterface::ReleaseVmo(Session& session, fit::callback<void()>&& on_co
     // Avoid notifying the device implementation if unregistration fails.
     // A non-ok return here means we're either attempting to double-release a VMO or the sessions
     // didn't have a registered VMO.
-    LOGF_WARN("%s: Failed to unregister VMO %d: %s", session.name(), vmo, result.status_string());
+    TRACEF("%s: Failed to unregister VMO %d: %d", session.name(), vmo, result.error_value());
     return;
   }
 
+#if 0
   fdf::Arena arena('NETD');
   device_impl_.buffer(arena)->ReleaseVmo(vmo).Then(
       [on_complete = std::move(on_complete)](
@@ -1274,9 +1277,10 @@ void DeviceInterface::ReleaseVmo(Session& session, fit::callback<void()>&& on_co
         }
         on_complete();
       });
+#endif
 }
 
-fbl::RefPtr<RefCountedFifo> DeviceInterface::primary_rx_fifo() {
+fbl::RefPtr<FifoDispatcher> DeviceInterface::primary_rx_fifo() {
   SharedAutoLock lock(&control_lock_);
   if (primary_session_) {
     return primary_session_->rx_fifo();
@@ -1294,8 +1298,9 @@ void DeviceInterface::NotifyTxReturned(bool was_full) {
   PruneDeadSessions();
 }
 
-void DeviceInterface::QueueRxSpace(cpp20::span<netdriver::wire::RxSpaceBuffer> rx) {
-  LOGF_TRACE("%s(_, %ld)", __FUNCTION__, rx.size());
+void DeviceInterface::QueueRxSpace(cpp20::span<rx_space_buffer_t> rx) {
+  TRACEF("(_, %ld)\n", rx.size());
+#if 0
   fdf::Arena arena('NETD');
   fidl::VectorView data =
       fidl::VectorView<netdriver::wire::RxSpaceBuffer>::FromExternal(rx.data(), rx.size());
@@ -1303,11 +1308,12 @@ void DeviceInterface::QueueRxSpace(cpp20::span<netdriver::wire::RxSpaceBuffer> r
   if (!status.ok()) {
     LOGF_ERROR("failed to queue %zu rx space: %s", rx.size(), status.FormatDescription().c_str());
   }
+#endif
 }
 
-void DeviceInterface::QueueTx(cpp20::span<netdriver::wire::TxBuffer> tx) {
-  LOGF_TRACE("%s(_, %ld)", __FUNCTION__, tx.size());
-
+void DeviceInterface::QueueTx(cpp20::span<tx_buffer_t> tx) {
+  TRACEF("(_, %ld)\n", tx.size());
+#if 0
   fdf::Arena arena('NETD');
   fidl::VectorView data =
       fidl::VectorView<netdriver::wire::TxBuffer>::FromExternal(tx.data(), tx.size());
@@ -1315,10 +1321,11 @@ void DeviceInterface::QueueTx(cpp20::span<netdriver::wire::TxBuffer> tx) {
   if (!status.ok()) {
     LOGF_ERROR("failed to queue %zu tx buffers: %s", tx.size(), status.FormatDescription().c_str());
   }
+#endif
 }
 
 void DeviceInterface::NotifyDeadSession(Session& dead_session) {
-  LOGF_TRACE("%s('%s')", __FUNCTION__, dead_session.name());
+  TRACEF("('%s')\n", dead_session.name());
   // First of all, stop all data-plane operations with stopped session.
   if (!dead_session.IsPaused()) {
     // Stop the session.
@@ -1345,8 +1352,7 @@ void DeviceInterface::NotifyDeadSession(Session& dead_session) {
 
   // Add the session to the list of dead sessions so we can wait for buffers to be returned and
   // ReleaseVmo to complete before destroying it.
-  LOGF_TRACE("%s('%s') session is dead, waiting for buffers to be reclaimed", __FUNCTION__,
-             session_ptr->name());
+  TRACEF("('%s') session is dead, waiting for buffers to be reclaimed\n", session_ptr->name());
   dead_sessions_.push_back(std::move(session_ptr));
   // The session may also be eligible for immediate destruction if all buffers are already returned.
   // Let PruneDeadSessions do the checking and cleanup work.
@@ -1356,6 +1362,7 @@ void DeviceInterface::NotifyDeadSession(Session& dead_session) {
 void DeviceInterface::PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_) {
   for (auto& session : dead_sessions_) {
     if (session.ShouldDestroy()) {
+#if 0
       // Schedule for destruction.
       //
       // Destruction must happen later because we currently hold shared access to the control lock
@@ -1376,8 +1383,9 @@ void DeviceInterface::PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_) {
           ContinueTeardown(TeardownState::SESSIONS);
         });
       });
+#endif
     } else {
-      LOGF_TRACE("%s: %s still pending", __FUNCTION__, session.name());
+      TRACEF("%s still pending\n", session.name());
     }
   }
 }
@@ -1448,6 +1456,7 @@ zx_status_t DeviceInterface::LoadRxDescriptors(RxSessionTransaction& transact) {
 
 bool DeviceInterface::IsDataPlaneOpen() { return device_status_ == DeviceStatus::STARTED; }
 
+#if 0
 zx_status_t DeviceInterface::CanCreatePortWithId(uint8_t port_id) {
   // Don't allow new ports if tearing down.
   if (teardown_state_ != TeardownState::RUNNING) {
@@ -1497,15 +1506,19 @@ void DeviceInterface::TryDelegateRxLease(uint64_t completed_frame_index) {
   }
   rx_lease_pending_.reset();
 }
+#endif
 
-DeviceInterface::DeviceInterface(const DeviceInterfaceDispatchers& dispatchers)
-    : dispatchers_(dispatchers),
-      vmo_store_(vmo_store::Options{
-          vmo_store::MapOptions{ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_REQUIRE_NON_RESIZABLE,
-                                nullptr},
-          std::nullopt,
+DeviceInterface::DeviceInterface()
+    : vmo_store_(vmo_store::Options{
+          .map =
+              vmo_store::MapOptions{
+                  .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_REQUIRE_NON_RESIZABLE,
+                  .vmar = nullptr,
+              },
+          .pin = std::nullopt,
       }) {
-  // Seed the port salts to some non-random but unpredictable value.
+// Seed the port salts to some non-random but unpredictable value.
+#if 0
   union {
     uint8_t b[sizeof(uintptr_t)];
     uintptr_t ptr;
@@ -1513,8 +1526,10 @@ DeviceInterface::DeviceInterface(const DeviceInterfaceDispatchers& dispatchers)
   for (size_t i = 0; i < ports_.size(); i++) {
     ports_[i].salt = static_cast<uint8_t>(i) ^ seed.b[i % sizeof(seed.b)];
   }
+#endif
 }
 
+#if 0
 zx_status_t DeviceInterface::Binding::Bind(DeviceInterface* interface,
                                            fidl::ServerEnd<netdev::Device> channel) {
   fbl::AllocChecker ac;
@@ -1547,6 +1562,7 @@ void DeviceInterface::Binding::Unbind() {
     binding->Unbind();
   }
 }
+#endif
 
 }  // namespace internal
 }  // namespace network

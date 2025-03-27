@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,18 +6,19 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
-#include <lib/async/dispatcher.h>
+#include <fuchsia/hardware/network/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/fit/function.h>
 
 #include "data_structs.h"
 #include "definitions.h"
-#include "device_port.h"
-#include "diagnostics_service.h"
-#include "event_hook.h"
-#include "port_watcher.h"
+// #include "device_port.h"
+// #include "diagnostics_service.h"
+// #include "event_hook.h"
+// #include "port_watcher.h"
 #include "public/locks.h"
-#include "public/network_device.h"
+// #include "public/network_device.h"
+#include <object/fifo_dispatcher.h>
 
 namespace network::testing {
 class NetworkDeviceTest;
@@ -36,10 +38,6 @@ class Session;
 class AttachedPort;
 using SessionList = fbl::SizedDoublyLinkedList<std::unique_ptr<Session>>;
 
-struct RefCountedFifo : public fbl::RefCounted<RefCountedFifo> {
-  zx::fifo fifo;
-};
-
 // Contains information about a filled Rx descriptor.
 //
 // Used to convey fulfilled rx frames in terms of descriptor indices.
@@ -53,7 +51,7 @@ struct SessionRxBuffer {
 //
 // Used to cache common calculation and reduce number of arguments in functions.
 struct RxFrameInfo {
-  const fuchsia_hardware_network_driver::wire::BufferMetadata& meta;
+  const buffer_metadata_t& meta;
   uint8_t port_id_salt;
   cpp20::span<const SessionRxBuffer> buffers;
   uint32_t total_length;
@@ -63,35 +61,25 @@ enum class DeviceStatus { STARTING, STARTED, STOPPING, STOPPED };
 
 enum class PendingDeviceOperation { NONE, START, STOP };
 
-class DeviceInterface;
-
-class DeviceInterface : public fidl::WireServer<netdev::Device>,
-                        public fdf::WireServer<netdriver::NetworkDeviceIfc>,
-                        public ::network::NetworkDeviceInterface {
+class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
  public:
   static zx::result<std::unique_ptr<DeviceInterface>> Create(
-      const DeviceInterfaceDispatchers& dispatchers,
-      std::unique_ptr<NetworkDeviceImplBinder>&& binder);
-  ~DeviceInterface() override;
+      const network_device_impl_protocol_t* device_impl);
+  ~DeviceInterface();
 
   // Public NetworkDevice API.
-  void Teardown(fit::callback<void()> callback) override;
-  zx_status_t Bind(fidl::ServerEnd<netdev::Device> req) override;
-  zx_status_t BindPort(uint8_t port_id, fidl::ServerEnd<netdev::Port> req) override;
+  void Teardown(fit::callback<void()> callback);  // override;
+  // zx_status_t Bind(fidl::ServerEnd<netdev::Device> req) override;
+  // zx_status_t BindPort(uint8_t port_id, fidl::ServerEnd<netdev::Port> req) override;
 
   // NetworkDeviceIfc implementation.
-  void PortStatusChanged(netdriver::wire::NetworkDeviceIfcPortStatusChangedRequest* request,
-                         fdf::Arena& arena, PortStatusChangedCompleter::Sync& completer) override;
-  void AddPort(netdriver::wire::NetworkDeviceIfcAddPortRequest* request, fdf::Arena& arena,
-               AddPortCompleter::Sync& completer) override;
-  void RemovePort(netdriver::wire::NetworkDeviceIfcRemovePortRequest* request, fdf::Arena& arena,
-                  RemovePortCompleter::Sync& completer) override;
-  void CompleteRx(netdriver::wire::NetworkDeviceIfcCompleteRxRequest* request, fdf::Arena& arena,
-                  CompleteRxCompleter::Sync& completer) override;
-  void CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena& arena,
-                  CompleteTxCompleter::Sync& completer) override;
-  void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
-                       fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override;
+  void NetworkDeviceIfcPortStatusChanged(uint8_t id, const port_status_t* new_status) {}
+  void NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port,
+                               network_device_ifc_add_port_callback callback, void* cookie) {}
+  void NetworkDeviceIfcRemovePort(uint8_t id) {}
+  void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
+  void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);
+  void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {}
 
   uint16_t rx_fifo_depth() const;
   uint16_t tx_fifo_depth() const;
@@ -99,14 +87,14 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Returns the device-owned buffer count threshold at which we should trigger RxQueue work. If the
   // number of buffers on device is less than or equal to the threshold, we should attempt to fetch
   // more buffers.
-  uint16_t rx_notify_threshold() const { return device_info_.rx_threshold().value_or(0); }
+  // uint16_t rx_notify_threshold() const { return device_info_.rx_threshold().value_or(0); }
 
   TxQueue& tx_queue() { return *tx_queue_; }
 
   SharedLock& control_lock() __TA_RETURN_CAPABILITY(control_lock_) { return control_lock_; }
   fbl::Mutex& rx_lock() __TA_RETURN_CAPABILITY(rx_lock_) { return rx_lock_; }
   fbl::Mutex& tx_lock() __TA_RETURN_CAPABILITY(tx_lock_) { return tx_lock_; }
-  const netdriver::DeviceImplInfo& info() { return device_info_; }
+  const device_impl_info_t& info() { return device_info_; }
 
   // Loads rx path descriptors from the primary session into a session transaction.
   zx_status_t LoadRxDescriptors(RxSessionTransaction& transact) __TA_REQUIRES_SHARED(control_lock_);
@@ -122,7 +110,7 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
 
   // If a primary session exists, primary_rx_fifo returns a reference-counted pointer to the primary
   // session's Rx FIFO. Otherwise, the returned pointer is null.
-  fbl::RefPtr<RefCountedFifo> primary_rx_fifo();
+  fbl::RefPtr<FifoDispatcher> primary_rx_fifo();
 
   // Commits all pending rx buffers in all active sessions.
   void CommitAllSessions() __TA_REQUIRES_SHARED(control_lock_) __TA_REQUIRES(rx_lock_);
@@ -140,11 +128,10 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Checks if dead sessions are ready to be destroyed due to buffers returning.
   void NotifyTxReturned(bool was_full);
   // Sends the provided space buffers in `rx` to the device implementation.
-  void QueueRxSpace(cpp20::span<netdriver::wire::RxSpaceBuffer> rx)
+  void QueueRxSpace(cpp20::span<rx_space_buffer_t> rx)
       __TA_EXCLUDES(control_lock_, rx_lock_, tx_lock_);
   // Sends the provided transmit buffers in `tx` to the device implementation.
-  void QueueTx(cpp20::span<netdriver::wire::TxBuffer> tx)
-      __TA_EXCLUDES(control_lock_, rx_lock_, tx_lock_);
+  void QueueTx(cpp20::span<tx_buffer_t> tx) __TA_EXCLUDES(control_lock_, rx_lock_, tx_lock_);
   bool IsDataPlaneOpen() __TA_REQUIRES_SHARED(control_lock_);
 
   // Called by sessions when they're no longer running. If the dead session has any outstanding
@@ -153,21 +140,22 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   void NotifyDeadSession(Session& dead_session);
 
   // FIDL protocol implementation.
-  void GetInfo(GetInfoCompleter::Sync& completer) override;
-  void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
-  void GetPort(GetPortRequestView request, GetPortCompleter::Sync& _completer) override;
-  void GetPortWatcher(GetPortWatcherRequestView request,
-                      GetPortWatcherCompleter::Sync& _completer) override;
-  void Clone(CloneRequestView request, CloneCompleter::Sync& _completer) override;
+  device_info_t GetInfo();
+  zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>> OpenSession(
+      ktl::string_view name, struct session_info session_info);
+  // override; void GetPort(GetPortRequestView request, GetPortCompleter::Sync& _completer)
+  // override; void GetPortWatcher(GetPortWatcherRequestView request,
+  //                    GetPortWatcherCompleter::Sync& _completer) override;
+  // void Clone(CloneRequestView request, CloneCompleter::Sync& _completer) override;
 
   // Returns the current port salt for the provided base port ID.
   //
   // If the port with |base_id| does not currently exist, returns the value of
   // the previously existing port with the same |base_id| or the initial salt
   // value.
-  uint8_t GetPortSalt(uint8_t base_id) __TA_REQUIRES_SHARED(control_lock_) {
-    return ports_[base_id].salt;
-  }
+  // uint8_t GetPortSalt(uint8_t base_id) __TA_REQUIRES_SHARED(control_lock_) {
+  //  return ports_[base_id].salt;
+  //}
 
   // Notifies of |frame_length| bytes received on port with |base_id|.
   void NotifyPortRxFrame(uint8_t base_id, uint64_t frame_length)
@@ -180,18 +168,18 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   //
   // NB: The validity of the returned AttachedPort is not really guaranteed by the type system, but
   // by the fact that DeviceInterface will detach all ports from sessions before continuing.
-  zx::result<AttachedPort> AcquirePort(netdev::wire::PortId port_id,
-                                       cpp20::span<const netdev::wire::FrameType> rx_frame_types)
-      __TA_REQUIRES(control_lock_);
+  // zx::result<AttachedPort> AcquirePort(netdev::wire::PortId port_id,
+  //                                     cpp20::span<const netdev::wire::FrameType> rx_frame_types)
+  //    __TA_REQUIRES(control_lock_);
 
   // Event observer hook for Rx queue packets.
   void NotifyRxQueuePacket(uint64_t key);
   // Event observer hook for Tx complete.
   void NotifyTxComplete();
 
-  DiagnosticsService& diagnostics() { return diagnostics_; }
+  // DiagnosticsService& diagnostics() { return diagnostics_; }
 
-  static void DropDelegatedRxLease(netdev::DelegatedRxLease lease);
+  // static void DropDelegatedRxLease(netdev::DelegatedRxLease lease);
 
   // Delegates a pending lease to the primary session.
   //
@@ -200,14 +188,15 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   //
   // The primary session receives the lease if one exists _and_ the session is
   // opted in to receive leases. Drops the pending lease immediately otherwise.
-  void TryDelegateRxLease(uint64_t completed_frame_index) __TA_REQUIRES_SHARED(control_lock_)
-      __TA_REQUIRES(rx_lock_);
+  // void TryDelegateRxLease(uint64_t completed_frame_index) __TA_REQUIRES_SHARED(control_lock_)
+  //    __TA_REQUIRES(rx_lock_);
 
  private:
   friend testing::NetworkDeviceTest;
   friend testing::FakeNetworkDeviceImpl;
   friend testing::banjo::FakeNetworkDeviceImpl;
 
+#if 0
   // Helper class to keep track of clients bound to DeviceInterface.
   class Binding : public fbl::DoublyLinkedListable<std::unique_ptr<Binding>> {
    public:
@@ -220,7 +209,7 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
     std::optional<fidl::ServerBindingRef<netdev::Device>> binding_;
   };
   using BindingList = fbl::SizedDoublyLinkedList<std::unique_ptr<Binding>>;
-
+#endif
   enum class TeardownState {
     RUNNING,
     BINDINGS,
@@ -233,8 +222,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
     FINISHED
   };
 
-  zx_status_t Init(std::unique_ptr<NetworkDeviceImplBinder>&& binder);
-  explicit DeviceInterface(const DeviceInterfaceDispatchers& dispatchers);
+  zx_status_t Init(const network_device_impl_protocol_t* device_impl);
+  explicit DeviceInterface();
 
   // Starts the data path with the device implementation.
   void StartDevice() __TA_EXCLUDES(control_lock_, tx_lock_, rx_lock_);
@@ -289,53 +278,54 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Returns the value returned by the call to f.
   //
   // It is unsafe to use the provided DevicePort outside of the scope of the callback f.
-  template <typename F>
-  auto WithPort(uint8_t port_id, F f) __TA_REQUIRES_SHARED(control_lock_) {
-    if (port_id >= ports_.size()) {
-      const std::unique_ptr<DevicePort> null_port;
-      return f(null_port);
-    }
-    return f(ports_[port_id].port);
-  }
-  void OnPortTeardownComplete(DevicePort& port);
+  // template <typename F>
+  // auto WithPort(uint8_t port_id, F f) __TA_REQUIRES_SHARED(control_lock_) {
+  //   if (port_id >= ports_.size()) {
+  //     const std::unique_ptr<DevicePort> null_port;
+  //     return f(null_port);
+  //   }
+  //   return f(ports_[port_id].port);
+  // }
+  // void OnPortTeardownComplete(DevicePort& port);
 
   // Destroys all dead sessions that report they can be destroyed through `Session::CanDestroy`.
   void PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_);
   // Notifies all sessions that the transmit queue has available spots to take in transmit frames.
   void NotifyTxQueueAvailable() __TA_REQUIRES_SHARED(control_lock_);
 
-  zx_status_t CanCreatePortWithId(uint8_t port_id) __TA_REQUIRES(control_lock_);
+  // zx_status_t CanCreatePortWithId(uint8_t port_id) __TA_REQUIRES(control_lock_);
 
-  netdriver::DeviceImplInfo device_info_;
-  DiagnosticsService diagnostics_;
-  const DeviceInterfaceDispatchers dispatchers_;
+  device_impl_info_t device_info_;
+  // DiagnosticsService diagnostics_;
+  // const DeviceInterfaceDispatchers dispatchers_;
   // Only used to keep a network device shim alive during the device's lifetime.
-  std::unique_ptr<NetworkDeviceImplBinder> binder_;
-  std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceIfc>> ifc_binding_;
-  fdf::WireSharedClient<netdriver::NetworkDeviceImpl> device_impl_;
-  std::array<netdev::wire::RxAcceleration, netdev::wire::kMaxAccelFlags> accel_rx_;
-  std::array<netdev::wire::TxAcceleration, netdev::wire::kMaxAccelFlags> accel_tx_;
+  // std::unique_ptr<NetworkDeviceImplBinder> binder_;
+  // std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceIfc>> ifc_binding_;
+  // fdf::WireSharedClient<netdriver::NetworkDeviceImpl> device_impl_;
+  ddk::NetworkDeviceImplProtocolClient device_impl_;
+  // std::array<netdev::wire::RxAcceleration, netdev::wire::kMaxAccelFlags> accel_rx_;
+  // std::array<netdev::wire::TxAcceleration, netdev::wire::kMaxAccelFlags> accel_tx_;
 
   std::unique_ptr<Session> primary_session_ __TA_GUARDED(control_lock_);
   SessionList sessions_ __TA_GUARDED(control_lock_);
   uint32_t active_primary_sessions_ __TA_GUARDED(control_lock_) = 0;
 
-  struct PortSlot {
-    std::unique_ptr<DevicePort> port;
-    uint8_t salt;
-  };
-  std::array<PortSlot, MAX_PORTS> ports_ __TA_GUARDED(control_lock_);
+  // struct PortSlot {
+  //   std::unique_ptr<DevicePort> port;
+  //   uint8_t salt;
+  // };
+  // std::array<PortSlot, MAX_PORTS> ports_ __TA_GUARDED(control_lock_);
 
   SessionList dead_sessions_ __TA_GUARDED(control_lock_);
 
   // We don't need to keep any data associated with the VMO ids, we use the slab to guarantee
   // non-overlapping unique identifiers within a set of valid IDs.
   DataVmoStore vmo_store_ __TA_GUARDED(control_lock_);
-  BindingList bindings_ __TA_GUARDED(control_lock_);
-  PortWatcher::List port_watchers_ __TA_GUARDED(control_lock_);
+  // BindingList bindings_ __TA_GUARDED(control_lock_);
+  // PortWatcher::List port_watchers_ __TA_GUARDED(control_lock_);
 
-  TeardownState teardown_state_ __TA_GUARDED(control_lock_) = TeardownState::RUNNING;
-  fit::callback<void()> teardown_callback_ __TA_GUARDED(control_lock_);
+  // TeardownState teardown_state_ __TA_GUARDED(control_lock_) = TeardownState::RUNNING;
+  // fit::callback<void()> teardown_callback_ __TA_GUARDED(control_lock_);
 
   PendingDeviceOperation pending_device_op_ = PendingDeviceOperation::NONE;
   std::atomic_bool has_listen_sessions_ = false;
@@ -345,18 +335,18 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
 
   DeviceStatus device_status_ __TA_GUARDED(control_lock_) = DeviceStatus::STOPPED;
 
-  std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lock_);
+  // std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lock_);
 
   fbl::Mutex rx_lock_;
   fbl::Mutex tx_lock_ __TA_ACQUIRED_AFTER(rx_lock_);
   SharedLock control_lock_ __TA_ACQUIRED_AFTER(tx_lock_, rx_lock_);
 
   // Event hooks used in tests:
-  EventHook<fit::function<void(const char*)>> evt_session_started_;
+  // EventHook<fit::function<void(const char*)>> evt_session_started_;
   // NB: This will be called with control_lock_ held.
-  EventHook<fit::function<void(const char*)>> evt_session_died_;
-  EventHook<fit::function<void(uint64_t)>> evt_rx_queue_packet_;
-  EventHook<fit::function<void()>> evt_tx_complete_;
+  // EventHook<fit::function<void(const char*)>> evt_session_died_;
+  // EventHook<fit::function<void(uint64_t)>> evt_rx_queue_packet_;
+  // EventHook<fit::function<void()>> evt_tx_complete_;
 };
 
 }  // namespace network::internal

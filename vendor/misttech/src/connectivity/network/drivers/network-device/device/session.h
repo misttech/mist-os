@@ -1,18 +1,14 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
-#define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
+#ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
+#define VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
 
-#include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/wire/server.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/event.h>
-#include <lib/zx/fifo.h>
-#include <lib/zx/vmo.h>
 
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
@@ -21,7 +17,7 @@
 #include "data_structs.h"
 #include "definitions.h"
 #include "device_interface.h"
-#include "device_port.h"
+// #include "device_port.h"
 #include "public/locks.h"
 #include "rx_queue.h"
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
@@ -29,6 +25,7 @@
 
 namespace network::internal {
 
+#if 0
 // A device port attached to a session.
 //
 // This class provides safe access to device ports owned by a DeviceInterface.
@@ -79,6 +76,7 @@ class AttachedPort {
   std::array<netdev::wire::FrameType, netdev::wire::kMaxFrameTypes> frame_types_{};
   uint32_t frame_type_count_ = 0;
 };
+#endif
 
 // A client session with a network device interface.
 //
@@ -87,10 +85,9 @@ class AttachedPort {
 //
 // It is invalid to destroy a Session that has outstanding buffers, that is, buffers that are
 // currently owned by the interface's Rx or Tx queues.
-class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
-                public fidl::WireServer<netdev::Session> {
+class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>> {
  public:
-  ~Session() override;
+  ~Session();
   // Creates a new session with the provided parameters.
   //
   // The session will service fuchsia.hardware.network.Session FIDL calls on the provided `control`
@@ -100,9 +97,10 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // be spawned to handle data fast path operations (tx data plane).
   //
   // Returns the session and its data path FIFOs.
-  static zx::result<std::pair<std::unique_ptr<Session>, netdev::wire::Fifos>> Create(
-      async_dispatcher_t* dispatcher, netdev::wire::SessionInfo& info, fidl::StringView name,
-      DeviceInterface* parent);
+  static zx::result<ktl::pair<std::unique_ptr<Session>, ktl::pair<KernelHandle<FifoDispatcher>,
+                                                                  KernelHandle<FifoDispatcher>>>>
+  Create(const session_info_t& info, std::string_view name, DeviceInterface* parent);
+
   bool IsPrimary() const;
   bool IsListen() const;
   bool IsPaused() const;
@@ -138,14 +136,14 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   }
 
   // FIDL interface implementation:
-  void Attach(AttachRequestView request, AttachCompleter::Sync& _completer) override;
-  void Detach(DetachRequestView request, DetachCompleter::Sync& _completer) override;
-  void Close(CloseCompleter::Sync& _completer) override;
-  void WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) override;
+  // void Attach(AttachRequestView request, AttachCompleter::Sync& _completer) override;
+  // void Detach(DetachRequestView request, DetachCompleter::Sync& _completer) override;
+  // void Close(CloseCompleter::Sync& _completer) override;
+  // void WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) override;
 
-  zx_status_t AttachPort(const netdev::wire::PortId& port_id,
-                         cpp20::span<const netdev::wire::FrameType> frame_types);
-  zx_status_t DetachPort(const netdev::wire::PortId& port_id);
+  // zx_status_t AttachPort(const netdev::wire::PortId& port_id,
+  //                        cpp20::span<const netdev::wire::FrameType> frame_types);
+  // zx_status_t DetachPort(const netdev::wire::PortId& port_id);
 
   // Sets the return code for a tx descriptor.
   void MarkTxReturnResult(uint16_t descriptor, zx_status_t status);
@@ -160,8 +158,7 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // needed.
   zx_status_t LoadRxDescriptors(RxQueue::SessionTransaction& transact);
   // Sets the data in the space buffer `buff` to region described by `descriptor_index`.
-  zx_status_t FillRxSpace(uint16_t descriptor_index,
-                          fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff);
+  zx_status_t FillRxSpace(uint16_t descriptor_index, rx_space_buffer_t* buff);
   // Completes rx for a single frame described by `frame_info`.
   //
   // Returns true if the buffers comprising `frame_info` can immediately be reused.
@@ -183,7 +180,7 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // Commits pending rx buffers, sending them back to the session client.
   void CommitRx() __TA_REQUIRES(parent_->rx_lock());
   // Returns true iff the session is subscribed to frame_type on port.
-  bool IsSubscribedToFrameType(uint8_t port, netdev::wire::FrameType frame_type)
+  bool IsSubscribedToFrameType(uint8_t port, frame_type_t frame_type)
       __TA_REQUIRES_SHARED(parent_->control_lock());
 
   inline void TxTaken() { in_flight_tx_++; }
@@ -200,8 +197,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
     return false;
   }
 
-  const fbl::RefPtr<RefCountedFifo>& rx_fifo() { return fifo_rx_; }
-  const zx::fifo& tx_fifo() const { return fifo_tx_; }
+  const fbl::RefPtr<FifoDispatcher>& rx_fifo() { return fifo_rx_.dispatcher(); }
+  const fbl::RefPtr<FifoDispatcher>& tx_fifo() { return fifo_tx_.dispatcher(); }
   const char* name() const { return name_.data(); }
 
   bool IsDying() const __TA_REQUIRES_SHARED(parent_->control_lock()) { return dying_; }
@@ -223,22 +220,21 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
       __TA_EXCLUDES(parent_->control_lock(), parent_->rx_lock()) __TA_REQUIRES(parent_->tx_lock());
 
   // Binds |channel| to this session. Must only be called once.
-  void Bind(fidl::ServerEnd<netdev::Session> channel);
+  // void Bind(fidl::ServerEnd<netdev::Session> channel);
 
   // Delegates an rx lease to this session. The lease is assumed to be already
   // fulfilled during rx queue processing, the hold until frame is updated to
   // the latest frame delivered to this session and the lease is delegated up.
-  void DelegateRxLease(netdev::DelegatedRxLease lease) __TA_EXCLUDES(rx_lease_lock_)
-      __TA_REQUIRES(parent_->rx_lock());
+  // void DelegateRxLease(netdev::DelegatedRxLease lease) __TA_EXCLUDES(rx_lease_lock_)
+  //    __TA_REQUIRES(parent_->rx_lock());
 
  private:
   inline void RxReturned(size_t count) { ZX_ASSERT(in_flight_rx_.fetch_sub(count) >= count); }
   inline void TxReturned(size_t count) { ZX_ASSERT(in_flight_tx_.fetch_sub(count) >= count); }
 
-  Session(async_dispatcher_t* dispatcher, netdev::wire::SessionInfo& info, fidl::StringView name,
-          DeviceInterface* parent);
-  zx::result<netdev::wire::Fifos> Init();
-  void OnUnbind(fidl::UnbindInfo info, fidl::ServerEnd<netdev::Session> channel);
+  Session(const session_info_t& info, std::string_view name, DeviceInterface* parent);
+  zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>> Init();
+  // void OnUnbind(fidl::UnbindInfo info, fidl::ServerEnd<netdev::Session> channel);
 
   // Detaches a port from the session.
   //
@@ -251,8 +247,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // to other ports.
   //
   // Returns zx::error otherwise.
-  zx::result<bool> DetachPortLocked(uint8_t port_id, std::optional<uint8_t> salt)
-      __TA_REQUIRES(parent_->control_lock());
+  // zx::result<bool> DetachPortLocked(uint8_t port_id, std::optional<uint8_t> salt)
+  //    __TA_REQUIRES(parent_->control_lock());
 
   buffer_descriptor_t* checked_descriptor(uint16_t index);
   const buffer_descriptor_t* checked_descriptor(uint16_t index) const;
@@ -266,8 +262,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // Fetches rx descriptors from the rx FIFO.
   zx_status_t FetchRxDescriptors() __TA_REQUIRES(parent_->rx_lock());
 
-  async_dispatcher_t* const dispatcher_;
-  const std::array<char, netdev::wire::kMaxSessionName + 1> name_;
+  // async_dispatcher_t* const dispatcher_;
+  const std::array<char, MAX_SESSION_NAME + 1> name_;
   // `MAX_VMOS` is used as a marker for invalid VMO identifier.
   // The destructor checks that vmo_id is set to `MAX_VMOS`, which verifies that `ReleaseDataVmo`
   // was called before destruction.
@@ -275,26 +271,26 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // Unowned pointer to data VMO stored in DeviceInterface.
   // Set by Session::Create.
   DataVmoStore::StoredVmo* data_vmo_ = nullptr;
-  std::optional<WatchDelegatedRxLeaseCompleter::Async> rx_lease_completer_
-      __TA_GUARDED(rx_lease_lock_);
-  std::optional<fidl::ServerBindingRef<netdev::Session>> binding_;
+  // std::optional<WatchDelegatedRxLeaseCompleter::Async> rx_lease_completer_
+  //     __TA_GUARDED(rx_lease_lock_);
+  // std::optional<fidl::ServerBindingRef<netdev::Session>> binding_;
   // The control channel is only set by the session teardown process if an epitaph must be sent when
   // all the buffers are properly reclaimed. It is set to the channel that was previously bound in
   // the `binding_` Server.
-  std::optional<fidl::ServerEnd<netdev::Session>> control_channel_;
-  const zx::vmo vmo_descriptors_;
+  // std::optional<fidl::ServerEnd<netdev::Session>> control_channel_;
+  const fbl::RefPtr<VmObjectDispatcher> vmo_descriptors_;
   fzl::VmoMapper descriptors_;
-  fbl::RefPtr<RefCountedFifo> fifo_rx_;
-  zx::fifo fifo_tx_;
+  KernelHandle<FifoDispatcher> fifo_rx_;
+  KernelHandle<FifoDispatcher> fifo_tx_;
   std::atomic<bool> paused_;
   const uint16_t descriptor_count_;
   const uint64_t descriptor_length_;
-  const netdev::wire::SessionFlags flags_;
+  const session_flags_t flags_;
 
   // AttachedPorts information. Parent device is responsible for detaching ports from sessions
   // before destroying them.
-  std::array<std::optional<AttachedPort>, MAX_PORTS> attached_ports_
-      __TA_GUARDED(parent_->control_lock());
+  // std::array<std::optional<AttachedPort>, MAX_PORTS> attached_ports_
+  //    __TA_GUARDED(parent_->control_lock());
   // Pointer to parent network device, not owned.
   DeviceInterface* const parent_;
   std::unique_ptr<uint16_t[]> rx_return_queue_ __TA_GUARDED(parent_->rx_lock());
@@ -313,11 +309,11 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   std::optional<TxQueue::SessionKey> tx_ticket_ __TA_GUARDED(parent_->tx_lock());
 
   fbl::Mutex rx_lease_lock_;
-  std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lease_lock_);
+  // std::optional<netdev::DelegatedRxLease> rx_lease_pending_ __TA_GUARDED(rx_lease_lock_);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Session);
 };
 
 }  // namespace network::internal
 
-#endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
+#endif  // VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_

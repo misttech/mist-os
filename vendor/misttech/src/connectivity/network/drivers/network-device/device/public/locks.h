@@ -1,33 +1,29 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_
-#define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_
 
-#include <mutex>
-#include <shared_mutex>
+#ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_
+#define VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_
 
 #include <fbl/mutex.h>
 
 namespace network {
 
-// TODO(https://fxbug.dev/42155349): Get rid of these classes and this file once std::shared_mutex and
-// std::shared_lock have thread analysis annotations.
-
 class __TA_CAPABILITY("shared_mutex") SharedLock {
  public:
   SharedLock() = default;
 
-  void Acquire() __TA_ACQUIRE() { m_.lock(); }
-  void Release() __TA_RELEASE() { m_.unlock(); }
+  void Acquire() __TA_ACQUIRE() { /*m_.lock();*/ }
+  void Release() __TA_RELEASE() { /*m_.unlock();*/ }
 
-  void AcquireShared() __TA_ACQUIRE_SHARED() { m_.lock_shared(); }
-  void ReleaseShared() __TA_RELEASE_SHARED() { m_.unlock_shared(); }
+  void AcquireShared() __TA_ACQUIRE_SHARED() { /*m_.lock_shared();*/ }
+  void ReleaseShared() __TA_RELEASE_SHARED() { /*m_.unlock_shared();*/ }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(SharedLock);
 
  private:
-  std::shared_mutex m_;
+  // DECLARE_BRWLOCK_PI(SharedLock, lockdep::LockFlagsMultiAcquire) m_;
 };
 
 template <typename T>
@@ -56,4 +52,4 @@ class __TA_SCOPED_CAPABILITY SharedAutoLock {
 };
 }  // namespace network
 
-#endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_
+#endif  // VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_LOCKS_H_

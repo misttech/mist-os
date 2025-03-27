@@ -1,11 +1,11 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "tx_queue.h"
 
-#include <lib/async/cpp/task.h>
-#include <lib/fdf/cpp/env.h>
+#include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -14,13 +14,29 @@
 #include "device_interface.h"
 #include "fbl/auto_lock.h"
 #include "lib/fit/defer.h"
-#include "log.h"
 #include "session.h"
 #include "zircon/status.h"
 
+#define LOCAL_TRACE 0
+
 namespace network::internal {
 
-constexpr char kTxSchedulerRole[] = "fuchsia.devices.network.core.tx";
+struct tx_thread_wrapper_data {
+  uint16_t capacity;
+  std::unique_ptr<tx_buffer_t[]> buffers;
+  std::unique_ptr<BufferParts<buffer_region_t>[]> buffer_parts;
+  TxQueue* queue;
+};
+
+int tx_thread_wrapper(void* arg) {
+  struct tx_thread_wrapper_data* thread_data = (struct tx_thread_wrapper_data*)arg;
+  cpp20::span<tx_buffer_t> buffers(thread_data->buffers.get(), thread_data->capacity);
+  thread_data->queue->Thread(std::move(buffers));
+  delete thread_data;
+  return 0;
+}
+
+// constexpr char kTxSchedulerRole[] = "fuchsia.devices.network.core.tx";
 
 std::atomic<uint32_t> TxQueue::num_instances_ = 0;
 
@@ -31,21 +47,24 @@ TxQueue::~TxQueue() {
 }
 
 void TxQueue::JoinThread() {
-  if (!dispatcher_.get()) {
+  if (!thread_) {
     return;
   }
 
   if (zx_status_t status = EnqueueUserPacket(kQuitKey); status != ZX_OK) {
-    LOGF_ERROR("TxQueue::JoinThread failed to send quit key: %s", zx_status_get_string(status));
+    TRACEF("TxQueue::JoinThread failed to send quit key: %s", zx_status_get_string(status));
   }
 
   // Mark the queue as not running anymore.
   running_ = false;
 
-  dispatcher_.ShutdownAsync();
-  dispatcher_shutdown_.Wait();
-  dispatcher_.reset();
-  --num_instances_;
+  ZX_ASSERT(thread_->Join(nullptr, ZX_TIME_INFINITE) == ZX_OK);
+  thread_ = nullptr;
+
+  // dispatcher_.ShutdownAsync();
+  // dispatcher_shutdown_.Wait();
+  // dispatcher_.reset();
+  //--num_instances_;
 }
 
 zx_status_t TxQueue::EnqueueUserPacket(uint64_t key) {
@@ -53,7 +72,7 @@ zx_status_t TxQueue::EnqueueUserPacket(uint64_t key) {
   packet.type = ZX_PKT_TYPE_USER;
   packet.key = key;
   packet.status = ZX_OK;
-  return port_.queue(&packet);
+  return port_->QueueUser(packet);
 }
 
 void TxQueue::SessionTransaction::Commit() {
@@ -62,7 +81,7 @@ void TxQueue::SessionTransaction::Commit() {
   if (queued_ != 0) {
     // Send buffers in batches of at most |MAX_TX_BUFFERS| at a time to stay within the FIDL
     // channel maximum.
-    netdriver::wire::TxBuffer* buffers = buffers_.data();
+    tx_buffer_t* buffers = buffers_.data();
     while (queued_ > 0) {
       const uint32_t batch = std::min(static_cast<uint32_t>(queued_), MAX_TX_BUFFERS);
       queue_->parent_->QueueTx(cpp20::span(buffers, batch));
@@ -72,7 +91,7 @@ void TxQueue::SessionTransaction::Commit() {
   }
 }
 
-fuchsia_hardware_network_driver::wire::TxBuffer* TxQueue::SessionTransaction::GetBuffer() {
+tx_buffer_t* TxQueue::SessionTransaction::GetBuffer() {
   ZX_ASSERT(available_ != 0);
   return &buffers_[queued_];
 }
@@ -85,9 +104,8 @@ void TxQueue::SessionTransaction::Push(uint16_t descriptor) {
   queued_++;
 }
 
-TxQueue::SessionTransaction::SessionTransaction(
-    cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers, TxQueue* parent,
-    Session* session)
+TxQueue::SessionTransaction::SessionTransaction(cpp20::span<tx_buffer_t> buffers, TxQueue* parent,
+                                                Session* session)
     : buffers_(buffers), queue_(parent), session_(session), queued_(0) {
   // only get available slots after lock is acquired:
   // 0 available slots if parent is not enabled.
@@ -96,7 +114,7 @@ TxQueue::SessionTransaction::SessionTransaction(
 
 zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
   // The Tx queue capacity is based on the underlying device's tx queue capacity.
-  auto capacity = parent->info().tx_depth().value_or(0);
+  auto capacity = parent->info().tx_depth;
 
   fbl::AllocChecker ac;
   std::unique_ptr<TxQueue> queue(new (&ac) TxQueue(parent));
@@ -117,32 +135,35 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
     return in_flight.take_error();
   }
   queue->in_flight_ = std::move(in_flight.value());
-  std::unique_ptr<fuchsia_hardware_network_driver::wire::TxBuffer[]> tx_buffers(
-      new (&ac) fuchsia_hardware_network_driver::wire::TxBuffer[capacity]);
+  std::unique_ptr<tx_buffer_t[]> tx_buffers(new (&ac) tx_buffer_t[capacity]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   // TODO(https://github.com/llvm/llvm-project/issues/54497): remove unnecessary
   // type extraction once clang-format can deal with [] in template parameter.
-  using BufferParts_t = BufferParts<fuchsia_hardware_network_driver::wire::BufferRegion>[];
-  std::unique_ptr<BufferParts_t> buffer_parts(
-      new (&ac) BufferParts<fuchsia_hardware_network_driver::wire::BufferRegion>[capacity]);
+  using BufferParts_t = BufferParts<buffer_region_t>[];
+  std::unique_ptr<BufferParts_t> buffer_parts(new (&ac) BufferParts<buffer_region_t>[capacity]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   for (int i = 0; i < capacity; ++i) {
-    tx_buffers[i].data =
-        fidl::VectorView<fuchsia_hardware_network_driver::wire::BufferRegion>::FromExternal(
-            buffer_parts[i].data(), 0);
+    tx_buffers[i].data_list = new (&ac) buffer_region_t[capacity];
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
   }
 
-  if (zx_status_t status = zx::port::create(0, &queue->port_); status != ZX_OK) {
-    LOGF_ERROR("failed to create tx queue port");
+  KernelHandle<PortDispatcher> port;
+  zx_rights_t rights;
+  if (zx_status_t status = PortDispatcher::Create(0, &port, &rights); status != ZX_OK) {
+    TRACEF("failed to create tx queue port");
     return zx::error(status);
   }
+  queue->port_ = port.release();
 
   // Make sure the driver framework allows for the creation of the necessary threads. Keep track of
   // the number of TX queue instances globally.
+  /*
   uint32_t instances = ++num_instances_;
   if (zx_status_t status =
           fdf_env_set_thread_limit(kTxSchedulerRole, strlen(kTxSchedulerRole), instances);
@@ -153,14 +174,14 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
     // ignore that in this context, the important part is that there are enough threads.
     LOGF_ERROR("failed to update thread limit: %s", zx_status_get_string(status));
     return zx::error(status);
-  }
+  }*/
 
   // In order to ensure that the async::PostTask below works this has to be a synchronized
   // dispatcher that allows synchronous calls. Any other combination of dispatcher and options could
   // lead to the async::PostTask call being inlined, meaning the task would run on the calling
   // thread, blocking it indefinitely. Use a unique owner to ensure inlining of calls from inside
   // the task. Calls to a dispatcher with the same owner might not be inlined.
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+  /*auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       queue.get(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "netdevice:tx_watch",
       [queue = queue.get()](fdf_dispatcher_t*) { queue->dispatcher_shutdown_.Signal(); },
       kTxSchedulerRole);
@@ -173,26 +194,42 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
   async::PostTask(queue->dispatcher_.async_dispatcher(),
                   [queue = queue.get(), tx_buffers = std::move(tx_buffers),
                    buffer_parts = std::move(buffer_parts),
-                   capacity]() { queue->Thread(cpp20::span(&tx_buffers[0], capacity)); });
+                   capacity]() { queue->Thread(cpp20::span(&tx_buffers[0], capacity)); });*/
+
+  auto thread_data = new (&ac) tx_thread_wrapper_data();
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  thread_data->capacity = capacity;
+  thread_data->buffers = std::move(tx_buffers);
+  thread_data->buffer_parts = std::move(buffer_parts);
+  thread_data->queue = queue.get();
+
+  queue->thread_ =
+      Thread::Create("netdevice:tx_watch", tx_thread_wrapper, thread_data, DEFAULT_PRIORITY);
+  ZX_ASSERT_MSG(queue->thread_, "Thread::Create failed.");
+  queue->thread_->Resume();
+
   queue->running_ = true;
 
   return zx::ok(std::move(queue));
 }
 
-void TxQueue::Thread(cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers) {
+void TxQueue::Thread(cpp20::span<tx_buffer_t> buffers) {
   for (;;) {
     zx_port_packet_t packet;
-    zx_status_t status = port_.wait(zx::time::infinite(), &packet);
+    zx_status_t status = port_->Dequeue(Deadline::infinite(), &packet);
     if (status != ZX_OK) {
-      LOGF_ERROR("tx thread port wait failed: %s", zx_status_get_string(status));
+      TRACEF("tx thread port wait failed: %s\n", zx_status_get_string(status));
       return;
     }
     switch (packet.type) {
       case ZX_PKT_TYPE_USER:
         switch (packet.key) {
           case kResumeKey:
-            if (zx_status_t status = UpdateFifoWatches(); status != ZX_OK) {
-              LOGF_ERROR("failed to install FIFO watches: %s", zx_status_get_string(status));
+            if (status = UpdateFifoWatches(); status != ZX_OK) {
+              TRACEF("failed to install FIFO watches: %s\n", zx_status_get_string(status));
               return;
             }
             break;
@@ -203,9 +240,9 @@ void TxQueue::Thread(cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer
         }
         break;
       case ZX_PKT_TYPE_SIGNAL_ONE:
-        if (zx_status_t status = HandleFifoSignal(buffers, packet.key, packet.signal.observed);
+        if (status = HandleFifoSignal(buffers, packet.key, packet.signal.observed);
             status != ZX_OK) {
-          LOGF_ERROR("failed to handle FIFO signal: %s", zx_status_get_string(status));
+          TRACEF("failed to handle FIFO signal: %s\n", zx_status_get_string(status));
           return;
         }
         break;
@@ -225,14 +262,15 @@ zx_status_t TxQueue::UpdateFifoWatches() {
       if (!waiter.wait_installed) {
         continue;
       }
-      zx_status_t status = port_.cancel(session.tx_fifo(), it.key());
+      zx_status_t status =
+          port_->CancelQueued(session.tx_fifo().get(), it.key()) == true ? ZX_OK : ZX_ERR_NOT_FOUND;
       switch (status) {
         case ZX_OK:
           waiter.wait_installed = false;
           continue;
         default:
-          LOGF_ERROR("failed to cancel FIFO wait for session %s: %s", session.name(),
-                     zx_status_get_string(status));
+          TRACEF("failed to cancel FIFO wait for session %s: %s\n", session.name(),
+                 zx_status_get_string(status));
           return status;
       }
     }
@@ -241,13 +279,15 @@ zx_status_t TxQueue::UpdateFifoWatches() {
       continue;
     }
 
-    if (zx_status_t status = session.tx_fifo().wait_async(
-            port_, it.key(), ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE, 0);
+    HandleOwner fifo_hdl = Handle::Make(session.tx_fifo(), ZX_DEFAULT_FIFO_RIGHTS);
+    if (zx_status_t status = port_->MakeObserver(0, fifo_hdl.get(), it.key(),
+                                                 ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE);
         status != ZX_OK) {
-      LOGF_ERROR("failed to start FIFO wait for session %s: %s", session.name(),
-                 zx_status_get_string(status));
+      TRACEF("failed to start FIFO wait for session %s: %s\n", session.name(),
+             zx_status_get_string(status));
       return status;
     }
+    fifo_hdl.release();
 
     waiter.wait_installed = true;
   }
@@ -255,9 +295,8 @@ zx_status_t TxQueue::UpdateFifoWatches() {
   return ZX_OK;
 }
 
-zx_status_t TxQueue::HandleFifoSignal(
-    cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers, SessionKey key,
-    zx_signals_t signals) {
+zx_status_t TxQueue::HandleFifoSignal(cpp20::span<tx_buffer_t> buffers, SessionKey key,
+                                      zx_signals_t signals) {
   fbl::AutoLock lock(&parent_->tx_lock());
   SessionWaiter* find_session = sessions_.Get(key);
   // Session already removed from Tx queue, packet was lingering in the port.
@@ -268,7 +307,7 @@ zx_status_t TxQueue::HandleFifoSignal(
   SessionWaiter& waiter = *find_session;
   waiter.wait_installed = false;
   Session& session = *waiter.session;
-  const zx::fifo& fifo = session.tx_fifo();
+  const fbl::RefPtr<FifoDispatcher>& fifo = session.tx_fifo();
   SessionTransaction transaction(buffers, this, &session);
 
   // TA really doesn't like defers or its interplay with AutoLock.
@@ -293,8 +332,8 @@ zx_status_t TxQueue::HandleFifoSignal(
         // notified of new buffers.
         return ZX_OK;
       default:
-        LOGF_ERROR("unexpected error for session %s: %s; killing it", session.name(),
-                   zx_status_get_string(status));
+        TRACEF("unexpected error for session %s: %s; killing it\n", session.name(),
+               zx_status_get_string(status));
         session.Kill();
         return ZX_OK;
     }
@@ -305,12 +344,15 @@ zx_status_t TxQueue::HandleFifoSignal(
     return ZX_OK;
   }
 
-  if (zx_status_t status = fifo.wait_async(port_, key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE, 0);
+  HandleOwner fifo_hdl = Handle::Make(fifo, ZX_DEFAULT_FIFO_RIGHTS);
+  if (zx_status_t status =
+          port_->MakeObserver(0, fifo_hdl.get(), key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE);
       status != ZX_OK) {
-    LOGF_ERROR("failed to start FIFO wait for session %s: %s", session.name(),
-               zx_status_get_string(status));
+    TRACEF("failed to start FIFO wait for session %s: %s\n", session.name(),
+           zx_status_get_string(status));
     return status;
   }
+  fifo_hdl.release();
 
   waiter.wait_installed = true;
 
@@ -323,7 +365,7 @@ void TxQueue::Resume() {
   }
 
   if (zx_status_t status = EnqueueUserPacket(kResumeKey); status != ZX_OK) {
-    LOGF_ERROR("TxQueue::Resume failed: %s", zx_status_get_string(status));
+    TRACEF("TxQueue::Resume failed: %s\n", zx_status_get_string(status));
   }
 }
 
@@ -366,17 +408,16 @@ bool TxQueue::ReturnBuffers() {
   return was_full;
 }
 
-void TxQueue::CompleteTxList(
-    const fidl::VectorView<::fuchsia_hardware_network_driver::wire::TxResult>& tx_results) {
+void TxQueue::CompleteTxList(const cpp20::span<const tx_result_t>& tx_results) {
   fbl::AutoLock lock(&parent_->tx_lock());
-  for (const auto& tx : tx_results.get()) {
+  for (const auto& tx : tx_results) {
     InFlightBuffer& buff = in_flight_->Get(tx.id);
     buff.result = tx.status;
     return_queue_->Push(tx.id);
   }
   bool was_full = ReturnBuffers();
   parent_->NotifyTxReturned(was_full);
-  parent_->NotifyTxComplete();
+  // parent_->NotifyTxComplete();
 }
 
 TxQueue::SessionKey TxQueue::AddSession(Session* session) {
@@ -391,8 +432,8 @@ TxQueue::SessionKey TxQueue::AddSession(Session* session) {
   TxQueue::SessionKey key = new_key.value();
 
   if (zx_status_t status = EnqueueUserPacket(kResumeKey); status != ZX_OK) {
-    LOGF_ERROR("failed to notify of new session %s with key %ld: %s", session->name(), key,
-               zx_status_get_string(status));
+    TRACEF("failed to notify of new session %s with key %ld: %s\n", session->name(), key,
+           zx_status_get_string(status));
   }
 
   return key;

@@ -19,6 +19,7 @@
 
 namespace network {
 
+#if 0
 namespace netdev = fuchsia_hardware_network;
 
 // TODO(https://fxbug.dev/42083623): Remove this and related artifacts once all parents have migrated
@@ -108,6 +109,21 @@ class OwnedShimDispatchers {
   libsync::Completion shim_shutdown_;
   fdf::SynchronizedDispatcher port_;
   libsync::Completion port_shutdown_;
+};
+#endif
+
+class NetworkDeviceImplBinder {
+ public:
+  enum class Synchronicity { Sync, Async };
+  virtual ~NetworkDeviceImplBinder() = default;
+  virtual zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>> Bind() = 0;
+  // Use this for binder specific teardown if needed. The return value indicates if the teardown
+  // is synchronous or asynchronous. Call |on_teardown_complete| when an asynchronous teardown has
+  // completed. If teardown is synchronous then |on_teardown_complete| should NOT be called, as seen
+  // in the base implementation here.
+  virtual Synchronicity Teardown(fit::callback<void()>&& on_teardown_complete) {
+    return Synchronicity::Sync;
+  }
 };
 
 class NetworkDeviceInterface {

@@ -1,19 +1,35 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "rx_queue.h"
 
-#include <lib/async/cpp/task.h>
-#include <lib/fdf/cpp/env.h>
+// #include <lib/async/cpp/task.h>
+// #include <lib/fdf/cpp/env.h>
 #include <zircon/assert.h>
 
-#include "log.h"
+// #include "log.h"
+#include <trace.h>
+
 #include "session.h"
+
+#define LOCAL_TRACE 0
 
 namespace network::internal {
 
-constexpr char kRxSchedulerRole[] = "fuchsia.devices.network.core.rx";
+struct rx_thread_wrapper_data {
+  std::unique_ptr<rx_space_buffer_t[]> buffers;
+  RxQueue* queue;
+};
+
+int rx_thread_wrapper(void* arg) {
+  struct rx_thread_wrapper_data* thread_data = (struct rx_thread_wrapper_data*)arg;
+  thread_data->queue->WatchThread(std::move(thread_data->buffers));
+  delete thread_data;
+  return 0;
+}
+// constexpr char kRxSchedulerRole[] = "fuchsia.devices.network.core.rx";
 
 std::atomic<uint32_t> RxQueue::num_instances_ = 0;
 
@@ -47,21 +63,24 @@ zx::result<std::unique_ptr<RxQueue>> RxQueue::Create(DeviceInterface* parent) {
   }
   queue->in_flight_ = std::move(in_flight.value());
 
-  auto device_depth = parent->info().rx_depth().value_or(0);
+  auto device_depth = parent->info().rx_depth;
 
-  std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> buffers(
-      new (&ac) fuchsia_hardware_network_driver::wire::RxSpaceBuffer[device_depth]);
+  std::unique_ptr<rx_space_buffer_t[]> buffers(new (&ac) rx_space_buffer_t[device_depth]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  if (zx_status_t status = zx::port::create(0, &queue->rx_watch_port_); status != ZX_OK) {
-    LOGF_ERROR("failed to create rx watch port: %s", zx_status_get_string(status));
+
+  KernelHandle<PortDispatcher> port;
+  zx_rights_t rights;
+  if (zx_status_t status = PortDispatcher::Create(0, &port, &rights); status != ZX_OK) {
+    TRACEF("failed to create rx watch port: %s\n", zx_status_get_string(status));
     return zx::error(status);
   }
+  queue->rx_watch_port_ = port.release();
 
   // Make sure the driver framework allows for the creation of the necessary threads. Keep track of
   // the number of RX queue instances globally.
-  uint32_t instances = ++num_instances_;
+  /*uint32_t instances = ++num_instances_;
   if (zx_status_t status =
           fdf_env_set_thread_limit(kRxSchedulerRole, strlen(kRxSchedulerRole), instances);
       status != ZX_OK && status != ZX_ERR_OUT_OF_RANGE) {
@@ -92,6 +111,20 @@ zx::result<std::unique_ptr<RxQueue>> RxQueue::Create(DeviceInterface* parent) {
                   [queue = queue.get(), rx_buffers = std::move(buffers)]() mutable {
                     queue->WatchThread(std::move(rx_buffers));
                   });
+                  */
+
+  auto thread_data = new (&ac) rx_thread_wrapper_data();
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  thread_data->buffers = std::move(buffers);
+  thread_data->queue = queue.get();
+
+  queue->thread_ =
+      Thread::Create("netdevice:rx_watch", rx_thread_wrapper, thread_data, DEFAULT_PRIORITY);
+  ZX_ASSERT_MSG(queue->thread_, "Thread::Create failed.");
+  queue->thread_->Resume();
 
   queue->running_ = true;
   return zx::ok(std::move(queue));
@@ -106,9 +139,9 @@ void RxQueue::TriggerRxWatch() {
   packet.type = ZX_PKT_TYPE_USER;
   packet.key = kTriggerRxKey;
   packet.status = ZX_OK;
-  zx_status_t status = rx_watch_port_.queue(&packet);
+  zx_status_t status = rx_watch_port_->QueueUser(packet);
   if (status != ZX_OK) {
-    LOGF_ERROR("TriggerRxWatch failed: %s", zx_status_get_string(status));
+    TRACEF("TriggerRxWatch failed: %s\n", zx_status_get_string(status));
   }
 }
 
@@ -120,14 +153,14 @@ void RxQueue::TriggerSessionChanged() {
   packet.type = ZX_PKT_TYPE_USER;
   packet.key = kSessionSwitchKey;
   packet.status = ZX_OK;
-  zx_status_t status = rx_watch_port_.queue(&packet);
+  zx_status_t status = rx_watch_port_->QueueUser(packet);
   if (status != ZX_OK) {
-    LOGF_ERROR("TriggerSessionChanged failed: %s", zx_status_get_string(status));
+    TRACEF("TriggerSessionChanged failed: %s\n", zx_status_get_string(status));
   }
 }
 
 void RxQueue::JoinThread() {
-  if (dispatcher_.get()) {
+  /*if (dispatcher_.get()) {
     zx_port_packet_t packet;
     packet.type = ZX_PKT_TYPE_USER;
     packet.key = kQuitWatchKey;
@@ -141,6 +174,19 @@ void RxQueue::JoinThread() {
     dispatcher_shutdown_.Wait();
     dispatcher_.reset();
     --num_instances_;
+  }*/
+
+  if (thread_) {
+    zx_port_packet_t packet;
+    packet.type = ZX_PKT_TYPE_USER;
+    packet.key = kQuitWatchKey;
+    if (zx_status_t status = rx_watch_port_->QueueUser(packet); status != ZX_OK) {
+      TRACEF("RxQueue::JoinThread failed to send quit key: %s", zx_status_get_string(status));
+    }
+    // Mark the queue as not running anymore.
+    running_ = false;
+    thread_->Join(nullptr, ZX_TIME_INFINITE);
+    thread_ = nullptr;
   }
 }
 
@@ -168,7 +214,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
   // Need to fetch more from the session.
   if (in_flight_->available() == 0) {
     // No more space to keep in flight buffers.
-    LOG_ERROR("can't fit more in-flight buffers");
+    TRACEF("can't fit more in-flight buffers\n");
     return std::make_tuple(nullptr, 0);
   }
 
@@ -177,7 +223,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
     case ZX_OK:
       break;
     default:
-      LOGF_ERROR("failed to load rx buffer descriptors: %s", zx_status_get_string(status));
+      TRACEF("failed to load rx buffer descriptors: %s\n", zx_status_get_string(status));
       __FALLTHROUGH;
     case ZX_ERR_PEER_CLOSED:  // Primary FIFO closed.
     case ZX_ERR_SHOULD_WAIT:  // No Rx buffers available in FIFO.
@@ -189,7 +235,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
   return std::make_tuple(&in_flight_->Get(idx), idx);
 }
 
-zx_status_t RxQueue::PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff) {
+zx_status_t RxQueue::PrepareBuff(rx_space_buffer_t* buff) {
   auto [session_buffer, index] = GetBuffer();
   if (session_buffer == nullptr) {
     return ZX_ERR_NO_RESOURCES;
@@ -211,25 +257,24 @@ zx_status_t RxQueue::PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceB
   return ZX_OK;
 }
 
-void RxQueue::CompleteRxList(
-    const fidl::VectorView<::fuchsia_hardware_network_driver::wire::RxBuffer>& rx_buffer_list) {
+void RxQueue::CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_list) {
   fbl::AutoLock lock(&parent_->rx_lock());
   SharedAutoLock control_lock(&parent_->control_lock());
-  device_buffer_count_ -= rx_buffer_list.count();
-  for (const auto& rx_buffer : rx_buffer_list.get()) {
+  device_buffer_count_ -= rx_buffer_list.size();
+  for (const auto& rx_buffer : rx_buffer_list) {
     // Always increment frame index for anything the device sends us. Sessions
     // get their local indices for frames that make their way through.
     rx_completed_frame_index_++;
-    ZX_ASSERT_MSG(rx_buffer.data.count() <= MAX_BUFFER_PARTS,
-                  "too many buffer parts in rx buffer: %ld", rx_buffer.data.count());
+    ZX_ASSERT_MSG(rx_buffer.data_count <= MAX_BUFFER_PARTS,
+                  "too many buffer parts in rx buffer: %ld", rx_buffer.data_count);
     std::array<SessionRxBuffer, MAX_BUFFER_PARTS> session_parts;
     auto session_parts_iter = session_parts.begin();
     bool drop_frame = false;
     uint32_t total_length = 0;
 
     Session* primary_session = nullptr;
-    cpp20::span rx_parts = rx_buffer.data.get();
-    for (const fuchsia_hardware_network_driver::wire::RxBufferPart& rx_part : rx_parts) {
+    cpp20::span rx_parts(rx_buffer.data_list, rx_buffer.data_count);
+    for (const rx_buffer_part_t& rx_part : rx_parts) {
       InFlightBuffer& in_flight_buffer = in_flight_->Get(rx_part.id);
 
       total_length += rx_part.length;
@@ -246,10 +291,8 @@ void RxQueue::CompleteRxList(
         // session, try and allocate buffers from it and copy things.
         // That's complicated enough and this is unexpected enough that the current decision is to
         // drop the frame on the floor.
-        LOGF_WARN(
-            "dropping chained frame with %ld buffers spanning different sessions: "
-            "%s, %s",
-            rx_buffer.data.count(), primary_session->name(), in_flight_buffer.session->name());
+        TRACEF("dropping chained frame with %ld buffers spanning different sessions:  %s, %s\n",
+               rx_buffer.data_count, primary_session->name(), in_flight_buffer.session->name());
         drop_frame = true;
       }
       ZX_DEBUG_ASSERT(in_flight_buffer.session != nullptr);
@@ -258,13 +301,13 @@ void RxQueue::CompleteRxList(
 
     if (!primary_session) {
       // Buffer contained no parts.
-      LOG_WARN("attempted to return an rx buffer with no parts");
+      TRACEF("attempted to return an rx buffer with no parts\n");
       continue;
     }
 
     // Drop any frames containing no data or where inconsistencies were found above.
     if (total_length == 0 || drop_frame) {
-      for (const fuchsia_hardware_network_driver::wire::RxBufferPart& rx_part : rx_parts) {
+      for (const rx_buffer_part_t& rx_part : rx_parts) {
         InFlightBuffer& in_flight_buffer = in_flight_->Get(rx_part.id);
         in_flight_buffer.session->AssertParentRxLock(*parent_);
         if (in_flight_buffer.session->CompleteUnfulfilledRx()) {
@@ -279,61 +322,60 @@ void RxQueue::CompleteRxList(
     }
 
     primary_session->AssertParentControlLockShared(*parent_);
-    parent_->NotifyPortRxFrame(rx_buffer.meta.port, total_length);
+    // parent_->NotifyPortRxFrame(rx_buffer.meta.port, total_length);
     const RxFrameInfo frame_info = {
         .meta = rx_buffer.meta,
-        .port_id_salt = parent_->GetPortSalt(rx_buffer.meta.port),
+        //.port_id_salt = parent_->GetPortSalt(rx_buffer.meta.port),
         .buffers = cpp20::span(session_parts.begin(), session_parts_iter),
         .total_length = total_length,
     };
     primary_session->AssertParentRxLock(*parent_);
     if (primary_session->CompleteRx(frame_info)) {
       std::for_each(rx_parts.begin(), rx_parts.end(),
-                    [this](const fuchsia_hardware_network_driver::wire::RxBufferPart& rx)
+                    [this](const rx_buffer_part_t& rx)
                         __TA_REQUIRES(parent_->rx_lock()) { available_queue_->Push(rx.id); });
     } else {
       std::for_each(rx_parts.begin(), rx_parts.end(),
-                    [this](const fuchsia_hardware_network_driver::wire::RxBufferPart& rx)
+                    [this](const rx_buffer_part_t& rx)
                         __TA_REQUIRES(parent_->rx_lock()) { in_flight_->Free(rx.id); });
     }
   }
   parent_->CommitAllSessions();
-  if (device_buffer_count_ <= parent_->rx_notify_threshold()) {
-    TriggerRxWatch();
-  }
-  parent_->TryDelegateRxLease(rx_completed_frame_index_);
+  // if (device_buffer_count_ <= parent_->rx_notify_threshold()) {
+  //   TriggerRxWatch();
+  // }
+  // parent_->TryDelegateRxLease(rx_completed_frame_index_);
 }
 
-int RxQueue::WatchThread(
-    std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> space_buffers) {
+int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
   auto loop = [this, space_buffers = std::move(space_buffers)]() -> zx_status_t {
-    fbl::RefPtr<RefCountedFifo> observed_fifo(nullptr);
+    fbl::RefPtr<FifoDispatcher> observed_fifo(nullptr);
     bool waiting_on_fifo = false;
     for (;;) {
       zx_port_packet_t packet;
       bool fifo_readable = false;
-      if (zx_status_t status = rx_watch_port_.wait(zx::time::infinite(), &packet);
+      if (zx_status_t status = rx_watch_port_->Dequeue(Deadline::infinite(), &packet);
           status != ZX_OK) {
-        LOGF_ERROR("RxQueue::WatchThread port wait failed %s", zx_status_get_string(status));
+        TRACEF("RxQueue::WatchThread port wait failed %s\n", zx_status_get_string(status));
         return status;
       }
-      parent_->NotifyRxQueuePacket(packet.key);
+      // parent_->NotifyRxQueuePacket(packet.key);
       switch (packet.key) {
         case kQuitWatchKey:
-          LOG_TRACE("RxQueue::WatchThread got quit key");
+          TRACEF("RxQueue::WatchThread got quit key\n");
           return ZX_OK;
         case kSessionSwitchKey:
           if (observed_fifo && waiting_on_fifo) {
-            if (zx_status_t status = rx_watch_port_.cancel(observed_fifo->fifo, kFifoWatchKey);
+            if (zx_status_t status =
+                    rx_watch_port_->CancelQueued(observed_fifo.get(), kFifoWatchKey);
                 status != ZX_OK) {
-              LOGF_ERROR("RxQueue::WatchThread port cancel failed %s",
-                         zx_status_get_string(status));
+              TRACEF("RxQueue::WatchThread port cancel failed %s\n", zx_status_get_string(status));
               return status;
             }
             waiting_on_fifo = false;
           }
           observed_fifo = parent_->primary_rx_fifo();
-          LOGF_TRACE("RxQueue primary FIFO changed, valid=%d", static_cast<bool>(observed_fifo));
+          TRACEF("RxQueue primary FIFO changed, valid=%d\n", static_cast<bool>(observed_fifo));
           break;
         case kFifoWatchKey:
           if ((packet.signal.observed & ZX_FIFO_PEER_CLOSED) || packet.status != ZX_OK) {
@@ -342,7 +384,7 @@ int RxQueue::WatchThread(
             // `DeviceInterface` to signal us that a new primary session is available when that
             // happens.
             observed_fifo.reset();
-            LOGF_TRACE("RxQueue fifo closed or bad status %s", zx_status_get_string(packet.status));
+            TRACEF("RxQueue fifo closed or bad status %s\n", zx_status_get_string(packet.status));
           } else {
             fifo_readable = true;
           }
@@ -358,7 +400,7 @@ int RxQueue::WatchThread(
 
       fbl::AutoLock rx_lock(&parent_->rx_lock());
       SharedAutoLock control_lock(&parent_->control_lock());
-      const uint16_t rx_depth = parent_->info().rx_depth().value_or(0);
+      const uint16_t rx_depth = parent_->info().rx_depth;
       size_t push_count = rx_depth - device_buffer_count_;
       if (parent_->IsDataPlaneOpen()) {
         for (; pushed < push_count; pushed++) {
@@ -386,7 +428,7 @@ int RxQueue::WatchThread(
       if (pushed != 0) {
         // Send buffers in batches of at most |MAX_RX_SPACE_BUFFERS| at a time to stay within the
         // FIDL channel maximum.
-        netdriver::wire::RxSpaceBuffer* buffers = space_buffers.get();
+        rx_space_buffer_t* buffers = space_buffers.get();
         while (pushed > 0) {
           const uint32_t batch = std::min(static_cast<uint32_t>(pushed), MAX_RX_SPACE_BUFFERS);
           parent_->QueueRxSpace(cpp20::span(buffers, static_cast<uint32_t>(batch)));
@@ -401,14 +443,16 @@ int RxQueue::WatchThread(
         if (!observed_fifo) {
           // This can happen if we get triggered to fetch more buffers, but the primary session is
           // already tearing down, it's fine to just proceed.
-          LOG_TRACE("RxQueue::WatchThread Should wait but no FIFO is here");
+          TRACEF("RxQueue::WatchThread Should wait but no FIFO is here\n");
         } else if (!waiting_on_fifo) {
-          zx_status_t status = observed_fifo->fifo.wait_async(
-              rx_watch_port_, kFifoWatchKey, ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED, 0);
+          HandleOwner fifo_hdl = Handle::Make(observed_fifo, ZX_DEFAULT_FIFO_RIGHTS);
+          zx_status_t status = rx_watch_port_->MakeObserver(0, fifo_hdl.get(), kFifoWatchKey,
+                                                            ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED);
           if (status == ZX_OK) {
+            fifo_hdl.release();
             waiting_on_fifo = true;
           } else {
-            LOGF_ERROR("RxQueue::WatchThread wait_async failed: %s", zx_status_get_string(status));
+            TRACEF("RxQueue::WatchThread wait_async failed: %s\n", zx_status_get_string(status));
             return status;
           }
         }
@@ -418,9 +462,9 @@ int RxQueue::WatchThread(
 
   zx_status_t status = loop();
   if (status != ZX_OK) {
-    LOGF_ERROR("RxQueue::WatchThread finished loop with error: %s", zx_status_get_string(status));
+    TRACEF("RxQueue::WatchThread finished loop with error: %s\n", zx_status_get_string(status));
   }
-  LOG_TRACE("watch thread done");
+  TRACEF("watch thread done\n");
   return 0;
 }
 

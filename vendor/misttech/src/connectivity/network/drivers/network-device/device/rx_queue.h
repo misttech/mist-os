@@ -1,13 +1,10 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
-#define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
-
-#include <lib/sync/cpp/completion.h>
-#include <lib/zx/port.h>
-#include <lib/zx/thread.h>
+#ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
+#define VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -20,6 +17,7 @@
 namespace network::internal {
 
 class Session;
+int rx_thread_wrapper(void* arg);
 
 class RxQueue {
  public:
@@ -45,8 +43,7 @@ class RxQueue {
   // Called by the DeviceInterface parent when the session is marked as dead.
   void PurgeSession(Session& session);
   // Returns rx buffers to their respective sessions.
-  void CompleteRxList(
-      const fidl::VectorView<::fuchsia_hardware_network_driver::wire::RxBuffer>& rx_buffer_list)
+  void CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_list)
       __TA_EXCLUDES(parent_->rx_lock());
   // Notifies watcher thread that the primary session changed.
   void TriggerSessionChanged();
@@ -81,6 +78,7 @@ class RxQueue {
   };
 
  private:
+  friend int rx_thread_wrapper(void* arg);
   explicit RxQueue(DeviceInterface* parent) : parent_(parent) {}
 
   struct InFlightBuffer {
@@ -97,10 +95,9 @@ class RxQueue {
       __TA_REQUIRES_SHARED(parent_->control_lock());
   // Pops a buffer from the queue, if any are available, and stores the space information in `buff`.
   // Returns ZX_ERR_NO_RESOURCES if there are no buffers available.
-  zx_status_t PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff)
-      __TA_REQUIRES(parent_->rx_lock()) __TA_REQUIRES_SHARED(parent_->control_lock());
-  int WatchThread(
-      std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> space_buffers);
+  zx_status_t PrepareBuff(rx_space_buffer_t* buff) __TA_REQUIRES(parent_->rx_lock())
+      __TA_REQUIRES_SHARED(parent_->control_lock());
+  int WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers);
 
   // Reclaims the buffer with `id` from the device. If the buffer's session is still valid, gives it
   // to the session, otherwise drops it.
@@ -113,9 +110,10 @@ class RxQueue {
   size_t device_buffer_count_ __TA_GUARDED(parent_->rx_lock()) = 0;
   uint64_t rx_completed_frame_index_ __TA_GUARDED(parent_->rx_lock()) = 0;
 
-  zx::port rx_watch_port_;
-  fdf::Dispatcher dispatcher_;
-  libsync::Completion dispatcher_shutdown_;
+  fbl::RefPtr<PortDispatcher> rx_watch_port_;
+  // fdf::Dispatcher dispatcher_;
+  struct Thread* thread_ = nullptr;
+  // libsync::Completion dispatcher_shutdown_;
   std::atomic<bool> running_;
 
   static std::atomic<uint32_t> num_instances_;
@@ -133,4 +131,4 @@ class RxSessionTransaction : public RxQueue::SessionTransaction {
 
 }  // namespace network::internal
 
-#endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
+#endif  // VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
