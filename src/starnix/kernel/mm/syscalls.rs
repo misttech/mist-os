@@ -30,9 +30,9 @@ use starnix_uapi::{
     FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI, FUTEX_LOCK_PI2,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI, FUTEX_WAIT,
     FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET, FUTEX_WAKE_OP,
-    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE,
-    MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK, MS_INVALIDATE,
-    O_CLOEXEC, O_NONBLOCK, PROT_EXEC, UFFD_USER_MODE_ONLY,
+    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_LOCKED,
+    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
+    MS_INVALIDATE, O_CLOEXEC, O_NONBLOCK, PROT_EXEC, UFFD_USER_MODE_ONLY,
 };
 use std::ops::Deref as _;
 use zx;
@@ -101,7 +101,8 @@ where
         | MAP_NORESERVE
         | MAP_STACK
         | MAP_DENYWRITE
-        | MAP_GROWSDOWN;
+        | MAP_GROWSDOWN
+        | MAP_LOCKED;
     if flags & !valid_flags != 0 {
         if flags & MAP_SHARED_VALIDATE != 0 {
             return error!(EOPNOTSUPP);
@@ -151,6 +152,11 @@ where
     }
     if flags & MAP_POPULATE != 0 {
         options |= MappingOptions::POPULATE;
+    }
+    if flags & MAP_LOCKED != 0 {
+        // The kernel isn't expected to return an error if locking fails with this flag, so for now
+        // this implementation will always fail to lock memory even if mapping succeeds.
+        track_stub!(TODO("https://fxbug.dev/406377606"), "MAP_LOCKED");
     }
 
     security::mmap_file(current_task, &file, prot_flags, options)?;

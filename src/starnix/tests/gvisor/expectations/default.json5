@@ -464,7 +464,6 @@
                 "MMapFileTest.MapLastPositivePage",
                 "MMapFileTest.MapSecondToLastNegativePage",
                 "MMapTest.ExceedLimitAS",
-                "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
 
                 // mount_test
