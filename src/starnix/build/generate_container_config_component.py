@@ -26,10 +26,12 @@ def main() -> int:
     with args.overrides as f:
         overrides = json.load(f)
 
+    known_keys = []
     capabilities = []
     expose = []
     for cap_schema in schema["use"]:
         key = cap_schema["key"]
+        known_keys.append(key)
         if key in overrides:
             value = overrides[key]
             # Remove known config keys from the overrides so after this only unknown keys remain.
@@ -54,9 +56,14 @@ def main() -> int:
         )
 
     if len(overrides) > 0:
-        raise Exception(
-            "Unknown config keys for container config.", list(overrides.keys())
-        )
+        known_keys = sorted(known_keys)
+        print(f"\nERROR: Unknown config keys:")
+        for key in overrides:
+            print(f"\t* {key}")
+        print(f"\nValid keys for container config overrides:")
+        for key in known_keys:
+            print(f"\t* {key}")
+        return 1
 
     manifest = {
         "capabilities": capabilities,
