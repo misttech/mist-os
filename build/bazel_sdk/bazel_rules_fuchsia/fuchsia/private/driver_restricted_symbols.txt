@@ -1056,7 +1056,6 @@ __tre_mem_destroy
 __tre_mem_new_impl
 trunc
 truncate
-truncf
 truncl
 tss_create
 tss_delete
