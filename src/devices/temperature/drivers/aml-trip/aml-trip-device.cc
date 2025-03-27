@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.trippoint/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.trippoint/cpp/wire_types.h>
-#include <lib/ddk/debug.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -17,6 +16,7 @@
 #include <src/devices/temperature/drivers/aml-trip/util.h>
 
 #include "aml-tsensor-regs.h"
+
 namespace temperature {
 
 void AmlTripDevice::Init() {
