@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::broker::{Lease, LeaseID};
-use crate::topology::{Dependency, Element};
+use crate::topology::{Dependency, Element, Topology};
 use crate::ElementID;
 use either::Either;
 use fuchsia_inspect::{ArrayProperty, Property};
@@ -126,22 +126,25 @@ impl ElementData {
         }
     }
 
-    fn set_current_level(&self, level: fpb::PowerLevel) {
-        match &self.current_level {
-            None => {}
-            Some(Either::Left(property)) => property.set(level as u64),
-            Some(Either::Right(_)) => {
-                unreachable!("we shouldn't be setting current level for an unsatisfiable element");
-            }
+    fn update_level(&self, update_level: &UpdateLevelInfo) {
+        if let Some(level) = update_level.current {
+            self.inner_update_level(&self.current_level, level);
+        }
+        if let Some(level) = update_level.required {
+            self.inner_update_level(&self.required_level, level)
         }
     }
 
-    fn set_required_level(&self, level: fpb::PowerLevel) {
-        match &self.required_level {
+    fn inner_update_level(
+        &self,
+        property: &Option<Either<inspect::UintProperty, inspect::StringProperty>>,
+        level: fpb::PowerLevel,
+    ) {
+        match property {
             None => {}
             Some(Either::Left(property)) => property.set(level as u64),
             Some(Either::Right(_)) => {
-                unreachable!("we shouldn't be setting required level for an unsatisfiable element");
+                unreachable!("we shouldn't be setting level for an unsatisfiable element");
             }
         }
     }
@@ -428,27 +431,20 @@ impl TopologyInspect {
         });
     }
 
-    pub fn on_update_current_level(&self, element: &Element, level: fpb::PowerLevel) {
+    pub fn on_update_level(&self, element: &Element, info: UpdateLevelInfo) {
         let Some(ref inspect_vertex) = element.inspect_vertex else {
             return;
         };
         let mut vertex = inspect_vertex.borrow_mut();
-        vertex.meta().set_current_level(level);
+        vertex.meta().update_level(&info);
         self.maybe_record_event(element, UPDATE_LEVEL_EVENT, |node| {
             node.record_uint(ELEMENT_ID, *element.id);
-            node.record_uint(CURRENT_LEVEL, level.into());
-        });
-    }
-
-    pub fn on_update_required_level(&self, element: &Element, level: fpb::PowerLevel) {
-        let Some(ref inspect_vertex) = element.inspect_vertex else {
-            return;
-        };
-        let mut vertex = inspect_vertex.borrow_mut();
-        vertex.meta().set_required_level(level);
-        self.maybe_record_event(element, UPDATE_LEVEL_EVENT, |node| {
-            node.record_uint(ELEMENT_ID, *element.id);
-            node.record_uint(REQUIRED_LEVEL, level.into());
+            if let Some(level) = info.current {
+                node.record_uint(CURRENT_LEVEL, level.into());
+            }
+            if let Some(level) = info.required {
+                node.record_uint(REQUIRED_LEVEL, level.into());
+            }
         });
     }
 
@@ -518,6 +514,53 @@ impl TopologyInspect {
                     node.record_child(event_name, callback);
                 });
                 self.shadow.lock().unwrap().add_entry(ShadowEvent { time: instant })
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct UpdateLevelInspectWriter {
+    events: HashMap<ElementID, UpdateLevelInfo>,
+}
+
+pub struct UpdateLevelInfo {
+    timestamp: zx::BootInstant,
+    required: Option<fpb::PowerLevel>,
+    current: Option<fpb::PowerLevel>,
+}
+
+impl UpdateLevelInfo {
+    pub fn required(level: fpb::PowerLevel) -> Self {
+        Self { timestamp: zx::BootInstant::get(), current: None, required: Some(level) }
+    }
+}
+
+impl UpdateLevelInspectWriter {
+    pub fn update_current_level(&mut self, element_id: ElementID, level: fpb::PowerLevel) {
+        let entry = self.events.entry(element_id).or_insert_with(|| UpdateLevelInfo {
+            timestamp: zx::BootInstant::get(),
+            required: None,
+            current: None,
+        });
+        entry.current = Some(level);
+    }
+
+    pub fn update_required_level(&mut self, element_id: ElementID, level: fpb::PowerLevel) {
+        let entry = self.events.entry(element_id).or_insert_with(|| UpdateLevelInfo {
+            timestamp: zx::BootInstant::get(),
+            required: None,
+            current: None,
+        });
+        entry.required = Some(level);
+    }
+
+    pub fn commit(self, topology: &Topology) {
+        let mut events = self.events.into_iter().collect::<Vec<_>>();
+        events.sort_by(|(_, a), (_, b)| a.timestamp.cmp(&b.timestamp));
+        for (element_id, data) in events {
+            if let Some(element) = topology.get_element(&element_id) {
+                topology.inspect().on_update_level(element, data);
             }
         }
     }

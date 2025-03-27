@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::inspect::{UpdateLevelInfo, UpdateLevelInspectWriter};
 use anyhow::{anyhow, Context, Error};
 use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_power_broker::{
@@ -11,7 +12,7 @@ use fidl_fuchsia_power_broker::{
 use fuchsia_inspect::{InspectType as IType, Node as INode};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use itertools::Itertools;
-use std::borrow::Cow;
+use std::borrow::{BorrowMut, Cow};
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
@@ -271,15 +272,16 @@ impl Broker {
                                 self.catalog.assertive_claims.deactivate_claim(&c.id);
                             }
                             self.catalog.opportunistic_claims.deactivate_claim(&c.id);
-                            affected_elements.insert(c.requires().element_id.clone());
+                            affected_elements.insert(c.requires().element_id);
                             affected_leases.insert(lease_id.clone());
                         });
                 }
             });
         affected_elements.remove(&element_id);
-        self.update_required_levels(affected_elements.iter());
+        let affected_elements = affected_elements.into_iter().collect::<Vec<_>>();
+        self.update_required_levels(affected_elements.iter(), None);
         if affected_elements.len() > 1 {
-            self.update_required_level(&element_id, prev_level.clone());
+            self.update_required_level(&element_id, prev_level.clone(), None);
         }
         for lease in affected_leases {
             self.update_lease_status(&lease);
@@ -444,9 +446,8 @@ impl Broker {
             self.current.insert(element_id.clone(), level_admin);
         }
 
-        if let Some(element) = self.catalog.topology.get_element(element_id) {
-            self.catalog.topology.inspect().on_update_current_level(&element, level.level);
-        }
+        let mut inspect_writer = UpdateLevelInspectWriter::default();
+        inspect_writer.update_current_level(*element_id, level.level);
 
         fuchsia_trace::counter!(
             c"power-broker", c"current_level", 0,
@@ -459,9 +460,10 @@ impl Broker {
                     "update_current_level_internal({element_id}): transitioned to {level:?}"
                 );
                 self.in_transition.remove(element_id);
-                self.update_required_levels([element_id].into_iter());
+                self.update_required_levels([element_id].into_iter(), Some(&mut inspect_writer));
             }
         }
+        inspect_writer.commit(&self.catalog.topology);
         previous
     }
 
@@ -480,6 +482,7 @@ impl Broker {
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
+        inspect_writer: Option<&mut UpdateLevelInspectWriter>,
     ) -> Option<IndexedPowerLevel> {
         let previous = self.get_required_level(element_id);
         if previous == Some(level) {
@@ -495,8 +498,13 @@ impl Broker {
                 self.in_transition.insert(element_id.clone(), level);
             }
         }
-        if let Some(element) = self.catalog.topology.get_element(element_id) {
-            self.catalog.topology.inspect().on_update_required_level(&element, level.level)
+        if let Some(inspect) = inspect_writer {
+            inspect.update_required_level(*element_id, level.level);
+        } else if let Some(element) = self.catalog.topology.get_element(&element_id) {
+            self.catalog
+                .topology
+                .inspect()
+                .on_update_level(&element, UpdateLevelInfo::required(level.level));
         }
         fuchsia_trace::counter!(
             c"power-broker", c"required_level", 0,
@@ -794,7 +802,7 @@ impl Broker {
             }
             None => unreachable!("The lease must be present when updating the status."),
         };
-        self.update_required_levels([synthetic_element_id].iter());
+        self.update_required_levels([synthetic_element_id].iter(), None);
         if prev_status.as_ref() != Some(&status) {
             if let Some(element) = self.catalog.topology.get_element(&underlying_element_id) {
                 let Some(lease) = self.catalog.leases.get(lease_id) else {
@@ -837,11 +845,19 @@ impl Broker {
         self.catalog.watch_lease_status(lease_id)
     }
 
-    fn update_required_levels<'a>(&mut self, element_ids: impl Iterator<Item = &'a ElementID>) {
+    fn update_required_levels<'a>(
+        &mut self,
+        element_ids: impl Iterator<Item = &'a ElementID>,
+        mut inspect_writer: Option<&mut UpdateLevelInspectWriter>,
+    ) {
         for element_id in element_ids {
             let new_required_level = self.catalog.calculate_required_level(element_id);
             log::debug!("update required level({:?}, {:?})", element_id, new_required_level);
-            self.update_required_level(element_id, new_required_level);
+            self.update_required_level(
+                element_id,
+                new_required_level,
+                inspect_writer.as_mut().map(BorrowMut::borrow_mut),
+            );
         }
     }
 
@@ -883,7 +899,7 @@ impl Broker {
         for claim in &claims_to_activate {
             self.catalog.assertive_claims.activate_claim(&claim.id);
         }
-        self.update_required_levels(element_ids_required_by_claims(&claims_to_activate));
+        self.update_required_levels(element_ids_required_by_claims(&claims_to_activate), None);
     }
 
     /// Examines the direct assertive and opportunistic dependencies of an element level
@@ -1005,7 +1021,7 @@ impl Broker {
             }
         }
         let element_ids_affected = element_ids_required_by_claims(claims).collect::<Vec<_>>();
-        self.update_required_levels(element_ids_affected.iter().map(|id| *id));
+        self.update_required_levels(element_ids_affected.iter().map(|id| *id), None);
         // Update the status of all leases with opportunistic claims no longer satisfied.
         let mut leases_affected = HashSet::new();
         for element_id in element_ids_affected {
@@ -1013,11 +1029,11 @@ impl Broker {
             // determine if there are still any assertive claims that would
             // satisfy these opportunistic claims.
             let max_required_by_assertive = max_level_required_by_claims(
-                &self.catalog.assertive_claims.activated.for_required_element(element_id),
+                &self.catalog.assertive_claims.activated.for_required_element(&element_id),
             )
-            .unwrap_or_else(|| self.catalog.minimum_level(element_id));
+            .unwrap_or_else(|| self.catalog.minimum_level(&element_id));
             for opportunistic_claim in
-                self.catalog.opportunistic_claims.activated.for_required_element(element_id)
+                self.catalog.opportunistic_claims.activated.for_required_element(&element_id)
             {
                 if !max_required_by_assertive.satisfies(opportunistic_claim.requires().level) {
                     log::debug!("opportunistic_claim {opportunistic_claim} no longer satisfied, must reevaluate lease {}", opportunistic_claim.lease_id);
@@ -1046,7 +1062,7 @@ impl Broker {
                 self.catalog.opportunistic_claims.deactivate_claim(&claim.id);
             }
         }
-        self.update_required_levels(element_ids_required_by_claims(claims));
+        self.update_required_levels(element_ids_required_by_claims(claims), None);
     }
 
     pub fn add_element(
@@ -1066,9 +1082,11 @@ impl Broker {
             .get_level_index(&id, &initial_current_level)
             .ok_or(AddElementError::Invalid)?;
         let current_level = initial_current_level.level;
+        // TODO(https://fxbug.dev/404631256): use bundle inspect event writer pattern for this.
         self.update_current_level_internal(&id, initial_current_level);
         let minimum_level = self.catalog.topology.minimum_level(&id);
-        self.update_required_level(&id, minimum_level);
+        // TODO(https://fxbug.dev/404631256): use bundle inspect event writer pattern for this.
+        self.update_required_level(&id, minimum_level, None);
         self.catalog.topology.initialize_element_inspect(
             &id,
             valid_levels,
@@ -1280,7 +1298,9 @@ impl Claim {
 }
 
 /// Returns a Vec of unique ElementIDs required by claims.
-fn element_ids_required_by_claims<'a>(claims: &'a [Claim]) -> impl Iterator<Item = &'a ElementID> {
+fn element_ids_required_by_claims<'a>(
+    claims: &'a [Claim],
+) -> impl Iterator<Item = &'a ElementID> + use<'a> {
     claims.into_iter().map(|c| &c.requires().element_id).unique()
 }
 
@@ -2336,10 +2356,10 @@ mod tests {
         broker.update_current_level(&latinum, ZERO);
 
         // Update required level to 1.
-        broker.update_required_level(&latinum, ONE);
+        broker.update_required_level(&latinum, ONE, None);
 
         // Update required level to 1 again, should have no additional effect.
-        broker.update_required_level(&latinum, ONE);
+        broker.update_required_level(&latinum, ONE, None);
 
         // Update current level to 1.
         // This should drop the current required level to ZERO, because there
@@ -2415,12 +2435,6 @@ mod tests {
                         update_level: {
                             element_id: *latinum,
                             current_level: 1u64,
-                        }
-                    },
-                    "5": {
-                        "@time": AnyProperty,
-                        update_level: {
-                            element_id: *latinum,
                             required_level: 0u64,
                         }
                     },
