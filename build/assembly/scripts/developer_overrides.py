@@ -149,6 +149,7 @@ def main() -> int:
         product=overrides_from_gn.product,
         board=overrides_from_gn.board,
         bootfs_files_package=overrides_from_gn.bootfs_files_package,
+        packages_to_compile=overrides_from_gn.packages_to_compile,
     )
 
     overrides_for_assembly.shell_commands = {}
