@@ -173,7 +173,7 @@ pub enum CreateSymbolizerError {
 }
 
 /// Errors that can occur when adding mappings.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum AddMappingError {
     /// A module's mapping information got out of sync in the symbolizer.
     #[error("Provided mapping does not have consistent start/offset.")]
@@ -185,7 +185,7 @@ pub enum AddMappingError {
 }
 
 /// Errors that can occur when resolving addresses.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum ResolveError {
     /// The C++ side did not populate any results at all for an address. Usually caused by an
     /// address not overlapping with any mappings.
