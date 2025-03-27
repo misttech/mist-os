@@ -163,6 +163,14 @@ class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware
     completer.Reply(voltage_step_);
   }
 
+  void Enable(EnableCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void Disable(DisableCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }

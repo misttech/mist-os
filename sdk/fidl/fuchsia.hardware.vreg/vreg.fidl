@@ -9,6 +9,8 @@ using zx;
 @discoverable
 closed protocol Vreg {
     // Set the step which yields a voltage of min_uv + step_size_uv * step.
+    // Any regulator that is disabled must remain disabled but the new voltage setting must be
+    // cached and applied the next time the regulator is enabled.
     strict SetVoltageStep(struct {
         step uint32;
     }) -> () error zx.Status;
@@ -17,6 +19,20 @@ closed protocol Vreg {
     strict GetVoltageStep() -> (struct {
         result uint32;
     });
+
+    // Enable this regulator.
+    // If Enable() is called before the regulator has been configured via a call to `SetVoltageStep`
+    // then the behavior of this method call is left up to the implementation. The implementation
+    // may choose to return an error or set the voltage to some nominal value.
+    // The client should not make any assumptions about the state of the regulator at boot time.
+    // The enable status of the regulator at boot time is left up to the implementation.
+    // Returns `ZX_ERR_NOT_SUPPORTED` if this regulator does not support being Enabled.
+    // Returns `ZX_ERR_TIMED_OUT` if the voltage did not settle in an appropriate period of time.
+    strict Enable() -> () error zx.Status;
+
+    // Disable this regulator.
+    // Returns `ZX_ERR_NOT_SUPPORTED` if this regulator does not support being Disabled.
+    strict Disable() -> () error zx.Status;
 
     // Obtain the parameters for this voltage regulator.
     // The output for this voltage regulator is defined by the

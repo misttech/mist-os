@@ -94,6 +94,14 @@ void AmlPwmRegulator::GetRegulatorParams(GetRegulatorParamsCompleter::Sync& comp
   completer.Reply(min_voltage_uv_, voltage_step_uv_, num_steps_);
 }
 
+void AmlPwmRegulator::Enable(EnableCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void AmlPwmRegulator::Disable(DisableCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
     const VregMetadata& metadata, AmlPwmRegulatorDriver* driver) {
   auto connect_result = driver->incoming()->Connect<fuchsia_hardware_pwm::Service::Pwm>("pwm");
