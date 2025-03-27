@@ -182,19 +182,6 @@ source_set("thread") {
   ]
 }
 
-source_set("thread_profile") {
-  configs += [ "..:platform_include_config" ]
-
-  sources = [ "zircon_platform_thread_profile.cc" ]
-
-  deps = [
-    "..:thread_header",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma/util:short_macros",
-    "//src/lib/ddk",
-  ]
-}
-
 source_set("thread_profile_dfv2") {
   configs += [ "..:platform_include_config" ]
 
@@ -269,14 +256,6 @@ source_set("logger") {
     "//sdk/lib/syslog/structured_backend",
     "//zircon/system/ulib/zx",
   ]
-}
-
-source_set("logger_for_system_drivers") {
-  public_deps = [ "..:logger_header" ]
-
-  sources = [ "zircon_platform_logger_ddk.cc" ]
-
-  deps = [ "//src/lib/ddk" ]
 }
 
 source_set("logger_for_dfv2") {

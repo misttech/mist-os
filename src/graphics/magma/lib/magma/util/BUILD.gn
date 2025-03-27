@@ -71,7 +71,6 @@ source_set("short_macros") {
     "//src/graphics/magma/lib/magma/platform/zircon:*",
     "//src/graphics/magma/lib/magma_client/mock:*",
     "//src/graphics/magma/lib/magma_service/mock:*",
-    "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:*",
     "//src/graphics/magma/lib/magma_service/sys_driver/tests:*",
     "//src/graphics/magma/tests/msd_conformance_tests:*",
     "//src/graphics/magma/tests/unit_tests:*",
