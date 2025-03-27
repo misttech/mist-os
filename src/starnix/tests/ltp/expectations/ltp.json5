@@ -128,7 +128,6 @@
                 "mprotect05",
                 "msync03",
                 "msync04",
-                "munlock02",
                 "munlockall01",
                 "perf_event_open01",
 

@@ -450,7 +450,6 @@
                 // mlock_test
                 "MapLockedTest.Basic",
                 "MapLockedTest.RlimitMemlockZero",
-                "MunlockTest.Basic",
                 "MlockallTest.Future",
                 "MunlockallTest.Basic",
                 "MapLockedTest.RlimitMemlockInsufficient",

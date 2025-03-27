@@ -142,6 +142,11 @@ impl Mapping {
         self.mlock = mlock.map(Box::new);
     }
 
+    pub fn clear_mlock(&mut self) {
+        self.flags = self.flags.difference(MappingFlags::LOCKED);
+        self.mlock = None;
+    }
+
     #[cfg(feature = "alternate_anon_allocs")]
     pub fn new_private_anonymous(flags: MappingFlags, name: MappingName) -> Mapping {
         Mapping {

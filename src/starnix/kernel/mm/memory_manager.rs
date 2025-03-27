@@ -1697,6 +1697,55 @@ impl MemoryManagerState {
         }
     }
 
+    pub fn munlock(
+        &mut self,
+        _current_task: &CurrentTask,
+        desired_addr: UserAddress,
+        desired_length: usize,
+    ) -> Result<(), Errno> {
+        let desired_end_addr =
+            desired_addr.checked_add(desired_length).ok_or_else(|| errno!(EINVAL))?;
+        let start_addr = round_down_to_system_page_size(desired_addr)?;
+        let end_addr = round_up_to_system_page_size(desired_end_addr)?;
+
+        let mut updates = vec![];
+        let mut bytes_mapped_in_range = 0;
+        for (range, mapping) in self.mappings.intersection(start_addr..end_addr) {
+            let mut range = range.clone();
+            let mut mapping = mapping.clone();
+
+            // Handle mappings that start before the region to be locked.
+            if range.start < start_addr {
+                // Mappings know about their starting location within the backing memory, so
+                // clamping the range isn't enough.
+                mapping.split_prefix_off(range.start, (start_addr - range.start) as u64);
+                range.start = start_addr;
+            }
+            // Handle mappings that extend past the region to be locked.
+            range.end = std::cmp::min(range.end, end_addr);
+
+            bytes_mapped_in_range += (range.end - range.start) as u64;
+
+            if mapping.flags().contains(MappingFlags::LOCKED) {
+                // This clears the locking for the shadow process pin flavor. It's not currently
+                // possible to actually unlock pages that were locked with the
+                // ZX_VMAR_OP_ALWAYS_NEED pin flavor.
+                mapping.clear_mlock();
+                updates.push((range, mapping));
+            }
+        }
+
+        if bytes_mapped_in_range as usize != end_addr - start_addr {
+            return error!(ENOMEM);
+        }
+
+        for (range, mapping) in updates {
+            self.mappings.insert(range, mapping);
+        }
+
+        Ok(())
+    }
+
     pub fn total_locked_bytes(&self) -> u64 {
         self.num_locked_bytes(
             UserAddress::from(self.user_vmar_info.base as u64)

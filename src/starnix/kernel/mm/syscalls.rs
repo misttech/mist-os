@@ -684,12 +684,12 @@ pub fn sys_mlock2(
 
 pub fn sys_munlock(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _addr: UserAddress,
-    _length: usize,
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    length: usize,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297591218"), "munlock");
-    Ok(())
+    let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
+    mm.state.write().munlock(current_task, addr, length)
 }
 
 pub fn sys_mlockall(
