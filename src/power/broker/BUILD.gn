@@ -47,6 +47,7 @@ rustc_binary("bin") {
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:log",
@@ -63,6 +64,7 @@ rustc_binary("bin") {
   sources = [
     "src/broker.rs",
     "src/credentials.rs",
+    "src/inspect.rs",
     "src/main.rs",
     "src/topology.rs",
   ]

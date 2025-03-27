@@ -30,6 +30,7 @@ use crate::topology::{ElementID, IndexedPowerLevel};
 
 mod broker;
 mod credentials;
+mod inspect;
 mod topology;
 
 /// Wraps all hosted protocols into a single type that can be matched against

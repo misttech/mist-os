@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
+use crate::inspect::{DependencyData, ElementData, TopologyInspect};
 use fidl_fuchsia_power_broker::{self as fpb};
-use fuchsia_inspect::Node as INode;
-use fuchsia_inspect_contrib::graph::{
-    Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
-    Vertex as IGraphVertex,
-};
+use fuchsia_inspect as inspect;
+use fuchsia_inspect_contrib::graph as igraph;
 use rand::distributions::{Alphanumeric, DistString};
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -59,6 +57,12 @@ pub const ID_DEBUG_MODE: bool = false;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ElementID {
     id: String,
+}
+
+impl ElementID {
+    pub fn as_str(&self) -> &str {
+        self.id.as_str()
+    }
 }
 
 impl fmt::Display for ElementID {
@@ -114,16 +118,12 @@ impl fmt::Display for Dependency {
 
 #[derive(Clone, Debug)]
 pub struct Element {
-    // Suppress 'dead_code' warning as no one currently accesses this ID from the element structure
-    // itself and we instead store the elements in a map indexed by this ID. This is still useful
-    // to keep around when we need to debug cloned Element objects.
-    #[allow(dead_code)]
-    id: ElementID,
-    name: String,
+    pub(crate) id: ElementID,
+    pub(crate) name: String,
     valid_levels: Vec<IndexedPowerLevel>,
-    synthetic: bool,
-    inspect_vertex: Option<Rc<RefCell<IGraphVertex<ElementID>>>>,
-    inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
+    pub(crate) synthetic: bool,
+    pub(crate) inspect_vertex: Option<Rc<RefCell<igraph::Vertex<ElementData>>>>,
+    pub(crate) inspect_edges: Rc<RefCell<HashMap<ElementID, igraph::Edge<DependencyData>>>>,
 }
 
 impl Element {
@@ -188,10 +188,7 @@ pub struct Topology {
     assertive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     opportunistic_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     unsatisfiable_element_id: ElementID,
-    inspect_graph: IGraph<ElementID>,
-    _inspect_node: INode,                       // keeps inspect_graph alive
-    synthetic_inspect_graph: IGraph<ElementID>, // holds synthetic nodes
-    _synthetic_inspect_node: INode,             // keeps synthetic_inspect_graph
+    inspect: TopologyInspect,
 }
 
 impl Topology {
@@ -199,20 +196,16 @@ impl Topology {
     const TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS: [fpb::PowerLevel; 2] =
         [fpb::PowerLevel::MIN, fpb::PowerLevel::MAX];
 
-    pub fn new(inspect_node: INode, inspect_max_event: usize) -> Self {
-        let synthetic_inspect_node = inspect_node.create_child("fuchsia.inspect.synthetic.Graph");
+    pub fn new(parent_inspect_node: &inspect::Node, inspect_max_event: usize) -> Self {
         let mut topology = Topology {
             elements: HashMap::new(),
             assertive_dependencies: HashMap::new(),
             opportunistic_dependencies: HashMap::new(),
             unsatisfiable_element_id: ElementID::from(""),
-            inspect_graph: IGraph::new(
-                &inspect_node,
-                IGraphOpts::default().track_events(inspect_max_event),
+            inspect: TopologyInspect::new(
+                parent_inspect_node.create_child("topology"),
+                inspect_max_event,
             ),
-            _inspect_node: inspect_node,
-            synthetic_inspect_graph: IGraph::new(&synthetic_inspect_node, IGraphOpts::default()),
-            _synthetic_inspect_node: synthetic_inspect_node,
         };
         topology.unsatisfiable_element_id = topology
             .add_element(
@@ -222,17 +215,10 @@ impl Topology {
             .ok()
             .expect("Failed to add unsatisfiable element");
         topology.elements.get_mut(&topology.unsatisfiable_element_id).unwrap().inspect_vertex =
-            Some(Rc::new(RefCell::new(topology.inspect_graph.add_vertex(
+            Some(Rc::new(RefCell::new(topology.inspect.record_unsatisfiable_element(
                 topology.unsatisfiable_element_id.clone(),
-                [
-                    IGraphMeta::new("name", Self::TOPOLOGY_UNSATISFIABLE_ELEMENT),
-                    IGraphMeta::new(
-                        "valid_levels",
-                        Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS.to_vec(),
-                    ),
-                    IGraphMeta::new("current_level", "unset").track_events(),
-                    IGraphMeta::new("required_level", "unset").track_events(),
-                ],
+                Self::TOPOLOGY_UNSATISFIABLE_ELEMENT,
+                &Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS,
             ))));
         topology
     }
@@ -259,6 +245,14 @@ impl Topology {
             .map(|&v| v as u64)
             .collect::<Vec<_>>()
             .clone()
+    }
+
+    pub fn inspect(&self) -> &TopologyInspect {
+        &self.inspect
+    }
+
+    pub fn get_element(&self, id: &ElementID) -> Option<&Element> {
+        self.elements.get(id)
     }
 
     pub fn add_element(
@@ -326,7 +320,9 @@ impl Topology {
     pub fn remove_element(&mut self, element_id: &ElementID) {
         if self.unsatisfiable_element_id != *element_id {
             self.invalidate_dependent_elements(element_id);
-            self.elements.remove(element_id);
+            if let Some(element) = self.elements.remove(element_id) {
+                self.inspect().on_remove_element(&element);
+            }
         }
     }
 
@@ -588,7 +584,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, true);
+        self.inspect.on_add_dependency(&self.elements, dep, true);
         Ok(())
     }
 
@@ -609,7 +605,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep);
+        self.inspect.on_remove_dependency(&self.elements, dep);
         Ok(())
     }
 
@@ -630,7 +626,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, false);
+        self.inspect.on_add_dependency(&self.elements, dep, false);
         Ok(())
     }
 
@@ -651,61 +647,8 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep);
+        self.inspect.on_remove_dependency(&self.elements, dep);
         Ok(())
-    }
-
-    fn add_inspect_for_dependency(&mut self, dep: &Dependency, is_assertive: bool) {
-        let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
-        let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
-            // elements[dp_id] and elements[rq_id] guaranteed by prior validation
-            log::error!(dep:?; "Failed to add inspect for dependency.");
-            return;
-        };
-        let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
-        let mut inspect_edges = dp.inspect_edges.borrow_mut();
-        match inspect_edges.get_mut(&rq_id) {
-            None => {
-                let mut dp_vertex = dp.inspect_vertex.as_ref().unwrap().borrow_mut();
-                let mut rq_vertex = rq.inspect_vertex.as_ref().unwrap().borrow_mut();
-                let edge = dp_vertex.add_edge(
-                    &mut rq_vertex,
-                    [IGraphMeta::new(
-                        dp_level.to_string(),
-                        format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
-                    )],
-                );
-                inspect_edges.insert(rq_id.clone(), edge);
-            }
-            Some(edge) => {
-                edge.meta().set(
-                    dp_level.to_string(),
-                    format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
-                );
-            }
-        }
-    }
-
-    fn remove_inspect_for_dependency(&mut self, dep: &Dependency) {
-        // elements[dp_id] and elements[rq_id] guaranteed by prior validation
-        let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
-        let Some(dp) = self.elements.get(dp_id) else {
-            log::error!(dp_id:?; "Missing element for removal");
-            return;
-        };
-        let mut dp_edges = dp.inspect_edges.borrow_mut();
-        let Some(inspect) = dp_edges.get_mut(rq_id) else {
-            log::error!(rq_id:?; "Missing edge for removal");
-            return;
-        };
-        inspect.meta().remove(&dep.dependent.level.to_string());
-    }
-
-    pub fn inspect_for_element<'a>(
-        &self,
-        element_id: &'a ElementID,
-    ) -> Option<Rc<RefCell<IGraphVertex<ElementID>>>> {
-        self.elements.get(element_id)?.inspect_vertex.as_ref().map(Rc::clone)
     }
 
     pub fn initialize_element_inspect<'a>(
@@ -718,25 +661,14 @@ impl Topology {
         let Some(element) = self.elements.get_mut(element_id) else {
             return;
         };
-        let inspect_vertex = if element.synthetic {
-            self.synthetic_inspect_graph.add_vertex(
-                element_id.clone(),
-                [
-                    IGraphMeta::new("name", &element.name),
-                    IGraphMeta::new("valid_levels", valid_levels),
-                ],
-            )
-        } else {
-            self.inspect_graph.add_vertex(
-                element_id.clone(),
-                [
-                    IGraphMeta::new("name", &element.name),
-                    IGraphMeta::new("valid_levels", valid_levels),
-                    IGraphMeta::new("current_level", current_level).track_events(),
-                    IGraphMeta::new("required_level", required_level).track_events(),
-                ],
-            )
-        };
+        let inspect_vertex = self.inspect.on_add_element(
+            element_id.clone(),
+            &element.name,
+            element.synthetic,
+            valid_levels,
+            current_level,
+            required_level,
+        );
         element.inspect_vertex = Some(Rc::new(RefCell::new(inspect_vertex)));
     }
 }
@@ -745,13 +677,7 @@ impl Topology {
 mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use lazy_static::lazy_static;
     use power_broker_client::BINARY_POWER_LEVELS;
-
-    lazy_static! {
-        static ref TOPOLOGY_UNSATISFIABLE_MAX_LEVEL: String =
-            format!("{}p", fpb::PowerLevel::MAX.to_string());
-    }
 
     const BINARY_POWER_LEVEL_ON: IndexedPowerLevel = IndexedPowerLevel { level: 1, index: 1 };
 
@@ -780,9 +706,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node, 0);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut t = Topology::new(inspect.root(), 0);
         let water = t
             .add_element_with_inspect(
                 "Water",
@@ -817,7 +742,7 @@ mod tests {
             .expect("add_element failed");
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
-            test: {
+            topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -826,7 +751,8 @@ mod tests {
                                 name: t.get_unsatisfiable_element().name,
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 current_level: "unset",
-                                required_level: "unset"
+                                required_level: "unset",
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -836,6 +762,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -845,6 +772,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -854,6 +782,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -863,6 +792,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -874,29 +804,36 @@ mod tests {
         })
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
-           test: {
+           topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
-            t.get_unsatisfiable_element().id.to_string() => {
-                meta: {
-                    name: t.get_unsatisfiable_element().name,
-                    valid_levels: t.get_unsatisfiable_element_levels(),
-                    required_level: "unset",
-                    current_level: "unset",
-                },
-                relationships: {}},
+                        t.get_unsatisfiable_element().id.to_string() => {
+                            meta: {
+                                name: t.get_unsatisfiable_element().name,
+                                valid_levels: t.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
+                            },
+                            relationships: {}
+                        },
                         water.to_string() => {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {
                                 earth.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        }
+                                    },
                                 },
                             },
                         },
@@ -906,6 +843,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -915,6 +853,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -924,6 +863,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -941,7 +881,7 @@ mod tests {
         })
         .expect("remove_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
-           test: {
+           topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -951,6 +891,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {}
                             },
                             relationships: {}},
                         water.to_string() => {
@@ -959,6 +900,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -973,6 +915,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -982,6 +925,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -991,6 +935,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1021,7 +966,7 @@ mod tests {
         assert_eq!(t.element_exists(&air), false);
 
         assert_data_tree!(inspect, root: {
-           test: {
+           topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -1031,6 +976,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {},
                             },
                             relationships: {}},
                         water.to_string() => {
@@ -1039,6 +985,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -1053,6 +1000,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {},
                         },
@@ -1071,7 +1019,7 @@ mod tests {
         assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_data_tree!(inspect, root: {
-           test: {
+           topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -1081,6 +1029,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {},
                             },
                             relationships: {}},
                         water.to_string() => {
@@ -1089,6 +1038,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -1103,6 +1053,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {},
                         },
@@ -1113,7 +1064,7 @@ mod tests {
             requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         })
         .expect("add_assertive_dependency failed");
-        assert_data_tree!(inspect, root: { test: {
+        assert_data_tree!(inspect, root: { topology: {
             "fuchsia.inspect.synthetic.Graph": contains {},
             "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
@@ -1122,6 +1073,7 @@ mod tests {
                     valid_levels: t.get_unsatisfiable_element_levels(),
                     required_level: "unset",
                     current_level: "unset",
+                    leases: {},
                 },
                 relationships: {}},
             water.to_string() => {
@@ -1130,11 +1082,16 @@ mod tests {
                     valid_levels: v01.clone(),
                     current_level: 1u64,
                     required_level: 1u64,
+                    leases: {},
                 },
                 relationships: {
                     earth.to_string() => {
                         edge_id: AnyProperty,
-                        "meta": { "1": "1" }
+                        meta: {
+                            "1": {
+                                required_level: 1u64,
+                            }
+                        }
                     },
                 },
             },
@@ -1144,6 +1101,7 @@ mod tests {
                     valid_levels: v01.clone(),
                     current_level: 0u64,
                     required_level: 1u64,
+                    leases: {},
                 },
                 relationships: {},
             },
@@ -1151,13 +1109,14 @@ mod tests {
 
         t.remove_element(&earth);
         assert_eq!(t.element_exists(&earth), false);
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.synthetic.Graph": contains {}, "fuchsia.inspect.Graph": { "topology": {
+        assert_data_tree!(inspect, root: { topology: { "fuchsia.inspect.synthetic.Graph": contains {}, "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
                     name: t.get_unsatisfiable_element().name,
                     valid_levels: t.get_unsatisfiable_element_levels(),
                     required_level: "unset",
                     current_level: "unset",
+                    leases: {},
                 },
                 relationships: {}
             },
@@ -1167,11 +1126,17 @@ mod tests {
                     valid_levels: v01.clone(),
                     current_level: 1u64,
                     required_level: 1u64,
+                    leases: {},
                 },
                 relationships: {
                     t.get_unsatisfiable_element().id.to_string() => {
                         edge_id: AnyProperty,
-                        "meta": { "1": TOPOLOGY_UNSATISFIABLE_MAX_LEVEL.as_str() }
+                        meta: {
+                            "1": {
+                                required_level: fpb::PowerLevel::MAX as u64,
+                                opportunistic: true,
+                            }
+                        }
                     },
                 },
             },
@@ -1186,9 +1151,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node, 0);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut t = Topology::new(inspect.root(), 0);
 
         let v012_u8: Vec<u8> = vec![0, 1, 2];
         let v012: Vec<u64> = v012_u8.iter().map(|&v| v as u64).collect();
@@ -1219,7 +1183,7 @@ mod tests {
         };
         t.add_assertive_dependency(&cd2).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
-            test: {
+            topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -1229,6 +1193,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {}
                             },
                             relationships: {}},
                         a.to_string() => {
@@ -1237,6 +1202,7 @@ mod tests {
                                 valid_levels: v012.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1246,11 +1212,16 @@ mod tests {
                                 valid_levels: v012.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {
                                 a.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        }
+                                    }
                                 },
                             },
                         },
@@ -1260,15 +1231,27 @@ mod tests {
                                 valid_levels: v012.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {
                                 b.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        }
+                                    }
                                 },
                                 d.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1", "2": "2" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        },
+                                        "2": {
+                                            required_level: 2u64,
+                                        }
+                                    }
                                 },
                             },
                         },
@@ -1278,6 +1261,7 @@ mod tests {
                                 valid_levels: v012.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1306,9 +1290,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_all_assertive_and_opportunistic_dependencies() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node, 0);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut t = Topology::new(inspect.root(), 0);
 
         let (v0123_u8, v015_u8, v01_u8, v013_u8): (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) =
             (vec![0, 1, 2, 3], vec![0, 1, 5], vec![0, 1], vec![0, 1, 3]);
@@ -1326,7 +1309,7 @@ mod tests {
         let d = t.add_element_with_inspect("D", vec![0, 1, 3], 1, 3).expect("add_element failed");
         let e = t.add_element_with_inspect("E", vec![0, 1], 0, 0).expect("add_element failed");
         assert_data_tree!(inspect, root: {
-            test: {
+            topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -1336,6 +1319,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {}
                             },
                             relationships: {}},
                         a.to_string() => {
@@ -1344,6 +1328,7 @@ mod tests {
                                 valid_levels: v0123.clone(),
                                 current_level: 2u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1353,6 +1338,7 @@ mod tests {
                                 valid_levels: v015.clone(),
                                 current_level: 0u64,
                                 required_level: 5u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1362,6 +1348,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1371,6 +1358,7 @@ mod tests {
                                 valid_levels: v013.clone(),
                                 current_level: 1u64,
                                 required_level: 3u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
@@ -1380,10 +1368,12 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {}
                             },
                             relationships: {},
                         },
-        }}}});
+        },
+                }}});
 
         // C has direct assertive dependencies on B and D.
         // B only has opportunistic dependencies on A.
@@ -1437,7 +1427,7 @@ mod tests {
         };
         t.add_assertive_dependency(&d1_e1).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
-            test: {
+            topology: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
@@ -1447,6 +1437,7 @@ mod tests {
                                 valid_levels: t.get_unsatisfiable_element_levels(),
                                 required_level: "unset",
                                 current_level: "unset",
+                                leases: {},
                             },
                             relationships: {}},
                         a.to_string() => {
@@ -1455,6 +1446,7 @@ mod tests {
                                 valid_levels: v0123.clone(),
                                 current_level: 2u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {},
                         },
@@ -1464,13 +1456,20 @@ mod tests {
                                 valid_levels: v015.clone(),
                                 current_level: 0u64,
                                 required_level: 5u64,
+                                leases: {},
                             },
                             relationships: {
                                 a.to_string() => {
                                     edge_id: AnyProperty,
                                     meta: {
-                                        "1": "2p",
-                                        "5": "3p",
+                                        "1": {
+                                            required_level: 2u64,
+                                            opportunistic: true,
+                                        },
+                                        "5": {
+                                            required_level: 3u64,
+                                            opportunistic: true,
+                                        }
                                     },
                                 },
                             },
@@ -1481,15 +1480,24 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 1u64,
                                 required_level: 1u64,
+                                leases: {},
                             },
                             relationships: {
                                 b.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "5" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 5u64,
+                                        },
+                                    },
                                 },
                                 d.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "3" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 3u64,
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -1499,15 +1507,24 @@ mod tests {
                                 valid_levels: v013.clone(),
                                 current_level: 1u64,
                                 required_level: 3u64,
+                                leases: {},
                             },
                             relationships: {
                                 a.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        },
+                                    },
                                 },
                                 e.to_string() => {
                                     edge_id: AnyProperty,
-                                    meta: { "1": "1" },
+                                    meta: {
+                                        "1": {
+                                            required_level: 1u64,
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -1517,6 +1534,7 @@ mod tests {
                                 valid_levels: v01.clone(),
                                 current_level: 0u64,
                                 required_level: 0u64,
+                                leases: {},
                             },
                             relationships: {},
                         },
@@ -1576,9 +1594,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_all_direct_and_indirect_dependencies() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut t = Topology::new(inspect_node, 0);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut t = Topology::new(inspect.root(), 0);
 
         let a =
             t.add_element_with_inspect("A", vec![0, 1, 2, 3], 0, 0).expect("add_element failed");

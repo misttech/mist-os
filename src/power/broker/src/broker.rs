@@ -444,8 +444,8 @@ impl Broker {
             self.current.insert(element_id.clone(), level_admin);
         }
 
-        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-            elem_inspect.borrow_mut().meta().set("current_level", level.level);
+        if let Some(element) = self.catalog.topology.get_element(element_id) {
+            self.catalog.topology.inspect().on_update_current_level(&element, level.level);
         }
 
         fuchsia_trace::counter!(
@@ -495,8 +495,8 @@ impl Broker {
                 self.in_transition.insert(element_id.clone(), level);
             }
         }
-        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-            elem_inspect.borrow_mut().meta().set("required_level", level.level);
+        if let Some(element) = self.catalog.topology.get_element(element_id) {
+            self.catalog.topology.inspect().on_update_required_level(&element, level.level)
         }
         fuchsia_trace::counter!(
             c"power-broker", c"required_level", 0,
@@ -794,17 +794,11 @@ impl Broker {
         };
         self.update_required_levels([synthetic_element_id].iter());
         if prev_status.as_ref() != Some(&status) {
-            if let Some(elem_inspect) =
-                self.catalog.topology.inspect_for_element(&underlying_element_id)
-            {
-                let level = match self.catalog.leases.get(lease_id) {
-                    Some(lease) => lease.underlying_element_level,
-                    None => unreachable!("The lease must be present when updating the status."),
+            if let Some(element) = self.catalog.topology.get_element(&underlying_element_id) {
+                let Some(lease) = self.catalog.leases.get(lease_id) else {
+                    unreachable!("The lease must be present when updating the status.");
                 };
-                elem_inspect.borrow_mut().meta().set_and_track(
-                    format!("lease_status_{lease_id}@level_{level}"),
-                    format!("{status:?}"),
-                );
+                self.catalog.topology.inspect().on_update_lease_status(&element, &lease, &status);
             }
         }
         // If the lease is contingent, we know that it must be pending and must have
@@ -1198,7 +1192,7 @@ impl Broker {
 pub struct LeaseID(String);
 
 impl LeaseID {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -1335,10 +1329,7 @@ struct Catalog {
 impl Catalog {
     fn new(inspect_parent: &INode) -> Self {
         Catalog {
-            topology: Topology::new(
-                inspect_parent.create_child("topology"),
-                INSPECT_GRAPH_EVENT_BUFFER_SIZE,
-            ),
+            topology: Topology::new(inspect_parent, INSPECT_GRAPH_EVENT_BUFFER_SIZE),
             leases: HashMap::new(),
             lease_status: SubscribeMap::new(Some(inspect_parent.create_child("leases"))),
             lease_contingent: HashMap::new(),
@@ -1502,12 +1493,8 @@ impl Catalog {
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
             level,
         );
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&element_id) {
-            let elem_readable_name = self.topology.element_name(&element_id);
-            elem_inspect.borrow_mut().meta().set_and_track(
-                format!("lease_{}@level_{}", lease.id, level), // for example, lease_ffff@level_1
-                format!("level_{level}@{elem_readable_name}"), // for example, level_1@elem_name
-            );
+        if let Some(element) = self.topology.get_element(element_id) {
+            self.topology.inspect().on_create_lease_and_claims(element, &lease.id, level.level);
         }
         self.leases.insert(lease.id.clone(), lease.clone());
 
@@ -1547,17 +1534,8 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or_else(|| anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         self.lease_contingent.remove(lease_id);
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.underlying_element_id)
-        {
-            elem_inspect.borrow_mut().meta().remove_and_track(
-                format!("lease_{}@level_{}", lease.id, lease.underlying_element_level).as_str(),
-            );
-            elem_inspect.borrow_mut().meta().remove(
-                format!("lease_status_{}@level_{}", lease.id, lease.underlying_element_level)
-                    .as_str(),
-            );
-            // lease_ drop events are useful as part of understanding lifecycle.
-            // lease_status_ drop events are redundant with lease_ drops, so we don't record them.
+        if let Some(element) = self.topology.get_element(&lease.underlying_element_id) {
+            self.topology.inspect().on_drop_lease(&element, &lease);
         }
         log::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
@@ -2141,9 +2119,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_out_redundant_claims() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let broker = Broker::new(inspect.root().create_child("test"));
 
         let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
         let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
@@ -2269,7 +2246,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_initialize_current_and_broker_status() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let latinum = broker
@@ -2296,6 +2273,25 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: {
+                        "0": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                element_id: broker.get_unsatisfiable_element_id().to_string(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            }
+                        },
+                        "1": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                element_id: latinum.to_string(),
+                                current_level: 7u64,
+                                required_level: 5u64,
+                            }
+                        },
+                    },
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2304,6 +2300,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2313,37 +2310,17 @@ mod tests {
                                     valid_levels: vec![5u64, 2u64, 7u64],
                                     current_level: 7u64,
                                     required_level: 5u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
-                            },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: 7u64,
-                                    required_level: 5u64,
-                                },
-                            },
-                        },
-                        stats: contains {},
         }}}});
     }
 
     #[fuchsia::test]
     fn test_current_required_level_inspect() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let latinum =
@@ -2369,88 +2346,88 @@ mod tests {
         broker.update_current_level(&latinum, ONE);
 
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {},
                             },
-                            latinum.to_string() => {
-                                meta: {
-                                    name: "Latinum",
-                                    valid_levels: vec![0u64, 1u64, 2u64],
-                                    current_level: 1u64,
-                                    required_level: 0u64,
-                                },
-                                relationships: {},
-                            },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
+                        latinum.to_string() => {
+                            meta: {
+                                name: "Latinum",
+                                valid_levels: vec![0u64, 1u64, 2u64],
+                                current_level: 1u64,
+                                required_level: 0u64,
+                                leases: {},
                             },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: 2u64,
-                                    required_level: 0u64,
-                                },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 0u64,
-                            },
-                            "3": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 1u64,
-                            },
-                            "4": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 1u64,
-                            },
-                            "5": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 0u64,
-                            },
+                            relationships: {},
                         },
-                        stats: contains {},
-        }}}});
+                    },
+                },
+                stats: contains {},
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: latinum.to_string(),
+                            current_level: 2u64,
+                            required_level: 0u64,
+                        }
+                    },
+                    "2": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: latinum.to_string(),
+                            current_level: 0u64,
+                        }
+                    },
+                    "3": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: latinum.to_string(),
+                            required_level: 1u64,
+                        }
+                    },
+                    "4": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: latinum.to_string(),
+                            current_level: 1u64,
+                        }
+                    },
+                    "5": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: latinum.to_string(),
+                            required_level: 0u64,
+                        }
+                    },
+                },
+            }}});
     }
 
     #[fuchsia::test]
     fn test_add_element_dependency_never_and_unregistered() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();
         let never_registered_token = DependencyToken::create();
         let mithril = broker
@@ -2469,6 +2446,8 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2477,6 +2456,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2486,12 +2466,11 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
                     },
                 },
         }});
@@ -2529,48 +2508,56 @@ mod tests {
             )
             .expect("add_element failed");
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
+                events: contains {},
+                stats: contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
-                            mithril.to_string() => {
-                                meta: {
-                                    name: "Mithril",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {},
+                            relationships: {}
+                        },
+                        mithril.to_string() => {
+                            meta: {
+                                name: "Mithril",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
                             },
-                            silver.to_string() => {
-                                meta: {
-                                    name: "Silver",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {
-                                    mithril.to_string() => {
-                                        edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                            relationships: {},
+                        },
+                        silver.to_string() => {
+                            meta: {
+                                name: "Silver",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
+                            },
+                            relationships: {
+                                mithril.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {
+                                      "1": {
+                                          required_level: 1u64,
+                                      },
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
-        }}}});
+                    },
+                }
+            }}});
 
         // Unregister token_mithril, then try to add again, which should fail.
         broker
@@ -2599,7 +2586,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_remove_element() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let unobtanium = broker
@@ -2608,101 +2595,104 @@ mod tests {
         assert_eq!(broker.element_exists(&unobtanium), true);
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
-                            unobtanium.to_string() => {
-                                meta: {
-                                    name: "Unobtainium",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {},
-                            },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
+                        unobtanium.to_string() => {
+                            meta: {
+                                name: "Unobtainium",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
                             },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                            },
+                            relationships: {},
                         },
-                        stats: contains {},
                     },
-        }}});
+                },
+                stats: contains {},
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: unobtanium.to_string(),
+                            current_level: OFF.level as u64,
+                            required_level: OFF.level as u64,
+                        }
+                    },
+                },
+            }
+        }});
 
         broker.remove_element(&unobtanium);
         assert_eq!(broker.element_exists(&unobtanium), false);
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: broker.get_unsatisfiable_element_id().to_string(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: unobtanium.to_string(),
+                            current_level: OFF.level as u64,
+                            required_level: OFF.level as u64,
+                        }
+                    },
+                    "2": {
+                        "@time": AnyProperty,
+                        rm_element: {
+                            element_id: unobtanium.to_string(),
+                            element_name: "Unobtainium",
+                        }
+                    },
+                },
+                stats: contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
-                            },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "remove_vertex",
-                            },
-                        },
-                        stats: contains {},
-        }}}});
+                    },
+                }
+            }}});
     }
 
     struct BrokerStatusMatcher {
@@ -2787,9 +2777,8 @@ mod tests {
     #[fuchsia::test]
     fn test_broker_adjust_lease_counter() {
         // Create a broker that has nothing since the test is just about the counter
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let a = broker
             .add_element("a", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -2824,9 +2813,8 @@ mod tests {
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct assertive dependencies.
         // P1 <= C => P2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let parent1_token = DependencyToken::create();
         let parent1: ElementID = broker
             .add_element("P1", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -2889,6 +2877,8 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2897,6 +2887,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2906,6 +2897,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -2915,6 +2907,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -2924,21 +2917,28 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {
                                     parent1.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        },
                                     },
                                     parent2.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        },
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
                     },
         }}});
 
@@ -2978,6 +2978,37 @@ mod tests {
                 },
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    // TODO(b/348700341): Re-enable this section of the data tree
+                    // when we can avoid explicitly marking the event number. As
+                    // broker changes, the exact order of creation / status
+                    // update events cannot be guaranteed.
+                    events: contains {},
+                    /*
+                    events: contains {
+                        "14": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_{}", lease.id),
+                            update: "level_1@C",
+                            vertex_id: child.to_string()
+                        },
+                        "17": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_status_{}", lease.id),
+                            update: "Pending",
+                            vertex_id: child.to_string()
+                        },
+                        "21": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_status_{}", lease.id),
+                            update: "Satisfied",
+                            vertex_id: child.to_string()
+                        }
+                    },
+                    */
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2986,6 +3017,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
                             },
@@ -2995,6 +3027,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -3004,6 +3037,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -3013,52 +3047,33 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease.id.clone()) => "level_1@C",
-                                    format!("lease_status_{}@level_1", lease.id.clone()) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease.id) => {
+                                            level: 1u64,
+                                            status: 2u64,
+                                        }
+                                    }
                                 },
                                 relationships: {
                                     parent1.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                     parent2.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        // TODO(b/348700341): Re-enable this section of the data tree
-                        // when we can avoid explicitly marking the event number. As
-                        // broker changes, the exact order of creation / status
-                        // update events cannot be guaranteed.
-                        events: contains {},
-                        /*
-                        events: contains {
-                            "14": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_{}", lease.id),
-                                update: "level_1@C",
-                                vertex_id: child.to_string()
-                            },
-                            "17": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_status_{}", lease.id),
-                                update: "Pending",
-                                vertex_id: child.to_string()
-                            },
-                            "21": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_status_{}", lease.id),
-                                update: "Satisfied",
-                                vertex_id: child.to_string()
-                            }
-                        },
-                        */
-                        stats: contains {},
                     },
         }}});
 
@@ -3099,9 +3114,8 @@ mod tests {
         // Create a topology of a child element with two chained transitive
         // dependencies.
         // C => P => GP
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3230,9 +3244,8 @@ mod tests {
         //  3 => 30 => 90
         // Grandparent has a minimum required level of 10.
         // All other elements have a minimum of 0.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID =
             broker.add_element("GP", 10, vec![10, 90, 200], vec![]).expect("add_element failed");
@@ -3439,9 +3452,8 @@ mod tests {
         // Child 2 ON requires Parent ON.
         // Parent ON requires Grandparent ON.
         // C2 =>  P => GP
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3612,9 +3624,8 @@ mod tests {
         // Child ON requires Parent 1 ON and Parent 2 ON.
         // Parent 1 ON requires Grandparent ON.
         // Parent 2 ON requires Grandparent ON.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3780,9 +3791,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -3901,6 +3911,8 @@ mod tests {
                 },
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -3909,6 +3921,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
                             },
@@ -3918,6 +3931,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -3927,13 +3941,21 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease_b.id) => "level_1@B",
-                                    format!("lease_status_{}@level_1", lease_b.id) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease_b.id) => {
+                                            level: 1u64,
+                                            status: fpb::LeaseStatus::Satisfied.into_primitive() as u64,
+                                        }
+                                    },
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
@@ -3943,19 +3965,26 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease_c.id) => "level_1@C",
-                                    format!("lease_status_{}@level_1", lease_c.id) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease_c.id) => {
+                                            level: 1u64,
+                                            status: fpb::LeaseStatus::Satisfied.into_primitive() as u64,
+                                        }
+                                    },
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1p" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                                opportunistic: true,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
 
         // Drop Lease on B.
@@ -4004,6 +4033,8 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -4012,6 +4043,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
                             },
@@ -4021,6 +4053,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -4030,11 +4063,17 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" }},
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
+                                    },
                                 },
                             },
                             element_c.to_string() => {
@@ -4043,17 +4082,21 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1p" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                                opportunistic: true,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
     }
 
@@ -4069,9 +4112,8 @@ mod tests {
         //
         //  A     B     C
         // ON => ON <- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_b_assertive = DependencyToken::create();
         let token_b_opportunistic = DependencyToken::create();
         let element_b = broker
@@ -4202,9 +4244,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4376,9 +4417,8 @@ mod tests {
         // ON <= ON
         // ON <------- ON -------> ON
         //                   ON => ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4639,9 +4679,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4818,9 +4857,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -5051,9 +5089,8 @@ mod tests {
         //  3 <== 1
         //  2 <-------- 1
         //  1 <============== 1
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a =
@@ -5308,9 +5345,8 @@ mod tests {
         //  2 <= 20
         //  1 <= 10
         //  2 <-------- 5
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a =
@@ -5540,9 +5576,8 @@ mod tests {
         //  A     B     C     D
         // ON <= ON
         // ON <------- ON => ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -5770,9 +5805,8 @@ mod tests {
         // ON <============= ON
         //             ON <- ON
         // ON <------------------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -6048,9 +6082,8 @@ mod tests {
         // ON <= ON
         //       ON <- ON <======= ON
         //       ON <======= ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a = DependencyToken::create();
         let element_a = broker
             .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -6314,9 +6347,8 @@ mod tests {
         //  A     B     C
         //  1 ==> 1
         //  2 ========> 1
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v012_u8: Vec<u8> = vec![0, 1, 2];
 
@@ -6468,9 +6500,8 @@ mod tests {
         //        1 <-------- 1
         //  2 --------> 1 <============== 1
         //  3 ==> 2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
 
@@ -6769,9 +6800,8 @@ mod tests {
         //  1 --> 1
         //  2 ==> 2 --> 1
         //  3 ========> 2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
 
@@ -6969,9 +6999,8 @@ mod tests {
         // HW -> ES(WH)
         // WOR => WH(A)
         // WH(A) => ES(WH)
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_sag_es_assertive = DependencyToken::create();
         let token_sag_es_opportunistic = DependencyToken::create();
         let sag_es = broker
@@ -7198,9 +7227,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -7302,9 +7330,8 @@ mod tests {
     #[fuchsia::test]
     fn test_required_level() {
         // Create a topology of one element.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let element =
             broker.add_element("E", 0, vec![0, 1, 2], vec![]).expect("add_element failed");
         let mut broker_status = BrokerStatusMatcher::new();
@@ -7360,9 +7387,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_element_dependency_list_of_levels() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();
         let mithril = broker
             .add_element("Mithril", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -7399,6 +7425,8 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -7407,6 +7435,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -7416,6 +7445,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -7425,17 +7455,20 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {
                                     mithril.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
     }
 
@@ -7459,9 +7492,8 @@ mod tests {
         //         X
         // C4 \   / \
         // C3 = P2   GP2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let token_gp1 = DependencyToken::create();
         let token_gp2 = DependencyToken::create();
