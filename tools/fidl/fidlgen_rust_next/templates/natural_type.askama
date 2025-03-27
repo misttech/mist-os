@@ -28,9 +28,9 @@
         {%- endmatch -%}
         <
             {%- if nullable -%}
-                Option<{{ context.config.resource_bindings.handle.natural_path }}>,
+                Option<{{ context.config.resource_bindings.channel.natural_path }}>,
             {%- else -%}
-                {{ context.config.resource_bindings.handle.natural_path }},
+                {{ context.config.resource_bindings.channel.natural_path }},
             {%- endif -%}
             {{ context.natural_id(protocol) }},
         >
@@ -42,10 +42,14 @@
             {%- when DeclType::Enum -%} {{ context.natural_id(identifier) }}
             {%- when DeclType::Table -%} {{ context.natural_id(identifier) }}
             {%- when DeclType::Struct -%}
-                {%- if nullable -%}
-                    Option<Box<{{ context.natural_id(identifier) }}>>
+                {%- if identifier.library() != context.schema.name || !context.schema.struct_declarations[identifier].is_empty_success_struct -%}
+                    {%- if nullable -%}
+                        Option<Box<{{ context.natural_id(identifier) }}>>
+                    {%- else -%}
+                        {{ context.natural_id(identifier) }}
+                    {%- endif -%}
                 {%- else -%}
-                    {{ context.natural_id(identifier) }}
+                    ()
                 {%- endif -%}
             {%- when DeclType::Union -%}
                 {%- if nullable -%}

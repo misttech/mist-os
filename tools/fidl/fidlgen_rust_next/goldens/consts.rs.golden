@@ -242,4 +242,23 @@ pub const ENUM_TRUE: crate::EnumType = crate::EnumType::True;
 pub const ENUM_VAL: crate::EnumType = crate::EnumType::Value;
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_consts::BitsType {
+        #[inline]
+        fn take_from(from: &crate::WireBitsType) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnumType> for ::fidl_test_consts::EnumType {
+        #[inline]
+        fn take_from(from: &crate::WireEnumType) -> Self {
+            match crate::EnumType::from(*from) {
+                crate::EnumType::Value => Self::Value,
+
+                crate::EnumType::True => Self::True_,
+            }
+        }
+    }
+}

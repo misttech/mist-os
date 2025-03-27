@@ -504,6 +504,24 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest>
+        for ::fidl_test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
+        for ::fidl_test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse) -> Self {
+            Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ExampleUseOfErrorSyntax`
     /// protocol.
@@ -511,4 +529,13 @@ pub mod compat {
         ::fidl_next::fuchsia::zx::Channel,
         crate::ExampleUseOfErrorSyntax,
     >;
+
+    impl ::fidl_next::TakeFrom<crate::ExampleUseOfErrorSyntax>
+        for ::fidl_test_errorsyntax::ExampleUseOfErrorSyntaxMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::ExampleUseOfErrorSyntax) -> Self {
+            Self
+        }
+    }
 }

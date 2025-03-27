@@ -820,9 +820,59 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireEmpty> for ::fidl_test_emptystruct::Empty {
+        #[inline]
+        fn take_from(from: &crate::WireEmpty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolReceiveRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolReceiveRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendAndReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendAndReceiveRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendAndReceiveResponse>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendAndReceiveResponse) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `EmptyProtocol`
     /// protocol.
     pub type EmptyProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::EmptyProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::EmptyProtocol> for ::fidl_test_emptystruct::EmptyProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::EmptyProtocol) -> Self {
+            Self
+        }
+    }
 }

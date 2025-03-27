@@ -570,4 +570,56 @@ pub const OR_RESULT: crate::BitsType = crate::BitsType::from_bits_retain(7);
 pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBits> for ::fidl_test_constants::Bits {
+        #[inline]
+        fn take_from(from: &crate::WireBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_constants::BitsType {
+        #[inline]
+        fn take_from(from: &crate::WireBitsType) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnum> for ::fidl_test_constants::Enum {
+        #[inline]
+        fn take_from(from: &crate::WireEnum) -> Self {
+            match crate::Enum::from(*from) {
+                crate::Enum::E => Self::E,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnumType> for ::fidl_test_constants::EnumType {
+        #[inline]
+        fn take_from(from: &crate::WireEnumType) -> Self {
+            match crate::EnumType::from(*from) {
+                crate::EnumType::Value => Self::Value,
+
+                crate::EnumType::SecondValue => Self::SecondValue,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStruct> for ::fidl_test_constants::Struct {
+        #[inline]
+        fn take_from(from: &crate::WireStruct) -> Self {
+            Self {
+                int64_with_default: ::fidl_next::TakeFrom::take_from(&from.int64_with_default),
+
+                string_with_default: ::fidl_next::TakeFrom::take_from(&from.string_with_default),
+
+                bool_with_default: ::fidl_next::TakeFrom::take_from(&from.bool_with_default),
+
+                enum_with_default: ::fidl_next::TakeFrom::take_from(&from.enum_with_default),
+
+                bits_with_default: ::fidl_next::TakeFrom::take_from(&from.bits_with_default),
+            }
+        }
+    }
+}

@@ -533,111 +533,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarDriverProtocolStrictTwoWa
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption
-    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>
-{
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -1187,8 +1082,6 @@ pub mod unknown_interactions_ajar_driver_protocol {
 
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse;
@@ -1277,10 +1170,7 @@ pub mod unknown_interactions_ajar_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -2386,109 +2276,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictTwoWayTable
         f.debug_struct("UnknownInteractionsAjarProtocolStrictTwoWayTableResponse")
             .field("some_field", &self.some_field())
             .finish()
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> {
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsAjarProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsAjarProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
     }
 }
 
@@ -4072,8 +3859,6 @@ pub mod unknown_interactions_ajar_protocol {
 
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse;
@@ -4162,10 +3947,7 @@ pub mod unknown_interactions_ajar_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -5639,113 +5421,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedDriverProtocolStrictTwo
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption
-    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>
-{
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(
-        from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
-    ) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -6305,8 +5980,6 @@ pub mod unknown_interactions_closed_driver_protocol {
 
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse;
@@ -6384,10 +6057,7 @@ pub mod unknown_interactions_closed_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -7469,111 +7139,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictTwoWayTab
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption
-    for Box<UnknownInteractionsClosedProtocolStrictTwoWayErrResponse>
-{
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsClosedProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsClosedProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -8638,8 +8203,6 @@ pub mod unknown_interactions_closed_protocol {
 
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse;
@@ -8716,10 +8279,7 @@ pub mod unknown_interactions_closed_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -9945,111 +9505,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayTab
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption
-    for Box<UnknownInteractionsDriverProtocolStrictTwoWayErrResponse>
-{
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsDriverProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -10574,109 +10029,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayTab
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> {
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse>
-    for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
 }
@@ -11192,111 +10544,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayT
         f.debug_struct("UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse")
             .field("some_field", &self.some_field())
             .finish()
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E>
-    for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption
-    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>
-{
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>
-    for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding
-    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
-{
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
     }
 }
 
@@ -11850,8 +11097,6 @@ pub mod unknown_interactions_driver_protocol {
 
         pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse;
@@ -11863,10 +11108,6 @@ pub mod unknown_interactions_driver_protocol {
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse;
-
-        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
-
-        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse;
 
@@ -11956,10 +11197,7 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -12016,9 +11254,7 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexible<
-            crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse,
-        >;
+        type Response = ::fidl_next::WireFlexible<()>;
     }
 
     pub struct FlexibleTwoWayFields;
@@ -12072,10 +11308,7 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexibleResult<
-            crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireFlexibleResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct FlexibleTwoWayFieldsErr;
@@ -13560,106 +12793,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayTableResp
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsProtocolStrictTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsProtocolStrictTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolStrictTwoWayErrResponse> {
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsProtocolStrictTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsProtocolStrictTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrResponse>
-    for UnknownInteractionsProtocolStrictTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsProtocolStrictTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsProtocolStrictTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolStrictTwoWayErrResponse {
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsProtocolStrictTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -14174,106 +13307,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayTableErrR
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwoWayResponse> {
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsProtocolFlexibleTwoWayResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsProtocolFlexibleTwoWayResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResponse>
-    for UnknownInteractionsProtocolFlexibleTwoWayResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsProtocolFlexibleTwoWayResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsProtocolFlexibleTwoWayResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleTwoWayResponse {
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsProtocolFlexibleTwoWayResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
 }
@@ -14781,106 +13814,6 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayTableRe
         f.debug_struct("UnknownInteractionsProtocolFlexibleTwoWayTableResponse")
             .field("some_field", &self.some_field())
             .finish()
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct UnknownInteractionsProtocolFlexibleTwoWayErrResponse {}
-
-impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayErrResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoWayErrResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<UnknownInteractionsProtocolFlexibleTwoWayErrResponse> {
-    type EncodedOption =
-        ::fidl_next::WireBox<WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E>
-    for Box<UnknownInteractionsProtocolFlexibleTwoWayErrResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    UnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse>
-    for UnknownInteractionsProtocolFlexibleTwoWayErrResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`UnknownInteractionsProtocolFlexibleTwoWayErrResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse {
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D>
-    for WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
     }
 }
 
@@ -16433,8 +15366,6 @@ pub mod unknown_interactions_protocol {
 
         pub use crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse;
 
-        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayErrResponse;
-
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse;
@@ -16446,10 +15377,6 @@ pub mod unknown_interactions_protocol {
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse;
 
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse;
-
-        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayResponse;
-
-        pub use crate::UnknownInteractionsProtocolStrictTwoWayErrResponse;
 
         pub use crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse;
 
@@ -16539,10 +15466,7 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -16599,8 +15523,7 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response =
-            ::fidl_next::WireFlexible<crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse>;
+        type Response = ::fidl_next::WireFlexible<()>;
     }
 
     pub struct FlexibleTwoWayFields;
@@ -16654,10 +15577,7 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexibleResult<
-            crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse,
-            ::fidl_next::WireI32,
-        >;
+        type Response = ::fidl_next::WireFlexibleResult<(), ::fidl_next::WireI32>;
     }
 
     pub struct FlexibleTwoWayFieldsErr;
@@ -17930,6 +16850,114 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarDriverProtocol`
     /// protocol.
@@ -17937,6 +16965,223 @@ pub mod compat {
         ::fidl_next::fuchsia::zx::Channel,
         crate::UnknownInteractionsAjarDriverProtocol,
     >;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsAjarDriverProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarDriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsAjarDriverProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventFieldsRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        ) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest,
+        ) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsAjarProtocol`
@@ -17946,6 +17191,123 @@ pub mod compat {
         crate::UnknownInteractionsAjarProtocol,
     >;
 
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsAjarProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsAjarProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsAjarProtocol) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedDriverProtocol`
     /// protocol.
@@ -17953,6 +17315,166 @@ pub mod compat {
         ::fidl_next::fuchsia::zx::Channel,
         crate::UnknownInteractionsClosedDriverProtocol,
     >;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsClosedDriverProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsClosedDriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsClosedDriverProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest> for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsClosedProtocol`
@@ -17962,6 +17484,231 @@ pub mod compat {
         crate::UnknownInteractionsClosedProtocol,
     >;
 
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsClosedProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsClosedProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsClosedProtocol) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsDriverProtocol`
     /// protocol.
@@ -17970,6 +17717,356 @@ pub mod compat {
         crate::UnknownInteractionsDriverProtocol,
     >;
 
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsDriverProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsDriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsDriverProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayUnionResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        ) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayTableResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictTwoWayTableResponse,
+        ) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
+        ) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse,
+        ) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
+        ) -> Self {
+            Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        ) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        ) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
+                                Self {
+
+                                        some_field: ::fidl_next::TakeFrom::take_from(&from.some_field),
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
+                            #[inline]
+                            fn take_from(from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+                                match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+                        #[inline]
+                        fn take_from(from: &crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse) -> Self {
+                            Self {
+
+                                    some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventFieldsRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest>
+        for Option<
+            Box<
+                ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest,
+            >,
+        >
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest,
+        ) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolStrictEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnknownInteractionsProtocolStrictEventTableRequest) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventFieldsRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        ) -> Self {
+            Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
+        ) -> Self {
+            match from.as_ref() {
+
+                                        crate::unknown_interactions_protocol_flexible_event_union_request::Ref::SomeField(value) =>
+                                            Self::SomeField(::fidl_next::TakeFrom::take_from(value)),
+
+
+                                        crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+
+                                }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest> for Option<Box<::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest,
+        ) -> Self {
+            Self {
+                some_field: from.some_field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `UnknownInteractionsProtocol`
     /// protocol.
@@ -17977,4 +18074,13 @@ pub mod compat {
         ::fidl_next::fuchsia::zx::Channel,
         crate::UnknownInteractionsProtocol,
     >;
+
+    impl ::fidl_next::TakeFrom<crate::UnknownInteractionsProtocol>
+        for ::fidl_test_unknowninteractions::UnknownInteractionsProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::UnknownInteractionsProtocol) -> Self {
+            Self
+        }
+    }
 }

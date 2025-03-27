@@ -214,7 +214,7 @@ impl ::core::fmt::Debug for WireOptionalUnionSize12Alignment4 {
 pub struct SandwichUnionSize12Alignment4 {
     pub before: u32,
 
-    pub union_: crate::UnionSize12Alignment4,
+    pub union: crate::UnionSize12Alignment4,
 
     pub after: i32,
 }
@@ -238,7 +238,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                union_,
+                union,
                 after,
 
             } = out;
@@ -246,7 +246,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -286,7 +286,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionS
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
@@ -299,7 +299,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionS
 pub struct WireSandwichUnionSize12Alignment4 {
     pub before: ::fidl_next::WireU32,
 
-    pub union_: crate::WireUnionSize12Alignment4,
+    pub union: crate::WireUnionSize12Alignment4,
 
     pub after: ::fidl_next::WireI32,
 }
@@ -330,7 +330,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut union_,
+                mut union,
                 mut after,
 
             } = slot;
@@ -338,7 +338,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -692,7 +692,7 @@ impl ::core::fmt::Debug for WireOptionalUnionSize24Alignment8 {
 pub struct SandwichUnionSize24Alignment8 {
     pub before: u32,
 
-    pub union_: crate::UnionSize24Alignment8,
+    pub union: crate::UnionSize24Alignment8,
 
     pub after: u32,
 }
@@ -716,7 +716,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                union_,
+                union,
                 after,
 
             } = out;
@@ -724,7 +724,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -764,7 +764,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionS
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
@@ -777,7 +777,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionS
 pub struct WireSandwichUnionSize24Alignment8 {
     pub before: ::fidl_next::WireU32,
 
-    pub union_: crate::WireUnionSize24Alignment8,
+    pub union: crate::WireUnionSize24Alignment8,
 
     pub after: ::fidl_next::WireU32,
 }
@@ -808,7 +808,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut union_,
+                mut union,
                 mut after,
 
             } = slot;
@@ -816,7 +816,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -1036,7 +1036,7 @@ impl ::core::fmt::Debug for WireOptionalUnionSize36Alignment4 {
 pub struct SandwichUnionSize36Alignment4 {
     pub before: u32,
 
-    pub union_: crate::UnionSize36Alignment4,
+    pub union: crate::UnionSize36Alignment4,
 
     pub after: u32,
 }
@@ -1060,7 +1060,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                union_,
+                union,
                 after,
 
             } = out;
@@ -1068,7 +1068,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -1108,7 +1108,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionS
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
@@ -1121,7 +1121,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionS
 pub struct WireSandwichUnionSize36Alignment4 {
     pub before: ::fidl_next::WireU32,
 
-    pub union_: crate::WireUnionSize36Alignment4,
+    pub union: crate::WireUnionSize36Alignment4,
 
     pub after: ::fidl_next::WireU32,
 }
@@ -1152,7 +1152,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut union_,
+                mut union,
                 mut after,
 
             } = slot;
@@ -1160,7 +1160,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -1400,7 +1400,7 @@ impl ::core::fmt::Debug for WireOptionalUnionSize8Alignment4 {
 pub struct SandwichUnionSize8Alignment4 {
     pub before: u32,
 
-    pub union_: crate::UnionSize8Alignment4,
+    pub union: crate::UnionSize8Alignment4,
 
     pub after: u32,
 }
@@ -1422,7 +1422,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                union_,
+                union,
                 after,
 
             } = out;
@@ -1430,7 +1430,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -1470,7 +1470,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
@@ -1483,7 +1483,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
 pub struct WireSandwichUnionSize8Alignment4 {
     pub before: ::fidl_next::WireU32,
 
-    pub union_: crate::WireUnionSize8Alignment4,
+    pub union: crate::WireUnionSize8Alignment4,
 
     pub after: ::fidl_next::WireU32,
 }
@@ -1512,7 +1512,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut union_,
+                mut union,
                 mut after,
 
             } = slot;
@@ -1520,7 +1520,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -1529,4 +1529,182 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSize12Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize12Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSize12Alignment4) -> Self {
+            match from.as_ref() {
+                crate::union_size12_alignment4::Ref::Variant(value) => {
+                    Self::Variant(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionSize12Alignment4>
+        for Option<Box<::fidl_test_unionsandwich::UnionSize12Alignment4>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionSize12Alignment4) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSandwichUnionSize12Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize12Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSandwichUnionSize12Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::TakeFrom::take_from(&from.before),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                after: ::fidl_next::TakeFrom::take_from(&from.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructSize16Alignment8>
+        for ::fidl_test_unionsandwich::StructSize16Alignment8
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructSize16Alignment8) -> Self {
+            Self {
+                f1: ::fidl_next::TakeFrom::take_from(&from.f1),
+
+                f2: ::fidl_next::TakeFrom::take_from(&from.f2),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSize24Alignment8>
+        for ::fidl_test_unionsandwich::UnionSize24Alignment8
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSize24Alignment8) -> Self {
+            match from.as_ref() {
+                crate::union_size24_alignment8::Ref::Variant(value) => {
+                    Self::Variant(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionSize24Alignment8>
+        for Option<Box<::fidl_test_unionsandwich::UnionSize24Alignment8>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionSize24Alignment8) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSandwichUnionSize24Alignment8>
+        for ::fidl_test_unionsandwich::SandwichUnionSize24Alignment8
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSandwichUnionSize24Alignment8) -> Self {
+            Self {
+                before: ::fidl_next::TakeFrom::take_from(&from.before),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                after: ::fidl_next::TakeFrom::take_from(&from.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSize36Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize36Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSize36Alignment4) -> Self {
+            match from.as_ref() {
+                crate::union_size36_alignment4::Ref::Variant(value) => {
+                    Self::Variant(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionSize36Alignment4>
+        for Option<Box<::fidl_test_unionsandwich::UnionSize36Alignment4>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionSize36Alignment4) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSandwichUnionSize36Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize36Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSandwichUnionSize36Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::TakeFrom::take_from(&from.before),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                after: ::fidl_next::TakeFrom::take_from(&from.after),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSize8Alignment4>
+        for ::fidl_test_unionsandwich::UnionSize8Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSize8Alignment4) -> Self {
+            match from.as_ref() {
+                crate::union_size8_alignment4::Ref::Variant(value) => {
+                    Self::Variant(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionSize8Alignment4>
+        for Option<Box<::fidl_test_unionsandwich::UnionSize8Alignment4>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionSize8Alignment4) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSandwichUnionSize8Alignment4>
+        for ::fidl_test_unionsandwich::SandwichUnionSize8Alignment4
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSandwichUnionSize8Alignment4) -> Self {
+            Self {
+                before: ::fidl_next::TakeFrom::take_from(&from.before),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                after: ::fidl_next::TakeFrom::take_from(&from.after),
+            }
+        }
+    }
+}

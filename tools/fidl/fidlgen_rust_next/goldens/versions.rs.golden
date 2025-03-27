@@ -435,7 +435,7 @@ pub trait ServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
         Self::Error,
     >;
@@ -453,7 +453,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
         Self::Error,
     > {
@@ -809,7 +809,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireUnion {
     }
 }
 
-pub mod union_ {
+pub mod union {
     pub enum Ref<'union> {
         X(&'union ::fidl_next::WireU32),
 
@@ -818,11 +818,11 @@ pub mod union_ {
 }
 
 impl WireUnion {
-    pub fn as_ref(&self) -> crate::union_::Ref<'_> {
+    pub fn as_ref(&self) -> crate::union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::union_::Ref::X(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union::Ref::X(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_::Ref::UnknownOrdinal_(unknown),
+            unknown => crate::union::Ref::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -923,15 +923,91 @@ impl ::core::fmt::Debug for WireOptionalUnion {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireBits> for ::fidl_test_versions::Bits {
+        #[inline]
+        fn take_from(from: &crate::WireBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnum> for ::fidl_test_versions::Enum {
+        #[inline]
+        fn take_from(from: &crate::WireEnum) -> Self {
+            match crate::Enum::from(*from) {
+                crate::Enum::A => Self::A,
+
+                crate::Enum::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OtherProtocol`
     /// protocol.
     pub type OtherProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OtherProtocol>;
 
+    impl ::fidl_next::TakeFrom<crate::OtherProtocol> for ::fidl_test_versions::OtherProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::OtherProtocol) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
     pub type ProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+
+    impl ::fidl_next::TakeFrom<crate::Protocol> for ::fidl_test_versions::ProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::Protocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStruct> for ::fidl_test_versions::Struct {
+        #[inline]
+        fn take_from(from: &crate::WireStruct) -> Self {
+            Self { x: ::fidl_next::TakeFrom::take_from(&from.x) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTable> for ::fidl_test_versions::Table {
+        #[inline]
+        fn take_from(from: &crate::WireTable) -> Self {
+            Self {
+                x: from.x().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnion> for ::fidl_test_versions::Union {
+        #[inline]
+        fn take_from(from: &crate::WireUnion) -> Self {
+            match from.as_ref() {
+                crate::union::Ref::X(value) => Self::X(::fidl_next::TakeFrom::take_from(value)),
+
+                crate::union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnion> for Option<Box<::fidl_test_versions::Union>> {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
 }

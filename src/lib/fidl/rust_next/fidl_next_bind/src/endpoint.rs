@@ -106,6 +106,39 @@ macro_rules! endpoint {
                 Self { transport: T::take_from(&from.transport), _protocol: PhantomData }
             }
         }
+
+        impl<T, P, U> TakeFrom<$name<U, P>> for Option<$name<T, P>>
+        where
+            Option<T>: TakeFrom<U>,
+        {
+            fn take_from(from: &$name<U, P>) -> Self {
+                Option::<T>::take_from(&from.transport)
+                    .map(|transport| $name { transport, _protocol: PhantomData })
+            }
+        }
+
+        #[cfg(feature = "compat")]
+        impl<T, P1, P2> TakeFrom<$name<T, P1>> for ::fidl::endpoints::$name<P2>
+        where
+            ::fidl::Channel: TakeFrom<T>,
+            P2: TakeFrom<P1>,
+        {
+            fn take_from(from: &$name<T, P1>) -> Self {
+                Self::new(::fidl::Channel::take_from(&from.transport))
+            }
+        }
+
+        #[cfg(feature = "compat")]
+        impl<T, P1, P2> TakeFrom<$name<T, P1>> for Option<::fidl::endpoints::$name<P2>>
+        where
+            Option<::fidl::Channel>: TakeFrom<T>,
+            P2: TakeFrom<P1>,
+        {
+            fn take_from(from: &$name<T, P1>) -> Self {
+                Option::<::fidl::Channel>::take_from(&from.transport)
+                    .map(::fidl::endpoints::$name::new)
+            }
+        }
     };
 }
 

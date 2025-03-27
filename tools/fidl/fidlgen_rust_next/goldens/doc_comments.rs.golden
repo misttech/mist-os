@@ -794,7 +794,7 @@ pub trait ServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Interface>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Interface>,
         >,
         Self::Error,
     >;
@@ -812,7 +812,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Interface>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Interface>,
         >,
         Self::Error,
     > {
@@ -1291,9 +1291,126 @@ impl ::core::fmt::Debug for WireTable {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleUnion> for ::fidl_test_doccomments::FlexibleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleUnion) -> Self {
+            match from.as_ref() {
+                crate::flexible_union::Ref::Field(value) => {
+                    Self::Field(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFlexibleUnion>
+        for Option<Box<::fidl_test_doccomments::FlexibleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFlexibleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Interface`
     /// protocol.
     pub type InterfaceProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Interface>;
+
+    impl ::fidl_next::TakeFrom<crate::Interface> for ::fidl_test_doccomments::InterfaceMarker {
+        #[inline]
+        fn take_from(from: &crate::Interface) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleBits> for ::fidl_test_doccomments::MyFlexibleBits {
+        #[inline]
+        fn take_from(from: &crate::WireMyFlexibleBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleEnum> for ::fidl_test_doccomments::MyFlexibleEnum {
+        #[inline]
+        fn take_from(from: &crate::WireMyFlexibleEnum) -> Self {
+            match crate::MyFlexibleEnum::from(*from) {
+                crate::MyFlexibleEnum::Foo => Self::Foo,
+
+                crate::MyFlexibleEnum::Bar => Self::Bar,
+
+                crate::MyFlexibleEnum::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyStrictBits> for ::fidl_test_doccomments::MyStrictBits {
+        #[inline]
+        fn take_from(from: &crate::WireMyStrictBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyStrictEnum> for ::fidl_test_doccomments::MyStrictEnum {
+        #[inline]
+        fn take_from(from: &crate::WireMyStrictEnum) -> Self {
+            match crate::MyStrictEnum::from(*from) {
+                crate::MyStrictEnum::Foo => Self::Foo,
+
+                crate::MyStrictEnum::Bar => Self::Bar,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictUnion> for ::fidl_test_doccomments::StrictUnion {
+        #[inline]
+        fn take_from(from: &crate::WireStrictUnion) -> Self {
+            match from.as_ref() {
+                crate::strict_union::Ref::Field(value) => {
+                    Self::Field(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictUnion>
+        for Option<Box<::fidl_test_doccomments::StrictUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStruct> for ::fidl_test_doccomments::Struct {
+        #[inline]
+        fn take_from(from: &crate::WireStruct) -> Self {
+            Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTable> for ::fidl_test_doccomments::Table {
+        #[inline]
+        fn take_from(from: &crate::WireTable) -> Self {
+            Self {
+                field: from.field().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
 }

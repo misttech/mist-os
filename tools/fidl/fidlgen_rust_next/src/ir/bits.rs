@@ -13,6 +13,7 @@ pub struct Bits {
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     pub members: Vec<BitsMember>,
     #[serde(rename = "strict")]
     pub is_strict: bool,

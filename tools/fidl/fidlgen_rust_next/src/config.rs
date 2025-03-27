@@ -17,6 +17,7 @@ pub struct ResourceBinding {
 
 pub struct ResourceBindings {
     pub handle: ResourceBinding,
+    pub channel: ResourceBinding,
 }
 
 impl Default for ResourceBindings {
@@ -26,6 +27,11 @@ impl Default for ResourceBindings {
                 wire_path: "::fidl_next::fuchsia::WireHandle".to_string(),
                 optional_wire_path: "::fidl_next::fuchsia::WireOptionalHandle".to_string(),
                 natural_path: "::fidl_next::fuchsia::zx::Handle".to_string(),
+            },
+            channel: ResourceBinding {
+                wire_path: "::fidl_next::fuchsia::WireChannel".to_string(),
+                optional_wire_path: "::fidl_next::fuchsia::WireOptionalChannel".to_string(),
+                natural_path: "::fidl_next::fuchsia::zx::Channel".to_string(),
             },
         }
     }

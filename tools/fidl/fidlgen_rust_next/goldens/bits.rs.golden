@@ -344,4 +344,33 @@ impl ::core::convert::From<StrictBits> for WireStrictBits {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyBits> for ::fidl_test_bits::EmptyBits {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleBits> for ::fidl_test_bits::FlexibleBits {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyBits> for ::fidl_test_bits::MyBits {
+        #[inline]
+        fn take_from(from: &crate::WireMyBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictBits> for ::fidl_test_bits::StrictBits {
+        #[inline]
+        fn take_from(from: &crate::WireStrictBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+}

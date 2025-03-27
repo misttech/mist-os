@@ -701,4 +701,77 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireInt16Int8> for ::fidl_test_encapsulatedstructs::Int16Int8 {
+        #[inline]
+        fn take_from(from: &crate::WireInt16Int8) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireArrayInt16Int8>
+        for ::fidl_test_encapsulatedstructs::ArrayInt16Int8
+    {
+        #[inline]
+        fn take_from(from: &crate::WireArrayInt16Int8) -> Self {
+            Self { arr: ::fidl_next::TakeFrom::take_from(&from.arr) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireInt8Int32> for ::fidl_test_encapsulatedstructs::Int8Int32 {
+        #[inline]
+        fn take_from(from: &crate::WireInt8Int32) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireNonInlineStructTestStruct>
+        for ::fidl_test_encapsulatedstructs::NonInlineStructTestStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireNonInlineStructTestStruct) -> Self {
+            Self {
+                element: ::fidl_next::TakeFrom::take_from(&from.element),
+
+                h: ::fidl_next::TakeFrom::take_from(&from.h),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructPaddingTestStruct>
+        for ::fidl_test_encapsulatedstructs::StructPaddingTestStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructPaddingTestStruct) -> Self {
+            Self {
+                trailing: ::fidl_next::TakeFrom::take_from(&from.trailing),
+
+                inner: ::fidl_next::TakeFrom::take_from(&from.inner),
+
+                array: ::fidl_next::TakeFrom::take_from(&from.array),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTopLevelStruct>
+        for ::fidl_test_encapsulatedstructs::TopLevelStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTopLevelStruct) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+}

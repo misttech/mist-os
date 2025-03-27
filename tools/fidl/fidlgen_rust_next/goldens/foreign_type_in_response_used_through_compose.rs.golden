@@ -155,4 +155,13 @@ pub mod compat {
     /// An alias for a client sender over `zx::Channel` for the `Top`
     /// protocol.
     pub type TopProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Top>;
+
+    impl ::fidl_next::TakeFrom<crate::Top>
+        for ::fidl_test_foreigntypeinresponseusedthroughcompose::TopMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::Top) -> Self {
+            Self
+        }
+    }
 }

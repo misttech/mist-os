@@ -889,4 +889,89 @@ impl ::core::fmt::Debug for WireOptionalUnionSmallArray {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireStructLargeArray> for ::fidl_test_arrays::StructLargeArray {
+        #[inline]
+        fn take_from(from: &crate::WireStructLargeArray) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructSmallArray> for ::fidl_test_arrays::StructSmallArray {
+        #[inline]
+        fn take_from(from: &crate::WireStructSmallArray) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTableLargeArray> for ::fidl_test_arrays::TableLargeArray {
+        #[inline]
+        fn take_from(from: &crate::WireTableLargeArray) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTableSmallArray> for ::fidl_test_arrays::TableSmallArray {
+        #[inline]
+        fn take_from(from: &crate::WireTableSmallArray) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionLargeArray> for ::fidl_test_arrays::UnionLargeArray {
+        #[inline]
+        fn take_from(from: &crate::WireUnionLargeArray) -> Self {
+            match from.as_ref() {
+                crate::union_large_array::Ref::A(value) => {
+                    Self::A(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionLargeArray>
+        for Option<Box<::fidl_test_arrays::UnionLargeArray>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionLargeArray) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSmallArray> for ::fidl_test_arrays::UnionSmallArray {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSmallArray) -> Self {
+            match from.as_ref() {
+                crate::union_small_array::Ref::A(value) => {
+                    Self::A(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionSmallArray>
+        for Option<Box<::fidl_test_arrays::UnionSmallArray>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionSmallArray) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+}

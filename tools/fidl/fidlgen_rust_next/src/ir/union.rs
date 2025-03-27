@@ -17,6 +17,7 @@ pub struct Union {
     pub attributes: Attributes,
     pub members: Vec<UnionMember>,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     #[serde(rename = "resource")]
     pub is_resource: bool,
     pub is_result: bool,

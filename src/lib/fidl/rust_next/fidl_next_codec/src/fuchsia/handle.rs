@@ -196,3 +196,50 @@ impl TakeFrom<WireOptionalHandle> for Option<Handle> {
         from.take()
     }
 }
+
+// TODO: newtype handle subtypes
+macro_rules! impl_takefrom {
+    ($($name:ident),* $(,)?) => {
+        $(
+            impl TakeFrom<WireHandle> for zx::$name {
+                fn take_from(from: &WireHandle) -> zx::$name {
+                    from.take().into()
+                }
+            }
+
+            impl TakeFrom<WireOptionalHandle> for Option<zx::$name> {
+                fn take_from(from: &WireOptionalHandle) -> Self {
+                    from.take().map(<zx::$name>::from)
+                }
+            }
+        )*
+    }
+}
+
+impl_takefrom! {
+    Process,
+    Thread,
+    Vmo,
+    Channel,
+    Event,
+    Port,
+    Interrupt,
+    Socket,
+    Resource,
+    EventPair,
+    Job,
+    Vmar,
+    Fifo,
+    Guest,
+    Vcpu,
+    Timer,
+    Iommu,
+    Bti,
+    Profile,
+    Pmt,
+    Pager,
+    Exception,
+    Clock,
+    Stream,
+    Iob,
+}

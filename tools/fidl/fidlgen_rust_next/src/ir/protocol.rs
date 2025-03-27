@@ -27,6 +27,16 @@ impl Index for Protocol {
     }
 }
 
+impl Protocol {
+    pub fn transport(&self) -> Option<&str> {
+        self.attributes
+            .attributes
+            .get("transport")
+            .and_then(|attr| attr.args.get("value"))
+            .map(|arg| arg.value.value.as_str())
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProtocolOpenness {

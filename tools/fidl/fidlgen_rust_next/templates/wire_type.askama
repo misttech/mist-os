@@ -28,9 +28,9 @@
         {%- endmatch -%}
         <
             {%- if nullable -%}
-                {{ context.config.resource_bindings.handle.optional_wire_path }},
+                {{ context.config.resource_bindings.channel.optional_wire_path }},
             {%- else -%}
-                {{ context.config.resource_bindings.handle.wire_path }},
+                {{ context.config.resource_bindings.channel.wire_path }},
             {%- endif -%}
             {{ context.natural_id(protocol) }},
         >
@@ -42,10 +42,14 @@
             {%- when DeclType::Enum -%} {{ context.wire_id(identifier) }}
             {%- when DeclType::Table -%} {{ context.wire_id(identifier) }}
             {%- when DeclType::Struct -%}
-                {%- if nullable -%}
-                    ::fidl_next::WireBox<{{ context.wire_id(identifier) }}>
+                {%- if identifier.library() != context.schema.name || !context.schema.struct_declarations[identifier].is_empty_success_struct -%}
+                    {%- if nullable -%}
+                        ::fidl_next::WireBox<{{ context.wire_id(identifier) }}>
+                    {%- else -%}
+                        {{ context.wire_id(identifier) }}
+                    {%- endif -%}
                 {%- else -%}
-                    {{ context.wire_id(identifier) }}
+                    ()
                 {%- endif -%}
             {%- when DeclType::Union -%}
                 {%- if nullable -%}

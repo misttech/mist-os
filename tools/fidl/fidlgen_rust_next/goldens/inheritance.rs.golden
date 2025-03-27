@@ -545,14 +545,46 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireSuperFooRequest>
+        for ::fidl_test_inheritance::SuperFooRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSuperFooRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSuperFooResponse>
+        for ::fidl_test_inheritance::SuperFooResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSuperFooResponse) -> Self {
+            Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Super`
     /// protocol.
     pub type SuperProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Super>;
 
+    impl ::fidl_next::TakeFrom<crate::Super> for ::fidl_test_inheritance::Super_Marker {
+        #[inline]
+        fn take_from(from: &crate::Super) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Sub`
     /// protocol.
     pub type SubProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Sub>;
+
+    impl ::fidl_next::TakeFrom<crate::Sub> for ::fidl_test_inheritance::SubMarker {
+        #[inline]
+        fn take_from(from: &crate::Sub) -> Self {
+            Self
+        }
+    }
 }

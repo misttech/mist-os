@@ -1943,9 +1943,109 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireLocalStructPayload>
+        for ::fidl_test_protocolpayloads::LocalStructPayload
+    {
+        #[inline]
+        fn take_from(from: &crate::WireLocalStructPayload) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOneWayAnonRequest>
+        for ::fidl_test_protocolpayloads::MainProtocolOneWayAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolOneWayAnonRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonRequest>
+        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonResponse>
+        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonResponse) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorRequest>
+        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorResponse>
+        for ::fidl_test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOnAnonRequest>
+        for ::fidl_test_protocolpayloads::MainProtocolOnAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolOnAnonRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MainProtocol`
     /// protocol.
     pub type MainProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MainProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::MainProtocol>
+        for ::fidl_test_protocolpayloads::MainProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::MainProtocol) -> Self {
+            Self
+        }
+    }
 }

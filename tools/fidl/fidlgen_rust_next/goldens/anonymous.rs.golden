@@ -1879,9 +1879,198 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireBitsMember> for ::fidl_test_anonymous::BitsMember {
+        #[inline]
+        fn take_from(from: &crate::WireBitsMember) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOp> for ::fidl_test_anonymous::Op {
+        #[inline]
+        fn take_from(from: &crate::WireOp) -> Self {
+            match crate::Op::from(*from) {
+                crate::Op::Add => Self::Add,
+
+                crate::Op::Mul => Self::Mul,
+
+                crate::Op::Div => Self::Div,
+
+                crate::Op::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOverrideTest> for ::fidl_test_anonymous::OverrideTest {
+        #[inline]
+        fn take_from(from: &crate::WireOverrideTest) -> Self {
+            Self {
+                op: ::fidl_next::TakeFrom::take_from(&from.op),
+
+                left: ::fidl_next::TakeFrom::take_from(&from.left),
+
+                right: ::fidl_next::TakeFrom::take_from(&from.right),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlags> for ::fidl_test_anonymous::Flags {
+        #[inline]
+        fn take_from(from: &crate::WireFlags) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFunctionApplication>
+        for ::fidl_test_anonymous::FunctionApplication
+    {
+        #[inline]
+        fn take_from(from: &crate::WireFunctionApplication) -> Self {
+            Self {
+                func: from.func().map(::fidl_next::TakeFrom::take_from),
+
+                args: from.args().map(::fidl_next::TakeFrom::take_from),
+
+                flags: from.flags().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExpression> for ::fidl_test_anonymous::Expression {
+        #[inline]
+        fn take_from(from: &crate::WireExpression) -> Self {
+            match from.as_ref() {
+                crate::expression::Ref::Value(value) => {
+                    Self::Value(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::expression::Ref::BinOp(value) => {
+                    Self::BinOp(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::expression::Ref::FunctionApplication(value) => {
+                    Self::FunctionApplication(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::expression::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExpression>
+        for Option<Box<::fidl_test_anonymous::Expression>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExpression) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionMember> for ::fidl_test_anonymous::UnionMember {
+        #[inline]
+        fn take_from(from: &crate::WireUnionMember) -> Self {
+            match from.as_ref() {
+                crate::union_member::Ref::UnionData(value) => {
+                    Self::UnionData(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union_member::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionMember>
+        for Option<Box<::fidl_test_anonymous::UnionMember>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionMember) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTableData> for ::fidl_test_anonymous::TableData {
+        #[inline]
+        fn take_from(from: &crate::WireTableData) -> Self {
+            Self { data: ::fidl_next::TakeFrom::take_from(&from.data) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTableMember> for ::fidl_test_anonymous::TableMember {
+        #[inline]
+        fn take_from(from: &crate::WireTableMember) -> Self {
+            Self {
+                table_data: from.table_data().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSomeProtocolSomeMethodRequest>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSomeProtocolSomeMethodRequest) -> Self {
+            Self {
+                union_member: ::fidl_next::TakeFrom::take_from(&from.union_member),
+
+                table_member: ::fidl_next::TakeFrom::take_from(&from.table_member),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSomeProtocolSomeMethodResponse>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSomeProtocolSomeMethodResponse) -> Self {
+            Self { bits_member: ::fidl_next::TakeFrom::take_from(&from.bits_member) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSomeProtocolSomeMethodError>
+        for ::fidl_test_anonymous::SomeProtocolSomeMethodError
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSomeProtocolSomeMethodError) -> Self {
+            match crate::SomeProtocolSomeMethodError::from(*from) {
+                crate::SomeProtocolSomeMethodError::ErrorOne => Self::ErrorOne,
+
+                crate::SomeProtocolSomeMethodError::ErrorTwo => Self::ErrorTwo,
+
+                crate::SomeProtocolSomeMethodError::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SomeProtocol`
     /// protocol.
     pub type SomeProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SomeProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::SomeProtocol> for ::fidl_test_anonymous::SomeProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::SomeProtocol) -> Self {
+            Self
+        }
+    }
 }

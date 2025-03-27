@@ -901,14 +901,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableProtocol {
     pub val:
-        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
+        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -973,7 +973,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -991,7 +991,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
 #[repr(C)]
 pub struct WireStructWithNullableProtocol {
     pub val:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::SimpleProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableProtocol {
@@ -1026,14 +1026,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableRequest {
     pub val:
-        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
+        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -1098,7 +1098,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -1116,7 +1116,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
 #[repr(C)]
 pub struct WireStructWithNullableRequest {
     pub val:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::SimpleProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableRequest {
@@ -1569,9 +1569,136 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireInt32Wrapper> for ::fidl_test_nullable::Int32Wrapper {
+        #[inline]
+        fn take_from(from: &crate::WireInt32Wrapper) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleProtocolAddRequest>
+        for ::fidl_test_nullable::SimpleProtocolAddRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleProtocolAddRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleProtocolAddResponse>
+        for ::fidl_test_nullable::SimpleProtocolAddResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleProtocolAddResponse) -> Self {
+            Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SimpleProtocol`
     /// protocol.
     pub type SimpleProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SimpleProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::SimpleProtocol> for ::fidl_test_nullable::SimpleProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::SimpleProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleUnion> for ::fidl_test_nullable::SimpleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleUnion) -> Self {
+            match from.as_ref() {
+                crate::simple_union::Ref::A(value) => {
+                    Self::A(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::simple_union::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalSimpleUnion>
+        for Option<Box<::fidl_test_nullable::SimpleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalSimpleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableHandle>
+        for ::fidl_test_nullable::StructWithNullableHandle
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableHandle) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableProtocol>
+        for ::fidl_test_nullable::StructWithNullableProtocol
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableProtocol) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableRequest>
+        for ::fidl_test_nullable::StructWithNullableRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableRequest) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableString>
+        for ::fidl_test_nullable::StructWithNullableString
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableString) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableStruct>
+        for ::fidl_test_nullable::StructWithNullableStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableStruct) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableUnion>
+        for ::fidl_test_nullable::StructWithNullableUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableUnion) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableVector>
+        for ::fidl_test_nullable::StructWithNullableVector
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableVector) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
 }

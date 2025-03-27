@@ -1027,4 +1027,126 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyResourceStruct>
+        for ::fidl_test_handlesintypes::EmptyResourceStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyResourceTable>
+        for ::fidl_test_handlesintypes::EmptyResourceTable
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyResourceTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyResourceUnion>
+        for ::fidl_test_handlesintypes::EmptyResourceUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyResourceUnion) -> Self {
+            match from.as_ref() {
+                crate::empty_resource_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalEmptyResourceUnion>
+        for Option<Box<::fidl_test_handlesintypes::EmptyResourceUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalEmptyResourceUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireObjType> for ::fidl_test_handlesintypes::ObjType {
+        #[inline]
+        fn take_from(from: &crate::WireObjType) -> Self {
+            match crate::ObjType::from(*from) {
+                crate::ObjType::None => Self::None,
+
+                crate::ObjType::Vmo => Self::Vmo,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTableWithHandle>
+        for ::fidl_test_handlesintypes::TableWithHandle
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTableWithHandle) -> Self {
+            Self {
+                h: from.h().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionWithHandle>
+        for ::fidl_test_handlesintypes::UnionWithHandle
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionWithHandle) -> Self {
+            match from.as_ref() {
+                crate::union_with_handle::Ref::H(value) => {
+                    Self::H(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union_with_handle::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionWithHandle>
+        for Option<Box<::fidl_test_handlesintypes::UnionWithHandle>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionWithHandle) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireHandlesInTypes>
+        for ::fidl_test_handlesintypes::HandlesInTypes
+    {
+        #[inline]
+        fn take_from(from: &crate::WireHandlesInTypes) -> Self {
+            Self {
+                normal_handle: ::fidl_next::TakeFrom::take_from(&from.normal_handle),
+
+                handle_in_vec: ::fidl_next::TakeFrom::take_from(&from.handle_in_vec),
+
+                handle_in_array: ::fidl_next::TakeFrom::take_from(&from.handle_in_array),
+
+                handle_in_mixed_vec_array: ::fidl_next::TakeFrom::take_from(
+                    &from.handle_in_mixed_vec_array,
+                ),
+
+                table_with_handle: ::fidl_next::TakeFrom::take_from(&from.table_with_handle),
+
+                union_with_handle: ::fidl_next::TakeFrom::take_from(&from.union_with_handle),
+            }
+        }
+    }
+}

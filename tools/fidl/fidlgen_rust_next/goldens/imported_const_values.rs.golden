@@ -108,4 +108,12 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireMyStruct> for ::fidl_test_importedconstvalues::MyStruct {
+        #[inline]
+        fn take_from(from: &crate::WireMyStruct) -> Self {
+            Self {}
+        }
+    }
+}

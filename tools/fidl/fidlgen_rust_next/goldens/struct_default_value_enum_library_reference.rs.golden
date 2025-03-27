@@ -124,4 +124,14 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireFoo>
+        for ::fidl_test_structdefaultvalueenumlibraryreference::Foo
+    {
+        #[inline]
+        fn take_from(from: &crate::WireFoo) -> Self {
+            Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
+        }
+    }
+}

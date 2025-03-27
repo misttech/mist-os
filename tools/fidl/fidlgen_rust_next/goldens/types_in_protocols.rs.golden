@@ -722,7 +722,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireUnion {
     }
 }
 
-pub mod union_ {
+pub mod union {
     pub enum Ref<'union> {
         B(&'union bool),
 
@@ -731,11 +731,11 @@ pub mod union_ {
 }
 
 impl WireUnion {
-    pub fn as_ref(&self) -> crate::union_::Ref<'_> {
+    pub fn as_ref(&self) -> crate::union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::union_::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_::Ref::UnknownOrdinal_(unknown),
+            unknown => crate::union::Ref::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -1431,7 +1431,7 @@ pub struct Compound {
 
     pub table: crate::Table,
 
-    pub union_: crate::Union,
+    pub union: crate::Union,
 
     pub opt_struct: Option<Box<crate::Struct>>,
 
@@ -1460,7 +1460,7 @@ where
                 enum_,
                 struct_,
                 table,
-                union_,
+                union,
                 opt_struct,
                 opt_union,
 
@@ -1475,7 +1475,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_struct, encoder, opt_struct)?;
 
@@ -1523,7 +1523,7 @@ impl ::fidl_next::TakeFrom<WireCompound> for Compound {
 
             table: ::fidl_next::TakeFrom::take_from(&from.table),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             opt_struct: ::fidl_next::TakeFrom::take_from(&from.opt_struct),
 
@@ -1544,7 +1544,7 @@ pub struct WireCompound {
 
     pub table: crate::WireTable,
 
-    pub union_: crate::WireUnion,
+    pub union: crate::WireUnion,
 
     pub opt_struct: ::fidl_next::WireBox<crate::WireStruct>,
 
@@ -1576,7 +1576,7 @@ where
                 mut enum_,
                 mut struct_,
                 mut table,
-                mut union_,
+                mut union,
                 mut opt_struct,
                 mut opt_union,
 
@@ -1591,7 +1591,7 @@ where
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_struct.as_mut(), decoder)?;
 
@@ -2576,25 +2576,25 @@ pub struct Resource {
 
     pub vmo: ::fidl_next::fuchsia::zx::Handle,
 
-    pub client_end: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>,
+    pub client_end: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
 
-    pub server_end: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>,
+    pub server_end: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
 
     pub struct_: crate::ResourceStruct,
 
     pub table: crate::ResourceTable,
 
-    pub union_: crate::ResourceUnion,
+    pub union: crate::ResourceUnion,
 
     pub opt_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub opt_vmo: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub opt_client_end:
-        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::Protocol>,
+        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::Protocol>,
 
     pub opt_server_end:
-        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::Protocol>,
+        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::Protocol>,
 
     pub opt_struct: Option<Box<crate::ResourceStruct>>,
 
@@ -2605,10 +2605,10 @@ pub struct Resource {
     pub array_vmo: [::fidl_next::fuchsia::zx::Handle; 5],
 
     pub array_client_end:
-        [::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>; 5],
+        [::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>; 5],
 
     pub array_server_end:
-        [::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>; 5],
+        [::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>; 5],
 
     pub array_struct: [crate::ResourceStruct; 5],
 
@@ -2621,10 +2621,10 @@ pub struct Resource {
     pub vector_vmo: Vec<::fidl_next::fuchsia::zx::Handle>,
 
     pub vector_client_end:
-        Vec<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>>,
+        Vec<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>>,
 
     pub vector_server_end:
-        Vec<::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Protocol>>,
+        Vec<::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>>,
 
     pub vector_struct: Vec<crate::ResourceStruct>,
 
@@ -2659,7 +2659,7 @@ where
                 server_end,
                 struct_,
                 table,
-                union_,
+                union,
                 opt_handle,
                 opt_vmo,
                 opt_client_end,
@@ -2696,7 +2696,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
+        ::fidl_next::Encode::encode(&mut self.union, encoder, union)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_handle, encoder, opt_handle)?;
 
@@ -2784,7 +2784,7 @@ impl ::fidl_next::TakeFrom<WireResource> for Resource {
 
             table: ::fidl_next::TakeFrom::take_from(&from.table),
 
-            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
+            union: ::fidl_next::TakeFrom::take_from(&from.union),
 
             opt_handle: ::fidl_next::TakeFrom::take_from(&from.opt_handle),
 
@@ -2837,25 +2837,25 @@ pub struct WireResource {
 
     pub vmo: ::fidl_next::fuchsia::WireHandle,
 
-    pub client_end: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>,
+    pub client_end: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>,
 
-    pub server_end: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>,
+    pub server_end: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>,
 
     pub struct_: crate::WireResourceStruct,
 
     pub table: crate::WireResourceTable,
 
-    pub union_: crate::WireResourceUnion,
+    pub union: crate::WireResourceUnion,
 
     pub opt_handle: ::fidl_next::fuchsia::WireOptionalHandle,
 
     pub opt_vmo: ::fidl_next::fuchsia::WireOptionalHandle,
 
     pub opt_client_end:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::Protocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::Protocol>,
 
     pub opt_server_end:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::Protocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::Protocol>,
 
     pub opt_struct: ::fidl_next::WireBox<crate::WireResourceStruct>,
 
@@ -2866,10 +2866,10 @@ pub struct WireResource {
     pub array_vmo: [::fidl_next::fuchsia::WireHandle; 5],
 
     pub array_client_end:
-        [::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>; 5],
+        [::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>; 5],
 
     pub array_server_end:
-        [::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>; 5],
+        [::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>; 5],
 
     pub array_struct: [crate::WireResourceStruct; 5],
 
@@ -2882,11 +2882,11 @@ pub struct WireResource {
     pub vector_vmo: ::fidl_next::WireVector<::fidl_next::fuchsia::WireHandle>,
 
     pub vector_client_end: ::fidl_next::WireVector<
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>,
     >,
 
     pub vector_server_end: ::fidl_next::WireVector<
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Protocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Protocol>,
     >,
 
     pub vector_struct: ::fidl_next::WireVector<crate::WireResourceStruct>,
@@ -2929,7 +2929,7 @@ where
                 mut server_end,
                 mut struct_,
                 mut table,
-                mut union_,
+                mut union,
                 mut opt_handle,
                 mut opt_vmo,
                 mut opt_client_end,
@@ -2966,7 +2966,7 @@ where
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_handle.as_mut(), decoder)?;
 
@@ -5013,9 +5013,381 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireArrayBasic> for ::fidl_test_typesinprotocols::ArrayBasic {
+        #[inline]
+        fn take_from(from: &crate::WireArrayBasic) -> Self {
+            Self {
+                array_uint8: ::fidl_next::TakeFrom::take_from(&from.array_uint8),
+
+                array_uint16: ::fidl_next::TakeFrom::take_from(&from.array_uint16),
+
+                array_uint32: ::fidl_next::TakeFrom::take_from(&from.array_uint32),
+
+                array_uint64: ::fidl_next::TakeFrom::take_from(&from.array_uint64),
+
+                array_int8: ::fidl_next::TakeFrom::take_from(&from.array_int8),
+
+                array_int16: ::fidl_next::TakeFrom::take_from(&from.array_int16),
+
+                array_int32: ::fidl_next::TakeFrom::take_from(&from.array_int32),
+
+                array_int64: ::fidl_next::TakeFrom::take_from(&from.array_int64),
+
+                array_float32: ::fidl_next::TakeFrom::take_from(&from.array_float32),
+
+                array_float64: ::fidl_next::TakeFrom::take_from(&from.array_float64),
+
+                array_string: ::fidl_next::TakeFrom::take_from(&from.array_string),
+
+                array_opt_string: ::fidl_next::TakeFrom::take_from(&from.array_opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireBits> for ::fidl_test_typesinprotocols::Bits {
+        #[inline]
+        fn take_from(from: &crate::WireBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnum> for ::fidl_test_typesinprotocols::Enum {
+        #[inline]
+        fn take_from(from: &crate::WireEnum) -> Self {
+            match crate::Enum::from(*from) {
+                crate::Enum::Val => Self::Val,
+
+                crate::Enum::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStruct> for ::fidl_test_typesinprotocols::Struct {
+        #[inline]
+        fn take_from(from: &crate::WireStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTable> for ::fidl_test_typesinprotocols::Table {
+        #[inline]
+        fn take_from(from: &crate::WireTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnion> for ::fidl_test_typesinprotocols::Union {
+        #[inline]
+        fn take_from(from: &crate::WireUnion) -> Self {
+            match from.as_ref() {
+                crate::union::Ref::B(value) => Self::B(::fidl_next::TakeFrom::take_from(value)),
+
+                crate::union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnion>
+        for Option<Box<::fidl_test_typesinprotocols::Union>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireArrayCompound>
+        for ::fidl_test_typesinprotocols::ArrayCompound
+    {
+        #[inline]
+        fn take_from(from: &crate::WireArrayCompound) -> Self {
+            Self {
+                array_bits: ::fidl_next::TakeFrom::take_from(&from.array_bits),
+
+                array_enum: ::fidl_next::TakeFrom::take_from(&from.array_enum),
+
+                array_struct: ::fidl_next::TakeFrom::take_from(&from.array_struct),
+
+                array_table: ::fidl_next::TakeFrom::take_from(&from.array_table),
+
+                array_union: ::fidl_next::TakeFrom::take_from(&from.array_union),
+
+                array_opt_struct: ::fidl_next::TakeFrom::take_from(&from.array_opt_struct),
+
+                array_opt_union: ::fidl_next::TakeFrom::take_from(&from.array_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireArrayVectorNested>
+        for ::fidl_test_typesinprotocols::ArrayVectorNested
+    {
+        #[inline]
+        fn take_from(from: &crate::WireArrayVectorNested) -> Self {
+            Self {
+                array_array_uint8: ::fidl_next::TakeFrom::take_from(&from.array_array_uint8),
+
+                array_vector_uint8: ::fidl_next::TakeFrom::take_from(&from.array_vector_uint8),
+
+                vector_array_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_array_uint8),
+
+                vector_vector_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_vector_uint8),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireBasic> for ::fidl_test_typesinprotocols::Basic {
+        #[inline]
+        fn take_from(from: &crate::WireBasic) -> Self {
+            Self {
+                uint8: ::fidl_next::TakeFrom::take_from(&from.uint8),
+
+                uint16: ::fidl_next::TakeFrom::take_from(&from.uint16),
+
+                uint32: ::fidl_next::TakeFrom::take_from(&from.uint32),
+
+                uint64: ::fidl_next::TakeFrom::take_from(&from.uint64),
+
+                int8: ::fidl_next::TakeFrom::take_from(&from.int8),
+
+                int16: ::fidl_next::TakeFrom::take_from(&from.int16),
+
+                int32: ::fidl_next::TakeFrom::take_from(&from.int32),
+
+                int64: ::fidl_next::TakeFrom::take_from(&from.int64),
+
+                float32: ::fidl_next::TakeFrom::take_from(&from.float32),
+
+                float64: ::fidl_next::TakeFrom::take_from(&from.float64),
+
+                string: ::fidl_next::TakeFrom::take_from(&from.string),
+
+                opt_string: ::fidl_next::TakeFrom::take_from(&from.opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireCompound> for ::fidl_test_typesinprotocols::Compound {
+        #[inline]
+        fn take_from(from: &crate::WireCompound) -> Self {
+            Self {
+                bits: ::fidl_next::TakeFrom::take_from(&from.bits),
+
+                enum_: ::fidl_next::TakeFrom::take_from(&from.enum_),
+
+                struct_: ::fidl_next::TakeFrom::take_from(&from.struct_),
+
+                table: ::fidl_next::TakeFrom::take_from(&from.table),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                opt_struct: ::fidl_next::TakeFrom::take_from(&from.opt_struct),
+
+                opt_union: ::fidl_next::TakeFrom::take_from(&from.opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireVectorBasic> for ::fidl_test_typesinprotocols::VectorBasic {
+        #[inline]
+        fn take_from(from: &crate::WireVectorBasic) -> Self {
+            Self {
+                vector_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_uint8),
+
+                vector_uint16: ::fidl_next::TakeFrom::take_from(&from.vector_uint16),
+
+                vector_uint32: ::fidl_next::TakeFrom::take_from(&from.vector_uint32),
+
+                vector_uint64: ::fidl_next::TakeFrom::take_from(&from.vector_uint64),
+
+                vector_int8: ::fidl_next::TakeFrom::take_from(&from.vector_int8),
+
+                vector_int16: ::fidl_next::TakeFrom::take_from(&from.vector_int16),
+
+                vector_int32: ::fidl_next::TakeFrom::take_from(&from.vector_int32),
+
+                vector_int64: ::fidl_next::TakeFrom::take_from(&from.vector_int64),
+
+                vector_float32: ::fidl_next::TakeFrom::take_from(&from.vector_float32),
+
+                vector_float64: ::fidl_next::TakeFrom::take_from(&from.vector_float64),
+
+                vector_string: ::fidl_next::TakeFrom::take_from(&from.vector_string),
+
+                vector_opt_string: ::fidl_next::TakeFrom::take_from(&from.vector_opt_string),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireVectorCompound>
+        for ::fidl_test_typesinprotocols::VectorCompound
+    {
+        #[inline]
+        fn take_from(from: &crate::WireVectorCompound) -> Self {
+            Self {
+                vector_bits: ::fidl_next::TakeFrom::take_from(&from.vector_bits),
+
+                vector_enum: ::fidl_next::TakeFrom::take_from(&from.vector_enum),
+
+                vector_struct: ::fidl_next::TakeFrom::take_from(&from.vector_struct),
+
+                vector_table: ::fidl_next::TakeFrom::take_from(&from.vector_table),
+
+                vector_union: ::fidl_next::TakeFrom::take_from(&from.vector_union),
+
+                vector_opt_struct: ::fidl_next::TakeFrom::take_from(&from.vector_opt_struct),
+
+                vector_opt_union: ::fidl_next::TakeFrom::take_from(&from.vector_opt_union),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireVectorOptional>
+        for ::fidl_test_typesinprotocols::VectorOptional
+    {
+        #[inline]
+        fn take_from(from: &crate::WireVectorOptional) -> Self {
+            Self {
+                opt_vector_uint8: ::fidl_next::TakeFrom::take_from(&from.opt_vector_uint8),
+
+                opt_vector_string: ::fidl_next::TakeFrom::take_from(&from.opt_vector_string),
+
+                opt_vector_struct: ::fidl_next::TakeFrom::take_from(&from.opt_vector_struct),
+
+                opt_vector_opt_struct: ::fidl_next::TakeFrom::take_from(
+                    &from.opt_vector_opt_struct,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireResourceStruct>
+        for ::fidl_test_typesinprotocols::ResourceStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireResourceStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireResourceTable>
+        for ::fidl_test_typesinprotocols::ResourceTable
+    {
+        #[inline]
+        fn take_from(from: &crate::WireResourceTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireResourceUnion>
+        for ::fidl_test_typesinprotocols::ResourceUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireResourceUnion) -> Self {
+            match from.as_ref() {
+                crate::resource_union::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::resource_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalResourceUnion>
+        for Option<Box<::fidl_test_typesinprotocols::ResourceUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalResourceUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireResource> for ::fidl_test_typesinprotocols::Resource {
+        #[inline]
+        fn take_from(from: &crate::WireResource) -> Self {
+            Self {
+                handle: ::fidl_next::TakeFrom::take_from(&from.handle),
+
+                vmo: ::fidl_next::TakeFrom::take_from(&from.vmo),
+
+                client_end: ::fidl_next::TakeFrom::take_from(&from.client_end),
+
+                server_end: ::fidl_next::TakeFrom::take_from(&from.server_end),
+
+                struct_: ::fidl_next::TakeFrom::take_from(&from.struct_),
+
+                table: ::fidl_next::TakeFrom::take_from(&from.table),
+
+                union: ::fidl_next::TakeFrom::take_from(&from.union),
+
+                opt_handle: ::fidl_next::TakeFrom::take_from(&from.opt_handle),
+
+                opt_vmo: ::fidl_next::TakeFrom::take_from(&from.opt_vmo),
+
+                opt_client_end: ::fidl_next::TakeFrom::take_from(&from.opt_client_end),
+
+                opt_server_end: ::fidl_next::TakeFrom::take_from(&from.opt_server_end),
+
+                opt_struct: ::fidl_next::TakeFrom::take_from(&from.opt_struct),
+
+                opt_union: ::fidl_next::TakeFrom::take_from(&from.opt_union),
+
+                array_handle: ::fidl_next::TakeFrom::take_from(&from.array_handle),
+
+                array_vmo: ::fidl_next::TakeFrom::take_from(&from.array_vmo),
+
+                array_client_end: ::fidl_next::TakeFrom::take_from(&from.array_client_end),
+
+                array_server_end: ::fidl_next::TakeFrom::take_from(&from.array_server_end),
+
+                array_struct: ::fidl_next::TakeFrom::take_from(&from.array_struct),
+
+                array_table: ::fidl_next::TakeFrom::take_from(&from.array_table),
+
+                array_union: ::fidl_next::TakeFrom::take_from(&from.array_union),
+
+                vector_handle: ::fidl_next::TakeFrom::take_from(&from.vector_handle),
+
+                vector_vmo: ::fidl_next::TakeFrom::take_from(&from.vector_vmo),
+
+                vector_client_end: ::fidl_next::TakeFrom::take_from(&from.vector_client_end),
+
+                vector_server_end: ::fidl_next::TakeFrom::take_from(&from.vector_server_end),
+
+                vector_struct: ::fidl_next::TakeFrom::take_from(&from.vector_struct),
+
+                vector_table: ::fidl_next::TakeFrom::take_from(&from.vector_table),
+
+                vector_union: ::fidl_next::TakeFrom::take_from(&from.vector_union),
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
     pub type ProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+
+    impl ::fidl_next::TakeFrom<crate::Protocol> for ::fidl_test_typesinprotocols::ProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::Protocol) -> Self {
+            Self
+        }
+    }
 }

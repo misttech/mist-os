@@ -19,7 +19,10 @@
         {% when DeclType::Enum %}
             {{ self.enm(schema.enum_declarations[ident]) }}
         {% when DeclType::Struct %}
-            {{ self.strct(schema.struct_declarations[ident]) }}
+            {% let strct = schema.struct_declarations[ident] %}
+            {% if !strct.is_empty_success_struct %}
+                {{ self.strct(schema.struct_declarations[ident]) }}
+            {% endif %}
         {% when DeclType::Table %}
             {{ self.table(schema.table_declarations[ident]) }}
         {% when DeclType::Union %}

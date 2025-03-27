@@ -1,20 +1,126 @@
+{% let compat_crate_name = context.compat_crate_name() %}
+
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
     {% for ident in context.schema.declaration_order %}
-        {% match context.schema.declarations[ident] %}
-            {% when DeclType::Protocol %}
-                {% let protocol = context.schema.protocol_declarations[ident] %}
-                {% let protocol_name = filters::ident(protocol.name.decl_name().camel())? %}
-                {% let proxy_name = format!("{}Proxy", protocol.name.decl_name().camel()) %}
+        {% let base_name = ident.decl_name() %}
+        {% let name = filters::ident(base_name.camel())? %}
+        {% let wire_name = format!("Wire{}", base_name.camel()) %}
 
-                #[cfg(target_os = "fuchsia")]
-                /// An alias for a client sender over `zx::Channel` for the `{{ protocol_name }}`
-                /// protocol.
-                pub type {{ proxy_name }} = ::fidl_next::ClientSender<
-                    ::fidl_next::fuchsia::zx::Channel,
-                    crate::{{ protocol_name }},
-                >;
-            {% else %}
-        {% endmatch %}
+        {% let restriction = context.rust_bindings_restriction(ident) %}
+        {% if !matches!(restriction, BindingsRestriction::Never) %}
+            {% match context.schema.declarations[ident] %}
+                {% when DeclType::Bits %}
+                    {% let bits = context.schema.bits_declarations[ident] %}
+                    {{ restriction }}
+                    impl ::fidl_next::TakeFrom<crate::{{ wire_name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                        #[inline]
+                        fn take_from(from: &crate::{{ wire_name }}) -> Self {
+                            Self::from_bits_retain(from.value.into())
+                        }
+                    }
+                {% when DeclType::Enum %}
+                    {% let enm = context.schema.enum_declarations[ident] %}
+                    {{ restriction }}
+                    impl ::fidl_next::TakeFrom<crate::{{ wire_name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                        #[inline]
+                        fn take_from(from: &crate::{{ wire_name }}) -> Self {
+                            match crate::{{ name }}::from(*from) {
+                                {% for member in enm.members %}
+                                    crate::{{ name }}::{{ member.name.camel()|ident }} =>
+                                        Self::{{ member.name|compat_camel }},
+                                {% endfor %}
+                                {% if !enm.is_strict %}
+                                    crate::{{ name }}::UnknownOrdinal_(value) =>
+                                        Self::__SourceBreaking { unknown_ordinal: value },
+                                {% endif %}
+                            }
+                        }
+                    }
+                {% when DeclType::Protocol %}
+                    {% let protocol = context.schema.protocol_declarations[ident] %}
+                    {% let protocol_name = filters::ident(protocol.name.decl_name().camel())? %}
+                    {% let proxy_name = format!("{}Proxy", protocol.name.decl_name().camel()) %}
+
+                    #[cfg(target_os = "fuchsia")]
+                    /// An alias for a client sender over `zx::Channel` for the `{{ protocol_name }}`
+                    /// protocol.
+                    pub type {{ proxy_name }} = ::fidl_next::ClientSender<
+                        ::fidl_next::fuchsia::zx::Channel,
+                        crate::{{ protocol_name }},
+                    >;
+
+                    {{ restriction }}
+                    impl ::fidl_next::TakeFrom<crate::{{ protocol_name }}> for ::{{ compat_crate_name }}::{{ protocol.name.decl_name()|compat_camel }}Marker {
+                        #[inline]
+                        fn take_from(from: &crate::{{ protocol_name }}) -> Self {
+                            Self
+                        }
+                    }
+                {% when DeclType::Struct %}
+                    {% let strct = context.schema.struct_declarations[ident] %}
+                    {% if !strct.is_empty_success_struct %}
+                        {{ restriction }}
+                        impl ::fidl_next::TakeFrom<crate::{{ wire_name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                            #[inline]
+                            fn take_from(from: &crate::{{ wire_name }}) -> Self {
+                                Self {
+                                    {% for member in strct.members %}
+                                        {{ member.name|compat_snake }}: ::fidl_next::TakeFrom::take_from(&from.{{ member.name.snake()|ident }}),
+                                    {% endfor %}
+                                }
+                            }
+                        }
+                    {% endif %}
+                {% when DeclType::Table %}
+                    {% let table = context.schema.table_declarations[ident] %}
+                    {{ restriction }}
+                    impl ::fidl_next::TakeFrom<crate::{{ wire_name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                        #[inline]
+                        fn take_from(from: &crate::{{ wire_name }}) -> Self {
+                            Self {
+                                {% for member in table.members %}
+                                    {{ member.name|compat_snake }}: from.{{ member.name.snake()|ident }}().map(::fidl_next::TakeFrom::take_from),
+                                {% endfor %}
+                                __source_breaking: ::fidl::marker::SourceBreaking,
+                            }
+                        }
+                    }
+                {% when DeclType::Union %}
+                    {% let union = context.schema.union_declarations[ident] %}
+                    {% if !union.is_result %}
+                        {% let module_name = filters::ident(ident.decl_name().snake())? %}
+                        {{ restriction }}
+                        impl ::fidl_next::TakeFrom<crate::{{ wire_name }}> for ::{{ compat_crate_name }}::{{ base_name|compat_camel }} {
+                            #[inline]
+                            fn take_from(from: &crate::{{ wire_name }}) -> Self {
+                                match from.as_ref() {
+                                    {% for member in union.members %}
+                                        crate::{{ module_name }}::Ref::{{ member.name.camel()|ident }}(value) =>
+                                            Self::{{ member.name|compat_camel }}(::fidl_next::TakeFrom::take_from(value)),
+                                    {% endfor %}
+                                    {% if !union.is_strict %}
+                                        crate::{{ module_name }}::Ref::UnknownOrdinal_(unknown_ordinal) =>
+                                            Self::__SourceBreaking { unknown_ordinal },
+                                    {% endif %}
+                                }
+                            }
+                        }
+
+                        {{ restriction }}
+                        impl ::fidl_next::TakeFrom<crate::WireOptional{{ name }}> for Option<Box<::{{ compat_crate_name }}::{{ base_name|compat_camel }}>> {
+                            #[inline]
+                            fn take_from(from: &crate::WireOptional{{ name }}) -> Self {
+                                if let Some(inner) = from.as_ref() {
+                                    Some(::fidl_next::TakeFrom::take_from(inner))
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+                    {% endif %}
+                {% else %}
+            {% endmatch %}
+        {% endif %}
     {% endfor %}
 }

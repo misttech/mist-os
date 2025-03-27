@@ -138,6 +138,9 @@ import("//build/testing/host_test_data.gni")
 #   enable_rust_next (optional flag, default to false)
 #     Set to true to enable next-generation Rust bindings for this library
 #
+#   rust_next_emit_compat (optional flag, default to true)
+#     Set to false to disable compatibility with existing Rust bindings for this library
+#
 #   enable_zither (optional flag, default to false)
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
@@ -578,9 +581,16 @@ template("fidl") {
         forward_variables_from(common_parameters, "*")
         deps = [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust_next"
+        if (!defined(invoker.rust_next_emit_compat) ||
+            invoker.rust_next_emit_compat) {
+          emit_compat = true
+          assert(enable_rust)
+          deps += [ ":${invoker.target_name}_rust" ]
+        }
+        if (!is_host && enable_rust_drivers) {
+          forward_variables_from(invoker, [ "contains_drivers" ])
+        }
       }
-    } else {
-      not_needed(invoker, [ "disable_rustdoc" ])
     }
 
     if (enable_bindlib) {

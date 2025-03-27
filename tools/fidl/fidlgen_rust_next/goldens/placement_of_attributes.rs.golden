@@ -929,9 +929,95 @@ impl ::core::fmt::Debug for WireOptionalExampleUnion {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireExampleBits>
+        for ::fidl_test_placementofattributes::ExampleBits
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleEnum>
+        for ::fidl_test_placementofattributes::ExampleEnum
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleEnum) -> Self {
+            match crate::ExampleEnum::from(*from) {
+                crate::ExampleEnum::Member => Self::Member,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleProtocolMethodRequest>
+        for ::fidl_test_placementofattributes::ExampleProtocolMethodRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleProtocolMethodRequest) -> Self {
+            Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ExampleProtocol`
     /// protocol.
     pub type ExampleProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ExampleProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::ExampleProtocol>
+        for ::fidl_test_placementofattributes::ExampleProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::ExampleProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleStruct>
+        for ::fidl_test_placementofattributes::ExampleStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleStruct) -> Self {
+            Self { member: ::fidl_next::TakeFrom::take_from(&from.member) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleTable>
+        for ::fidl_test_placementofattributes::ExampleTable
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleTable) -> Self {
+            Self {
+                member: from.member().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleUnion>
+        for ::fidl_test_placementofattributes::ExampleUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleUnion) -> Self {
+            match from.as_ref() {
+                crate::example_union::Ref::Variant(value) => {
+                    Self::Variant(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExampleUnion>
+        for Option<Box<::fidl_test_placementofattributes::ExampleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExampleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
 }

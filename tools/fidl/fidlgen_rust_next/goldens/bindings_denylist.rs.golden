@@ -5430,17 +5430,102 @@ pub mod compat {
     pub type AllowedProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Allowed>;
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `ContainsAllowed`
-    /// protocol.
-    pub type ContainsAllowedProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ContainsAllowed>;
+    impl ::fidl_next::TakeFrom<crate::Allowed> for ::fidl_test_bindingsdenylist::AllowedMarker {
+        #[inline]
+        fn take_from(from: &crate::Allowed) -> Self {
+            Self
+        }
+    }
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `Denied`
-    /// protocol.
-    pub type DeniedProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Denied>;
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyCppRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyCppRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyCppResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyCppResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyCppResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyDartRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyDartRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyDartResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyDartResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyGoRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyGoRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyGoResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyGoResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyLibfuzzerRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyLibfuzzerRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenySyzkallerRequest>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenySyzkallerRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireDenyEachBindingOnlyDenySyzkallerResponse>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDenyEachBindingOnlyDenySyzkallerResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `DenyEachBinding`
@@ -5448,21 +5533,56 @@ pub mod compat {
     pub type DenyEachBindingProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DenyEachBinding>;
 
+    impl ::fidl_next::TakeFrom<crate::DenyEachBinding>
+        for ::fidl_test_bindingsdenylist::DenyEachBindingMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::DenyEachBinding) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ImportsSameNameContext`
     /// protocol.
     pub type ImportsSameNameContextProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ImportsSameNameContext>;
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `OnlyCppAndDeps`
-    /// protocol.
-    pub type OnlyCppAndDepsProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OnlyCppAndDeps>;
+    impl ::fidl_next::TakeFrom<crate::ImportsSameNameContext>
+        for ::fidl_test_bindingsdenylist::ImportsSameNameContextMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::ImportsSameNameContext) -> Self {
+            Self
+        }
+    }
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `OnlyLibfuzzerAndDeps`
-    /// protocol.
-    pub type OnlyLibfuzzerAndDepsProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OnlyLibfuzzerAndDeps>;
+    impl ::fidl_next::TakeFrom<crate::WireMemberOnlyAppearsInImportingLibrary>
+        for ::fidl_test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMemberOnlyAppearsInImportingLibrary) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOnlyAppearsInImportingLibrary>
+        for ::fidl_test_bindingsdenylist::OnlyAppearsInImportingLibrary
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOnlyAppearsInImportingLibrary) -> Self {
+            Self {
+                member_only_appears_in_importing_library: ::fidl_next::TakeFrom::take_from(
+                    &from.member_only_appears_in_importing_library,
+                ),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOnlyRust> for ::fidl_test_bindingsdenylist::OnlyRust {
+        #[inline]
+        fn take_from(from: &crate::WireOnlyRust) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
 }

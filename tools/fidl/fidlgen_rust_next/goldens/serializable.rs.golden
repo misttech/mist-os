@@ -419,4 +419,49 @@ impl ::core::fmt::Debug for WireOptionalSerializableUnion {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireSerializableStruct>
+        for ::fidl_test_serializable::SerializableStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSerializableStruct) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSerializableTable>
+        for ::fidl_test_serializable::SerializableTable
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSerializableTable) -> Self {
+            Self { __source_breaking: ::fidl::marker::SourceBreaking }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSerializableUnion>
+        for ::fidl_test_serializable::SerializableUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSerializableUnion) -> Self {
+            match from.as_ref() {
+                crate::serializable_union::Ref::Unused(value) => {
+                    Self::Unused(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalSerializableUnion>
+        for Option<Box<::fidl_test_serializable::SerializableUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalSerializableUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+}

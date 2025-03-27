@@ -1927,4 +1927,209 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding1ByteEnd> for ::fidl_test_padding::Padding1ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding1ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding1ByteMiddle>
+        for ::fidl_test_padding::Padding1ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding1ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding2ByteAlignmentLength6>
+        for ::fidl_test_padding::Padding2ByteAlignmentLength6
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding2ByteAlignmentLength6) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+
+                c: ::fidl_next::TakeFrom::take_from(&from.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding2ByteEnd> for ::fidl_test_padding::Padding2ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding2ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding2ByteMiddle>
+        for ::fidl_test_padding::Padding2ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding2ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding3ByteEnd> for ::fidl_test_padding::Padding3ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding3ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding3ByteMiddle>
+        for ::fidl_test_padding::Padding3ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding3ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding4ByteAlignmentLength12>
+        for ::fidl_test_padding::Padding4ByteAlignmentLength12
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding4ByteAlignmentLength12) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+
+                c: ::fidl_next::TakeFrom::take_from(&from.c),
+
+                d: ::fidl_next::TakeFrom::take_from(&from.d),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding4ByteEnd> for ::fidl_test_padding::Padding4ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding4ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding4ByteMiddle>
+        for ::fidl_test_padding::Padding4ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding4ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding5ByteEnd> for ::fidl_test_padding::Padding5ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding5ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+
+                c: ::fidl_next::TakeFrom::take_from(&from.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding5ByteMiddle>
+        for ::fidl_test_padding::Padding5ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding5ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+
+                c: ::fidl_next::TakeFrom::take_from(&from.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding6ByteEnd> for ::fidl_test_padding::Padding6ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding6ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding6ByteMiddle>
+        for ::fidl_test_padding::Padding6ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding6ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding7ByteEnd> for ::fidl_test_padding::Padding7ByteEnd {
+        #[inline]
+        fn take_from(from: &crate::WirePadding7ByteEnd) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePadding7ByteMiddle>
+        for ::fidl_test_padding::Padding7ByteMiddle
+    {
+        #[inline]
+        fn take_from(from: &crate::WirePadding7ByteMiddle) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+}

@@ -116,4 +116,12 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBaz> for ::fidl_test_transitivedependencies::Baz {
+        #[inline]
+        fn take_from(from: &crate::WireBaz) -> Self {
+            Self { g: ::fidl_next::TakeFrom::take_from(&from.g) }
+        }
+    }
+}

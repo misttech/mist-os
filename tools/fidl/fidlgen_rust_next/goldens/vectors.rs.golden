@@ -125,4 +125,20 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleUseOfVectors>
+        for ::fidl_test_vectors::ExampleUseOfVectors
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleUseOfVectors) -> Self {
+            Self {
+                vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),
+
+                vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
+                    &from.vector_of_vector_of_bool,
+                ),
+            }
+        }
+    }
+}

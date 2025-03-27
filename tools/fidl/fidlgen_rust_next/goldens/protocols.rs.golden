@@ -3546,18 +3546,18 @@ where
 #[repr(C)]
 pub struct ProtocolEnds {
     pub client:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
 
     pub server:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
 
     pub client_opt: ::fidl_next::ClientEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
+        Option<::fidl_next::fuchsia::zx::Channel>,
         crate::DiscoverableProtocol,
     >,
 
     pub server_opt: ::fidl_next::ServerEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
+        Option<::fidl_next::fuchsia::zx::Channel>,
         crate::DiscoverableProtocol,
     >,
 }
@@ -3566,22 +3566,22 @@ impl ::fidl_next::Encodable for ProtocolEnds {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled()
                 && <::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
+                    ::fidl_next::fuchsia::zx::Channel,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
                 && <::fidl_next::ClientEnd<
-                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    Option<::fidl_next::fuchsia::zx::Channel>,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
                 && <::fidl_next::ServerEnd<
-                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    Option<::fidl_next::fuchsia::zx::Channel>,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled(),
@@ -3655,22 +3655,22 @@ impl ::fidl_next::TakeFrom<WireProtocolEnds> for ProtocolEnds {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled()
                 && <::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
+                    ::fidl_next::fuchsia::zx::Channel,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
                 && <::fidl_next::ClientEnd<
-                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    Option<::fidl_next::fuchsia::zx::Channel>,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
                 && <::fidl_next::ServerEnd<
-                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    Option<::fidl_next::fuchsia::zx::Channel>,
                     crate::DiscoverableProtocol,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled(),
@@ -3696,18 +3696,18 @@ impl ::fidl_next::TakeFrom<WireProtocolEnds> for ProtocolEnds {
 #[repr(C)]
 pub struct WireProtocolEnds {
     pub client:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
 
     pub server:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
 
     pub client_opt: ::fidl_next::ClientEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
+        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
     >,
 
     pub server_opt: ::fidl_next::ServerEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
+        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
     >,
 }
@@ -5386,200 +5386,6 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WithErrorSyntaxErrorAsPrimitiveResponse {}
-
-impl ::fidl_next::Encodable for WithErrorSyntaxErrorAsPrimitiveResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireWithErrorSyntaxErrorAsPrimitiveResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsPrimitiveResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<WithErrorSyntaxErrorAsPrimitiveResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireWithErrorSyntaxErrorAsPrimitiveResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<WithErrorSyntaxErrorAsPrimitiveResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    WithErrorSyntaxErrorAsPrimitiveResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsPrimitiveResponse>
-    for WithErrorSyntaxErrorAsPrimitiveResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireWithErrorSyntaxErrorAsPrimitiveResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`WithErrorSyntaxErrorAsPrimitiveResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireWithErrorSyntaxErrorAsPrimitiveResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxErrorAsPrimitiveResponse {
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsPrimitiveResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WithErrorSyntaxErrorAsEnumResponse {}
-
-impl ::fidl_next::Encodable for WithErrorSyntaxErrorAsEnumResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    type Encoded = WireWithErrorSyntaxErrorAsEnumResponse;
-}
-
-unsafe impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsEnumResponse
-where
-    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
-{
-    #[inline]
-    fn encode(
-        &mut self,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge! {
-            let Self::Encoded {
-
-            } = out;
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::EncodableOption for Box<WithErrorSyntaxErrorAsEnumResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireWithErrorSyntaxErrorAsEnumResponse>;
-}
-
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<WithErrorSyntaxErrorAsEnumResponse>
-where
-    ___E: ::fidl_next::Encoder + ?Sized,
-    WithErrorSyntaxErrorAsEnumResponse: ::fidl_next::Encode<___E>,
-{
-    #[inline]
-    fn encode_option(
-        this: Option<&mut Self>,
-        encoder: &mut ___E,
-        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
-    ) -> Result<(), ::fidl_next::EncodeError> {
-        if let Some(inner) = this {
-            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(out);
-        } else {
-            ::fidl_next::WireBox::encode_absent(out);
-        }
-
-        Ok(())
-    }
-}
-
-impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsEnumResponse>
-    for WithErrorSyntaxErrorAsEnumResponse
-{
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
-
-    #[inline]
-    fn take_from(from: &WireWithErrorSyntaxErrorAsEnumResponse) -> Self {
-        Self {}
-    }
-}
-
-/// The wire type corersponding to [`WithErrorSyntaxErrorAsEnumResponse`].
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct WireWithErrorSyntaxErrorAsEnumResponse {}
-
-unsafe impl ::fidl_next::ZeroPadding for WireWithErrorSyntaxErrorAsEnumResponse {
-    #[inline]
-    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
-}
-
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsEnumResponse
-where
-    ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
-{
-    fn decode(
-        slot: ::fidl_next::Slot<'_, Self>,
-        decoder: &mut ___D,
-    ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge! {
-            let Self {
-
-            } = slot;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithErrorSyntaxHandleInResultResponse {
@@ -5712,10 +5518,6 @@ pub mod with_error_syntax {
 
         pub use crate::ErrorEnum;
 
-        pub use crate::WithErrorSyntaxErrorAsEnumResponse;
-
-        pub use crate::WithErrorSyntaxErrorAsPrimitiveResponse;
-
         pub use crate::WithErrorSyntaxHandleInResultResponse;
 
         pub use crate::WithErrorSyntaxResponseAsStructResponse;
@@ -5745,10 +5547,7 @@ pub mod with_error_syntax {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireWithErrorSyntaxErrorAsPrimitiveResponse,
-            ::fidl_next::WireU32,
-        >;
+        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireU32>;
     }
 
     pub struct ErrorAsEnum;
@@ -5760,10 +5559,7 @@ pub mod with_error_syntax {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<
-            crate::WireWithErrorSyntaxErrorAsEnumResponse,
-            crate::WireErrorEnum,
-        >;
+        type Response = ::fidl_next::WireResult<(), crate::WireErrorEnum>;
     }
 
     pub struct HandleInResult;
@@ -6007,14 +5803,14 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsClientEndsRequest {
-    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsClientEndsRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6081,7 +5877,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6098,7 +5894,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsRequest {
-    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsClientEndsRequest {
@@ -6133,7 +5929,7 @@ where
 #[repr(C)]
 pub struct WithProtocolEndsClientEndsResponse {
     pub out: ::fidl_next::ClientEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
+        Option<::fidl_next::fuchsia::zx::Channel>,
         crate::DiscoverableProtocol,
     >,
 }
@@ -6142,7 +5938,7 @@ impl ::fidl_next::Encodable for WithProtocolEndsClientEndsResponse {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6209,7 +6005,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsResponse>
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6227,7 +6023,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsResponse>
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsResponse {
     pub out: ::fidl_next::ClientEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
+        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
     >,
 }
@@ -6264,7 +6060,7 @@ where
 #[repr(C)]
 pub struct WithProtocolEndsServerEndsRequest {
     pub in_: ::fidl_next::ServerEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
+        Option<::fidl_next::fuchsia::zx::Channel>,
         crate::DiscoverableProtocol,
     >,
 }
@@ -6273,7 +6069,7 @@ impl ::fidl_next::Encodable for WithProtocolEndsServerEndsRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6340,7 +6136,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6358,7 +6154,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsRequest {
     pub in_: ::fidl_next::ServerEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
+        ::fidl_next::fuchsia::WireOptionalChannel,
         crate::DiscoverableProtocol,
     >,
 }
@@ -6394,14 +6190,14 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsServerEndsResponse {
-    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
+    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsServerEndsResponse {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6468,7 +6264,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsResponse>
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Handle,
+                ::fidl_next::fuchsia::zx::Channel,
                 crate::DiscoverableProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -6485,7 +6281,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsResponse>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsResponse {
-    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::DiscoverableProtocol>,
+    pub out: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DiscoverableProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireWithProtocolEndsServerEndsResponse {
@@ -7070,11 +6866,104 @@ pub mod compat {
         crate::AnotherDiscoverableProtocol,
     >;
 
+    impl ::fidl_next::TakeFrom<crate::AnotherDiscoverableProtocol>
+        for ::fidl_test_protocols::AnotherDiscoverableProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::AnotherDiscoverableProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolMethodARequest>
+        for ::fidl_test_protocols::ChannelProtocolMethodARequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolMethodARequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolEventARequest>
+        for ::fidl_test_protocols::ChannelProtocolEventARequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolEventARequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolMethodBRequest>
+        for ::fidl_test_protocols::ChannelProtocolMethodBRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolMethodBRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolMethodBResponse>
+        for ::fidl_test_protocols::ChannelProtocolMethodBResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolMethodBResponse) -> Self {
+            Self { result: ::fidl_next::TakeFrom::take_from(&from.result) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolTakeHandleRequest>
+        for ::fidl_test_protocols::ChannelProtocolTakeHandleRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolTakeHandleRequest) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolMutateSocketRequest>
+        for ::fidl_test_protocols::ChannelProtocolMutateSocketRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolMutateSocketRequest) -> Self {
+            Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireChannelProtocolMutateSocketResponse>
+        for ::fidl_test_protocols::ChannelProtocolMutateSocketResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireChannelProtocolMutateSocketResponse) -> Self {
+            Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ChannelProtocol`
     /// protocol.
     pub type ChannelProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ChannelProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::ChannelProtocol>
+        for ::fidl_test_protocols::ChannelProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::ChannelProtocol) -> Self {
+            Self
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `DiscoverableProtocol`
@@ -7082,11 +6971,115 @@ pub mod compat {
     pub type DiscoverableProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DiscoverableProtocol>;
 
+    impl ::fidl_next::TakeFrom<crate::DiscoverableProtocol>
+        for ::fidl_test_protocols::DiscoverableProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::DiscoverableProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireErrorEnum> for ::fidl_test_protocols::ErrorEnum {
+        #[inline]
+        fn take_from(from: &crate::WireErrorEnum) -> Self {
+            match crate::ErrorEnum::from(*from) {
+                crate::ErrorEnum::ErrFoo => Self::ErrFoo,
+
+                crate::ErrorEnum::ErrBar => Self::ErrBar,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireHandleRightsProtocolNoResponseMethodRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolNoResponseMethodRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireHandleRightsProtocolNoResponseMethodRequest) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireHandleRightsProtocolResponseMethodRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolResponseMethodRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireHandleRightsProtocolResponseMethodRequest) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireHandleRightsProtocolResponseMethodResponse>
+        for ::fidl_test_protocols::HandleRightsProtocolResponseMethodResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireHandleRightsProtocolResponseMethodResponse) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireHandleRightsProtocolAnEventRequest>
+        for ::fidl_test_protocols::HandleRightsProtocolAnEventRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireHandleRightsProtocolAnEventRequest) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `HandleRightsProtocol`
     /// protocol.
     pub type HandleRightsProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::HandleRightsProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::HandleRightsProtocol>
+        for ::fidl_test_protocols::HandleRightsProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::HandleRightsProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireManyParametersFifteenRequest>
+        for ::fidl_test_protocols::ManyParametersFifteenRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireManyParametersFifteenRequest) -> Self {
+            Self {
+                p1: ::fidl_next::TakeFrom::take_from(&from.p1),
+
+                p2: ::fidl_next::TakeFrom::take_from(&from.p2),
+
+                p3: ::fidl_next::TakeFrom::take_from(&from.p3),
+
+                p4: ::fidl_next::TakeFrom::take_from(&from.p4),
+
+                p5: ::fidl_next::TakeFrom::take_from(&from.p5),
+
+                p6: ::fidl_next::TakeFrom::take_from(&from.p6),
+
+                p7: ::fidl_next::TakeFrom::take_from(&from.p7),
+
+                p8: ::fidl_next::TakeFrom::take_from(&from.p8),
+
+                p9: ::fidl_next::TakeFrom::take_from(&from.p9),
+
+                p10: ::fidl_next::TakeFrom::take_from(&from.p10),
+
+                p11: ::fidl_next::TakeFrom::take_from(&from.p11),
+
+                p12: ::fidl_next::TakeFrom::take_from(&from.p12),
+
+                p13: ::fidl_next::TakeFrom::take_from(&from.p13),
+
+                p14: ::fidl_next::TakeFrom::take_from(&from.p14),
+
+                p15: ::fidl_next::TakeFrom::take_from(&from.p15),
+            }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `ManyParameters`
@@ -7094,11 +7087,71 @@ pub mod compat {
     pub type ManyParametersProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::ManyParameters>;
 
+    impl ::fidl_next::TakeFrom<crate::ManyParameters> for ::fidl_test_protocols::ManyParametersMarker {
+        #[inline]
+        fn take_from(from: &crate::ManyParameters) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireTheUnion> for ::fidl_test_protocols::TheUnion {
+        #[inline]
+        fn take_from(from: &crate::WireTheUnion) -> Self {
+            match from.as_ref() {
+                crate::the_union::Ref::V(value) => Self::V(::fidl_next::TakeFrom::take_from(value)),
+
+                crate::the_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalTheUnion>
+        for Option<Box<::fidl_test_protocols::TheUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalTheUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMethodWithUnionUnionMethodRequest>
+        for ::fidl_test_protocols::MethodWithUnionUnionMethodRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMethodWithUnionUnionMethodRequest) -> Self {
+            Self { u: ::fidl_next::TakeFrom::take_from(&from.u) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMethodWithUnionUnionMethodResponse>
+        for ::fidl_test_protocols::MethodWithUnionUnionMethodResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMethodWithUnionUnionMethodResponse) -> Self {
+            Self { u: ::fidl_next::TakeFrom::take_from(&from.u) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MethodWithUnion`
     /// protocol.
     pub type MethodWithUnionProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MethodWithUnion>;
+
+    impl ::fidl_next::TakeFrom<crate::MethodWithUnion>
+        for ::fidl_test_protocols::MethodWithUnionMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::MethodWithUnion) -> Self {
+            Self
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `PlatformServer`
@@ -7106,11 +7159,98 @@ pub mod compat {
     pub type PlatformServerProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::PlatformServer>;
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `SyscallProtocol`
-    /// protocol.
-    pub type SyscallProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SyscallProtocol>;
+    impl ::fidl_next::TakeFrom<crate::PlatformServer> for ::fidl_test_protocols::PlatformServer_Marker {
+        #[inline]
+        fn take_from(from: &crate::PlatformServer) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireProtocolEnds> for ::fidl_test_protocols::ProtocolEnds {
+        #[inline]
+        fn take_from(from: &crate::WireProtocolEnds) -> Self {
+            Self {
+                client: ::fidl_next::TakeFrom::take_from(&from.client),
+
+                server: ::fidl_next::TakeFrom::take_from(&from.server),
+
+                client_opt: ::fidl_next::TakeFrom::take_from(&from.client_opt),
+
+                server_opt: ::fidl_next::TakeFrom::take_from(&from.server_opt),
+            }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<crate::WireWithAndWithoutRequestResponseNoRequestWithResponseResponse>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireWithAndWithoutRequestResponseNoRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::TakeFrom::take_from(&from.ret) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<
+            crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+        > for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<
+            crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest,
+        > for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest,
+        ) -> Self {
+            Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<
+            crate::WireWithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        > for ::fidl_test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireWithAndWithoutRequestResponseWithRequestWithResponseResponse,
+        ) -> Self {
+            Self { ret: ::fidl_next::TakeFrom::take_from(&from.ret) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithAndWithoutRequestResponseOnWithResponseRequest>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithAndWithoutRequestResponseOnWithResponseRequest) -> Self {
+            Self { ret: ::fidl_next::TakeFrom::take_from(&from.ret) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithAndWithoutRequestResponse`
@@ -7120,15 +7260,120 @@ pub mod compat {
         crate::WithAndWithoutRequestResponse,
     >;
 
+    impl ::fidl_next::TakeFrom<crate::WithAndWithoutRequestResponse>
+        for ::fidl_test_protocols::WithAndWithoutRequestResponseMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::WithAndWithoutRequestResponse) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithErrorSyntaxResponseAsStructResponse>
+        for ::fidl_test_protocols::WithErrorSyntaxResponseAsStructResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithErrorSyntaxResponseAsStructResponse) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+
+                c: ::fidl_next::TakeFrom::take_from(&from.c),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithErrorSyntaxHandleInResultResponse>
+        for ::fidl_test_protocols::WithErrorSyntaxHandleInResultResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithErrorSyntaxHandleInResultResponse) -> Self {
+            Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithErrorSyntax`
     /// protocol.
     pub type WithErrorSyntaxProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithErrorSyntax>;
 
+    impl ::fidl_next::TakeFrom<crate::WithErrorSyntax>
+        for ::fidl_test_protocols::WithErrorSyntaxMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::WithErrorSyntax) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsClientEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsClientEndsRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsClientEndsRequest) -> Self {
+            Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsClientEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsClientEndsResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsClientEndsResponse) -> Self {
+            Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsServerEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsServerEndsRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsServerEndsRequest) -> Self {
+            Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsServerEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsServerEndsResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsServerEndsResponse) -> Self {
+            Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsStructContainingEndsRequest>
+        for ::fidl_test_protocols::WithProtocolEndsStructContainingEndsRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsStructContainingEndsRequest) -> Self {
+            Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireWithProtocolEndsStructContainingEndsResponse>
+        for ::fidl_test_protocols::WithProtocolEndsStructContainingEndsResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireWithProtocolEndsStructContainingEndsResponse) -> Self {
+            Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `WithProtocolEnds`
     /// protocol.
     pub type WithProtocolEndsProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::WithProtocolEnds>;
+
+    impl ::fidl_next::TakeFrom<crate::WithProtocolEnds>
+        for ::fidl_test_protocols::WithProtocolEndsMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::WithProtocolEnds) -> Self {
+            Self
+        }
+    }
 }

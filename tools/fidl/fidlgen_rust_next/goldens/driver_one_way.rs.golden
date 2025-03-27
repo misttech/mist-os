@@ -377,9 +377,34 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WirePayload> for ::fidl_test_driveroneway::Payload {
+        #[inline]
+        fn take_from(from: &crate::WirePayload) -> Self {
+            Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireOneWaySendRequest>
+        for ::fidl_test_driveroneway::OneWaySendRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOneWaySendRequest) -> Self {
+            Self { payload: ::fidl_next::TakeFrom::take_from(&from.payload) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OneWay`
     /// protocol.
     pub type OneWayProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OneWay>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::OneWay> for ::fidl_test_driveroneway::OneWayMarker {
+        #[inline]
+        fn take_from(from: &crate::OneWay) -> Self {
+            Self
+        }
+    }
 }

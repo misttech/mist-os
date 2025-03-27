@@ -394,4 +394,51 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireObjType> for ::fidl_test_aliases::ObjType {
+        #[inline]
+        fn take_from(from: &crate::WireObjType) -> Self {
+            match crate::ObjType::from(*from) {
+                crate::ObjType::None => Self::None,
+
+                crate::ObjType::Channel => Self::Channel,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleOfUseOfAliases>
+        for ::fidl_test_aliases::ExampleOfUseOfAliases
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleOfUseOfAliases) -> Self {
+            Self {
+                field_of_u32: ::fidl_next::TakeFrom::take_from(&from.field_of_u32),
+
+                field_of_vec_of_strings: ::fidl_next::TakeFrom::take_from(
+                    &from.field_of_vec_of_strings,
+                ),
+
+                field_of_vec_of_strings_at_most_nine: ::fidl_next::TakeFrom::take_from(
+                    &from.field_of_vec_of_strings_at_most_nine,
+                ),
+
+                field_of_vec_of_strings_at_most_5: ::fidl_next::TakeFrom::take_from(
+                    &from.field_of_vec_of_strings_at_most_5,
+                ),
+
+                field_of_vec_of_ref_me_at_most_5: ::fidl_next::TakeFrom::take_from(
+                    &from.field_of_vec_of_ref_me_at_most_5,
+                ),
+
+                field_of_channel: ::fidl_next::TakeFrom::take_from(&from.field_of_channel),
+
+                field_of_client_end: ::fidl_next::TakeFrom::take_from(&from.field_of_client_end),
+
+                field_of_nullable_client_end: ::fidl_next::TakeFrom::take_from(
+                    &from.field_of_nullable_client_end,
+                ),
+            }
+        }
+    }
+}

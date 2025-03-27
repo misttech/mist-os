@@ -5,20 +5,19 @@
 #[derive(Debug)]
 #[repr(C)]
 pub struct ClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
 }
 
 impl ::fidl_next::Encodable for ClientEndWrapper {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::ClientEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::DriverProtocol,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::ClientEnd<
+                ::fidl_next::fuchsia::zx::Channel,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
 
     type Encoded = WireClientEndWrapper;
 }
@@ -75,16 +74,15 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireClientEndWrapper> for ClientEndWrapper {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::ClientEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::DriverProtocol,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::ClientEnd<
+                ::fidl_next::fuchsia::zx::Channel,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
 
     #[inline]
     fn take_from(from: &WireClientEndWrapper) -> Self {
@@ -96,7 +94,7 @@ impl ::fidl_next::TakeFrom<WireClientEndWrapper> for ClientEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireClientEndWrapper {
@@ -231,7 +229,7 @@ pub struct T {
     pub zircon_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub fdf_handle:
-        Option<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DriverProtocol>>,
+        Option<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>>,
 }
 
 impl T {
@@ -367,7 +365,7 @@ where
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
                         ::fidl_next::ClientEnd<
-                            ::fidl_next::fuchsia::WireHandle,
+                            ::fidl_next::fuchsia::WireChannel,
                             crate::DriverProtocol,
                         >,
                     >(slot.as_mut(), decoder)?;
@@ -388,7 +386,7 @@ impl WireT {
 
     pub fn fdf_handle(
         &self,
-    ) -> Option<&::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>>
+    ) -> Option<&::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>>
     {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
@@ -666,20 +664,19 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
 }
 
 impl ::fidl_next::Encodable for ServerEndWrapper {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::DriverProtocol,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::ServerEnd<
+                ::fidl_next::fuchsia::zx::Channel,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
 
     type Encoded = WireServerEndWrapper;
 }
@@ -736,16 +733,15 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::DriverProtocol,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::ServerEnd<
+                ::fidl_next::fuchsia::zx::Channel,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
 
     #[inline]
     fn take_from(from: &WireServerEndWrapper) -> Self {
@@ -757,7 +753,7 @@ impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireServerEndWrapper {
@@ -797,9 +793,13 @@ pub mod compat {
     pub type DriverProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>;
 
-    #[cfg(target_os = "fuchsia")]
-    /// An alias for a client sender over `zx::Channel` for the `HandlesInProtocol`
-    /// protocol.
-    pub type HandlesInProtocolProxy =
-        ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::HandlesInProtocol>;
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::DriverProtocol>
+        for ::fidl_test_driverhandle::DriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::DriverProtocol) -> Self {
+            Self
+        }
+    }
 }

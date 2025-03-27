@@ -168,7 +168,7 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -179,7 +179,7 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
         Self::Error,
     >;
@@ -198,7 +198,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
@@ -210,7 +210,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
         Self::Error,
     > {
@@ -236,7 +236,7 @@ pub trait MultiHomogeneousMemberServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -247,7 +247,7 @@ pub trait MultiHomogeneousMemberServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -266,7 +266,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
@@ -278,7 +278,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
@@ -431,7 +431,7 @@ pub trait SingleMemberServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -449,7 +449,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
@@ -466,9 +466,23 @@ pub mod compat {
     pub type FirstProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>;
 
+    impl ::fidl_next::TakeFrom<crate::FirstProtocol> for ::fidl_test_service::FirstProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::FirstProtocol) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SecondProtocol`
     /// protocol.
     pub type SecondProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::SecondProtocol> for ::fidl_test_service::SecondProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::SecondProtocol) -> Self {
+            Self
+        }
+    }
 }

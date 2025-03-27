@@ -104,7 +104,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentGetChildResponse {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildResponse {
@@ -113,7 +113,7 @@ impl ::fidl_next::Encodable for ParentGetChildResponse {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -180,7 +180,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildResponse> for ParentGetChildRespons
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -197,7 +197,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildResponse> for ParentGetChildRespons
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildResponse {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireParentGetChildResponse {
@@ -231,7 +231,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentGetChildRequestResponse {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
@@ -240,7 +240,7 @@ impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -307,7 +307,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChild
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -324,7 +324,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChild
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildRequestResponse {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireParentGetChildRequestResponse {
@@ -358,7 +358,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentTakeChildRequest {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequest {
@@ -367,7 +367,7 @@ impl ::fidl_next::Encodable for ParentTakeChildRequest {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -434,7 +434,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequest> for ParentTakeChildReques
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -451,7 +451,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequest> for ParentTakeChildReques
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequest {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireParentTakeChildRequest {
@@ -485,7 +485,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentTakeChildRequestRequest {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
@@ -494,7 +494,7 @@ impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -561,7 +561,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChil
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Child,
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
         > as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
@@ -578,7 +578,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChil
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequestRequest {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
 }
 
 unsafe impl ::fidl_next::ZeroPadding for WireParentTakeChildRequestRequest {
@@ -917,9 +917,59 @@ pub mod compat {
     pub type ChildProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Child>;
 
+    impl ::fidl_next::TakeFrom<crate::Child> for ::fidl_test_protocolrequest::ChildMarker {
+        #[inline]
+        fn take_from(from: &crate::Child) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireParentGetChildResponse>
+        for ::fidl_test_protocolrequest::ParentGetChildResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireParentGetChildResponse) -> Self {
+            Self { c: ::fidl_next::TakeFrom::take_from(&from.c) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireParentGetChildRequestResponse>
+        for ::fidl_test_protocolrequest::ParentGetChildRequestResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireParentGetChildRequestResponse) -> Self {
+            Self { r: ::fidl_next::TakeFrom::take_from(&from.r) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireParentTakeChildRequest>
+        for ::fidl_test_protocolrequest::ParentTakeChildRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireParentTakeChildRequest) -> Self {
+            Self { c: ::fidl_next::TakeFrom::take_from(&from.c) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireParentTakeChildRequestRequest>
+        for ::fidl_test_protocolrequest::ParentTakeChildRequestRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireParentTakeChildRequestRequest) -> Self {
+            Self { r: ::fidl_next::TakeFrom::take_from(&from.r) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Parent`
     /// protocol.
     pub type ParentProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Parent>;
+
+    impl ::fidl_next::TakeFrom<crate::Parent> for ::fidl_test_protocolrequest::ParentMarker {
+        #[inline]
+        fn take_from(from: &crate::Parent) -> Self {
+            Self
+        }
+    }
 }

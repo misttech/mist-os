@@ -20,7 +20,7 @@ pub trait DriverOnlyServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SomeDriverProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
         Self::Error,
     >;
@@ -38,7 +38,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SomeDriverProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
         Self::Error,
     > {
@@ -154,4 +154,14 @@ pub mod compat {
     /// protocol.
     pub type SomeDriverProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::SomeDriverProtocol>
+        for ::fidl_test_driverservice::SomeDriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::SomeDriverProtocol) -> Self {
+            Self
+        }
+    }
 }

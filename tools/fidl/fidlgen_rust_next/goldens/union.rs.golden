@@ -5551,7 +5551,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireUnion {
     }
 }
 
-pub mod union_ {
+pub mod union {
     pub enum Ref<'union> {
         Primitive(&'union ::fidl_next::WireI32),
 
@@ -5562,15 +5562,15 @@ pub mod union_ {
 }
 
 impl WireUnion {
-    pub fn as_ref(&self) -> crate::union_::Ref<'_> {
+    pub fn as_ref(&self) -> crate::union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::union_::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => crate::union_::Ref::StringNeedsConstructor(unsafe {
+            2 => crate::union::Ref::StringNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            3 => crate::union_::Ref::VectorStringAlsoNeedsConstructor(unsafe {
+            3 => crate::union::Ref::VectorStringAlsoNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -6286,9 +6286,762 @@ impl ::core::fmt::Debug for WireOptionalUnionWithAttributes {
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireEmpty> for ::fidl_test_union::Empty {
+        #[inline]
+        fn take_from(from: &crate::WireEmpty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyFlexibleUnion>
+        for ::fidl_test_union::EmptyFlexibleUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyFlexibleUnion) -> Self {
+            match from.as_ref() {
+                crate::empty_flexible_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalEmptyFlexibleUnion>
+        for Option<Box<::fidl_test_union::EmptyFlexibleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalEmptyFlexibleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExplicitFlexibleUnion>
+        for ::fidl_test_union::ExplicitFlexibleUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExplicitFlexibleUnion) -> Self {
+            match from.as_ref() {
+                crate::explicit_flexible_union::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_flexible_union::Ref::F(value) => {
+                    Self::F(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_flexible_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExplicitFlexibleUnion>
+        for Option<Box<::fidl_test_union::ExplicitFlexibleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExplicitFlexibleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExplicitFoo> for ::fidl_test_union::ExplicitFoo {
+        #[inline]
+        fn take_from(from: &crate::WireExplicitFoo) -> Self {
+            match from.as_ref() {
+                crate::explicit_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_foo::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExplicitFoo>
+        for Option<Box<::fidl_test_union::ExplicitFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExplicitFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePizza> for ::fidl_test_union::Pizza {
+        #[inline]
+        fn take_from(from: &crate::WirePizza) -> Self {
+            Self { toppings: ::fidl_next::TakeFrom::take_from(&from.toppings) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePasta> for ::fidl_test_union::Pasta {
+        #[inline]
+        fn take_from(from: &crate::WirePasta) -> Self {
+            Self { sauce: ::fidl_next::TakeFrom::take_from(&from.sauce) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExplicitPizzaOrPasta>
+        for ::fidl_test_union::ExplicitPizzaOrPasta
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExplicitPizzaOrPasta) -> Self {
+            match from.as_ref() {
+                crate::explicit_pizza_or_pasta::Ref::Pizza(value) => {
+                    Self::Pizza(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_pizza_or_pasta::Ref::Pasta(value) => {
+                    Self::Pasta(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExplicitPizzaOrPasta>
+        for Option<Box<::fidl_test_union::ExplicitPizzaOrPasta>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExplicitPizzaOrPasta) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExplicitStrictFoo> for ::fidl_test_union::ExplicitStrictFoo {
+        #[inline]
+        fn take_from(from: &crate::WireExplicitStrictFoo) -> Self {
+            match from.as_ref() {
+                crate::explicit_strict_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_strict_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExplicitStrictFoo>
+        for Option<Box<::fidl_test_union::ExplicitStrictFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExplicitStrictFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExplicitUnion> for ::fidl_test_union::ExplicitUnion {
+        #[inline]
+        fn take_from(from: &crate::WireExplicitUnion) -> Self {
+            match from.as_ref() {
+                crate::explicit_union::Ref::Primitive(value) => {
+                    Self::Primitive(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::explicit_union::Ref::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalExplicitUnion>
+        for Option<Box<::fidl_test_union::ExplicitUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalExplicitUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFieldCollision> for ::fidl_test_union::FieldCollision {
+        #[inline]
+        fn take_from(from: &crate::WireFieldCollision) -> Self {
+            match from.as_ref() {
+                crate::field_collision::Ref::FieldCollisionTag(value) => {
+                    Self::FieldCollisionTag(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFieldCollision>
+        for Option<Box<::fidl_test_union::FieldCollision>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFieldCollision) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleFoo> for ::fidl_test_union::FlexibleFoo {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleFoo) -> Self {
+            match from.as_ref() {
+                crate::flexible_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_foo::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFlexibleFoo>
+        for Option<Box<::fidl_test_union::FlexibleFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFlexibleFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlexiblePizzaOrPasta>
+        for ::fidl_test_union::FlexiblePizzaOrPasta
+    {
+        #[inline]
+        fn take_from(from: &crate::WireFlexiblePizzaOrPasta) -> Self {
+            match from.as_ref() {
+                crate::flexible_pizza_or_pasta::Ref::Pizza(value) => {
+                    Self::Pizza(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_pizza_or_pasta::Ref::Pasta(value) => {
+                    Self::Pasta(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_pizza_or_pasta::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFlexiblePizzaOrPasta>
+        for Option<Box<::fidl_test_union::FlexiblePizzaOrPasta>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFlexiblePizzaOrPasta) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleUnion> for ::fidl_test_union::FlexibleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleUnion) -> Self {
+            match from.as_ref() {
+                crate::flexible_union::Ref::Primitive(value) => {
+                    Self::Primitive(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_union::Ref::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_union::Ref::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFlexibleUnion>
+        for Option<Box<::fidl_test_union::FlexibleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFlexibleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireNewerSimpleUnion> for ::fidl_test_union::NewerSimpleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireNewerSimpleUnion) -> Self {
+            match from.as_ref() {
+                crate::newer_simple_union::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::newer_simple_union::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::newer_simple_union::Ref::V(value) => {
+                    Self::V(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::newer_simple_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalNewerSimpleUnion>
+        for Option<Box<::fidl_test_union::NewerSimpleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalNewerSimpleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireNullableUnionStruct>
+        for ::fidl_test_union::NullableUnionStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireNullableUnionStruct) -> Self {
+            Self { the_union: ::fidl_next::TakeFrom::take_from(&from.the_union) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOlderSimpleUnion> for ::fidl_test_union::OlderSimpleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireOlderSimpleUnion) -> Self {
+            match from.as_ref() {
+                crate::older_simple_union::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::older_simple_union::Ref::F(value) => {
+                    Self::F(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::older_simple_union::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalOlderSimpleUnion>
+        for Option<Box<::fidl_test_union::OlderSimpleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalOlderSimpleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WirePizzaOrPasta> for ::fidl_test_union::PizzaOrPasta {
+        #[inline]
+        fn take_from(from: &crate::WirePizzaOrPasta) -> Self {
+            match from.as_ref() {
+                crate::pizza_or_pasta::Ref::Pizza(value) => {
+                    Self::Pizza(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::pizza_or_pasta::Ref::Pasta(value) => {
+                    Self::Pasta(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalPizzaOrPasta>
+        for Option<Box<::fidl_test_union::PizzaOrPasta>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalPizzaOrPasta) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireReverseOrdinalUnion>
+        for ::fidl_test_union::ReverseOrdinalUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireReverseOrdinalUnion) -> Self {
+            match from.as_ref() {
+                crate::reverse_ordinal_union::Ref::First(value) => {
+                    Self::First(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::reverse_ordinal_union::Ref::Second(value) => {
+                    Self::Second(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalReverseOrdinalUnion>
+        for Option<Box<::fidl_test_union::ReverseOrdinalUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalReverseOrdinalUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictBoundedUnion>
+        for ::fidl_test_union::StrictBoundedUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStrictBoundedUnion) -> Self {
+            match from.as_ref() {
+                crate::strict_bounded_union::Ref::V(value) => {
+                    Self::V(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictBoundedUnion>
+        for Option<Box<::fidl_test_union::StrictBoundedUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictBoundedUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictFoo> for ::fidl_test_union::StrictFoo {
+        #[inline]
+        fn take_from(from: &crate::WireStrictFoo) -> Self {
+            match from.as_ref() {
+                crate::strict_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictFoo>
+        for Option<Box<::fidl_test_union::StrictFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictPizzaOrPasta>
+        for ::fidl_test_union::StrictPizzaOrPasta
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStrictPizzaOrPasta) -> Self {
+            match from.as_ref() {
+                crate::strict_pizza_or_pasta::Ref::Pizza(value) => {
+                    Self::Pizza(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_pizza_or_pasta::Ref::Pasta(value) => {
+                    Self::Pasta(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictPizzaOrPasta>
+        for Option<Box<::fidl_test_union::StrictPizzaOrPasta>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictPizzaOrPasta) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictSimpleUnion> for ::fidl_test_union::StrictSimpleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireStrictSimpleUnion) -> Self {
+            match from.as_ref() {
+                crate::strict_simple_union::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_simple_union::Ref::F(value) => {
+                    Self::F(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_simple_union::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictSimpleUnion>
+        for Option<Box<::fidl_test_union::StrictSimpleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictSimpleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictUnion> for ::fidl_test_union::StrictUnion {
+        #[inline]
+        fn take_from(from: &crate::WireStrictUnion) -> Self {
+            match from.as_ref() {
+                crate::strict_union::Ref::Primitive(value) => {
+                    Self::Primitive(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_union::Ref::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_union::Ref::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictUnion>
+        for Option<Box<::fidl_test_union::StrictUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableUnion>
+        for ::fidl_test_union::StructWithNullableUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableUnion) -> Self {
+            Self { x1: ::fidl_next::TakeFrom::take_from(&from.x1) }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<
+            crate::WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        > for ::fidl_test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::TakeFrom::take_from(&from.xu) }
+        }
+    }
+
+    impl
+        ::fidl_next::TakeFrom<
+            crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        > for ::fidl_test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+    {
+        #[inline]
+        fn take_from(
+            from: &crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+        ) -> Self {
+            Self { xu: ::fidl_next::TakeFrom::take_from(&from.xu) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `TestProtocol`
     /// protocol.
     pub type TestProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::TestProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::TestProtocol> for ::fidl_test_union::TestProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::TestProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnion> for ::fidl_test_union::Union {
+        #[inline]
+        fn take_from(from: &crate::WireUnion) -> Self {
+            match from.as_ref() {
+                crate::union::Ref::Primitive(value) => {
+                    Self::Primitive(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union::Ref::StringNeedsConstructor(value) => {
+                    Self::StringNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union::Ref::VectorStringAlsoNeedsConstructor(value) => {
+                    Self::VectorStringAlsoNeedsConstructor(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnion> for Option<Box<::fidl_test_union::Union>> {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionContainingEmptyStruct>
+        for ::fidl_test_union::UnionContainingEmptyStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionContainingEmptyStruct) -> Self {
+            match from.as_ref() {
+                crate::union_containing_empty_struct::Ref::Empty(value) => {
+                    Self::Empty(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union_containing_empty_struct::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionContainingEmptyStruct>
+        for Option<Box<::fidl_test_union::UnionContainingEmptyStruct>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionContainingEmptyStruct) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionSandwich> for ::fidl_test_union::UnionSandwich {
+        #[inline]
+        fn take_from(from: &crate::WireUnionSandwich) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                u: ::fidl_next::TakeFrom::take_from(&from.u),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireUnionWithAttributes>
+        for ::fidl_test_union::UnionWithAttributes
+    {
+        #[inline]
+        fn take_from(from: &crate::WireUnionWithAttributes) -> Self {
+            match from.as_ref() {
+                crate::union_with_attributes::Ref::X(value) => {
+                    Self::X(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::union_with_attributes::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalUnionWithAttributes>
+        for Option<Box<::fidl_test_union::UnionWithAttributes>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalUnionWithAttributes) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
 }

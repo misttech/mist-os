@@ -3849,15 +3849,205 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireLocalTablePayload>
+        for ::fidl_test_protocollayouts::LocalTablePayload
+    {
+        #[inline]
+        fn take_from(from: &crate::WireLocalTablePayload) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireLocalUnionPayload>
+        for ::fidl_test_protocollayouts::LocalUnionPayload
+    {
+        #[inline]
+        fn take_from(from: &crate::WireLocalUnionPayload) -> Self {
+            match from.as_ref() {
+                crate::local_union_payload::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::local_union_payload::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalLocalUnionPayload>
+        for Option<Box<::fidl_test_protocollayouts::LocalUnionPayload>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalLocalUnionPayload) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOneWayAnonRequest>
+        for ::fidl_test_protocollayouts::MainProtocolOneWayAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolOneWayAnonRequest) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonRequest>
+        for ::fidl_test_protocollayouts::MainProtocolTwoWayAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonRequest) -> Self {
+            match from.as_ref() {
+                crate::main_protocol_two_way_anon_request::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalMainProtocolTwoWayAnonRequest>
+        for Option<Box<::fidl_test_protocollayouts::MainProtocolTwoWayAnonRequest>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalMainProtocolTwoWayAnonRequest) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonResponse>
+        for ::fidl_test_protocollayouts::MainProtocolTwoWayAnonResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonResponse) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorRequest>
+        for ::fidl_test_protocollayouts::MainProtocolTwoWayAnonWithErrorRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
+            Self {
+                a: from.a().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolTwoWayAnonWithErrorResponse>
+        for ::fidl_test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+            match from.as_ref() {
+                crate::main_protocol_two_way_anon_with_error_response::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal_(
+                    unknown_ordinal,
+                ) => Self::__SourceBreaking { unknown_ordinal },
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalMainProtocolTwoWayAnonWithErrorResponse>
+        for Option<Box<::fidl_test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalMainProtocolTwoWayAnonWithErrorResponse) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMainProtocolOnAnonRequest>
+        for ::fidl_test_protocollayouts::MainProtocolOnAnonRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMainProtocolOnAnonRequest) -> Self {
+            match from.as_ref() {
+                crate::main_protocol_on_anon_request::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::main_protocol_on_anon_request::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalMainProtocolOnAnonRequest>
+        for Option<Box<::fidl_test_protocollayouts::MainProtocolOnAnonRequest>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalMainProtocolOnAnonRequest) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `MainProtocol`
     /// protocol.
     pub type MainProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MainProtocol>;
 
+    impl ::fidl_next::TakeFrom<crate::MainProtocol>
+        for ::fidl_test_protocollayouts::MainProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::MainProtocol) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `OpenProtocol`
     /// protocol.
     pub type OpenProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::OpenProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::OpenProtocol>
+        for ::fidl_test_protocollayouts::OpenProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::OpenProtocol) -> Self {
+            Self
+        }
+    }
 }

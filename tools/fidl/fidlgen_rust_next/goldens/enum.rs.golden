@@ -405,4 +405,63 @@ impl ::core::convert::From<MyStrictEnum> for WireMyStrictEnum {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireMyEmptyFlexibleEnum>
+        for ::fidl_test_enum::MyEmptyFlexibleEnum
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMyEmptyFlexibleEnum) -> Self {
+            match crate::MyEmptyFlexibleEnum::from(*from) {
+                crate::MyEmptyFlexibleEnum::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleEnum> for ::fidl_test_enum::MyFlexibleEnum {
+        #[inline]
+        fn take_from(from: &crate::WireMyFlexibleEnum) -> Self {
+            match crate::MyFlexibleEnum::from(*from) {
+                crate::MyFlexibleEnum::Foo => Self::Foo,
+
+                crate::MyFlexibleEnum::Bar => Self::Bar,
+
+                crate::MyFlexibleEnum::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyFlexibleEnumWithCustomUnknown>
+        for ::fidl_test_enum::MyFlexibleEnumWithCustomUnknown
+    {
+        #[inline]
+        fn take_from(from: &crate::WireMyFlexibleEnumWithCustomUnknown) -> Self {
+            match crate::MyFlexibleEnumWithCustomUnknown::from(*from) {
+                crate::MyFlexibleEnumWithCustomUnknown::Foo => Self::Foo,
+
+                crate::MyFlexibleEnumWithCustomUnknown::Bar => Self::Bar,
+
+                crate::MyFlexibleEnumWithCustomUnknown::CustomUnknown => Self::CustomUnknown,
+
+                crate::MyFlexibleEnumWithCustomUnknown::UnknownOrdinal_(value) => {
+                    Self::__SourceBreaking { unknown_ordinal: value }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyStrictEnum> for ::fidl_test_enum::MyStrictEnum {
+        #[inline]
+        fn take_from(from: &crate::WireMyStrictEnum) -> Self {
+            match crate::MyStrictEnum::from(*from) {
+                crate::MyStrictEnum::Foo => Self::Foo,
+
+                crate::MyStrictEnum::Bar => Self::Bar,
+            }
+        }
+    }
+}

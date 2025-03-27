@@ -250,4 +250,27 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBasicStruct> for ::fidl_test_struct::BasicStruct {
+        #[inline]
+        fn take_from(from: &crate::WireBasicStruct) -> Self {
+            Self {
+                x: ::fidl_next::TakeFrom::take_from(&from.x),
+
+                y: ::fidl_next::TakeFrom::take_from(&from.y),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimple> for ::fidl_test_struct::Simple {
+        #[inline]
+        fn take_from(from: &crate::WireSimple) -> Self {
+            Self {
+                f1: ::fidl_next::TakeFrom::take_from(&from.f1),
+
+                f2: ::fidl_next::TakeFrom::take_from(&from.f2),
+            }
+        }
+    }
+}

@@ -386,9 +386,32 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireExampleFooRequest> for ::fidl_test_error::ExampleFooRequest {
+        #[inline]
+        fn take_from(from: &crate::WireExampleFooRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleFooResponse>
+        for ::fidl_test_error::ExampleFooResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleFooResponse) -> Self {
+            Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Example`
     /// protocol.
     pub type ExampleProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Example>;
+
+    impl ::fidl_next::TakeFrom<crate::Example> for ::fidl_test_error::ExampleMarker {
+        #[inline]
+        fn take_from(from: &crate::Example) -> Self {
+            Self
+        }
+    }
 }

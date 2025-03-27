@@ -14,6 +14,7 @@ pub struct Table {
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     pub members: Vec<TableMember>,
     #[serde(rename = "resource")]
     pub is_resource: bool,

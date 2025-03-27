@@ -410,9 +410,41 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireTwoWayAddRequest>
+        for ::fidl_test_drivertwoway::TwoWayAddRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTwoWayAddRequest) -> Self {
+            Self {
+                addend1: ::fidl_next::TakeFrom::take_from(&from.addend1),
+
+                addend2: ::fidl_next::TakeFrom::take_from(&from.addend2),
+            }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireTwoWayAddResponse>
+        for ::fidl_test_drivertwoway::TwoWayAddResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTwoWayAddResponse) -> Self {
+            Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `TwoWay`
     /// protocol.
     pub type TwoWayProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::TwoWay>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::TwoWay> for ::fidl_test_drivertwoway::TwoWayMarker {
+        #[inline]
+        fn take_from(from: &crate::TwoWay) -> Self {
+            Self
+        }
+    }
 }

@@ -53,6 +53,9 @@ struct Fidlgen {
     /// rustfmt configuration file path
     #[argh(option)]
     rustfmt_config: PathBuf,
+    /// whether to generate compatibility impls for the existing Rust bindings
+    #[argh(switch)]
+    emit_compat: bool,
 }
 
 fn main() {
@@ -63,7 +66,7 @@ fn main() {
         .expect("failed to parse source JSON IR");
 
     let config = Config {
-        emit_compat: true,
+        emit_compat: args.emit_compat,
         emit_debug_impls: true,
         resource_bindings: ResourceBindings::default(),
     };

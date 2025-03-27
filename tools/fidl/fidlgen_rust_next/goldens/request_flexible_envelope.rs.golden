@@ -1124,9 +1124,118 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleFoo>
+        for ::fidl_test_requestflexibleenvelope::FlexibleFoo
+    {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleFoo) -> Self {
+            match from.as_ref() {
+                crate::flexible_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::flexible_foo::Ref::UnknownOrdinal_(unknown_ordinal) => {
+                    Self::__SourceBreaking { unknown_ordinal }
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalFlexibleFoo>
+        for Option<Box<::fidl_test_requestflexibleenvelope::FlexibleFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalFlexibleFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictFoo>
+        for ::fidl_test_requestflexibleenvelope::StrictFoo
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStrictFoo) -> Self {
+            match from.as_ref() {
+                crate::strict_foo::Ref::S(value) => {
+                    Self::S(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::strict_foo::Ref::I(value) => {
+                    Self::I(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalStrictFoo>
+        for Option<Box<::fidl_test_requestflexibleenvelope::StrictFoo>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalStrictFoo) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireProtocolRequestStrictResponseFlexibleRequest>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireProtocolRequestStrictResponseFlexibleRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireProtocolRequestStrictResponseFlexibleResponse>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireProtocolRequestStrictResponseFlexibleResponse) -> Self {
+            Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireProtocolRequestFlexibleResponseStrictRequest>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireProtocolRequestFlexibleResponseStrictRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireProtocolRequestFlexibleResponseStrictResponse>
+        for ::fidl_test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireProtocolRequestFlexibleResponseStrictResponse) -> Self {
+            Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Protocol`
     /// protocol.
     pub type ProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Protocol>;
+
+    impl ::fidl_next::TakeFrom<crate::Protocol>
+        for ::fidl_test_requestflexibleenvelope::ProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::Protocol) -> Self {
+            Self
+        }
+    }
 }

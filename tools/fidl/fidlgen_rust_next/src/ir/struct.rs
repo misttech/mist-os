@@ -13,11 +13,13 @@ pub struct Struct {
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     pub members: Vec<StructMember>,
     #[serde(rename = "resource")]
     pub is_resource: bool,
     #[serde(rename = "type_shape_v2")]
     pub shape: TypeShape,
+    pub is_empty_success_struct: bool,
 }
 
 impl Index for Struct {

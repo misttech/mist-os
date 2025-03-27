@@ -102,4 +102,12 @@ pub const CONST2: crate::BitsType = crate::BitsType::from_bits_retain(129);
 pub const CONST3: crate::BitsType = crate::BitsType::from_bits_retain(131);
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_bitsconstants::BitsType {
+        #[inline]
+        fn take_from(from: &crate::WireBitsType) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+}

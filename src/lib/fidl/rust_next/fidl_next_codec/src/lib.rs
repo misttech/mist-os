@@ -26,6 +26,8 @@
 mod testing;
 
 mod chunk;
+#[cfg(feature = "compat")]
+mod compat;
 mod decode;
 pub mod decoder;
 mod encode;
