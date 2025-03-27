@@ -8,6 +8,7 @@ pub mod converter;
 pub mod error;
 mod executor;
 pub mod maps;
+pub mod memio;
 pub mod program;
 pub mod verifier;
 mod visitor;
