@@ -1,0 +1,17 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_binary.gni")
+
+python_binary("generate_container_config_component") {
+  main_source = "generate_container_config_component.py"
+  main_callable = "main"
+  deps = [ "//third_party/pyjson5" ]
+}
+
+python_binary("generate_container_config_shard") {
+  main_source = "generate_container_config_shard.py"
+  main_callable = "main"
+  deps = [ "//third_party/pyjson5" ]
+}

@@ -7,6 +7,7 @@ import("//build/test.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/lib/testing/expectation/generated_expectations_file.gni")
+import("//src/starnix/build/starnix_container_config_component.gni")
 import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
@@ -87,19 +88,27 @@ syscall_tests = [
 syscall_tests_etc = [
   {
     name = "input_test"
-    features = [ "framebuffer" ]
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
   },
   {
     name = "ioctl_test"
-    features = [ "framebuffer" ]
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
   },
   {
     name = "touch_standby_test"
-    features = [ "framebuffer" ]
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
   },
   {
     name = "udev_test"
-    features = [ "framebuffer" ]
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
   },
 ]
 
@@ -109,7 +118,9 @@ if (target_cpu == "x64") {
   syscall_tests_etc += [
     {
       name = "uinput_test"
-      features = [ "framebuffer" ]
+      container_config = {
+        extra_features = [ "framebuffer" ]
+      }
     },
   ]
 }
@@ -139,19 +150,10 @@ foreach(onfault_behavior, mlock_onfault_behaviors) {
         # Sanitizer runtimes stub out mlock() because it is incompatible with their virtual memory
         # management.
         disable_sanitizers_on_host = true
-        config_capabilities = [
-          {
-            config = "fuchsia.starnix.config.container.MlockAlwaysOnFault"
-            type = "bool"
-            value = onfault_behavior
-          },
-          {
-            config = "fuchsia.starnix.config.container.MlockPinFlavor"
-            type = "string"
-            max_size = 100
-            value = pin_flavor
-          },
-        ]
+        container_config = {
+          mlock_always_onfault = onfault_behavior
+          mlock_pin_flavor = pin_flavor
+        }
       },
     ]
   }
@@ -263,10 +265,6 @@ template("syscall_test") {
   if (defined(invoker.disable_sanitizers_on_host)) {
     _disable_sanitizers_on_host = invoker.disable_sanitizers_on_host
   }
-  extra_features = []
-  if (defined(invoker.features)) {
-    extra_features = invoker.features
-  }
 
   _test_sources = []
   if (defined(invoker.sources)) {
@@ -275,52 +273,23 @@ template("syscall_test") {
     _test_sources = [ "${test_name}.cc" ]
   }
 
-  _container_config_capabilities = [
-    {
-      config = "fuchsia.starnix.config.container.ExtraFeatures"
-      type = "vector"
-      element = {
-        type = "string"
-        max_size = 1024
-      }
-      max_count = 1024
-      value = extra_features
-    },
-  ]
-
-  if (defined(invoker.config_capabilities)) {
-    _container_config_capabilities += invoker.config_capabilities
+  _container_config = {
+  }
+  if (defined(invoker.container_config)) {
+    _container_config = invoker.container_config
   }
 
-  _config_component_exposes = []
-  _config_component_offers = []
-  foreach(_capability, _container_config_capabilities) {
-    _config_component_exposes += [
-      {
-        config = _capability.config
-        from = "self"
-      },
-    ]
-    _config_component_offers += [
-      {
-        config = _capability.config
-        from = "#config"
-        to = "#container"
-        availability = "transitional"
-      },
-    ]
+  _config_component = "${test_name}_config"
+  starnix_container_config_component(_config_component) {
+    config = _container_config
   }
 
-  # Generate the configuration component
-  _config_manifest_label = "${test_name}_config.cml"
-  _config_manifest_file = "$target_gen_dir/${_config_manifest_label}"
-  generated_file(_config_manifest_label) {
-    outputs = [ _config_manifest_file ]
-    output_conversion = "json"
-    contents = {
-      capabilities = _container_config_capabilities
-      expose = _config_component_exposes
-    }
+  _config_shard_label = "${_config_component}_shard"
+  _config_shard = "${target_gen_dir}/${test_name}_config.shard.cml"
+  starnix_container_config_offers(_config_shard_label) {
+    output = _config_shard
+    offer_from = "#config"
+    offer_to = "#container"
   }
 
   # Generate the manifest
@@ -330,19 +299,22 @@ template("syscall_test") {
     outputs = [ _manifest_file ]
     output_conversion = "json"
     contents = {
-      include =
-          [ "//src/starnix/tests/syscalls/cpp/meta/syscalls_cpp_test.cml" ]
+      include = [
+        rebase_path(_config_shard, root_build_dir),
+        "//src/starnix/tests/syscalls/cpp/meta/syscalls_cpp_test.cml",
+      ]
       program = {
         binary = "data/tests/${test_name}_bin"
       }
       children = [
         {
           name = "config"
-          url = "#meta/${test_name}_config.cm"
+          url = "#meta/${_config_component}.cm"
         },
       ]
-      offer = _config_component_offers
     }
+
+    deps = [ ":${_config_shard_label}" ]
   }
 
   _target_test_label = "${test_name}_bin"
@@ -409,11 +381,6 @@ template("syscall_test") {
         ":host_runtime_deps",
       ]
     }
-  }
-
-  fuchsia_component("${target_name}_config") {
-    manifest = _config_manifest_file
-    deps = [ ":${_config_manifest_label}" ]
   }
 
   starnix_linux_test_component(target_name) {
