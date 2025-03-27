@@ -362,6 +362,44 @@ pub fn create_proxy_for_wake_events(
     (local_proxy, local_resume_event)
 }
 
+/// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
+///
+/// The proxying is done by the Starnix runner, and allows messages on the channel to wake
+/// the container.
+pub fn create_proxy_for_wake_events_counter(
+    remote_channel: zx::Channel,
+    name: String,
+) -> (zx::Channel, zx::Counter) {
+    let (local_proxy, kernel_channel) = zx::Channel::create();
+    let counter = zx::Counter::create().expect("failed to create counter");
+
+    // Increment the counter by one so that the initial incoming message to the container will
+    // set the count to 0, instead of -1.
+    counter.add(1).expect("Failed to add to counter");
+
+    let local_counter =
+        counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed to duplicate counter");
+
+    let manager = fuchsia_component::client::connect_to_protocol_sync::<frunner::ManagerMarker>()
+        .expect("failed");
+    manager
+        .proxy_wake_channel(frunner::ManagerProxyWakeChannelRequest {
+            container_job: Some(
+                fuchsia_runtime::job_default()
+                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .expect("Failed to dup handle"),
+            ),
+            container_channel: Some(kernel_channel),
+            remote_channel: Some(remote_channel),
+            counter: Some(counter),
+            name: Some(name),
+            ..Default::default()
+        })
+        .expect("Failed to create proxy");
+
+    (local_proxy, local_counter)
+}
+
 /// Creates a watcher between clients and the Starnix runner.
 ///
 /// Changes in the power state of the container are relayed by the event pair.
