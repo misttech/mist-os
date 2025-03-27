@@ -639,7 +639,7 @@ TEST_F(NetworkServiceTest, FakeEndpoints) {
   test_buff2.reserve(TEST_BUF_SIZE);
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
     test_buff1[i] = static_cast<uint8_t>(i);
-    test_buff2[i] = ~static_cast<uint8_t>(i);
+    test_buff2[i] = static_cast<uint8_t>(~i);
   }
 
   dev1.client->SetRxCallback(
@@ -1119,7 +1119,7 @@ TEST_F(NetworkServiceTest, DualNetworkDevice) {
   uint8_t test_buff2[TEST_BUF_SIZE];
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
     test_buff1[i] = static_cast<uint8_t>(i);
-    test_buff2[i] = ~static_cast<uint8_t>(i);
+    test_buff2[i] = static_cast<uint8_t>(~i);
   }
 
   // Install callbacks on the clients.
