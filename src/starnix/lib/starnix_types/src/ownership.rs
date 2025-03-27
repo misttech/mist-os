@@ -65,6 +65,19 @@ impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T>
     }
 }
 
+/// Releasing a vec calls release on each element
+impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Vec<T>
+    where for <'a, 'b> T::Context<'a, 'b>: Clone
+{
+    type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
+
+    fn release<'a: 'b, 'b>(self: $self, c: Self::Context<'a, 'b>) {
+        for v in self {
+            v.release(c.clone());
+        }
+    }
+}
+
 /// Releasing a result calls release on the value if the result is ok.
 impl<T: [< Releasable $($suffix)? >], E> [< Releasable $($suffix)? >] for Result<T, E> {
     type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
