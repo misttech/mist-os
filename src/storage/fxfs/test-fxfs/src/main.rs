@@ -3,26 +3,33 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
-use fidl_fuchsia_fshost::{StarnixVolumeProviderRequest, StarnixVolumeProviderRequestStream};
+use fidl::endpoints::{create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd};
+use fidl_fuchsia_fshost::{
+    StarnixVolumeProviderMarker, StarnixVolumeProviderRequest, StarnixVolumeProviderRequestStream,
+};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
-use fidl_fuchsia_test_fxfs::{StarnixVolumeAdminRequest, StarnixVolumeAdminRequestStream};
+use fidl_fuchsia_test_fxfs::{
+    StarnixVolumeAdminMarker, StarnixVolumeAdminRequest, StarnixVolumeAdminRequestStream,
+};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_component::server::ServiceFs;
-use futures::lock::Mutex;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use fuchsia_runtime::HandleType;
+use fuchsia_sync::Mutex;
+use futures::StreamExt;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::FxFilesystem;
 use fxfs::object_store::volume::root_volume;
 use fxfs_crypto::Crypt;
 use fxfs_platform::fuchsia::RemoteCrypt;
-use fxfs_platform::volume::RootDir;
 use fxfs_platform::volumes_directory::VolumesDirectory;
 use std::sync::{Arc, Weak};
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
+use vfs::ToObjectRequest;
 
 const BLOCK_SIZE: u32 = 4096; // 8KiB
 const USER_VOLUME_NAME: &str = "test_fxfs_user_volume";
@@ -41,17 +48,12 @@ struct MountedVolume {
     root_dir: fio::DirectoryProxy,
 }
 
-enum Services {
-    StarnixVolumeProvider(StarnixVolumeProviderRequestStream),
-    StarnixVolumeAdmin(StarnixVolumeAdminRequestStream),
-}
-
 async fn mount_user_volume(
     crypt: ClientEnd<CryptMarker>,
     starnix_exposed_dir: ServerEnd<DirectoryMarker>,
     volumes_directory: &Arc<VolumesDirectory>,
-    mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
-    inspect_node: &fuchsia_inspect::Node,
+    mounted_volume: &Mutex<Option<MountedVolume>>,
+    inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
     let remote_crypt = Arc::new(RemoteCrypt::new(crypt));
     let vol = match volumes_directory
@@ -77,16 +79,16 @@ async fn mount_user_volume(
     update_mounted_volume(mounted_volume, exposed_dir, vol.volume().store().store_object_id())
         .await?;
 
-    inspect_node.record_bool("mounted", true);
+    inspect_node.lock().record_bool("mounted", true);
     Ok(())
 }
 
 async fn update_mounted_volume(
-    mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
+    mounted_volume: &Mutex<Option<MountedVolume>>,
     exposed_dir: fio::DirectoryProxy,
     store_id: u64,
 ) -> Result<(), Error> {
-    let mut guard = mounted_volume.lock().await;
+    let mut guard = mounted_volume.lock();
     let (root_dir_client_end, server_end) = zx::Channel::create();
     exposed_dir.open(
         "root",
@@ -108,9 +110,9 @@ async fn delete_user_volume(volumes_directory: &Arc<VolumesDirectory>) -> Result
 }
 
 async fn get_user_volume_root(
-    mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
+    mounted_volume: &Mutex<Option<MountedVolume>>,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let guard = mounted_volume.lock().await;
+    let guard = mounted_volume.lock();
     let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
     if let Some(vol) = &*guard {
         vol.root_dir.clone(server_end.into_channel().into())?;
@@ -124,13 +126,13 @@ async fn create_user_volume(
     crypt: ClientEnd<CryptMarker>,
     starnix_exposed_dir: ServerEnd<DirectoryMarker>,
     volumes_directory: &Arc<VolumesDirectory>,
-    mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
-    inspect_node: &fuchsia_inspect::Node,
+    mounted_volume: &Mutex<Option<MountedVolume>>,
+    inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
     let remote_crypt = Arc::new(RemoteCrypt::new(crypt));
-    if let Some(vol) = mounted_volume.lock().await.take() {
+    if let Some(vol) = mounted_volume.lock().take() {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
-        inspect_node.record_bool("mounted", false);
+        inspect_node.lock().record_bool("mounted", false);
     }
     let vol = match volumes_directory
         .create_and_mount_volume(
@@ -160,18 +162,18 @@ async fn create_user_volume(
     update_mounted_volume(mounted_volume, exposed_dir, vol.volume().store().store_object_id())
         .await?;
 
-    inspect_node.record_bool("mounted", true);
+    inspect_node.lock().record_bool("mounted", true);
     Ok(())
 }
 
 async fn unmount_user_volume(
     volumes_directory: &Arc<VolumesDirectory>,
-    mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
-    inspect_node: &fuchsia_inspect::Node,
+    mounted_volume: &Mutex<Option<MountedVolume>>,
+    inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
-    if let Some(vol) = mounted_volume.lock().await.take() {
+    if let Some(vol) = mounted_volume.lock().take() {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
-        inspect_node.record_bool("mounted", false);
+        inspect_node.lock().record_bool("mounted", false);
         Ok(())
     } else {
         Err(anyhow!("tried to unmount a volume that was never mounted"))
@@ -182,10 +184,8 @@ async fn handle_starnix_volume_admin_requests(
     mut stream: StarnixVolumeAdminRequestStream,
     volumes_directory: Arc<VolumesDirectory>,
     mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
-) -> Result<(), Error> {
-    let volumes_directory = volumes_directory.clone();
-    let mounted_volume = mounted_volume.clone();
-    while let Some(request) = stream.try_next().await? {
+) {
+    while let Some(Ok(request)) = stream.next().await {
         match request {
             StarnixVolumeAdminRequest::Delete { responder } => {
                 log::info!("volume admin delete called");
@@ -203,7 +203,7 @@ async fn handle_starnix_volume_admin_requests(
             StarnixVolumeAdminRequest::GetRoot { responder } => {
                 log::info!("volume admin get_root called");
                 let res: Result<ClientEnd<fio::DirectoryMarker>, i32> =
-                    match get_user_volume_root(mounted_volume.clone()).await {
+                    match get_user_volume_root(&mounted_volume).await {
                         Ok(root_dir) => Ok(root_dir.into_client_end().unwrap()),
                         Err(e) => {
                             log::error!("volume admin service: get_root failed: {:?}", e);
@@ -216,19 +216,15 @@ async fn handle_starnix_volume_admin_requests(
             }
         }
     }
-
-    Ok(())
 }
 
 async fn handle_starnix_volume_provider_requests(
     mut stream: StarnixVolumeProviderRequestStream,
     volumes_directory: Arc<VolumesDirectory>,
-    inspect_node: &fuchsia_inspect::Node,
+    inspect_node: Arc<Mutex<fuchsia_inspect::Node>>,
     mounted_volume: Arc<Mutex<Option<MountedVolume>>>,
-) -> Result<(), Error> {
-    let volumes_directory = volumes_directory.clone();
-    let mounted_volume = mounted_volume.clone();
-    while let Some(request) = stream.try_next().await? {
+) {
+    while let Some(Ok(request)) = stream.next().await {
         match request {
             StarnixVolumeProviderRequest::Mount { crypt, exposed_dir, responder } => {
                 log::info!("volume provider mount called");
@@ -236,8 +232,8 @@ async fn handle_starnix_volume_provider_requests(
                     crypt,
                     exposed_dir,
                     &volumes_directory,
-                    mounted_volume.clone(),
-                    inspect_node,
+                    &mounted_volume,
+                    &inspect_node,
                 )
                 .await
                 {
@@ -257,8 +253,8 @@ async fn handle_starnix_volume_provider_requests(
                     crypt,
                     exposed_dir,
                     &volumes_directory,
-                    mounted_volume.clone(),
-                    inspect_node,
+                    &mounted_volume,
+                    &inspect_node,
                 )
                 .await
                 {
@@ -274,27 +270,22 @@ async fn handle_starnix_volume_provider_requests(
             }
             StarnixVolumeProviderRequest::Unmount { responder } => {
                 log::info!("volume provider unmount called");
-                let res = match unmount_user_volume(
-                    &volumes_directory,
-                    mounted_volume.clone(),
-                    inspect_node,
-                )
-                .await
-                {
-                    Ok(()) => Ok(()),
-                    Err(e) => {
-                        log::error!("volume provider service: unmount failed: {:?}", e);
-                        Err(zx::Status::INTERNAL.into_raw())
-                    }
-                };
+                let res =
+                    match unmount_user_volume(&volumes_directory, &mounted_volume, &inspect_node)
+                        .await
+                    {
+                        Ok(()) => Ok(()),
+                        Err(e) => {
+                            log::error!("volume provider service: unmount failed: {:?}", e);
+                            Err(zx::Status::INTERNAL.into_raw())
+                        }
+                    };
                 responder.send(res).unwrap_or_else(|e| {
                     log::error!("failed to send Unmount response. error: {:?}", e);
                 });
             }
         }
     }
-
-    Ok(())
 }
 
 #[fuchsia::main]
@@ -307,7 +298,7 @@ async fn main() -> Result<(), Error> {
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server_task =
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
-    let inspect_node = inspector.root().create_child("starnix_volume");
+    let inspect_node = Arc::new(Mutex::new(inspector.root().create_child("starnix_volume")));
 
     let crypt_management = connect_to_protocol::<CryptManagementMarker>()?;
     let wrapping_key_id_0 = [0; 16];
@@ -356,48 +347,52 @@ async fn main() -> Result<(), Error> {
         .create_and_mount_volume("vol", Some(crypt.clone()), false)
         .await
         .context("create and mount volume failed on vol")?;
-    let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-
-    let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-    vol.root_dir().as_directory().open3(
-        vol.volume().scope().clone(),
-        Path::dot(),
-        flags,
-        &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
-    )?;
 
     let mounted_volume = Arc::new(Mutex::new(None));
-
-    let mut fs = ServiceFs::new();
-    fs.add_remote("data", root);
-    fs.dir("svc").add_fidl_service(Services::StarnixVolumeProvider);
-    fs.dir("svc").add_fidl_service(Services::StarnixVolumeAdmin);
-
-    fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(None, |request: Services| async {
-        match request {
-            Services::StarnixVolumeProvider(stream) => {
-                handle_starnix_volume_provider_requests(
-                    stream,
-                    volumes_directory.clone(),
-                    &inspect_node,
-                    mounted_volume.clone(),
-                )
-                .unwrap_or_else(|e| log::error!("{:?}", e))
-                .await
-            }
-            Services::StarnixVolumeAdmin(stream) => {
+    let svc_dir = vfs::directory::immutable::Simple::new();
+    svc_dir
+        .add_entry(
+            StarnixVolumeProviderMarker::PROTOCOL_NAME,
+            vfs::service::host({
+                let volumes_directory = volumes_directory.clone();
+                let inspect_node = inspect_node.clone();
+                let mounted_volume = mounted_volume.clone();
+                move |stream| {
+                    handle_starnix_volume_provider_requests(
+                        stream,
+                        volumes_directory.clone(),
+                        inspect_node.clone(),
+                        mounted_volume.clone(),
+                    )
+                }
+            }),
+        )
+        .unwrap();
+    svc_dir
+        .add_entry(
+            StarnixVolumeAdminMarker::PROTOCOL_NAME,
+            vfs::service::host(move |stream| {
                 handle_starnix_volume_admin_requests(
                     stream,
                     volumes_directory.clone(),
                     mounted_volume.clone(),
                 )
-                .unwrap_or_else(|e| log::error!("{:?}", e))
-                .await
-            }
-        }
-    })
-    .await;
+            }),
+        )
+        .unwrap();
+
+    let out_dir = vfs::directory::immutable::Simple::new();
+    out_dir.add_entry("svc", svc_dir).unwrap();
+    out_dir.add_entry("data", vol.root_dir()).unwrap();
+
+    let export_handle = fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
+        .context("Missing startup handle")?;
+    let scope = ExecutionScope::new();
+    let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
+    flags
+        .to_object_request(export_handle)
+        .handle(|object_request| out_dir.open3(scope.clone(), Path::dot(), flags, object_request));
+    scope.wait().await;
 
     Ok(())
 }
