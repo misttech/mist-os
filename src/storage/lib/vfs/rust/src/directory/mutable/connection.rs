@@ -236,10 +236,12 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         let attributes = match self.base.directory.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
+                #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
-                iterator
-                    .close_with_epitaph(status)
-                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
+                iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
+                    #[cfg(any(test, feature = "use_log"))]
+                    log::error!(_error:?; "failed to send epitaph")
+                });
                 return;
             }
         };

@@ -132,8 +132,9 @@ pub async fn extended_attributes_sender(
             Some(chunk) => (chunk, chunks.peek().is_none()),
             None => (&[][..], true),
         };
-        responder.send(Ok((chunk, last))).unwrap_or_else(|error| {
-            log::error!(error:?; "list extended attributes failed to send a chunk");
+        responder.send(Ok((chunk, last))).unwrap_or_else(|_error| {
+            #[cfg(any(test, feature = "use_log"))]
+            log::error!(_error:?; "list extended attributes failed to send a chunk");
         });
         if last {
             break;

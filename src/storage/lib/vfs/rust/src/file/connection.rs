@@ -974,10 +974,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
         let attributes = match self.file.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
+                #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
-                iterator
-                    .close_with_epitaph(status)
-                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
+                iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
+                    #[cfg(any(test, feature = "use_log"))]
+                    log::error!(_error:?; "failed to send epitaph")
+                });
                 return;
             }
         };

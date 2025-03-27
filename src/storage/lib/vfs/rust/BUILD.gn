@@ -6,6 +6,15 @@ import("//build/components.gni")
 import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_dylib.gni")
 
+declare_args() {
+  # Set this to true to enable some additional logs in the vfs crate and have it depend on the
+  # log crate. This should not be enabled in general for non-host builds because it causes the vfs
+  # crate, which is built as a dylib, to be the source of the global logger, which can cause
+  # problems for things that dynamically link rust libraries (like drivers) and cause link errors
+  # at worst, or incorrect log attribution at best.
+  vfs_rust_uses_log = is_host
+}
+
 common_vfs_args = {
   output_name = "vfs_rust"
   version = "0.1.0"
@@ -25,12 +34,16 @@ common_vfs_args = {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:slab",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
   ]
+
+  if (vfs_rust_uses_log) {
+    deps += [ "//third_party/rust_crates:log" ]
+    features = [ "use_log" ]
+  }
 
   sources = [
     "src/common.rs",
@@ -91,6 +104,7 @@ common_vfs_args = {
     "//src/lib/fuchsia",
     "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:log",
   ]
 }
 

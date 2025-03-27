@@ -218,8 +218,9 @@ impl<T: Symlink> Connection<T> {
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
-            fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
-                log::warn!(ordinal; "Received unknown method")
+            fio::SymlinkRequest::_UnknownMethod { ordinal: _ordinal, .. } => {
+                #[cfg(any(test, feature = "use_log"))]
+                log::warn!(_ordinal; "Received unknown method")
             }
         }
         Ok(false)
@@ -282,10 +283,12 @@ impl<T: Symlink> Connection<T> {
         let attributes = match self.symlink.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
+                #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
-                iterator
-                    .close_with_epitaph(status)
-                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
+                iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
+                    #[cfg(any(test, feature = "use_log"))]
+                    log::error!(_error:?; "failed to send epitaph")
+                });
                 return;
             }
         };
