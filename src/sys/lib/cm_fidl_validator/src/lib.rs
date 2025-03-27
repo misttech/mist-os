@@ -371,6 +371,8 @@ fn ref_to_dependency_node<'a>(ref_: Option<&'a fdecl::Ref>) -> Option<Dependency
 fn generate_dependency_graph<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
+    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
 ) {
     if let Some(uses) = decl.uses.as_ref() {
         for use_ in uses.iter() {
@@ -395,6 +397,52 @@ fn generate_dependency_graph<'a>(
             }
             if let Some(source_node) = ref_to_dependency_node(source.as_ref()) {
                 strong_dependencies.add_edge(source_node, DependencyNode::Self_);
+            }
+        }
+    }
+
+    let mut all_offers: Vec<&fdecl::Offer> = vec![];
+
+    if let Some(dynamic_offers) = dynamic_offers.as_ref() {
+        for dynamic_offer in dynamic_offers.iter() {
+            all_offers.push(dynamic_offer);
+        }
+    }
+
+    if let Some(offers) = decl.offers.as_ref() {
+        for offer in offers.iter() {
+            all_offers.push(offer);
+        }
+    }
+
+    for offer in all_offers {
+        let (_dependency_type, source, _target) = match offer {
+            fdecl::Offer::Protocol(o) => (o.dependency_type, &o.source, &o.target),
+            #[cfg(fuchsia_api_level_at_least = "25")]
+            fdecl::Offer::Dictionary(o) => (o.dependency_type, &o.source, &o.target),
+            fdecl::Offer::Directory(o) => (o.dependency_type, &o.source, &o.target),
+            fdecl::Offer::Service(o) => (None, &o.source, &o.target),
+            fdecl::Offer::Storage(o) => (None, &o.source, &o.target),
+            fdecl::Offer::Runner(o) => (Some(fdecl::DependencyType::Strong), &o.source, &o.target),
+            fdecl::Offer::Resolver(o) => {
+                (Some(fdecl::DependencyType::Strong), &o.source, &o.target)
+            }
+            fdecl::Offer::Config(o) => (Some(fdecl::DependencyType::Strong), &o.source, &o.target),
+            _ => continue,
+        };
+
+        // If `source` is a collection, add dependency edges from all its dynamic children
+        // to the collection, since the collection forms an aggregate.
+        if let Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: collection })) =
+            source.as_ref()
+        {
+            for name in
+                ValidationContext::dynamic_children_in_collection(dynamic_children, &collection)
+            {
+                strong_dependencies.add_edge(
+                    DependencyNode::Child(&name, Some(&collection)),
+                    DependencyNode::Collection(collection),
+                );
             }
         }
     }
@@ -490,7 +538,12 @@ impl<'a> ValidationContext<'a> {
         self.validate_config(decl.config.as_ref(), decl.uses.as_ref());
 
         // Check that there are no strong cyclical dependencies
-        generate_dependency_graph(&mut self.strong_dependencies, &decl);
+        generate_dependency_graph(
+            &mut self.strong_dependencies,
+            &decl,
+            &self.dynamic_children,
+            dynamic_offers,
+        );
         if let Err(e) = self.strong_dependencies.topological_sort() {
             self.errors.push(Error::dependency_cycle(e.format_cycle()));
         }
@@ -2361,23 +2414,14 @@ impl<'a> ValidationContext<'a> {
             if let Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: collection })) =
                 target.as_ref()
             {
-                for name in self.dynamic_children_in_collection(&collection) {
+                for name in
+                    Self::dynamic_children_in_collection(&self.dynamic_children, &collection)
+                {
                     self.add_strong_dep(
                         self.source_dependency_from_ref(source_name, source_dictionary, source),
                         Some(DependencyNode::Child(name, Some(&collection))),
                     );
                 }
-            }
-        }
-
-        // If `source` is a collection, add dependency edges from all its dynamic children
-        // to the collection, since the collection forms an aggregate.
-        if let Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: collection })) = source {
-            for name in self.dynamic_children_in_collection(&collection) {
-                self.add_strong_dep(
-                    Some(DependencyNode::Child(&name, Some(&collection))),
-                    Some(DependencyNode::Collection(collection)),
-                );
             }
         }
 
@@ -2869,8 +2913,11 @@ impl<'a> ValidationContext<'a> {
         self.source_dependency_from_ref(None, None, ref_)
     }
 
-    fn dynamic_children_in_collection(&self, collection: &'a str) -> Vec<&'a str> {
-        self.dynamic_children
+    fn dynamic_children_in_collection(
+        dynamic_children: &Vec<(&'a str, &'a str)>,
+        collection: &'a str,
+    ) -> Vec<&'a str> {
+        dynamic_children
             .iter()
             .filter_map(|(n, c)| if *c == collection { Some(*n) } else { None })
             .collect()
