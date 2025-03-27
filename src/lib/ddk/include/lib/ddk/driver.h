@@ -5,7 +5,9 @@
 #ifndef SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
 #define SRC_LIB_DDK_INCLUDE_LIB_DDK_DRIVER_H_
 
+#ifndef __mist_os__
 #include <lib/async/dispatcher.h>
+#endif
 #include <stdint.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>

@@ -51,6 +51,7 @@ config("suppress-warning.config") {
     "//src/devices/board/lib/acpi/*",
     "//src/devices/bus/lib/virtio/*",
     "//src/lib/ddk/*",
+    "//src/lib/ddktl/*",
     "//src/lib/elfldltl/*",
     "//src/lib/llvm-profdata/*",
     "//src/lib/ubsan-custom/*",
