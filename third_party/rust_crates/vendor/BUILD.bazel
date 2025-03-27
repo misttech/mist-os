@@ -3199,14 +3199,14 @@ alias(
 )
 
 alias(
-    name = "vte-0.3.3",
-    actual = "//third_party/rust_crates/vendor/vte-0.3.3:vte",
+    name = "vte-0.15.0",
+    actual = "//third_party/rust_crates/vendor/vte-0.15.0:vte",
     tags = ["manual"],
 )
 
 alias(
     name = "vte",
-    actual = "//third_party/rust_crates/vendor/vte-0.3.3:vte",
+    actual = "//third_party/rust_crates/vendor/vte-0.15.0:vte",
     tags = ["manual"],
 )
 

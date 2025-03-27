@@ -1227,7 +1227,7 @@ group("vm-device") {
 }
 
 group("vte") {
-  public_deps = [ ":vte-v0_3_3" ]
+  public_deps = [ ":vte-v0_15_0" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -18857,35 +18857,38 @@ rust_library("vm-device-v0_1_0") {
   applicable_licenses = [ ":vm-device-v0_1_0.license" ]
 }
 
-license("vte-v0_3_3.license") {
+license("vte-v0_15_0.license") {
   public_package_name = "vte"
   license_files = [
-    "//third_party/rust_crates/vendor/vte-0.3.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/vte-0.3.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/vte-0.15.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/vte-0.15.0/LICENSE-MIT",
   ]
 }
 
-rust_library("vte-v0_3_3") {
+rust_library("vte-v0_15_0") {
   crate_name = "vte"
-  crate_root = "//third_party/rust_crates/vendor/vte-0.3.3/src/lib.rs"
-  output_name = "vte-8f5a30c97a835161"
+  crate_root = "//third_party/rust_crates/vendor/vte-0.15.0/src/lib.rs"
+  output_name = "vte-7e34f308e17953a5"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":utf8parse-v0_1_1" ]
+  deps += [ ":memchr-v2_7_4" ]
+  deps += [ ":arrayvec-v0_7_4" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=8f5a30c97a835161",
-    "-Cextra-filename=-8f5a30c97a835161",
+    "--edition=2021",
+    "-Cmetadata=7e34f308e17953a5",
+    "-Cextra-filename=-7e34f308e17953a5",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":vte-v0_3_3.license" ]
+  applicable_licenses = [ ":vte-v0_15_0.license" ]
 }
 
 license("wait-timeout-v0_2_0.license") {
