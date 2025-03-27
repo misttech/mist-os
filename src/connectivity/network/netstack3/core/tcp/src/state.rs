@@ -1388,11 +1388,11 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
         // Find the sequence number for the next segment, we start with snd_nxt
         // unless a fast retransmit is needed.
-        let next_seg = match congestion_control.fast_retransmit() {
-            None => *snd_nxt,
+        let (next_seg, loss_recovery) = match congestion_control.fast_retransmit() {
+            None => (*snd_nxt, false),
             Some(seg) => {
                 increment_retransmit_counters(congestion_control);
-                seg
+                (seg, true)
             }
         };
         // First calculate the unused window, note that if our peer has shrank
@@ -1434,9 +1434,15 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 u32::try_from(readable.len()).unwrap_or(u32::MAX),
             );
             let has_fin = has_fin && bytes_to_send == can_send - u32::from(has_fin);
-            // If we have more bytes to send than a MSS (enough to send) or the
-            // segment is a FIN (no need to wait for more), don't hold off.
-            if bytes_to_send < mss && !has_fin {
+
+            // Checks if the frame needs to be delayed.
+            //
+            // Conditions triggering delay:
+            //  - we're sending a segment smaller than MSS.
+            //  - the segment is not a FIN (a FIN segment never needs to be
+            //    delayed).
+            //  - this is not a loss-recovery frame.
+            if bytes_to_send < mss && !has_fin && !loss_recovery {
                 if bytes_to_send == 0 {
                     return None;
                 }
@@ -3462,6 +3468,7 @@ mod test {
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
     use crate::internal::buffer::testutil::RingBuffer;
     use crate::internal::buffer::Buffer;
+    use crate::internal::congestion::DUP_ACK_THRESHOLD;
     use crate::internal::counters::testutil::CounterExpectations;
     use crate::internal::counters::TcpCountersWithSocketInner;
 
@@ -8631,5 +8638,101 @@ mod test {
             (None, None)
         );
         assert_eq!(state.assert_established().snd.rtt_sampler, expect_sampler);
+    }
+
+    #[test]
+    fn loss_recovery_skips_nagle() {
+        let mut buffer = RingBuffer::default();
+        let payload = "Hello World".as_bytes();
+        assert_eq!(buffer.enqueue_data(payload), payload.len());
+        let mut state = State::<_, _, _, ()>::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                wnd_max: WindowSize::DEFAULT,
+                buffer,
+                wl1: ISS_2 + 1,
+                wl2: ISS_1 + 1,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                wnd_scale: WindowScale::default(),
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
+            }
+            .into(),
+        });
+
+        let socket_options =
+            SocketOptions { nagle_enabled: true, ..SocketOptions::default_for_state_tests() };
+        let clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+        let seg = state
+            .poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            )
+            .expect("should not close");
+        assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
+        // Receive duplicate acks repeatedly before this payload until we hit
+        // fast retransmit.
+        let ack =
+            Segment::ack(ISS_2 + 1, seg.header.seq, WindowSize::DEFAULT >> WindowScale::default());
+
+        let mut dup_acks = 0;
+        let seg = loop {
+            let (seg, passive_open, data_acked, newly_closed) = state
+                .on_segment::<(), ClientlessBufferProvider>(
+                    &FakeStateMachineDebugId,
+                    &counters.refs(),
+                    ack.clone(),
+                    clock.now(),
+                    &socket_options,
+                    false,
+                );
+            assert_eq!(seg, None);
+            assert_eq!(passive_open, None);
+            assert_eq!(data_acked, DataAcked::No);
+            assert_eq!(newly_closed, NewlyClosed::No);
+            dup_acks += 1;
+
+            match state.poll_send(
+                &FakeStateMachineDebugId,
+                &counters.refs(),
+                u32::MAX,
+                clock.now(),
+                &socket_options,
+            ) {
+                Ok(seg) => break seg,
+                Err(newly_closed) => {
+                    assert_eq!(newly_closed, NewlyClosed::No);
+                    assert!(
+                        dup_acks < DUP_ACK_THRESHOLD,
+                        "failed to retransmit after {dup_acks} dup acks"
+                    );
+                }
+            }
+        };
+        assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
+        assert_eq!(seg.header.seq, ack.header.ack.unwrap());
     }
 }

@@ -21,7 +21,7 @@ use netstack3_base::{Instant, Mss, SeqNum, WindowSize};
 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
 ///   The fast retransmit algorithm uses the arrival of 3 duplicate ACKs (...)
 ///   as an indication that a segment has been lost.
-const DUP_ACK_THRESHOLD: u8 = 3;
+pub(crate) const DUP_ACK_THRESHOLD: u8 = 3;
 
 /// Holds the parameters of congestion control that are common to algorithms.
 #[derive(Debug)]
@@ -283,7 +283,7 @@ impl FastRecovery {
                 //   cwnd MUST be incremented by SMSS. This artificially inflates
                 //   the congestion window in order to reflect the additional
                 //   segment that has left the network.
-                params.cwnd += u32::from(params.mss);
+                params.cwnd = params.cwnd.saturating_add(u32::from(params.mss));
             }
         }
     }
