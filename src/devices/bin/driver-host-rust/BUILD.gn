@@ -22,6 +22,8 @@ rustc_binary("bin") {
   output_name = "driver-host-rust"
   edition = "2021"
 
+  configs += [ "//build/config/rust:bootfs" ]
+
   with_unit_tests = true
 
   deps = [
