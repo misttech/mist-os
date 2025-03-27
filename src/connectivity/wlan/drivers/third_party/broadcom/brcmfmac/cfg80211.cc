@@ -5032,15 +5032,6 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQuery
   }
 }
 
-void brcmf_if_query_mac_sublayer_support(net_device* ndev,
-                                         fuchsia_wlan_common_wire::MacSublayerSupport* resp) {
-  BRCMF_IFDBG(WLANIF, ndev, "Query MAC sublayer feature support request received from SME.");
-
-  memset(resp, 0, sizeof(*resp));
-  resp->data_plane.data_plane_type = fuchsia_wlan_common_wire::DataPlaneType::kGenericNetworkDevice;
-  resp->device.mac_implementation_type = fuchsia_wlan_common_wire::MacImplementationType::kFullmac;
-}
-
 void brcmf_if_query_security_support(net_device* ndev,
                                      fuchsia_wlan_common_wire::SecuritySupport* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);

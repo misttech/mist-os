@@ -131,9 +131,6 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   // Query an interface
   fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse Query();
 
-  // Query for MAC sublayer feature support on an interface
-  void QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp);
-
   // Query for security feature support on an interface
   void QuerySecuritySupport(wlan_common::SecuritySupport* out_resp);
 

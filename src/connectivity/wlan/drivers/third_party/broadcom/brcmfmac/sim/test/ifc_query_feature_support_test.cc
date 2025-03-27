@@ -18,23 +18,6 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 const common::MacAddr kDefaultMac({0x12, 0x34, 0x56, 0x65, 0x43, 0x21});
 
-// Verify that a query for MAC sublayer features support works on a client interface
-TEST_F(SimTest, ClientIfcQueryMacSublayerSupport) {
-  ASSERT_EQ(Init(), ZX_OK);
-
-  SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
-
-  wlan_common::MacSublayerSupport resp;
-  env_->ScheduleNotification(std::bind(&SimInterface::QueryMacSublayerSupport, &client_ifc, &resp),
-                             zx::sec(1));
-  env_->Run(kSimulatedClockDuration);
-
-  EXPECT_FALSE(resp.rate_selection_offload.supported);
-  EXPECT_EQ(resp.data_plane.data_plane_type, wlan_common::DataPlaneType::kGenericNetworkDevice);
-  EXPECT_EQ(resp.device.mac_implementation_type, wlan_common::MacImplementationType::kFullmac);
-}
-
 // Verify that a query for security features support works on a client interface
 TEST_F(SimTest, ClientIfcQuerySecuritySupport) {
   ASSERT_EQ(Init(), ZX_OK);

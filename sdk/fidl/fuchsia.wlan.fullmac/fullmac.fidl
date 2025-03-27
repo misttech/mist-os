@@ -383,9 +383,6 @@ closed protocol WlanFullmacImpl {
         3: band_caps vector<BandCapability>:fuchsia.wlan.common.MAX_BANDS;
     }) error zx.Status;
 
-    strict QueryMacSublayerSupport() -> (struct {
-        resp fuchsia.wlan.common.MacSublayerSupport;
-    }) error zx.Status;
     strict QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;

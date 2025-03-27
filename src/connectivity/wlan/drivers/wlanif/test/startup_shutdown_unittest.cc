@@ -63,16 +63,6 @@ struct BaseWlanFullmacServerForStartup
     completer.Reply(fit::ok(std::move(response)));
   }
 
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-    fuchsia_wlan_common::MacSublayerSupport response(
-        fuchsia_wlan_common::RateSelectionOffloadExtension(false),
-        fuchsia_wlan_common::DataPlaneExtension(
-            fuchsia_wlan_common::DataPlaneType::kGenericNetworkDevice),
-        fuchsia_wlan_common::DeviceExtension(
-            true, fuchsia_wlan_common::MacImplementationType::kFullmac, false));
-    completer.Reply(fit::ok(response));
-  }
-
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
     fuchsia_wlan_common::SecuritySupport response(fuchsia_wlan_common::SaeFeature(false, true),
                                                   fuchsia_wlan_common::MfpFeature(false));

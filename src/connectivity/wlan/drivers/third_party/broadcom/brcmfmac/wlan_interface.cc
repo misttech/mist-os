@@ -336,15 +336,6 @@ void WlanInterface::Query(QueryCompleter::Sync& completer) {
   completer.ReplySuccess(info);
 }
 
-void WlanInterface::QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  fuchsia_wlan_common::wire::MacSublayerSupport resp;
-  if (wdev_ != nullptr) {
-    brcmf_if_query_mac_sublayer_support(wdev_->netdev, &resp);
-  }
-  completer.ReplySuccess(resp);
-}
-
 void WlanInterface::QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   fuchsia_wlan_common::wire::SecuritySupport resp;

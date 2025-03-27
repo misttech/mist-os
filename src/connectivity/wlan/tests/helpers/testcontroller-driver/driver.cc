@@ -226,11 +226,6 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     WLAN_TRACE_DURATION();
     bridge_client_->Query().Then(ForwardResult<WlanFullmacImpl::Query>(completer.ToAsync()));
   }
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-    WLAN_TRACE_DURATION();
-    bridge_client_->QueryMacSublayerSupport().Then(
-        ForwardResult<WlanFullmacImpl::QueryMacSublayerSupport>(completer.ToAsync()));
-  }
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->QuerySecuritySupport().Then(

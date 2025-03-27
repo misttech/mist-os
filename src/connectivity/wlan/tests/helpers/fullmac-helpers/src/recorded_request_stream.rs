@@ -8,7 +8,6 @@ use futures::StreamExt;
 #[derive(Clone, Debug, PartialEq)]
 pub enum FullmacRequest {
     Query,
-    QueryMacSublayerSupport,
     QuerySecuritySupport,
     StartScan(fidl_fullmac::WlanFullmacImplStartScanRequest),
     Connect(fidl_fullmac::WlanFullmacImplConnectRequest),
@@ -66,9 +65,6 @@ impl RecordedRequestStream {
             .expect("Could not get next request in fullmac request stream");
         match &request {
             WlanFullmacImpl_Request::Query { .. } => self.history.push(FullmacRequest::Query),
-            WlanFullmacImpl_Request::QueryMacSublayerSupport { .. } => {
-                self.history.push(FullmacRequest::QueryMacSublayerSupport)
-            }
             WlanFullmacImpl_Request::QuerySecuritySupport { .. } => {
                 self.history.push(FullmacRequest::QuerySecuritySupport)
             }

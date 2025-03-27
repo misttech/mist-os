@@ -18,7 +18,6 @@ pub trait DeviceOps {
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status>;
     fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse>;
-    fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport>;
     fn query_spectrum_management_support(
         &self,
@@ -96,13 +95,6 @@ impl DeviceOps for FullmacDevice {
             .query(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryDeviceInfo")?
             .map_err(|e| format_err!("Driver returned error on QueryDeviceInfo: {}", e))
-    }
-
-    fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
-        self.fullmac_impl_sync_proxy
-            .query_mac_sublayer_support(zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on QueryMacSublayerSupport")?
-            .map_err(|e| format_err!("Driver returned error on QueryMacSublayerSupport: {}", e))
     }
 
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport> {
@@ -285,7 +277,6 @@ pub mod test_utils {
         // If any of the query mocks are None, then an Err is returned from DeviceOps with an empty
         // error message.
         pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacImplQueryResponse>,
-        pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
         pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
         pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
         pub query_telemetry_support_mock: Option<Result<fidl_stats::TelemetrySupport, i32>>,
@@ -332,19 +323,6 @@ pub mod test_utils {
                         band_caps: Some(vec![]),
                         ..Default::default()
                     }),
-                    query_mac_sublayer_support_mock: Some(fidl_common::MacSublayerSupport {
-                        rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
-                            supported: false,
-                        },
-                        data_plane: fidl_common::DataPlaneExtension {
-                            data_plane_type: fidl_common::DataPlaneType::GenericNetworkDevice,
-                        },
-                        device: fidl_common::DeviceExtension {
-                            is_synthetic: true,
-                            mac_implementation_type: fidl_common::MacImplementationType::Fullmac,
-                            tx_status_report_supported: false,
-                        },
-                    }),
                     query_security_support_mock: Some(fidl_common::SecuritySupport {
                         sae: fidl_common::SaeFeature {
                             driver_handler_supported: false,
@@ -388,15 +366,6 @@ pub mod test_utils {
 
         fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
             self.mocks.lock().unwrap().query_device_info_mock.clone().ok_or(format_err!(""))
-        }
-
-        fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
-            self.mocks
-                .lock()
-                .unwrap()
-                .query_mac_sublayer_support_mock
-                .clone()
-                .ok_or(format_err!(""))
         }
 
         fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport> {
