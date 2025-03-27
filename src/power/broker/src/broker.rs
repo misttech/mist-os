@@ -7499,7 +7499,41 @@ mod tests {
                 leases: {},
                 topology: {
                     "fuchsia.inspect.synthetic.Graph": contains {},
-                    events: contains {},
+                    events: {
+                        "0": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: "unset",
+                                required_level: "unset",
+                                element_id: *broker.get_unsatisfiable_element_id(),
+                            }
+                        },
+                        "1": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                element_id: *mithril,
+                            }
+                        },
+                        "2": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                element_id: *silver,
+                            }
+                        },
+                        "3": {
+                            "@time": AnyProperty,
+                            add_dep: {
+                                dependent_element: *silver,
+                                dependent_level: ON.level as u64,
+                                required_element: *mithril,
+                                required_level: ON.level as u64,
+                            }
+                        }
+                    },
                     stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
