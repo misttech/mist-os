@@ -28,7 +28,8 @@
           },
           {
             "projects": [
-              "prebuilt/third_party/android/aemu/release/linux-x64"
+              "prebuilt/third_party/android/aemu/release/linux-x64",
+              "prebuilt/third_party/android/aemu/release-gfxstream/linux-x64"
             ],
             "bug": "",
             "notes": []
