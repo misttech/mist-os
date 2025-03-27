@@ -193,24 +193,6 @@ pub enum ResolveError {
     NoOverlappingModule,
 }
 
-/// A resolved address.
-#[derive(Clone, PartialEq)]
-pub struct ResolvedAddress {
-    /// Address for which source locations were resolved.
-    pub addr: u64,
-    /// Source locations found at `addr`.
-    pub locations: Vec<ResolvedLocation>,
-}
-
-impl std::fmt::Debug for ResolvedAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResolvedAddress")
-            .field("addr", &format_args!("0x{:x}", self.addr))
-            .field("lines", &self.locations)
-            .finish()
-    }
-}
-
 /// A single source location resolved from an address.
 #[derive(Clone, PartialEq)]
 pub struct ResolvedLocation {
