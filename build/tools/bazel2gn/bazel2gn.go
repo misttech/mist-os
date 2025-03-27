@@ -21,8 +21,15 @@ var knownRules = map[string]bool{
 	"go_library":         true,
 	"go_test":            true,
 	"install_host_tools": true,
-	"sdk_host_tool":      true,
 	"package":            true,
+	"rust_binary":        true,
+	"sdk_host_tool":      true,
+}
+
+// bazelToGNRuleName maps from Bazel rule names to GN template names _iff_ they
+// are different.
+var bazelToGNRuleName = map[string]string{
+	"rust_binary": "rustc_binary",
 }
 
 // attrsToOmitByRules stores a mapping from known rules to attributes to omit when
@@ -53,6 +60,14 @@ var specialTokens = map[syntax.Token]string{
 
 var bazelConstraintsToGNConditions = map[string]string{
 	"HOST_CONSTRAINTS": "is_host",
+}
+
+var thirdPartyRustCrateDirs = []string{
+	"//third_party/rust_crates/ask2patch",
+	"//third_party/rust_crates/empty",
+	"//third_party/rust_crates/forks",
+	"//third_party/rust_crates/intree",
+	"//third_party/rust_crates/vendor",
 }
 
 // indent indents input lines by input levels.
@@ -173,6 +188,30 @@ func bazelVisibilityToGN(expr syntax.Expr) (syntax.Expr, error) {
 	return lit, nil
 }
 
+// bazelDepToGN converts Bazel dependency paths to GN ones.
+//
+// This function is expected to encapsulate information specific to the Fuchsia
+// build system. Ideally the problem solved here should be solved in the build
+// system (e.g. move location of build files), so this tool packs less surprises.
+func bazelDepToGN(expr syntax.Expr) (syntax.Expr, error) {
+	lit, ok := expr.(*syntax.Literal)
+	if !ok {
+		return expr, nil
+	}
+	var is3pRustCrate bool
+	for _, dir := range thirdPartyRustCrateDirs {
+		dir = `"` + dir // String literals in Starlark are quoted.
+		lit.Raw, is3pRustCrate = strings.CutPrefix(lit.Raw, dir)
+		if is3pRustCrate {
+			break
+		}
+	}
+	if is3pRustCrate {
+		lit.Raw = `"//third_party/rust_crates` + lit.Raw
+	}
+	return lit, nil
+}
+
 // callExprToGN converts a Bazel call expression [0] to GN. These calls should
 // be macro or Bazel rules known to the converter.
 //
@@ -228,7 +267,11 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		return nil, errors.New("missing `name` attribute in Bazel target")
 	}
 
-	ret := []string{fmt.Sprintf("%s(%s) {", fn.Name, name)}
+	gnRuleName := fn.Name
+	if n, ok := bazelToGNRuleName[fn.Name]; ok {
+		gnRuleName = n
+	}
+	ret := []string{fmt.Sprintf("%s(%s) {", gnRuleName, name)}
 
 	// Loop through all args again to actually build the content of this target.
 	for _, arg := range remainingArgs {
@@ -267,8 +310,11 @@ func attrAssignmentToGN(expr *syntax.BinaryExpr) ([]string, error) {
 	attrName := lhs.Name
 
 	var transformers []transformer
-	if attrName == "visibility" {
+	switch attrName {
+	case "visibility":
 		transformers = append(transformers, bazelVisibilityToGN)
+	case "deps":
+		transformers = append(transformers, bazelDepToGN)
 	}
 
 	return binaryExprToGN(expr, transformers)

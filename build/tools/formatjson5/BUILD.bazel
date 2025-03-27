@@ -1,0 +1,18 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+rust_binary(
+    name = "formatjson5",
+    srcs = ["src/main.rs"],
+    edition = "2021",
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [
+        "//third_party/rust_crates/vendor:anyhow",
+        "//third_party/rust_crates/vendor:json5format",
+        "//third_party/rust_crates/vendor:structopt",
+    ],
+)

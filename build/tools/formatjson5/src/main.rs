@@ -157,6 +157,7 @@ impl Opt {
 }
 
 #[cfg(test)]
+#[allow(static_mut_refs)]
 impl Opt {
     fn args() -> Self {
         if let Some(test_args) = unsafe { &self::tests::TEST_ARGS } {
@@ -201,6 +202,7 @@ impl Opt {
 }
 
 #[cfg(test)]
+#[allow(static_mut_refs)]
 mod tests {
 
     use super::*;
@@ -313,9 +315,9 @@ mod tests {
             TEST_ARGS = Some(vec![
                 "formatjson5",
                 "--replace",
-                "--no_trailing_commas",
-                "--one_element_lines",
-                "--sort_arrays",
+                "--no-trailing-commas",
+                "--one-element-lines",
+                "--sort-arrays",
                 "--indent",
                 "2",
                 "-",
