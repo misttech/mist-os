@@ -364,6 +364,8 @@ pub fn create_proxy_for_wake_events(
 
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///
+/// The message counter's initial value will be set to 0.
+///
 /// The returned counter will be incremented each time there is an incoming message on the proxied
 /// channel. The starnix_kernel is expected to decrement the counter when that incoming message is
 /// handled.
@@ -377,7 +379,7 @@ pub fn create_proxy_for_wake_events(
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
 /// the container.
-pub fn create_proxy_for_wake_events_counter(
+pub fn create_proxy_for_wake_events_counter_zero(
     remote_channel: zx::Channel,
     name: String,
 ) -> (zx::Channel, zx::Counter) {
@@ -409,6 +411,37 @@ pub fn create_proxy_for_wake_events_counter(
         .expect("Failed to create proxy");
 
     (local_proxy, local_counter)
+}
+
+/// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
+///
+/// The message counter's initial value will be set to 1, which will prevent the container from
+/// suspending until the caller decrements the counter.
+///
+/// The returned counter will be incremented each time there is an incoming message on the proxied
+/// channel. The starnix_kernel is expected to decrement the counter when that incoming message is
+/// handled.
+///
+/// Note that "message" in this context means channel message. This can be either a FIDL event, or
+/// a response to a FIDL message from the platform.
+///
+/// For example, the starnix_kernel may issue a hanging get to retrieve input events. When that
+/// hanging get returns, the counter will be incremented by 1. When the next hanging get has been
+/// scheduled, the input subsystem decrements the counter by 1.
+///
+/// The proxying is done by the Starnix runner, and allows messages on the channel to wake
+/// the container.
+pub fn create_proxy_for_wake_events_counter(
+    remote_channel: zx::Channel,
+    name: String,
+) -> (zx::Channel, zx::Counter) {
+    let (proxy, counter) = create_proxy_for_wake_events_counter_zero(remote_channel, name);
+
+    // Increment the counter by one so that the initial incoming message to the container will
+    // set the count to 0, instead of -1.
+    counter.add(1).expect("Failed to add to counter");
+
+    (proxy, counter)
 }
 
 /// Creates a watcher between clients and the Starnix runner.
