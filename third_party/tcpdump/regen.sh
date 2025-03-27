@@ -12,15 +12,17 @@ readonly TCPDUMP_TAG
 readonly CONFIG_H="$REPO_DIR/config.h"
 
 "$FUCHSIA_DIR"/scripts/autoconf/regen.sh \
-  OUT_CONFIG_H="$CONFIG_H" \
+  FUCHSIA_OUT_CONFIG_H="${CONFIG_H}.fuchsia" \
+  LINUX_OUT_CONFIG_H="${CONFIG_H}.linux" \
   FXSET_WITH_ADDITIONAL="--with=//third_party/libpcap" \
   FXBUILD_WITH_ADDITIONAL="third_party/libpcap" \
   CPPFLAGS_ADDITIONAL="-I$FUCHSIA_DIR/third_party/libpcap/src" \
   LDFLAGS_ADDITIONAL="-lpcap" \
+  LINUX_LIBRARY="third_party/libpcap" \
   REPO_ZIP_URL="https://github.com/the-tcpdump-group/tcpdump/archive/refs/tags/$TCPDUMP_TAG.zip" \
   REPO_EXTRACTED_FOLDER="tcpdump-$TCPDUMP_TAG"
 
 # Manually override some symbols we expose but don't implement.
 for i in HAVE_{FORK,GETSERVENT}; do
-  sed -i "s,^#define $i 1$,/* #undef $i */," "$CONFIG_H"
+  sed -i "s,^#define $i 1$,/* #undef $i */," "${CONFIG_H}.fuchsia"
 done

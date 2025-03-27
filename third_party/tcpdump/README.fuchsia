@@ -14,3 +14,4 @@ Local Modifications:
     includes the line `#include <version>` in various headers.
   - (Googlers only) Absorb upstream changes using the script found at
     //vendor/google/connectivity/network/third_party/libpcap_tcpdump/update_tcpdump.sh.
+  - Don't include sys/resource.h on Fuchsia.

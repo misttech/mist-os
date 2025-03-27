@@ -4,49 +4,81 @@
 
 import("//build/cpp/library_headers.gni")
 
-shared_library("libpcap") {
-  output_name = "pcap"
+if (is_fuchsia || is_linux) {
+  target(default_library_type, "libpcap") {
+    output_name = "pcap"
 
-  sources = [
-    "src/bpf_dump.c",
-    "src/bpf_filter.c",
-    "src/bpf_image.c",
-    "src/etherent.c",
-    "src/fad-getad.c",
-    "src/fmtutils.c",
-    "src/gencode.c",
-    "src/grammar.c",
-    "src/nametoaddr.c",
-    "src/optimize.c",
-    "src/pcap-common.c",
-    "src/pcap-usb-linux-common.c",
-    "src/pcap-util.c",
-    "src/pcap.c",
-    "src/savefile.c",
-    "src/scanner.c",
-    "src/sf-pcap.c",
-    "src/sf-pcapng.c",
+    sources = [
+      "src/bpf_dump.c",
+      "src/bpf_filter.c",
+      "src/bpf_image.c",
+      "src/etherent.c",
+      "src/fad-getad.c",
+      "src/fmtutils.c",
+      "src/gencode.c",
+      "src/grammar.c",
+      "src/nametoaddr.c",
+      "src/optimize.c",
+      "src/pcap-common.c",
+      "src/pcap-usb-linux-common.c",
+      "src/pcap-util.c",
+      "src/pcap.c",
+      "src/savefile.c",
+      "src/scanner.c",
+      "src/sf-pcap.c",
+      "src/sf-pcapng.c",
+    ]
 
-    # To build for the null-platform, use `src/pcap-null.c` instead of
-    # `pcap-fuchsia.{c,cc}`.
-    "pcap-fuchsia.c",
-    "pcap-fuchsia.cc",
-  ]
+    defines = [
+      "HAVE_CONFIG_H",
+      "BUILDING_PCAP",
+      "pcap_EXPORTS",
+    ]
 
-  defines = [
-    "HAVE_CONFIG_H",
-    "BUILDING_PCAP",
-    "pcap_EXPORTS",
-  ]
+    include_dirs = [
+      # For config.h.
+      "$target_gen_dir",
+    ]
 
-  # For config.h.
-  include_dirs = [ "." ]
+    if (is_fuchsia) {
+      sources += [
+        # To build for the null-platform, use `src/pcap-null.c` instead of
+        # `pcap-fuchsia.{c,cc}`.
+        "pcap-fuchsia.c",
+        "pcap-fuchsia.cc",
+      ]
 
-  configs += [ ":suppress_warnings" ]
+      include_dirs += [ "." ]
+    }
+    if (is_linux) {
+      sources += [
+        "src/missing/strlcat.c",
+        "src/missing/strlcpy.c",
+        "src/pcap-linux.c",
+      ]
 
-  public_deps = [ ":headers" ]
+      defines += [ "_GNU_SOURCE" ]
+    }
 
-  deps = [ "//sdk/lib/fit" ]
+    configs += [ ":suppress_warnings" ]
+
+    public_deps = [ ":headers" ]
+
+    deps = [
+      ":copy_config",
+      "//sdk/lib/fit",
+    ]
+  }
+}
+
+copy("copy_config") {
+  if (is_fuchsia) {
+    sources = [ "config.h.fuchsia" ]
+  }
+  if (is_linux) {
+    sources = [ "config.h.linux" ]
+  }
+  outputs = [ "$target_gen_dir/config.h" ]
 }
 
 library_headers("headers") {
@@ -64,6 +96,7 @@ library_headers("headers") {
     "pcap/sll.h",
     "pcap/socket.h",
     "pcap/usb.h",
+    "pcap/vlan.h",
   ]
 
   include_dir = "./src"
@@ -76,4 +109,10 @@ config("suppress_warnings") {
     "-Wno-int-conversion",
     "-Wno-unused-but-set-variable",
   ]
+  if (is_linux) {
+    cflags += [
+      "-Wno-macro-redefined",
+      "-Wno-implicit-int-conversion",
+    ]
+  }
 }
