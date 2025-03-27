@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Error};
 use async_utils::event::Event;
-use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlRequest,
     ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
@@ -24,6 +24,7 @@ use inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as DEFAULT_INSPECT_VMO;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use zx::AsHandleRef;
 
 use crate::broker::{Broker, CurrentLevelSubscriber, LeaseID};
 use crate::topology::{ElementID, IndexedPowerLevel};
@@ -78,6 +79,10 @@ impl BrokerSvc {
                 match request {
                     LessorRequest::Lease { level, responder } => {
                         log::debug!("Lease({:?}, {:?})", &element_id, &level);
+                        let (client, server_end) =
+                            fidl::endpoints::create_endpoints::<LeaseControlMarker>();
+                        let lease_control_koid =
+                            server_end.channel().as_handle_ref().get_koid().unwrap();
                         let resp = {
                             let mut broker = self.broker.borrow_mut();
                             let Some(level) =
@@ -87,19 +92,18 @@ impl BrokerSvc {
                                     .send(Err(LeaseError::InvalidLevel))
                                     .context("send failed");
                             };
-                            broker.acquire_lease(&element_id, level)
+                            broker.acquire_lease(&element_id, level, lease_control_koid)
                         };
                         match resp {
                             Ok(lease) => {
                                 log::debug!("responder.send({:?})", &lease);
-                                let (client, stream) =
-                                    create_request_stream::<LeaseControlMarker>();
                                 log::debug!("Spawning lease control task for {:?}", &lease.id);
                                 Task::local({
                                     let svc = self.clone();
                                     async move {
-                                        if let Err(err) =
-                                            svc.run_lease_control(&lease.id, stream).await
+                                        if let Err(err) = svc
+                                            .run_lease_control(&lease.id, server_end.into_stream())
+                                            .await
                                         {
                                             log::debug!("run_lease_control err: {:?}", err);
                                         }

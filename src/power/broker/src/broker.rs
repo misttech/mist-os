@@ -527,6 +527,7 @@ impl Broker {
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> Result<Lease, fpb::LeaseError> {
         log::debug!("acquire_lease({element_id}@{level})");
         let counter = self.adjust_lease_counter(element_id, level.level, 1) as i64;
@@ -535,7 +536,8 @@ impl Broker {
             &self.lookup_name(element_id) => counter
         );
 
-        let (lease, assertive_claims) = self.catalog.create_lease_and_claims(element_id, level);
+        let (lease, assertive_claims) =
+            self.catalog.create_lease_and_claims(element_id, level, lease_control);
         if self.is_lease_contingent(&lease.id) {
             // Lease is blocked on opportunistic claims, update status and return.
             log::debug!(
@@ -1188,14 +1190,8 @@ impl Broker {
     }
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct LeaseID(String);
-
-impl LeaseID {
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct LeaseID(u64);
 
 impl fmt::Display for LeaseID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1203,10 +1199,10 @@ impl fmt::Display for LeaseID {
     }
 }
 
-impl ops::Deref for LeaseID {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_str()
+impl std::ops::Deref for LeaseID {
+    type Target = u64;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -1227,12 +1223,10 @@ impl Lease {
         underlying_element_id: &ElementID,
         level: IndexedPowerLevel,
         underlying_element_level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> Self {
-        let uuid = Uuid::new_v4().as_simple().to_string();
-        let id =
-            if ID_DEBUG_MODE { format!("{synthetic_element_id}@{level}:{uuid:.6}") } else { uuid };
         Lease {
-            id: LeaseID(id),
+            id: LeaseID(lease_control.raw_koid()),
             synthetic_element_id: synthetic_element_id.clone(),
             underlying_element_id: underlying_element_id.clone(),
             level: level.clone(),
@@ -1479,6 +1473,7 @@ impl Catalog {
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> (Lease, Vec<Claim>) {
         log::debug!("create_lease_and_claims({element_id}@{level})");
 
@@ -1492,9 +1487,10 @@ impl Catalog {
             &element_id,
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
             level,
+            lease_control,
         );
         if let Some(element) = self.topology.get_element(element_id) {
-            self.topology.inspect().on_create_lease_and_claims(element, &lease.id, level.level);
+            self.topology.inspect().on_create_lease_and_claims(element, lease.id, level.level);
         }
         self.leases.insert(lease.id.clone(), lease.clone());
 
@@ -1793,7 +1789,7 @@ impl Inspectable for &ElementID {
 impl Inspectable for &LeaseID {
     type Value = LeaseStatus;
     fn track_inspect_with(&self, value: Self::Value, parent: &INode) -> Box<dyn IType> {
-        Box::new(parent.create_string(self.as_str(), format!("{:?}", value)))
+        Box::new(parent.create_string(format!("{self}"), format!("{:?}", value)))
     }
 }
 
@@ -2091,7 +2087,7 @@ mod tests {
                     level: IndexedPowerLevel::from_same_level_and_index(requires_element_level),
                 },
             },
-            &LeaseID(String::new()),
+            &LeaseID(0),
         )
     }
 
@@ -2946,7 +2942,8 @@ mod tests {
         // P1's required level should become ON.
         // P2's required level should become ON.
         // The lease should be pending, as C isn't ON yet.
-        let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&parent1, ON);
         broker_status.required_level.update(&parent2, ON);
         broker_status.lease.update(&lease.id, LeaseStatus::Pending, false);
@@ -3180,7 +3177,8 @@ mod tests {
         // dependency and GP as the transitive dependency.
         // P's required level should remain OFF, it depends on GP.
         // GP's required level should become ON.
-        let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3341,7 +3339,7 @@ mod tests {
         // dependency on Grandparent. Grandparent has no dependencies so its
         // level should be raised first.
         let lease1 = broker
-            .acquire_lease(&child1, IndexedPowerLevel { level: 5, index: 1 })
+            .acquire_lease(&child1, IndexedPowerLevel { level: 5, index: 1 }, zx::Koid::from_raw(1))
             .expect("acquire failed");
         broker_status
             .required_level
@@ -3372,7 +3370,7 @@ mod tests {
         // requirements of Parent at 30 and Grandparent at 100, they are
         // superseded by Child 1's requirements of 50 and 200.
         let lease2 = broker
-            .acquire_lease(&child2, IndexedPowerLevel { level: 3, index: 1 })
+            .acquire_lease(&child2, IndexedPowerLevel { level: 3, index: 1 }, zx::Koid::from_raw(2))
             .expect("acquire failed");
         broker_status.required_level.update(&child2, IndexedPowerLevel { level: 3, index: 1 });
         broker_status.lease.update(&lease2.id, LeaseStatus::Pending, false);
@@ -3534,7 +3532,8 @@ mod tests {
         // should have required level ON because Child 1 has a dependency
         // on Parent and Parent has a dependency on Grandparent. Grandparent
         // has no dependencies so its level should be raised first.
-        let lease1 = broker.acquire_lease(&child1, ON).expect("acquire failed");
+        let lease1 =
+            broker.acquire_lease(&child1, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease1.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3560,7 +3559,8 @@ mod tests {
 
         // Acquire a lease for Child 2. Child 2 requires Parent and
         // Grandparent ON, which is already met by Child 1's requirements.
-        let lease2 = broker.acquire_lease(&child2, ON).expect("acquire failed");
+        let lease2 =
+            broker.acquire_lease(&child2, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&child2, ON);
         broker_status.lease.update(&lease2.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3721,7 +3721,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for Child.
-        let lease1 = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease1 =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease1.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3868,7 +3869,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because the lease is still Pending.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -3879,7 +3881,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but is no longer contingent because
         // B's assertive claim unblocks C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -4189,7 +4192,8 @@ mod tests {
         // Lease C.
         // All required levels should be OFF, as B is not on and opportunistic.
         // Lease C should be pending and contingent.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
@@ -4199,7 +4203,8 @@ mod tests {
         // A and C's required levels should be OFF.
         // Lease A should be pending and non-contingent.
         // Lease C should be pending and non-contingent.
-        let lease_a = broker.acquire_lease(&element_a, ON).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_b, ON);
         broker_status.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
@@ -4323,7 +4328,8 @@ mod tests {
         // B's required level should be OFF because A is not yet on.
         // C's required level should remain OFF.
         // Lease B should be pending.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4349,7 +4355,8 @@ mod tests {
         // C's required level should become ON because its dependencies are
         // already satisfied.
         // Lease B should still be satisfied.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_c, ON);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4549,7 +4556,8 @@ mod tests {
         // A's required level should become ON because of B's assertive claim.
         // B, C, D & E's required levels should remain OFF.
         // Lease B should be pending.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4576,7 +4584,8 @@ mod tests {
         // Lease C should be contingent because while B's assertive claim on
         // A satisfies C's opportunistic claim on A, nothing satisfies C's opportunistic
         // claim on E.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4587,7 +4596,8 @@ mod tests {
         // Lease B should still be satisfied.
         // Lease C should be pending, but no longer contingent.
         // Lease D should be pending and not contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_e, ON);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, false);
@@ -4756,7 +4766,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4767,7 +4778,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -4826,7 +4838,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // The lease on C should remain Pending and contingent even though A's current level is ON.
-        let lease_c_reacquired = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c_reacquired =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.lease.update(&lease_c_reacquired.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4930,7 +4943,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4941,7 +4955,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -5022,7 +5037,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b_reacquired = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b_reacquired =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b_reacquired.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -5178,7 +5194,8 @@ mod tests {
         broker.update_current_level(&element_d, ZERO);
 
         // Lease C.
-        let lease_c = broker.acquire_lease(&element_c, ONE).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ONE, zx::Koid::from_raw(1)).expect("acquire failed");
         // A's required level should remain 0 despite C's opportunistic claim.
         // B's required level should remain 0.
         // C's required level should remain 0 because its lease is pending and contingent.
@@ -5188,7 +5205,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Lease B.
-        let lease_b = broker.acquire_lease(&element_b, ONE).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ONE, zx::Koid::from_raw(2)).expect("acquire failed");
         // A's required level should become 3 because of B's assertive claim.
         // B's required level should remain 0 because its dependency is not yet satisfied.
         // C's required level should remain 0 because its dependency is not yet satisfied.
@@ -5261,7 +5279,8 @@ mod tests {
 
         // Reacquire Lease on C.
         // The lease on C should remain Pending even though A's current level is 2.
-        let lease_c_reacquired = broker.acquire_lease(&element_c, ONE).expect("acquire failed");
+        let lease_c_reacquired =
+            broker.acquire_lease(&element_c, ONE, zx::Koid::from_raw(3)).expect("acquire failed");
         // A's required level should remain 0 despite C's new opportunistic claim.
         // B's required level should remain 0.
         // C's required level should remain 0.
@@ -5274,7 +5293,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire Lease on D.
-        let lease_d = broker.acquire_lease(&element_d, ONE).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ONE, zx::Koid::from_raw(4)).expect("acquire failed");
         // A's required level should become 1, but this is not enough to
         // satisfy C's opportunistic claim.
         // B's required level should remain 0.
@@ -5433,7 +5453,11 @@ mod tests {
         // C's required level should remain 0 because its lease is pending and contingent.
         // Lease C should be pending because it is contingent on an opportunistic claim.
         let lease_c = broker
-            .acquire_lease(&element_c, IndexedPowerLevel { level: 5, index: 1 })
+            .acquire_lease(
+                &element_c,
+                IndexedPowerLevel { level: 5, index: 1 },
+                zx::Koid::from_raw(1),
+            )
             .expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
@@ -5445,7 +5469,11 @@ mod tests {
         // Lease B @ 10 should be pending.
         // Lease C should remain pending because A @ 1 does not satisfy its claim.
         let lease_b_10 = broker
-            .acquire_lease(&element_b, IndexedPowerLevel { level: 10, index: 1 })
+            .acquire_lease(
+                &element_b,
+                IndexedPowerLevel { level: 10, index: 1 },
+                zx::Koid::from_raw(2),
+            )
             .expect("acquire failed");
         broker_status.required_level.update(&element_a, ONE);
         broker_status.lease.update(&lease_b_10.id, LeaseStatus::Pending, false);
@@ -5475,7 +5503,11 @@ mod tests {
         // Lease C should remain pending because A is not yet at 2, but
         // should no longer be contingent on its opportunistic claim.
         let lease_b_20 = broker
-            .acquire_lease(&element_b, IndexedPowerLevel { level: 20, index: 2 })
+            .acquire_lease(
+                &element_b,
+                IndexedPowerLevel { level: 20, index: 2 },
+                zx::Koid::from_raw(3),
+            )
             .expect("acquire failed");
         broker_status.required_level.update(&element_a, TWO);
         broker_status.lease.update(&lease_b_20.id, LeaseStatus::Pending, false);
@@ -5684,7 +5716,8 @@ mod tests {
         // no other assertive claims that would satisfy it.
         // Lease C should be pending and contingent because its opportunistic
         // claim has no other assertive claim that would satisfy it.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5697,7 +5730,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should be pending but no longer contingent because B's
         // assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.required_level.update(&element_d, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
@@ -5948,7 +5982,8 @@ mod tests {
         // A's required level should remain OFF because of E's opportunistic claim.
         // B, C, D & E's required level are unaffected and should remain OFF.
         // Lease E should be pending and contingent on its opportunistic claim.
-        let lease_e = broker.acquire_lease(&element_e, ON).expect("acquire failed");
+        let lease_e =
+            broker.acquire_lease(&element_e, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5960,7 +5995,8 @@ mod tests {
         // Lease D should be pending and contingent on its opportunistic claim.
         // Lease E should be pending and contingent on its opportunistic claim, which is not satisfied
         // by Lease D's assertive claim, as Lease D is contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5971,7 +6007,8 @@ mod tests {
         // Lease B should be pending and not contingent.
         // Lease D should be pending and not contingent.
         // Lease E should be pending and not contingent.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.required_level.update(&element_c, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
@@ -6214,7 +6251,8 @@ mod tests {
         // D's required level should remain OFF.
         // E's required level should remain OFF because its lease is pending and contingent.
         // Lease E should be pending and contingent on its opportunistic claim.
-        let lease_e = broker.acquire_lease(&element_e, ON).expect("acquire failed");
+        let lease_e =
+            broker.acquire_lease(&element_e, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -6226,7 +6264,8 @@ mod tests {
         // E's required level should remain OFF because C is not yet ON.
         // Lease D should be pending.
         // Lease E should remain pending but is no longer contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, false);
@@ -6426,7 +6465,8 @@ mod tests {
         // B and C's required level should be 1.
         //
         // A's lease is pending and not contingent.
-        let lease_a = broker.acquire_lease(&element_a, TWO).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, TWO, zx::Koid::from_raw(1)).expect("acquire failed");
         let lease_a_id = lease_a.id.clone();
         broker_status.required_level.update(&element_b, ONE);
         broker_status.required_level.update(&element_c, ONE);
@@ -6681,7 +6721,8 @@ mod tests {
         // A, B, C, D, E and F's required levels should not change.
         //
         // A's lease is pending and contingent.
-        let lease_a = broker.acquire_lease(&element_a, THREE).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, THREE, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_a.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -6696,7 +6737,8 @@ mod tests {
         //
         // A's lease is pending and not contingent.
         // F's lease is pending and not contingent.
-        let lease_f = broker.acquire_lease(&element_f, ONE).expect("acquire failed");
+        let lease_f =
+            broker.acquire_lease(&element_f, ONE, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_b, TWO);
         broker_status.required_level.update(&element_c, ONE);
         broker_status.required_level.update(&element_e, ONE);
@@ -6922,7 +6964,8 @@ mod tests {
         // A and B's required level should not change.
         //
         // A's lease should be pending and not contingent.
-        let lease_a = broker.acquire_lease(&element_a, THREE).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, THREE, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_c, TWO);
         broker_status.lease.update(&lease_a.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -7101,14 +7144,16 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Create Persistent Lease for HW.
-        let lease_hw = broker.acquire_lease(&storage_hw, ON).expect("acquire failed");
+        let lease_hw =
+            broker.acquire_lease(&storage_hw, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         // Required levels should not have changed.
         // Lease is contingent on the opportunistic dependency on ES(WH).
         broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
         // Create Lease for WOR.
-        let lease_wor1 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor1 =
+            broker.acquire_lease(&storage_wor, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&sag_es, ON);
         // Lease is no longer contingent because the opportunistic dependency
         // on ES(WH) is supported by WH's assertive dependency.
@@ -7158,7 +7203,8 @@ mod tests {
 
         // Create new Lease for WOR.
         // HW lease is pending because HW is not yet ON.
-        let lease_wor2 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor2 =
+            broker.acquire_lease(&storage_wor, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&sag_wh, ON);
         broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_wor2.id, LeaseStatus::Pending, false);
@@ -7309,8 +7355,10 @@ mod tests {
         // B & C's required level should remain OFF.
         // Both leases should be pending and contingent, as they should
         // have a new opportunistic dependency on the topology unsatisfiable element.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker.update_current_level(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, true);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
@@ -7341,7 +7389,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for level 1.
-        let lease = broker.acquire_lease(&element, ONE).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, ONE, zx::Koid::from_raw(1)).expect("acquire failed");
         // Required level should become 1.
         broker_status.required_level.update(&element, ONE);
         broker_status.assert_matches(&broker);
@@ -7358,7 +7407,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire and drop a level 2 lease.
-        let lease = broker.acquire_lease(&element, TWO).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, TWO, zx::Koid::from_raw(2)).expect("acquire failed");
         broker.drop_lease(&lease.id).expect("drop failed");
         // Required level should stay 0, to preserve orderly transition.
         broker_status.assert_matches(&broker);
@@ -7369,7 +7419,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for level 1 and check required level.
-        let lease = broker.acquire_lease(&element, ONE).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, ONE, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element, ONE);
         broker_status.assert_matches(&broker);
 
@@ -7711,11 +7762,16 @@ mod tests {
         let mut broker_status = BrokerStatusMatcher::new();
 
         // Grab all required leases and power on all elements.
-        let lease_gp2 = broker.acquire_lease(&element_gp2, ON).expect("acquire failed");
-        let lease_c1 = broker.acquire_lease(&element_c1, ON).expect("acquire failed");
-        let lease_c2 = broker.acquire_lease(&element_c2, ON).expect("acquire failed");
-        let lease_c3 = broker.acquire_lease(&element_c3, ON).expect("acquire failed");
-        let lease_c4 = broker.acquire_lease(&element_c4, ON).expect("acquire failed");
+        let lease_gp2 =
+            broker.acquire_lease(&element_gp2, ON, zx::Koid::from_raw(1)).expect("acquire failed");
+        let lease_c1 =
+            broker.acquire_lease(&element_c1, ON, zx::Koid::from_raw(2)).expect("acquire failed");
+        let lease_c2 =
+            broker.acquire_lease(&element_c2, ON, zx::Koid::from_raw(3)).expect("acquire failed");
+        let lease_c3 =
+            broker.acquire_lease(&element_c3, ON, zx::Koid::from_raw(4)).expect("acquire failed");
+        let lease_c4 =
+            broker.acquire_lease(&element_c4, ON, zx::Koid::from_raw(5)).expect("acquire failed");
         broker.update_current_level(&element_gp1, ON);
         broker.update_current_level(&element_gp2, ON);
         broker.update_current_level(&element_x, ON);

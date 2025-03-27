@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::broker::Lease;
+use crate::broker::{Lease, LeaseID};
 use crate::topology::{Dependency, Element};
 use crate::ElementID;
 use either::Either;
@@ -55,7 +55,7 @@ pub struct ElementData {
     current_level: Option<Either<inspect::UintProperty, inspect::StringProperty>>,
     required_level: Option<Either<inspect::UintProperty, inspect::StringProperty>>,
     // { LeaseId  => { Level => LeaseStatus } }
-    leases: HashMap<String, LeaseData>,
+    leases: HashMap<LeaseID, LeaseData>,
     _node: inspect::Node,
     leases_node: inspect::Node,
 }
@@ -146,11 +146,11 @@ impl ElementData {
         }
     }
 
-    fn create_lease(&mut self, lease_id: &str, level: fpb::PowerLevel) {
-        match self.leases.get_mut(lease_id) {
+    fn create_lease(&mut self, lease_id: LeaseID, level: fpb::PowerLevel) {
+        match self.leases.get_mut(&lease_id) {
             Some(_) => unreachable!("We can't call into create lease twice"),
             None => {
-                let lease_node = self.leases_node.create_child(lease_id);
+                let lease_node = self.leases_node.create_child(format!("{lease_id}"));
                 lease_node.record_uint(LEVEL, level as u64);
                 self.leases
                     .insert(lease_id.to_owned(), LeaseData { node: lease_node, status: None });
@@ -158,9 +158,9 @@ impl ElementData {
         }
     }
 
-    fn set_lease_status(&mut self, lease_id: &str, status: fpb::LeaseStatus) {
+    fn set_lease_status(&mut self, lease_id: LeaseID, status: fpb::LeaseStatus) {
         let status = status.into_primitive() as u64;
-        match self.leases.get_mut(lease_id) {
+        match self.leases.get_mut(&lease_id) {
             None => unreachable!("we must have a lease created if we got here"),
             Some(LeaseData { status: Some(status_property), .. }) => {
                 status_property.set(status);
@@ -171,8 +171,8 @@ impl ElementData {
         }
     }
 
-    fn remove_lease(&mut self, lease_id: &str) {
-        self.leases.remove(lease_id);
+    fn remove_lease(&mut self, lease_id: LeaseID) {
+        self.leases.remove(&lease_id);
     }
 
     fn record_valid_levels(node: &inspect::Node, valid_levels: &[fpb::PowerLevel]) {
@@ -462,7 +462,7 @@ impl TopologyInspect {
     pub fn on_create_lease_and_claims(
         &self,
         element: &Element,
-        lease_id: &str,
+        lease_id: LeaseID,
         level: fpb::PowerLevel,
     ) {
         let Some(ref vertex) = element.inspect_vertex else {
@@ -471,7 +471,7 @@ impl TopologyInspect {
         vertex.borrow_mut().meta().create_lease(lease_id, level);
         self.maybe_record_event(element, CREATE_LEASE_EVENT, |node| {
             node.record_string(ELEMENT_ID, element.id.as_str());
-            node.record_string(LEASE_ID, lease_id);
+            node.record_uint(LEASE_ID, *lease_id);
         });
     }
 
@@ -484,10 +484,10 @@ impl TopologyInspect {
         let Some(ref inspect_vertex) = element.inspect_vertex else {
             return;
         };
-        inspect_vertex.borrow_mut().meta().set_lease_status(&lease.id, *status);
+        inspect_vertex.borrow_mut().meta().set_lease_status(lease.id, *status);
         self.maybe_record_event(element, UPDATE_LEASE_STATUS_EVENT, |node| {
             node.record_string(ELEMENT_ID, element.id.as_str());
-            node.record_string(LEASE_ID, lease.id.as_str());
+            node.record_uint(LEASE_ID, *lease.id);
             node.record_uint(STATUS, status.into_primitive() as u64);
         });
     }
@@ -496,10 +496,10 @@ impl TopologyInspect {
         let Some(ref inspect_vertex) = element.inspect_vertex else {
             return;
         };
-        inspect_vertex.borrow_mut().meta().remove_lease(&lease.id);
+        inspect_vertex.borrow_mut().meta().remove_lease(lease.id);
         self.maybe_record_event(element, REMOVE_LEASE_EVENT, |node| {
             node.record_string(ELEMENT_ID, element.id.as_str());
-            node.record_string(LEASE_ID, lease.id.as_str());
+            node.record_uint(LEASE_ID, *lease.id);
             node.record_uint(LEVEL, lease.underlying_element_level.level.into());
         });
     }
