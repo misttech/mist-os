@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
-use crate::inspect::{DependencyData, ElementData, TopologyInspect};
+use crate::inspect::{AddElementInspectWriter, DependencyData, ElementData, TopologyInspect};
 use fidl_fuchsia_power_broker::{self as fpb};
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_contrib::graph as igraph;
@@ -106,7 +106,7 @@ impl fmt::Display for Dependency {
 pub struct Element {
     pub(crate) id: ElementID,
     pub(crate) name: String,
-    valid_levels: Vec<IndexedPowerLevel>,
+    pub(crate) valid_levels: Vec<IndexedPowerLevel>,
     pub(crate) synthetic: bool,
     pub(crate) inspect_vertex: Option<Rc<RefCell<igraph::Vertex<ElementData>>>>,
     pub(crate) inspect_edges: Rc<RefCell<HashMap<ElementID, igraph::Edge<DependencyData>>>>,
@@ -200,12 +200,7 @@ impl Topology {
             )
             .ok()
             .expect("Failed to add unsatisfiable element");
-        topology.elements.get_mut(&topology.unsatisfiable_element_id).unwrap().inspect_vertex =
-            Some(Rc::new(RefCell::new(topology.inspect.record_unsatisfiable_element(
-                topology.unsatisfiable_element_id.clone(),
-                Self::TOPOLOGY_UNSATISFIABLE_ELEMENT,
-                &Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS,
-            ))));
+        AddElementInspectWriter::new(topology.unsatisfiable_element_id).commit(&mut topology);
         topology
     }
 
@@ -239,6 +234,10 @@ impl Topology {
 
     pub fn get_element(&self, id: &ElementID) -> Option<&Element> {
         self.elements.get(id)
+    }
+
+    pub fn get_element_mut(&mut self, id: &ElementID) -> Option<&mut Element> {
+        self.elements.get_mut(id)
     }
 
     pub fn add_element(
@@ -630,32 +629,12 @@ impl Topology {
         self.inspect.on_remove_dependency(&self.elements, dep);
         Ok(())
     }
-
-    pub fn initialize_element_inspect<'a>(
-        &mut self,
-        element_id: &'a ElementID,
-        valid_levels: Vec<fpb::PowerLevel>,
-        current_level: fpb::PowerLevel,
-        required_level: fpb::PowerLevel,
-    ) {
-        let Some(element) = self.elements.get_mut(element_id) else {
-            return;
-        };
-        let inspect_vertex = self.inspect.on_add_element(
-            element_id.clone(),
-            &element.name,
-            element.synthetic,
-            valid_levels,
-            current_level,
-            required_level,
-        );
-        element.inspect_vertex = Some(Rc::new(RefCell::new(inspect_vertex)));
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inspect::InspectUpdateLevel;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use power_broker_client::BINARY_POWER_LEVELS;
 
@@ -674,12 +653,13 @@ mod tests {
             required_level: fpb::PowerLevel,
         ) -> Result<ElementID, AddElementError> {
             let element_id = self.add_element(name, &valid_levels)?;
-            self.initialize_element_inspect(
-                &element_id,
-                valid_levels,
-                current_level,
+            let mut writer = AddElementInspectWriter::new(element_id);
+            writer.update_current_level(self, element_id, current_level).update_required_level(
+                self,
+                element_id,
                 required_level,
             );
+            writer.commit(self);
             Ok(element_id)
         }
     }
