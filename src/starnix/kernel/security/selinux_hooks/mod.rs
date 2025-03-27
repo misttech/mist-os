@@ -168,11 +168,6 @@ fn has_fs_node_permissions(
 ) -> Result<(), Errno> {
     let target = fs_node_effective_sid_and_class(node);
 
-    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
-    if target.class == FileClass::SockFile.into() {
-        return Ok(());
-    }
-
     let audit_context = [audit_context, node.into()];
     for permission in permissions {
         check_permission(
@@ -197,11 +192,6 @@ fn todo_has_fs_node_permissions(
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     let target = fs_node_effective_sid_and_class(node);
-
-    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
-    if target.class == FileClass::SockFile.into() {
-        return Ok(());
-    }
 
     for permission in permissions {
         todo_check_permission(
