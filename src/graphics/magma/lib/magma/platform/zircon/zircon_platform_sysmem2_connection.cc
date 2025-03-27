@@ -286,8 +286,8 @@ class ZirconPlatformSysmem2BufferConstraints : public PlatformBufferConstraints 
 
     bool is_yuv = false;
     static const magma_format_t yuv_formats[] = {
-        MAGMA_FORMAT_NV12, MAGMA_FORMAT_I420, MAGMA_FORMAT_M420,
-        MAGMA_FORMAT_YV12, MAGMA_FORMAT_YUY2, MAGMA_FORMAT_MJPEG,
+        MAGMA_FORMAT_NV12, MAGMA_FORMAT_I420,  MAGMA_FORMAT_M420, MAGMA_FORMAT_YV12,
+        MAGMA_FORMAT_YUY2, MAGMA_FORMAT_MJPEG, MAGMA_FORMAT_P010,
     };
     static const magma_format_t rgb_formats[] = {
         MAGMA_FORMAT_R8G8B8A8, MAGMA_FORMAT_BGRA32, MAGMA_FORMAT_RGB565,  MAGMA_FORMAT_BGR24,
