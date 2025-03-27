@@ -25,8 +25,12 @@ from typing import Any, Dict, List
 # The "condensed" schema stores a dict of interned endpoints that calls refer into,
 # and its schema is `CondensedSchema`.
 #
-# The "summary" schema is a dict from "fuchsia.library/Protocol/Message" to a dict with
+# The "summary" schema is a dict from "fuchsia.library/Protocol.Message" to a dict with
 # keys: "incoming", "outgoing", "intra"; values: int number of calls.
+#
+# The "flat" schema is an array of dicts with keys "incoming", "outgoing", "intra" (int),
+# and "message" with value "fuchsia.library/Protocol.Message". Same information as
+# "summary" but it's all in the values, which is easier for SQL to unpack.
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,14 @@ class ExpandedMessage:
 
 @dataclass
 class CallsSummary:
+    incoming: int
+    outgoing: int
+    intra: int
+
+
+@dataclass
+class CallsFlat:
+    message: str
     incoming: int
     outgoing: int
     intra: int
@@ -148,11 +160,20 @@ class Message:
                 )
             )
 
-    def summary(self) -> CallsSummary:
-        counts = {"incoming": 0, "outgoing": 0, "intra": 0}
+    def call_counts(self) -> Dict[str, Any]:
+        counts: Dict[str, Any] = {"incoming": 0, "outgoing": 0, "intra": 0}
         for call in self.condensed_calls:
             counts[call.direction] += 1
+        return counts
+
+    def summary(self) -> CallsSummary:
+        counts = self.call_counts()
         return CallsSummary(**counts)
+
+    def flat(self) -> CallsFlat:
+        data: Dict[str, Any] = self.call_counts()
+        data["message"] = self.name
+        return CallsFlat(**data)
 
     def condensed_version(self) -> CondensedMessage:
         return CondensedMessage(
@@ -254,6 +275,11 @@ class Messages:
         with open(path, "w") as f:
             json.dump(data, f, default=vars_or_obj, indent=2)
 
+    def write_flat_to_json(self, path: Path) -> None:
+        data = [message.flat() for message in self.data_to_write()]
+        with open(path, "w") as f:
+            json.dump(data, f, default=vars_or_obj, indent=1)
+
 
 # The core of this script. Scans for FIDL-snoop files, accumulates calls from them, and writes
 # the accumulated information to specified files in the correct schema.
@@ -271,7 +297,7 @@ def check_coverage(args: argparse.Namespace) -> None:
                 elif name.endswith("outgoing_calls.freeform.json"):
                     messages.process_calls(Path(dir_path) / name, "outgoing")
     if args.json_output:
-        messages.write_expanded_to_json(Path(args.json_output))
+        messages.write_flat_to_json(Path(args.json_output))
     if args.expanded_json_output:
         messages.write_expanded_to_json(Path(args.expanded_json_output))
     if args.condensed_json_output:
@@ -299,19 +325,19 @@ def main(argv: List[str]) -> None:
     )
     subparser.add_argument(
         "--json_output",
-        help="Path to write (expanded/legacy) FIDL coverage summary to.",
+        help="Path to write a flat (array of struct) FIDL coverage summary to.",
     )
     subparser.add_argument(
         "--expanded_json_output",
-        help="Path to write expanded FIDL coverage summary to.",
+        help="Path to write expanded FIDL coverage summary to. Deprecated; use condensed.",
     )
     subparser.add_argument(
         "--condensed_json_output",
-        help="Path to write condensed FIDL coverage summary to.",
+        help="Path to write condensed FIDL coverage summary to, with full call info.",
     )
     subparser.add_argument(
         "--summary_json_output",
-        help="Path to write a brief FIDL coverage summary to.",
+        help="Path to write a brief (dict by message name) FIDL coverage summary to.",
     )
     subparser.add_argument(
         "--results_dir",
