@@ -7057,7 +7057,39 @@ void VmCowPages::CopyPageMetadataForReplacementLocked(vm_page_t* dst_page, vm_pa
   dst_page->object.dirty_state = src_page->object.dirty_state;
 }
 
-VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {}
+VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
+  // If we are referencing a pager backed object then we must acquire the pager hierarchy lock,
+  // which requires walking up to the root to find the page_source_.
+  if (self_->root_has_page_source()) {
+    fbl::RefPtr<PageSource> source;
+    {
+      Guard<VmoLockType> guard{AssertOrderedLock, self_->lock(), self_->lock_order(),
+                               VmLockAcquireMode::First};
+      if (self_->life_cycle_ != LifeCycle::Alive) {
+        // Although the C++ object is guaranteed to be valid by the caller, it's possible that VMO
+        // has transitioned into a dead state. This race can occur typically due to reclamation
+        // having to first acquire a RefPtr, then check acquire the lock, then check if the page is
+        // still present in the VMO. If the VMO has transitioned to dead then its pages will have
+        // been cleared, and so the operation will get skipped.
+        // Unfortunately at this point the main lock acquisition and check has not been performed.
+        // This is a problem since when dead transitioning the parent_ reference is cleared, meaning
+        // we will find a 'fake' root, that will not consequently not have a valid page_source_.
+        // So to avoid failing to find a root page_source_ we make sure to terminate if this object
+        // is dead.
+        // As it is dead and no longer connected to the tree, there is no rest of the hierarchy to
+        // synchronize with and so failing to acquire the lock is safe.
+        return;
+      }
+      LockedPtr current;
+      while (current.locked_or(self_).parent_) {
+        current = LockedPtr(current.locked_or(self_).parent_.get(), VmLockAcquireMode::Reentrant);
+      }
+      source = current.locked_or(self_).page_source_;
+    }
+    DEBUG_ASSERT(source);
+    page_source_lock_.emplace(source->paged_vmo_lock());
+  }
+}
 
 VmCowPages::DeferredOps::~DeferredOps() {
   const bool list_empty = list_is_empty(&free_list_.list_);
