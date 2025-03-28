@@ -52,6 +52,7 @@ void IntelHDAStreamConfigBase::Connect(ConnectRequestView request,
   // Do not allow any new connections if we are in the process of shutting down
   if (!is_active()) {
     completer.Close(ZX_ERR_BAD_STATE);
+    LOG("%s failed, ZX_ERR_BAD_STATE\n", __func__);
     return;
   }
 
@@ -76,6 +77,7 @@ void IntelHDAStreamConfigBase::Connect(ConnectRequestView request,
   bool privileged = (stream_channel_ == nullptr);
   if (privileged && IsFormatChangeInProgress()) {
     completer.Close(ZX_ERR_SHOULD_WAIT);
+    LOG("%s failed, ZX_ERR_SHOULD_WAIT\n", __func__);
     return;
   }
 
@@ -86,6 +88,7 @@ void IntelHDAStreamConfigBase::Connect(ConnectRequestView request,
   fbl::RefPtr<StreamChannel> stream_channel = StreamChannel::Create(this);
   if (stream_channel == nullptr) {
     completer.Close(ZX_ERR_NO_MEMORY);
+    LOG("%s failed, ZX_ERR_NO_MEMORY\n", __func__);
     return;
   }
   stream_channels_.push_back(stream_channel);
@@ -94,6 +97,7 @@ void IntelHDAStreamConfigBase::Connect(ConnectRequestView request,
       [this, stream_channel](fidl::WireServer<audio_fidl::StreamConfig>*, fidl::UnbindInfo,
                              fidl::ServerEnd<fuchsia_hardware_audio::StreamConfig>) {
         fbl::AutoLock channel_lock(this->obj_lock());
+        LOG("StreamConfig FIDL disconnected for %p\n", stream_channel.get());
         this->ProcessClientDeactivateLocked(stream_channel.get());
       };
 
@@ -195,7 +199,7 @@ void IntelHDAStreamConfigBase::CreateRingBuffer(
 
   // Only the privileged stream channel is allowed to change the format.
   if (channel != stream_channel_.get()) {
-    LOG("Unprivileged channel cannot set the format");
+    LOG("Unprivileged channel cannot set the format\n");
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -222,6 +226,7 @@ void IntelHDAStreamConfigBase::CreateRingBuffer(
 
   res = IntelHDAStreamBase::CreateRingBufferLocked(format, std::move(ring_buffer));
   if (res != ZX_OK) {
+    LOG("IntelHDAStreamBase::CreateRingBufferLocked failed: %d\n", res);
     completer.Close(res);
   }
 }
@@ -445,7 +450,7 @@ void IntelHDAStreamConfigBase::OnPlugDetectLocked(StreamChannel* response_channe
 
   ZX_DEBUG_ASSERT(parent_codec() != nullptr);
   out_resp->plug_state_time = parent_codec()->create_time();
-  out_resp->flags = static_cast<audio_pd_notify_flags_t>(AUDIO_PDNF_HARDWIRED | AUDIO_PDNF_PLUGGED);
+  out_resp->flags = AUDIO_PDNF_HARDWIRED | AUDIO_PDNF_PLUGGED;
 }
 
 void IntelHDAStreamConfigBase::OnGetStringLocked(const audio_proto::GetStringReq& req,
@@ -502,31 +507,36 @@ zx_status_t IntelHDAStreamConfigBase::ProcessSetStreamFmtLocked(
   zx_status_t res = ZX_OK;
 
   // Are we shutting down?
-  if (!is_active())
+  if (!is_active()) {
+    LOG("%s: not active, so returning  ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
+  bool cleanup_after_error = false;
   // If we don't have a set format operation in flight, or the stream channel
   // has been closed, this set format operation has been canceled.  Do not
   // return an error up the stack; we don't want to close the connection to
   // our codec device.
   if ((!IsFormatChangeInProgress()) || (stream_channel_ == nullptr)) {
-    goto finished;
+    LOG("%s: no SetFormat in flight, or stream_channel_ closed\n", __func__);
+    cleanup_after_error = true;
+  } else {
+    // Let the implementation send the commands required to finish changing the
+    // stream format.
+    res = FinishChangeStreamFormatLocked(encoded_fmt());
+    if (res != ZX_OK) {
+      LOG("Failed to finish set format (enc fmt 0x%04hx res %d)\n", encoded_fmt(), res);
+      cleanup_after_error = true;
+    }
   }
 
-  // Let the implementation send the commands required to finish changing the
-  // stream format.
-  res = FinishChangeStreamFormatLocked(encoded_fmt());
-  if (res != ZX_OK) {
-    DEBUG_LOG("Failed to finish set format (enc fmt 0x%04hx res %d)\n", encoded_fmt(), res);
-    goto finished;
-  }
-
-finished:
-  // Something went fatally wrong when trying to send the result back to the
-  // caller.  Close the stream channel.
-  if (stream_channel_ != nullptr) {
-    OnChannelDeactivateLocked(*stream_channel_);
-    stream_channel_ = nullptr;
+  if (cleanup_after_error) {
+    // Something went fatally wrong when trying to send the result back to the
+    // caller.  Close the stream channel, if it is still open.
+    if (stream_channel_ != nullptr) {
+      OnChannelDeactivateLocked(*stream_channel_);
+      stream_channel_ = nullptr;
+    }
   }
 
   // Set format operation is finished. There is no reply sent in CreateRingBuffer.
@@ -536,8 +546,10 @@ finished:
 }
 
 zx_status_t IntelHDAStreamConfigBase::PublishDeviceLocked() {
-  if (!is_active())
+  if (!is_active()) {
+    LOG("%s: not active, returning  ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   // Initialize our device and fill out the protocol hooks
   device_add_args_t args = {};

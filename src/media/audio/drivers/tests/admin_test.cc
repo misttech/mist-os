@@ -629,6 +629,19 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   WaitForError();
 });
 
+// Create a RingBuffer, drop it, recreate it, then interact with it in any way (e.g. GetProperties).
+DEFINE_ADMIN_TEST_CLASS(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
+
+  // Dropped first ring buffer, creating second one.
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+
+  RequestRingBufferProperties();
+  WaitForError();
+});
+
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
@@ -726,6 +739,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else if (device_entry.isDai()) {
@@ -750,6 +764,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else if (device_entry.isStreamConfig()) {
@@ -774,6 +789,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else {
