@@ -143,20 +143,17 @@ impl CgroupPidTable {
     ) {
         assert!(thread_group.read().tasks_count() == 0, "threadgroup must be newly created");
 
-        if let Some(cgroup) = self.0.get(&parent_pid).cloned() {
+        if let Some(weak_cgroup) = self.0.get(&parent_pid).cloned() {
+            let Some(cgroup) = weak_cgroup.upgrade() else {
+                log_warn!("ignored attempt to inherit a non-existant cgroup");
+                return;
+            };
             assert!(
-                self.0.insert(child_pid, cgroup.clone()).is_none(),
+                self.0.insert(child_pid, weak_cgroup).is_none(),
                 "child pid should not exist when inheriting"
             );
-            // Skip safety checks because the cgroup is non-empty and thus cannot be deleted.
             // Skip freezer propagation because the `ThreadGroup` is newly created and has no tasks.
-            cgroup
-                .upgrade()
-                .expect("parent cgroup should not be deprecated")
-                .state
-                .lock()
-                .processes
-                .insert(child_pid, WeakRef::from(thread_group));
+            cgroup.state.lock().processes.insert(child_pid, WeakRef::from(thread_group));
         }
     }
 
@@ -165,7 +162,6 @@ impl CgroupPidTable {
         let Some(weak_cgroup) = self.0.get(&pid) else {
             return None;
         };
-        // let Some(cgroup) = self.0.get(&pid).and_then(Weak::upgrade) else {
         let Some(cgroup) = weak_cgroup.upgrade() else {
             return None;
         };
