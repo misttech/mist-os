@@ -47,21 +47,6 @@ fuchsia_package_with_single_component("thread_group_leader_killed_package") {
   testonly = true
 }
 
-starnix_linux_executable("process_name_change") {
-  output_name = "process_name_change"
-  sources = [ "process_name_change.c" ]
-  cflags = [ "-std=c11" ]
-
-  disable_syslog_backend = true
-}
-
-fuchsia_package_with_single_component("process_name_change_package") {
-  component_name = "process_name_change"
-  manifest = "meta/process_name_change.cml"
-  deps = [ ":process_name_change" ]
-  testonly = true
-}
-
 # Integration test component
 
 rustc_test("bin") {
@@ -73,7 +58,6 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/rust/zx",
@@ -81,7 +65,6 @@ rustc_test("bin") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/fuchsia-runtime",
     "//src/performance/memory/attribution/testing",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:assert_matches",
@@ -109,7 +92,6 @@ fuchsia_test_package("starnix_memory_attribution_test") {
   subpackages = [
     ":mmap_anonymous_then_sleep_package",
     ":thread_group_leader_killed_package",
-    ":process_name_change_package",
     "//src/starnix/containers/debian:debian_package",
     "//src/power/system-activity-governor/fake:package",
   ]

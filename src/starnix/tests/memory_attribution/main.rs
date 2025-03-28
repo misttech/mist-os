@@ -7,13 +7,10 @@ use attribution_testing::PrincipalIdentifier;
 use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::AsHandleRef;
-use fidl_fuchsia_component::CreateChildArgs;
-use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
 use fidl_fuchsia_sys2::OpenError;
 use fuchsia_component_test::{
     RealmBuilder, RealmBuilderParams, RealmInstance, ScopedInstanceFactory,
 };
-use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::stream::BoxStream;
 use futures::StreamExt;
 use moniker::Moniker;
@@ -22,8 +19,7 @@ use zx::{MapDetails, MapInfo, MappingDetails};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_starnix_container as fcontainer,
-    fidl_fuchsia_sys2 as fsys2,
+    fidl_fuchsia_starnix_container as fcontainer, fidl_fuchsia_sys2 as fsys2,
 };
 
 const PROGRAM_COLLECTION: &str = "debian_programs";
@@ -207,104 +203,6 @@ async fn leader_killed() {
     // Termination memory reporting is tested in `mmap_anonymous`.
     drop(program);
     drop(container_execution);
-}
-
-/// Test that a change in the name of a process results in an attribution update.
-#[fuchsia::test]
-async fn process_name_change() {
-    const PROGRAM_URL: &str = "process_name_change_package#meta/process_name_change.cm";
-    const EXPECTED_LOG_1: &str = "process_name_change started";
-    const EXPECTED_LOG_2: &str = "process_name_change name changed";
-
-    let AttributionTest { realm, realm_proxy, container_execution, mut attribution } =
-        init_attribution_test().await;
-
-    // Stream memory attribution data until the container shows up in the reporting.
-    let mut tree: attribution_testing::Principal;
-    loop {
-        tree = attribution.next().await.unwrap();
-        if tree.children.len() == 1 {
-            break;
-        }
-    }
-    // Starnix runner should report a single container, backed by a job.
-    assert_eq!(tree.children.len(), 1);
-    assert_eq!(tree.children[0].name, "debian_container");
-    assert_eq!(tree.children[0].children.len(), 0);
-    assert_eq!(tree.children[0].resources.len(), 1);
-
-    let (stdin_recv, stdin_send) = zx::Socket::create_stream();
-
-    // We need to manually start the process to be able to communicate with it through its standard
-    // input.
-    realm_proxy
-        .create_child(
-            &CollectionRef { name: PROGRAM_COLLECTION.to_string() },
-            &Child {
-                name: Some("process_name_change".to_string()),
-                url: Some(PROGRAM_URL.to_string()),
-                startup: Some(StartupMode::Lazy),
-                ..Default::default()
-            },
-            CreateChildArgs {
-                numbered_handles: Some(vec![fprocess::HandleInfo {
-                    id: HandleInfo::new(HandleType::FileDescriptor, 0).as_raw(),
-                    handle: stdin_recv.into(),
-                }]),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap()
-        .unwrap();
-
-    // Wait for log from the program.
-    wait_for_log(&realm, EXPECTED_LOG_1).await;
-
-    stdin_send.write(b"n\n").unwrap();
-
-    wait_for_log(&realm, EXPECTED_LOG_2).await;
-
-    // Wait for the desired attribution information.
-    // There should be three child principals under the container:
-    // - The init task (PID 1).
-    // - The system task (PID 2).
-    // - The task for the test program we just launched (PID > 2), and its name should
-    //   match regex "(.*): process_name_change".
-    let program_name = Regex::new(r"(.*): new_name").unwrap();
-    loop {
-        tree = attribution.next().await.unwrap();
-        let container = &tree.children[0];
-        if container
-            .children
-            .iter()
-            .any(|child| program_name.is_match(child.name.as_str()) && child.resources.len() > 0)
-        {
-            break;
-        }
-    }
-
-    // Terminate the program. The tree should eventually no longer contain the program.
-    stdin_send.write(b"n\n").unwrap();
-
-    loop {
-        tree = attribution.next().await.unwrap();
-        if tree.children.len() == 1 && tree.children[0].children.len() == 2 {
-            break;
-        }
-    }
-
-    // Stop the container and verify that the starnix runner reports that the
-    // container is removed.
-    container_execution.stop().unwrap();
-    let event = container_execution.take_event_stream().next().await.unwrap().unwrap();
-    assert_matches!(event, fcomponent::ExecutionControllerEvent::OnStop { .. });
-    loop {
-        let tree_opt = attribution.next().await;
-        if tree_opt.is_none() {
-            break;
-        }
-    }
 }
 
 struct AttributionTest {

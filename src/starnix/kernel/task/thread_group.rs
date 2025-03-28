@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::device::terminal::{Terminal, TerminalController};
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::syscalls::{read_siginfo, WaitingOptions};
@@ -133,9 +132,6 @@ pub struct ThreadGroupMutableState {
 
     /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
     pub is_sharing: bool,
-
-    /// Notifier for name changes.
-    pub notifier: Option<std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>>,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -496,7 +492,6 @@ impl ThreadGroup {
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
                     is_sharing: false,
-                    notifier: None,
                 }),
             };
 
@@ -580,15 +575,6 @@ impl ThreadGroup {
             return error!(EINVAL);
         }
         state.tasks.insert(task.id, task.into());
-
-        if state.tasks_count() == 1 {
-            // It is only at this point that we have a started ThreadGroup with a running leader
-            // task. If we notify the memory attribution module before, we may fail to observe the
-            // leader task and its memory manager.
-            if let Some(notifier) = &state.notifier {
-                let _ = notifier.send(MemoryAttributionLifecycleEvent::creation(self.leader));
-            }
-        }
         Ok(())
     }
 

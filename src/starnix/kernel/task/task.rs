@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
@@ -1516,9 +1515,6 @@ impl Task {
                 zx::sys::ZX_EXCP_USER_CODE_PROCESS_NAME_CHANGED,
                 0,
             );
-            if let Some(notifier) = &self.thread_group.read().notifier {
-                let _ = notifier.send(MemoryAttributionLifecycleEvent::name_change(self.id));
-            }
         }
 
         set_current_task_info(&name, self.thread_group.leader, self.id);

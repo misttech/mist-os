@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
+use crate::memory_attribution;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
 use starnix_types::ownership::{TempRef, WeakRef};
@@ -53,7 +53,7 @@ pub struct PidTable {
     table: HashMap<pid_t, PidEntry>,
 
     /// Used to notify thread group changes.
-    thread_group_notifier: Option<std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>>,
+    thread_group_notifier: Option<memory_attribution::sync::Notifier>,
 }
 
 impl PidTable {
@@ -80,10 +80,7 @@ impl PidTable {
         }
     }
 
-    pub fn set_thread_group_notifier(
-        &mut self,
-        notifier: std::sync::mpsc::Sender<MemoryAttributionLifecycleEvent>,
-    ) {
+    pub fn set_thread_group_notifier(&mut self, notifier: memory_attribution::sync::Notifier) {
         self.thread_group_notifier = Some(notifier);
     }
 
@@ -157,14 +154,7 @@ impl PidTable {
 
         // Notify thread group changes.
         if let Some(notifier) = &self.thread_group_notifier {
-            thread_group.write().notifier = Some(notifier.clone());
-            if thread_group.read().tasks_count() > 0 {
-                // We only send the notification if the task group already has an active leader
-                // task, ie. its task count is not zero. If it is zero, the task group will send the
-                // notification itself once the first task is added.
-                let _ =
-                    notifier.send(MemoryAttributionLifecycleEvent::creation(thread_group.leader));
-            }
+            notifier.notify();
         }
     }
 
@@ -188,7 +178,7 @@ impl PidTable {
 
         // Notify thread group changes.
         if let Some(notifier) = &self.thread_group_notifier {
-            let _ = notifier.send(MemoryAttributionLifecycleEvent::destruction(pid));
+            notifier.notify();
         }
     }
 
