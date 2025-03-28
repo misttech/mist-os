@@ -53,6 +53,7 @@ if (current_toolchain == default_toolchain) {
 
       toolchain_tags = [
         "kernel",
+        "custom-abi",
         "no-floating-point",
         "standalone",
       ]
