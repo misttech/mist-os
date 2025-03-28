@@ -223,6 +223,7 @@ pub fn sys_bind(
                 .map_err(|_| errno!(EACCES))?;
         }
     }
+    security::check_socket_bind_access(current_task, &file.node(), &address)?;
     match address {
         SocketAddress::Unspecified => return error!(EINVAL),
         SocketAddress::Unix(mut name) => {

@@ -2,9 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::vfs::socket::{NetlinkFamily, Socket, SocketDomain, SocketProtocol, SocketType};
+use super::audit::Auditable;
+use crate::task::CurrentTask;
+use crate::vfs::socket::{
+    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
+};
 use crate::vfs::FsNode;
-use selinux::SocketClass;
+use selinux::permission_check::PermissionCheck;
+use selinux::{
+    CommonSocketPermission, FsNodeClass, InitialSid, Permission, SecurityId, SecurityServer,
+    SocketClass,
+};
+use starnix_uapi::errors::Errno;
+
+use super::{check_permission, fs_node_effective_sid_and_class};
+
+/// Checks that `current_task` has the specified `permission` for the `socket_node`.
+fn has_socket_permission(
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    socket_node: &FsNode,
+    permission: &Permission,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
+
+    // If the socket is for kernel-internal use we can return success immediately.
+    // TODO(https://fxbug.dev/364569010): check if there are additional cases when the socket is for
+    // kernel-internal use.
+    if subject_sid == SecurityId::initial(InitialSid::Kernel)
+        || socket_sid == SecurityId::initial(InitialSid::Kernel)
+    {
+        return Ok(());
+    }
+    let audit_context = [audit_context, socket_node.into()];
+    check_permission(
+        permission_check,
+        subject_sid,
+        socket_sid,
+        permission.clone(),
+        (&audit_context).into(),
+    )
+}
 
 pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
     let security_class = match socket.domain {
@@ -60,6 +99,30 @@ pub(in crate::security) fn socket_post_create(socket: &Socket, socket_node: &FsN
         SocketDomain::Key => SocketClass::Key,
     };
     socket_node.security_state.lock().class = security_class.into();
+}
+
+/// Checks that `current_task` has the right permissions to perform a bind operation on
+/// `socket_node`.
+pub(in crate::security) fn check_socket_bind_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket_node: &FsNode,
+    _socket_address: &SocketAddress,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_bind_access called for non-Socket class")
+    };
+
+    // TODO(https://fxbug.dev/364569010): Add checks for `name_bind` between the socket and the SID
+    // of the port number, and for `node_bind` between the socket and the SID of the IP address.
+    has_socket_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        socket_node,
+        &CommonSocketPermission::Bind.for_class(socket_class),
+        current_task.into(),
+    )
 }
 
 #[cfg(test)]

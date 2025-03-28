@@ -791,6 +791,8 @@ common_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     CommonSocketPermission extends CommonFsNodePermission {
         // keep-sorted start
+        /// Permission to bind to a name.
+        Bind("bind"),
         // keep-sorted end
     }
 }

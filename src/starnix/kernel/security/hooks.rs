@@ -12,7 +12,7 @@ use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::socket::Socket;
+use crate::vfs::socket::{Socket, SocketAddress};
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
     Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
@@ -851,6 +851,24 @@ pub fn check_exec_access(
 pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
     profile_duration!("security.hooks.socket_post_create");
     selinux_hooks::socket::socket_post_create(socket, socket_node);
+}
+
+/// Checks if the `current_task` is allowed to perform a bind operation for this `socket_node`.
+/// Corresponds to the `socket_bind()` LSM hook.
+pub fn check_socket_bind_access(
+    current_task: &CurrentTask,
+    socket_node: &FsNode,
+    socket_address: &SocketAddress,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_bind_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_bind_access(
+            &security_server,
+            current_task,
+            socket_node,
+            socket_address,
+        )
+    })
 }
 
 /// Updates the SELinux thread group state on exec.
