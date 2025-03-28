@@ -16,9 +16,7 @@ use fidl_fuchsia_ui_pointer::{
     {self as fuipointer},
 };
 use futures::StreamExt as _;
-use starnix_core::power::{
-    clear_wake_proxy_signal, create_proxy_for_wake_events, create_proxy_for_wake_events_counter,
-};
+use starnix_core::power::create_proxy_for_wake_events_counter;
 use starnix_core::task::Kernel;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
@@ -572,11 +570,11 @@ impl InputEventsRelay {
             open_files: default_mouse_device_opened_files,
             inspect_status: device_inspect_status,
         };
-        let (mouse_source_proxy, resume_event) = match event_proxy_mode {
+        let (mouse_source_proxy, message_counter) = match event_proxy_mode {
             EventProxyMode::WakeContainer => {
                 // Proxy the mouse events through the Starnix runner. This allows mouse events to
                 // wake the container when it is suspended.
-                let (mouse_source_channel, resume_event) = create_proxy_for_wake_events(
+                let (mouse_source_channel, resume_event) = create_proxy_for_wake_events_counter(
                     mouse_source_client_end.into_channel(),
                     "mouse".to_string(),
                 );
@@ -594,9 +592,9 @@ impl InputEventsRelay {
             // it...
             let event_future = mouse_source_proxy.watch();
 
-            // .. until the event that we passed to the runner has been cleared. This prevents
+            // .. until the message counter has been decremented. This prevents
             // the container from suspending between calls to `watch`.
-            resume_event.as_ref().map(clear_wake_proxy_signal);
+            message_counter.as_ref().map(|c| c.add(-1));
 
             match event_future.await {
                 Ok(mouse_events) => {
