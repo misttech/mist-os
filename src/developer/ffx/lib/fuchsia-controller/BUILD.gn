@@ -14,12 +14,6 @@ import("//tools/fidl/gidl/gidl.gni")
 
 assert(is_host, "The fuchsia-controller framework is for host tools only")
 
-visibility = [
-  ":*",
-  "cpp:*",
-  "tests:*",
-]
-
 conformance_test_source = "$target_gen_dir/conformance_test.py"
 
 gidl("conformance_tests_py") {
@@ -31,9 +25,6 @@ gidl("conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
   libraries = [
     ":fidl_bindings",
     ":fuchsia_controller_py",
@@ -47,7 +38,6 @@ python_host_test("fuchsia_controller_conformance_tests") {
 }
 
 rustc_staticlib("lib") {
-  test_visibility = [ "*" ]
   output_name = "fuchsia_controller"
   edition = "2021"
   with_unit_tests = true
@@ -88,13 +78,6 @@ rustc_staticlib("lib") {
 }
 
 python_library("fuchsia_controller_py") {
-  visibility += [
-    "tests:*",
-    "//src/tests/fidl/conformance_suite/*",
-    "//tools/fidl/fidlc/testdata/*",
-    "//tools/fidl/fidlgen_python/tests/*",
-    "//zircon/vdso/*",
-  ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
@@ -114,16 +97,6 @@ python_library("fuchsia_controller_py") {
 }
 
 python_library("fidl_bindings") {
-  visibility += [
-    "./*",
-    "tests:*",
-    "//src/testing/end_to_end/honeydew:*",
-    "//src/tests/fidl/conformance_suite/*",
-    "//tools/fidl/fidlc/testdata/*",
-    "//tools/fidl/fidlgen_python/tests/*",
-    "//zircon/vdso/*",
-  ]
-
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
@@ -154,9 +127,6 @@ gidl("static_conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_static_conformance_tests") {
-  visibility = []
-  visibility = [ "*" ]
-
   libraries = [ ":fuchsia_controller_py" ]
   deps = [
     ":static_conformance_tests_py",
@@ -182,7 +152,6 @@ python_binary("example") {
 
 group("fuchsia-controller") {
   testonly = true
-  visibility += [ "//src/developer/ffx/lib" ]
   deps = [
     ":example",
     ":fuchsia_controller_py",
@@ -192,10 +161,6 @@ group("fuchsia-controller") {
 
 group("tests") {
   testonly = true
-
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
 
   deps = [
     ":lib_test",
@@ -223,9 +188,6 @@ group("tests") {
 }
 
 group("host_tests") {
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
   testonly = true
   deps = []
 

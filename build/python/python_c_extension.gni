@@ -50,8 +50,6 @@ import("//build/python/python_library.gni")
 template("python_c_extension") {
   assert(is_host, "python C extensions can only be built on the host")
 
-  visibility = [ ":*" ]
-
   main_target_name = target_name
   shlib_target_name = "lib${target_name}"
   python_c_extension_shared_lib(shlib_target_name) {

@@ -4,11 +4,6 @@
 
 import("//build/python/python_c_extension.gni")
 
-visibility = [
-  ":*",
-  "..:*",
-]
-
 config("python_config") {
   defines = [
     "Py_LIMITED_API=0x030b00f0",
@@ -39,15 +34,6 @@ config("fuchsia_controller_abi_config") {
 }
 
 python_c_extension("fidl_codec") {
-  visibility += [
-    "../tests:*",
-    "//src/testing/end_to_end/*",
-    "//src/tests/end_to_end/*",
-    "//src/tests/fidl/conformance_suite/*",
-    "//tools/fidl/fidlc/testdata/*",
-    "//tools/fidl/fidlgen_python/tests/*",
-    "//zircon/vdso/*",
-  ]
   sources = [
     "fidl_codec/decode.cc",
     "fidl_codec/decode.h",
@@ -77,10 +63,6 @@ python_c_extension("fidl_codec") {
 }
 
 python_c_extension("fuchsia_controller_internal") {
-  visibility += [
-    "//src/testing/end_to_end/*",
-    "//src/tests/end_to_end/*",
-  ]
   sources = [
     "fuchsia_controller_internal/error.cc",
     "fuchsia_controller_internal/error.h",
