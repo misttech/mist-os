@@ -431,6 +431,7 @@ var pythonReservedWords = map[string]struct{}{
 	"return":                    {}, //
 	"reversed":                  {}, //
 	"round":                     {}, //
+	"self":                      {}, //
 	"set":                       {}, //
 	"setattr":                   {}, //
 	"slice":                     {}, //

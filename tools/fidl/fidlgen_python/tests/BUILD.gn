@@ -37,3 +37,15 @@ group("fidlgen_python_protocol_compile_test") {
   testonly = true
   deps = [ "fidl:test.python.protocol_python" ]
 }
+
+python_host_test("fidlgen_python_construct_test") {
+  main_source = "test_construct.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_python",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
+  ]
+  test_data_deps = [ "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data" ]
+}

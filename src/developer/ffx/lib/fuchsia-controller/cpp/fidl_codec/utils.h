@@ -206,6 +206,7 @@ inline std::string NormalizeMemberName(std::string_view s) {
       "return",
       "reversed",
       "round",
+      "self",
       "set",
       "setattr",
       "slice",

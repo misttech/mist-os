@@ -809,6 +809,7 @@ def normalize_member_name(name) -> str:
         "return",
         "reversed",
         "round",
+        "self",
         "set",
         "setattr",
         "slice",

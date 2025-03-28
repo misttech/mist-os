@@ -206,6 +206,7 @@ template("fidl") {
   enable_cpp = !defined(invoker.enable_cpp) || invoker.enable_cpp
   enable_rust = !defined(invoker.enable_rust) || invoker.enable_rust
   enable_fdomain = enable_rust
+  enable_python = !defined(invoker.enable_python) || invoker.enable_python
   if (defined(invoker.enable_fdomain)) {
     enable_fdomain = invoker.enable_fdomain
   }
@@ -217,8 +218,6 @@ template("fidl") {
   # These bindings are not:
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
-  enable_python = defined(invoker._enable_experimental_python) &&
-                  invoker._enable_experimental_python
   enable_rust_next =
       defined(invoker.enable_rust_next) && invoker.enable_rust_next
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither

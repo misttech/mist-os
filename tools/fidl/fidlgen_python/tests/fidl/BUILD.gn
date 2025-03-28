@@ -6,7 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("test.python.struct") {
   testonly = true
-  _enable_experimental_python = true
 
   public_deps = [ ":test.python.otherstruct" ]
 
@@ -15,14 +14,12 @@ fidl("test.python.struct") {
 
 fidl("test.python.otherstruct") {
   testonly = true
-  _enable_experimental_python = true
 
   sources = [ "test.python.otherstruct/otherstruct.test.fidl" ]
 }
 
 fidl("test.python.protocol") {
   testonly = true
-  _enable_experimental_python = true
 
   sources = [ "test.python.protocol/protocol.test.fidl" ]
 }

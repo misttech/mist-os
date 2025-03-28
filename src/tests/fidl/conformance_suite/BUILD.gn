@@ -10,7 +10,6 @@ fidl("conformance_fidl") {
   testonly = true
 
   enable_hlcpp = true
-  _enable_experimental_python = true
 
   sources = [
     "//src/tests/fidl/conformance_suite/aliases.test.fidl",
