@@ -74,6 +74,7 @@ pub struct DeveloperOverrides {
     pub packages: Vec<PackageDetails>,
 
     /// Compiled components to add to the build
+    #[file_relative_paths]
     pub packages_to_compile: Vec<CompiledPackageDefinition>,
 
     /// Map of the names of packages that contain shell commands to the list of

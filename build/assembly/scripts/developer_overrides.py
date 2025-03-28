@@ -9,10 +9,14 @@ import os
 import shutil
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
-from assembly import PackageCopier, PackageDetails, fast_copy_makedirs
-from assembly.assembly_input_bundle import CompiledPackageDefinition, DepSet
+from assembly import FilePath, PackageCopier, PackageDetails, fast_copy_makedirs
+from assembly.assembly_input_bundle import (
+    CompiledComponentDefinition,
+    CompiledPackageDefinition,
+    DepSet,
+)
 from depfile import DepFile
 from serialization import instance_from_dict, json_dump, json_load
 
@@ -149,7 +153,6 @@ def main() -> int:
         product=overrides_from_gn.product,
         board=overrides_from_gn.board,
         bootfs_files_package=overrides_from_gn.bootfs_files_package,
-        packages_to_compile=overrides_from_gn.packages_to_compile,
     )
 
     overrides_for_assembly.shell_commands = {}
@@ -175,6 +178,47 @@ def main() -> int:
 
         _, copy_deps = package_copier.perform_copy()
         deps.update(copy_deps)
+
+    # TODO(https://fxbug.dev/406838880) - Refactor this to use the same mechanisms in
+    # assembly_input_bundle.py.
+    if overrides_from_gn.packages_to_compile:
+        packages_to_compile: List[CompiledPackageDefinition] = []
+        for package in overrides_from_gn.packages_to_compile:
+            if package.contents:
+                raise ValueError(
+                    "\nExtra package contents for compiled_packages are not supported at this time.\n"
+                )
+            if package.includes:
+                raise ValueError(
+                    "\nExtra component includes for compiled_packages are not supported at this time.\n"
+                )
+            components: List[CompiledComponentDefinition] = []
+            for component in package.components:
+                shards: Set[FilePath] = set()
+                for shard in component.shards:
+                    dest = os.path.join(
+                        args.outdir,
+                        "compiled_packages",
+                        package.name,
+                        component.component_name,
+                        os.path.basename(shard),
+                    )
+                    deps.add(shard)
+                    fast_copy_makedirs(shard, dest)
+                    shards.add(os.path.relpath(dest, args.outdir))
+                components.append(
+                    CompiledComponentDefinition(
+                        component.component_name, shards
+                    )
+                )
+            packages_to_compile.append(
+                CompiledPackageDefinition(
+                    package.name,
+                    components,
+                    bootfs_package=package.bootfs_package,
+                )
+            )
+        overrides_for_assembly.packages_to_compile = packages_to_compile
 
     outfile_path = os.path.join(args.outdir, "product_assembly_overrides.json")
 
