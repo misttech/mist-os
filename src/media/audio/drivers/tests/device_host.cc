@@ -88,7 +88,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
   // Ensure that an initial devfs enumeration pass completes before creating the next watcher.
   // This is only accessed by the idle_callback, which we explicitly await before we exit. Just in
   // case the callback can subsequently run for some reason, we give this variable static scope.
-  static bool initial_enumeration_done;
+  static volatile bool initial_enumeration_done;
 
   // Set up the device watchers. If any fail, automatically stop monitoring all device sources.
   // First, we add any preexisting ("built-in") devices.
@@ -159,7 +159,8 @@ void DeviceHost::AddVirtualDevices() {
         fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
     zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                               controller_.NewRequest().TakeChannel().release());
-    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
+    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect(" << kControlNodePath
+                             << ") failed: " << status;
 
     uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
     status = controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
@@ -182,22 +183,33 @@ void DeviceHost::AddVirtualDevices() {
         fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
     zx_status_t status = fdio_service_connect(
         kLegacyControlNodePath.c_str(), legacy_controller_.NewRequest().TakeChannel().release());
-    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
+    if (status != ZX_OK) {
+      legacy_controller_.Unbind();
+      FAIL() << "fdio_service_connect(" << kLegacyControlNodePath << ") failed: " << status;
+    }
 
     uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
     status =
         legacy_controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
-    ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
-    ASSERT_TRUE(legacy_controller_.is_bound()) << "virtualaudio::Control did not stay bound";
-    ASSERT_EQ(num_inputs, 0u) << num_inputs
-                              << " virtual-audio-legacy inputs already exist (should be 0)";
-    ASSERT_EQ(num_outputs, 0u) << num_outputs
-                               << " virtual-audio-legacy outputs already exist (should be 0)";
-    ASSERT_EQ(num_unspecified_direction, 0u)
-        << num_unspecified_direction
-        << " virtual-audio-legacy devices with unspecified direction already exist (should be 0)";
+    if (status != ZX_OK) {
+      legacy_controller_.Unbind();
+      FAIL() << "GetNumDevices(legacy) failed: " << status;
+    }
+    ASSERT_TRUE(legacy_controller_.is_bound())
+        << "virtualaudio::Control(legacy) did not stay bound";
 
-    // Codec directionality is not applicable.
+    if (num_inputs || num_outputs || num_unspecified_direction) {
+      legacy_controller_.Unbind();
+      ASSERT_EQ(num_inputs, 0u)
+          << num_inputs << " virtual-audio-legacy 'input' devices already exist (should be 0)";
+      ASSERT_EQ(num_outputs, 0u)
+          << num_outputs << " virtual-audio-legacy 'output' devices already exist (should be 0)";
+      ASSERT_EQ(num_unspecified_direction, 0u)
+          << num_unspecified_direction
+          << " virtual-audio-legacy 'unspecified direction' devices already exist (should be 0)";
+    }
+
+    // For Codec drivers, directionality is not applicable.
     AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::CODEC);
 
     AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, true);
@@ -210,7 +222,12 @@ void DeviceHost::AddVirtualDevices() {
 void DeviceHost::AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& controller,
                                   const fuchsia::virtualaudio::DeviceType device_type,
                                   std::optional<bool> is_input) {
-  const char* direction = is_input ? (*is_input ? "input" : "output") : "NONE";
+  const char* direction;
+  if (is_input.has_value()) {
+    direction = *is_input ? "input" : "output";
+  } else {
+    direction = "NONE";
+  }
   const char* type;
   switch (device_type) {
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:

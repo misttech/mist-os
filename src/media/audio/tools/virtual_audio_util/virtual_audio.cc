@@ -232,8 +232,8 @@ class VirtualAudioUtil {
   bool SetRingBufferRestrictions(const std::string& rb_restr_str);
   bool SetGainProps(const std::string& gain_props_str);
   bool SetPlugProps(const std::string& plug_props_str);
-  bool ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
-                          std::optional<bool> is_input);
+  zx_status_t ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
+                                 std::optional<bool> is_input);
   bool ResetAllConfigurations();
 
   // Methods using the FIDL Device interface
@@ -264,6 +264,7 @@ class VirtualAudioUtil {
 
   fuchsia::virtualaudio::ControlSyncPtr controller_ = nullptr;
   fuchsia::virtualaudio::ControlSyncPtr legacy_controller_ = nullptr;
+
   fuchsia::virtualaudio::DevicePtr codec_ = nullptr;
   fuchsia::virtualaudio::DevicePtr codec_input_ = nullptr;
   fuchsia::virtualaudio::DevicePtr codec_output_ = nullptr;
@@ -545,32 +546,25 @@ void VirtualAudioUtil::SetUpEvents() {
 }
 
 bool VirtualAudioUtil::ResetAllConfigurations() {
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, std::nullopt)) {
+  if (ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, std::nullopt) != ZX_OK) {
+    QuitLoop();
     return false;
   }
 
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, true)) {
-    return false;
-  }
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, false)) {
-    return false;
-  }
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, std::nullopt)) {
-    return false;
+  if (ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, true) != ZX_OK ||
+      ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, false) != ZX_OK ||
+      ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, std::nullopt) != ZX_OK) {
+    printf("ERROR: failed to ResetConfiguration for Codec, but continuing anyway...\n");
   }
 
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, true)) {
-    return false;
-  }
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, false)) {
-    return false;
+  if (ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, true) != ZX_OK ||
+      ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, false) != ZX_OK) {
+    printf("ERROR: failed to ResetConfiguration for Dai, but continuing anyway...\n");
   }
 
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, true)) {
-    return false;
-  }
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, false)) {
-    return false;
+  if (ResetConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, true) != ZX_OK ||
+      ResetConfiguration(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, false) != ZX_OK) {
+    printf("ERROR: failed to ResetConfiguration for StreamConfig, but continuing anyway...\n");
   }
 
   return true;
@@ -677,7 +671,7 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
       success = SetPlugProps(value);
       break;
     case Command::RESET_CONFIG:
-      success = ResetConfiguration(device_type_, configuring_input_);
+      success = (ResetConfiguration(device_type_, configuring_input_) == ZX_OK);
       break;
 
     case Command::ADD_DEVICE:
@@ -853,7 +847,7 @@ bool VirtualAudioUtil::GetNumDevices() {
   zx_status_t status =
       controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
   if (status != ZX_OK) {
-    printf("ERROR: GetNumDevices (non-legacy) failed, status = %d", status);
+    printf("ERROR: GetNumDevices (non-legacy) failed, status = %d\n", status);
     return false;
   }
 
@@ -863,7 +857,7 @@ bool VirtualAudioUtil::GetNumDevices() {
   status = legacy_controller_->GetNumDevices(&num_legacy_inputs, &num_legacy_outputs,
                                              &num_legacy_unspecified_direction);
   if (status != ZX_OK) {
-    printf("ERROR: GetNumDevices (legacy) failed, status = %d", status);
+    printf("ERROR: GetNumDevices (legacy) failed, status = %d\n", status);
     return false;
   }
 
@@ -1535,8 +1529,8 @@ bool VirtualAudioUtil::SetDirection(std::optional<bool> is_input) {
   }
 }
 
-bool VirtualAudioUtil::ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
-                                          std::optional<bool> is_input) {
+zx_status_t VirtualAudioUtil::ResetConfiguration(fuchsia::virtualaudio::DeviceType device_type,
+                                                 std::optional<bool> is_input) {
   zx_status_t status = ZX_OK;
   fuchsia::virtualaudio::Direction direction;
   if (is_input) {
@@ -1546,20 +1540,18 @@ bool VirtualAudioUtil::ResetConfiguration(fuchsia::virtualaudio::DeviceType devi
   auto& controller = GetController(device_type);
   status = controller->GetDefaultConfiguration(device_type, std::move(direction), &config_result);
   if (status != ZX_OK) {
-    printf("ERROR: Failed to send GetDefaultConfiguration request: %s",
+    printf("ERROR: Failed to send GetDefaultConfiguration request: %s\n",
            zx_status_get_string(status));
-    QuitLoop();
-    return false;
+    return status;
   }
   if (config_result.is_err()) {
-    printf("ERROR: Failed to get default config for device, error = %d",
-           static_cast<uint32_t>(config_result.err()));
-    QuitLoop();
-    return false;
+    status = static_cast<zx_status_t>(config_result.err());
+    printf("ERROR: Failed to get default config for device, error = %d\n", status);
+    return status;
   }
 
   *ConfigForDevice(is_input, device_type) = std::move(config_result.response().config);
-  return true;
+  return ZX_OK;
 }
 
 bool VirtualAudioUtil::AddDevice() {
@@ -1571,9 +1563,11 @@ bool VirtualAudioUtil::AddDevice() {
 
   fuchsia::virtualaudio::Control_AddDevice_Result result;
   auto& controller = GetController(cfg.device_specific().Which());
-  if ((status = controller->AddDevice(std::move(cfg), std::move(request), &result)) == ZX_OK) {
+  status = controller->AddDevice(std::move(cfg), std::move(request), &result);
+  if (status == ZX_OK) {
     if (result.is_err()) {
-      status = result.err();
+      status = static_cast<zx_status_t>(result.err());
+      printf("ERROR: AddDevice returned ZX_OK but result.err was %d\n", status);
     }
   }
 
@@ -1908,11 +1902,14 @@ void VirtualAudioUtil::EnsureTypesExist() {
 fuchsia::virtualaudio::ControlSyncPtr& VirtualAudioUtil::GetController(
     fuchsia::virtualaudio::DeviceType device_type) {
   switch (device_type) {
-    case fuchsia::virtualaudio::DeviceType::DAI:
     case fuchsia::virtualaudio::DeviceType::CODEC:
+    case fuchsia::virtualaudio::DeviceType::DAI:
     case fuchsia::virtualaudio::DeviceType::STREAM_CONFIG:
       return legacy_controller_;
+    case fuchsia::virtualaudio::DeviceType::COMPOSITE:
+      return controller_;
     default:
+      printf("ERROR: unknown DeviceType\n");
       return controller_;
   }
 }
@@ -1920,11 +1917,14 @@ fuchsia::virtualaudio::ControlSyncPtr& VirtualAudioUtil::GetController(
 fuchsia::virtualaudio::ControlSyncPtr& VirtualAudioUtil::GetController(
     fuchsia::virtualaudio::DeviceSpecific::Tag device_type) {
   switch (device_type) {
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig:
       return legacy_controller_;
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite:
+      return controller_;
     default:
+      printf("ERROR: unknown DeviceSpecific::Tag\n");
       return controller_;
   }
 }
