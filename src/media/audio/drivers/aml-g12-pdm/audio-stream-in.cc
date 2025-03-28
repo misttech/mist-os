@@ -9,6 +9,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/clock.h>
 #include <math.h>
 #include <threads.h>
@@ -104,42 +105,46 @@ zx_status_t AudioStreamIn::InitPDev() {
     return status;
   }
 
-  zx::result pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
-  if (pdev_result.is_error()) {
-    zxlogf(ERROR, "get pdev protocol failed %s", pdev_result.status_string());
-    return pdev_result.error_value();
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent(), "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
-  ddk::PDevFidl pdev = std::move(pdev_result.value());
-  status = pdev.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not obtain bti %d", status);
-    return status;
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
+  }
+  bti_ = std::move(bti.value());
+
+  zx::result mmio0 = pdev.MapMmio(0);
+  if (mmio0.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio 0: %s", mmio0.status_string());
+    return mmio0.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> mmio0, mmio1, mmio2;
-  status = pdev.MapMmio(0, &mmio0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not map mmio0 %d", status);
-    return status;
+  zx::result mmio1 = pdev.MapMmio(1);
+  if (mmio1.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio 1: %s", mmio1.status_string());
+    return mmio1.status_value();
   }
-  status = pdev.MapMmio(1, &mmio1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not map mmio1 %d", status);
-    return status;
-  }
+
+  std::optional<fdf::MmioBuffer> mmio2;
   if (metadata_.version == metadata::AmlVersion::kA5) {
-    status = pdev.MapMmio(2, &mmio2);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "could not map mmio2 %d", status);
-      return status;
+    zx::result result = pdev.MapMmio(2);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to map mmio 2: %s", result.status_string());
+      return result.status_value();
     }
+    mmio2.emplace(std::move(result.value()));
   }
-  status = pdev.GetInterrupt(0, 0, &irq_);
-  if (status != ZX_ERR_OUT_OF_RANGE) {  // Not specified in the board file.
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "could not get IRQ %d", status);
-      return status;
-    }
+
+  zx::result irq = pdev.GetInterrupt(0);
+  if (irq.is_ok()) {
+    irq_ = std::move(irq.value());
 
     auto irq_thread = [](void* arg) -> int {
       return reinterpret_cast<AudioStreamIn*>(arg)->Thread();
@@ -151,6 +156,9 @@ zx_status_t AudioStreamIn::InitPDev() {
       zxlogf(ERROR, "could not create thread %d", rc);
       return status;
     }
+  } else if (irq.status_value() != ZX_ERR_OUT_OF_RANGE) {  // Not specified in the board file.
+    zxlogf(ERROR, "Failed to get irq: %s", irq.status_string());
+    return irq.status_value();
   }
 
   lib_ = AmlPdmDevice::Create(*std::move(mmio0), *std::move(mmio1), *std::move(mmio2), HIFI_PLL,

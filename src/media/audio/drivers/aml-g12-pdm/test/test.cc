@@ -7,16 +7,16 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/sync/completion.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
 #include "../audio-stream-in.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace audio::aml_g12 {
@@ -43,12 +43,12 @@ class FakeMmio {
   FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {}
 
   fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
-  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
+  fake_mmio::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
   static constexpr size_t kRegCount =
       S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 metadata::AmlPdmConfig GetDefaultMetadata() {
@@ -80,7 +80,7 @@ audio_fidl::wire::PcmFormat GetDefaultPcmFormat() {
 }
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -88,7 +88,7 @@ struct AudioStreamInTest : public inspect::InspectTestHelper, public zxtest::Tes
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
 
     config.mmios[0] = mmio_.mmio();
     config.mmios[1] = mmio_.mmio();
