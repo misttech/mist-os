@@ -58,12 +58,13 @@ struct VictimSelPolicy {
 
 // SSR mode uses these field to determine which blocks are allocatable.
 struct SegmentEntry {
-  RawBitmapHeap cur_valid_map;     // validity bitmap of blocks
-  RawBitmapHeap ckpt_valid_map;    // validity bitmap in the last CP
-  uint64_t mtime = 0;              // modification time of the segment
-  uint16_t valid_blocks = 0;       // # of valid blocks
-  uint16_t ckpt_valid_blocks = 0;  // # of valid blocks in the last CP
-  uint8_t type = 0;                // segment type like CursegType::XXX
+  RawBitmapHeap cur_valid_map;       // validity bitmap of blocks
+  RawBitmapHeap ckpt_valid_map;      // validity bitmap in the last CP
+  uint64_t mtime = 0;                // modification time of the segment
+  uint16_t valid_blocks = 0;         // # of valid blocks
+  uint16_t ckpt_valid_blocks = 0;    // # of valid blocks in the last CP
+  uint16_t ckpt_invalid_blocks = 0;  // # of invalid blocks in the last CP
+  uint8_t type = 0;                  // segment type like CursegType::XXX
 };
 
 struct SectionEntry {
@@ -217,16 +218,17 @@ class SegmentManager {
   bool NeedInplaceUpdate(bool is_dir);
 
   void LocateDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
-      __TA_REQUIRES_SHARED(sentry_lock_);
+      __TA_REQUIRES(sentry_lock_);
   void RemoveDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
-      __TA_REQUIRES_SHARED(sentry_lock_);
-  void LocateDirtySegment(uint32_t segno) __TA_EXCLUDES(seglist_lock_)
-      __TA_REQUIRES_SHARED(sentry_lock_);
+      __TA_REQUIRES(sentry_lock_);
+  void LocateDirtySegment(uint32_t segno) __TA_EXCLUDES(seglist_lock_) __TA_REQUIRES(sentry_lock_);
   void SetPrefreeAsFreeSegments() __TA_EXCLUDES(seglist_lock_);
   void ClearPrefreeSegments() __TA_EXCLUDES(seglist_lock_);
   void MarkSitEntryDirty(uint32_t segno) __TA_REQUIRES(sentry_lock_);
-  void SetSitEntryType(CursegType type, uint32_t segno, int modified) __TA_REQUIRES(sentry_lock_);
-  void UpdateSitEntry(block_t blkaddr, int del) __TA_REQUIRES(sentry_lock_);
+  void SetSitEntryType(CursegType type, uint32_t segno, bool modified) __TA_REQUIRES(sentry_lock_);
+  void UpdateSitEntry(block_t blkaddr, int del) __TA_REQUIRES(sentry_lock_)
+      __TA_EXCLUDES(seglist_lock_);
+  void UpdateInvalidBlocks(int32_t delta, bool is_node) __TA_REQUIRES(sentry_lock_);
   void RefreshSitEntry(block_t old_blkaddr, block_t new_blkaddr) __TA_REQUIRES(sentry_lock_);
   void InvalidateBlocks(block_t addr) __TA_EXCLUDES(sentry_lock_);
   void AddSumEntry(CursegType type, Summary *sum, uint16_t offset);
@@ -238,7 +240,7 @@ class SegmentManager {
 
   uint32_t CheckPrefreeSegments(int ofs_unit, CursegType type);
   void GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirection dir);
-  void ResetCurseg(CursegType type, int modified) __TA_REQUIRES(sentry_lock_);
+  void ResetCurseg(CursegType type, bool modified) __TA_REQUIRES(sentry_lock_);
   void NewCurseg(CursegType type, bool new_sec) __TA_REQUIRES(sentry_lock_);
   void NextFreeBlkoff(CursegInfo *seg, block_t start);
   void RefreshNextBlkoff(CursegInfo *seg);
@@ -458,6 +460,10 @@ class SegmentManager {
   block_t main_segments_ = 0;                                         // # of segments in main area
   block_t reserved_segments_ = 0;                                     // # of reserved segments
   block_t ovp_segments_ = 0;                                          // # of overprovision segments
+  std::array<int64_t, 2> ckpt_invalid_blocks_ __TA_GUARDED(sentry_lock_) = {
+      0};  // # of checkpointed invalid blocks that SSR can allocate. ckpt_invalid_blocks_[0] and
+           // ckpt_invalid_blocks_[1] tracks invalid blocks for data and node respectively.
+
   bool disable_gc_for_test_ = false;
 };
 

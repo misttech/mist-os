@@ -72,6 +72,7 @@ CursegType GetSegmentType(Page &page, PageType p_type, size_t num_logs) {
 static void SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
+  segment_entry.ckpt_invalid_blocks = kDefaultBlocksPerSegment - segment_entry.ckpt_valid_blocks;
   CloneBits<RawBitmapHeap>(segment_entry.cur_valid_map, raw_sit.valid_map, 0,
                            GetBitSize(kSitVBlockMapSize));
   CloneBits<RawBitmapHeap>(segment_entry.ckpt_valid_map, raw_sit.valid_map, 0,
@@ -89,6 +90,7 @@ static void SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit) {
   CloneBits<RawBitmapHeap>(segment_entry.ckpt_valid_map, raw_sit.valid_map, 0,
                            GetBitSize(kSitVBlockMapSize));
   segment_entry.ckpt_valid_blocks = segment_entry.valid_blocks;
+  segment_entry.ckpt_invalid_blocks = kDefaultBlocksPerSegment - segment_entry.ckpt_valid_blocks;
   raw_sit.mtime = CpuToLe(static_cast<uint64_t>(segment_entry.mtime));
 }
 
@@ -432,6 +434,11 @@ void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
   if (!dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
     dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].SetOne(segno);
     ++dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+    if (dirty_type == DirtyType::kDirty) {
+      SegmentEntry &segment_entry = sit_info_->sentries[segno];
+      UpdateInvalidBlocks(segment_entry.ckpt_invalid_blocks,
+                          IsNodeSeg(static_cast<CursegType>(segment_entry.type)));
+    }
   }
 
   if (dirty_type == DirtyType::kDirty) {
@@ -447,6 +454,11 @@ void SegmentManager::RemoveDirtySegment(uint32_t segno, DirtyType dirty_type) {
   if (dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
     dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].ClearOne(segno);
     --dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+    if (dirty_type == DirtyType::kDirty) {
+      SegmentEntry &segment_entry = sit_info_->sentries[segno];
+      UpdateInvalidBlocks(-segment_entry.ckpt_invalid_blocks,
+                          IsNodeSeg(static_cast<CursegType>(segment_entry.type)));
+    }
   }
 
   if (dirty_type == DirtyType::kDirty) {
@@ -465,14 +477,12 @@ void SegmentManager::RemoveDirtySegment(uint32_t segno, DirtyType dirty_type) {
 // Adding dirty entry into seglist is not critical operation.
 // If a given segment is one of current working segments, it won't be added.
 void SegmentManager::LocateDirtySegment(uint32_t segno) {
-  uint32_t valid_blocks;
-
   if (segno == kNullSegNo || IsCurSeg(segno))
     return;
 
   std::lock_guard seglist_lock(seglist_lock_);
 
-  valid_blocks = GetValidBlocks(segno, false);
+  uint32_t valid_blocks = GetValidBlocks(segno, false);
 
   if (valid_blocks == 0) {
     LocateDirtySegment(segno, DirtyType::kPre);
@@ -561,7 +571,7 @@ void SegmentManager::MarkSitEntryDirty(uint32_t segno) {
   }
 }
 
-void SegmentManager::SetSitEntryType(CursegType type, uint32_t segno, int modified) {
+void SegmentManager::SetSitEntryType(CursegType type, uint32_t segno, bool modified) {
   SegmentEntry &segment_entry = sit_info_->sentries[segno];
   segment_entry.type = static_cast<uint8_t>(type);
   if (modified)
@@ -594,13 +604,21 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
         !segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset))) {
       segment_entry.ckpt_valid_map.SetOne(ToMsbFirst(offset));
       ++segment_entry.ckpt_valid_blocks;
+      --segment_entry.ckpt_invalid_blocks;
+      // No need to call UpdateInvalidBlocks() as curseg cannot belong to dirty_segmap.
     }
   } else {
     ZX_ASSERT(segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
     segment_entry.cur_valid_map.ClearOne(ToMsbFirst(offset));
   }
-  if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset)))
+  if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset))) {
     segment_entry.ckpt_valid_blocks += del;
+    segment_entry.ckpt_invalid_blocks -= del;
+    fs::SharedLock seglist_lock(seglist_lock_);
+    if (dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(segno)) {
+      UpdateInvalidBlocks(-del, IsNodeSeg(static_cast<CursegType>(segment_entry.type)));
+    }
+  }
 
   MarkSitEntryDirty(segno);
 
@@ -618,11 +636,10 @@ void SegmentManager::RefreshSitEntry(block_t old_blkaddr, block_t new_blkaddr) {
 }
 
 void SegmentManager::InvalidateBlocks(block_t addr) {
-  uint32_t segno = GetSegmentNumber(addr);
-
   ZX_ASSERT(addr != kNullAddr);
-  if (addr == kNewAddr)
+  if (addr == kNewAddr) {
     return;
+  }
 
   std::lock_guard sentry_lock(sentry_lock_);
 
@@ -630,7 +647,7 @@ void SegmentManager::InvalidateBlocks(block_t addr) {
   UpdateSitEntry(addr, -1);
 
   // add it into dirty seglist
-  LocateDirtySegment(segno);
+  LocateDirtySegment(GetSegmentNumber(addr));
 }
 
 // This function should be resided under the curseg_mutex lock
@@ -780,7 +797,7 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirectio
   *newseg = segno;
 }
 
-void SegmentManager::ResetCurseg(CursegType type, int modified) {
+void SegmentManager::ResetCurseg(CursegType type, bool modified) {
   CursegInfo *curseg = CURSEG_I(type);
   SummaryFooter *sum_footer;
 
@@ -1300,7 +1317,7 @@ zx_status_t SegmentManager::FlushSitEntries() {
       int offset = -1;
 
       sit_offset = SitEntryOffset(segno);
-
+      uint32_t delta = segment_entry.ckpt_invalid_blocks;
       if (!flushed) {
         offset = LookupJournalInCursum(sum, JournalType::kSitJournal, segno, 1);
       }
@@ -1331,6 +1348,12 @@ zx_status_t SegmentManager::FlushSitEntries() {
       }
       bitmap.ClearOne(segno);
       --sit_info_->dirty_sentries;
+      // Update |ckpt_invalid_blocks_| if the checkpointed invalid blocks of dirty segments change.
+      delta = segment_entry.ckpt_invalid_blocks - delta;
+      if (delta && !IsCurSeg(segno) && segment_entry.valid_blocks &&
+          segment_entry.valid_blocks < kDefaultBlocksPerSegment) {
+        UpdateInvalidBlocks(delta, IsNodeSeg(static_cast<CursegType>(segment_entry.type)));
+      }
     }
     return ZX_OK;
   });
@@ -1489,7 +1512,7 @@ void SegmentManager::InitFreeSegmap() {
 }
 
 zx_status_t SegmentManager::BuildDirtySegmap() {
-  fs::SharedLock lock(sentry_lock_);
+  std::lock_guard lock(sentry_lock_);
   std::lock_guard seglist_lock(seglist_lock_);
   dirty_info_ = std::make_unique<DirtySeglistInfo>();
   for (uint32_t i = 0; i < static_cast<int>(DirtyType::kNrDirtytype); ++i) {
@@ -1581,5 +1604,10 @@ void SegmentManager::DestroyDirtySegmap() {
 }
 
 void SegmentManager::DestroySegmentManager() { DestroyDirtySegmap(); }
+
+void SegmentManager::UpdateInvalidBlocks(int32_t delta, bool is_node) {
+  ckpt_invalid_blocks_[is_node] += delta;
+  ZX_ASSERT(ckpt_invalid_blocks_[is_node] >= 0);
+}
 
 }  // namespace f2fs
