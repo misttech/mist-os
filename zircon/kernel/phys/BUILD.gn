@@ -553,6 +553,7 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [
       ":handoff",
       ":kernel-package",
+      ":new",
       ":uart",
       ":zbitl-allocation",
       "//sdk/lib/fit",
@@ -566,6 +567,7 @@ if (toolchain_environment == "kernel.phys" ||
 
   source_set("handoff-prep") {
     sources = [
+      "handoff-prep-vm.cc",
       "handoff-prep-zbi.cc",
       "handoff-prep.cc",
     ]

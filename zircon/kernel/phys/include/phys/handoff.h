@@ -34,6 +34,7 @@
 #include <zircon/types.h>
 
 #include <array>
+#include <bitset>
 #include <optional>
 #include <string_view>
 #include <type_traits>
@@ -79,25 +80,132 @@ class PhysBootTimes {
   arch::EarlyTicks timestamps_[kCount] = {};
 };
 
-// VMOs to publish as is.
-struct PhysVmo {
+// A base class for VM object descriptions.
+struct PhysVmObject {
   using Name = std::array<char, ZX_MAX_NAME_LEN>;
 
+  constexpr void set_name(std::string_view new_name) {
+    ZX_DEBUG_ASSERT(new_name.size() < name.size());
+    new_name.copy(name.data(), name.size() - 1);
+    name[new_name.size()] = '\0';
+  }
+
+  Name name{};
+};
+static_assert(std::is_default_constructible_v<PhysVmObject>);
+
+// VMOs to publish as is.
+struct PhysVmo : public PhysVmObject {
   // The maximum number of additional VMOs expected to be in the hand-off
   // beyond the special ones explicitly enumerated.
   static constexpr size_t kMaxExtraHandoffPhysVmos = 3;
 
+  // It's useful to normalize VMO order on physical base address for more
+  // readable kernel start-up logging.
+  constexpr auto operator<=>(const PhysVmo& other) const { return addr <=> other.addr; }
+
   // The full page-aligned size of the memory.
   constexpr size_t size_bytes() const { return (content_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE; }
-
-  void set_name(std::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
 
   // The physical address of the memory.
   uintptr_t addr = 0;
   size_t content_size = 0;
-  Name name{};
 };
 static_assert(std::is_default_constructible_v<PhysVmo>);
+
+// Describes a virtual mapping present at the time of hand-off, the virtual
+// address range of which should be reserved during VM initialization.
+struct PhysMapping : public PhysVmObject {
+  class Permissions {
+   public:
+    static Permissions Rw() { return Permissions{}.set_readable().set_writable(); }
+
+    constexpr Permissions() = default;
+
+    constexpr bool readable() const { return perms_[kReadable]; }
+    constexpr bool writable() const { return perms_[kWritable]; }
+    constexpr bool executable() const { return perms_[kExecutable]; }
+
+    Permissions& set_readable(bool value = true) {
+      perms_.set(kReadable, value);
+      return *this;
+    }
+
+    Permissions& set_writable(bool value = true) {
+      perms_.set(kWritable, value);
+      return *this;
+    }
+
+    Permissions& set_executable(bool value = true) {
+      perms_.set(kExecutable, value);
+      return *this;
+    }
+
+    Permissions& operator|=(const Permissions& other) {
+      perms_ |= other.perms_;
+      return *this;
+    }
+
+   private:
+    static constexpr size_t kReadable = 0;
+    static constexpr size_t kWritable = 1;
+    static constexpr size_t kExecutable = 2;
+
+    std::bitset<3> perms_;
+  };
+
+  constexpr PhysMapping() = default;
+
+  constexpr PhysMapping(std::string_view name, uintptr_t vaddr, size_t size, uintptr_t paddr,
+                        Permissions perms, bool kasan_shadow = true)
+      : vaddr(vaddr), size(size), paddr(paddr), perms(perms), kasan_shadow(kasan_shadow) {
+    set_name(name);
+  }
+
+  // It's useful to normalize mapping order on virtual base addr for more
+  // readable kernel start-up logging.
+  constexpr auto operator<=>(const PhysMapping& other) const { return vaddr <=> other.vaddr; }
+
+  constexpr uintptr_t vaddr_end() const { return vaddr + size; }
+  constexpr uintptr_t paddr_end() const { return paddr + size; }
+
+  uintptr_t vaddr = 0;
+  size_t size = 0;
+  uintptr_t paddr = 0;
+  Permissions perms;
+
+  // TODO(https://fxbug.dev/379891035): Revisit handing this information off -
+  // once there is first-class kASan support in physboot.
+  bool kasan_shadow = true;
+};
+static_assert(std::is_default_constructible_v<PhysMapping>);
+
+// The virtual address range intended to be occupied only by an associated,
+// logical grouping of mappings, to be realized as a proper VMAR during VM
+// initialization.
+struct PhysVmar : public PhysVmObject {
+  // It's useful to normalize VMAR order on base address for more readable
+  // kernel start-up logging.
+  constexpr auto operator<=>(const PhysVmar& other) const { return base <=> other.base; }
+
+  constexpr uintptr_t end() const { return base + size; }
+
+#if HANDOFF_PTR_DEREF
+  // The union/OR-ing of all associated mapping permissions.
+  PhysMapping::Permissions permissions() const {
+    PhysMapping::Permissions perms;
+    for (const auto& mapping : mappings.get()) {
+      perms |= mapping.perms;
+    }
+    return perms;
+  }
+#endif
+
+  uintptr_t base = 0;
+  size_t size = 0;
+  PhysHandoffTemporarySpan<const PhysMapping> mappings;
+};
+static_assert(std::is_default_constructible_v<PhysVmar>);
 
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
@@ -136,9 +244,10 @@ struct PhysHandoff {
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryString version_string;
 
-  // Additional VMOs to be published to userland as-is and not otherwise used by
-  // the kernel proper.
-  PhysHandoffTemporarySpan<const PhysVmo> extra_vmos;
+  // VMARs to construct along with mapped regions within. The VMARs will be
+  // sorted by base address, and the mappings within each VMAR will similarly
+  // be sorted by virtual address.
+  PhysHandoffTemporarySpan<const PhysVmar> vmars;
 
   // The data ZBI.
   PhysVmo zbi;
@@ -148,6 +257,10 @@ struct PhysHandoff {
 
   // Userboot.
   PhysVmo userboot;
+
+  // Additional VMOs to be published to userland as-is and not otherwise used by
+  // the kernel proper.
+  PhysHandoffTemporarySpan<const PhysVmo> extra_vmos;
 
   // Entropy gleaned from ZBI Items such as 'ZBI_TYPE_SECURE_ENTROPY' and/or command line.
   std::optional<crypto::EntropyPool> entropy_pool;

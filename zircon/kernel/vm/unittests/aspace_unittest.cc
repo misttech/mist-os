@@ -21,6 +21,40 @@
 
 namespace vm_unittest {
 
+struct KernelRegion {
+  const char* name;
+  vaddr_t base;
+  size_t size;
+  uint arch_mmu_flags;
+};
+
+const ktl::array kernel_regions = {
+    KernelRegion{
+        .name = "kernel_code",
+        .base = (vaddr_t)__code_start,
+        .size = ROUNDUP((uintptr_t)__code_end - (uintptr_t)__code_start, PAGE_SIZE),
+        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE,
+    },
+    KernelRegion{
+        .name = "kernel_rodata",
+        .base = (vaddr_t)__rodata_start,
+        .size = ROUNDUP((uintptr_t)__rodata_end - (uintptr_t)__rodata_start, PAGE_SIZE),
+        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
+    },
+    KernelRegion{
+        .name = "kernel_relro",
+        .base = (vaddr_t)__relro_start,
+        .size = ROUNDUP((uintptr_t)__relro_end - (uintptr_t)__relro_start, PAGE_SIZE),
+        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
+    },
+    KernelRegion{
+        .name = "kernel_data_bss",
+        .base = (vaddr_t)__data_start,
+        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__data_start, PAGE_SIZE),
+        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+    },
+};
+
 // Wrapper for harvesting access bits that informs the page queues
 static void harvest_access_bits(VmAspace::NonTerminalAction non_terminal_action,
                                 VmAspace::TerminalAction terminal_action) {
