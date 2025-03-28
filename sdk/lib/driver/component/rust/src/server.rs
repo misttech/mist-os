@@ -201,7 +201,7 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
 
-    use fdf::Arena;
+    use fdf::{Arena, OnDispatcher};
     use fdf_env::test::with_raw_dispatcher;
     use zx::Status;
 
@@ -250,12 +250,11 @@ mod tests {
                     )
                     .unwrap();
                     client_chan.write(start_msg).unwrap();
-                    let _ = client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap();
+                    let _ = client_chan.read_bytes(dispatcher.clone()).await.unwrap();
 
                     let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
                     client_chan.write(stop_msg).unwrap();
-                    let Err(Status::PEER_CLOSED) =
-                        client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await
+                    let Err(Status::PEER_CLOSED) = client_chan.read_bytes(dispatcher.clone()).await
                     else {
                         panic!("expected peer closed from driver server after end message");
                     };

@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::{addr_of_mut, null_mut, NonNull};
 use core::task::Context;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use zx::Status;
 
@@ -189,6 +189,7 @@ impl Dispatcher {
         (self.get_raw_flags() & DispatcherBuilder::ALLOW_THREAD_BLOCKING) != 0
     }
 
+    /// Schedules the callback [`p`] to be run on this dispatcher later.
     pub fn post_task_sync(&self, p: impl TaskCallback) -> Result<(), Status> {
         // SAFETY: the fdf dispatcher is valid by construction and can provide an async dispatcher.
         let async_dispatcher = unsafe { fdf_dispatcher_get_async_dispatcher(self.0.as_ptr()) };
@@ -216,17 +217,6 @@ impl Dispatcher {
         } else {
             Ok(())
         }
-    }
-
-    pub fn spawn_task(
-        &self,
-        future: impl Future<Output = ()> + 'static + Send,
-    ) -> Result<(), Status> {
-        let task = Arc::new(Task {
-            future: Mutex::new(Some(future.boxed())),
-            dispatcher: ManuallyDrop::new(Dispatcher(self.0)),
-        });
-        task.queue()
     }
 
     /// Releases ownership over this dispatcher and returns a [`DispatcherRef`]
@@ -290,15 +280,80 @@ impl<'a> core::ops::DerefMut for DispatcherRef<'a> {
     }
 }
 
+/// A trait that can be used to access a lifetime-constrained dispatcher in a generic way.
+pub trait OnDispatcher: Clone + Send + Sync + Unpin {
+    /// Runs the function `f` with a lifetime-bound [`DispatcherRef`] for this object's dispatcher.
+    /// If the dispatcher is no longer valid, the callback will be given [`None`].
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R;
+
+    /// Helper version of [`OnDispatcher::on_dispatcher`] that translates an invalidated dispatcher
+    /// handle into a [`Status::BAD_STATE`] error instead of giving the callback [`None`].
+    fn on_maybe_dispatcher<R, E: From<Status>>(
+        &self,
+        f: impl FnOnce(DispatcherRef<'_>) -> Result<R, E>,
+    ) -> Result<R, E> {
+        self.on_dispatcher(|dispatcher| {
+            let dispatcher = dispatcher.ok_or(Status::BAD_STATE)?;
+            f(dispatcher)
+        })
+    }
+
+    /// Spawn an asynchronous task on this dispatcher. If this returns [`Ok`] then the task
+    /// has successfully been scheduled and will run or be cancelled and dropped when the dispatcher
+    /// shuts down.
+    fn spawn_task(&self, future: impl Future<Output = ()> + Send + 'static) -> Result<(), Status>
+    where
+        Self: 'static,
+    {
+        let task =
+            Arc::new(Task { future: Mutex::new(Some(future.boxed())), dispatcher: self.clone() });
+        task.queue()
+    }
+}
+
+impl<'a, D: OnDispatcher> OnDispatcher for &'a D {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        D::on_dispatcher(*self, f)
+    }
+}
+
+impl<'a> OnDispatcher for &'a Dispatcher {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        f(Some(self.as_dispatcher_ref()))
+    }
+}
+
+impl<'a> OnDispatcher for DispatcherRef<'a> {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        f(Some(self.as_dispatcher_ref()))
+    }
+}
+
+impl OnDispatcher for Arc<Dispatcher> {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        f(Some(self.as_dispatcher_ref()))
+    }
+}
+
+impl OnDispatcher for Weak<Dispatcher> {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        let dispatcher = Weak::upgrade(self);
+        match dispatcher {
+            Some(dispatcher) => f(Some(dispatcher.as_dispatcher_ref())),
+            None => f(None),
+        }
+    }
+}
+
 pub trait TaskCallback: FnOnce(Status) + 'static + Send + Sync {}
 impl<T> TaskCallback for T where T: FnOnce(Status) + 'static + Send + Sync {}
 
-struct Task {
+struct Task<D> {
     future: Mutex<Option<BoxFuture<'static, ()>>>,
-    dispatcher: ManuallyDrop<Dispatcher>,
+    dispatcher: D,
 }
 
-impl ArcWake for Task {
+impl<D: OnDispatcher + 'static> ArcWake for Task<D> {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         match arc_self.queue() {
             Err(e) if e == Status::from_raw(ZX_ERR_BAD_STATE) => {
@@ -312,31 +367,33 @@ impl ArcWake for Task {
     }
 }
 
-impl Task {
+impl<D: OnDispatcher + 'static> Task<D> {
     /// Posts a task to progress the currently stored future. The task will
     /// consume the future if the future is ready after the next poll.
     /// Otherwise, the future is kept to be polled again after being woken.
     fn queue(self: &Arc<Self>) -> Result<(), Status> {
         let arc_self = self.clone();
-        self.dispatcher
-            .post_task_sync(move |status| {
-                let mut future_slot = arc_self.future.lock().unwrap();
-                // if we're cancelled, drop the future we're waiting on.
-                if status != Status::from_raw(ZX_OK) {
-                    core::mem::drop(future_slot.take());
-                    return;
-                }
+        self.dispatcher.on_maybe_dispatcher(move |dispatcher| {
+            dispatcher
+                .post_task_sync(move |status| {
+                    let mut future_slot = arc_self.future.lock().unwrap();
+                    // if we're cancelled, drop the future we're waiting on.
+                    if status != Status::from_raw(ZX_OK) {
+                        core::mem::drop(future_slot.take());
+                        return;
+                    }
 
-                let Some(mut future) = future_slot.take() else {
-                    return;
-                };
-                let waker = waker_ref(&arc_self);
-                let context = &mut Context::from_waker(&waker);
-                if future.as_mut().poll(context).is_pending() {
-                    *future_slot = Some(future);
-                }
-            })
-            .map(|_| ())
+                    let Some(mut future) = future_slot.take() else {
+                        return;
+                    };
+                    let waker = waker_ref(&arc_self);
+                    let context = &mut Context::from_waker(&waker);
+                    if future.as_mut().poll(context).is_pending() {
+                        *future_slot = Some(future);
+                    }
+                })
+                .map(|_| ())
+        })
     }
 }
 
@@ -440,14 +497,14 @@ pub mod test {
             }
         });
     }
-    pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(&Arc<Dispatcher>) -> T) -> T {
+    pub fn with_raw_dispatcher<T>(name: &str, p: impl for<'a> FnOnce(Weak<Dispatcher>) -> T) -> T {
         with_raw_dispatcher_flags(name, DispatcherBuilder::ALLOW_THREAD_BLOCKING, p)
     }
 
     pub(crate) fn with_raw_dispatcher_flags<T>(
         name: &str,
         flags: u32,
-        p: impl for<'a> FnOnce(&Arc<Dispatcher>) -> T,
+        p: impl for<'a> FnOnce(Weak<Dispatcher>) -> T,
     ) -> T {
         ensure_driver_env();
 
@@ -480,7 +537,7 @@ pub mod test {
         assert_eq!(res, ZX_OK);
         let dispatcher = Arc::new(Dispatcher(NonNull::new(dispatcher).unwrap()));
 
-        let res = p(&dispatcher);
+        let res = p(Arc::downgrade(&dispatcher));
 
         // this initiates the dispatcher shutdown on a driver runtime
         // thread. When all tasks on the dispatcher have completed, the wait
@@ -519,6 +576,7 @@ mod tests {
     fn post_task_on_dispatcher() {
         with_raw_dispatcher("testing task", |dispatcher| {
             let (tx, rx) = mpsc::channel();
+            let dispatcher = Weak::upgrade(&dispatcher).unwrap();
             dispatcher
                 .post_task_sync(move |status| {
                     assert_eq!(status, Status::from_raw(ZX_OK));
@@ -535,6 +593,7 @@ mod tests {
         with_raw_dispatcher("testing task top level", move |dispatcher| {
             let (tx, rx) = mpsc::channel();
             let (inner_tx, inner_rx) = mpsc::channel();
+            let dispatcher = Weak::upgrade(&dispatcher).unwrap();
             dispatcher
                 .post_task_sync(move |status| {
                     assert_eq!(status, Status::from_raw(ZX_OK));

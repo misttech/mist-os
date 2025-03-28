@@ -8,7 +8,7 @@ use core::future::Future;
 use std::mem::ManuallyDrop;
 use zx::Status;
 
-use crate::{Arena, ArenaBox, DispatcherRef, DriverHandle, Message, MixedHandle};
+use crate::{Arena, ArenaBox, DriverHandle, Message, MixedHandle, OnDispatcher};
 use fdf_sys::*;
 
 use core::marker::PhantomData;
@@ -184,7 +184,7 @@ fn try_read_raw(channel: &DriverHandle) -> Result<Option<Message<[MaybeUninit<u8
 /// # Panic
 ///
 /// Panics if this is not run from a driver framework dispatcher.
-fn read_raw<'a>(channel: &'a DriverHandle, dispatcher: DispatcherRef<'a>) -> ReadMessageRawFut<'a> {
+fn read_raw<'a, D>(channel: &'a DriverHandle, dispatcher: D) -> ReadMessageRawFut<D> {
     // SAFETY: Since the future's lifetime is bound to the original driver handle and it
     // holds the message state, the message state object can't outlive the handle.
     ReadMessageRawFut { raw_fut: unsafe { ReadMessageState::new(channel) }, dispatcher }
@@ -203,7 +203,7 @@ impl<T> Channel<T> {
     }
 
     /// Reads an object of type `T` and a handle set from the channel asynchronously
-    pub async fn read(&self, dispatcher: DispatcherRef<'_>) -> Result<Option<Message<T>>, Status> {
+    pub async fn read<D: OnDispatcher>(&self, dispatcher: D) -> Result<Option<Message<T>>, Status> {
         let Some(message) = read_raw(&self.0, dispatcher).await? else {
             return Ok(None);
         };
@@ -226,9 +226,9 @@ impl Channel<[u8]> {
     }
 
     /// Reads a slice of type `T` and a handle set from the channel asynchronously
-    pub async fn read_bytes(
+    pub async fn read_bytes<D: OnDispatcher>(
         &self,
-        dispatcher: DispatcherRef<'_>,
+        dispatcher: D,
     ) -> Result<Option<Message<[u8]>>, Status> {
         // read a message from the channel
         let Some(message) = read_raw(&self.0, dispatcher).await? else {
@@ -324,10 +324,10 @@ impl ReadMessageState {
     }
 
     /// Polls this channel read operation against the given dispatcher.
-    pub(crate) fn poll_with_dispatcher(
+    pub(crate) fn poll_with_dispatcher<D: OnDispatcher>(
         self: &mut Self,
         cx: &mut Context<'_>,
-        dispatcher: DispatcherRef<'_>,
+        dispatcher: D,
     ) -> Poll<Result<Option<Message<[MaybeUninit<u8>]>>, Status>> {
         let mut waker_lock = self.op.waker.lock().unwrap();
 
@@ -340,17 +340,22 @@ impl ReadMessageState {
                     // increment the reference count of the read op to account for the copy that will be given to
                     // `fdf_channel_wait_async`.
                     let op = Arc::into_raw(self.op.clone());
-                    // SAFETY: the `ReadMessageStateOp` starts with an `fdf_channel_read` struct and
-                    // has `repr(C)` layout, so is safe to be cast to the latter.
-                    let res = Status::ok(unsafe {
-                        fdf_channel_wait_async(dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
+                    let res = dispatcher.on_maybe_dispatcher(|dispatcher| {
+                        // SAFETY: the `ReadMessageStateOp` starts with an `fdf_channel_read` struct and
+                        // has `repr(C)` layout, so is safe to be cast to the latter.
+                        let res = Status::ok(unsafe {
+                            fdf_channel_wait_async(dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
+                        });
+                        // if the dispatcher we're waiting on is unsynchronized, the callback
+                        // will drop the Arc and we need to indicate to our own Drop impl
+                        // that it should not.
+                        let callback_drops_arc = res.is_ok() && dispatcher.is_unsynchronized();
+                        Ok(callback_drops_arc)
                     });
+
                     match res {
-                        Ok(()) => {
-                            // if the dispatcher we're waiting on is unsynchronized, the callback
-                            // will drop the Arc and we need to indicate to our own Drop impl
-                            // that it should not.
-                            self.callback_drops_arc = dispatcher.is_unsynchronized();
+                        Ok(callback_drops_arc) => {
+                            self.callback_drops_arc = callback_drops_arc;
                         }
                         Err(e) => return Poll::Ready(Err(e)),
                     }
@@ -394,12 +399,12 @@ impl Drop for ReadMessageState {
     }
 }
 
-struct ReadMessageRawFut<'a> {
+struct ReadMessageRawFut<D> {
     raw_fut: ReadMessageState,
-    dispatcher: DispatcherRef<'a>,
+    dispatcher: D,
 }
 
-impl<'a> Future for ReadMessageRawFut<'a> {
+impl<D: OnDispatcher> Future for ReadMessageRawFut<D> {
     type Output = Result<Option<Message<[MaybeUninit<u8>]>>, Status>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -415,7 +420,7 @@ mod tests {
 
     use crate::test::{with_raw_dispatcher, with_raw_dispatcher_flags};
     use crate::tests::DropSender;
-    use crate::{Dispatcher, DispatcherBuilder, MixedHandleType};
+    use crate::{DispatcherBuilder, MixedHandleType, OnDispatcher};
 
     use super::*;
 
@@ -445,13 +450,10 @@ mod tests {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (first, second) = Channel::create();
 
-            let dispatcher = dispatcher.clone();
             dispatcher
                 .clone()
                 .spawn_task(async move {
-                    fin_tx
-                        .send(first.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap())
-                        .unwrap();
+                    fin_tx.send(first.read_bytes(dispatcher.clone()).await.unwrap()).unwrap();
                 })
                 .unwrap();
             second.write_with_data(arena, |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
@@ -510,23 +512,23 @@ mod tests {
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
     }
 
-    async fn ping(dispatcher: Arc<Dispatcher>, chan: Channel<u8>) {
+    async fn ping<D: OnDispatcher>(dispatcher: D, chan: Channel<u8>) {
         println!("starting ping!");
         chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
-        while let Ok(Some(msg)) = chan.read(dispatcher.as_dispatcher_ref()).await {
+        while let Ok(Some(msg)) = chan.read(dispatcher.clone()).await {
             let next = *msg.data().unwrap();
             println!("ping! {next}");
             chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
         }
     }
 
-    async fn pong(
-        dispatcher: Arc<Dispatcher>,
+    async fn pong<D: OnDispatcher>(
+        dispatcher: D,
         fin_tx: std::sync::mpsc::Sender<()>,
         chan: Channel<u8>,
     ) {
         println!("starting pong!");
-        while let Some(msg) = chan.read(dispatcher.as_dispatcher_ref()).await.unwrap() {
+        while let Some(msg) = chan.read(dispatcher.clone()).await.unwrap() {
             let next = *msg.data().unwrap();
             println!("pong! {next}");
             if next > 10 {
@@ -556,7 +558,7 @@ mod tests {
             let (fin_tx, fin_rx) = mpsc::channel();
             let (ping_chan, pong_chan) = Channel::create();
 
-            let dispatcher = dispatcher.clone();
+            let dispatcher = Weak::upgrade(&dispatcher).unwrap();
             dispatcher
                 .clone()
                 .post_task_sync(move |_status| {
@@ -593,11 +595,11 @@ mod tests {
     /// that the internal op arc has the right refcount at all steps. Returns a copy
     /// of the op arc at the end so it can be verified that the count goes down
     /// to zero correctly.
-    async fn read_and_drop<T: ?Sized + 'static>(
+    async fn read_and_drop<T: ?Sized + 'static, D: OnDispatcher>(
         channel: &Channel<T>,
-        dispatcher: DispatcherRef<'_>,
+        dispatcher: D,
     ) -> Weak<ReadMessageStateOp> {
-        let fut = read_raw(&channel.0, dispatcher.as_dispatcher_ref());
+        let fut = read_raw(&channel.0, dispatcher);
         let op_arc = Arc::downgrade(&fut.raw_fut.op);
         assert_strong_count(&op_arc, 1);
         let mut fut = pin!(fut);
@@ -619,12 +621,9 @@ mod tests {
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
                     // so that it properly sets up the wait.
-                    read_and_drop(&a, dispatcher.as_dispatcher_ref()).await;
+                    read_and_drop(&a, dispatcher.clone()).await;
                     b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
-                    assert_eq!(
-                        a.read(dispatcher.as_dispatcher_ref()).await.unwrap().unwrap().data(),
-                        Some(&1)
-                    );
+                    assert_eq!(a.read(dispatcher.clone()).await.unwrap().unwrap().data(), Some(&1));
                     fin_tx.send(()).unwrap();
                 })
                 .unwrap();
@@ -643,7 +642,7 @@ mod tests {
                 .clone()
                 .spawn_task(async move {
                     // drop before even polling it should drop the arc correctly
-                    let fut = read_raw(&a.0, dispatcher.as_dispatcher_ref());
+                    let fut = read_raw(&a.0, dispatcher.clone());
                     let op_arc = Arc::downgrade(&fut.raw_fut.op);
                     assert_strong_count(&op_arc, 1);
                     drop(fut);
@@ -665,10 +664,7 @@ mod tests {
             dispatcher
                 .clone()
                 .spawn_task(async move {
-                    assert_strong_count(
-                        &read_and_drop(&a, dispatcher.as_dispatcher_ref()).await,
-                        0,
-                    );
+                    assert_strong_count(&read_and_drop(&a, dispatcher.clone()).await, 0);
                     fin_tx.send(()).unwrap();
                 })
                 .unwrap();
@@ -694,7 +690,7 @@ mod tests {
                         // that we can be sure that the callback has had a chance to be called.
                         // We send the channel back out so that it lives long enough for the
                         // cancellation to be called on it.
-                        let res = read_and_drop(&a, inner_dispatcher.as_dispatcher_ref()).await;
+                        let res = read_and_drop(&a, inner_dispatcher.clone()).await;
                         fin_tx.send((res, a)).unwrap();
                     })
                     .unwrap();

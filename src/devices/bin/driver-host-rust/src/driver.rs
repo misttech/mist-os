@@ -5,6 +5,7 @@
 use crate::loader::{Library, LoaderService};
 use crate::modules::ModulesAndSymbols;
 use crate::utils::*;
+use fdf::OnDispatcher;
 use fdf_component::Incoming;
 use fidl::client::decode_transaction_body;
 use fidl::encoding::{DefaultFuchsiaResourceDialect, EmptyStruct, ResultType};
