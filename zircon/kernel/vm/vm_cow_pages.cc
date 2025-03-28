@@ -6068,6 +6068,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     return ReclaimCounts{};
   }
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
@@ -6103,16 +6104,14 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   // Remove any mappings to this page before we remove it.
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
-  }
+  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
   DEBUG_ASSERT(p == page);
   const bool loaned = page->is_loaned();
-  RemoveAndFreePageLocked(page);
+  RemovePageLocked(page, deferred);
 
   reclamation_event_count_++;
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
