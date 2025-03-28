@@ -66,7 +66,12 @@ fi
 # If build profiling is enabled, collect system stats during build,
 # including CPU, memory, disk I/O...
 BUILD_PROFILE_ENABLED=0
-readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx-build-profile-config"
+readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx/config/build-profile"
+readonly fx_build_profile_config_old="${FUCHSIA_DIR}/.fx-build-profile-config"
+if [[ -f "$fx_build_profile_config_old" ]]; then
+  fx-info "Moving $fx_build_profile_config_old to new location $fx_build_profile_config.  No further action is necessary."
+  mv "$fx_build_profile_config_old" "$fx_build_profile_config"
+fi
 if [[ -f "$fx_build_profile_config" ]]; then
   # shellcheck source=/dev/null
   source "$fx_build_profile_config"

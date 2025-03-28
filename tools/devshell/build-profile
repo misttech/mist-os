@@ -26,7 +26,8 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
 
-readonly BUILD_PROFILE_CONFIG="${FUCHSIA_DIR}/.fx-build-profile-config"
+readonly BUILD_PROFILE_CONFIG="${FUCHSIA_DIR}/.fx/config/build-profile"
+readonly BUILD_PROFILE_CONFIG_OLD="${FUCHSIA_DIR}/.fx-build-profile-config"
 
 function usage {
   fx-command-help
@@ -60,6 +61,10 @@ action_args=("$@")
 
 function build-profile-read-config {
   BUILD_PROFILE_ENABLED=0
+  if [[ -f "${BUILD_PROFILE_CONFIG_OLD}" ]]; then
+    fx-info "Moving ${BUILD_PROFILE_CONFIG_OLD} to new location ${BUILD_PROFILE_CONFIG}.  No further action is necessary."
+    mv "${BUILD_PROFILE_CONFIG_OLD}" "${BUILD_PROFILE_CONFIG}"
+  fi
   if [[ ! -f "${BUILD_PROFILE_CONFIG}" ]]; then
     return 1
   fi
