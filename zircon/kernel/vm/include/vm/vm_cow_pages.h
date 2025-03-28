@@ -1143,6 +1143,9 @@ class VmCowPages final : public VmHierarchyBase,
   // page source).
   void RemoveAndFreePageLocked(vm_page_t* page) TA_REQ(lock());
 
+  // Helper for removing a page from the PageQueues and adding to a deferred ops for later freeing.
+  void RemovePageLocked(vm_page_t* page, DeferredOps& ops) TA_REQ(lock());
+
   // Helper for removing a page from the page queues and either returning it immediately to the PMM
   // if it's a loaned page, or appending it to the supplied list.
   void RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) TA_REQ(lock());

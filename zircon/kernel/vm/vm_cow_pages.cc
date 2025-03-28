@@ -443,6 +443,16 @@ void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page) {
   }
 }
 
+void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
+  if (page->is_loaned()) {
+    Pmm::Node().BeginFreeLoanedPage(
+        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, ops.Flph(this));
+  } else {
+    pmm_page_queues()->Remove(page);
+    list_add_tail(&ops.FreeList(this).list_, &page->queue_node);
+  }
+}
+
 void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
   if (page->is_loaned()) {
     FreeLoanedPagesHolder flph;
