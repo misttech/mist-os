@@ -82,7 +82,7 @@ _COMMON_FILESYSTEMS = {
         "key_metadata": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_dev_atx_metadata.bin)",
     },
     "zbi": {
-        "compression": "zstd.17" if compilation_mode == "debug" else "zstd",
+        "compression": "zstd.16" if compilation_mode == "debug" else "zstd",
     },
     "fvm": {
         "blobfs": {
