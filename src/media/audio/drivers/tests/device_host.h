@@ -25,7 +25,7 @@ class DeviceHost {
   void AddDevices(bool devfs_only, bool no_virtual_audio);
 
   // Create testcase instances for each device entry, based on the passed-in configuration.
-  void RegisterTests(bool expect_audio_core_not_connected, bool enable_position_tests);
+  void RegisterTests(bool expect_audio_svcs_not_connected, bool enable_position_tests);
 
   // Testing is complete. Clean up our virtual audio devices and shut down our loop.
   zx_status_t QuitDeviceLoop();

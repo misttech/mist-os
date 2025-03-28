@@ -32,9 +32,9 @@ namespace media::audio::drivers::test {
 
 extern void RegisterBasicTestsForDevice(const DeviceEntry& device_entry);
 extern void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
-                                        bool expect_audio_core_not_connected);
+                                        bool expect_audio_svcs_not_connected);
 extern void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
-                                           bool expect_audio_core_not_connected,
+                                           bool expect_audio_svcs_not_connected,
                                            bool enable_position_tests);
 
 static const struct {
@@ -259,11 +259,11 @@ void DeviceHost::AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& control
 }
 
 // Create testcase instances for each device entry.
-void DeviceHost::RegisterTests(bool expect_audio_core_not_connected, bool enable_position_tests) {
+void DeviceHost::RegisterTests(bool expect_audio_svcs_not_connected, bool enable_position_tests) {
   for (auto& device_entry : device_entries()) {
     RegisterBasicTestsForDevice(device_entry);
-    RegisterAdminTestsForDevice(device_entry, expect_audio_core_not_connected);
-    RegisterPositionTestsForDevice(device_entry, expect_audio_core_not_connected,
+    RegisterAdminTestsForDevice(device_entry, expect_audio_svcs_not_connected);
+    RegisterPositionTestsForDevice(device_entry, expect_audio_svcs_not_connected,
                                    enable_position_tests);
   }
 }

@@ -691,10 +691,11 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
       [&]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
 
 void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
-                                 bool expect_audio_core_not_connected) {
-  // If audio_core is connected to the audio driver, admin tests will fail.
-  // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (!(device_entry.isA2DP() || expect_audio_core_not_connected)) {
+                                 bool expect_audio_svcs_not_connected) {
+  // If audio_core or audio_device_registry is connected to the audio driver, admin tests will fail.
+  // We test a hermetic instance of the A2DP driver, so audio services are never connected to it --
+  // thus we can always run the admin tests on it.
+  if (!(device_entry.isA2DP() || expect_audio_svcs_not_connected)) {
     return;
   }
 
