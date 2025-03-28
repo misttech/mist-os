@@ -388,8 +388,8 @@ impl OnDispatcher for CurrentDispatcher {
     }
 }
 
-pub trait TaskCallback: FnOnce(Status) + 'static + Send + Sync {}
-impl<T> TaskCallback for T where T: FnOnce(Status) + 'static + Send + Sync {}
+pub trait TaskCallback: FnOnce(Status) + 'static + Send {}
+impl<T> TaskCallback for T where T: FnOnce(Status) + 'static + Send {}
 
 struct Task<D> {
     future: Mutex<Option<BoxFuture<'static, ()>>>,

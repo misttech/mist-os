@@ -4,7 +4,7 @@
 
 //! Safe bindings for driver runtime environment.
 
-#![allow(unused)]
+#![deny(missing_docs)]
 
 use fdf_sys::*;
 
@@ -15,6 +15,8 @@ use core::ptr::{null_mut, NonNull};
 use zx::Status;
 
 use fdf::{Dispatcher, DispatcherBuilder, DispatcherRef, ShutdownObserver};
+
+pub mod test;
 
 /// Create the dispatcher as configured by this object. This must be called from a
 /// thread managed by the driver runtime. The dispatcher returned is owned by the caller,
@@ -69,6 +71,8 @@ fn create_with_driver_released<'a>(
     create_with_driver(dispatcher, driver).map(Dispatcher::release)
 }
 
+/// A marker trait for a function that can be used as a driver shutdown observer with
+/// [`Driver::shutdown`].
 pub trait DriverShutdownObserverFn<T: 'static>:
     FnOnce(DriverRef<'static, T>) + Send + Sync + 'static
 {
@@ -87,7 +91,7 @@ impl<T, U: 'static> DriverShutdownObserverFn<U> for T where
 /// `*mut fdf_dispatcher_shutdown_observer` and a `*mut ShutdownObserver`. To that end,
 /// it is important that this struct stay both `#[repr(C)]` and that `observer` be its first member.
 #[repr(C)]
-pub struct DriverShutdownObserver<T: 'static> {
+struct DriverShutdownObserver<T: 'static> {
     observer: fdf_env_driver_shutdown_observer,
     shutdown_fn: Box<dyn DriverShutdownObserverFn<T>>,
     driver: Driver<T>,
@@ -145,6 +149,7 @@ impl<T: 'static> DriverShutdownObserver<T> {
     }
 }
 
+/// An owned handle to a Driver instance that can be used to create initial dispatchers.
 #[derive(Debug)]
 pub struct Driver<T> {
     pub(crate) inner: NonNull<T>,
@@ -165,7 +170,7 @@ impl<T: 'static> Driver<T> {
         create_with_driver_released(dispatcher, self.as_ref_type_erased())
     }
 
-    // Run a closure in the context of a driver.
+    /// Run a closure in the context of a driver.
     pub fn enter<R>(&mut self, f: impl FnOnce() -> R) -> R {
         unsafe { fdf_env_register_driver_entry(self.inner.as_ptr() as *const _) };
         let res = f();
@@ -173,6 +178,7 @@ impl<T: 'static> Driver<T> {
         res
     }
 
+    /// Adds an allowed scheduler role to the driver
     pub fn add_allowed_scheduler_role(&self, scheduler_role: &str) {
         let driver_ptr = self.inner.as_ptr() as *const _;
         let scheduler_role_ptr = scheduler_role.as_ptr() as *mut ffi::c_char;
@@ -186,10 +192,10 @@ impl<T: 'static> Driver<T> {
         };
     }
 
-    // Asynchronously shuts down all dispatchers owned by |driver|.
-    // |f| will be called once shutdown completes. This is guaranteed to be
-    // after all the dispatcher's shutdown observers have been called, and will be running
-    // on the thread of the final dispatcher which has been shutdown.
+    /// Asynchronously shuts down all dispatchers owned by |driver|.
+    /// |f| will be called once shutdown completes. This is guaranteed to be
+    /// after all the dispatcher's shutdown observers have been called, and will be running
+    /// on the thread of the final dispatcher which has been shutdown.
     pub fn shutdown<F: DriverShutdownObserverFn<T>>(mut self, f: F) {
         self.shutdown_triggered = true;
         // It should be impossible for this to fail as we ensure we are the only caller of this
@@ -203,10 +209,12 @@ impl<T: 'static> Driver<T> {
     /// Create a reference to a driver without ownership. The returned reference lacks the ability
     /// to perform most actions available to the owner of the driver, therefore it doesn't need to
     /// have it's lifetime tracked closely.
-    pub fn as_ref_type_erased<'a>(&'a self) -> DriverRefTypeErased<'a> {
+    fn as_ref_type_erased<'a>(&'a self) -> DriverRefTypeErased<'a> {
         DriverRefTypeErased(self.inner.as_ptr() as *const _, PhantomData)
     }
 
+    /// Releases ownership of this driver instance, allowing it to be shut down when the runtime
+    /// shuts down.
     pub fn release(self) -> DriverRef<'static, T> {
         DriverRef(self.inner.as_ptr() as *const _, PhantomData)
     }
@@ -220,7 +228,7 @@ impl<T> Drop for Driver<T> {
 
 // Note that inner type is not guaranteed to not be null.
 #[derive(Clone, Copy)]
-pub struct DriverRefTypeErased<'a>(*const ffi::c_void, PhantomData<&'a u32>);
+struct DriverRefTypeErased<'a>(*const ffi::c_void, PhantomData<&'a u32>);
 
 impl Default for DriverRefTypeErased<'_> {
     fn default() -> Self {
@@ -228,11 +236,14 @@ impl Default for DriverRefTypeErased<'_> {
     }
 }
 
+/// A lifetime-bound reference to a driver handle.
 pub struct DriverRef<'a, T>(pub *const T, PhantomData<&'a Driver<T>>);
 
+/// The driver runtime environment
 pub struct Environment;
 
 impl Environment {
+    /// Whether the environment should enforce scheduler roles. Used with [`Self::start`].
     pub const ENFORCE_ALLOWED_SCHEDULER_ROLES: u32 = 1;
 
     /// Start the driver runtime. This sets up the initial thread that the dispatchers run on.
@@ -254,17 +265,6 @@ impl Environment {
         Driver {
             inner: NonNull::new(driver as *mut _).expect("driver must not be null"),
             shutdown_triggered: false,
-        }
-    }
-
-    /// Calls |f| with the driver on top of the the thread's current call stack. If no drivers
-    /// ar currently on the stack, it will pass in None instead.
-    pub fn with_current_driver<R>(f: impl FnOnce(Option<DriverRefTypeErased<'_>>) -> R) -> R {
-        let driver = unsafe { fdf_env_get_current_driver() };
-        if driver.is_null() {
-            f(None)
-        } else {
-            f(Some(DriverRefTypeErased(driver, PhantomData)))
         }
     }
 
@@ -337,60 +337,5 @@ impl Environment {
         Status::ok(unsafe {
             fdf_env_set_thread_limit(scheduler_role_ptr, scheduler_role_len, max_threads)
         })
-    }
-}
-
-pub mod test {
-    use std::sync::{mpsc, Arc};
-
-    use super::*;
-    use fdf::*;
-
-    pub fn with_raw_dispatcher<T>(
-        name: &str,
-        p: impl for<'a> FnOnce(DispatcherRef<'static>) -> T,
-    ) -> T {
-        with_raw_dispatcher_etc(name, true, false, p)
-    }
-
-    pub fn with_raw_dispatcher_etc<T>(
-        name: &str,
-        allow_thread_blocking: bool,
-        unsynchronized: bool,
-        p: impl for<'a> FnOnce(DispatcherRef<'static>) -> T,
-    ) -> T {
-        let env = Arc::new(Environment::start(0).unwrap());
-        let env_clone = env.clone();
-
-        let (shutdown_tx, shutdown_rx) = mpsc::channel();
-        let driver_value: u32 = 0x1337;
-        let driver_value_ptr = &driver_value as *const u32;
-        let driver = env.new_driver(driver_value_ptr);
-        let dispatcher = DispatcherBuilder::new().name(name);
-        let dispatcher =
-            if allow_thread_blocking { dispatcher.allow_thread_blocking() } else { dispatcher };
-        let dispatcher = if unsynchronized { dispatcher.unsynchronized() } else { dispatcher };
-        let dispatcher = dispatcher.shutdown_observer(move |dispatcher| {
-            // We verify that the dispatcher has no tasks left queued in it,
-            // just because this is testing code.
-            assert!(!env_clone.dispatcher_has_queued_tasks(dispatcher.as_dispatcher_ref()));
-        });
-        let dispatcher = driver.new_dispatcher(dispatcher).unwrap();
-
-        let res = p(dispatcher.clone());
-
-        // This initiates the dispatcher shutdown on a driver runtime
-        // thread. When all tasks on the dispatcher have completed, the wait
-        // on the shutdown_rx below will end and we can tear it down.
-        drop(dispatcher);
-        driver.shutdown(move |driver| {
-            // SAFTEY: driver lives on the stack, it's safe to dereference it.
-            assert!(unsafe { *driver.0 } == 0x1337);
-            shutdown_tx.send(()).unwrap();
-        });
-
-        shutdown_rx.recv().unwrap();
-
-        res
     }
 }
