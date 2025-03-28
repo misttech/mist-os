@@ -41,9 +41,9 @@ use starnix_uapi::{
     bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_BIND_MAP,
     bpf_cmd_BPF_PROG_DETACH, bpf_cmd_BPF_PROG_GET_FD_BY_ID, bpf_cmd_BPF_PROG_GET_NEXT_ID,
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
-    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_insn, bpf_map_info,
-    bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
-    error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
+    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE, bpf_insn,
+    bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
+    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
@@ -535,6 +535,10 @@ pub fn sys_bpf(
         }
         bpf_cmd_BPF_PROG_BIND_MAP => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_BIND_MAP");
+            error!(EINVAL)
+        }
+        bpf_cmd_BPF_TOKEN_CREATE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_TOKEN_CREATE");
             error!(EINVAL)
         }
         _ => {
