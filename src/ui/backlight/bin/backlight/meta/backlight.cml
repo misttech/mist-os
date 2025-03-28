@@ -11,10 +11,6 @@
         binary: "bin/backlight",
     },
     use: [
-        {
-            directory: "dev-backlight",
-            rights: [ "r*" ],
-            path: "/dev/class/backlight",
-        },
+        { service: "fuchsia.hardware.backlight.Service" },
     ],
 }

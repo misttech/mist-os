@@ -165,7 +165,7 @@ async fn main() -> Result<(), Error> {
         Backlight::with_display_power(config.power_off_delay_millis, config.power_on_delay_millis)
             .await?
     } else {
-        Backlight::without_display_power()?
+        Backlight::without_display_power().await?
     };
     let backlight = Arc::new(backlight);
 

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <unistd.h>
 
 #include <array>
@@ -96,14 +97,12 @@ class BacklightDevice {
 class BacklightTest : public zxtest::Test {
  public:
   void SetUp() override {
-    constexpr char kDevicePath[] = "/dev/class/backlight/";
-    if (std::filesystem::exists(kDevicePath)) {
-      for (const auto& entry : std::filesystem::directory_iterator(kDevicePath)) {
-        printf("Found backlight device: %s\n", entry.path().c_str());
-        zx::result client_end = component::Connect<FidlBacklight::Device>(entry.path().c_str());
-        ASSERT_OK(client_end);
-        devices_.push_back(std::make_unique<BacklightDevice>(std::move(client_end.value())));
-      }
+    component::SyncServiceMemberWatcher<FidlBacklight::Service::Backlight> watcher;
+    auto result = watcher.GetNextInstance(true);
+    while (result.is_ok()) {
+      printf("Found backlight device.\n");
+      devices_.push_back(std::make_unique<BacklightDevice>(std::move(result.value())));
+      result = watcher.GetNextInstance(true);
     }
     if (devices_.empty()) {
       printf("No backlight devices found. Exiting...\n");

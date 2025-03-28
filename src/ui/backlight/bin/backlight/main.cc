@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 
 #include <filesystem>
 
@@ -24,17 +25,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  constexpr char kDevicePath[] = "/dev/class/backlight/";
-  std::optional<std::string> path;
-  for (const auto& entry : std::filesystem::directory_iterator(kDevicePath)) {
-    path = entry.path().string();
-    break;
-  }
-  if (!path.has_value()) {
-    printf("Found no backlight devices in %s\n", kDevicePath);
-    return -1;
-  }
-  zx::result client_end = component::Connect<FidlBacklight::Device>(path.value());
+  component::SyncServiceMemberWatcher<FidlBacklight::Service::Backlight> watcher;
+  zx::result client_end = watcher.GetNextInstance(true);
   if (client_end.is_error()) {
     printf("Failed to open backlight: %s\n", client_end.status_string());
     return -1;

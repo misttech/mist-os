@@ -32,11 +32,9 @@
             to: "#auto-brightness",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.backlight.Service",
             from: "parent",
-            as: "dev-backlight",
             to: "#auto-brightness",
-            subdir: "backlight",
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have

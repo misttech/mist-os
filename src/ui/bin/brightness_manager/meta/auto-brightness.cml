@@ -8,11 +8,7 @@
         binary: "bin/auto_brightness",
     },
     use: [
-        {
-            directory: "dev-backlight",
-            rights: [ "r*" ],
-            path: "/dev/class/backlight",
-        },
+        { service: "fuchsia.hardware.backlight.Service" },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
             // been migrated to services. The service capability has been added below.
