@@ -16,7 +16,6 @@ source_set("virtio_netdevice_lib") {
     "//src/lib/ddktl",
     "//src/lib/vmo_store",
     "//vendor/misttech/src/connectivity/network/drivers/network-device:src",
-    "//vendor/misttech/third_party/lwip",
   ]
   configs += [ "//build/config:default_include_dirs" ]
 }
