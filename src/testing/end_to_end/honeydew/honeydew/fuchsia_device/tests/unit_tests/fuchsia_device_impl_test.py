@@ -194,7 +194,7 @@ def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
             content_size=size,
             # The args below are arbitrary.
             mode=0,
-            id=0,
+            id_=0,
             storage_size=0,
             link_count=0,
             creation_time=0,

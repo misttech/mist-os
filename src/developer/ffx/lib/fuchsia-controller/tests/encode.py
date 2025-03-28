@@ -62,7 +62,7 @@ class Encode(common.FuchsiaControllerTest):
         obj = typing.cast(typing.Any, EncodeObj())
         setattr(obj, "tab", EncodeObj())
         setattr(obj.tab, "dub", 2.0)
-        setattr(obj.tab, "str", "foobar")
+        setattr(obj.tab, "str_", "foobar")
         setattr(obj.tab, "union_field", EncodeObj())
         setattr(obj.tab.union_field, "union_int", 5)
 
@@ -96,7 +96,7 @@ class Encode(common.FuchsiaControllerTest):
         obj = typing.cast(typing.Any, EncodeObj())
         setattr(obj, "tab", EncodeObj())
         setattr(obj.tab, "dub", 2.0)
-        setattr(obj.tab, "str", "foobar")
+        setattr(obj.tab, "str_", "foobar")
         setattr(obj.tab, "union_field", EncodeObj())
         setattr(obj.tab.union_field, "union_int", 5)
         (b, h) = encode_fidl_message(
@@ -117,7 +117,7 @@ class Encode(common.FuchsiaControllerTest):
                 "tab": {
                     "dub": 2.0,
                     "integer": None,
-                    "str": "foobar",
+                    "str_": "foobar",
                     "union_field": {
                         "union_int": 5,
                     },

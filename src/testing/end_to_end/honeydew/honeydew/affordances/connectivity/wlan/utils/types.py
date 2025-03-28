@@ -408,7 +408,7 @@ class NetworkConfig:
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkConfig) -> "NetworkConfig":
         """Parse from a fuchsia.wlan.policy/NetworkConfig."""
-        identifier = NetworkIdentifier.from_fidl(fidl.id)
+        identifier = NetworkIdentifier.from_fidl(fidl.id_)
         credential = Credential.from_fidl(fidl.credential)
         return NetworkConfig(
             ssid=identifier.ssid,
@@ -420,7 +420,7 @@ class NetworkConfig:
     def to_fidl(self) -> f_wlan_policy.NetworkConfig:
         """Convert to equivalent FIDL."""
         return f_wlan_policy.NetworkConfig(
-            id=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
+            id_=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
             credential=Credential.from_password(
                 self.credential_value
             ).to_fidl(),
@@ -447,14 +447,14 @@ class NetworkIdentifier:
 
         return NetworkIdentifier(
             ssid=bytes(fidl.ssid).decode("utf-8"),
-            security_type=SecurityType.from_fidl(fidl.type),
+            security_type=SecurityType.from_fidl(fidl.type_),
         )
 
     def to_fidl(self) -> f_wlan_policy.NetworkIdentifier:
         """Convert to a fuchsia.wlan.policy/NetworkIdentifier."""
         return f_wlan_policy.NetworkIdentifier(
             ssid=list(self.ssid.encode("utf-8")),
-            type=self.security_type.to_fidl(),
+            type_=self.security_type.to_fidl(),
         )
 
     def __lt__(self, other: NetworkIdentifier) -> bool:
@@ -573,7 +573,7 @@ class NetworkState:
     def from_fidl(fidl: f_wlan_policy.NetworkState) -> "NetworkState":
         """Parse from a fuchsia.wlan.policy/NetworkState."""
         return NetworkState(
-            network_identifier=NetworkIdentifier.from_fidl(fidl.id),
+            network_identifier=NetworkIdentifier.from_fidl(fidl.id_),
             connection_state=ConnectionState.from_fidl(fidl.state),
             disconnect_status=(
                 DisconnectStatus.from_fidl(fidl.status) if fidl.status else None
@@ -652,7 +652,7 @@ class QueryIfaceResponse:
     """
 
     role: WlanMacRole
-    id: int
+    id_: int
     phy_id: int
     phy_assigned_id: int
     sta_addr: list[int]
@@ -664,7 +664,7 @@ class QueryIfaceResponse:
         """Parse from a fuchsia.wlan.device.service/QueryIfaceResponse."""
         return QueryIfaceResponse(
             role=WlanMacRole.from_fidl(fidl.role),
-            id=fidl.id,
+            id_=fidl.id_,
             phy_id=fidl.phy_id,
             phy_assigned_id=fidl.phy_assigned_id,
             sta_addr=list(fidl.sta_addr),
@@ -1105,7 +1105,7 @@ class AccessPointState:
     clients: ConnectedClientInformation | None
     """Information about connected clients."""
 
-    id: NetworkIdentifier
+    id_: NetworkIdentifier
     """Identifying information of the access point whose state has changed."""
 
     @staticmethod
@@ -1123,7 +1123,7 @@ class AccessPointState:
                 if fidl.clients
                 else None
             ),
-            id=NetworkIdentifier.from_fidl(fidl.id),
+            id_=NetworkIdentifier.from_fidl(fidl.id_),
         )
 
 

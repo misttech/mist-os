@@ -36,7 +36,7 @@ class PairingDelegateImpl(f_btsys_controller.PairingDelegate.Server):
         """
         _LOGGER.info(
             "On Pairing Request method called with peer: %s",
-            pairing_start_request.peer.id.value,
+            pairing_start_request.peer.id_.value,
         )
         return f_btsys_controller.PairingDelegateOnPairingRequestResponse(
             accept=True, entered_passkey=0

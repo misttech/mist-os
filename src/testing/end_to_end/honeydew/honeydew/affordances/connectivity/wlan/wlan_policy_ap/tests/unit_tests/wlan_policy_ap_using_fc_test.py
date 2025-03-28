@@ -44,7 +44,7 @@ _ACCESS_POINT_STATE = AccessPointState(
     band=OperatingBand.ONLY_2_4GHZ,
     frequency=None,
     clients=None,
-    id=NetworkIdentifier(ssid=_TEST_SSID, security_type=SecurityType.WPA2),
+    id_=NetworkIdentifier(ssid=_TEST_SSID, security_type=SecurityType.WPA2),
 )
 _ACCESS_POINT_STATE_FIDL = f_wlan_policy.AccessPointState(
     state=f_wlan_policy.OperatingState.STARTING,
@@ -52,9 +52,9 @@ _ACCESS_POINT_STATE_FIDL = f_wlan_policy.AccessPointState(
     band=f_wlan_policy.OperatingBand.ONLY_2_4GHZ,
     frequency=None,
     clients=None,
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=list(_TEST_SSID_BYTES),
-        type=f_wlan_policy.SecurityType.WPA2,
+        type_=f_wlan_policy.SecurityType.WPA2,
     ),
 )
 

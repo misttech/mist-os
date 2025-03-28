@@ -228,14 +228,14 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         _LOGGER.debug(
             "Calling fuchsia.wlan.policy/ClientController.Connect("
-            'ssid="%s", type="%s")',
+            'ssid="%s", type_="%s")',
             target_ssid,
             security_type,
         )
 
         try:
             resp = await self._client_controller.proxy.connect(
-                id=NetworkIdentifier(target_ssid, security_type).to_fidl(),
+                id_=NetworkIdentifier(target_ssid, security_type).to_fidl(),
             )
             return RequestStatus.from_fidl(resp.status)
         except ZxStatus as status:
@@ -417,7 +417,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         _LOGGER.debug(
             "Calling fuchsia.wlan.policy/ClientController.RemoveNetwork("
-            'ssid="%s", type="%s", credential="%s")',
+            'ssid="%s", type_="%s", credential="%s")',
             target_ssid,
             security_type,
             target_pwd,
@@ -426,9 +426,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         try:
             res = await self._client_controller.proxy.remove_network(
                 config=f_wlan_policy.NetworkConfig(
-                    id=f_wlan_policy.NetworkIdentifier(
+                    id_=f_wlan_policy.NetworkIdentifier(
                         ssid=list(target_ssid.encode("utf-8")),
-                        type=security_type.to_fidl(),
+                        type_=security_type.to_fidl(),
                     ),
                     credential=Credential.from_password(target_pwd).to_fidl(),
                 ),
@@ -471,7 +471,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         _LOGGER.debug(
             "Calling fuchsia.wlan.policy/ClientController.SaveNetwork("
-            'ssid="%s", type="%s", credential="%s")',
+            'ssid="%s", type_="%s", credential="%s")',
             target_ssid,
             security_type,
             target_pwd,
@@ -480,9 +480,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         try:
             res = await self._client_controller.proxy.save_network(
                 config=f_wlan_policy.NetworkConfig(
-                    id=f_wlan_policy.NetworkIdentifier(
+                    id_=f_wlan_policy.NetworkIdentifier(
                         ssid=list(target_ssid.encode("utf-8")),
-                        type=security_type.to_fidl(),
+                        type_=security_type.to_fidl(),
                     ),
                     credential=Credential.from_password(target_pwd).to_fidl(),
                 ),
@@ -534,7 +534,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         return list(
             {
-                bytes(scan_result.id.ssid).decode("utf-8")
+                bytes(scan_result.id_.ssid).decode("utf-8")
                 for res in await collect_iterator(iterator)
                 for scan_result in res.response.scan_results
             }

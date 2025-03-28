@@ -59,6 +59,7 @@ python_c_extension("fidl_codec") {
     "fidl_codec/mod.h",
     "fidl_codec/object_converter.cc",
     "fidl_codec/object_converter.h",
+    "fidl_codec/python_dict_visitor.cc",
     "fidl_codec/python_dict_visitor.h",
     "fidl_codec/utils.h",
   ]

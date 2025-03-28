@@ -20,7 +20,7 @@ from honeydew.affordances.connectivity.bluetooth.utils.fidl_servers.bt_fidl_serv
 
 _SAMPLE_ON_PAIRING_REQUEST_INPUT = (
     f_btsys_controller.PairingDelegateOnPairingRequestRequest(
-        peer=f_btsys_controller.Peer(id=f_bt.PeerId(value=123)),
+        peer=f_btsys_controller.Peer(id_=f_bt.PeerId(value=123)),
         method=f_btsys_controller.PairingMethod(1),
         displayed_passkey=0,
     )
@@ -32,12 +32,12 @@ _SAMPLE_ON_PAIRING_REQUEST_OUTPUT = (
 )
 _SAMPLE_ON_PAIRING_COMPLETE_SUCCESS_INPUT = (
     f_btsys_controller.PairingDelegateOnPairingCompleteRequest(
-        id=f_bt.PeerId(value=123), success=True
+        id_=f_bt.PeerId(value=123), success=True
     )
 )
 _SAMPLE_ON_PAIRING_COMPLETE_FAILURE_INPUT = (
     f_btsys_controller.PairingDelegateOnPairingCompleteRequest(
-        id=f_bt.PeerId(value=123), success=False
+        id_=f_bt.PeerId(value=123), success=False
     )
 )
 

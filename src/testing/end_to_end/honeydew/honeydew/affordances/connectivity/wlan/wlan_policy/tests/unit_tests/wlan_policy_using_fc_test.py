@@ -59,9 +59,9 @@ _TEST_NETWORK_CONFIG_NONE = NetworkConfig(
     credential_value="",
 )
 _TEST_NETWORK_CONFIG_NONE_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.NONE,
+        type_=f_wlan_policy.SecurityType.NONE,
     ),
     credential=_TEST_CREDENTIAL_NONE,
 )
@@ -73,9 +73,9 @@ _TEST_NETWORK_CONFIG_PASSWORD = NetworkConfig(
     credential_value=_TEST_PASSWORD,
 )
 _TEST_NETWORK_CONFIG_PASSWORD_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.WPA2,
+        type_=f_wlan_policy.SecurityType.WPA2,
     ),
     credential=_TEST_CREDENTIAL_PASSWORD,
 )
@@ -87,9 +87,9 @@ _TEST_NETWORK_CONFIG_PSK = NetworkConfig(
     credential_value=_TEST_PSK,
 )
 _TEST_NETWORK_CONFIG_PSK_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.WPA2,
+        type_=f_wlan_policy.SecurityType.WPA2,
     ),
     credential=_TEST_CREDENTIAL_PSK,
 )
@@ -99,9 +99,9 @@ _TEST_MAC_ADDRESS_BYTES = bytes([1, 35, 69, 103, 137, 171])  # 01:23:45:67:89:ab
 
 def _make_scan_result(ssid: str) -> f_wlan_policy.ScanResult:
     return f_wlan_policy.ScanResult(
-        id=f_wlan_policy.NetworkIdentifier(
+        id_=f_wlan_policy.NetworkIdentifier(
             ssid=list(ssid.encode("utf-8")),
-            type=f_wlan_policy.SecurityType.WPA2,
+            type_=f_wlan_policy.SecurityType.WPA2,
         ),
         entries=[
             f_wlan_policy.Bss(
@@ -403,9 +403,9 @@ class WlanPolicyFCTests(unittest.TestCase):
                         state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
                         networks=[
                             f_wlan_policy.NetworkState(
-                                id=f_wlan_policy.NetworkIdentifier(
+                                id_=f_wlan_policy.NetworkIdentifier(
                                     ssid=list(b"Google Guest"),
-                                    type=f_wlan_policy.SecurityType.WPA2,
+                                    type_=f_wlan_policy.SecurityType.WPA2,
                                 ),
                                 state=f_wlan_policy.ConnectionState.CONNECTING,
                                 status=None,

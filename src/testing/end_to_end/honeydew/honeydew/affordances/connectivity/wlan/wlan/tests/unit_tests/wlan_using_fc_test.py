@@ -117,7 +117,7 @@ _TEST_QUERY_IFACE_RESP_FC.response = (
     f_wlan_device_service.DeviceMonitorQueryIfaceResponse(
         resp=f_wlan_device_service.QueryIfaceResponse(
             role=f_wlan_common.WlanMacRole.CLIENT,
-            id=1,
+            id_=1,
             phy_id=1,
             phy_assigned_id=1,
             sta_addr=bytes([1, 2, 3, 4, 5, 6]),
@@ -126,7 +126,7 @@ _TEST_QUERY_IFACE_RESP_FC.response = (
 )
 _TEST_QUERY_IFACE_RESP = QueryIfaceResponse(
     role=WlanMacRole.CLIENT,
-    id=1,
+    id_=1,
     phy_id=1,
     phy_assigned_id=1,
     sta_addr=[1, 2, 3, 4, 5, 6],

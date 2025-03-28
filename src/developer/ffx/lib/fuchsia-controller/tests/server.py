@@ -95,7 +95,7 @@ class TestingServer(fc_test.Testing.Server):
 
     def return_union_with_table(self):
         res = fc_test.TestingReturnUnionWithTableResponse()
-        res.y = fc_test.NoopTable(str="bazzz", integer=-2)
+        res.y = fc_test.NoopTable(str_="bazzz", integer=-2)
         return res
 
 
@@ -260,7 +260,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await t_client.return_union()
         self.assertEqual(res.y, "foobar")
         res = await t_client.return_union_with_table()
-        self.assertEqual(res.y.str, "bazzz")
+        self.assertEqual(res.y.str_, "bazzz")
         self.assertEqual(res.y.integer, -2)
         server_task.cancel()
 

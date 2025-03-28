@@ -18,7 +18,7 @@ class WifiChipCorrectnessAndConsistencyTest(base_test.WifiChipBaseTestClass):
     def test_chip_id_match(self) -> None:
         response = asyncio.run(self.wifi_chip_proxy.get_id()).unwrap()
         assert_equal(
-            response.id,
+            response.id_,
             self.chip_id,
             "WifiChip itself returns a different id than chip_id",
         )
@@ -44,7 +44,7 @@ class WifiChipCorrectnessAndConsistencyTest(base_test.WifiChipBaseTestClass):
             fidl_wlanix.WifiChipGetAvailableModesResponse(
                 chip_modes=[
                     fidl_wlanix.ChipMode(
-                        id=self.chip_id,
+                        id_=self.chip_id,
                         available_combinations=[
                             fidl_wlanix.ChipConcurrencyCombination(
                                 limits=[

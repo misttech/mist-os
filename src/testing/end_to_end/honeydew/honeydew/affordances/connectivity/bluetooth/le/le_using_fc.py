@@ -57,7 +57,7 @@ class AdvertisedPeripheralImpl(f_ble_controller.AdvertisedPeripheral.Server):
     ) -> None:
         _LOGGER.info(
             "Advertised Peripheral Connected with peer: %s",
-            request.peer.id.value,
+            request.peer.id_.value,
         )
         self._peripheral_connection = request.connection
         raise StopServer
@@ -208,9 +208,9 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             central_client.close()
             await task1
         for peer in res.updated:
-            self.known_le_devices[peer.id.value] = {
+            self.known_le_devices[peer.id_.value] = {
                 "name": peer.name,
-                "id": peer.id,
+                "id": peer.id_,
                 "bonded": peer.bonded,
                 "connectable": peer.connectable,
             }
@@ -236,7 +236,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         try:
             assert self._central_controller_proxy is not None
             self._central_controller_proxy.connect(
-                id=peer_id,
+                id_=peer_id,
                 options=connection_options,
                 handle=conn_server.take(),
             )
@@ -380,7 +380,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         for service in res.updated:
             self.service_info[service.handle.value] = {
                 "kind": service.kind,
-                "type": service.type,
+                "type": service.type_,
                 "characteristics": service.characteristics,
                 "includes": service.includes,
             }
@@ -434,7 +434,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         for characteristic in res.characteristics:
             remote_response[characteristic.handle.value] = {
                 "handle": characteristic.handle.value,
-                "type": characteristic.type.value,
+                "type": characteristic.type_.value,
                 "properties": characteristic.properties,
                 "permissions": characteristic.permissions,
                 "descriptors": characteristic.descriptors,

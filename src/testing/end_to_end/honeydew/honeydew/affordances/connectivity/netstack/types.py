@@ -24,7 +24,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
 class InterfaceProperties:
     """Properties of a network interface."""
 
-    id: int
+    id_: int
     """An opaque identifier for the interface."""
 
     name: str
@@ -73,7 +73,7 @@ class InterfaceProperties:
             raise TypeError(f"Unknown port_class: {fidl.port_class}")
 
         return InterfaceProperties(
-            id=fidl.id,
+            id_=fidl.id_,
             name=fidl.name,
             mac=mac,
             ipv4_addresses=ipv4_addresses,
@@ -126,7 +126,7 @@ class InterfaceProperties:
             port_class.device = self.port_class.value
 
         return f_net_interfaces.Properties(
-            id=self.id,
+            id_=self.id_,
             addresses=addresses,
             online=None,
             device_class=None,

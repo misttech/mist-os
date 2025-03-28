@@ -14,6 +14,7 @@
 #include "mod.h"
 #include "python_dict_visitor.h"
 #include "src/lib/fidl_codec/wire_parser.h"
+#include "utils.h"
 
 namespace fuchsia_controller::fidl_codec::decode {
 

@@ -96,7 +96,7 @@ class WlanPolicyApTests(wlan_base_test.WlanBaseTest):
                     band=OperatingBand.ONLY_2_4GHZ,
                     frequency=None,
                     clients=None,
-                    id=NetworkIdentifier(
+                    id_=NetworkIdentifier(
                         ssid=test_ssid, security_type=SecurityType.NONE
                     ),
                 )
@@ -111,7 +111,7 @@ class WlanPolicyApTests(wlan_base_test.WlanBaseTest):
                     band=OperatingBand.ONLY_2_4GHZ,
                     frequency=None,
                     clients=None,
-                    id=NetworkIdentifier(
+                    id_=NetworkIdentifier(
                         ssid=test_ssid, security_type=SecurityType.NONE
                     ),
                 )
@@ -129,7 +129,7 @@ class WlanPolicyApTests(wlan_base_test.WlanBaseTest):
                     band=OperatingBand.ONLY_2_4GHZ,
                     frequency=got_states[0].frequency,
                     clients=ConnectedClientInformation(count=0),
-                    id=NetworkIdentifier(
+                    id_=NetworkIdentifier(
                         ssid=test_ssid, security_type=SecurityType.NONE
                     ),
                 )
@@ -148,7 +148,7 @@ class WlanPolicyApTests(wlan_base_test.WlanBaseTest):
                     band=OperatingBand.ONLY_2_4GHZ,
                     frequency=got_states[0].frequency,
                     clients=ConnectedClientInformation(count=0),
-                    id=NetworkIdentifier(
+                    id_=NetworkIdentifier(
                         ssid=test_ssid, security_type=SecurityType.NONE
                     ),
                 )

@@ -252,7 +252,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         try:
             self.loop.run_until_complete(
                 asyncio.wait_for(
-                    self._access_controller_proxy.connect(id=peer_id),
+                    self._access_controller_proxy.connect(id_=peer_id),
                     timeout_sec,
                 )
             )
@@ -279,7 +279,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         try:
             self.loop.run_until_complete(
                 asyncio.wait_for(
-                    self._access_controller_proxy.forget(id=peer_id),
+                    self._access_controller_proxy.forget(id_=peer_id),
                     timeout_sec,
                 )
             )
@@ -330,7 +330,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             for host in hosts:
                 if host.addresses:
                     res = host.addresses[0]
-                    return res.bytes
+                    return res.bytes_
         raise bluetooth_errors.BluetoothStateError(
             "No Bluetooth addresses found on {self._device_name} in FIDL response: {hosts_response}"
         )
@@ -375,12 +375,12 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             )
             return self.known_devices
         for p in results.updated:
-            self.known_devices[str(p.id.value)] = {
-                "address": p.address.bytes,
+            self.known_devices[str(p.id_.value)] = {
+                "address": p.address.bytes_,
                 "appearance": p.appearance,
                 "bonded": p.bonded,
                 "connected": p.connected,
-                "id": p.id.value,
+                "id": p.id_.value,
                 "name": p.name,
                 "rssi": p.rssi,
                 "services": p.services,
@@ -408,7 +408,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.pair(
-                        id=peer_id, options=options
+                        id_=peer_id, options=options
                     ),
                     timeout_sec,
                 )

@@ -261,6 +261,203 @@ func formatPyBool(value bool) string {
 	return "False"
 }
 
+var pythonReservedWords = map[string]struct{}{
+	// LINT.IfChange
+	// keep-sorted start
+	"ArithmeticError":           {}, //
+	"AssertionError":            {}, //
+	"AttributeError":            {}, //
+	"BaseException":             {}, //
+	"BaseExceptionGroup":        {}, //
+	"BlockingIOError":           {}, //
+	"BrokenPipeError":           {}, //
+	"BufferError":               {}, //
+	"BytesWarning":              {}, //
+	"ChildProcessError":         {}, //
+	"ConnectionAbortedError":    {}, //
+	"ConnectionError":           {}, //
+	"ConnectionRefusedError":    {}, //
+	"ConnectionResetError":      {}, //
+	"DeprecationWarning":        {}, //
+	"EOFError":                  {}, //
+	"Ellipsis":                  {}, //
+	"EncodingWarning":           {}, //
+	"EnvironmentError":          {}, //
+	"Exception":                 {}, //
+	"ExceptionGroup":            {}, //
+	"False":                     {}, //
+	"FileExistsError":           {}, //
+	"FileNotFoundError":         {}, //
+	"FloatingPointError":        {}, //
+	"FutureWarning":             {}, //
+	"GeneratorExit":             {}, //
+	"IOError":                   {}, //
+	"ImportError":               {}, //
+	"ImportWarning":             {}, //
+	"IndentationError":          {}, //
+	"IndexError":                {}, //
+	"InterruptedError":          {}, //
+	"IsADirectoryError":         {}, //
+	"KeyError":                  {}, //
+	"KeyboardInterrupt":         {}, //
+	"LookupError":               {}, //
+	"MemoryError":               {}, //
+	"ModuleNotFoundError":       {}, //
+	"NameError":                 {}, //
+	"None":                      {}, //
+	"NotADirectoryError":        {}, //
+	"NotImplemented":            {}, //
+	"NotImplementedError":       {}, //
+	"OSError":                   {}, //
+	"OverflowError":             {}, //
+	"PendingDeprecationWarning": {}, //
+	"PermissionError":           {}, //
+	"ProcessLookupError":        {}, //
+	"RecursionError":            {}, //
+	"ReferenceError":            {}, //
+	"ResourceWarning":           {}, //
+	"RuntimeError":              {}, //
+	"RuntimeWarning":            {}, //
+	"StopAsyncIteration":        {}, //
+	"StopIteration":             {}, //
+	"SyntaxError":               {}, //
+	"SyntaxWarning":             {}, //
+	"SystemError":               {}, //
+	"SystemExit":                {}, //
+	"TabError":                  {}, //
+	"TimeoutError":              {}, //
+	"True":                      {}, //
+	"TypeError":                 {}, //
+	"UnboundLocalError":         {}, //
+	"UnicodeDecodeError":        {}, //
+	"UnicodeEncodeError":        {}, //
+	"UnicodeError":              {}, //
+	"UnicodeTranslateError":     {}, //
+	"UnicodeWarning":            {}, //
+	"UserWarning":               {}, //
+	"ValueError":                {}, //
+	"Warning":                   {}, //
+	"ZeroDivisionError":         {}, //
+	"abs":                       {}, //
+	"aiter":                     {}, //
+	"all":                       {}, //
+	"and":                       {}, //
+	"anext":                     {}, //
+	"any":                       {}, //
+	"as":                        {}, //
+	"ascii":                     {}, //
+	"assert":                    {}, //
+	"async":                     {}, //
+	"await":                     {}, //
+	"bin":                       {}, //
+	"bool":                      {}, //
+	"break":                     {}, //
+	"breakpoint":                {}, //
+	"bytearray":                 {}, //
+	"bytes":                     {}, //
+	"callable":                  {}, //
+	"case":                      {}, //
+	"chr":                       {}, //
+	"class":                     {}, //
+	"classmethod":               {}, //
+	"compile":                   {}, //
+	"complex":                   {}, //
+	"continue":                  {}, //
+	"copyright":                 {}, //
+	"credits":                   {}, //
+	"def":                       {}, //
+	"del":                       {}, //
+	"delattr":                   {}, //
+	"dict":                      {}, //
+	"dir":                       {}, //
+	"divmod":                    {}, //
+	"elif":                      {}, //
+	"else":                      {}, //
+	"enumerate":                 {}, //
+	"eval":                      {}, //
+	"except":                    {}, //
+	"exec":                      {}, //
+	"exit":                      {}, //
+	"filter":                    {}, //
+	"finally":                   {}, //
+	"float":                     {}, //
+	"for":                       {}, //
+	"format":                    {}, //
+	"from":                      {}, //
+	"frozenset":                 {}, //
+	"getattr":                   {}, //
+	"global":                    {}, //
+	"globals":                   {}, //
+	"hasattr":                   {}, //
+	"hash":                      {}, //
+	"help":                      {}, //
+	"hex":                       {}, //
+	"id":                        {}, //
+	"if":                        {}, //
+	"import":                    {}, //
+	"in":                        {}, //
+	"input":                     {}, //
+	"int":                       {}, //
+	"is":                        {}, //
+	"isinstance":                {}, //
+	"issubclass":                {}, //
+	"iter":                      {}, //
+	"lambda":                    {}, //
+	"len":                       {}, //
+	"license":                   {}, //
+	"list":                      {}, //
+	"locals":                    {}, //
+	"map":                       {}, //
+	"match":                     {}, //
+	"max":                       {}, //
+	"memoryview":                {}, //
+	"min":                       {}, //
+	"next":                      {}, //
+	"nonlocal":                  {}, //
+	"not":                       {}, //
+	"object":                    {}, //
+	"oct":                       {}, //
+	"open":                      {}, //
+	"or":                        {}, //
+	"ord":                       {}, //
+	"pass":                      {}, //
+	"pow":                       {}, //
+	"print":                     {}, //
+	"property":                  {}, //
+	"quit":                      {}, //
+	"raise":                     {}, //
+	"range":                     {}, //
+	"repr":                      {}, //
+	"return":                    {}, //
+	"reversed":                  {}, //
+	"round":                     {}, //
+	"set":                       {}, //
+	"setattr":                   {}, //
+	"slice":                     {}, //
+	"sorted":                    {}, //
+	"staticmethod":              {}, //
+	"str":                       {}, //
+	"sum":                       {}, //
+	"super":                     {}, //
+	"try":                       {}, //
+	"tuple":                     {}, //
+	"type":                      {}, //
+	"vars":                      {}, //
+	"while":                     {}, //
+	"with":                      {}, //
+	"yield":                     {}, //
+	"zip":                       {}, //
+	// keep-sorted end
+	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //src/developer/ffx/lib/fuchsia-controller/python/fidl/_library.py, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/fuchsia_controller/conformance.go)
+}
+
+func changeIfReserved(s string) string {
+	if _, ok := pythonReservedWords[s]; ok {
+		return s + "_"
+	}
+	return s
+}
+
 func onStruct(value ir.Record, decl *mixer.StructDecl) string {
 	var structFields []string
 	providedKeys := make(map[string]struct{}, len(value.Fields))
@@ -269,13 +466,13 @@ func onStruct(value ir.Record, decl *mixer.StructDecl) string {
 			panic(fmt.Sprintf("unknown field not supported %+v", field.Key))
 		}
 		providedKeys[field.Key.Name] = struct{}{}
-		fieldName := fidlgen.ToSnakeCase(field.Key.Name)
+		fieldName := changeIfReserved(fidlgen.ToSnakeCase(field.Key.Name))
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))
 		structFields = append(structFields, fmt.Sprintf("%s=%s", fieldName, fieldValueStr))
 	}
 	for _, key := range decl.FieldNames() {
 		if _, ok := providedKeys[key]; !ok {
-			fieldName := fidlgen.ToSnakeCase(key)
+			fieldName := changeIfReserved(fidlgen.ToSnakeCase(key))
 			structFields = append(structFields, fmt.Sprintf("%s=None", fieldName))
 		}
 	}
@@ -290,7 +487,7 @@ func onTable(value ir.Record, decl *mixer.TableDecl) string {
 			panic(fmt.Sprintf("table %s: unknown ordinal %d: Rust cannot construct tables with unknown fields",
 				decl.Name(), field.Key.UnknownOrdinal))
 		}
-		fieldName := fidlgen.ToSnakeCase(field.Key.Name)
+		fieldName := changeIfReserved(fidlgen.ToSnakeCase(field.Key.Name))
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))
 		tableFields = append(tableFields, fmt.Sprintf("%s=%s", fieldName, fieldValueStr))
 	}
@@ -316,7 +513,7 @@ func onUnion(value ir.Record, decl *mixer.UnionDecl) string {
 		}
 		valueStr = fmt.Sprintf("%s()", declName(decl))
 	} else {
-		fieldName := fidlgen.ToSnakeCase(field.Key.Name)
+		fieldName := changeIfReserved(fidlgen.ToSnakeCase(field.Key.Name))
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))
 		valueStr = fmt.Sprintf("%s.%s_variant(%s)", declName(decl), fieldName, fieldValueStr)
 	}

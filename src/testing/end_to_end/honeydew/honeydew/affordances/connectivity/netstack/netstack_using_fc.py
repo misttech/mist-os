@@ -145,7 +145,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
             if event.existing:
                 try:
                     res = await self._interfaces_proxy.get_mac(
-                        id=event.existing.id
+                        id_=event.existing.id_
                     )
 
                     if res.err:
@@ -153,7 +153,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
                             'Failed to find the MAC of interface "%s" (%s); '
                             "it no longer exists",
                             event.existing.name,
-                            event.existing.id,
+                            event.existing.id_,
                         )
                         continue  # this is fine and sometimes even expected
 

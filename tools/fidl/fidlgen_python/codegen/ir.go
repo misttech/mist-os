@@ -251,7 +251,7 @@ func (c *compiler) compileBits(val fidlgen.Bits) PythonBits {
 
 		e.PythonMembers = append(e.PythonMembers, PythonBitsMember{
 			BitsMember:  member_val,
-			PythonName:  compileScreamingSnakeIdentifier(member_val.Name),
+			PythonName:  changeIfReserved(compileScreamingSnakeIdentifier(member_val.Name)),
 			PythonValue: value,
 		})
 	}
@@ -278,7 +278,7 @@ func (c *compiler) compileEnum(val fidlgen.Enum) PythonEnum {
 
 		e.PythonMembers = append(e.PythonMembers, PythonEnumMember{
 			EnumMember:  member_val,
-			PythonName:  compileScreamingSnakeIdentifier(member_val.Name),
+			PythonName:  changeIfReserved(compileScreamingSnakeIdentifier(member_val.Name)),
 			PythonValue: value,
 		})
 	}
@@ -293,7 +293,7 @@ func (c *compiler) compileTableMember(val fidlgen.TableMember) PythonTableMember
 	return PythonTableMember{
 		TableMember: val,
 		PythonType:  *t,
-		PythonName:  compileSnakeIdentifier(val.Name),
+		PythonName:  changeIfReserved(compileSnakeIdentifier(val.Name)),
 	}
 }
 
@@ -322,7 +322,7 @@ func (c *compiler) compileStructMember(val fidlgen.StructMember) PythonStructMem
 	return PythonStructMember{
 		StructMember: val,
 		PythonType:   *t,
-		PythonName:   compileSnakeIdentifier(val.Name),
+		PythonName:   changeIfReserved(compileSnakeIdentifier(val.Name)),
 	}
 }
 
@@ -343,6 +343,203 @@ func (c *compiler) compileStruct(val fidlgen.Struct) PythonStruct {
 	return python_struct
 }
 
+var pythonReservedWords = map[string]struct{}{
+	// LINT.IfChange
+	// keep-sorted start
+	"ArithmeticError":           {}, //
+	"AssertionError":            {}, //
+	"AttributeError":            {}, //
+	"BaseException":             {}, //
+	"BaseExceptionGroup":        {}, //
+	"BlockingIOError":           {}, //
+	"BrokenPipeError":           {}, //
+	"BufferError":               {}, //
+	"BytesWarning":              {}, //
+	"ChildProcessError":         {}, //
+	"ConnectionAbortedError":    {}, //
+	"ConnectionError":           {}, //
+	"ConnectionRefusedError":    {}, //
+	"ConnectionResetError":      {}, //
+	"DeprecationWarning":        {}, //
+	"EOFError":                  {}, //
+	"Ellipsis":                  {}, //
+	"EncodingWarning":           {}, //
+	"EnvironmentError":          {}, //
+	"Exception":                 {}, //
+	"ExceptionGroup":            {}, //
+	"False":                     {}, //
+	"FileExistsError":           {}, //
+	"FileNotFoundError":         {}, //
+	"FloatingPointError":        {}, //
+	"FutureWarning":             {}, //
+	"GeneratorExit":             {}, //
+	"IOError":                   {}, //
+	"ImportError":               {}, //
+	"ImportWarning":             {}, //
+	"IndentationError":          {}, //
+	"IndexError":                {}, //
+	"InterruptedError":          {}, //
+	"IsADirectoryError":         {}, //
+	"KeyError":                  {}, //
+	"KeyboardInterrupt":         {}, //
+	"LookupError":               {}, //
+	"MemoryError":               {}, //
+	"ModuleNotFoundError":       {}, //
+	"NameError":                 {}, //
+	"None":                      {}, //
+	"NotADirectoryError":        {}, //
+	"NotImplemented":            {}, //
+	"NotImplementedError":       {}, //
+	"OSError":                   {}, //
+	"OverflowError":             {}, //
+	"PendingDeprecationWarning": {}, //
+	"PermissionError":           {}, //
+	"ProcessLookupError":        {}, //
+	"RecursionError":            {}, //
+	"ReferenceError":            {}, //
+	"ResourceWarning":           {}, //
+	"RuntimeError":              {}, //
+	"RuntimeWarning":            {}, //
+	"StopAsyncIteration":        {}, //
+	"StopIteration":             {}, //
+	"SyntaxError":               {}, //
+	"SyntaxWarning":             {}, //
+	"SystemError":               {}, //
+	"SystemExit":                {}, //
+	"TabError":                  {}, //
+	"TimeoutError":              {}, //
+	"True":                      {}, //
+	"TypeError":                 {}, //
+	"UnboundLocalError":         {}, //
+	"UnicodeDecodeError":        {}, //
+	"UnicodeEncodeError":        {}, //
+	"UnicodeError":              {}, //
+	"UnicodeTranslateError":     {}, //
+	"UnicodeWarning":            {}, //
+	"UserWarning":               {}, //
+	"ValueError":                {}, //
+	"Warning":                   {}, //
+	"ZeroDivisionError":         {}, //
+	"abs":                       {}, //
+	"aiter":                     {}, //
+	"all":                       {}, //
+	"and":                       {}, //
+	"anext":                     {}, //
+	"any":                       {}, //
+	"as":                        {}, //
+	"ascii":                     {}, //
+	"assert":                    {}, //
+	"async":                     {}, //
+	"await":                     {}, //
+	"bin":                       {}, //
+	"bool":                      {}, //
+	"break":                     {}, //
+	"breakpoint":                {}, //
+	"bytearray":                 {}, //
+	"bytes":                     {}, //
+	"callable":                  {}, //
+	"case":                      {}, //
+	"chr":                       {}, //
+	"class":                     {}, //
+	"classmethod":               {}, //
+	"compile":                   {}, //
+	"complex":                   {}, //
+	"continue":                  {}, //
+	"copyright":                 {}, //
+	"credits":                   {}, //
+	"def":                       {}, //
+	"del":                       {}, //
+	"delattr":                   {}, //
+	"dict":                      {}, //
+	"dir":                       {}, //
+	"divmod":                    {}, //
+	"elif":                      {}, //
+	"else":                      {}, //
+	"enumerate":                 {}, //
+	"eval":                      {}, //
+	"except":                    {}, //
+	"exec":                      {}, //
+	"exit":                      {}, //
+	"filter":                    {}, //
+	"finally":                   {}, //
+	"float":                     {}, //
+	"for":                       {}, //
+	"format":                    {}, //
+	"from":                      {}, //
+	"frozenset":                 {}, //
+	"getattr":                   {}, //
+	"global":                    {}, //
+	"globals":                   {}, //
+	"hasattr":                   {}, //
+	"hash":                      {}, //
+	"help":                      {}, //
+	"hex":                       {}, //
+	"id":                        {}, //
+	"if":                        {}, //
+	"import":                    {}, //
+	"in":                        {}, //
+	"input":                     {}, //
+	"int":                       {}, //
+	"is":                        {}, //
+	"isinstance":                {}, //
+	"issubclass":                {}, //
+	"iter":                      {}, //
+	"lambda":                    {}, //
+	"len":                       {}, //
+	"license":                   {}, //
+	"list":                      {}, //
+	"locals":                    {}, //
+	"map":                       {}, //
+	"match":                     {}, //
+	"max":                       {}, //
+	"memoryview":                {}, //
+	"min":                       {}, //
+	"next":                      {}, //
+	"nonlocal":                  {}, //
+	"not":                       {}, //
+	"object":                    {}, //
+	"oct":                       {}, //
+	"open":                      {}, //
+	"or":                        {}, //
+	"ord":                       {}, //
+	"pass":                      {}, //
+	"pow":                       {}, //
+	"print":                     {}, //
+	"property":                  {}, //
+	"quit":                      {}, //
+	"raise":                     {}, //
+	"range":                     {}, //
+	"repr":                      {}, //
+	"return":                    {}, //
+	"reversed":                  {}, //
+	"round":                     {}, //
+	"set":                       {}, //
+	"setattr":                   {}, //
+	"slice":                     {}, //
+	"sorted":                    {}, //
+	"staticmethod":              {}, //
+	"str":                       {}, //
+	"sum":                       {}, //
+	"super":                     {}, //
+	"try":                       {}, //
+	"tuple":                     {}, //
+	"type":                      {}, //
+	"vars":                      {}, //
+	"while":                     {}, //
+	"with":                      {}, //
+	"yield":                     {}, //
+	"zip":                       {}, //
+	// keep-sorted end
+	// LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //src/developer/ffx/lib/fuchsia-controller/python/fidl/_library.py, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/fuchsia_controller/conformance.go)
+}
+
+func changeIfReserved(s string) string {
+	if _, ok := pythonReservedWords[s]; ok {
+		return s + "_"
+	}
+	return s
+}
+
 func (c *compiler) compileUnionMember(val fidlgen.UnionMember) PythonUnionMember {
 	t := c.compileType(val.Type, val.MaybeFromAlias)
 	if t == nil {
@@ -351,7 +548,7 @@ func (c *compiler) compileUnionMember(val fidlgen.UnionMember) PythonUnionMember
 	return PythonUnionMember{
 		UnionMember: val,
 		PythonType:  *t,
-		PythonName:  compileSnakeIdentifier(val.Name),
+		PythonName:  changeIfReserved(compileSnakeIdentifier(val.Name)),
 	}
 }
 

@@ -19,6 +19,7 @@ conformance_python_fidl_source_basenames = [
   "golden.test.fidl",
   "handles.test.fidl",
   "memcpy_compatibility.test.fidl",
+  "mix_and_match.test.fidl",
   "optionals.test.fidl",
   "padding.test.fidl",
   "ported_from_walker_handles.test.fidl",
