@@ -91,6 +91,7 @@ python_library("fuchsia_controller_py") {
   visibility += [
     "tests:*",
     "//src/tests/fidl/conformance_suite/python/*",
+    "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//zircon/vdso/*",
   ]
@@ -118,6 +119,7 @@ python_library("fidl_bindings") {
     "tests:*",
     "//src/testing/end_to_end/honeydew:*",
     "//src/tests/fidl/conformance_suite/python/*",
+    "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//zircon/vdso/*",
   ]

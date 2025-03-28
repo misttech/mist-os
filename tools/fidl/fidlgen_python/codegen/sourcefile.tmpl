@@ -52,6 +52,13 @@ import {{ . }}
 {{ end -}}
 
 
+{{- if .PythonConsts }}
+# Generated constants
+{{ end -}}
+{{ range .PythonConsts -}}
+{{ .PythonName }}: {{ .PythonType.PythonName }} = {{ .PythonValue }}
+{{ end }}
+
 {{- if .PythonAliases }}
 # Generated aliases
 {{ end -}}

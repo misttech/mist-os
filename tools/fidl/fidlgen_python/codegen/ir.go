@@ -18,6 +18,13 @@ type PythonType struct {
 	PythonName string
 }
 
+type PythonConst struct {
+	fidlgen.Const
+	PythonName  string
+	PythonValue string
+	PythonType  PythonType
+}
+
 type PythonBits struct {
 	fidlgen.Bits
 	PythonName    string
@@ -97,6 +104,7 @@ type PythonRoot struct {
 	PythonStructs         []PythonStruct
 	PythonUnions          []PythonUnion
 	PythonAliases         []PythonAlias
+	PythonConsts          []PythonConst
 	PythonBits            []PythonBits
 	PythonEnums           []PythonEnum
 	PythonExternalModules []string
@@ -135,11 +143,12 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 		log.Fatalf("Non-empty Member implies this is not a declaration: %v", val)
 	}
 
+	var name string
 	if c.lookupDeclInfo(val).Type == fidlgen.ConstDeclType {
-		log.Fatalf("ConstDeclType not supported")
-		return nil
+		name = compileScreamingSnakeIdentifier(ci.Name)
+	} else {
+		name = compileCamelIdentifier(ci.Name)
 	}
-	name := compileCamelIdentifier(ci.Name)
 
 	if val.LibraryName() == c.library {
 		return &name
@@ -224,13 +233,63 @@ func (c *compiler) compileAlias(val fidlgen.Alias) PythonAlias {
 
 // TODO(https://fxbug.dev/396552135): Add literal tests to conformance test suite.
 func (c *compiler) compileLiteral(val fidlgen.Literal) *string {
+	var r string
 	switch val.Kind {
 	case fidlgen.NumericLiteral:
-		return &val.Value
+		r = val.Value
+	case fidlgen.BoolLiteral:
+		if val.Value == "true" {
+			r = "True"
+			return &r
+		} else if val.Value == "false" {
+			r = "False"
+		} else {
+			log.Fatalf("Unknown bool value: %v", val)
+		}
+	case fidlgen.StringLiteral:
+		r = fmt.Sprintf("\"%s\"", val.Value)
 	default:
-		log.Fatalf("unknown literal kind: %v", val)
+		log.Fatalf("Unknown literal kind: %v", val)
 	}
+	return &r
+}
+
+func (c *compiler) compileMemberIdentifier(val fidlgen.EncodedCompoundIdentifier) *string {
+	ci := val.Parse()
+	if ci.Member == "" {
+		log.Fatalf("expected a member: %s", val)
+	}
+	decl := val.DeclName()
+	declType := c.lookupDeclInfo(decl).Type
+	var member string
+	switch declType {
+	case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
+		member = compileScreamingSnakeIdentifier(ci.Member)
+	default:
+		log.Fatalf("unexpected decl type: %s", declType)
+	}
+	member_identifier := fmt.Sprintf("%s.%s", *c.compileDeclIdentifier(decl), member)
+	return &member_identifier
+}
+
+func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) *string {
+	switch val.Kind {
+	case fidlgen.LiteralConstant:
+		return c.compileLiteral(*val.Literal)
+	case fidlgen.BinaryOperator, fidlgen.IdentifierConstant:
+		return &val.Value
+	}
+	log.Fatalf("Failed to compile constant: %v, %v", val, typ)
 	return nil
+}
+
+func (c *compiler) compileConst(val fidlgen.Const) PythonConst {
+	return PythonConst{
+		Const:       val,
+		PythonName:  *c.compileDeclIdentifier(val.Name),
+		PythonValue: *c.compileConstant(val.Value, val.Type),
+		PythonType:  *c.compileType(val.Type, nil),
+	}
 }
 
 func (c *compiler) compileBits(val fidlgen.Bits) PythonBits {
@@ -241,18 +300,10 @@ func (c *compiler) compileBits(val fidlgen.Bits) PythonBits {
 		Empty:         len(val.Members) == 0,
 	}
 	for _, member_val := range val.Members {
-		var value string
-		switch member_val.Value.Kind {
-		case fidlgen.LiteralConstant:
-			value = *c.compileLiteral(*member_val.Value.Literal)
-		default:
-			log.Fatalf("Unknown bits member kind: %v", member_val)
-		}
-
 		e.PythonMembers = append(e.PythonMembers, PythonBitsMember{
 			BitsMember:  member_val,
 			PythonName:  changeIfReserved(compileScreamingSnakeIdentifier(member_val.Name)),
-			PythonValue: value,
+			PythonValue: *c.compileConstant(member_val.Value, val.Type),
 		})
 	}
 	return e
@@ -272,6 +323,8 @@ func (c *compiler) compileEnum(val fidlgen.Enum) PythonEnum {
 		case fidlgen.LiteralConstant:
 			value = *c.compileLiteral(*member_val.Value.Literal)
 			e.HasZero = e.HasZero || (value == "0")
+		case fidlgen.BinaryOperator, fidlgen.IdentifierConstant:
+			value = member_val.Value.Value
 		default:
 			log.Fatalf("Unknown enum member kind: %v", member_val)
 		}
@@ -603,6 +656,10 @@ func Compile(root fidlgen.Root) PythonRoot {
 	// of bits declarations.
 	for _, v := range root.Bits {
 		python_root.PythonBits = append(python_root.PythonBits, c.compileBits(v))
+	}
+
+	for _, v := range root.Consts {
+		python_root.PythonConsts = append(python_root.PythonConsts, c.compileConst(v))
 	}
 
 	for _, v := range root.Enums {

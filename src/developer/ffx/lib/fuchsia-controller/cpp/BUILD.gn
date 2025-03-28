@@ -44,6 +44,7 @@ python_c_extension("fidl_codec") {
     "//src/testing/end_to_end/*",
     "//src/tests/end_to_end/*",
     "//src/tests/fidl/conformance_suite/python/*",
+    "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//zircon/vdso/*",
   ]

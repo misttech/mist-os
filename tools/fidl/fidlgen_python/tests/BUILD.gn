@@ -13,3 +13,12 @@ python_host_test("fidlgen_python_external_library_test") {
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_host_test_data",
   ]
 }
+
+python_host_test("fidlgen_python_const_test") {
+  main_source = "test_const.py"
+  libraries = [ "//tools/fidl/fidlc/testdata:test.constants_python" ]
+  test_data_deps = [
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_host_test_data",
+    "//tools/fidl/fidlc/testdata:test.constants_host_test_data",
+  ]
+}
