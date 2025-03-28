@@ -821,11 +821,12 @@ if (is_kernel) {
   config("phys-elf-module.config") {
     visibility = [ ":*" ]
     if (is_gcc) {
-      inputs = [ "phys-elf-module.ld" ]
-      ldflags = [
-        "-Wl,-z,relro",
-        "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
-      ]
+      ldflags = [ "-Wl,-z,relro" ]
+      if (toolchain_environment != "kernel") {
+        # The kernel has its own linker script, so don't pass two -T switches.
+        inputs = [ "phys-elf-module.ld" ]
+        ldflags += [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
+      }
     }
   }
 
