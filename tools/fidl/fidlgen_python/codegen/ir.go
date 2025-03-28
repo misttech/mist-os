@@ -133,6 +133,7 @@ type PythonRoot struct {
 	PythonModuleName       string
 	PythonTables           []PythonTable
 	PythonStructs          []PythonStruct
+	ExternalPythonStructs  []PythonStruct
 	PythonUnions           []PythonUnion
 	PythonAliases          []PythonAlias
 	PythonConsts           []PythonConst
@@ -144,9 +145,10 @@ type PythonRoot struct {
 }
 
 type compiler struct {
-	decls           fidlgen.DeclInfoMap
-	library         fidlgen.EncodedLibraryIdentifier
-	externalModules map[string]struct{}
+	decls               fidlgen.DeclInfoMap
+	library             fidlgen.EncodedLibraryIdentifier
+	externalModules     map[string]struct{}
+	EmptySuccessStructs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
 }
 
 func (c *compiler) lookupDeclInfo(val fidlgen.EncodedCompoundIdentifier) *fidlgen.DeclInfo {
@@ -202,6 +204,13 @@ func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
 }
 
 func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) *PythonType {
+	if _, ok := c.EmptySuccessStructs[val.Identifier]; ok {
+		return &PythonType{
+			Type:       val,
+			PythonName: "None",
+		}
+	}
+
 	name := ""
 	if val.Nullable {
 		name = "typing.Optional["
@@ -245,6 +254,14 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 			name += "int"
 		default:
 			log.Fatalf("Unsupported endpoint role: %v", val)
+		}
+	case fidlgen.InternalType:
+		// TODO(https://fxbug.dev/42061151): Remove "transport_error".
+		switch val.InternalSubtype {
+		case "framework_error", "transport_error":
+			name += "fidl.FrameworkError"
+		default:
+			log.Fatalf("Unrecognized internal type: %v", val)
 		}
 	default:
 		log.Fatalf("Unknown kind: %v", val)
@@ -716,9 +733,31 @@ func Compile(root fidlgen.Root) PythonRoot {
 		PythonBits:       []PythonBits{},
 	}
 	c := compiler{
-		decls:           root.DeclInfo(),
-		library:         root.Name,
-		externalModules: map[string]struct{}{},
+		decls:               root.DeclInfo(),
+		library:             root.Name,
+		externalModules:     map[string]struct{}{},
+		EmptySuccessStructs: map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+	}
+
+	// Collect all empty success structs so that all calls to compileType() will return None as
+	// their type.
+	for _, v := range root.Structs {
+		if v.IsEmptySuccessStruct {
+			c.EmptySuccessStructs[v.Name] = v
+		}
+	}
+	// The only known uses of ExternalStructs are from fuchsia.unknown which provides some empty
+	// success structs. Otherwise, it seems safe to ignore types in ExternalStructs.
+	for _, v := range root.ExternalStructs {
+		if v.IsEmptySuccessStruct {
+			c.EmptySuccessStructs[v.Name] = v
+		}
+		python_struct, python_unsupported := c.compileStruct(v)
+		if python_unsupported != nil {
+			python_root.PythonUnsupportedTypes = append(python_root.PythonUnsupportedTypes, *python_unsupported)
+		} else {
+			python_root.ExternalPythonStructs = append(python_root.ExternalPythonStructs, python_struct)
+		}
 	}
 
 	for _, v := range root.Tables {
@@ -727,7 +766,7 @@ func Compile(root fidlgen.Root) PythonRoot {
 
 	for _, v := range root.Structs {
 		if v.IsEmptySuccessStruct {
-			continue
+			c.EmptySuccessStructs[v.Name] = v
 		}
 		python_struct, python_unsupported := c.compileStruct(v)
 		if python_unsupported != nil {

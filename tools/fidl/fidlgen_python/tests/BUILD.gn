@@ -22,3 +22,18 @@ python_host_test("fidlgen_python_const_test") {
     "//tools/fidl/fidlc/testdata:test.constants_host_test_data",
   ]
 }
+
+python_host_test("fidlgen_python_method_response_types_test") {
+  main_source = "test_method_response_types.py"
+  libraries = [ "fidl:test.python.protocol_python" ]
+  test_data_deps = [
+    "fidl:test.python.protocol_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_host_test_data",
+  ]
+}
+
+# Test for ability to compile types associated with all protocol method shapes.
+group("fidlgen_python_protocol_compile_test") {
+  testonly = true
+  deps = [ "fidl:test.python.protocol_python" ]
+}
