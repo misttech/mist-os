@@ -229,8 +229,7 @@ ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
   } else {
     // Try to lock the set of threads we need to wake.  Either the next writer,
     // or the next contiguous span of readers.
-    ktl::optional<BrwLockOps::LockForWakeResult> lock_result =
-        BrwLockOps::LockForWake(wait_, current_mono_time());
+    ktl::optional<BrwLockOps::LockForWakeResult> lock_result = BrwLockOps::LockForWake(wait_);
 
     // If we failed to lock, backoff and try again.
     if (!lock_result.has_value()) {

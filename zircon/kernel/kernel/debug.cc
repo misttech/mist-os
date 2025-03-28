@@ -40,6 +40,7 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_threadstats(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_threadq(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_threadqstats(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -48,6 +49,7 @@ STATIC_COMMAND_MASKED("thread", "manipulate kernel threads", &cmd_thread, CMD_AV
 STATIC_COMMAND("threadstats", "thread level statistics", &cmd_threadstats)
 STATIC_COMMAND("threadload", "toggle thread load display", &cmd_threadload)
 STATIC_COMMAND("threadq", "toggle thread queue display", &cmd_threadq)
+STATIC_COMMAND("threadqstats", "toggle thread queue stats display", &cmd_threadqstats)
 STATIC_COMMAND("zmips", "compute zmips of a cpu", &cmd_zmips)
 STATIC_COMMAND_MASKED("rppm", "runtime processor power management commands", &cmd_rppm,
                       CMD_AVAIL_ALWAYS)
@@ -259,6 +261,17 @@ RecurringCallback g_threadq_callback([]() {
   printf("\n");
 });
 
+RecurringCallback g_threadq_stats_callback([]() {
+  printf("----------------------------------------------------\n");
+  for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
+    if (Scheduler::PeekIsActive(i)) {
+      printf("thread queue cpu %2u:\n", i);
+      percpu::Get(i).scheduler.Dump(stdout, /*queue_state_only=*/true);
+    }
+  }
+  printf("\n");
+});
+
 }  // anonymous namespace
 static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags) {
   g_threadload_callback.Toggle();
@@ -267,6 +280,11 @@ static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags) {
 
 static int cmd_threadq(int argc, const cmd_args* argv, uint32_t flags) {
   g_threadq_callback.Toggle();
+  return 0;
+}
+
+static int cmd_threadqstats(int argc, const cmd_args* argv, uint32_t flags) {
+  g_threadq_stats_callback.Toggle();
   return 0;
 }
 

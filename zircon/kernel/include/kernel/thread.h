@@ -81,7 +81,7 @@ enum class ResourceOwnership {
 };
 
 // The types of affinity the scheduler understands.
-enum class Affinity { Hard, Soft };
+enum class AffinityType : bool { Hard, Soft };
 
 static inline fbl::NullLock is_current_thread_token;
 
@@ -194,7 +194,7 @@ class WaitQueueCollection {
   struct MinRelativeDeadlineTraits;
 
  public:
-  using Key = ktl::pair<uint64_t, uintptr_t>;
+  using Key = ktl::pair<SchedTime, uintptr_t>;
 
   // Encapsulation of all the per-thread state for the WaitQueueCollection data structure.
   class ThreadState {
@@ -251,11 +251,10 @@ class WaitQueueCollection {
     // Primary key used for determining our position in the collection of
     // blocked threads. Pre-computed during insert in order to save a time
     // during insert, rebalance, and search operations.
-    uint64_t blocked_threads_tree_sort_key_{0};
+    SchedTime blocked_threads_tree_sort_key_{0};
 
-    // State variable holding the pointer to the thread in our subtree with the
-    // minimum relative deadline (if any).
-    Thread* subtree_min_rel_deadline_thread_{nullptr};
+    // The minimum relative deadline of this node's subtree, if any.
+    SchedDuration subtree_min_deadline_{SchedDuration::Max()};
 
     // Return code if woken up abnormally from suspend, sleep, or block.
     zx_status_t blocked_status_ = ZX_OK;
@@ -288,10 +287,8 @@ class WaitQueueCollection {
   SchedDuration MinInheritableRelativeDeadline() const;
 
   // Peek at the first Thread in the collection.
-  Thread* Peek(zx_instant_mono_t now);
-  const Thread* Peek(zx_instant_mono_t now) const {
-    return const_cast<WaitQueueCollection*>(this)->Peek(now);
-  }
+  Thread* Peek();
+  const Thread* Peek() const { return const_cast<WaitQueueCollection*>(this)->Peek(); }
 
   Thread& PeekOnlyThread() {
     DEBUG_ASSERT_MSG(threads_.size() == 1, "Expected size 1, not %zu", threads_.size());
@@ -327,8 +324,6 @@ class WaitQueueCollection {
   WaitQueueCollection& operator=(WaitQueueCollection&&) = delete;
 
  private:
-  static constexpr uint64_t kFairThreadSortKeyBit = uint64_t{1} << 63;
-
   struct BlockedThreadTreeTraits {
     static Key GetKey(const Thread& thread);
     static bool LessThan(Key a, Key b) { return a < b; }
@@ -336,18 +331,14 @@ class WaitQueueCollection {
     static fbl::WAVLTreeNodeState<Thread*>& node_state(Thread& thread);
   };
 
+  // WAVLTreeBestNodeObserver template API.
   struct MinRelativeDeadlineTraits {
-    // WAVLTreeBestNodeObserver template API
-    using ValueType = Thread*;
-    static ValueType GetValue(const Thread& node);
-    static ValueType GetSubtreeBest(const Thread& node);
-    static bool Compare(ValueType a, ValueType b);
-    static void AssignBest(Thread& node, ValueType val);
-    static void ResetBest(Thread& target);
+    static SchedDuration GetValue(const Thread& thread);
+    static SchedDuration GetSubtreeBest(const Thread& thread);
+    static bool Compare(SchedDuration a, SchedDuration b) { return a < b; }
+    static void AssignBest(Thread& thread, SchedDuration val);
+    static void ResetBest(Thread& thread);
   };
-
-  static inline bool IsFairThreadSortBitSet(const Thread& t)
-      TA_REQ_SHARED(ChainLockable::GetLock(t));
 
   using BlockedThreadTree = fbl::WAVLTree<Key, Thread*, BlockedThreadTreeTraits,
                                           fbl::DefaultObjectTag, BlockedThreadTreeTraits,
@@ -410,10 +401,8 @@ class WaitQueue : public ChainLockable {
 
   // Returns the current highest priority blocked thread on this wait queue, or
   // nullptr if no threads are blocked.
-  Thread* Peek(zx_instant_mono_t now) TA_REQ(get_lock()) { return collection_.Peek(now); }
-  const Thread* Peek(zx_instant_mono_t now) const TA_REQ(get_lock()) {
-    return collection_.Peek(now);
-  }
+  Thread* Peek() TA_REQ(get_lock()) { return collection_.Peek(); }
+  const Thread* Peek() const TA_REQ(get_lock()) { return collection_.Peek(); }
 
   // Release one or more threads from the wait queue.
   // wait_queue_error = what WaitQueue::Block() should return for the blocking thread.
@@ -1509,6 +1498,9 @@ struct Thread : public ChainLockable {
   // Thread API.
 
   thread_state state() const TA_REQ_SHARED(get_lock()) { return scheduler_state_.state(); }
+  SchedulerQueueState::Disposition disposition() const TA_REQ(get_scheduler_variable_lock()) {
+    return scheduler_queue_state().disposition();
+  }
 
   // The scheduler can set threads to be running, or to be ready to run.
   void set_running() TA_REQ(get_lock()) { scheduler_state_.set_state(THREAD_RUNNING); }
@@ -1811,7 +1803,6 @@ struct Thread : public ChainLockable {
 
   // These fields are among the most active in the thread. They are grouped
   // together near the front to improve cache locality.
-  // mutable ChainLock lock_;
   __NO_UNIQUE_ADDRESS mutable fbl::NullLock scheduler_variable_lock_;
   unsigned int flags_{};
   // TODO(https://fxbug.dev/42077109): Write down memory order requirements for accessing signals_.
@@ -2047,12 +2038,6 @@ static inline void AssertInWaitQueue(const Thread& t, const WaitQueue& wq) TA_RE
   }();
 }
 
-// Note: This implementation *must* come after the implementation of GetThreadsLock.
-inline bool WaitQueueCollection::IsFairThreadSortBitSet(const Thread& t) {
-  const uint64_t key = t.wait_queue_state().blocked_threads_tree_sort_key_;
-  return (key & kFairThreadSortKeyBit) != 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Here and below, we need to deal with static analysis.  Right now, we need to
@@ -2080,47 +2065,33 @@ inline fbl::WAVLTreeNodeState<Thread*>& WaitQueueCollection::BlockedThreadTreeTr
   return thread.wait_queue_state().blocked_threads_tree_node_;
 }
 
-inline Thread* WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(const Thread& thread)
+inline SchedDuration WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(const Thread& thread)
     TA_NO_THREAD_SAFETY_ANALYSIS {
-  // TODO(johngro), consider pre-computing this value so it is just a fetch
-  // instead of a branch.
-  return (thread.scheduler_state().discipline() == SchedDiscipline::Fair)
-             ? nullptr
-             : const_cast<Thread*>(&thread);
+  const auto& scheduler_state = thread.scheduler_state();
+  if (scheduler_state.effective_profile().IsDeadline()) {
+    return scheduler_state.effective_profile().deadline().deadline_ns;
+  }
+  return SchedDuration::Max();
 }
 
-inline Thread* WaitQueueCollection::MinRelativeDeadlineTraits::GetSubtreeBest(const Thread& thread)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
-  return thread.wait_queue_state().subtree_min_rel_deadline_thread_;
+inline SchedDuration WaitQueueCollection::MinRelativeDeadlineTraits::GetSubtreeBest(
+    const Thread& thread) TA_NO_THREAD_SAFETY_ANALYSIS {
+  return thread.wait_queue_state().subtree_min_deadline_;
 }
 
-inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(Thread* a, Thread* b)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
-  // The thread pointer value of a non-deadline thread is null, an non-deadline
-  // threads are always the worst choice when choosing the thread with the
-  // minimum relative deadline.
-  // clang-format off
-  if (a == nullptr) { return false; }
-  if (b == nullptr) { return true; }
-  const SchedDuration a_deadline = a->scheduler_state().effective_profile().deadline.deadline_ns;
-  const SchedDuration b_deadline = b->scheduler_state().effective_profile().deadline.deadline_ns;
-  return (a_deadline < b_deadline) || ((a_deadline == b_deadline) && (a < b));
-  // clang-format on
-}
-
-inline void WaitQueueCollection::MinRelativeDeadlineTraits::AssignBest(Thread& thread, Thread* val)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
-  thread.wait_queue_state().subtree_min_rel_deadline_thread_ = val;
+inline void WaitQueueCollection::MinRelativeDeadlineTraits::AssignBest(
+    Thread& thread, SchedDuration val) TA_NO_THREAD_SAFETY_ANALYSIS {
+  thread.wait_queue_state().subtree_min_deadline_ = val;
 }
 
 inline void WaitQueueCollection::MinRelativeDeadlineTraits::ResetBest(Thread& thread)
     TA_NO_THREAD_SAFETY_ANALYSIS {
-  // In a debug build, zero out the subtree best as we leave the collection.
-  // This can help to find bugs by allowing us to assert that the value is zero
+  // In a debug build, reset the subtree best as we leave the collection.
+  // This can help to find bugs by allowing us to assert that the value is max
   // during insertion, however it is not strictly needed in a production build
   // and can be skipped.
 #ifdef DEBUG_ASSERT_IMPLEMENTED
-  thread.wait_queue_state().subtree_min_rel_deadline_thread_ = nullptr;
+  thread.wait_queue_state().subtree_min_deadline_ = SchedDuration::Max();
 #endif
 }
 
@@ -2155,7 +2126,7 @@ struct BrwLockOps {
     uint32_t count{0};
   };
 
-  static ktl::optional<LockForWakeResult> LockForWake(WaitQueue& queue, zx_instant_mono_t now)
+  static ktl::optional<LockForWakeResult> LockForWake(WaitQueue& queue)
       TA_REQ(chainlock_transaction_token, queue.get_lock());
 };
 

@@ -10,6 +10,7 @@
 
 #include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
+#include <ktl/algorithm.h>
 #include <ktl/array.h>
 #include <ktl/unique_ptr.h>
 
@@ -50,11 +51,16 @@ struct WaitQueueOrderingTests {
     ASSERT_TRUE(ac.check());
     auto cleanup = fit::defer([&wqc]() __TA_NO_THREAD_SAFETY_ANALYSIS {
       while (wqc->Count() > 0) {
-        wqc->Remove(wqc->Peek(1));
+        wqc->Remove(wqc->Peek());
       }
     });
 
-    // Aliases to reduce the typing just a bit.
+    // Sort the thread array by address to simplify tests that involve address
+    // based tie breaking.
+    ktl::stable_sort(threads.begin(), threads.end(),
+                     [](const auto& a, const auto& b) { return a.get() < b.get(); });
+
+    // Aliases to reduce the typing just a bit, ordered by increasing address.
     Thread& t0 = *threads[0];
     Thread& t1 = *threads[1];
     Thread& t2 = *threads[2];
@@ -62,62 +68,52 @@ struct WaitQueueOrderingTests {
 
     SchedTime now{ZX_SEC(300)};
 
-    // No one in in the queue right now.  If we Peek it, we should get back
-    // nullptr.
-    ASSERT_NULL(wqc->Peek(now.raw_value()));
+    // The wait queue is empty.
+    ASSERT_NULL(wqc->Peek());
 
-    // Add a fair thread to the collection.  As the only thread in the
-    // collection, it should be chosen no matter what.
+    // Add a fair thread to the collection, which is at the front of the queue
+    // by definition.
     ResetFair(t0, kDefaultWeight, now);
     wqc->Insert(&t0);
-    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+    ASSERT_EQ(&t0, wqc->Peek());
 
     // Add a higher weight thread with the same start time to the collection.
-    // It should be chosen instead of the normal weight thread.
+    // The thread selected should have a lower address, since the finish times
+    // are the same.
     ResetFair(t1, kHighWeight, now);
     wqc->Insert(&t1);
-    ASSERT_EQ(&t1, wqc->Peek(now.raw_value()));
+    ASSERT_EQ(&t0, wqc->Peek());
 
-    // Reduce the weight of the thread we just added and try again.  This time,
-    // the initial default weight thread should be chosen.
+    // Reduce the start and finish times of the thread we just added and try
+    // again. The thread with the earlier finish time should be selected.
     wqc->Remove(&t1);
-    ResetFair(t1, kLowWeight, now);
+    ResetFair(t1, kLowWeight, now - SchedNs(1));
     wqc->Insert(&t1);
-    ASSERT_EQ(&t0, wqc->Peek(now.raw_value()));
+    ASSERT_EQ(&t1, wqc->Peek());
 
-    // Add a deadline thread whose absolute deadline is in the future.
+    // Add a deadline thread whose absolute deadline is far in the future.
+    // The thread with the earliest finish time should be selected.
     ResetDeadline(t2, kLongDeadline, now);
     wqc->Insert(&t2);
-    ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
+    ASSERT_EQ(&t1, wqc->Peek());
 
-    // Add another deadline thread, with a shorter relative deadline, but an
-    // absolute deadline also in the future.  This should become the new choice.
+    // Add another deadline thread with a shorter relative deadline. This
+    // should become the new choice.
     ResetDeadline(t3, kShortDeadline, now);
     wqc->Insert(&t3);
-    ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
-
-    // Advance time so that we have passed t3's deadline, but not t2's.  t3's
-    // absolute deadline is in the past, and t2's is not, so t2 should be chosen
-    // over t3.
-    now += kShortDeadline + SchedNs(1);
-    ASSERT_EQ(&t2, wqc->Peek(now.raw_value()));
-
-    // Now, move past both of the absolute deadlines.  t3 should go back to
-    // becoming the proper choice as it has the shorter relative deadline.
-    now += kLongDeadline;
-    ASSERT_EQ(&t3, wqc->Peek(now.raw_value()));
+    ASSERT_EQ(&t3, wqc->Peek());
 
     // Finally, unwind by "unblocking" all of the threads from the queue and
-    // making sure that the come out in the order we expect.  Right now, that
-    // should be t3 first, then t2, t0, and finally t1.
-    ktl::array expected_order{&t3, &t2, &t0, &t1};
-    for (Thread* t : expected_order) {
-      ASSERT_EQ(t, wqc->Peek(now.raw_value()));
-      wqc->Remove(t);
+    // making sure that the come out in the order we expect.
+    ktl::array expected_order{&t3, &t1, &t0, &t2};
+    for (Thread* expected_thread : expected_order) {
+      Thread* actual_thread = wqc->Peek();
+      ASSERT_EQ(expected_thread, actual_thread);
+      wqc->Remove(actual_thread);
     }
 
     // And the queue should finally be empty now.
-    ASSERT_NULL(wqc->Peek(now.raw_value()));
+    ASSERT_NULL(wqc->Peek());
 
     END_TEST;
   }
@@ -128,7 +124,7 @@ struct WaitQueueOrderingTests {
   static constexpr SchedWeight kHighWeight = SchedWeight{40};
 
   static constexpr SchedDuration kShortDeadline = SchedUs(500);
-  static constexpr SchedDuration kLongDeadline = kShortDeadline * 10;
+  static constexpr SchedDuration kLongDeadline = SchedMs(20);
 
   static void ResetFair(Thread& t, SchedWeight weight,
                         SchedTime start_time) __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -137,17 +133,12 @@ struct WaitQueueOrderingTests {
     ss.base_profile_.fair.weight = weight;
     ss.base_profile_.discipline = SchedDiscipline::Fair;
 
-    ss.effective_profile_.fair.weight = ss.base_profile_.fair.weight;
-    ss.effective_profile_.discipline = ss.base_profile_.discipline;
+    ss.effective_profile_.SetFair(ss.base_profile_.fair.weight);
 
     ss.start_time_ = start_time;
-
-    // The initial time slice, NSTR, and the virtual finish time are all
-    // meaningless for a thread which is currently blocked. Just default them to
-    // 0 for now.
-    ss.effective_profile_.fair.initial_time_slice_ns = SchedDuration{0};
-    ss.effective_profile_.fair.normalized_timeslice_remainder = SchedRemainder{0};
-    ss.finish_time_ = SchedTime{0};
+    ss.finish_time_ = start_time + SchedDefaultFairPeriod;
+    ss.time_slice_ns_ = SchedDefaultFairPeriod;
+    ss.time_slice_used_ns_ = SchedDuration{0};
   }
 
   static void ResetDeadline(Thread& t, SchedDuration rel_deadline,
@@ -161,11 +152,12 @@ struct WaitQueueOrderingTests {
     ss.base_profile_.discipline = SchedDiscipline::Deadline;
     ss.base_profile_.deadline = SchedDeadlineParams{kUtil, rel_deadline};
 
-    ss.effective_profile_.discipline = ss.base_profile_.discipline;
-    ss.effective_profile_.deadline = ss.base_profile_.deadline;
+    ss.effective_profile_.SetDeadline(ss.base_profile_.deadline);
 
     ss.start_time_ = start_time;
-    ss.finish_time_ = ss.start_time_ + ss.effective_profile_.deadline.deadline_ns;
+    ss.finish_time_ = ss.start_time_ + ss.effective_profile().deadline().deadline_ns;
+    ss.time_slice_ns_ = ss.effective_profile().deadline().capacity_ns;
+    ss.time_slice_used_ns_ = SchedDuration{0};
   }
 };
 

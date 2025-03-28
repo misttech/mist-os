@@ -166,7 +166,7 @@ class ThreadEffectiveProfileObserver {
 
     if (observed_profile_.IsFair()) {
       SchedWeight expected = eep.base.fair_weight + eep.ipvs.total_weight;
-      EXPECT_EQ(expected.raw_value(), observed_profile_.fair.weight.raw_value());
+      EXPECT_EQ(expected.raw_value(), observed_profile_.weight().raw_value());
     } else {
       SchedUtilization effective_utilization = eep.ipvs.uncapped_utilization;
       SchedDuration effective_deadline = eep.ipvs.min_deadline;
@@ -179,11 +179,11 @@ class ThreadEffectiveProfileObserver {
 
       SchedDeadlineParams expected{effective_utilization, effective_deadline};
       EXPECT_EQ(expected.capacity_ns.raw_value(),
-                observed_profile_.deadline.capacity_ns.raw_value());
+                observed_profile_.deadline().capacity_ns.raw_value());
       EXPECT_EQ(expected.deadline_ns.raw_value(),
-                observed_profile_.deadline.deadline_ns.raw_value());
+                observed_profile_.deadline().deadline_ns.raw_value());
       EXPECT_EQ(expected.utilization.raw_value(),
-                observed_profile_.deadline.utilization.raw_value());
+                observed_profile_.deadline().utilization.raw_value());
     }
 
     END_TEST;

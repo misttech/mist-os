@@ -18,6 +18,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler.h>
+#include <kernel/scheduler_state.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
 #include <kernel/wait_queue_internal.h>
@@ -161,130 +162,23 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   if (threads_.is_empty()) {
     return SchedDuration::Max();
   }
-
   const Thread& root_thread = *threads_.root();
   MarkInWaitQueue(root_thread);
-
-  const Thread* t = root_thread.wait_queue_state().subtree_min_rel_deadline_thread_;
-  if (t == nullptr) {
-    return SchedDuration::Max();
-  }
-  MarkInWaitQueue(*t);
-
-  // Deadline profiles must (currently) always be inheritable, otherwise we
-  // would need to maintain a second augmented invariant here.  One for the
-  // minimum effective relative deadline (used when waking "the best" thread),
-  // and the other for the minimum inheritable relative deadline (for
-  // recomputing an OWQ's inherited minimum deadline after the removal of
-  // thread from the wait queue).
-  //
-  // For now, assert that the thread we are reporting as having the minimum
-  // relative deadline is either inheriting it's deadline from somewhere else,
-  // or that its base deadline profile is inheritable.
-  const SchedulerState& ss = t->scheduler_state();
-  const SchedDuration min_deadline = ss.effective_profile().deadline.deadline_ns;
-  DEBUG_ASSERT((ss.base_profile_.IsDeadline() && (ss.base_profile_.inheritable == true)) ||
-               (ss.inherited_profile_values_.min_deadline == min_deadline));
-  return min_deadline;
+  return root_thread.wait_queue_state().subtree_min_deadline_;
 }
 
-Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
-  // Find the "best" thread in the queue to run at time |now|.  See the comments
-  // in thread.h, immediately above the definition of WaitQueueCollection for
-  // details of how the data structure and this algorithm work.
-
-  // If the collection is empty, there is nothing to do.
-  if (threads_.is_empty()) {
-    return nullptr;
-  }
-
-  // If the front of the collection has a key with the fair thread bit set in
-  // it, then there are no deadline threads in the collection, and the front of
-  // the queue is the proper choice.
-  const Thread& front = threads_.front();
-  MarkInWaitQueue(front);
-
-  if (IsFairThreadSortBitSet(front)) {
-    // Front of the queue is a fair thread, which means that there are no
-    // deadline threads in the queue.  This thread is our best choice.
-    return const_cast<Thread*>(&front);
-  }
-
-  // Looks like we have deadline threads waiting in the queue.  Is the absolute
-  // deadline of the front of the queue in the future?  If so, then this is our
-  // best choice.
-  //
-  // TODO(johngro): Is it actually worth this optimistic check, or would it be
-  // better to simply do the search every time?
-  DEBUG_ASSERT(signed_now >= 0);
-  const uint64_t now = static_cast<uint64_t>(signed_now);
-  if (front.wait_queue_state().blocked_threads_tree_sort_key_ > now) {
-    return const_cast<Thread*>(&front);
-  }
-
-  // Actually search the tree for the deadline thread with the smallest relative
-  // deadline which is in the future relative to now.
-  auto best_deadline_iter = threads_.upper_bound({now, 0});
-  if (best_deadline_iter.IsValid()) {
-    Thread& best_deadline = *best_deadline_iter;
-    MarkInWaitQueue(best_deadline);
-    if (!IsFairThreadSortBitSet(best_deadline)) {
-      return &best_deadline;
-    }
-  }
-
-  // Looks like we have deadline threads, but all of their deadlines have
-  // expired.  Choose the thread with the minimum relative deadline in the tree.
-  const Thread& root_thread = *threads_.root();
-  MarkInWaitQueue(root_thread);
-
-  Thread* min_relative = root_thread.wait_queue_state().subtree_min_rel_deadline_thread_;
-  DEBUG_ASSERT(min_relative != nullptr);
-  return min_relative;
-}
+Thread* WaitQueueCollection::Peek() { return !threads_.is_empty() ? &threads_.front() : nullptr; }
 
 void WaitQueueCollection::Insert(Thread* thread) {
   WqTraceDepth(this, Count() + 1);
 
   WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
   DEBUG_ASSERT(wq_state.blocked_threads_tree_sort_key_ == 0);
-  DEBUG_ASSERT(wq_state.subtree_min_rel_deadline_thread_ == nullptr);
-
-  // Pre-compute our sort key so that it does not have to be done every time we
-  // need to compare our node against another node while we exist in the tree.
-  //
-  // See the comments in thread.h, immediately above the definition of
-  // WaitQueueCollection for details of why we compute the key in this fashion.
-  static_assert(SchedTime::Format::FractionalBits == 0,
-                "WaitQueueCollection assumes that the raw_value() of a SchedTime is always a whole "
-                "number of nanoseconds");
-  static_assert(SchedDuration::Format::FractionalBits == 0,
-                "WaitQueueCollection assumes that the raw_value() of a SchedDuration is always a "
-                "whole number of nanoseconds");
+  DEBUG_ASSERT(wq_state.subtree_min_deadline_ == SchedDuration::Max());
 
   const auto& sched_state = thread->scheduler_state();
-  const auto& ep = sched_state.effective_profile();
-  if (ep.IsFair()) {
-    // Statically assert that the offset we are going to add to a fair thread's
-    // start time to form its virtual start time can never be the equivalent of
-    // something more than ~1 year.  If the resolution of SchedWeight becomes
-    // too fine, it could drive the sum of the thread's virtual start time into
-    // saturation for low weight threads, making the key useless for sorting.
-    // By putting a limit of 1 year on the offset, we know that the
-    // current_mono_time() of the system would need to be greater than 2^63
-    // nanoseconds minus one year, or about 291 years, before this can happen.
-    constexpr SchedWeight kMinPosWeight{ffl::FromRatio<int64_t>(1, SchedWeight::Format::Power)};
-    constexpr SchedDuration OneYear{SchedMs(zx_duration_mono_t(1) * 86400 * 365245)};
-    static_assert(OneYear >= (Scheduler::kDefaultTargetLatency / kMinPosWeight),
-                  "SchedWeight resolution is too fine");
+  wq_state.blocked_threads_tree_sort_key_ = sched_state.finish_time();
 
-    SchedTime key = sched_state.start_time() + (Scheduler::kDefaultTargetLatency / ep.fair.weight);
-    wq_state.blocked_threads_tree_sort_key_ =
-        static_cast<uint64_t>(key.raw_value()) | kFairThreadSortKeyBit;
-  } else {
-    wq_state.blocked_threads_tree_sort_key_ =
-        static_cast<uint64_t>(sched_state.finish_time().raw_value());
-  }
   threads_.insert(thread);
 }
 
@@ -298,7 +192,7 @@ void WaitQueueCollection::Remove(Thread* thread) {
   // production build and can be skipped.
   WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
 #ifdef DEBUG_ASSERT_IMPLEMENTED
-  wq_state.blocked_threads_tree_sort_key_ = 0;
+  wq_state.blocked_threads_tree_sort_key_ = SchedTime{0};
 #endif
 }
 
@@ -441,7 +335,7 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
     // Now that we are holding the queue lock, attempt to lock the thread's pi
     // lock.  Be prepared to drop all locks and retry the operation if we
     // fail.
-    Thread* t = Peek(current_mono_time());
+    Thread* t = Peek();
     if (t) {
       if (!t->get_lock().AcquireOrBackoff()) {
         return ChainLockTransaction::Action::Backoff;
@@ -482,7 +376,7 @@ ktl::optional<bool> WaitQueue::WakeOneLocked(zx_status_t wait_queue_error) {
   }
 
   // Check to see if there is a thread we want to wake.
-  if (Thread* t = Peek(current_mono_time()); t != nullptr) {
+  if (Thread* t = Peek(); t != nullptr) {
     // There is!  Try to lock it so we can actually wake it up.  If we can't, we
     // will need to unwind to allow the caller to release our lock before trying
     // again.
@@ -737,13 +631,12 @@ void WaitQueue::UpdateBlockedThreadEffectiveProfile(Thread& t) {
   }
 }
 
-ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& queue,
-                                                                     zx_instant_mono_t now) {
+ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& queue) {
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
   LockForWakeResult result;
   Thread* t;
 
-  while ((t = queue.collection_.Peek(now)) != nullptr) {
+  while ((t = queue.collection_.Peek()) != nullptr) {
     // Figure out of this thread a reader or a writer.  Note; the odd use of a
     // lambda here is to work around issues with the static analyzer.  We cannot
     // assert that we have read access to a capability in a function, and later
@@ -829,7 +722,7 @@ ktl::optional<Thread::UnblockList> WaitQueueLockOps::LockForWakeOne(WaitQueue& q
                                                                     zx_status_t wait_queue_error) {
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
 
-  if (Thread* t = queue.collection_.Peek(current_mono_time()); t != nullptr) {
+  if (Thread* t = queue.collection_.Peek(); t != nullptr) {
     if (!t->get_lock().AcquireOrBackoff()) {
       return ktl::nullopt;
     }

@@ -14,9 +14,11 @@
 #include <arch/mp.h>
 #include <fbl/algorithm.h>
 #include <fbl/enum_bits.h>
+#include <ffl/string.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/preempt_disabled_token.h>
 #include <kernel/scheduler.h>
+#include <kernel/scheduler_state.h>
 #include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
 #include <ktl/bit.h>
@@ -123,8 +125,7 @@ using RemoveSingleEdgeTag = decltype(OwnedWaitQueue::RemoveSingleEdgeOp);
 using BaseProfileChangedTag = decltype(OwnedWaitQueue::BaseProfileChangedOp);
 
 inline bool IpvsAreConsequential(const SchedulerState::InheritedProfileValues* ipvs) {
-  return (ipvs != nullptr) && ((ipvs->total_weight != SchedWeight{0}) ||
-                               (ipvs->uncapped_utilization != SchedUtilization{0}));
+  return ipvs != nullptr && ipvs->is_consequential();
 }
 
 template <typename UpstreamType, typename DownstreamType>
@@ -301,7 +302,7 @@ SchedulerState::InheritedProfileValues OwnedWaitQueue::SnapshotThreadIpv(Thread&
     if (bp.discipline == SchedDiscipline::Fair) {
       ret.total_weight += bp.fair.weight;
     } else {
-      DEBUG_ASSERT(ret.min_deadline != SchedDuration{0});
+      ret.AssertConsistency();
       ret.uncapped_utilization += bp.deadline.utilization;
       ret.min_deadline = ktl::min(ret.min_deadline, bp.deadline.deadline_ns);
     }
@@ -388,7 +389,7 @@ void OwnedWaitQueue::ApplyIpvDeltaToThread(const SchedulerState::InheritedProfil
     }
   }
 
-  DEBUG_ASSERT(thread_ipv.min_deadline > SchedDuration{0});
+  thread_ipv.AssertConsistency();
 }
 
 void OwnedWaitQueue::ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileValues* old_ipv,
@@ -410,9 +411,7 @@ void OwnedWaitQueue::ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileVa
   iss.ipvs.uncapped_utilization += util_delta;
   iss.ipvs.min_deadline = owq.collection_.MinInheritableRelativeDeadline();
 
-  DEBUG_ASSERT(iss.ipvs.total_weight >= SchedWeight{0});
-  DEBUG_ASSERT(iss.ipvs.uncapped_utilization >= SchedUtilization{0});
-  DEBUG_ASSERT(iss.ipvs.min_deadline > SchedDuration{0});
+  iss.ipvs.AssertConsistency();
 }
 
 template <OwnedWaitQueue::PropagateOp OpType>
@@ -462,6 +461,7 @@ void OwnedWaitQueue::BeginPropagate(OwnedWaitQueue& upstream_node, Thread& downs
   DEBUG_ASSERT(upstream_node.inherited_scheduler_state_storage_ != nullptr);
   SchedulerState::InheritedProfileValues& ipvs =
       upstream_node.inherited_scheduler_state_storage_->ipvs;
+  ipvs.AssertConsistency();
 
   if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
     FinishPropagate(upstream_node, downstream_node, nullptr, &ipvs, op);
@@ -486,6 +486,26 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
 
   constexpr bool kStartingFromThread = ktl::is_same_v<UpstreamNodeType, Thread>;
 
+  if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv == nullptr);
+  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    DEBUG_ASSERT(added_ipv == nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else if constexpr (OpType == PropagateOp::BaseProfileChanged) {
+    static_assert(
+        kStartingFromThread,
+        "Base profile propagation changes may only start from Threads, not OwnedWaitQueues");
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else {
+    // This has to be something template-dependent so it only fails when
+    // instantiated and not ignored by the `if constexpr` logic, and nontrivial
+    // enough to avoid tautological test sorts of warnings that are generated
+    // for e.g. `OpType != OpType`.
+    static_assert(ktl::is_void_v<PropagateOpTag<OpType>>, "Unrecognized propagation operation");
+  }
+
   // If neither the IPVs we are adding, nor the IPVs we are removing, are
   // "consequential" (meaning, the have either some fair weight, or some
   // deadline capacity, or both), then we can just get out now.  There are no
@@ -493,6 +513,10 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
   if (!IpvsAreConsequential(added_ipv) && !IpvsAreConsequential(lost_ipv)) {
     return;
   }
+
+  // When we have finally finished updating everything, make sure to update
+  // our max traversal statistic.
+  ChainLengthTracker len_tracker;
 
   // Set up the pointers we will use as iterators for traversing the inheritance
   // graph.  Snapshot the starting node's current inherited profile values which
@@ -516,6 +540,25 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
           "blocking wait queue %p owq_iter %p",
           thread_iter->wait_queue_state().blocking_wait_queue_, static_cast<WaitQueue*>(owq_iter));
     }
+
+    // OK - we are finally ready to get to work.  Use a slightly-evil(tm) goto in
+    // order to start our propagate loop with the proper phase (either
+    // thread-to-OWQ first, or OWQ-to-thread first)
+    if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+      // Are we starting from a thread during an edge remove operation?  If so,
+      // and if we were the last thread to leave our wait queue, then we don't
+      // need to bother to update its IPVs anymore (it cannot have any IPVs if it
+      // has no waiters), so we can just skip it an move on to its owner thread.
+      //
+      // Additionally, we know that it must have an owner thread at this point in
+      // time.  If if didn't, BeginPropagate would have already bailed out.
+      owq_iter->get_lock().AssertHeld();
+      if (owq_iter->IsEmpty()) {
+        thread_iter = owq_iter->owner_;
+        DEBUG_ASSERT(thread_iter != nullptr);
+        goto start_from_owq;
+      }
+    }
   } else {
     // Base profile changes should never start from OWQs.
     static_assert(OpType != PropagateOp::BaseProfileChanged);
@@ -523,51 +566,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
     thread_iter = &downstream_node;
     owq_iter->get_lock().AssertHeld();
     DEBUG_ASSERT(!owq_iter->IsEmpty());
-  }
-
-  if constexpr (OpType == PropagateOp::AddSingleEdge) {
-    DEBUG_ASSERT(added_ipv != nullptr);
-    DEBUG_ASSERT(lost_ipv == nullptr);
-  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
-    DEBUG_ASSERT(added_ipv == nullptr);
-    DEBUG_ASSERT(lost_ipv != nullptr);
-  } else if constexpr (OpType == PropagateOp::BaseProfileChanged) {
-    static_assert(
-        kStartingFromThread,
-        "Base profile propagation changes may only start from Threads, not OwnedWaitQueues");
-    DEBUG_ASSERT(added_ipv != nullptr);
-    DEBUG_ASSERT(lost_ipv != nullptr);
-  } else {
-    // This has to be something template-dependent so it only fails when
-    // instantiated and not ignored by the `if constexpr` logic, and nontrivial
-    // enough to avoid tautological test sorts of warnings that are generated
-    // for e.g. `OpType != OpType`.
-    static_assert(ktl::is_void_v<PropagateOpTag<OpType>>, "Unrecognized propagation operation");
-  }
-
-  // When we have finally finished updating everything, make sure to update
-  // our max traversal statistic.
-  ChainLengthTracker len_tracker;
-
-  // OK - we are finally ready to get to work.  Use a slightly-evil(tm) goto in
-  // order to start our propagate loop with the proper phase (either
-  // thread-to-OWQ first, or OWQ-to-thread first)
-  if constexpr (kStartingFromThread == false) {
     goto start_from_owq;
-  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
-    // Are we starting from a thread during an edge remove operation?  If so,
-    // and if we were the last thread to leave our wait queue, then we don't
-    // need to bother to update its IPVs anymore (it cannot have any IPVs if it
-    // has no waiters), so we can just skip it an move on to its owner thread.
-    //
-    // Additionally, we know that it must have an owner thread at this point in
-    // time.  If if didn't, BeginPropagate would have already bailed out.
-    owq_iter->get_lock().AssertHeld();
-    if (owq_iter->IsEmpty()) {
-      thread_iter = owq_iter->owner_;
-      DEBUG_ASSERT(thread_iter != nullptr);
-      goto start_from_owq;
-    }
   }
 
   while (true) {
@@ -608,6 +607,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
       //
       SchedulerState::WaitQueueInheritedSchedulerState& owq_iss =
           *owq_iter->inherited_scheduler_state_storage_;
+      owq_iss.ipvs.AssertConsistency();
       const SchedUtilization utilization_before = owq_iss.ipvs.uncapped_utilization;
       ApplyIpvDeltaToOwq(lost_ipv, added_ipv, *owq_iter);
       const SchedUtilization utilization_after = owq_iss.ipvs.uncapped_utilization;
@@ -620,6 +620,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
           owq_iss.start_time = ss.start_time_;
           owq_iss.finish_time = ss.finish_time_;
           owq_iss.time_slice_ns = ss.time_slice_ns_;
+          owq_iss.time_slice_used_ns = ss.time_slice_used_ns_;
         } else if (utilization_after == SchedUtilization{0}) {
           // Last deadline thread just left, reset our dynamic params.
           owq_iss.ResetDynamicParameters();
@@ -703,9 +704,8 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockForWakeOperationLocked(
 
   // Lock as many threads as we can, moving them out of our wait collection
   // and onto a temporary unblock list as we go.
-  const zx_instant_mono_t now = current_mono_time();
   ktl::optional<Thread::UnblockList> maybe_unblock_list =
-      LockAndMakeWaiterListLocked(now, max_wake, wake_hooks);
+      LockAndMakeWaiterListLocked(max_wake, wake_hooks);
 
   // If we didn't get a list back (even an empty one), then we need to back off
   // and try again.  Drop the locks we obtained starting from our owner (if
@@ -735,8 +735,8 @@ bool OwnedWaitQueue::LockForRequeueOperationOrBackoff(
   // Next, the threads we plan to wake/requeue, placing them on two different lists.
   RequeueLockingDetails res;
   {
-    ktl::optional<WakeRequeueThreadDetails> maybe_threads = LockAndMakeWakeRequeueThreadListsLocked(
-        current_mono_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
+    ktl::optional<WakeRequeueThreadDetails> maybe_threads =
+        LockAndMakeWakeRequeueThreadListsLocked(max_wake, wake_hooks, max_requeue, requeue_hooks);
 
     if (!maybe_threads.has_value()) {
       get_lock().Release();
@@ -1236,10 +1236,10 @@ OwnedWaitQueue::LockForOwnerReplacement(Thread* _new_owner, const Thread* blocki
 }
 
 ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockAndMakeWaiterListLocked(
-    zx_instant_mono_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
+    uint32_t max_count, IWakeRequeueHook& hooks) {
   // Try to lock a set of threads to wake.  If we succeeded, make sure we place
   // them back into the collection before returning the list.
-  ktl::optional<Thread::UnblockList> res = TryLockAndMakeWaiterListLocked(now, max_count, hooks);
+  ktl::optional<Thread::UnblockList> res = TryLockAndMakeWaiterListLocked(max_count, hooks);
   if (res.has_value()) {
     for (Thread& t : res.value()) {
       t.get_lock().AssertHeld();
@@ -1251,14 +1251,13 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockAndMakeWaiterListLocked(
 }
 
 ktl::optional<OwnedWaitQueue::WakeRequeueThreadDetails>
-OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_instant_mono_t now,
-                                                        uint32_t max_wake_count,
+OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(uint32_t max_wake_count,
                                                         IWakeRequeueHook& wake_hooks,
                                                         uint32_t max_requeue_count,
                                                         IWakeRequeueHook& requeue_hooks) {
   // Start by trying to lock the set of threads to wake.
   ktl::optional<Thread::UnblockList> wake_res =
-      TryLockAndMakeWaiterListLocked(now, max_wake_count, wake_hooks);
+      TryLockAndMakeWaiterListLocked(max_wake_count, wake_hooks);
   if (!wake_res.has_value()) {
     return ktl::nullopt;
   }
@@ -1268,7 +1267,7 @@ OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_instant_mono_t now,
   // to requeue.  If we fail, make sure we unlock the threads we selected for
   // wake and return them to the collection.
   ktl::optional<Thread::UnblockList> requeue_res =
-      TryLockAndMakeWaiterListLocked(now, max_requeue_count, requeue_hooks);
+      TryLockAndMakeWaiterListLocked(max_requeue_count, requeue_hooks);
   if (!requeue_res.has_value()) {
     UnlockAndClearWaiterListLocked(ktl::move(wake_res).value());
     return ktl::nullopt;
@@ -1292,7 +1291,7 @@ OwnedWaitQueue::LockAndMakeWakeRequeueThreadListsLocked(zx_instant_mono_t now,
 }
 
 ktl::optional<Thread::UnblockList> OwnedWaitQueue::TryLockAndMakeWaiterListLocked(
-    zx_instant_mono_t now, uint32_t max_count, IWakeRequeueHook& hooks) {
+    uint32_t max_count, IWakeRequeueHook& hooks) {
   // Lock as many threads as we can, placing them on a temporary unblock list as
   // we go.  We remove the threads from the collection as we go, but we do not
   // remove the bookkeeping (see the note on optimization below).
@@ -1351,7 +1350,7 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::TryLockAndMakeWaiterListLocke
   // more than one thread.
   //
   for (uint32_t count = 0; count < max_count; ++count) {
-    Thread* t = Peek(now);
+    Thread* t = Peek();
     if (t == nullptr) {
       break;
     }
