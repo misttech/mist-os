@@ -44,5 +44,5 @@ std::unique_ptr<SharedVmo> SharedVmo::AdoptVmo(zx::vmo vmo) {
 }
 
 SharedVmo::~SharedVmo() { vmar_.unmap(reinterpret_cast<uintptr_t>(addr_), size_); }
-void* SharedVmo::start() const { return addr_; }
+const void* SharedVmo::start() const { return addr_; }
 size_t SharedVmo::size() const { return size_; }

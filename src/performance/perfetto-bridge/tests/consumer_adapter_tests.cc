@@ -115,7 +115,7 @@ class FakeConsumerEndpoint : public perfetto::ConsumerEndpoint {
   }
   void StartTracing() override { RecordObservedCall(CallType::START_TRACING); }
   void DisableTracing() override { RecordObservedCall(CallType::DISABLE_TRACING); }
-  void Flush(uint32_t timeout_ms, FlushCallback callback) override {
+  void Flush(uint32_t timeout_ms, FlushCallback callback, perfetto::FlushFlags flags) override {
     flush_cb_ = callback;
     RecordObservedCall(CallType::FLUSH);
   }
@@ -128,9 +128,12 @@ class FakeConsumerEndpoint : public perfetto::ConsumerEndpoint {
   void Detach(const std::string& key) override { FX_NOTREACHED(); }
   void Attach(const std::string& key) override { FX_NOTREACHED(); }
   void ObserveEvents(uint32_t events_mask) override { FX_NOTREACHED(); }
-  void QueryServiceState(QueryServiceStateCallback) override { FX_NOTREACHED(); }
+  void QueryServiceState(QueryServiceStateArgs, QueryServiceStateCallback) override {
+    FX_NOTREACHED();
+  }
   void QueryCapabilities(QueryCapabilitiesCallback) override { FX_NOTREACHED(); }
   void SaveTraceForBugreport(SaveTraceForBugreportCallback) override { FX_NOTREACHED(); }
+  void CloneSession(CloneSessionArgs) override { FX_NOTREACHED(); }
 
   perfetto::TraceConfig config_;
   std::deque<CallType> expected_calls_;
