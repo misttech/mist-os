@@ -1224,15 +1224,16 @@ fn receive_ndp_packet<
         + NudIpHandler<Ipv6, BC>
         + IpLayerHandler<Ipv6, BC>
         + CounterContext<NdpCounters>,
-    H: IpHeaderInfo<Ipv6>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     src_ip: Ipv6SourceAddr,
     packet: NdpPacket<B>,
-    header_info: &H,
 ) {
+    // TODO(https://fxbug.dev/42179534): Make sure IP's hop limit is set to 255 as
+    // per RFC 4861 section 6.1.2.
+
     match packet {
         NdpPacket::RouterSolicitation(_) | NdpPacket::Redirect(_) => {}
         NdpPacket::NeighborSolicitation(ref p) => {
@@ -1449,22 +1450,6 @@ fn receive_ndp_packet<
                 },
                 Ipv6SourceAddr::Unspecified => return,
             };
-
-            // As per RFC 4861 section 6.1.2:
-            //
-            // A node MUST silently discard any received Router Advertisement
-            // messages that do not satisfy all of the following validity
-            // checks:
-            //
-            //    ...
-            //
-            //    - The IP Hop Limit field has a value of 255, i.e., the packet
-            //      could not possibly have been forwarded by a router.
-            //
-            //    ...
-            if header_info.hop_limit() != REQUIRED_NDP_IP_PACKET_HOP_LIMIT {
-                return;
-            }
 
             let ra = p.message();
             debug!("received router advertisement from {:?}: {:?}", src_ip, ra);
@@ -1764,7 +1749,7 @@ impl<
                 );
             }
             Icmpv6Packet::Ndp(packet) => {
-                receive_ndp_packet(core_ctx, bindings_ctx, device, src_ip, packet, header_info)
+                receive_ndp_packet(core_ctx, bindings_ctx, device, src_ip, packet)
             }
             Icmpv6Packet::PacketTooBig(packet_too_big) => {
                 CounterContext::<IcmpRxCounters<Ipv6>>::counters(core_ctx)
