@@ -72,6 +72,7 @@ template("board_input_bundle_set") {
         {
           label =
               get_label_info(":${labels.main_target}", "label_with_toolchain")
+          name = target_name
           outdir = rebase_path(files.output_dir, root_build_dir)
         },
       ]

@@ -9,6 +9,11 @@ import("//build/bazel/bazel_build_action.gni")
 #
 # Parameters
 #
+#  name (optional)
+#    Name of the board input bundle set.
+#    Type: string
+#    Default: $target_name
+#
 #  bazel_board_input_bundle_set_target (required)
 #    The Bazel board input bundle set target to build.
 #    Type: label (from BUILD.bazel)
@@ -21,6 +26,11 @@ import("//build/bazel/bazel_build_action.gni")
 template("bazel_board_input_bundle_set") {
   assert(defined(invoker.bazel_board_input_bundle_set_target),
          "bazel_board_input_bundle_set_target is required")
+
+  bib_set_name = target_name
+  if (defined(invoker.name)) {
+    bib_set_name = invoker.name
+  }
 
   board_input_bundle_set_target = target_name
   board_input_bundle_set_out =
@@ -56,6 +66,7 @@ template("bazel_board_input_bundle_set") {
         {
           label = get_label_info(":${board_input_bundle_set_target}",
                                  "label_with_toolchain")
+          name = bib_set_name
           outdir = rebase_path(board_input_bundle_set_out, root_build_dir)
         },
       ]
