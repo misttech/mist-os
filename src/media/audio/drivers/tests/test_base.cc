@@ -130,10 +130,11 @@ void TestBase::ConnectToBluetoothDevice() {
         return std::move(audio_device_enumerator_impl);
       });
   builder.AddChild("audio-device-output-harness", "#meta/audio-device-output-harness.cm");
-  builder.AddRoute(Route{.capabilities = {Protocol{fuchsia::media::AudioDeviceEnumerator::Name_}},
-                         .source = ChildRef{"audio-device-enumerator"},
-                         .targets = {ChildRef{"audio-device-output-harness"}}});
-  builder.AddRoute(Route{.capabilities = {Protocol{fuchsia::logger::LogSink::Name_}},
+  builder.AddRoute(
+      Route{.capabilities = {Protocol{.name = fuchsia::media::AudioDeviceEnumerator::Name_}},
+            .source = ChildRef{"audio-device-enumerator"},
+            .targets = {ChildRef{"audio-device-output-harness"}}});
+  builder.AddRoute(Route{.capabilities = {Protocol{.name = fuchsia::logger::LogSink::Name_}},
                          .source = ParentRef{},
                          .targets = {ChildRef{"audio-device-output-harness"}}});
   builder.AddRoute(Route{
@@ -230,7 +231,7 @@ void TestBase::CreateStreamConfigFromChannel(
 
 // For debugging purposes
 void TestBase::DisplayBaseProperties() {
-  ASSERT_TRUE(properties_);
+  ASSERT_TRUE(properties_.has_value());
 
   FX_LOGS(INFO) << driver_type() << " is_input: "
                 << (properties_->is_input.has_value() ? std::to_string(*properties_->is_input)
@@ -265,7 +266,7 @@ void TestBase::DisplayBaseProperties() {
 }
 
 bool TestBase::ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id) {
-  return std::any_of(
+  return std::ranges::any_of(
       elements_.begin(), elements_.end(),
       [element_id](const fuchsia::hardware::audio::signalprocessing::Element& element) {
         return element.has_id() && element.id() == element_id && element.has_type() &&
@@ -291,12 +292,12 @@ bool TestBase::RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId e
     ADD_FAILURE() << "could not find edge_pairs for topology_id " << *topology_id_;
     return true;
   }
-  bool has_outgoing = std::any_of(
+  bool has_outgoing = std::ranges::any_of(
       edge_pairs.begin(), edge_pairs.end(),
       [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
         return (edge_pair.processing_element_id_from == element_id);
       });
-  bool has_incoming = std::any_of(
+  bool has_incoming = std::ranges::any_of(
       edge_pairs.begin(), edge_pairs.end(),
       [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
         return (edge_pair.processing_element_id_to == element_id);
@@ -357,7 +358,7 @@ void TestBase::RetrieveDaiFormats() {
     // If there is a dai id, request the DAI formats for this interconnect.
     if (dai_id_.has_value()) {
       composite()->GetDaiFormats(
-          dai_id_.value(),
+          *dai_id_,
           AddCallback("Composite::GetDaiFormats",
                       [this](fuchsia::hardware::audio::Composite_GetDaiFormats_Result result) {
                         ASSERT_FALSE(result.is_err());
@@ -500,7 +501,7 @@ void TestBase::ValidateDaiFormatSets(
 // For debugging purposes
 void TestBase::LogDaiFormatSets(
     const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_format_sets,
-    std::string tag) {
+    const std::string& tag) {
   FX_LOGS(INFO) << tag << ": dai_format_sets[" << dai_format_sets.size() << "]";
   for (auto i = 0u; i < dai_format_sets.size(); ++i) {
     auto& format_set = dai_format_sets[i];
@@ -551,42 +552,26 @@ void TestBase::SetMinMaxDaiFormats() {
 
     uint32_t min_number_of_channels = ~0, max_number_of_channels = 0;
     for (auto& number_of_channels : format_set.number_of_channels) {
-      if (number_of_channels < min_number_of_channels) {
-        min_number_of_channels = number_of_channels;
-      }
-      if (number_of_channels > max_number_of_channels) {
-        max_number_of_channels = number_of_channels;
-      }
+      min_number_of_channels = std::min(number_of_channels, min_number_of_channels);
+      max_number_of_channels = std::max(number_of_channels, max_number_of_channels);
     }
 
     uint8_t min_bits_per_slot = ~0, max_bits_per_slot = 0;
     for (auto& bits_per_slot : format_set.bits_per_slot) {
-      if (bits_per_slot < min_bits_per_slot) {
-        min_bits_per_slot = bits_per_slot;
-      }
-      if (bits_per_slot > max_bits_per_slot) {
-        max_bits_per_slot = bits_per_slot;
-      }
+      min_bits_per_slot = std::min(bits_per_slot, min_bits_per_slot);
+      max_bits_per_slot = std::max(bits_per_slot, max_bits_per_slot);
     }
 
     uint8_t min_bits_per_sample = ~0, max_bits_per_sample = 0;
     for (auto& bits_per_sample : format_set.bits_per_sample) {
-      if (bits_per_sample < min_bits_per_sample) {
-        min_bits_per_sample = bits_per_sample;
-      }
-      if (bits_per_sample > max_bits_per_sample) {
-        max_bits_per_sample = bits_per_sample;
-      }
+      min_bits_per_sample = std::min(bits_per_sample, min_bits_per_sample);
+      max_bits_per_sample = std::max(bits_per_sample, max_bits_per_sample);
     }
 
     uint32_t min_frame_rate = ~0, max_frame_rate = 0;
     for (auto& frame_rate : format_set.frame_rates) {
-      if (frame_rate < min_frame_rate) {
-        min_frame_rate = frame_rate;
-      }
-      if (frame_rate > max_frame_rate) {
-        max_frame_rate = frame_rate;
-      }
+      min_frame_rate = std::min(frame_rate, min_frame_rate);
+      max_frame_rate = std::max(frame_rate, max_frame_rate);
     }
 
     // Save, if less than min.
@@ -621,7 +606,7 @@ void TestBase::SetMinMaxDaiFormats() {
 }
 
 void TestBase::GetMinDaiFormat(fuchsia::hardware::audio::DaiFormat& min_dai_format_out) {
-  if (!min_dai_format_) {
+  if (!min_dai_format_.has_value()) {
     RetrieveDaiFormats();
   }
 
@@ -634,7 +619,7 @@ void TestBase::GetMinDaiFormat(fuchsia::hardware::audio::DaiFormat& min_dai_form
 }
 
 void TestBase::GetMaxDaiFormat(fuchsia::hardware::audio::DaiFormat& max_dai_format_out) {
-  if (!max_dai_format_) {
+  if (!max_dai_format_.has_value()) {
     RetrieveDaiFormats();
   }
 
@@ -684,36 +669,36 @@ void TestBase::RetrieveRingBufferFormats() {
 
     // If ring_buffer_id_ is set, then a ring-buffer element exists for this composite device.
     // Retrieve the supported ring buffer formats for that node.
-    if (ring_buffer_id_.has_value()) {
-      composite()->GetRingBufferFormats(
-          ring_buffer_id_.value(),
-          AddCallback("GetRingBufferFormats", [this](fuchsia::hardware::audio::
-                                                         Composite_GetRingBufferFormats_Result
-                                                             result) {
-            if (!device_entry().isVirtual() && !device_entry().isA2DP() &&
-                kAllowCompositeDriverUnsupportedRingBufferFormats) {
-              if (result.is_err() &&
-                  (result.err() == fuchsia::hardware::audio::DriverError::NOT_SUPPORTED)) {
-                GTEST_SKIP()
-                    << "*** this audio device is known to not (yet) support GetRingBufferFormats(). Skipping this test. ***";
-                __UNREACHABLE;
-              }
-            }
-            ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
-            auto& supported_formats = result.response().ring_buffer_formats;
-            EXPECT_FALSE(supported_formats.empty());
-
-            for (size_t i = 0; i < supported_formats.size(); ++i) {
-              SCOPED_TRACE(testing::Message() << "Composite supported_formats[" << i << "]");
-              ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
-              auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
-              ring_buffer_pcm_formats_.push_back(std::move(format_set));
-            }
-          }));
-    } else {
+    if (!ring_buffer_id_.has_value()) {
       // "No ring buffer" is valid (Composite can replace Codec); do nothing in that case.
       return;
     }
+    composite()->GetRingBufferFormats(
+        *ring_buffer_id_,
+        AddCallback("GetRingBufferFormats", [this](
+                                                fuchsia::hardware::audio::
+                                                    Composite_GetRingBufferFormats_Result result) {
+          if (!device_entry().isVirtual() && !device_entry().isA2DP() &&
+              kAllowCompositeDriverUnsupportedRingBufferFormats) {
+            if (result.is_err() &&
+                (result.err() == fuchsia::hardware::audio::DriverError::NOT_SUPPORTED)) {
+              GTEST_SKIP()
+                  << "*** this audio device is known to not (yet) support GetRingBufferFormats()."
+                  << " Skipping this test. ***";
+              __UNREACHABLE;
+            }
+          }
+          ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
+          auto& supported_formats = result.response().ring_buffer_formats;
+          EXPECT_FALSE(supported_formats.empty());
+
+          for (size_t i = 0; i < supported_formats.size(); ++i) {
+            SCOPED_TRACE(testing::Message() << "Composite supported_formats[" << i << "]");
+            ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
+            auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
+            ring_buffer_pcm_formats_.push_back(std::move(format_set));
+          }
+        }));
   } else if (device_entry().isDai()) {
     dai()->GetRingBufferFormats(
         AddCallback("GetRingBufferFormats",
@@ -897,39 +882,23 @@ void TestBase::SetMinMaxRingBufferFormats() {
     fuchsia::hardware::audio::SampleFormat sample_format = format_set.sample_formats()[0];
 
     for (auto& channel_set : format_set.channel_sets()) {
-      if (channel_set.attributes().size() < min_chans) {
-        min_chans = channel_set.attributes().size();
-      }
-      if (channel_set.attributes().size() > max_chans) {
-        max_chans = channel_set.attributes().size();
-      }
+      min_chans = std::min(channel_set.attributes().size(), min_chans);
+      max_chans = std::max(channel_set.attributes().size(), max_chans);
     }
 
     for (auto& bytes_per_sample : format_set.bytes_per_sample()) {
-      if (bytes_per_sample < min_bytes_per_sample) {
-        min_bytes_per_sample = bytes_per_sample;
-      }
-      if (bytes_per_sample > max_bytes_per_sample) {
-        max_bytes_per_sample = bytes_per_sample;
-      }
+      min_bytes_per_sample = std::min(bytes_per_sample, min_bytes_per_sample);
+      max_bytes_per_sample = std::max(bytes_per_sample, max_bytes_per_sample);
     }
 
     for (auto& valid_bits : format_set.valid_bits_per_sample()) {
-      if (valid_bits < min_valid_bits_per_sample) {
-        min_valid_bits_per_sample = valid_bits;
-      }
-      if (valid_bits > max_valid_bits_per_sample) {
-        max_valid_bits_per_sample = valid_bits;
-      }
+      min_valid_bits_per_sample = std::min(valid_bits, min_valid_bits_per_sample);
+      max_valid_bits_per_sample = std::max(valid_bits, max_valid_bits_per_sample);
     }
 
     for (auto& frame_rate : format_set.frame_rates()) {
-      if (frame_rate < min_frame_rate) {
-        min_frame_rate = frame_rate;
-      }
-      if (frame_rate > max_frame_rate) {
-        max_frame_rate = frame_rate;
-      }
+      min_frame_rate = std::min(frame_rate, min_frame_rate);
+      max_frame_rate = std::max(frame_rate, max_frame_rate);
     }
 
     // Save, if less than min.
@@ -1013,6 +982,7 @@ void TestBase::SignalProcessingConnect() {
 void TestBase::RequestElements() {
   SignalProcessingConnect();
 
+  // If we've already checked for signalprocessing support, then no need to do it again.
   if (signalprocessing_is_supported_.has_value()) {
     return;
   }

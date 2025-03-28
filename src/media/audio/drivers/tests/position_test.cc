@@ -113,7 +113,7 @@ void PositionTest::ValidatePositionInfo() {
   // Upon enabling notifications, our first notification might arrive immediately. Thus, the average
   // number of notification periods elapsed is (position_notification_count_ - 0.5).
   auto expected_timestamp =
-      zx::duration(position_notification_count_ * nsec_per_notif - nsec_per_notif / 2);
+      zx::duration((position_notification_count_ * nsec_per_notif) - (nsec_per_notif / 2));
 
   // Delivery-time requirements for pos notifications are loose; include a tolerance of +/-2 notifs.
   auto timestamp_tolerance = zx::duration(nsec_per_notif * 2);

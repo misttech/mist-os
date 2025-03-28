@@ -197,7 +197,8 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
                               uint32_t notifications_per_ring = 0) {
   ASSERT_FALSE(device_entry().isCodec());
 
-  ASSERT_TRUE(ring_buffer_props_) << "RequestBuffer was called before RequestRingBufferChannel";
+  ASSERT_TRUE(ring_buffer_props_.has_value())
+      << "RequestBuffer was called before RequestRingBufferChannel";
 
   min_ring_buffer_frames_ = min_ring_buffer_frames;
   notifications_per_ring_ = notifications_per_ring;

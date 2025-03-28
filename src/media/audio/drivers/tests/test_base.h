@@ -37,7 +37,7 @@ inline constexpr size_t kUniqueIdLength = 16;
     }                                                      \
   } while (0)
 
-enum DriverType : uint16_t {
+enum DriverType : uint8_t {
   Codec = 0,
   Composite = 1,
   Dai = 2,
@@ -45,7 +45,7 @@ enum DriverType : uint16_t {
   StreamConfigOutput = 4,
 };
 
-enum DeviceType : uint16_t {
+enum DeviceType : uint8_t {
   A2DP = 0,
   BuiltIn = 1,
   Virtual = 2,
@@ -136,24 +136,6 @@ class TestBase : public media::audio::test::TestFixture {
   // know at least whether ring buffers are outgoing or incoming, so this is implemented in this
   // shared parent class.
   void DisplayBaseProperties();
-  // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
-  struct BaseProperties {
-    //       On codec/composite/dai/stream, member is   (o)ptional (r)equired (.)absent
-    std::optional<bool> is_input;                                   // o.rr
-    std::optional<std::array<uint8_t, kUniqueIdLength>> unique_id;  // oooo
-    std::optional<std::string> manufacturer;                        // oooo
-    std::optional<std::string> product;                             // oooo
-    std::optional<uint32_t> clock_domain;                           // .rrr
-
-    std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>
-        plug_detect_capabilities;       // r..r
-    std::optional<bool> can_mute;       // ...o
-    std::optional<bool> can_agc;        // ...o
-    std::optional<float> min_gain_db;   // ...r
-    std::optional<float> max_gain_db;   // ...r
-    std::optional<float> gain_step_db;  // ...r
-  };
-  std::optional<BaseProperties> properties_;
 
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // know the supported formats, so this is implemented in this shared parent class.
@@ -162,7 +144,7 @@ class TestBase : public media::audio::test::TestFixture {
       const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_format_sets);
   static void LogDaiFormatSets(
       const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_format_sets,
-      std::string tag = "");
+      const std::string& tag = "");
   static void ValidateDaiFormat(const fuchsia::hardware::audio::DaiFormat& dai_format);
   static void LogDaiFormat(const fuchsia::hardware::audio::DaiFormat& format,
                            const std::string& tag = {});
@@ -203,8 +185,29 @@ class TestBase : public media::audio::test::TestFixture {
   }
   std::optional<uint64_t>& ring_buffer_id() { return ring_buffer_id_; }
 
+  // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
+  struct BaseProperties {
+    //       On codec/composite/dai/stream, member is   (o)ptional (r)equired (.)absent
+    std::optional<bool> is_input;                                   // o.rr
+    std::optional<std::array<uint8_t, kUniqueIdLength>> unique_id;  // oooo
+    std::optional<std::string> manufacturer;                        // oooo
+    std::optional<std::string> product;                             // oooo
+    std::optional<uint32_t> clock_domain;                           // .rrr
+
+    std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>
+        plug_detect_capabilities;       // r..r
+    std::optional<bool> can_mute;       // ...o
+    std::optional<bool> can_agc;        // ...o
+    std::optional<float> min_gain_db;   // ...r
+    std::optional<float> max_gain_db;   // ...r
+    std::optional<float> gain_step_db;  // ...r
+  };
+  std::optional<BaseProperties>& properties() { return properties_; }
+
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
+
+  std::optional<BaseProperties> properties_;
 
   void SetMinMaxRingBufferFormats();
   void SetMinMaxDaiFormats();
@@ -267,7 +270,7 @@ inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>& plug_caps) {
-  if (!plug_caps) {
+  if (!plug_caps.has_value()) {
     return (out << "NONE");
   }
   switch (*plug_caps) {
@@ -333,10 +336,10 @@ inline std::ostream& operator<<(std::ostream& out,
 }
 
 inline std::ostream& operator<<(std::ostream& out, std::optional<std::array<uint8_t, 16>> id) {
-  if (!id) {
+  if (!id.has_value()) {
     return (out << "NONE");
   }
-  char id_buf[2 * kUniqueIdLength + 1];
+  char id_buf[(2 * kUniqueIdLength) + 1];
   std::snprintf(id_buf, sizeof(id_buf),
                 "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", (*id)[0],
                 (*id)[1], (*id)[2], (*id)[3], (*id)[4], (*id)[5], (*id)[6], (*id)[7], (*id)[8],
