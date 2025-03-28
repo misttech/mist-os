@@ -15,7 +15,7 @@
 namespace {
 
 constexpr std::string kHelpOption = "help";
-constexpr std::string kDevFsOnlyOption = "devfs-only";
+constexpr std::string kNoBluetoothOption = "no-bluetooth";
 constexpr std::string kNoVirtualAudioOption = "no-virtual";
 constexpr std::string kRunAdminTestsOption = "admin";
 constexpr std::string kRunPositionTestsOption = "position";
@@ -42,7 +42,7 @@ void usage(const std::string& prog_name) {
 
   printf(
       "  --%s\t\t   Do not test the Bluetooth helper library; only test drivers found in devfs\n",
-      kDevFsOnlyOption.c_str());
+      kNoBluetoothOption.c_str());
   printf("  --%s\t\t   Do not instantiate+test 'virtual_audio' instances\n",
          kNoVirtualAudioOption.c_str());
   printf("  \t\t\t   Note: this switch allows any ALREADY-RUNNING 'virtual_audio' instances to\n");
@@ -77,12 +77,12 @@ int main(int argc, char** argv) {
   builder.WithTags({"audio_driver_tests"}).BuildAndInitialize();
   testing::InitGoogleTest(&argc, argv);
 
-  // --devfs-only: Only test devices detected in devfs; don't add/test Bluetooth audio a2dp output.
-  bool devfs_only = command_line.HasOption(kDevFsOnlyOption);
+  // --no-bluetooth: Only detect+test devices in devfs; don't add+test the Bluetooth audio library.
+  bool no_bluetooth = command_line.HasOption(kNoBluetoothOption);
 
-  // --no-virtual: Don't automatically create and test virtual_audio instances for StreamConfig
-  //   Dai and Composite (using default settings). When this flag is enabled, any _preexisting_
-  //   virtual_audio instances are allowed and tested like any other physical device.
+  // --no-virtual: Don't automatically create+test virtual_audio instances for StreamConfig, Dai,
+  //   Codec and Composite (using default settings). When this flag is enabled, any _preexisting_
+  //   virtual_audio instances are allowed and detected+tested like any other devfs device.
   bool no_virtual_audio = command_line.HasOption(kNoVirtualAudioOption);
 
   // --admin: Validate commands that require exclusive access, such as SetFormat.
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
 
   media::audio::drivers::test::DeviceHost device_host;
   // The default configuration for each of these four booleans is FALSE.
-  device_host.AddDevices(devfs_only, no_virtual_audio);
+  device_host.AddDevices(no_bluetooth, no_virtual_audio);
   device_host.RegisterTests(expect_audio_svcs_not_connected, enable_position_tests);
 
   auto ret = RUN_ALL_TESTS();

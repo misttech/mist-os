@@ -17,7 +17,7 @@ using their default settings; this can be disabled by including the
 
 The suite also hermetically creates and tests an instance of the Bluetooth a2dp
 library (see `//src/connectivity/bluetooth/tests/audio-device-output-harness`);
-this can be disabled by specifying `--devfs-only`.
+this can be disabled by specifying `--no-bluetooth`.
 
 By design, clients of `fuchsia.hardware.audio.StreamConfig` and
 `fuchsia.hardware.audio.Dai` may connect to only one audio driver's `RingBuffer`
@@ -52,4 +52,4 @@ Thus, to ***fully*** validate a devfs-based audio driver, while avoiding re-
 testing `virtual_audio` instances or the Bluetooth audio library, execute the
 following in a `minimal` release build running on a non-emulated system:
 
-`fx test audio_driver_tests -- --admin --position --no-virtual --devfs-only`
+`fx test audio_driver_tests -- --admin --position --no-virtual --no-bluetooth`

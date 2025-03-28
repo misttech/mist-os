@@ -22,7 +22,7 @@ class DeviceHost {
   ~DeviceHost();
 
   // Post a task to our thread to detect and add all devices, so that driver testing can begin.
-  void AddDevices(bool devfs_only, bool no_virtual_audio);
+  void AddDevices(bool no_bluetooth, bool no_virtual_audio);
 
   // Create testcase instances for each device entry, based on the passed-in configuration.
   void RegisterTests(bool expect_audio_svcs_not_connected, bool enable_position_tests);
@@ -31,8 +31,8 @@ class DeviceHost {
   zx_status_t QuitDeviceLoop();
 
  private:
-  // Detect devfs-based audio devices, optionally adding device entries for a2dp and virtual_audio.
-  void DetectDevices(bool devfs_only, bool no_virtual_audio);
+  // Detect devfs-based devices, optionally adding device entries for bluetooth and virtual devices.
+  void DetectDevices(bool no_bluetooth, bool no_virtual_audio);
 
   // Optionally called during DetectDevices. Create virtual_audio instances for each device type
   // using the default configurations settings (which should always pass all tests).

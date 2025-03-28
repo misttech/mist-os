@@ -55,10 +55,10 @@ DeviceHost::DeviceHost() : device_loop_(async::Loop(&kAsyncLoopConfigNeverAttach
 DeviceHost::~DeviceHost() { QuitDeviceLoop(); }
 
 // Post a task to our thread to detect and add all devices, so that testing can begin.
-void DeviceHost::AddDevices(bool devfs_only, bool no_virtual_audio) {
+void DeviceHost::AddDevices(bool no_bluetooth, bool no_virtual_audio) {
   libsync::Completion done;
-  async::PostTask(device_loop_.dispatcher(), [this, &done, devfs_only, no_virtual_audio]() {
-    DetectDevices(devfs_only, no_virtual_audio);
+  async::PostTask(device_loop_.dispatcher(), [this, &done, no_bluetooth, no_virtual_audio]() {
+    DetectDevices(no_bluetooth, no_virtual_audio);
     done.Signal();
   });
   // If we hang indefinitely here, the test execution environment will eventually timeout.
@@ -80,7 +80,7 @@ void DeviceHost::AddDevices(bool devfs_only, bool no_virtual_audio) {
 // this method exits. This requires us to use class member `device_enumeration_complete_` to signal
 // that these subsequent device-detection callbacks should trigger immediate failures instead of
 // treating this like another device to be tested.
-void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
+void DeviceHost::DetectDevices(bool no_bluetooth, bool no_virtual_audio) {
   // This is guarded by `device_enumeration_complete_` which we set before we exit, but we give this
   // variable static scope to avoid future issues.
   static DeviceType dev_type = DeviceType::BuiltIn;
@@ -145,7 +145,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
 
   // And finally, unless expressly excluded, manually add a device entry for the Bluetooth audio
   // library, to validate admin functions even if AudioCore has connected to "real" audio drivers.
-  if (!devfs_only) {
+  if (!no_bluetooth) {
     device_entries().insert({{}, "A2DP", DriverType::StreamConfigOutput, DeviceType::A2DP});
   }
 }
