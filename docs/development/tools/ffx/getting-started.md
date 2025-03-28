@@ -31,7 +31,7 @@ about the interactions between `ffx` and your Fuchsia target device.
 After following all the prerequisites, run the following in a terminal:
 
 ```posix-terminal
-fx ffx help
+ffx help
 ```
 
 This will list all of the available `ffx` subcommands. You'll see something
@@ -64,7 +64,7 @@ Commands:
   version           Print out ffx tool and daemon versions
 ```
 
-You can use `fx ffx help <subcommand>` or `fx ffx <subcommand> --help` to see
+You can use `ffx help <subcommand>` or `ffx <subcommand> --help` to see
 more about any subcommand.
 
 ## Interacting with target devices
@@ -72,7 +72,7 @@ more about any subcommand.
 In a terminal, run the following:
 
 ```posix-terminal
-fx ffx target list
+ffx target list
 ```
 
 You'll see a list of devices that `ffx` has discovered. For example, with a
@@ -86,39 +86,25 @@ fuchsia-emulator  <unknown>    Unknown    Product    [fe80::5054:ff:fe63:5e7a%4]
 `RCS`: Indicates whether there is a reachable instance of the Remote Control
 Service (RCS) running on the device.
 
-In order to get `ffx` to automatically connect to a device, you must either have
-set the target's nodename to be the default target, or attempt to interact with the
-device.
+If multiple devices are connected, you must follow the steps in
+[Interacting with multiple devices](#interacting-with-multiple-devices) to
+specify which target to interact with.
 
-To set the target to be the default, run:
-
-```posix-terminal
-fx ffx target default set $NODENAME
-```
-
-If the default target has been set prior to starting the daemon, waiting a few seconds
-should yield a change to the `RCS` status to show `Y`.
-
-If the default target has been set after starting the daemon, attempting to interact
-with the target should be sufficient to kick off a connection, like the following
+In most cases, if you just interact with a target that should be
+sufficient to start a connection. For example:
 
 ```posix-terminal
-fx ffx component list
+ffx target echo
 ```
-
-Note: If the default target has been set, and you are unable to run that command
-against the target, [reach out](#contacting_the_ffx_team) to the `ffx` team.
 
 Then the next time you list targets you should see that an `RCS` connection
 is active.
 
 ```none
-$ fx ffx target list
+$ ffx target list
 NAME                    SERIAL       TYPE       STATE      ADDRS/IP                       RCS
 fuchsia-emulator  <unknown>    Unknown    Product    [fe80::5054:ff:fe63:5e7a%4]    Y
 ```
-
-If a target has been set as default there will be a `*` next to it.
 
 If you had `ffx log` running, you should also see something like the following in
 the logs:
@@ -127,28 +113,56 @@ the logs:
 [00009.776170][28540][28542][remote-control, remote_control_bin] INFO: published remote control service to overnet
 ```
 
-NOTE: if the `RCS` column remains `N` for an extended amount of time and you have
-already set this target's nodename to `target.default` _before_ initially starting
-ffx, [reach out](#contacting_the_ffx_team) to the `ffx` team.
+## Interacting with multiple devices
 
-### On Default Targets
+When multiple targets are visible in `ffx target list`, you must set a target
+as the default or explicitly set the target.
 
-Above we covered setting the default target using the command
+Otherwise, `ffx` commands requiring a target interaction will fail since it's
+ambiguous which device to use.
+
+Note: If the default or explicit target has been specified, and you are unable
+to run that command against the target, [reach out](#contacting_the_ffx_team)
+to the `ffx` team.
+
+### Setting a default target
+
+To set a default target, run:
 
 ```posix-terminal
-fx ffx target default set
+fx set-device $NODENAME
 ```
 
-It is also possible to set the default target on a per-command basis using the
-`--target` flag like so.
+You can run the following command to verify that the default target was set
+correctly:
 
 ```posix-terminal
-fx ffx --target $NODENAME component list
+ffx target default get
 ```
 
-### Interacting with multiple devices
+The target list command shows an asterisk (`*`) next to the name of the
+default target. To see the target list:
 
-TODO: fill this out.
+```posix-terminal
+ffx target list
+```
+
+### Explicitly specifying a target
+
+To specify which target to use in one-off cases (such as flashing), you can specify
+the `-t` or `--target` flag to `ffx` commands, for example:
+
+```posix-terminal
+# These 2 commands are equivalent.
+ffx --target $NODENAME target flash
+ffx -t $NODENAME target flash
+```
+
+For `fx` commands, the flag's name is `-d` instead of `-t|--target`. For example:
+
+```posix-terminal
+fx -d $NODENAME serve
+```
 
 ### Controlling the state of target devices
 
@@ -164,7 +178,7 @@ Logs normally go to a cache directory (on Linux, usually
 The location can be found by running
 
 ```posix-terminal
-fx ffx config get log.dir
+ffx config get log.dir
 ```
 
 However, the location can be overridden with `-o/--log-output <destination>`,
@@ -180,7 +194,7 @@ The default is `info`.
 It can also be permanently set by configuring `log.level`, e.g.:
 
 ```posix-terminal
-fx ffx config set log.level debug
+ffx config set log.level debug
 ```
 
 ### Interactive Use
@@ -188,7 +202,7 @@ fx ffx config set log.level debug
 A common use of the above options is to see debugging for a specific command:
 
 ```posix-terminal
-fx ffx -l debug -o - target echo
+ffx -l debug -o - target echo
 ```
 
 The above command will produce debugging logs on the command line as part
@@ -201,7 +215,7 @@ configuration entries under `log.target_levels`. For instance, to
 see debug logs only for `analytics`:
 
 ```posix-terminal
-fx ffx config set log.target_levels.analytics debug
+ffx config set log.target_levels.analytics debug
 ```
 
 Log "targets" are simply prefixes to a log line.
@@ -223,7 +237,7 @@ The `component list` command will output monikers of all components that current
 in the component topology.
 
 ```none
-$ fx ffx component list
+$ ffx component list
 /
 /bootstrap
 /bootstrap/archivist
@@ -247,7 +261,7 @@ a capability with a given name.
 The following command will display all components that use/expose the `diagnostics` capability:
 
 ```none
-$ fx ffx component capability diagnostics
+$ ffx component capability diagnostics
 Exposed:
   /bootstrap/archivist
   /bootstrap/base_resolver
@@ -271,7 +285,7 @@ component.
 The following command will display information about the `/core/network/dhcpd` component:
 
 ```none
-$ fx ffx component show dhcpd
+$ ffx component show dhcpd
                Moniker:  /core/network/dhcpd
                    URL:  #meta/dhcpv4_server.cm
            Instance ID:  20b2c7aba6793929c252d4e933b8a1537f7bfe8e208ad228c50a896a18b2c4b5
@@ -300,7 +314,7 @@ exposed and used by a component are successfully routed.
 For example:
 
 ```none
-$ fx ffx component doctor /bootstrap/archivist
+$ ffx component doctor /bootstrap/archivist
 Querying component manager for /bootstrap/archivist
 URL: fuchsia-boot:///#meta/archivist.cm
 Instance ID: None
@@ -332,7 +346,7 @@ Instance ID: None
 ```
 
 ```none
-$ fx ffx component doctor /core/feedback
+$ ffx component doctor /core/feedback
 Querying component manager for /core/feedback
 URL: fuchsia-pkg://fuchsia.com/forensics#meta/feedback.cm
 Instance ID: eb345fb7dcaa4260ee0c65bb73ef0ec5341b15a4f603f358d6631c4be6bf7080
@@ -378,12 +392,12 @@ Then use the `component run` command to create and launch a component instance f
 `/core/ffx-laboratory:hello-world-rust`:
 
 ```none
-$ fx ffx component run /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
+$ ffx component run /core/ffx-laboratory:hello-world-rust fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
 Moniker: /core/ffx-laboratory:hello-world-rust
 Creating component instance...
 ...
-$ fx ffx component show hello-world-rust
+$ ffx component show hello-world-rust
                Moniker: /core/ffx-laboratory:hello-world-rust
                    URL: fuchsia-pkg://fuchsia.com/hello-world-rust#meta/hello-world-rust.cm
                   Type: v2 dynamic component
@@ -407,18 +421,29 @@ a target device and start the Remote Control Service.
 If you try running `ffx doctor` under normal circumstances, you should see:
 
 ```none
-$ fx ffx doctor
-Checking for a running daemon...none running.
-Attempting to kill any zombie daemons...killed at least one daemon.
-Starting a new daemon instance...success
-Attempting to connect to the daemon. This may take a couple seconds...success
-Attempting to communicate with the daemon...success
-Attempting to list targets...success
-Attempting to get an RCS connection...success
-Attempting to communicate with RCS...success
+$ ffx doctor
 
+Doctor summary (to see all details, run ffx doctor -v):
 
-SUCCESS. You should be able to run ffx commands now.
+[✓] FFX Environment Context
+    [✓] Kind of Environment: Fuchsia.git In-Tree Rooted at /usr/local/google/home/username/fuchsia, with default build directory of /usr/local/google/home/username/fuchsia/out/default
+    [✓] Environment-default build directory: /usr/local/google/home/username/fuchsia/out/default
+    [✓] Config Lock Files
+        [✓] /usr/local/google/home/username/global_ffx_config.json locked by /usr/local/google/home/username/global_ffx_config.json.lock
+    [✓] SSH Public/Private keys match
+
+[✓] Checking daemon
+    [✓] Daemon found: [3338687]
+    [✓] Connecting to daemon
+
+[✓] Searching for targets
+    [✓] 1 targets found
+
+[✓] Verifying Targets
+    [✓] Target: fuchsia-emulator
+        [i] Running `ffx target show` against device
+
+[✓] No issues found
 ```
 
 If `doctor` fails, it will try to suggest a resolution to the problem. You can [file a bug](https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957) for the ffx team if you
@@ -426,31 +451,44 @@ persistently have problems. For example, if `doctor` is unable to start the RCS,
 you would see the following:
 
 ```none
-$ fx ffx doctor
-Checking for a running daemon...found
-Attempting to connect to the daemon. This may take a couple seconds...success
-Attempting to communicate with the daemon...success
-Attempting to list targets...success
-Attempting to get an RCS connection...success
-Attempting to communicate with RCS...FAILED. Timed out.
+$ ffx doctor -v
 
+Doctor summary:
 
-Attempt 2 of 3
-Attempting to list targets...success
-Attempting to get an RCS connection...success
-Attempting to communicate with RCS...FAILED. Timed out.
+[✓] FFX doctor
+    [✓] Frontend version: 2025-03-25T18:48:31+00:00
+    [✓] abi-revision: 0xB5D2EBDA9DA50585
+    [✓] api-level: 26
+    [i] Path to ffx: /usr/local/google/home/username/fuchsia/out/default/host_x64/ffx
 
+[✓] FFX Environment Context
+    [✓] Kind of Environment: Fuchsia.git In-Tree Rooted at /usr/local/google/home/username/fuchsia, with default build directory of /usr/local/google/home/username/fuchsia/out/default
+    [✓] Environment File Location: /usr/local/google/home/username/.local/share/Fuchsia/ffx/config/.ffx_env
+    [✓] Environment-default build directory: /usr/local/google/home/username/fuchsia/out/default
+    [✓] Config Lock Files
+        [✓] /usr/local/google/home/username/global_ffx_config.json locked by /usr/local/google/home/username/global_ffx_config.json.lock
+    [✓] SSH Public/Private keys match
 
-Attempt 3 of 3
-Attempting to list targets...success
-Attempting to get an RCS connection...success
-Attempting to communicate with RCS...FAILED. Timed out.
+[✓] Checking daemon
+    [✓] Daemon found: [3338687]
+    [✓] Connecting to daemon
+    [✓] Daemon version: 2025-03-25T18:48:31+00:00
+    [✓] path: /usr/local/google/home/username/fuchsia/out/default/host_x64/ffx
+    [✓] abi-revision: 0xB5D2EBDA9DA50585
+    [✓] api-level: 26
+    [✓] Default target: (none)
 
+[✓] Searching for targets
+    [✓] 1 targets found
 
-Connecting to RCS failed after maximum attempts. To resolve this issue, try
-rebooting your device. If this persists, please file a bug at the link below
-and include 1) all output
-above and 2) device syslog if available.Bug link: ...
+[✗] Verifying Targets
+    [✗] Target: fuchsia-emulator
+        [✓] Compatibility state: supported
+            [✓] Host overnet is running supported revision
+        [✓] Opened target handle
+        [✗] Timeout while connecting to RCS
+
+[✗] Doctor found issues in one or more categories.
 ```
 
 ## Testing with ffx
