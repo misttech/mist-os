@@ -18,7 +18,7 @@ use ffx_daemon_target::target_collection::{TargetCollection, TargetUpdateFilter}
 use ffx_stream_util::TryStreamUtilExt;
 use ffx_target::{FastbootInterface, TargetInfoQuery};
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_ffx::{self as ffx, TargetAddrInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 #[cfg(test)]
 use futures::channel::oneshot::Sender;
@@ -747,7 +747,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
     }
 }
 
-// mDNS Fastboot & RCS
+// mDNS/Emulator Fastboot & RCS
 #[tracing::instrument(skip(tc))]
 fn handle_discovered_target(
     tc: &Rc<TargetCollection>,
@@ -776,10 +776,22 @@ fn handle_discovered_target(
         .addresses
         .iter()
         .flatten()
-        .map(|a| TargetIpAddr::try_from(a).ok().expect("Invalid mdns target address").into())
+        .filter_map(|a| TargetIpAddr::try_from(a).ok().map(Into::into))
         .collect::<Vec<_>>();
 
+    let vsock_addr = t.addresses.iter().flatten().find_map(|x| {
+        if let TargetAddrInfo::Vsock(x) = x {
+            Some(*x)
+        } else {
+            None
+        }
+    });
+
     let mut update = TargetUpdateBuilder::new().net_addresses(&addrs);
+
+    if let Some(vsock_addr) = vsock_addr {
+        update = update.vsock_cid(vsock_addr.cid);
+    }
 
     if autoconnect {
         update = update.enable();
@@ -798,23 +810,23 @@ fn handle_discovered_target(
                 _ => panic!("Discovered non-network fastboot interface over mDNS, {interface:?}"),
             },
         ),
-        None => update.discovered(TargetProtocol::Ssh, TargetTransport::Network),
+        None => {
+            if vsock_addr.is_some() {
+                update.discovered(TargetProtocol::Vsock, TargetTransport::Network)
+            } else {
+                update.discovered(TargetProtocol::Ssh, TargetTransport::Network)
+            }
+        }
     };
 
     if let Some(ffx::TargetIpAddrInfo::IpPort(ssh_address)) = t.ssh_address {
         update = update.ssh_port(Some(ssh_address.port));
     }
 
-    let mut single_filter = None;
-    let mut both_filter = None;
-
     let filter = if let Some(ref name) = t.nodename {
-        &both_filter.insert([
-            TargetUpdateFilter::NetAddrs(&addrs),
-            TargetUpdateFilter::LegacyNodeName(name),
-        ])[..]
+        &[TargetUpdateFilter::NetAddrs(&addrs), TargetUpdateFilter::LegacyNodeName(name)][..]
     } else {
-        &single_filter.insert([TargetUpdateFilter::NetAddrs(&addrs)])[..]
+        &[TargetUpdateFilter::NetAddrs(&addrs)][..]
     };
 
     tc.update_target(filter, update.build(), true);
