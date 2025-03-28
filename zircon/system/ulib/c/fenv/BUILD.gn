@@ -36,13 +36,6 @@ llvm_libc_source_set("fenv") {
   ]
 
   test_deps = [ ":FEnvSafeTest" ]
-
-  # TODO(https://fxbug.dev/42053828): GCC's <arm_acle.h> doesn't provide some
-  # intrinsics that llvm-libc expects and clang provides.  Remove this after
-  # these have been upstreamed into GCC.
-  if (is_gcc) {
-    include_dirs = [ "." ]
-  }
 }
 
 libc_test("FEnvSafeTest") {
