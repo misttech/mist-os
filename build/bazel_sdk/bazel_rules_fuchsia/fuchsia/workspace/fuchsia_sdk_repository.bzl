@@ -203,6 +203,21 @@ Loads a particular version of the Fuchsia IDK.
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
             allow_single_file = True,
         ),
+        "visibility_templates": attr.string_list_dict(
+            doc = """Allows for the addition of additional visibility lists.
+
+            This attribute lets the caller specify a set of additional visibility
+            parameters to be passed into the templates when we generate the repositry.
+            For a list of keys refer to the generate_sdk_build_rules.bzl file.
+
+            When you pass in the labels you must specify the fully qualified name of
+            the label to ensure that we reference the correct labels. For example,
+            if you are wanting to refer to a target within the root repository you should
+            use a path like @@//foo:__pkg__. If you were to pass in this value as
+            //foo:__pkg__ then it will be passed into the template in a way that makes
+            bazel think it belongs to the repository you are generating.
+            """,
+        ),
     },
 )
 

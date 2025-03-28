@@ -293,6 +293,13 @@ fuchsia_sdk_repository(
     # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
     local_sdk_version_file = fuchsia_in_tree_idk_hash_label,
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@internal_sdk//:__subpackages__",
+            "@fuchsia_sdk//:__subpackages__",
+        ],
+    },
 )
 
 # A repository used to expose SDK atoms that are not yet ready to be
@@ -305,6 +312,13 @@ fuchsia_sdk_repository(
     local_sdk_version_file = fuchsia_internal_only_idk_hash_label,
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@internal_sdk//:__subpackages__",
+            "@fuchsia_sdk//:__subpackages__",
+        ],
+    },
 )
 
 # buildifier: disable=load-on-top

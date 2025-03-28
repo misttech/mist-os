@@ -50,6 +50,9 @@ fuchsia_fidl_hlcpp_library(
         {{cc_deps}}
     ],
     target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
+    visibility = [
+        {{hlcpp_visibility}}
+    ],
 )
 
 # TODO(https://fxbug.dev/42068276): Rename HLCPP generated bindings to "_hlcpp" suffix.

@@ -22,7 +22,7 @@ fuchsia_cc_binary(
         "@fuchsia_sdk//pkg/syslog",
         # the fidl libraries below are not effectively used in the hello world sample, they are here just to validate that
         # the Bazel build can include FIDL dependencies from both internal and partner SDK correctly:
-        "@fuchsia_sdk//fidl/fuchsia.component.decl:fuchsia.component.decl_cc",
+        "@fuchsia_sdk//fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     ],
 )
 

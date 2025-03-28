@@ -141,6 +141,10 @@ _REPOSITORY_BUILD_TEMPLATE = (
     "//fuchsia/workspace/sdk_templates:fuchsia_sdk.BUILD.bazel"
 )
 
+# The following keys are used to add additional visibility restrictions that the
+# caller can define. They are defined here for reference purposes.
+HLCPP_VISIBILITY_KEY = "hlcpp"  # Used to restrict access to hlcpp targets.
+
 def resolve_repository_labels(runtime):
     """Resolve the labels used by this repository.
 
@@ -181,6 +185,34 @@ def _sdk_template_path(runtime, name):
        A path value pointing to the template file.
     """
     return runtime.label_to_path(_SDK_TEMPLATES[name])
+
+def _get_visibility_list(values):
+    """ Returns a string representation of the visibility list.
+
+    If the list is None or empty then ["//visibility:public"] value will be returned.
+
+    Args:
+        values: A list of values of None
+    Returns:
+        A list of visibility parameters
+    """
+    if not values:
+        return ["//visibility:public"]
+
+    visibility_list = []
+    for entry in values:
+        repo_name = entry.repo_name
+
+        # If this repo_name is empty we change it to refer to the root
+        # repo to avoid confusing it with the generated repo.
+        if repo_name == "":
+            repo_name = "@"
+        visibility_list.append("@{}//{}:{}".format(
+            repo_name,
+            entry.package,
+            entry.name,
+        ))
+    return visibility_list
 
 def _get_target_name(name):
     return name.rpartition("/")[2]
@@ -711,6 +743,10 @@ def _generate_fidl_library_build_rules(
         parent_sdk_contents,
     )
 
+    hlcpp_visibility = _get_visibility_list(
+        process_context.visibility_templates.get(HLCPP_VISIBILITY_KEY, None),
+    )
+
     _merge_template(
         ctx,
         build_file,
@@ -733,6 +769,7 @@ def _generate_fidl_library_build_rules(
                 "",
                 "_llcpp_cc",
             ),
+            "{{hlcpp_visibility}}": _get_starlark_list(runtime, hlcpp_visibility),
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(
@@ -1680,6 +1717,10 @@ def _generate_sdk_build_rules(
         files_to_copy = files_to_copy,
         component_manifest_targets = [],
         constants = constants,
+        visibility_templates = {
+            key: [Label(v) for v in values]
+            for key, values in ctx.attr.visibility_templates.items()
+        },
     )
 
     for dir in dir_to_meta.keys():
