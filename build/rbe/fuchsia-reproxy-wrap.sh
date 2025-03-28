@@ -43,7 +43,8 @@ readonly build_summary_script="$script_dir"/build_summary.py
 reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$PREBUILT_SUBDIR"
 
 # Configuration for RBE metrics and logs collection.
-readonly fx_build_metrics_config="$project_root_rel"/.fx-build-metrics-config
+readonly fx_build_metrics_config="$project_root_rel"/.fx/config/build-metrics
+readonly fx_build_metrics_config_old="$project_root_rel"/.fx-build-metrics-config
 
 readonly jq="$project_root/prebuilt/third_party/jq/"$PREBUILT_SUBDIR"/bin/jq"
 
@@ -301,6 +302,10 @@ BUILD_METRICS_ENABLED=0
 if [[ "$FX_REMOTE_BUILD_METRICS" == 0 ]]
 then echo "Disabled RBE metrics for this run."
 else
+  # Update location of config file if needed.
+  if [[ -f "$fx_build_metrics_config_old" ]]
+  then mv "$fx_build_metrics_config_old" "$fx_build_metrics_config"
+  fi
   if [[ -f "$fx_build_metrics_config" ]]
   then source "$fx_build_metrics_config"
     # This config sets BUILD_METRICS_ENABLED.

@@ -66,7 +66,6 @@ tables_generator_tests_*.txt
 !/.fx/config/README.md
 .fx-build-dir
 .fx-build-profile-config
-.fx-build-metrics-config
 .fx-metrics-config
 .fx-multi-list
 .fx-remote-config

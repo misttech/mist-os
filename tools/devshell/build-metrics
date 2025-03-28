@@ -32,7 +32,9 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
 
-readonly BUILD_METRICS_CONFIG="${FUCHSIA_DIR}/.fx-build-metrics-config"
+readonly BUILD_METRICS_CONFIG="${FUCHSIA_DIR}/.fx/config/build-metrics"
+# Old location of this file.  Will move to new location automatically.
+readonly BUILD_METRICS_CONFIG_OLD="${FUCHSIA_DIR}/.fx-build-metrics-config"
 
 function usage {
   show-what-is-collected
@@ -95,6 +97,10 @@ action_args=("$@")
 
 function build-metrics-read-config {
   BUILD_METRICS_ENABLED=0
+  if [[ -f "${BUILD_METRICS_CONFIG_OLD}" ]]; then
+    fx-info "Moving ${BUILD_METRICS_CONFIG_OLD} to new location ${BUILD_METRICS_CONFIG}.  No further action is needed."
+    mv "${BUILD_METRICS_CONFIG_OLD}" "${BUILD_METRICS_CONFIG}"
+  fi
   if [[ ! -f "${BUILD_METRICS_CONFIG}" ]]; then
     return 1
   fi
