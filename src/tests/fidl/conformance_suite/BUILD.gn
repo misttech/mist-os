@@ -12,6 +12,7 @@ fidl("conformance_fidl") {
   enable_hlcpp = true
 
   sources = [
+    "//src/tests/fidl/conformance_suite/aliases.test.fidl",
     "//src/tests/fidl/conformance_suite/alignment.test.fidl",
     "//src/tests/fidl/conformance_suite/arrays_and_vectors.test.fidl",
     "//src/tests/fidl/conformance_suite/bits_flexible.test.fidl",

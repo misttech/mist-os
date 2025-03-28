@@ -9,6 +9,7 @@ import("//build/fidl/fidl.gni")
 # FIDL file to test.conformance.python. This allows the ..:conformance_fidl
 # and :conformance_python_fidl targets to co-exist.
 conformance_python_fidl_source_basenames = [
+  "aliases.test.fidl",
   "alignment.test.fidl",
   "arrays_and_vectors.test.fidl",
   "bits_flexible.test.fidl",
@@ -67,7 +68,7 @@ fidl("conformance_python_fidl") {
   _enable_experimental_python = true
 
   non_fidl_deps = []
-  sources = [ "//src/tests/fidl/conformance_suite/python/aliases.test.fidl" ]
+  sources = []
   foreach(source_basename, conformance_python_fidl_source_basenames) {
     transplant_target = ":conformance_python_fidl_transplant__${source_basename}(//build/toolchain:host_x64)"
     non_fidl_deps += [ transplant_target ]

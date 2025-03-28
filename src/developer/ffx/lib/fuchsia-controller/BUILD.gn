@@ -149,6 +149,7 @@ gidl("static_conformance_tests_py") {
   type = "conformance"
   language = "python"
   inputs = [
+    "//src/tests/fidl/conformance_suite/aliases.gidl",
     "//src/tests/fidl/conformance_suite/alignment.gidl",
     "//src/tests/fidl/conformance_suite/bits_flexible.gidl",
     "//src/tests/fidl/conformance_suite/bits_strict.gidl",
@@ -176,7 +177,6 @@ gidl("static_conformance_tests_py") {
     "//src/tests/fidl/conformance_suite/transformer2.gidl",
     "//src/tests/fidl/conformance_suite/union.gidl",
     "//src/tests/fidl/conformance_suite/vectors.gidl",
-    "//src/tests/fidl/conformance_suite/python/aliases.gidl",
   ]
   fidl = "//src/tests/fidl/conformance_suite/python:conformance_python_fidl"
   output = conformance_test_source

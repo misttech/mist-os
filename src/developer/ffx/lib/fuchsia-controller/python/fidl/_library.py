@@ -960,6 +960,8 @@ def alias_declaration(ir, root_ir) -> type:
                 base_type.__members_for_aliasing__,
             )
             return ty
+        if base_type == bool:
+            return bool
         base_params = {
             "__doc__": docstring(ir),
             "__fidl_kind__": "alias",
@@ -1384,8 +1386,17 @@ class FIDLLibraryModule(ModuleType):
 
     def _export_aliases(self) -> None:
         for decl in self.__ir__.alias_declarations():
-            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
-                self._export_type(alias_declaration(decl, self.__ir__))
+            name = fidl_ident_to_py_library_member(decl.name())
+            if name in self.__all__:
+                continue
+            ty = alias_declaration(decl, self.__ir__)
+            # Python doesn't allow subclassing bool, so this is a special case
+            # to handle an alias for bool.
+            if ty == bool:
+                setattr(self, name, bool)
+                self.__all__.append(name)
+                continue
+            self._export_type(ty)
 
     def _export_unions(self) -> None:
         for decl in self.__ir__.union_declarations():
