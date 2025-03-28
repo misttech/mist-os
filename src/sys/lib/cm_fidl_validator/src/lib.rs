@@ -446,6 +446,76 @@ fn generate_dependency_graph<'a>(
             }
         }
     }
+
+    if let Some(capabilities) = decl.capabilities.as_ref() {
+        for cap in capabilities {
+            match cap {
+                #[cfg(fuchsia_api_level_at_least = "25")]
+                fdecl::Capability::Dictionary(dictionary) => {
+                    if dictionary.source_path.as_ref().is_some() {
+                        if let Some(name) = dictionary.name.as_ref() {
+                            // If `source_path` is set that means the dictionary is provided by the program,
+                            // which implies a dependency from `self` to the dictionary declaration.
+                            strong_dependencies
+                                .add_edge(DependencyNode::Self_, DependencyNode::Capability(name));
+                        }
+                    }
+                }
+                fdecl::Capability::Storage(storage) => {
+                    if let (Some(name), Some(_backing_dir)) =
+                        (storage.name.as_ref(), storage.backing_dir.as_ref())
+                    {
+                        if let Some(source_node) = ref_to_dependency_node(storage.source.as_ref()) {
+                            strong_dependencies
+                                .add_edge(source_node, DependencyNode::Capability(name));
+                        }
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+
+    if let Some(children) = decl.children.as_ref() {
+        for child in children {
+            if let Some(name) = child.name.as_ref() {
+                if let Some(env) = child.environment.as_ref() {
+                    let source = DependencyNode::Environment(env.as_str());
+                    let target = DependencyNode::Child(name, None);
+                    strong_dependencies.add_edge(source, target);
+                }
+            }
+        }
+    }
+
+    if let Some(collections) = decl.collections.as_ref() {
+        for collection in collections {
+            if let Some(env) = collection.environment.as_ref() {
+                if let Some(name) = collection.name.as_ref() {
+                    let source = DependencyNode::Environment(env.as_str());
+                    let target = DependencyNode::Collection(name.as_str());
+                    strong_dependencies.add_edge(source, target);
+                }
+            }
+        }
+    }
+
+    if let Some(environment) = decl.environments.as_ref() {
+        for environment in environment {
+            if let Some(debugs) = environment.debug_capabilities.as_ref() {
+                for debug in debugs {
+                    if let Some(name) = environment.name.as_ref() {
+                        if let fdecl::DebugRegistration::Protocol(o) = debug {
+                            if let Some(source_node) = ref_to_dependency_node(o.source.as_ref()) {
+                                let target = DependencyNode::Environment(name);
+                                strong_dependencies.add_edge(source_node, target);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'a> ValidationContext<'a> {
@@ -1220,11 +1290,6 @@ impl<'a> ValidationContext<'a> {
             if self.all_children.insert(name, child).is_some() {
                 self.errors.push(Error::duplicate_field(DeclType::Child, "name", name));
             }
-            if let Some(env) = child.environment.as_ref() {
-                let source = DependencyNode::Environment(env.as_str());
-                let target = DependencyNode::Child(name, None);
-                self.add_strong_dep(Some(source), Some(target));
-            }
         }
         if let Some(environment) = child.environment.as_ref() {
             if !self.all_environment_names.contains(environment.as_str()) {
@@ -1255,11 +1320,6 @@ impl<'a> ValidationContext<'a> {
                     "environment",
                     environment,
                 ));
-            }
-            if let Some(name) = collection.name.as_ref() {
-                let source = DependencyNode::Environment(environment.as_str());
-                let target = DependencyNode::Collection(name.as_str());
-                self.add_strong_dep(Some(source), Some(target));
             }
         }
         // Allow `allowed_offers` & `allow_long_names` to be unset/unvalidated, for backwards compatibility.
@@ -1300,7 +1360,7 @@ impl<'a> ValidationContext<'a> {
 
         if let Some(debugs) = environment.debug_capabilities.as_ref() {
             for debug in debugs {
-                self.validate_environment_debug_registration(debug, name.clone());
+                self.validate_environment_debug_registration(debug);
             }
         }
     }
@@ -1538,15 +1598,6 @@ impl<'a> ValidationContext<'a> {
             "backing_dir",
             &mut self.errors,
         );
-
-        // The storage capability depends on its backing dir.
-        if let (Some(name), Some(backing_dir), Some(source)) =
-            (storage.name.as_ref(), storage.backing_dir.as_ref(), storage.source.as_ref())
-        {
-            let source = self.source_dependency_from_ref(Some(backing_dir), None, Some(source));
-            let target = Some(DependencyNode::Capability(name));
-            self.add_strong_dep(source, target);
-        }
     }
 
     fn validate_runner_decl(&mut self, runner: &'a fdecl::Runner, as_builtin: bool) {
@@ -1624,14 +1675,6 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::extraneous_field(decl, "source"));
             }
             check_path(Some(path), DeclType::Dictionary, "source_path", &mut self.errors);
-            // If `source_path` is set that means the dictionary is provided by the program,
-            // which implies a dependency from `self` to the dictionary declaration.
-            if let Some(name) = dictionary.name.as_ref() {
-                self.add_strong_dep(
-                    Some(DependencyNode::Self_),
-                    Some(DependencyNode::Capability(name)),
-                );
-            }
         }
     }
 
@@ -1647,11 +1690,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_environment_debug_registration(
-        &mut self,
-        debug: &'a fdecl::DebugRegistration,
-        environment_name: Option<&'a String>,
-    ) {
+    fn validate_environment_debug_registration(&mut self, debug: &'a fdecl::DebugRegistration) {
         match debug {
             fdecl::DebugRegistration::Protocol(o) => {
                 let decl = DeclType::DebugProtocolRegistration;
@@ -1666,16 +1705,6 @@ impl<'a> ValidationContext<'a> {
                     if !self.all_protocols.contains(&name as &str) {
                         self.errors.push(Error::invalid_field(decl, "source"));
                     }
-                }
-
-                if let Some(env_name) = &environment_name {
-                    let source = self.source_dependency_from_ref(
-                        o.source_name.as_ref(),
-                        None,
-                        o.source.as_ref(),
-                    );
-                    let target = Some(DependencyNode::Environment(env_name));
-                    self.add_strong_dep(source, target);
                 }
             }
             _ => {
