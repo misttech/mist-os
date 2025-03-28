@@ -110,7 +110,11 @@ impl From<LogCommand> for LogFilterCriteria {
         Self {
             min_severity: cmd.severity,
             filters: cmd.filter,
-            tags: cmd.tag,
+            tags: cmd
+                .tag
+                .into_iter()
+                .map(|value| convert_to_lowercase_if_needed(&value, cmd.case_sensitive).to_string())
+                .collect(),
             excludes: cmd.exclude,
             moniker_filters: if cmd.kernel {
                 cmd.component.push(KLOG.to_string());
@@ -213,9 +217,14 @@ impl LogFilterCriteria {
         }
     }
 
-    fn match_synthetic_klog_tags(&self, klog_str: &str) -> bool {
-        let tags = Self::parse_tags(klog_str);
-        self.tags.iter().any(|f| tags.iter().any(|t| t.contains(f)))
+    fn match_synthetic_klog_tags(&self, klog_str: &str, case_sensitive: bool) -> bool {
+        let tags = Self::parse_tags(klog_str)
+            .into_iter()
+            .map(|value| convert_to_lowercase_if_needed(value, case_sensitive))
+            .collect::<Vec<_>>();
+        self.tags.iter().any(|f| {
+            tags.iter().any(|t| convert_to_lowercase_if_needed(t, case_sensitive).contains(f))
+        })
     }
 
     /// Returns true if the given `LogsData` matches the moniker string.
@@ -279,23 +288,32 @@ impl LogFilterCriteria {
         {
             return false;
         }
-
         if !self.tags.is_empty()
             && !self.tags.iter().any(|query_tag| {
-                let has_tag = data.tags().map(|t| t.contains(query_tag)).unwrap_or(false);
-                let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, query_tag);
+                let has_tag = data
+                    .tags()
+                    .map(|t| {
+                        t.iter().any(|value| {
+                            convert_to_lowercase_if_needed(value, self.case_sensitive) == *query_tag
+                        })
+                    })
+                    .unwrap_or(false);
+                let moniker_has_tag =
+                    moniker_contains_in_last_segment(&data.moniker, query_tag, self.case_sensitive);
                 has_tag || moniker_has_tag
             })
         {
             if data.moniker == *KLOG_MONIKER {
-                return self.match_synthetic_klog_tags(data.msg().unwrap_or(""));
+                return self
+                    .match_synthetic_klog_tags(data.msg().unwrap_or(""), self.case_sensitive);
             }
             return false;
         }
 
         if self.exclude_tags.iter().any(|excluded_tag| {
             let has_tag = data.tags().map(|tag| tag.contains(excluded_tag)).unwrap_or(false);
-            let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, excluded_tag);
+            let moniker_has_tag =
+                moniker_contains_in_last_segment(&data.moniker, excluded_tag, self.case_sensitive);
             has_tag || moniker_has_tag
         }) {
             return false;
@@ -305,15 +323,23 @@ impl LogFilterCriteria {
     }
 }
 
-fn moniker_contains_in_last_segment(moniker: &ExtendedMoniker, query_tag: &str) -> bool {
+fn moniker_contains_in_last_segment(
+    moniker: &ExtendedMoniker,
+    query_tag: &str,
+    case_sensitive: bool,
+) -> bool {
+    let query_tag = convert_to_lowercase_if_needed(query_tag, case_sensitive);
     match moniker {
         ExtendedMoniker::ComponentInstance(moniker) => moniker
             .path()
             .last()
-            .map(|segment| segment.to_string().contains(query_tag))
+            .map(|segment| {
+                convert_to_lowercase_if_needed(&segment.to_string(), case_sensitive)
+                    .contains(&*query_tag)
+            })
             .unwrap_or(false),
         ExtendedMoniker::ComponentManager => {
-            EXTENDED_MONIKER_COMPONENT_MANAGER_STR.contains(query_tag)
+            EXTENDED_MONIKER_COMPONENT_MANAGER_STR.contains(&*query_tag)
         }
     }
 }
@@ -1028,6 +1054,96 @@ mod test {
         // Case-sensitive
         let cmd = LogCommand {
             filter: vec!["sometestfile".into()],
+            case_sensitive: true,
+            ..empty_dump_command()
+        };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        assert!(criteria.matches(&entry_0));
+        assert!(!criteria.matches(&entry_1));
+    }
+
+    #[test]
+    fn filter_fiters_case_sensitivity_for_tags() {
+        // Case-insensitive by default
+        let cmd = LogCommand { tag: vec!["someTAG".into()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        let entry_0 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .add_tag("someTAG")
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+
+        let entry_1 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .add_tag("SomeTaG")
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+        assert!(criteria.matches(&entry_0));
+        assert!(criteria.matches(&entry_1));
+
+        // Case-sensitive
+        let cmd = LogCommand {
+            tag: vec!["someTAG".into()],
+            case_sensitive: true,
+            ..empty_dump_command()
+        };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        assert!(criteria.matches(&entry_0));
+        assert!(!criteria.matches(&entry_1));
+    }
+
+    #[test]
+    fn filter_fiters_case_sensitivity_for_tags_including_moniker() {
+        // Case-insensitive by default
+        let cmd = LogCommand { tag: vec!["someTAG".into()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        let entry_0 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/someTAG".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+
+        let entry_1 = make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "core/SomeTaG".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("hello world")
+            .build()
+            .into(),
+        );
+        assert!(criteria.matches(&entry_0));
+        assert!(criteria.matches(&entry_1));
+
+        // Case-sensitive
+        let cmd = LogCommand {
+            tag: vec!["someTAG".into()],
             case_sensitive: true,
             ..empty_dump_command()
         };

@@ -277,7 +277,7 @@ pub struct LogCommand {
     pub no_color: bool,
 
     /// if enabled, text filtering options are case-sensitive
-    /// this applies to --filter and --exclude.
+    /// this applies to --filter, --exclude, --tag, and --exclude-tag.
     #[argh(switch)]
     pub case_sensitive: bool,
 

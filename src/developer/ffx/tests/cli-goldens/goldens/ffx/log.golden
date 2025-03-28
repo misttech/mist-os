@@ -182,7 +182,7 @@
       "optionality": "optional",
       "long": "--case-sensitive",
       "short": null,
-      "description": "if enabled, text filtering options are case-sensitive this applies to --filter and --exclude.",
+      "description": "if enabled, text filtering options are case-sensitive this applies to --filter, --exclude, --tag, and --exclude-tag.",
       "hidden": false
     },
     {
