@@ -95,6 +95,10 @@ async fn handler(
                 .map_err(Into::into);
             responder.send(result).map_err(Error::from)
         }
+        AccessRequest::SetConnectionPolicy { payload: _, responder } => {
+            info!("fuchsia.bluetooth.sys.Access/SetConnectionPolicy unimplemented (b/404839827)");
+            responder.send(Err(sys::Error::NotSupported)).map_err(Error::from)
+        }
         AccessRequest::StartDiscovery { token, responder } => {
             info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
             let stream = token.into_stream(); // into_stream never fails

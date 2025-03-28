@@ -91,6 +91,18 @@ closed protocol Access {
         token server_end:ProcedureToken;
     }) -> () error Error;
 
+    /// Set the BR/EDR and LE connection policy for the active host.
+    ///
+    /// * error Reports Error.FAILED if the requested connection policy couldn't be applied.
+    @available(added=HEAD)
+    strict SetConnectionPolicy(resource table {
+        /// Suppress all new connections over the BR/EDR transport. The active host will disable
+        /// page scan while the `ProcedureToken` is held open.
+        /// NOTE: The system will remain non-connectable until all [`fuchsia.bluetooth.sys/Access`]
+        /// clients drop their tokens.
+        1: suppress_bredr_connections server_end:ProcedureToken;
+    }) -> () error Error;
+
     /// Start a general discovery procedure. All general discoverable BR/EDR, LE,
     /// and BR/EDR/LE devices will appear in the peer list, which can be observed by calling
     /// [`fuchsia.bluetooth.sys/Access.WatchPeers`].
