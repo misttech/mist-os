@@ -609,13 +609,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Serve the ContainerPowerController protocol.
     async fn serve_container_power_controller(
         server_end: ServerEnd<fbinder::ContainerPowerControllerMarker>,
-        proxy_event: zx::EventPair,
+        message_counter: zx::Counter,
         kernel: Arc<Kernel>,
         service_name: &str,
     ) -> Result<(), Error> {
         async fn handle_request(
             event: fbinder::ContainerPowerControllerRequest,
-            proxy_event: &zx::EventPair,
+            message_counter: &zx::Counter,
             kernel: &Arc<Kernel>,
             wake_lock_name: &str,
         ) -> Result<(), Error> {
@@ -649,7 +649,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 }
                 unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
             };
-            crate::power::clear_wake_proxy_signal(proxy_event);
+            message_counter.add(-1).expect("Failed to decrement message counter");
             Ok(())
         }
 
@@ -657,7 +657,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             .into_stream()
             .map(|result| result.context("failed fbinder::ContainerPowerControllerRequest request"))
             .try_for_each_concurrent(None, |event| {
-                handle_request(event, &proxy_event, &kernel, service_name)
+                handle_request(event, &message_counter, &kernel, service_name)
             })
             .await
     }
@@ -992,7 +992,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
         let (power_controller_server_end, power_controller_client_end) = zx::Channel::create();
         let (power_controller_server_end, power_controller_event) =
-            crate::power::create_proxy_for_wake_events(
+            crate::power::create_proxy_for_wake_events_counter_zero(
                 power_controller_server_end,
                 format!("hal: {}", service_name),
             );
@@ -1148,7 +1148,6 @@ mod tests {
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::binder::BinderFs;
     use crate::mm::MemoryAccessor;
-    use crate::power::{KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL};
     use crate::testing::*;
     use crate::vfs::{FileSystemOptions, WhatToMount};
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
@@ -1428,9 +1427,8 @@ mod tests {
         .await
     }
 
-    async fn wait_for_kernel_proxy_and_clear(event: &zx::EventPair) {
-        fasync::OnSignals::new(&event, KERNEL_PROXY_EVENT_SIGNAL).await.unwrap();
-        event.as_handle_ref().signal(KERNEL_PROXY_EVENT_SIGNAL, zx::Signals::empty()).unwrap();
+    async fn wait_for_message(counter: &zx::Counter) {
+        fasync::OnSignals::new(&counter, zx::Signals::COUNTER_NON_POSITIVE).await.unwrap();
     }
 
     #[::fuchsia::test]
@@ -1438,22 +1436,21 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
 
         let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
-        let (event, event_remote) = zx::EventPair::create();
+        let message_counter = zx::Counter::create().expect("Failed to create message counter");
+        let message_counter_clone =
+            message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed handle dup");
+        // Simulate the proxy incrementing the message counter.
+        message_counter.add(1).expect("Failed to add to counter");
+
         let _server_task = fasync::Task::local(async move {
-            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel, "test").await;
+            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, message_counter_clone, kernel, "test").await;
             assert_matches::assert_matches!(result, Ok(_));
         });
 
-        // Check that `wake` signals correctly.
-        event.as_handle_ref().signal(zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL).unwrap();
         power_controller
             .wake(fbinder::ContainerPowerControllerWakeRequest { ..Default::default() })
             .unwrap();
-        wait_for_kernel_proxy_and_clear(&event).await;
-        assert_matches::assert_matches!(
-            event.wait_handle(RUNNER_PROXY_EVENT_SIGNAL, zx::MonotonicInstant::INFINITE_PAST),
-            Err(_)
-        );
+        wait_for_message(&message_counter).await;
     }
 
     #[test]
@@ -1462,15 +1459,18 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
 
         let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
-        let (event, event_remote) = zx::EventPair::create();
+        let message_counter = zx::Counter::create().expect("Failed to create message counter");
+        let message_counter_clone =
+            message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed handle dup");
+        // Simulate the proxy incrementing the message counter.
+        message_counter.add(1).expect("Failed to add to counter");
+
         let kernel_clone = kernel.clone();
         let _server_task = fasync::Task::local(async move {
-            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel_clone, "test").await;
+            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, message_counter_clone, kernel_clone, "test").await;
             assert_matches::assert_matches!(result, Ok(_));
         });
 
-        // Take a wake lock and check that the runner signal is no longer cleared.
-        event.as_handle_ref().signal(zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL).unwrap();
         let (wake_lock, wake_lock_remote) = zx::EventPair::create();
         power_controller
             .wake(fbinder::ContainerPowerControllerWakeRequest {
@@ -1478,7 +1478,7 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-        exec.run_singlethreaded(wait_for_kernel_proxy_and_clear(&event));
+        exec.run_singlethreaded(wait_for_message(&message_counter));
 
         // Check that we already have the lock.
         assert!(!kernel.suspend_resume_manager.add_lock("test"));
