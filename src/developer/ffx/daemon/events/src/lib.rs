@@ -57,8 +57,6 @@ pub enum TargetConnectionState {
     Disconnected,
     /// Contains the last known ping from mDNS.
     Mdns(Instant),
-    /// Contains the moment the emulator was started.
-    Vsock(Instant),
     /// Contains an actual connection to RCS.
     Rcs(RcsConnection),
     /// Target was manually added. A Manual target may have an associated

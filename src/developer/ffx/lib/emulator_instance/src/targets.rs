@@ -5,7 +5,7 @@ use crate::{
     EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances, EngineOption, NetworkingMode,
 };
 use anyhow::{Context, Result};
-use ffx::{TargetAddrInfo, TargetVSockCtx};
+use ffx::TargetAddrInfo;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
 use futures::channel::mpsc::{self, Receiver, Sender};
@@ -295,19 +295,6 @@ impl EmulatorWatcher {
     #[tracing::instrument()]
     fn make_target(instance: &EmulatorInstanceData) -> Option<ffx::TargetInfo> {
         let nodename: String = instance.get_name().into();
-        let mut addresses = Vec::with_capacity(2);
-        let vsock_device =
-            instance.emulator_configuration.device.vsock.clone().filter(|x| x.enabled);
-
-        if let Some(v) = &vsock_device {
-            addresses.push(TargetAddrInfo::Vsock(TargetVSockCtx { cid: v.cid }));
-        }
-
-        if nodename.is_empty() {
-            tracing::debug!("Skipping making target for emulator with empty nodename");
-            return None;
-        }
-
         // TUN/TAP emulators are discoverable via mDNS.
         if instance.get_networking_mode() == &NetworkingMode::Tap {
             tracing::debug!(
@@ -317,27 +304,22 @@ impl EmulatorWatcher {
             return None;
         }
         let ssh_port = instance.get_ssh_port();
-        let ssh_address = if ssh_port.is_none() {
-            if vsock_device.is_none() {
-                // No ssh port assigned so don't create a target.
-                tracing::debug!(
-                    "Skipping making target for {}, since ssh port and vsock device are both none",
-                    nodename
-                );
-                return None;
-            }
-            None
-        } else {
-            // All emulators run on loopback ipv4.
-            let ip = IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] });
-            let loopback = ffx::TargetIpPort { ip, scope_id: 0, port: ssh_port.unwrap() };
-            addresses.push(TargetAddrInfo::IpPort(loopback.clone()));
-            Some(ffx::TargetIpAddrInfo::IpPort(loopback))
-        };
-
+        if ssh_port.is_none() {
+            // No ssh port assigned so don't create a target.
+            tracing::debug!("Skipping making target for {}, since ssh port is none", nodename);
+            return None;
+        }
+        // All emulators run on loopback ipv4.
+        let ip = IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] });
+        let loopback = ffx::TargetIpPort { ip, scope_id: 0, port: ssh_port.unwrap() };
+        let ssh_address = Some(ffx::TargetIpAddrInfo::IpPort(loopback.clone()));
+        if nodename.is_empty() {
+            tracing::debug!("Skipping making target for {}, since nodename is empty", nodename);
+            return None;
+        }
         Some(ffx::TargetInfo {
             nodename: Some(nodename),
-            addresses: Some(addresses),
+            addresses: Some(vec![TargetAddrInfo::IpPort(loopback)]),
             ssh_address,
             ..Default::default()
         })

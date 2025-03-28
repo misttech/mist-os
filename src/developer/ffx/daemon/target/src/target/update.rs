@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
 use chrono::Utc;
 use ffx_daemon_events::TargetConnectionState;
 
@@ -37,12 +36,11 @@ struct Connection<'a> {
     kind: ConnectionKind,
     /// Addresses to update the target with.
     net_address: &'a [SocketAddr],
-    vsock_cid: Option<u32>,
 }
 
 impl<'a> Default for Connection<'a> {
     fn default() -> Self {
-        Self { kind: ConnectionKind::Disconnected, net_address: &[], vsock_cid: None }
+        Self { kind: ConnectionKind::Disconnected, net_address: &[] }
     }
 }
 
@@ -94,7 +92,6 @@ impl<'a> TargetUpdate<'a> {
                 TargetAddrStatus::fastboot(transport)
             }
             Found { protocol: TargetProtocol::Ssh, .. } => TargetAddrStatus::ssh(),
-            Found { protocol: TargetProtocol::Vsock, .. } => TargetAddrStatus::vsock(),
             Found { protocol: TargetProtocol::Netsvc, .. } => TargetAddrStatus::netsvc(),
         };
 
@@ -229,11 +226,6 @@ impl<'a> TargetUpdateBuilder<'a> {
         self
     }
 
-    pub fn vsock_cid(mut self, cid: u32) -> Self {
-        self.connection_mut().vsock_cid = Some(cid);
-        self
-    }
-
     pub fn discovered(mut self, protocol: TargetProtocol, transport: TargetTransport) -> Self {
         self.connection_mut().kind = ConnectionKind::Found { protocol, transport };
         self
@@ -315,10 +307,7 @@ impl super::Target {
                     connection
                         .net_address
                         .iter()
-                        .map(|addr| TargetAddrEntry::new((*addr).into(), now, status))
-                        .chain(connection.vsock_cid.iter().map(|cid| {
-                            TargetAddrEntry::new(TargetAddr::VSockCtx(*cid), now, status)
-                        })),
+                        .map(|addr| TargetAddrEntry::new((*addr).into(), now, status)),
                 );
             }
 
@@ -346,9 +335,6 @@ impl super::Target {
                     }
                     TargetProtocol::Ssh => {
                         self.update_connection_state(|_| TargetConnectionState::Mdns(last_seen));
-                    }
-                    TargetProtocol::Vsock => {
-                        self.update_connection_state(|_| TargetConnectionState::Vsock(last_seen));
                     }
                     TargetProtocol::Fastboot => {
                         self.update_connection_state(|_| {

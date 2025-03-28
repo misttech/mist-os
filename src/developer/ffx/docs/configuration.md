@@ -12,10 +12,6 @@ When updating, please add the value in alphabetical order.
 
     | Configuration Value                     | Documentation                      |
     | --------------------------------------- | ---------------------------------- |
-    | `connectivity.enable_vsock`             | Allow using a VSOCK socket to      |
-    |                                         | connect to virtual machine targets |
-    |                                         | where supported. Defaults to       |
-    |                                         | `false`.                           |
     | `daemon.autostart`                      | Determines if the daemon should    |
     |                                         | start automatically when a subtool |
     |                                         | that requires the daemon is        |
