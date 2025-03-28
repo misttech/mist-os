@@ -1116,49 +1116,15 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
 }
 
 void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit,
-                                                     VmCowPages* child, const LockedPtr& parent) {
+                                                     VmCowPages* child, const LockedPtr& parent,
+                                                     bool update_backlinks) {
   AddChildLocked(child, offset, limit);
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
-  // Add references to pages that the COW clone now shares ownership over.
-  zx_status_t status = ForEveryOwnedHierarchyPageInRangeLocked(
-      [compression](const VmPageOrMarker* p, const VmCowPages* owner, uint64_t cow_clone_offset,
-                    uint64_t owner_offset) __ALWAYS_INLINE {
-        if (p->IsPage()) {
-          p->Page()->object.share_count++;
-        } else if (p->IsReference()) {
-          VmPageOrMarker::ReferenceValue ref = p->Reference();
-          compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
-        } else {
-          // Markers do not have references counts.
-        }
+  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(this);
 
-        return ZX_ERR_NEXT;
-      },
-      offset, limit, parent);
-  DEBUG_ASSERT(status == ZX_OK);
-
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSharingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
-}
-
-void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
-  canary_.Assert();
-
-  // This function is invalid to call if any pages are pinned as the unpin after we change the
-  // backlink will not work.
-  DEBUG_ASSERT(pinned_page_count_ == 0);
-  // This function assumes there is no page source or discardable tracker because moving pages
-  // in the presence of these delegates changes the relationship between these pages and these
-  // objects.
-  ASSERT(!page_source_);
-  ASSERT(!discardable_tracker_);
-
-  VmCompression* compression = Pmm::Node().GetPageCompression();
-
-  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&other);
-  page_list_.ForEveryPageMutable([&](VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
+  auto page_update_backlink = [this, compression, &page_backlink_updater](
+                                  VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
     if (p->IsReference()) {
       // A regular reference we can move, a temporary reference we need to turn back into its
       // page so we can move it. To determine if we have a temporary reference we can just
@@ -1178,13 +1144,46 @@ void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
       page_backlink_updater.Push(p->Page(), off);
     }
     return ZX_ERR_NEXT;
-  });
+  };
+
+  // Add references to pages that the COW clone now shares ownership over, and add backlinks if
+  // required.
+  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
+      [this, compression, update_backlinks, &page_update_backlink](
+          VmPageOrMarkerRef p, VmCowPages* owner, uint64_t cow_clone_offset, uint64_t owner_offset)
+          __ALWAYS_INLINE {
+            if (update_backlinks && (owner == this)) {
+              page_update_backlink(p, owner_offset);
+            }
+
+            if (p->IsPage()) {
+              p->Page()->object.share_count++;
+            } else if (p->IsReference()) {
+              VmPageOrMarker::ReferenceValue ref = p->Reference();
+              compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
+            } else {
+              // Markers do not have references counts.
+            }
+
+            return ZX_ERR_NEXT;
+          },
+      offset, limit, parent);
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // If this is a new node and the clone doesn't see all of the hidden parent, update the remaining
+  // part of the range.
+  if (update_backlinks && (offset > 0)) {
+    page_list_.ForEveryPageInRangeMutable(page_update_backlink, 0, offset);
+  }
+  if (update_backlinks && (limit < size_)) {
+    page_list_.ForEveryPageInRangeMutable(page_update_backlink, limit, size_);
+  }
 
   page_backlink_updater.Flush();
 
-  DEBUG_ASSERT(other.page_list_.IsEmpty());
-  other.page_list_ = ktl::move(page_list_);
-  DEBUG_ASSERT(page_list_.IsEmpty());
+  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  VMO_VALIDATION_ASSERT(child->DebugValidatePageSharingLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
 zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
@@ -1257,9 +1256,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
     parent_offset_ = parent_limit_ = 0;
   }
 
-  // We need to move all our pages into the new parent before adding ourselves as its child
-  // because we cannot be added as a child unless we have no pages.
-  MovePagesIntoLocked(hidden_parent.locked());
+  // Move our pagelist before adding ourselves as its child, because we cannot be added as a child
+  // unless we have no pages. Backlinks will be incorrect after move, but are updated later in the
+  // clone operation.
+  DEBUG_ASSERT(hidden_parent.locked().page_list_.IsEmpty());
+  hidden_parent.locked().page_list_ = ktl::move(page_list_);
+  DEBUG_ASSERT(page_list_.IsEmpty());
   DEBUG_ASSERT(page_list_.GetSkew() == 0);
 
   hidden_parent.locked().AddChildLocked(this, 0, size_);
@@ -1306,12 +1308,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
     }
     DEBUG_ASSERT((*result)->is_hidden());
     (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(),
-                                                           parent);
+                                                           parent, true);
   } else {
     // The COW clone's parent must be hidden because the clone must not see any future parent
     // writes.
     DEBUG_ASSERT(is_hidden());
-    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(), parent);
+    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(), parent, false);
   }
 
   // Checking this node's hierarchy will also check the parent's hierarchy.

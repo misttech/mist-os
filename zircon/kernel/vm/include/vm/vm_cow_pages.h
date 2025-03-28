@@ -1392,8 +1392,8 @@ class VmCowPages final : public VmHierarchyBase,
   // the appropriate share counts for the pages that are now shared by the new child. If there is a
   // parent_ then the passed in |parent| is a locked ptr to it.
   void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child,
-                                           const LockedPtr& parent) TA_REQ(lock())
-      TA_REQ(child->lock());
+                                           const LockedPtr& parent, bool update_backlinks)
+      TA_REQ(lock()) TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1474,10 +1474,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper to invalidate any READ requests in the specified range by spuriously resolving them.
   void InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
-
-  // Move all the pages from this VmCowPages object into another VmCowPages object.
-  // The receiving VmCowPages must not have any pages yet.
-  void MovePagesIntoLocked(VmCowPages& other) TA_REQ(lock()) TA_REQ(other.lock());
 
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
