@@ -291,7 +291,13 @@ function get_loas_cert_type() {
   done
 
   # Use the cached result unless -f forces an update to the cache.
-  local -r auth_config="${FUCHSIA_DIR}/.fx/auth-config"
+  local -r auth_config="${FUCHSIA_DIR}/.fx/config/build-auth"
+  local -r auth_config_old="${FUCHSIA_DIR}/.fx/auth-config"
+  if [[ -f "$auth_config_old" ]]
+  then
+    fx-info "Moving $auth_config_old to new location $auth_config.  No further action is necessary."
+    mv "$auth_config_old" "$auth_config"
+  fi
   if [[ -r "$auth_config" && "$recache" == 0 ]]
   then
     # Print the cached value

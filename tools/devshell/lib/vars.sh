@@ -1062,7 +1062,7 @@ function fx-run-ninja {
   [[ "${FX_BUILD_AUTO_AUTH:-NOT_SET}" == "NOT_SET" ]] || {
     fx-warn "FX_BUILD_AUTO_AUTH is no longer used from the environment."
     cat <<EOF
-To disable gcert-based authentication in build tools, manually set in .fx/auth-config:
+To disable gcert-based authentication in build tools, manually set in .fx/config/build-auth:
 
   loas_cert_type=restricted
 
