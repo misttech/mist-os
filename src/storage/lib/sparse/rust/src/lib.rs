@@ -28,11 +28,6 @@ fn deserialize_from<'a, T: DeserializeOwned, R: Read + ?Sized>(source: &mut R) -
     Ok(bincode::deserialize(&buf[..])?)
 }
 
-/// A union trait for `Read` and `Seek`.
-pub trait Reader: Read + Seek {}
-
-impl<T: Read + Seek> Reader for T {}
-
 /// A union trait for `Write` and `Seek` that also allows truncation.
 pub trait Writer: Write + Seek {
     /// Sets the length of the output stream.
@@ -926,7 +921,7 @@ mod test {
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
             .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader(Box::new(file)))
+            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
             .add_chunk(DataSource::Fill(0xaaaa_aaaau32, 1024))
             .add_chunk(DataSource::Skip(16384))
             .build(&mut sparse_file)

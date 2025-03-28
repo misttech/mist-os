@@ -123,7 +123,7 @@ pub async fn make_blob_image(
     }
 
     if let Some(sparse_path) = sparse_output_image_path {
-        create_sparse_image(sparse_path, output_image_path, target_size, BLOCK_SIZE)
+        create_sparse_image(sparse_path, output_image_path, actual_size, target_size, BLOCK_SIZE)
             .context("Failed to create sparse image")?;
     }
 
@@ -146,14 +146,14 @@ pub async fn make_blob_image(
 fn create_sparse_image(
     sparse_output_image_path: &str,
     image_path: &str,
-    target_length: u64,
+    actual_size: u64,
+    target_size: u64,
     block_size: u32,
 ) -> Result<(), Error> {
     let image = std::fs::OpenOptions::new()
         .read(true)
         .open(image_path)
         .with_context(|| format!("Failed to open {:?}", image_path))?;
-    let actual_length = image.metadata()?.len();
     let mut output = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -163,8 +163,11 @@ fn create_sparse_image(
         .with_context(|| format!("Failed to create {:?}", sparse_output_image_path))?;
     sparse::builder::SparseImageBuilder::new()
         .set_block_size(block_size)
-        .add_chunk(sparse::builder::DataSource::Reader(Box::new(image)))
-        .add_chunk(sparse::builder::DataSource::Skip(target_length - actual_length))
+        .add_chunk(sparse::builder::DataSource::Reader {
+            reader: Box::new(image),
+            size: actual_size,
+        })
+        .add_chunk(sparse::builder::DataSource::Skip(target_size - actual_size))
         .build(&mut output)
 }
 
@@ -483,8 +486,7 @@ mod tests {
 
         let unsparsed_image = {
             let sparse_image = std::fs::OpenOptions::new().read(true).open(sparse_path).unwrap();
-            let mut reader =
-                SparseReader::new(Box::new(sparse_image)).expect("Failed to parse sparse image");
+            let mut reader = SparseReader::new(sparse_image).expect("Failed to parse sparse image");
 
             let unsparsed_image_path = dir.join("fxfs.unsparsed.blk");
             let mut unsparsed_image = std::fs::OpenOptions::new()
@@ -577,5 +579,39 @@ mod tests {
             std::fs::metadata(compressed_path).unwrap().len()
                 < std::fs::metadata(uncompressed_path).unwrap().len()
         )
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_make_blob_image_with_target_size() {
+        const TARGET_SIZE: u64 = 200 * 1024 * 1024;
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path();
+        let path = dir.join("large_blob.txt");
+        let mut file = File::create(&path).unwrap();
+        let data = vec![0xabu8; 8 * 1024 * 1024];
+        file.write_all(&data).unwrap();
+        let tree = fuchsia_merkle::from_slice(data.as_slice());
+        let blobs_in = vec![(tree.root(), path)];
+
+        let image_path = dir.join("fxfs.blk");
+        let sparse_image_path = dir.join("fxfs.sparse.blk");
+        let blobs_json_path = dir.join("blobs.json");
+        make_blob_image(
+            image_path.as_os_str().to_str().unwrap(),
+            Some(sparse_image_path.as_os_str().to_str().unwrap()),
+            blobs_in.clone(),
+            blobs_json_path.as_os_str().to_str().unwrap(),
+            /*target_size=*/ Some(200 * 1024 * 1024),
+            /*compression_enabled=*/ true,
+        )
+        .await
+        .expect("make_blob_image failed");
+
+        // The fxfs image is small but gets padded with zeros up to the target size. The zeros
+        // should be replaced with a don't care chunk in the sparse format making it much smaller.
+        let image_size = std::fs::metadata(image_path).unwrap().len();
+        let sparse_image_size = std::fs::metadata(sparse_image_path).unwrap().len();
+        assert_eq!(image_size, TARGET_SIZE);
+        assert!(sparse_image_size < TARGET_SIZE, "Sparse image size: {sparse_image_size}");
     }
 }

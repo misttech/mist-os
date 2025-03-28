@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::format::{CHUNK_HEADER_SIZE, SPARSE_HEADER_SIZE};
-use crate::{Chunk, Reader, SparseHeader, BLK_SIZE, NO_SOURCE};
+use crate::{Chunk, SparseHeader, BLK_SIZE, NO_SOURCE};
 use anyhow::{ensure, Context, Result};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
@@ -11,8 +11,11 @@ use std::ops::Range;
 /// Input data for a SparseImageBuilder.
 pub enum DataSource {
     Buffer(Box<[u8]>),
-    /// Read everything from the reader.
-    Reader(Box<dyn Reader>),
+    /// Read `size` bytes from `reader`.
+    Reader {
+        reader: Box<dyn Read>,
+        size: u64,
+    },
     /// Skips this many bytes.
     Skip(u64),
     /// Repeats the given u32, this many times.
@@ -70,9 +73,7 @@ impl SparseImageBuilder {
                             .write_raw_chunk(slice.len().try_into().unwrap(), Cursor::new(slice))?;
                     }
                 }
-                DataSource::Reader(mut reader) => {
-                    let size = reader.seek(SeekFrom::End(0))?;
-                    reader.seek(SeekFrom::Start(0))?;
+                DataSource::Reader { mut reader, size } => {
                     ensure!(size % self.block_size as u64 == 0, "Invalid Reader length {}", size);
                     for size in ChunkedRange::new(0..size, self.max_chunk_size) {
                         chunk_writer.write_raw_chunk(size, (&mut reader).take(size as u64))?;
@@ -254,8 +255,17 @@ mod tests {
         let mut builder = SparseImageBuilder::new();
         builder.max_chunk_size = BLK_SIZE;
         let mut output = vec![];
+
+        let reader1 = Cursor::new(buf.clone());
+        let mut reader2 = Cursor::new(buf);
+        reader2.seek(SeekFrom::Start(BLK_SIZE as u64)).unwrap();
+
         builder
-            .add_chunk(DataSource::Reader(Box::new(Cursor::new(buf))))
+            .add_chunk(DataSource::Reader {
+                reader: Box::new(reader1),
+                size: (BLK_SIZE * 2) as u64,
+            })
+            .add_chunk(DataSource::Reader { reader: Box::new(reader2), size: BLK_SIZE as u64 })
             .build(&mut Cursor::new(&mut output))
             .unwrap();
 
@@ -271,6 +281,10 @@ mod tests {
                     Chunk::Raw { start: BLK_SIZE as u64, size: BLK_SIZE },
                     Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as u64)
                 ),
+                (
+                    Chunk::Raw { start: (BLK_SIZE * 2) as u64, size: BLK_SIZE },
+                    Some((SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 3 + BLK_SIZE * 2) as u64)
+                ),
             ]
         );
         assert_eq!(
@@ -281,6 +295,11 @@ mod tests {
         assert_eq!(
             &output[(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE) as usize
                 ..(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 2 + BLK_SIZE * 2) as usize],
+            &part2
+        );
+        assert_eq!(
+            &output[(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 3 + BLK_SIZE * 2) as usize
+                ..(SPARSE_HEADER_SIZE + CHUNK_HEADER_SIZE * 3 + BLK_SIZE * 3) as usize],
             &part2
         );
     }
