@@ -36,8 +36,8 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
-fuchsia_cc_driver(
-    name = "aml-g12-composite-driver",
+cc_library(
+    name = "common",
     srcs = [
         "aml-tdm-config-device.cc",
         "aml-tdm-config-device.h",
@@ -52,7 +52,6 @@ fuchsia_cc_driver(
         "ZX_ASSERT_LEVEL=2",
         "_ALL_SOURCE",
     ],
-    output_name = "aml-g12-composite",
     deps = [
         "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
@@ -64,10 +63,18 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_devfs_cpp",
-        "@fuchsia_sdk//pkg/driver_runtime",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/inspect",
         "@fuchsia_sdk//pkg/memory_barriers",
         "@fuchsia_sdk//pkg/trace",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-g12-composite-driver",
+    output_name = "aml-g12-composite",
+    deps = [
+        ":common",
     ],
 )
 
@@ -96,14 +103,6 @@ fuchsia_package(
 fuchsia_cc_test(
     name = "aml-g12-composite-test-bin",
     srcs = [
-        "aml-tdm-config-device.cc",
-        "aml-tdm-config-device.h",
-        "composite.cc",
-        "composite.h",
-        "composite-server.cc",
-        "composite-server.h",
-        "recorder.cc",
-        "recorder.h",
         "test/composite-test.cc",
     ],
     copts = [
@@ -112,30 +111,19 @@ fuchsia_cc_test(
         "--hwasan-globals=0",
     ],
     deps = [
-        "//sdk/lib/driver/compat/cpp",
-        "//src/devices/lib/amlogic",
+        ":common",
         "//zircon/system/ulib/ddk-platform-defs",
         "//zircon/system/ulib/fzl",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-        "@fuchsia_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
-        "@fuchsia_sdk//pkg/async",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
-        "@fuchsia_sdk//pkg/driver_devfs_cpp",
-        "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
-        "@fuchsia_sdk//pkg/fit-promise",
-        "@fuchsia_sdk//pkg/memory_barriers",
-        "@fuchsia_sdk//pkg/mmio",
-        "@fuchsia_sdk//pkg/trace",
-        "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//src/devices/testing/fake-bti_fake-bti",
     ],
 )
