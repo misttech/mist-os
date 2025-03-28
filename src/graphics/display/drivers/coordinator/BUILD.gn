@@ -76,7 +76,6 @@ source_set("shared") {
   ]
   public_deps = [
     ":coordinator_bind",
-    "//sdk/banjo/fuchsia.hardware.audiotypes:fuchsia.hardware.audiotypes_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",

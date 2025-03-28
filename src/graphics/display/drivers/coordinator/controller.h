@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_CONTROLLER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
