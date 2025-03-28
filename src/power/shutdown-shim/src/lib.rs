@@ -278,10 +278,11 @@ impl<D: Directory + AsRefDirectory> ProgramContext<D> {
 
     async fn forward_command(
         &self,
-        _fallback_state: SystemPowerState,
+        fallback_state: SystemPowerState,
         reboot_reasons: Option<RebootReasons>,
         _mexec_request: Option<AdminMexecRequest>,
     ) -> Result<(), zx::Status> {
+        println!("[shutdown-shim] entering {:?} state", fallback_state);
         // Return if shutdown is already pending
         {
             let mut shutdown_pending = self.shutdown_pending.lock().await;
