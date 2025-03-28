@@ -279,8 +279,8 @@ void Vp9Decoder::UpdateLoopFilter(HardwareRenderParams* param) {
     segmentation_->feature_mask[i] =
         (param->segmentation_loop_filter_info[i] & 0x8000) ? (1 << SEG_LVL_ALT_LF) : 0;
     uint16_t abs_value = param->segmentation_loop_filter_info[i] & 0x3f;
-    segmentation_->feature_data[i][SEG_LVL_ALT_LF] =
-        (param->segmentation_loop_filter_info[i] & 0x100) ? -abs_value : abs_value;
+    segmentation_->feature_data[i][SEG_LVL_ALT_LF] = static_cast<int16_t>(
+        (param->segmentation_loop_filter_info[i] & 0x100) ? -abs_value : abs_value);
   }
   bool updated_sharpness;
   vp9_loop_filter_frame_init(loop_filter_.get(), loop_filter_info_.get(), segmentation_.get(),
