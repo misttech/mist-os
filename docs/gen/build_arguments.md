@@ -699,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719243592283569441"`
+**Current value for `target_cpu = "arm64"`:** `"8719198288726849681"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719243592283569441"`
+**Current value for `target_cpu = "riscv64"`:** `"8719198288726849681"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719243592283569441"`
+**Current value for `target_cpu = "x64"`:** `"8719198288726849681"`
 
 From //out/not-default/args.gn:10
 
@@ -1822,7 +1822,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
@@ -2480,17 +2480,29 @@ From //build/images/args.gni:81
 
 From //src/connectivity/network/BUILD.gn:9
 
+### enable_perfetto_android_java_sdk
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:205
+
 ### enable_perfetto_benchmarks
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:195
+From //third_party/perfetto/gn/perfetto.gni:207
+
+### enable_perfetto_etm_importer
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:356
 
 ### enable_perfetto_fuzzers
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:198
+From //third_party/perfetto/gn/perfetto.gni:210
 
 ### enable_perfetto_grpc
 
@@ -2501,37 +2513,47 @@ enable this by default.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:322
+From //third_party/perfetto/gn/perfetto.gni:350
 
 ### enable_perfetto_heapprofd
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:157
+From //third_party/perfetto/gn/perfetto.gni:166
 
 ### enable_perfetto_integration_tests
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:193
+From //third_party/perfetto/gn/perfetto.gni:202
 
 ### enable_perfetto_ipc
 
 **Current value (from the default):** `true`
 
-From //third_party/perfetto/gn/perfetto.gni:150
+From //third_party/perfetto/gn/perfetto.gni:159
 
 ### enable_perfetto_llvm_demangle
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:316
+From //third_party/perfetto/gn/perfetto.gni:344
+
+### enable_perfetto_merged_protos_check
+
+Check that the merged perfetto_trace.proto can be translated to a C++ lite
+proto and compiled. This is disabled by default because it's expensive (it
+can take a couple of minutes).
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:378
 
 ### enable_perfetto_platform_services
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:141
+From //third_party/perfetto/gn/perfetto.gni:150
 
 ### enable_perfetto_site
 
@@ -2542,87 +2564,85 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:339
+From //third_party/perfetto/gn/perfetto.gni:373
 
 ### enable_perfetto_stderr_crash_dump
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:235
+From //third_party/perfetto/gn/perfetto.gni:247
 
 ### enable_perfetto_system_consumer
 
 **Current value (from the default):** `true`
 
-From //third_party/perfetto/gn/perfetto.gni:251
+From //third_party/perfetto/gn/perfetto.gni:268
 
 ### enable_perfetto_tools
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:187
+From //third_party/perfetto/gn/perfetto.gni:196
 
 ### enable_perfetto_trace_processor
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:173
+From //third_party/perfetto/gn/perfetto.gni:182
 
 ### enable_perfetto_trace_processor_httpd
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:302
+From //third_party/perfetto/gn/perfetto.gni:328
 
 ### enable_perfetto_trace_processor_json
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:295
+From //third_party/perfetto/gn/perfetto.gni:313
 
 ### enable_perfetto_trace_processor_linenoise
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:289
+From //third_party/perfetto/gn/perfetto.gni:307
+
+### enable_perfetto_trace_processor_mac_instruments
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:319
 
 ### enable_perfetto_trace_processor_percentile
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:284
+From //third_party/perfetto/gn/perfetto.gni:302
 
 ### enable_perfetto_trace_processor_sqlite
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:279
+From //third_party/perfetto/gn/perfetto.gni:297
 
 ### enable_perfetto_traceconv
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:328
+From //third_party/perfetto/gn/perfetto.gni:362
 
 ### enable_perfetto_traced_perf
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:165
+From //third_party/perfetto/gn/perfetto.gni:174
 
 ### enable_perfetto_traced_probes
 
-The traced_probes daemon is very Linux-specific, as it depends on ftrace and
-various /proc interfaces. There is no point making its code platform-neutral
-as it won't do anything useful on Windows.
-The only reason why we still build it on Mac OS is to be able to run the
-unittests there and making dev on mac less cumbersome. The traced_probes
-code happens to build cleanly and for now the mainteinance cost on Mac is
-extremely low.
-
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:267
+From //third_party/perfetto/gn/perfetto.gni:285
 
 ### enable_perfetto_traced_relay
 
@@ -2631,43 +2651,43 @@ TODO(chinglinyu) check if we can enable on Windows.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:271
+From //third_party/perfetto/gn/perfetto.gni:289
 
 ### enable_perfetto_ui
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:332
+From //third_party/perfetto/gn/perfetto.gni:366
 
 ### enable_perfetto_unittests
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:189
+From //third_party/perfetto/gn/perfetto.gni:198
 
 ### enable_perfetto_version_gen
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:204
+From //third_party/perfetto/gn/perfetto.gni:216
 
 ### enable_perfetto_watchdog
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:182
+From //third_party/perfetto/gn/perfetto.gni:191
 
 ### enable_perfetto_x64_cpu_opt
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:243
+From //third_party/perfetto/gn/perfetto.gni:255
 
 ### enable_perfetto_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:310
+From //third_party/perfetto/gn/perfetto.gni:336
 
 ### enable_power_manager_debug
 
@@ -3438,7 +3458,7 @@ All the tools/gen_* scripts set this to true. This is mainly used to locate
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:82
+From //third_party/perfetto/gn/perfetto.gni:90
 
 ### is_perfetto_embedder
 
@@ -3448,7 +3468,7 @@ perfetto_build_with_embedder=true in their GN files.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:87
+From //third_party/perfetto/gn/perfetto.gni:95
 
 ### jtrace_enabled
 
@@ -4012,13 +4032,13 @@ Only for local development. When true the binaries (perfetto, traced, ...)
 are monolithic and don't use a common shared library. This is mainly to
 avoid LD_LIBRARY_PATH dances when testing locally.
 On Windows we default to monolithic executables, because pairing
-dllexport/import adds extra complexity for little benefit. The only reason
+dllexport/import adds extra complexity for little benefit. Te only reason
 for monolithic_binaries=false is saving binary size, which matters mainly on
 Android. See also comments on PERFETTO_EXPORT_ENTRYPOINT in compiler.h.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:214
+From //third_party/perfetto/gn/perfetto.gni:226
 
 ### netstack3_profile_rustc
 
@@ -4736,13 +4756,13 @@ In standalone Android builds and Chromium Android builds, this is false.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:78
+From //third_party/perfetto/gn/perfetto.gni:86
 
 ### perfetto_enable_git_rev_version_header
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:257
+From //third_party/perfetto/gn/perfetto.gni:274
 
 ### perfetto_force_dcheck
 
@@ -4757,7 +4777,7 @@ See base/logging.h for the implementation of all this.
 
 **Current value (from the default):** `""`
 
-From //third_party/perfetto/gn/perfetto.gni:229
+From //third_party/perfetto/gn/perfetto.gni:241
 
 ### perfetto_force_dlog
 
@@ -4767,7 +4787,13 @@ console.
 
 **Current value (from the default):** `""`
 
-From //third_party/perfetto/gn/perfetto.gni:219
+From //third_party/perfetto/gn/perfetto.gni:231
+
+### perfetto_thread_safety_annotations
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:260
 
 ### perfetto_use_pkgconfig
 
@@ -4779,7 +4805,7 @@ Note: that if this is enabled `perfetto_use_system_protobuf` should be also.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:349
+From //third_party/perfetto/gn/perfetto.gni:388
 
 ### perfetto_use_system_protobuf
 
@@ -4788,7 +4814,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:353
+From //third_party/perfetto/gn/perfetto.gni:392
 
 ### perfetto_use_system_sqlite
 
@@ -4797,19 +4823,19 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:357
+From //third_party/perfetto/gn/perfetto.gni:396
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:359
+From //third_party/perfetto/gn/perfetto.gni:398
 
 ### perfetto_verbose_logs_enabled
 
 **Current value (from the default):** `true`
 
-From //third_party/perfetto/gn/perfetto.gni:275
+From //third_party/perfetto/gn/perfetto.gni:293
 
 ### persistent_ram_allocation_granularity
 
@@ -5761,7 +5787,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:342
+From //third_party/perfetto/gn/perfetto.gni:381
 
 ### smp_max_cpus
 
@@ -6481,6 +6507,18 @@ Controls whether the build runs the depfile verifier
 **Current value (from the default):** `true`
 
 From //build/rust/build.gni:25
+
+### vfs_rust_uses_log
+
+Set this to true to enable some additional logs in the vfs crate and have it depend on the
+log crate. This should not be enabled in general for non-host builds because it causes the vfs
+crate, which is built as a dylib, to be the source of the global logger, which can cause
+problems for things that dynamically link rust libraries (like drivers) and cause link errors
+at worst, or incorrect log attribution at best.
+
+**Current value (from the default):** `false`
+
+From //src/storage/lib/vfs/rust/BUILD.gn:15
 
 ### vim3_mcu_fan_default_level
 
