@@ -12,7 +12,6 @@ group("tests") {
 zx_library("fake-object") {
   sdk = "static"
   sdk_headers = [ "lib/fake-object/object.h" ]
-  sdk_publishable = "internal"
 
   sources = [
     "fake-handle.cc",

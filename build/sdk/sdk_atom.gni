@@ -206,20 +206,20 @@ template("sdk_atom") {
       # `sdk_source_set()` enforces an allowlist.
       type != "cc_source_library") {
     # Handle individual exceptions for types with only one "internal" instance.
-    target_label = get_label_info(target_name, "label_no_toolchain")
+    target_label = get_label_info(":${target_name}", "label_no_toolchain")
     assert(
         (type == "cc_prebuilt_library" &&
-             # TODO(https://fxbug.dev/366517646): Remove these once all uses of
-             # `fake-bti` are migrated to the //sdk target.
-             (target_label == "//src/devices/testing/fake-bti/fake-bti_sdk_manifest:fake-bti_sdk_manifest" || target_label == "//src/devices/testing/fake-object/fake-object_sdk_manifest:fake-object_sdk_manifest" ||
-                  # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
-                  target_label == "//zircon/kernel/lib/devicetree/devicetree_sdk_manifest:devicetree_sdk_manifest")) ||
+             # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+             target_label ==
+                 "//zircon/kernel/lib/devicetree:devicetree_sdk_manifest") ||
             # TODO(https://fxbug.dev/42070500): Remove once shard is in "partner".
-            (type == "data" && target_label == "//sdk/lib/sys/component/realm_builder_shard:realm_builder_shard") ||
+            (type == "data" &&
+                 target_label ==
+                     "//sdk/lib/sys/component:realm_builder_shard") ||
             # TODO(https://fxbug.dev/331991540): Remove once a different
             # solution for the Firmware SDK is implemented.
             (type == "documentation" &&
-                 target_label == "//sdk/docs/firmware:firmware") ||
+                 target_label == "//sdk/docs:firmware") ||
             # TODO(https://fxbug.dev/343059325): Remove once devicetree is in
             # "partner" or no longer using loadable modules.
             (type == "loadable_module" &&

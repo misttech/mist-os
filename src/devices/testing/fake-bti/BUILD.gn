@@ -12,7 +12,6 @@ group("tests") {
 zx_library("fake-bti") {
   sdk = "static"
   sdk_headers = [ "lib/fake-bti/bti.h" ]
-  sdk_publishable = "internal"
 
   sources = [ "fake-bti.cc" ]
   public_deps = [

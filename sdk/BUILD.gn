@@ -1342,10 +1342,6 @@ if (current_toolchain == default_toolchain) {
       "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
       "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
 
-      # TODO(https://fxbug.dev/366517646): Remove once all uses of `fake-bti`
-      # are migrated to the //sdk target.
-      "//src/devices/testing/fake-bti:fake-bti_sdk",
-
       # TODO(https://fxbug.dev/333907192): Eliminate vendor dependencies on fzl
       # or promote it to "partner".
       "//zircon/system/ulib/fzl:fzl_sdk",
