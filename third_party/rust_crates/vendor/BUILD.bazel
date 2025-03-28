@@ -2779,14 +2779,14 @@ alias(
 )
 
 alias(
-    name = "termios-0.3.2",
-    actual = "//third_party/rust_crates/vendor/termios-0.3.2:termios",
+    name = "termios-0.3.3",
+    actual = "//third_party/rust_crates/vendor/termios-0.3.3:termios",
     tags = ["manual"],
 )
 
 alias(
     name = "termios",
-    actual = "//third_party/rust_crates/vendor/termios-0.3.2:termios",
+    actual = "//third_party/rust_crates/vendor/termios-0.3.3:termios",
     tags = ["manual"],
 )
 

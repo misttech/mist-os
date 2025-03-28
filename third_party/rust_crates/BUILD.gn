@@ -1056,7 +1056,7 @@ group("termion") {
 
 if (!(current_os == "fuchsia")) {
   group("termios") {
-    public_deps = [ ":termios-v0_3_2" ]
+    public_deps = [ ":termios-v0_3_3" ]
   }
 }
 
@@ -16568,15 +16568,15 @@ rust_library("termion-v1_5_3") {
   applicable_licenses = [ ":termion-v1_5_3.license" ]
 }
 
-license("termios-v0_3_2.license") {
+license("termios-v0_3_3.license") {
   public_package_name = "termios"
-  license_files = [ "//third_party/rust_crates/vendor/termios-0.3.2/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/termios-0.3.3/LICENSE" ]
 }
 
-rust_library("termios-v0_3_2") {
+rust_library("termios-v0_3_3") {
   crate_name = "termios"
-  crate_root = "//third_party/rust_crates/vendor/termios-0.3.2/src/lib.rs"
-  output_name = "termios-ef75c1b73286d58d"
+  crate_root = "//third_party/rust_crates/vendor/termios-0.3.3/src/lib.rs"
+  output_name = "termios-c312fd88ea47d1f8"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -16587,13 +16587,13 @@ rust_library("termios-v0_3_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=ef75c1b73286d58d",
-    "-Cextra-filename=-ef75c1b73286d58d",
+    "-Cmetadata=c312fd88ea47d1f8",
+    "-Cextra-filename=-c312fd88ea47d1f8",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":termios-v0_3_2.license" ]
+  applicable_licenses = [ ":termios-v0_3_3.license" ]
 }
 
 license("termtree-v0_5_1.license") {

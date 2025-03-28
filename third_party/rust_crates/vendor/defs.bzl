@@ -523,7 +523,7 @@ _NORMAL_DEPENDENCIES = {
             "synstructure": Label("//third_party/rust_crates/vendor/synstructure-0.12.1:synstructure"),
             "tar": Label("//third_party/rust_crates/vendor/tar-0.4.25:tar"),
             "term_grid": Label("//third_party/rust_crates/vendor/term_grid-0.2.0:term_grid"),
-            "termios": Label("//third_party/rust_crates/vendor/termios-0.3.2:termios"),
+            "termios": Label("//third_party/rust_crates/vendor/termios-0.3.3:termios"),
             "tinyjson": Label("//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson"),
             "tokio": Label("//third_party/rust_crates/vendor/tokio-1.38.1:tokio"),
             "tokio-stream": Label("//third_party/rust_crates/vendor/tokio-stream-0.1.14:tokio_stream"),

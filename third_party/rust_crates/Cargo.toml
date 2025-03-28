@@ -339,7 +339,7 @@ syn = { version = "2.0.87", features = ["full", "visit", "visit-mut", "extra-tra
 synstructure = "0.12.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
-termios = "0.3.2"
+termios = "0.3.3"
 tinyjson = "2.5.0"
 # TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
