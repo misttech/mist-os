@@ -87,11 +87,11 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
 }
 
 void AmlPwmRegulator::GetVoltageStep(GetVoltageStepCompleter::Sync& completer) {
-  completer.Reply(current_step_);
+  completer.ReplySuccess(current_step_);
 }
 
 void AmlPwmRegulator::GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) {
-  completer.Reply(min_voltage_uv_, voltage_step_uv_, num_steps_);
+  completer.ReplySuccess(min_voltage_uv_, voltage_step_uv_, num_steps_);
 }
 
 void AmlPwmRegulator::Enable(EnableCompleter::Sync& completer) {

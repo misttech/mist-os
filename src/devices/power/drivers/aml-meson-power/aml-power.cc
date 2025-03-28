@@ -132,8 +132,15 @@ zx_status_t AmlPower::PowerImplGetSupportedVoltageRange(uint32_t index, uint32_t
       return params.status();
     }
 
-    *min_voltage = CalculateVregVoltage(params->min_uv, params->step_size_uv, 0);
-    *max_voltage = CalculateVregVoltage(params->min_uv, params->step_size_uv, params->num_steps);
+    if (params->is_error()) {
+      zxlogf(ERROR, "Failed to get regulator params: %s",
+             zx_status_get_string(params->error_value()));
+      return params->error_value();
+    }
+
+    *min_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv, 0);
+    *max_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv,
+                                        params.value()->num_steps);
     zxlogf(DEBUG, "%s: Getting %s Cluster VReg Range max = %u, min = %u", __func__,
            index ? "Little" : "Big", *max_voltage, *min_voltage);
 
@@ -200,9 +207,16 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
     return params.status();
   }
 
-  const auto min_voltage_uv = CalculateVregVoltage(params->min_uv, params->step_size_uv, 0);
-  const auto max_voltage_uv =
-      CalculateVregVoltage(params->min_uv, params->step_size_uv, params->num_steps);
+  if (params->is_error()) {
+    zxlogf(ERROR, "Failed to get regulator params: %s",
+           zx_status_get_string(params->error_value()));
+    return params->error_value();
+  }
+
+  const auto min_voltage_uv =
+      CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv, 0);
+  const auto max_voltage_uv = CalculateVregVoltage(
+      params.value()->min_uv, params.value()->step_size_uv, params.value()->num_steps);
   // Find the step value that achieves the requested voltage.
   if (u_volts < min_voltage_uv || u_volts > max_voltage_uv) {
     zxlogf(ERROR, "%s: Voltage must be between %u and %u microvolts", __func__, min_voltage_uv,
@@ -210,8 +224,8 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  *target_index = (u_volts - min_voltage_uv) / params->step_size_uv;
-  ZX_ASSERT(*target_index <= params->num_steps);
+  *target_index = (u_volts - min_voltage_uv) / params.value()->step_size_uv;
+  ZX_ASSERT(*target_index <= params.value()->num_steps);
 
   return ZX_OK;
 }
@@ -327,8 +341,14 @@ zx_status_t AmlPower::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
         return params.status();
       }
 
-      *actual_voltage =
-          CalculateVregVoltage(params->min_uv, params->step_size_uv, domain.current_voltage_index);
+      if (params->is_error()) {
+        zxlogf(ERROR, "Failed to get regulator params: %s",
+               zx_status_get_string(params->error_value()));
+        return params->error_value();
+      }
+
+      *actual_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv,
+                                             domain.current_voltage_index);
     }
     return st;
   }
@@ -360,8 +380,14 @@ zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* curre
       return params.status();
     }
 
-    *current_voltage =
-        CalculateVregVoltage(params->min_uv, params->step_size_uv, domain.current_voltage_index);
+    if (params->is_error()) {
+      zxlogf(ERROR, "Failed to get regulator params: %s",
+             zx_status_get_string(params->error_value()));
+      return params->error_value();
+    }
+
+    *current_voltage = CalculateVregVoltage(params.value()->min_uv, params.value()->step_size_uv,
+                                            domain.current_voltage_index);
   } else {
     return ZX_ERR_INTERNAL;
   }

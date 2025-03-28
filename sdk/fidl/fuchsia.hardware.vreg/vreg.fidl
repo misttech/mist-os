@@ -18,7 +18,7 @@ closed protocol Vreg {
     // Get the current step.
     strict GetVoltageStep() -> (struct {
         result uint32;
-    });
+    }) error zx.Status;
 
     // Enable this regulator.
     // If Enable() is called before the regulator has been configured via a call to `SetVoltageStep`
@@ -50,7 +50,7 @@ closed protocol Vreg {
 
         // Max number of steps.
         num_steps uint32;
-    });
+    }) error zx.Status;
 };
 
 service Service {

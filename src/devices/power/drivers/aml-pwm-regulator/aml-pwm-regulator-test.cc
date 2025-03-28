@@ -37,7 +37,8 @@ void set_and_expect_voltage_step(fidl::WireSyncClient<fuchsia_hardware_vreg::Vre
 
   fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
   EXPECT_TRUE(voltage_step.ok());
-  EXPECT_EQ(voltage_step->result, value);
+  EXPECT_TRUE(voltage_step->is_ok());
+  EXPECT_EQ(voltage_step.value()->result, value);
 }
 
 class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
@@ -227,13 +228,15 @@ TEST_F(AmlPwmRegulatorTest, RegulatorTest) {
 
   fidl::WireResult params = vreg_client->GetRegulatorParams();
   EXPECT_TRUE(params.ok());
-  EXPECT_EQ(params->min_uv, 690'000);
-  EXPECT_EQ(params->num_steps, 11);
-  EXPECT_EQ(params->step_size_uv, 1'000);
+  EXPECT_TRUE(params->is_ok());
+  EXPECT_EQ(params.value()->min_uv, 690'000);
+  EXPECT_EQ(params.value()->num_steps, 11);
+  EXPECT_EQ(params.value()->step_size_uv, 1'000);
 
   fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
   EXPECT_TRUE(voltage_step.ok());
-  EXPECT_EQ(voltage_step->result, 11);
+  EXPECT_TRUE(voltage_step->is_ok());
+  EXPECT_EQ(voltage_step.value()->result, 11);
 
   aml_pwm::mode_config mode = {
       .mode = aml_pwm::Mode::kOn,
