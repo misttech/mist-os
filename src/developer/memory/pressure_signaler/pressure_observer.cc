@@ -124,15 +124,13 @@ void PressureObserver::WaitOnLevelChange() {
 }
 
 void PressureObserver::OnLevelChanged(zx_handle_t handle) {
-  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged " << handle << " Old level " << level_;
+  const Level old_level = level_;
   for (size_t i = 0; i < Level::kNumLevels; i++) {
     if (events_[i].get() == handle) {
       level_ = Level(i);
       break;
     }
   }
-
-  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged new level " << level_;
 
   if (unlikely(!level_initialized_)) {
     // Record that the level has been initialized if this is the first time. Before this, the
@@ -141,9 +139,14 @@ void PressureObserver::OnLevelChanged(zx_handle_t handle) {
     // required (i.e. if the pressure level is not Normal). See comment near |level_| in class
     // definition.
     level_initialized_ = true;
+    FX_LOGS(INFO) << "starting at " << kLevelNames[level_] << ", handle(" << handle
+                  << "), notifying: " << std::boolalpha << (notifier_ != nullptr)
+                  << std::noboolalpha;
+  } else {
+    FX_LOGS(INFO) << kLevelNames[old_level] << " -> " << kLevelNames[level_] << ", handle("
+                  << handle << "), notifying: " << std::boolalpha << (notifier_ != nullptr)
+                  << std::noboolalpha;
   }
-
-  FX_LOGS(INFO) << "PressureObserver::OnLevelChanged notify " << (notifier_ != nullptr);
 
   if (notifier_ != nullptr) {
     // Notify the |PressureNotifier| that the level has changed. |PressureNotifier::Notify()| is a
