@@ -11,6 +11,11 @@
 #include <memory>
 
 namespace msd {
+
+struct DeviceHandle {
+  struct MsdPlatformDevice* platform_device;
+};
+
 class CppDriver : public msd::Driver {
  public:
   CppDriver();

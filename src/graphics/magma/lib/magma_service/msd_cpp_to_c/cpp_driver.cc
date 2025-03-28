@@ -46,8 +46,7 @@ CppDriver::CppDriver() {
 }
 
 std::unique_ptr<msd::Device> CppDriver::CreateDevice(msd::DeviceHandle* device_handle) {
-  return std::make_unique<CppDevice>(
-      msd_driver_create_device(reinterpret_cast<MsdPlatformDevice*>(device_handle)));
+  return std::make_unique<CppDevice>(msd_driver_create_device(device_handle->platform_device));
 }
 
 std::unique_ptr<msd::Buffer> CppDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
