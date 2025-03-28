@@ -880,6 +880,11 @@ config("Wno-unused-function") {
   ]
 }
 
+config("Wno-deprecated-declarations") {
+  visibility = [ "//third_party/boringssl:*" ]
+  cflags = [ "-Wno-deprecated-declarations" ]
+}
+
 config("Wno-strict-prototypes") {
   cflags = [ "-Wno-strict-prototypes" ]
 }
