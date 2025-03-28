@@ -168,6 +168,7 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
     match schema.map_type {
         bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema)?)),
         bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema)?)),
+        bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema)?),
 
         // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
         // these
@@ -179,7 +180,10 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LPM_TRIE");
             Ok(Box::pin(hashmap::HashMap::new(schema)?))
         }
-        bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema)?),
+        bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
+            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
+            Ok(Box::pin(hashmap::HashMap::new(schema)?))
+        }
         bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_ARRAY");
             Ok(Box::pin(array::Array::new(schema)?))
@@ -200,10 +204,6 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
         }
         bpf_map_type_BPF_MAP_TYPE_PERF_EVENT_ARRAY => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERF_EVENT_ARRAY");
-            Err(MapError::InvalidParam)
-        }
-        bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
-            track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
             Err(MapError::InvalidParam)
         }
         bpf_map_type_BPF_MAP_TYPE_STACK_TRACE => {
