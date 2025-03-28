@@ -44,6 +44,7 @@ source_set("lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",

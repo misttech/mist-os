@@ -22,10 +22,6 @@
 
     // Capabilities used by this component.
     use: [
-        {
-            directory: "dev-class",
-            rights: [ "r*" ],
-            path: "/dev/class/camera",
-        },
+        { service: "fuchsia.hardware.camera.Service" },
     ],
 }

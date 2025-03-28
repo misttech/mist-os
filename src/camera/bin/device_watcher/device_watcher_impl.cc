@@ -34,7 +34,7 @@ constexpr uint16_t kFakeInfoReturnProductId = 0x9898;
 using DeviceHandle = fuchsia::hardware::camera::DeviceHandle;
 
 static std::string GetCameraFullPath(const std::string& path) {
-  return std::string(kCameraPath) + "/" + path;
+  return std::string(kCameraPath) + "/" + path + "/device";
 }
 
 static fpromise::result<DeviceHandle, zx_status_t> GetCameraHandle(const std::string& full_path) {
@@ -153,9 +153,9 @@ void DeviceWatcherImpl::AddDeviceByPath(const std::string& path) {
   }
   auto camera_type = type_result.take_value();
 
-  // TODO(https://fxbug.dev/42068996) - Need either A) an explanation for why this (2nd fetch of the camera handle)
-  // is necessary, or B) figure out the right way to produce the right handle to pass down to the
-  // child component.
+  // TODO(https://fxbug.dev/42068996) - Need either A) an explanation for why this (2nd fetch of the
+  // camera handle) is necessary, or B) figure out the right way to produce the right handle to pass
+  // down to the child component.
   dev = nullptr;
   auto handle_result = GetCameraHandle(full_path);
   if (handle_result.is_error()) {
@@ -191,8 +191,8 @@ fpromise::result<PersistentDeviceId, zx_status_t> DeviceWatcherImpl::AddMipiCsiD
     return fpromise::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // TODO(https://fxbug.dev/42119883): This generates the same ID for multiple instances of the same device. It
-  // should be made unique by incorporating a truly unique value such as the bus ID.
+  // TODO(https://fxbug.dev/42119883): This generates the same ID for multiple instances of the same
+  // device. It should be made unique by incorporating a truly unique value such as the bus ID.
   constexpr uint32_t kVendorShift = 16;
   PersistentDeviceId persistent_id =
       (static_cast<uint64_t>(device_info.vendor_id()) << kVendorShift) | device_info.product_id();
@@ -223,8 +223,8 @@ fpromise::result<PersistentDeviceId, zx_status_t> DeviceWatcherImpl::AddUvcDevic
   device_info.set_vendor_id(kFakeInfoReturnVendorId);
   device_info.set_product_id(kFakeInfoReturnProductId);
 
-  // TODO(https://fxbug.dev/42119883): This generates the same ID for multiple instances of the same device. It
-  // should be made unique by incorporating a truly unique value such as the bus ID.
+  // TODO(https://fxbug.dev/42119883): This generates the same ID for multiple instances of the same
+  // device. It should be made unique by incorporating a truly unique value such as the bus ID.
   constexpr uint32_t kVendorShift = 16;
   PersistentDeviceId persistent_id =
       (static_cast<uint64_t>(device_info.vendor_id()) << kVendorShift) | device_info.product_id();

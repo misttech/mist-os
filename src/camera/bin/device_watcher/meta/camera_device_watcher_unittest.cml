@@ -17,11 +17,7 @@
         },
     ],
     use: [
-        {
-            directory: "dev-camera",
-            rights: [ "r*" ],
-            path: "/dev/class/camera",
-        },
+        { service: "fuchsia.hardware.camera.Service" },
         {
             protocol: [
                 "fuchsia.camera.test.DeviceWatcherTester",
@@ -36,7 +32,7 @@
     ],
     offer: [
         {
-            directory: "dev-camera",
+            service: "fuchsia.hardware.camera.Service",
             from: "parent",
             to: "#camera_device_watcher",
         },

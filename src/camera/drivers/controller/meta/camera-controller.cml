@@ -12,7 +12,16 @@
         bind: "meta/bind/camera_controller_bind.bindbc",
         colocate: "true",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.camera.Service" },
+    ],
     use: [
         { protocol: "fuchsia.sysmem2.Allocator" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.camera.Service",
+            from: "self",
+        },
     ],
 }

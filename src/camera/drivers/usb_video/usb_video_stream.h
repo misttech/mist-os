@@ -96,14 +96,12 @@ class RequestTask : public async_task {
 // Unless specified otherwise, all methods of this class are assumed to be called
 // on the single threaded dispatcher owned by this class.
 class UsbVideoStream;
-using UsbVideoStreamBase =
-    ::ddk::Device<UsbVideoStream, ::ddk::Unbindable,
-                  ::ddk::Messageable<fuchsia_hardware_camera::Device>::Mixin>;
+using UsbVideoStreamBase = ::ddk::Device<UsbVideoStream, ::ddk::Unbindable>;
 
 class UsbVideoStream : public UsbVideoStreamBase,
                        public fuchsia::camera::Control,
                        public fuchsia::camera::Stream,
-                       public ::ddk::EmptyProtocol<ZX_PROTOCOL_CAMERA> {
+                       public fidl::WireServer<fuchsia_hardware_camera::Device> {
  public:
   // Constructor is assumed to be called only through Bind, or suitable testing rig.
   // This method will not be called on the fidl_dispatch_loop_.
@@ -270,6 +268,7 @@ class UsbVideoStream : public UsbVideoStreamBase,
 
   zx::eventpair stream_token_;
   fidl::Binding<Stream> stream_binding_;
+  fidl::ServerBindingGroup<fuchsia_hardware_camera::Device> bindings_;
 };
 
 }  // namespace camera::usb_video

@@ -43,6 +43,16 @@ fpromise::result<std::unique_ptr<ControllerDevice>, zx_status_t> ControllerDevic
   if (status != ZX_OK) {
     return fpromise::error(status);
   }
+  fuchsia_hardware_camera::Service::InstanceHandler handler({
+      .device = device->bindings_.CreateHandler(device.get(), device->loop_.dispatcher(),
+                                                fidl::kIgnoreBindingClosure),
+  });
+  zx::result add_result =
+      device->DdkAddService<fuchsia_hardware_camera::Service>(std::move(handler));
+  if (add_result.is_error()) {
+    zxlogf(ERROR, "Failed to advertise camera service");
+    return fpromise::error(add_result.error_value());
+  }
 
   return fpromise::ok(std::move(device));
 }
