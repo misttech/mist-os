@@ -151,7 +151,7 @@ where
 #[async_trait(?Send)]
 impl<T: serde::Serialize> TryFromEnv for MachineWriter<T> {
     async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
-        Ok(MachineWriter::new(env.ffx_command().global.machine))
+        Ok(MachineWriter::new(env.ffx_command().global.machine.and_then(|mf| mf.into())))
     }
 }
 

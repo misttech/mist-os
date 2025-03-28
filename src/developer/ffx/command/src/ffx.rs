@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::metrics::analytics_command;
-use crate::{Format, MetricsSession};
+use crate::{MachineFormat, MetricsSession};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::{bug, return_user_error, user_error, Error, FfxContext as _, Result};
@@ -219,8 +219,8 @@ pub struct Ffx {
 
     #[argh(option)]
     /// produce output for a machine in the specified format; available formats: "json",
-    /// "json-pretty"
-    pub machine: Option<Format>,
+    /// "json-pretty", "raw"
+    pub machine: Option<MachineFormat>,
 
     #[argh(switch)]
     /// produce the JSON schema for the MachineWriter output. The `--machine` option
@@ -532,7 +532,7 @@ impl Ffx {
                 }
                 "--machine" => {
                     if let Some(val) = argv_iter.next() {
-                        if let Ok(fmt) = Format::from_str(val) {
+                        if let Ok(fmt) = MachineFormat::from_str(val) {
                             return_val.machine = Some(fmt);
                         }
                     }
@@ -803,7 +803,7 @@ mod test {
             FfxCommandLine::from_args_for_help(&args).expect("Command line should parse");
         assert_eq!(cmd_for_help.ffx_args, vec!["--verbose", "--machine", "json-pretty"]);
         assert!(cmd_for_help.global.verbose);
-        assert!(cmd_for_help.global.machine == Some(Format::JsonPretty));
+        assert!(cmd_for_help.global.machine == Some(MachineFormat::JsonPretty));
     }
 
     /// A subcommand
@@ -996,5 +996,13 @@ mod test {
         let _ffx = Ffx::from_args(&["ffx"], &all_args).expect("parsing all long args");
         let _ffx_for_help = Ffx::from_args_for_help(&all_args).expect("parsing args for help");
         assert_eq!(_ffx, _ffx_for_help);
+    }
+
+    #[test]
+    fn cmd_machine_raw() {
+        let args = ["test/things/ffx", "--machine", "raw"].map(String::from);
+        let cmd_line =
+            FfxCommandLine::new(Some("tools/ffx"), &args).expect("Command line should parse");
+        assert_eq!(cmd_line.global.machine, Some(MachineFormat::Raw));
     }
 }

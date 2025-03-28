@@ -66,6 +66,46 @@ pub async fn report_bug(err: &impl std::fmt::Display) {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MachineFormat {
+    Json,
+    JsonPretty,
+    Raw,
+}
+
+impl From<MachineFormat> for Option<writer::Format> {
+    fn from(value: MachineFormat) -> Self {
+        match value {
+            MachineFormat::Json => Some(Format::Json),
+            MachineFormat::JsonPretty => Some(Format::JsonPretty),
+            MachineFormat::Raw => None,
+        }
+    }
+}
+
+impl From<writer::Format> for MachineFormat {
+    fn from(value: writer::Format) -> Self {
+        match value {
+            Format::Json => MachineFormat::Json,
+            Format::JsonPretty => MachineFormat::JsonPretty,
+        }
+    }
+}
+
+impl std::str::FromStr for MachineFormat {
+    type Err = writer::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match Format::from_str(s) {
+            Ok(f) => Ok(f.into()),
+            _ => match s.to_lowercase().as_ref() {
+                "raw" => Ok(MachineFormat::Raw),
+                lower => Err(writer::Error::InvalidFormat(lower.into())),
+            },
+        }
+    }
+}
+
 #[tracing::instrument]
 pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     let mut return_args_info = false;
@@ -130,8 +170,9 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         // for all subcommands.
         let args = tools.get_args_info().await?;
         let output = match cmd.global.machine.unwrap() {
-            Format::Json => serde_json::to_string(&args),
-            Format::JsonPretty => serde_json::to_string_pretty(&args),
+            MachineFormat::Json => serde_json::to_string(&args),
+            MachineFormat::JsonPretty => serde_json::to_string_pretty(&args),
+            MachineFormat::Raw => Ok(format!("{args:#?}")),
         };
         println!("{}", output.bug_context("Error serializing args")?);
         return Ok(ExitStatus::from_raw(0));
@@ -184,8 +225,9 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
                             .unwrap_or(info);
                     }
                     let output = match machine_format {
-                        Format::Json => serde_json::to_string(&info),
-                        Format::JsonPretty => serde_json::to_string_pretty(&info),
+                        MachineFormat::Json => serde_json::to_string(&info),
+                        MachineFormat::JsonPretty => serde_json::to_string_pretty(&info),
+                        MachineFormat::Raw => Ok(format!("{info:#?}")),
                     };
                     println!("{}", output.bug_context("Error serializing args")?);
                     return Ok(ExitStatus::from_raw(0));
@@ -274,7 +316,7 @@ pub async fn exit(res: Result<ExitStatus>, should_format: bool) -> ! {
 /// look through the command line args for `--machine <format>`
 /// and --help or help or -h. This is used to indicate the
 /// JSON arg info should be returned.
-fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<Format> {
+fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<MachineFormat> {
     if cmd.subcmd_iter().any(|c| c == "help" || c == "--help" || c == "-h") {
         cmd.global.machine
     } else {
