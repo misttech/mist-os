@@ -540,8 +540,8 @@ mod test {
     use fho::{user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpPort,
-        TargetRequest, TargetState,
+        RemoteControlState, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpAddrInfo,
+        TargetIpPort, TargetRequest, TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol::{self as frcs, RemoteControlProxy};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
@@ -596,11 +596,16 @@ mod test {
             scope_id: 0,
             port: DEVICE_PORT,
         });
+        let device_addr_ip = TargetIpAddrInfo::IpPort(TargetIpPort {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+            port: DEVICE_PORT,
+        });
 
         TargetInfo {
             nodename: Some(nodename),
-            addresses: Some(vec![device_addr.clone()]),
-            ssh_address: Some(device_addr.clone()),
+            addresses: Some(vec![device_addr]),
+            ssh_address: Some(device_addr_ip),
             ssh_host_address: Some(SshHostAddrInfo { address: HOST_ADDR.to_string() }),
             age_ms: Some(101),
             rcs_state: Some(RemoteControlState::Up),

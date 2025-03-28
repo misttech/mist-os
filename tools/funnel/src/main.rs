@@ -388,7 +388,10 @@ where
                                     // We support fastboot over tcp!
                                     targets.insert(
                                         handle.node_name.unwrap_or_else(|| "".to_string()),
-                                        (tcp_state, TargetMode::Fastboot),
+                                        (
+                                            tcp_state.iter().map(Into::into).collect(),
+                                            TargetMode::Fastboot,
+                                        ),
                                     );
                                 }
                                 FastbootConnectionState::Udp(udp_state) => {

@@ -6,12 +6,12 @@ use crate::overnet::host_pipe::{
     spawn, HostPipeChildBuilder, HostPipeChildDefaultBuilder, LogBuffer,
 };
 use crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE};
-use addr::TargetAddr;
+use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use compat_info::{CompatibilityInfo, CompatibilityState};
-use ffx::{TargetAddrInfo, TargetIpPort};
+use ffx::{TargetIpAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{TargetConnectionState, TargetEvent};
 use ffx_fastboot::common::fastboot::{
@@ -305,7 +305,7 @@ pub struct Target {
     target_event_synthesizer: Rc<TargetEventSynthesizer>,
     pub(crate) ssh_host_address: RefCell<Option<HostAddr>>,
     // A user provided address that should be used to SSH.
-    preferred_ssh_address: RefCell<Option<TargetAddr>>,
+    preferred_ssh_address: RefCell<Option<TargetIpAddr>>,
 
     compatibility_status: RefCell<Option<CompatibilityInfo>>,
 }
@@ -366,7 +366,7 @@ impl Target {
         target
     }
 
-    pub fn new_with_addrs<S>(nodename: Option<S>, addrs: BTreeSet<TargetAddr>) -> Rc<Self>
+    pub fn new_with_addrs<S>(nodename: Option<S>, addrs: BTreeSet<TargetIpAddr>) -> Rc<Self>
     where
         S: Into<String>,
     {
@@ -376,9 +376,9 @@ impl Target {
         }
         let now = Utc::now();
         target.addrs_extend(
-            addrs
-                .iter()
-                .map(|addr| TargetAddrEntry::new(*addr, now.clone(), TargetAddrStatus::ssh())),
+            addrs.iter().map(|addr| {
+                TargetAddrEntry::new(addr.into(), now.clone(), TargetAddrStatus::ssh())
+            }),
         );
         target
     }
@@ -399,7 +399,7 @@ impl Target {
     pub fn new_with_fastboot_addrs<S>(
         nodename: Option<S>,
         serial: Option<String>,
-        addrs: BTreeSet<TargetAddr>,
+        addrs: BTreeSet<TargetIpAddr>,
         interface: FastbootInterface,
     ) -> Rc<Self>
     where
@@ -423,7 +423,11 @@ impl Target {
             addrs
                 .iter()
                 .map(|e| {
-                    TargetAddrEntry::new(*e, Utc::now(), TargetAddrStatus::fastboot(transport))
+                    TargetAddrEntry::new(
+                        e.into(),
+                        Utc::now(),
+                        TargetAddrStatus::fastboot(transport),
+                    )
                 })
                 .collect(),
         );
@@ -432,7 +436,7 @@ impl Target {
         target
     }
 
-    pub fn new_with_netsvc_addrs<S>(nodename: Option<S>, addrs: BTreeSet<TargetAddr>) -> Rc<Self>
+    pub fn new_with_netsvc_addrs<S>(nodename: Option<S>, addrs: BTreeSet<TargetIpAddr>) -> Rc<Self>
     where
         S: Into<String>,
     {
@@ -443,7 +447,7 @@ impl Target {
         target.addrs.replace(
             addrs
                 .iter()
-                .map(|e| TargetAddrEntry::new(*e, Utc::now(), TargetAddrStatus::netsvc()))
+                .map(|e| TargetAddrEntry::new(e.into(), Utc::now(), TargetAddrStatus::netsvc()))
                 .collect(),
         );
         target.update_connection_state(|_| TargetConnectionState::Zedboot(Instant::now()));
@@ -477,7 +481,10 @@ impl Target {
         if let Some(s) = t.serial {
             Self::new_for_usb(&s)
         } else {
-            let res = Self::new_with_addrs(t.nodename.take(), t.addresses.drain(..).collect());
+            let res = Self::new_with_addrs(
+                t.nodename.take(),
+                t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
+            );
             *res.ssh_host_address.borrow_mut() = t.ssh_host_address.take().map(HostAddr::from);
             *res.ssh_port.borrow_mut() = t.ssh_port;
             res
@@ -485,14 +492,17 @@ impl Target {
     }
 
     pub fn from_netsvc_target_info(mut t: Description) -> Rc<Self> {
-        Self::new_with_netsvc_addrs(t.nodename.take(), t.addresses.drain(..).collect())
+        Self::new_with_netsvc_addrs(
+            t.nodename.take(),
+            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
+        )
     }
 
     pub fn from_fastboot_target_info(mut t: Description) -> Result<Rc<Self>> {
         Ok(Self::new_with_fastboot_addrs(
             t.nodename.take(),
             t.serial.take(),
-            t.addresses.drain(..).collect(),
+            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
             t.fastboot_interface.ok_or_else(|| anyhow!("No fastboot mode?"))?,
         ))
     }
@@ -642,8 +652,8 @@ impl Target {
 
         // Order by link-local first, then by recency
         let link_local_recency = |e1: &TargetAddrEntry, e2: &TargetAddrEntry| match (
-            e1.addr.ip().is_link_local_addr(),
-            e2.addr.ip().is_link_local_addr(),
+            e1.addr.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
+            e2.addr.ip().map(|x| x.is_link_local_addr()).unwrap_or(false),
         ) {
             (true, true) | (false, false) => recency(e1, e2),
             (true, false) => Ordering::Less,
@@ -653,11 +663,11 @@ impl Target {
         let manual_link_local_recency = |e1: &TargetAddrEntry, e2: &TargetAddrEntry| {
             // If the user specified a preferred address, then use it.
             if let Some(preferred_ssh_address) = *self.preferred_ssh_address.borrow() {
-                if e1.addr == preferred_ssh_address {
+                if TargetIpAddr::try_from(e1.addr).ok() == Some(preferred_ssh_address) {
                     return Ordering::Less;
                 }
 
-                if e2.addr == preferred_ssh_address {
+                if TargetIpAddr::try_from(e2.addr).ok() == Some(preferred_ssh_address) {
                     return Ordering::Greater;
                 }
             }
@@ -678,17 +688,15 @@ impl Target {
             .iter()
             .filter(|t| matches!(t.protocol, TargetProtocol::Ssh))
             .sorted_by(|e1, e2| manual_link_local_recency(e1, e2))
-            .next()
-            .map(|e| e.addr);
+            .find_map(|e| TargetIpAddr::try_from(e.addr).map(Into::into).ok());
 
-        target_addr.map(|target_addr| {
-            let mut socket_addr: SocketAddr = target_addr.into();
+        target_addr.map(|mut socket_addr: SocketAddr| {
             socket_addr.set_port(self.ssh_port().unwrap_or(DEFAULT_SSH_PORT));
             socket_addr
         })
     }
 
-    pub fn netsvc_address(&self) -> Option<TargetAddr> {
+    pub fn netsvc_address(&self) -> Option<TargetIpAddr> {
         use itertools::Itertools;
         // Order e1 & e2 by most recent timestamp
         let recency = |e1: &TargetAddrEntry, e2: &TargetAddrEntry| e2.timestamp.cmp(&e1.timestamp);
@@ -696,11 +704,11 @@ impl Target {
             .borrow()
             .iter()
             .sorted_by(|e1, e2| recency(e1, e2))
-            .find(|t| matches!(t.protocol, TargetProtocol::Netsvc))
-            .map(|addr_entry| addr_entry.addr.clone())
+            .filter(|t| matches!(t.protocol, TargetProtocol::Netsvc))
+            .find_map(|addr_entry| addr_entry.addr.try_into().ok())
     }
 
-    pub fn fastboot_address(&self) -> Option<(TargetAddr, FastbootInterface)> {
+    pub fn fastboot_address(&self) -> Option<(TargetIpAddr, FastbootInterface)> {
         use itertools::Itertools;
         // Order e1 & e2 by most recent timestamp
         let recency = |e1: &TargetAddrEntry, e2: &TargetAddrEntry| e2.timestamp.cmp(&e1.timestamp);
@@ -708,11 +716,13 @@ impl Target {
             .borrow()
             .iter()
             .sorted_by(|e1, e2| recency(e1, e2))
-            .find(|t| matches!(t.protocol, TargetProtocol::Fastboot))
-            .map(|addr_entry| (addr_entry.addr, addr_entry.transport.into()))
+            .filter(|t| matches!(t.protocol, TargetProtocol::Fastboot))
+            .find_map(|addr_entry| {
+                addr_entry.addr.try_into().ok().map(|x| (x, addr_entry.transport.into()))
+            })
     }
 
-    pub fn ssh_address_info(&self) -> Option<ffx::TargetAddrInfo> {
+    pub fn ssh_address_info(&self) -> Option<ffx::TargetIpAddrInfo> {
         let addr = self.ssh_address()?;
         let ip = match addr.ip() {
             IpAddr::V6(i) => IpAddress::Ipv6(Ipv6Address { addr: i.octets().into() }),
@@ -726,7 +736,7 @@ impl Target {
 
         let port = self.ssh_port().unwrap_or(DEFAULT_SSH_PORT);
 
-        Some(TargetAddrInfo::IpPort(TargetIpPort { ip, port, scope_id }))
+        Some(TargetIpAddrInfo::IpPort(TargetIpPort { ip, port, scope_id }))
     }
 
     pub fn ssh_host_address_info(&self) -> Option<ffx::SshHostAddrInfo> {
@@ -1009,7 +1019,7 @@ impl Target {
             .into_iter()
             .filter(|entry| match (entry.is_manual(), &entry.addr.ip()) {
                 (true, _) => true,
-                (_, IpAddr::V6(v)) => entry.addr.scope_id() != 0 || !v.is_link_local_addr(),
+                (_, Some(IpAddr::V6(v))) => entry.addr.scope_id() != 0 || !v.is_link_local_addr(),
                 _ => true,
             })
             .collect();
@@ -1024,7 +1034,7 @@ impl Target {
             .into_iter()
             .filter(|entry| match (entry.is_manual(), &entry.addr.ip(), entry.addr.port()) {
                 (true, _, _) => true,
-                (_, IpAddr::V4(v), p) => !(v.is_loopback() && p == 0),
+                (_, Some(IpAddr::V4(v)), p) => !(v.is_loopback() && p == Some(0)),
                 _ => true,
             })
             .collect();
@@ -1113,14 +1123,16 @@ impl Target {
             // originally present, for example if a directly connected USB target has restarted,
             // wherein the scopeid could be incremented due to the device being given a new
             // interface id allocation.
-            if addr.addr.ip().is_ipv6() && addr.addr.scope_id() == 0 {
-                if let Some(entry) = addrs.get(&addr) {
-                    addr.addr.set_scope_id(entry.addr.scope_id());
-                }
+            if let TargetAddr::Net(ip_addr) = &addr.addr {
+                if ip_addr.ip().is_ipv6() && addr.addr.scope_id() == 0 {
+                    if let Some(entry) = addrs.get(&addr) {
+                        addr.addr.set_scope_id(entry.addr.scope_id());
+                    }
 
-                // Note: not adding ipv6 link-local addresses without scopes here is deliberate!
-                if addr.addr.ip().is_link_local_addr() && addr.addr.scope_id() == 0 {
-                    continue;
+                    // Note: not adding ipv6 link-local addresses without scopes here is deliberate!
+                    if addr.addr.ip().unwrap().is_link_local_addr() && addr.addr.scope_id() == 0 {
+                        continue;
+                    }
                 }
             }
 
@@ -1145,12 +1157,12 @@ impl Target {
     /// Returns true if successful (the `target_addr` exists). Otherwise,
     /// returns false. If the `target_addr` should be used immediately, then
     /// callers should invoke `maybe_reconnect` after calling this method.
-    pub fn set_preferred_ssh_address(&self, target_addr: TargetAddr) -> bool {
+    pub fn set_preferred_ssh_address(&self, target_addr: TargetIpAddr) -> bool {
         let address_exists = self
             .addrs
             .borrow()
             .iter()
-            .any(|target_addr_entry| target_addr_entry.addr == target_addr);
+            .any(|target_addr_entry| target_addr_entry.addr == target_addr.into());
 
         if !address_exists {
             return false;
@@ -2088,10 +2100,10 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_set_preferred_ssh_address() {
-        let target_addr: TargetAddr = TargetAddr::new("fe80::2".parse().unwrap(), 1, 0);
+        let target_addr: TargetIpAddr = TargetIpAddr::new("fe80::2".parse().unwrap(), 1, 0);
         let target = Target::new_with_addr_entries(
             Some("foo"),
-            vec![TargetAddrEntry::new(target_addr, Utc::now(), TargetAddrStatus::ssh())]
+            vec![TargetAddrEntry::new((&target_addr).into(), Utc::now(), TargetAddrStatus::ssh())]
                 .into_iter(),
         );
 
@@ -2110,7 +2122,7 @@ mod test {
             .into_iter(),
         );
 
-        assert!(!target.set_preferred_ssh_address(TargetAddr::new(
+        assert!(!target.set_preferred_ssh_address(TargetIpAddr::new(
             "fe80::2".parse().unwrap(),
             1,
             0
@@ -2217,11 +2229,16 @@ mod test {
             Some("[2000::2]:22".parse().unwrap())
         );
 
-        let preferred_target_addr: TargetAddr = TargetAddr::new("fe80::2".parse().unwrap(), 1, 0);
+        let preferred_target_addr: TargetIpAddr =
+            TargetIpAddr::new("fe80::2".parse().unwrap(), 1, 0);
         // User expressed a preferred SSH address. Prefer it over all other
         // addresses (even manual).
         let addrs = BTreeSet::from_iter(vec![
-            TargetAddrEntry::new(preferred_target_addr, start.into(), TargetAddrStatus::ssh()),
+            TargetAddrEntry::new(
+                (&preferred_target_addr).into(),
+                start.into(),
+                TargetAddrStatus::ssh(),
+            ),
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 (start - Duration::from_secs(1)).into(),
@@ -2247,7 +2264,7 @@ mod test {
         );
 
         let (ip, port) = match target.ssh_address_info().unwrap() {
-            TargetAddrInfo::IpPort(TargetIpPort { ip, port, .. }) => match ip {
+            TargetIpAddrInfo::IpPort(TargetIpPort { ip, port, .. }) => match ip {
                 IpAddress::Ipv4(i) => (IpAddr::from(i.addr), port),
                 IpAddress::Ipv6(i) => (IpAddr::from(i.addr), port),
             },
@@ -2272,7 +2289,7 @@ mod test {
         target.set_ssh_port(Some(8022));
 
         let (ip, port) = match target.ssh_address_info().unwrap() {
-            TargetAddrInfo::IpPort(TargetIpPort { ip, port, .. }) => match ip {
+            TargetIpAddrInfo::IpPort(TargetIpPort { ip, port, .. }) => match ip {
                 IpAddress::Ipv4(i) => (IpAddr::from(i.addr), port),
                 IpAddress::Ipv6(i) => (IpAddr::from(i.addr), port),
             },
@@ -2318,7 +2335,7 @@ mod test {
     async fn test_netsvc_ssh_address_info_should_be_none() {
         let ip = "f111::4".parse().unwrap();
         let mut addr_set = BTreeSet::new();
-        addr_set.replace(TargetAddr::new(ip, 0xbadf00d, 0));
+        addr_set.replace(TargetIpAddr::new(ip, 0xbadf00d, 0));
         let target = Target::new_with_netsvc_addrs(Some("foo"), addr_set);
 
         assert!(target.ssh_address_info().is_none());
@@ -2507,7 +2524,7 @@ mod test {
         }
         {
             let mut addrs = BTreeSet::new();
-            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            addrs.insert(TargetIpAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
             let interface = FastbootInterface::Tcp;
             let target = Target::new_with_fastboot_addrs(Some("Babs"), None, addrs, interface);
 
@@ -2516,7 +2533,7 @@ mod test {
         }
         {
             let mut addrs = BTreeSet::new();
-            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            addrs.insert(TargetIpAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
             let interface = FastbootInterface::Udp;
             let target =
                 Target::new_with_fastboot_addrs(Some("Coronabeth"), None, addrs, interface);
@@ -2536,7 +2553,7 @@ mod test {
         }
         {
             let mut addrs = BTreeSet::new();
-            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            addrs.insert(TargetIpAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
             let interface = FastbootInterface::Tcp;
             let target = Target::new_with_fastboot_addrs(Some("Babs"), None, addrs, interface);
 
@@ -2547,7 +2564,7 @@ mod test {
         }
         {
             let mut addrs = BTreeSet::new();
-            addrs.insert(TargetAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
+            addrs.insert(TargetIpAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0, 0));
             let interface = FastbootInterface::Udp;
             let target =
                 Target::new_with_fastboot_addrs(Some("Coronabeth"), None, addrs, interface);
@@ -2598,7 +2615,7 @@ mod test {
         let local_node = overnet_core::Router::new(None).unwrap();
         let target = crate::target::Target::new_with_addrs(
             Some("foo"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         target.set_state(TargetConnectionState::Mdns(Instant::now()));
         let (snd, rcv) = channel::oneshot::channel::<Option<u64>>();
@@ -2614,7 +2631,7 @@ mod test {
         let local_node = overnet_core::Router::new(None).unwrap();
         let target = crate::target::Target::new_with_addrs(
             Some("foo"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let overnet_id = Some(123);
         target.set_state(TargetConnectionState::Mdns(Instant::now()));

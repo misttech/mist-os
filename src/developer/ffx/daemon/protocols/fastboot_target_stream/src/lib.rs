@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
-use ffx::TargetAddrInfo;
+use ffx::TargetIpAddrInfo;
 use ffx_config::{get, is_usb_discovery_disabled};
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
@@ -99,7 +99,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                                                     addresses: Some(
                                                         addrs
                                                             .into_iter()
-                                                            .map(|x| TargetAddrInfo::from(x.into()))
+                                                            .map(|x| TargetIpAddrInfo::from(x.into()))
                                                             .collect(),
                                                     ),
                                                     ..Default::default()
@@ -115,7 +115,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                                                     addresses: Some(
                                                         addrs
                                                             .into_iter()
-                                                            .map(|x| TargetAddrInfo::from(x.into()))
+                                                            .map(|x| TargetIpAddrInfo::from(x.into()))
                                                             .collect(),
                                                     ),
                                                     ..Default::default()

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::{anyhow, Result};
 use async_utils::async_once::Once;
 use ffx_daemon_events::TargetConnectionState;
@@ -372,7 +372,7 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
 
 #[tracing::instrument]
 async fn build_ssh_command_local(
-    addr: TargetAddr,
+    addr: TargetIpAddr,
     desired_state: TargetRebootState,
 ) -> Result<Command> {
     let device_command = match desired_state {

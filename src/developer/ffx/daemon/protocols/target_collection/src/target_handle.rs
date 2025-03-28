@@ -317,7 +317,7 @@ mod tests {
         let tc = Rc::new(TargetCollection::new());
         let _handle = Task::local(TargetHandle::new(target, cx, server, tc.clone()).unwrap());
         let result = proxy.get_ssh_address().await.unwrap();
-        if let ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+        if let ffx::TargetIpAddrInfo::IpPort(ffx::TargetIpPort {
             ip: fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address { addr }),
             ..
         }) = result

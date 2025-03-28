@@ -27,6 +27,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/daemon/target:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",

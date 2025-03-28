@@ -1,7 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
 use errors::ffx_bail;
@@ -151,8 +151,10 @@ async fn get_remote_proxy_impl(
     // Only replace the target spec info if we're going from less info to more info.
     // Don't want to overwrite it otherwise.
     match (target_spec.as_ref(), info.nodename, info.ssh_address) {
-        (None, Some(n), Some(s)) => target_spec.replace(format!("{n} at {}", TargetAddr::from(s))),
-        (None, None, Some(s)) => target_spec.replace(TargetAddr::from(s).to_string()),
+        (None, Some(n), Some(s)) => {
+            target_spec.replace(format!("{n} at {}", TargetIpAddr::from(s)))
+        }
+        (None, None, Some(s)) => target_spec.replace(TargetIpAddr::from(s).to_string()),
         (None, Some(n), None) => target_spec.replace(format!("{n}")),
         (_, _, _) => None,
     };
@@ -518,16 +520,17 @@ pub async fn add_manual_target(
         IpAddr::V4(i) => net::IpAddress::Ipv4(net::Ipv4Address { addr: i.octets().into() }),
     };
     let addr = if port > 0 {
-        ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, port, scope_id })
+        ffx::TargetIpAddrInfo::IpPort(ffx::TargetIpPort { ip, port, scope_id })
     } else {
-        ffx::TargetAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
+        ffx::TargetIpAddrInfo::Ip(ffx::TargetIp { ip, scope_id })
     };
 
+    let taddr = TargetIpAddr::from(&addr);
     let (client, mut stream) =
         fidl::endpoints::create_request_stream::<ffx::AddTargetResponder_Marker>();
     target_collection_proxy
         .add_target(
-            &addr,
+            &taddr.into(),
             &ffx::AddTargetConfig { verify_connection: Some(wait), ..Default::default() },
             client,
         )
@@ -544,7 +547,6 @@ pub async fn add_manual_target(
     // Change TargetAddrInfo to TargetAddr so ip can be extracted.
     // This is similar logic found in get_ssh_address().
     const DEFAULT_SSH_PORT: u16 = 22;
-    let taddr = TargetAddr::from(&addr);
     let taddr_str = match taddr.ip() {
         IpAddr::V4(_) => format!("{}", taddr),
         IpAddr::V6(_) => format!("[{}]", taddr),
@@ -554,11 +556,9 @@ pub async fn add_manual_target(
     res.map_err(|e| {
         let err = e.connection_error.unwrap();
         let logs = e.connection_error_logs.map(|v| v.join("\n"));
-        let target = Some(format!(
-            "{}:{}",
-            taddr_str,
-            if taddr.port() == 0 { DEFAULT_SSH_PORT } else { taddr.port() }
-        ));
+        let port = taddr.port();
+        let target =
+            Some(format!("{}:{}", taddr_str, if port == 0 { DEFAULT_SSH_PORT } else { port }));
         FfxTargetError::TargetConnectionError { err, target, logs }.into()
     })
 }

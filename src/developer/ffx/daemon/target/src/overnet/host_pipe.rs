@@ -645,7 +645,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use addr::TargetAddr;
+    use addr::TargetIpAddr;
     use assert_matches::assert_matches;
     use ffx_config::ConfigLevel;
     use serde_json::json;
@@ -807,7 +807,7 @@ mod test {
     async fn test_host_pipe_start_and_stop_normal_operation() {
         let target = crate::target::Target::new_with_addrs(
             Some("flooooooooberdoober"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let node = overnet_core::Router::new(None).unwrap();
         let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
@@ -831,7 +831,7 @@ mod test {
         // TODO(awdavies): Verify the error matches.
         let target = crate::target::Target::new_with_addrs(
             Some("flooooooooberdoober"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let node = overnet_core::Router::new(None).unwrap();
         let res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
@@ -853,7 +853,7 @@ mod test {
     async fn test_host_pipe_start_and_stop_ssh_failure() {
         let target = crate::target::Target::new_with_addrs(
             Some("flooooooooberdoober"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let events = target.events.clone();
         let task = Task::local(async move {
@@ -941,7 +941,7 @@ mod test {
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let node = overnet_core::Router::new(None).unwrap();
         let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
@@ -973,7 +973,7 @@ mod test {
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
         let node = overnet_core::Router::new(None).unwrap();
@@ -1006,7 +1006,7 @@ mod test {
 
         let target = crate::target::Target::new_with_addrs(
             Some("test_target"),
-            [TargetAddr::from_str("192.168.1.1:22").unwrap()].into(),
+            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
         );
         let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
         let node = overnet_core::Router::new(None).unwrap();
@@ -1049,7 +1049,7 @@ mod test {
     async fn test_host_pipe_with_overnet_id() {
         let target = crate::target::Target::new_with_addrs(
             Some("overnetid"),
-            [TargetAddr::from_str("10.0.2.2:22").unwrap()].into(),
+            [TargetIpAddr::from_str("10.0.2.2:22").unwrap()].into(),
         );
         // Test that the overnet_id is available via the Child builder
         let node = overnet_core::Router::new(None).unwrap();

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetIpAddr;
 use anyhow::{anyhow, bail, Context, Result};
 use ascendd::Ascendd;
 use async_trait::async_trait;
@@ -159,7 +160,11 @@ impl DaemonEventHandler {
             t.nodename.as_deref().unwrap_or("<unknown>")
         );
 
-        let addrs = t.addresses.into_iter().map(|a| a.into()).collect::<Vec<_>>();
+        let addrs = t
+            .addresses
+            .into_iter()
+            .filter_map(|a| TargetIpAddr::try_from(a).map(Into::into).ok())
+            .collect::<Vec<_>>();
 
         let mut update = target::TargetUpdateBuilder::new()
             .net_addresses(&addrs)
@@ -991,7 +996,9 @@ mod test {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_with_netsvc_addrs(
             Some("abc"),
-            BTreeSet::from_iter(vec![TargetAddr::from_str("[fe80::1%1]:22").unwrap()].into_iter()),
+            BTreeSet::from_iter(
+                vec![TargetIpAddr::from_str("[fe80::1%1]:22").unwrap()].into_iter(),
+            ),
         );
         daemon.target_collection.merge_insert(target);
         let result = daemon.open_remote_control(None).await;

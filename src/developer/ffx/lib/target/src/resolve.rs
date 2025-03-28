@@ -1,7 +1,7 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use addr::TargetAddr;
+use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{anyhow, bail, Context, Result};
 use discovery::desc::Description;
 use discovery::query::TargetInfoQuery;
@@ -252,8 +252,11 @@ impl RetrievedTargetInfo {
             context.get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
+            let Ok(addr) = TargetIpAddr::try_from(addr).map(Into::into) else {
+                continue;
+            };
             // Ensure there's a port
-            let addr = replace_default_port(addr.into());
+            let addr = replace_default_port(addr);
             tracing::debug!("Trying to make a connection to {addr:?}");
 
             match try_get_target_info(addr, context)
@@ -308,8 +311,12 @@ async fn get_handle_info(
             serial_number.replace(state.serial_number);
             let (fastboot_connection, addresses) = match state.connection_state {
                 FastbootConnectionState::Usb => (ffx::FastbootInterface::Usb, None),
-                FastbootConnectionState::Tcp(addrs) => (ffx::FastbootInterface::Tcp, Some(addrs)),
-                FastbootConnectionState::Udp(addrs) => (ffx::FastbootInterface::Udp, Some(addrs)),
+                FastbootConnectionState::Tcp(addrs) => {
+                    (ffx::FastbootInterface::Tcp, Some(addrs.into_iter().map(Into::into).collect()))
+                }
+                FastbootConnectionState::Udp(addrs) => {
+                    (ffx::FastbootInterface::Udp, Some(addrs.into_iter().map(Into::into).collect()))
+                }
             };
             (ffx::TargetState::Fastboot, Some(fastboot_connection), addresses)
         }
@@ -332,7 +339,7 @@ async fn get_handle_info(
         product_config,
         serial_number,
         fastboot_interface,
-        ssh_address: ssh_address.map(|a| TargetAddr::from(a).into()),
+        ssh_address: ssh_address.map(|a| TargetIpAddr::from(a).into()),
         ..Default::default()
     })
 }
@@ -523,20 +530,21 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::Addr(ref sa) => {
-            fn addr_matches(addrs: &Vec<TargetAddr>, sa: &SocketAddr) -> bool {
-                addrs.iter().any(|a| a.ip() == sa.ip())
-            }
             if let TargetState::Product(addrs) = &h.state {
-                return addr_matches(addrs, sa);
+                return addrs.iter().any(|a| a.ip() == Some(sa.ip()));
             } else if let TargetState::Fastboot(fts) = &h.state {
                 match &fts.connection_state {
-                    FastbootConnectionState::Tcp(addrs) => {
-                        return addr_matches(addrs, sa);
-                    }
-                    FastbootConnectionState::Udp(addrs) => {
-                        return addr_matches(addrs, sa);
+                    FastbootConnectionState::Tcp(addrs) | FastbootConnectionState::Udp(addrs) => {
+                        return addrs.iter().any(|a| a.ip() == sa.ip());
                     }
                     FastbootConnectionState::Usb => {}
+                }
+            }
+        }
+        TargetInfoQuery::VSock(cid) => {
+            if let TargetState::Product(addrs) = &h.state {
+                if addrs.iter().any(|a| a.cid() == Some(*cid)) {
+                    return true;
                 }
             }
         }
@@ -555,8 +563,10 @@ fn handle_to_description(handle: &TargetHandle) -> Description {
         }) => {
             let addresses = match connection_state {
                 FastbootConnectionState::Usb => Vec::<TargetAddr>::new(),
-                FastbootConnectionState::Tcp(addresses) => addresses.to_vec(),
-                FastbootConnectionState::Udp(addresses) => addresses.to_vec(),
+                FastbootConnectionState::Tcp(addresses)
+                | FastbootConnectionState::Udp(addresses) => {
+                    addresses.iter().map(Into::into).collect()
+                }
             };
             (addresses, Some(sn.clone()))
         }
@@ -631,16 +641,13 @@ fn sort_socket_addrs(a1: &SocketAddr, a2: &SocketAddr) -> Ordering {
 
 fn choose_socketaddr_from_addresses(
     target: &TargetHandle,
-    addresses: &Vec<TargetAddr>,
+    addresses: &Vec<TargetIpAddr>,
 ) -> Result<SocketAddr> {
     if addresses.is_empty() {
         bail!("Target discovered but does not contain addresses: {target:?}");
     }
-    let mut addrs_sorted = addresses
-        .into_iter()
-        .map(SocketAddr::from)
-        .sorted_by(sort_socket_addrs)
-        .collect::<Vec<_>>();
+    let mut addrs_sorted =
+        addresses.into_iter().map(Into::into).sorted_by(sort_socket_addrs).collect::<Vec<_>>();
     let sock: SocketAddr = addrs_sorted.pop().ok_or_else(|| {
         anyhow!("Choosing a socketaddr from a list of addresses, must contain at least one address")
     })?;
@@ -648,12 +655,15 @@ fn choose_socketaddr_from_addresses(
 }
 
 impl ResolutionTarget {
-    // If the target is a product, pull out the "best" address from the
+    // If the target is a product, pull out the "best" network address from the
     // target, and return it.
     fn from_target_handle(target: &TargetHandle) -> Result<ResolutionTarget> {
         match &target.state {
-            TargetState::Product(ref addresses) => {
-                let sock = choose_socketaddr_from_addresses(&target, addresses)?;
+            TargetState::Product(addresses) => {
+                let sock = choose_socketaddr_from_addresses(
+                    &target,
+                    &addresses.into_iter().filter_map(|x| x.try_into().ok()).collect(),
+                )?;
                 let addr: SocketAddr = replace_default_port(sock);
                 Ok(ResolutionTarget::Addr(addr))
             }
@@ -716,7 +726,8 @@ impl Resolution {
             0 => TARGET_DEFAULT_PORT,
             p => p,
         };
-        Self::from_target(ResolutionTarget::Addr(TargetAddr::new(sa.ip(), scope_id, port).into()))
+        let addr = TargetIpAddr::new(sa.ip(), scope_id, port).into();
+        Self::from_target(ResolutionTarget::Addr(addr))
     }
 
     fn from_target_handle(th: TargetHandle) -> Result<Self> {

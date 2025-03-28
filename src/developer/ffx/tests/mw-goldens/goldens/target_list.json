@@ -45,21 +45,56 @@
       }
     },
     "JsonTargetAddress": {
-      "type": "object",
-      "required": [
-        "ip",
-        "ssh_port"
-      ],
-      "properties": {
-        "ip": {
-          "type": "string"
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Ip"
+          ],
+          "properties": {
+            "Ip": {
+              "type": "object",
+              "required": [
+                "ip",
+                "ssh_port"
+              ],
+              "properties": {
+                "ip": {
+                  "type": "string"
+                },
+                "ssh_port": {
+                  "type": "integer",
+                  "format": "uint16",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         },
-        "ssh_port": {
-          "type": "integer",
-          "format": "uint16",
-          "minimum": 0.0
+        {
+          "type": "object",
+          "required": [
+            "VSock"
+          ],
+          "properties": {
+            "VSock": {
+              "type": "object",
+              "required": [
+                "cid"
+              ],
+              "properties": {
+                "cid": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
-      }
+      ]
     }
   }
 }

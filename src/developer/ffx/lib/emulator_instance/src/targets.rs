@@ -311,16 +311,15 @@ impl EmulatorWatcher {
         }
         // All emulators run on loopback ipv4.
         let ip = IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] });
-        let loopback =
-            TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, scope_id: 0, port: ssh_port.unwrap() });
-        let ssh_address = Some(loopback.clone());
+        let loopback = ffx::TargetIpPort { ip, scope_id: 0, port: ssh_port.unwrap() };
+        let ssh_address = Some(ffx::TargetIpAddrInfo::IpPort(loopback.clone()));
         if nodename.is_empty() {
             tracing::debug!("Skipping making target for {}, since nodename is empty", nodename);
             return None;
         }
         Some(ffx::TargetInfo {
             nodename: Some(nodename),
-            addresses: Some(vec![loopback]),
+            addresses: Some(vec![TargetAddrInfo::IpPort(loopback)]),
             ssh_address,
             ..Default::default()
         })
@@ -555,8 +554,10 @@ mod tests {
         config = tap_instance_data.get_emulator_configuration_mut();
         config.host.networking = crate::NetworkingMode::Tap;
         let ip = IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] });
-        let loopback = TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, scope_id: 0, port: 3322 });
-        let ssh_address = Some(loopback.clone());
+        let loopback =
+            ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort { ip, scope_id: 0, port: 3322 });
+        let ssh_address =
+            Some(ffx::TargetIpAddrInfo::IpPort(ffx::TargetIpPort { ip, scope_id: 0, port: 3322 }));
         // not running
         // not user mode
         // missing reading
