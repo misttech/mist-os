@@ -122,9 +122,9 @@ fuchsia_cc_test(
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_fake_bti_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
-        "@internal_sdk//src/devices/testing/fake-bti_fake-bti",
     ],
 )
 

@@ -111,9 +111,9 @@ test("aml-g12-composite-test-bin") {
   deps = [
     "..:aml-g12-composite-common",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/fake-bti/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/testing/fake-bti",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]
