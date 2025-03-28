@@ -1407,7 +1407,7 @@ TEST_F(NetworkServiceTest, NetworkDeviceAndVirtualization) {
   uint8_t test_buff2[TEST_BUF_SIZE];
   for (size_t i = 0; i < TEST_BUF_SIZE; i++) {
     test_buff1[i] = static_cast<uint8_t>(i);
-    test_buff2[i] = ~static_cast<uint8_t>(i);
+    test_buff2[i] = static_cast<uint8_t>(~i);
   }
 
   // Send data from virtualized guest to network device.
