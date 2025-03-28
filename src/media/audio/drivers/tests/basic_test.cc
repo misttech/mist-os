@@ -58,175 +58,8 @@ void BasicTest::TearDown() {
   TestBase::TearDown();
 }
 
-// Requests on protocols that are composesd into StreamConfig/Dai/Codec/Composite.
-//
-// fuchsia.hardware.audio.Health
-// We expect a response, and we allow 'healthy' to be either unspecified or TRUE.
-void BasicTest::RequestHealthAndExpectHealthy() {
-  GetHealthState(AddCallback("GetHealthState", [](fuchsia::hardware::audio::HealthState state) {
-    EXPECT_TRUE(!state.has_healthy() || state.healthy());
-  }));
-  ExpectCallbacks();
-}
-
-void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb) {
-  if (device_entry().isCodec()) {
-    codec()->GetHealthState(std::move(cb));
-  } else if (device_entry().isComposite()) {
-    composite()->GetHealthState(std::move(cb));
-  } else if (device_entry().isDai()) {
-    dai()->GetHealthState(std::move(cb));
-  } else if (device_entry().isStreamConfig()) {
-    stream_config()->GetHealthState(std::move(cb));
-  }
-}
-
 // Basic (non-privileged) requests
 //
-// Request properties including unique ID (which should be unique across instances).
-// The FIDL table for properties differs across Codec/Composite/Dai/StreamConfig.
-// Extract these into a common struct so that subsequent code can be shared.
-void BasicTest::RetrieveProperties() {
-  properties().reset();
-  // TODO(b/315049103): actually ensure that this differs between input and output.
-  if (device_entry().isCodec()) {
-    codec()->GetProperties(AddCallback(
-        "Codec::GetProperties", [this](fuchsia::hardware::audio::CodecProperties props) {
-          properties() = BaseProperties{};
-          if (props.has_is_input()) {
-            properties()->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties()->unique_id.emplace();
-            std::memcpy(properties()->unique_id->data(), props.unique_id().data(), 16);
-          }
-          if (props.has_manufacturer()) {
-            properties()->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties()->product = props.product();
-          }
-          if (props.has_plug_detect_capabilities()) {
-            properties()->plug_detect_capabilities = props.plug_detect_capabilities();
-          }
-        }));
-  } else if (device_entry().isComposite()) {
-    composite()->GetProperties(AddCallback(
-        "Composite::GetProperties", [this](fuchsia::hardware::audio::CompositeProperties props) {
-          properties() = BaseProperties{};
-          if (props.has_unique_id()) {
-            properties()->unique_id.emplace(props.unique_id());
-          }
-          if (props.has_manufacturer()) {
-            properties()->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties()->product = props.product();
-          }
-          if (props.has_clock_domain()) {
-            properties()->clock_domain = props.clock_domain();
-          }
-        }));
-  } else if (device_entry().isDai()) {
-    dai()->GetProperties(
-        AddCallback("Dai::GetProperties", [this](fuchsia::hardware::audio::DaiProperties props) {
-          properties() = BaseProperties{};
-          if (props.has_is_input()) {
-            properties()->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties()->unique_id = props.unique_id();
-          }
-          if (props.has_manufacturer()) {
-            properties()->manufacturer = props.manufacturer();
-          }
-          if (props.has_product_name()) {  // Note: not 'product'
-            properties()->product = props.product_name();
-          }
-          if (props.has_clock_domain()) {
-            properties()->clock_domain = props.clock_domain();
-          }
-        }));
-  } else if (device_entry().isStreamConfig()) {
-    stream_config()->GetProperties(AddCallback(
-        "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties props) {
-          properties() = BaseProperties{};
-          if (props.has_is_input()) {
-            properties()->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties()->unique_id = props.unique_id();
-          }
-          if (props.has_manufacturer()) {
-            properties()->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties()->product = props.product();
-          }
-          if (props.has_clock_domain()) {
-            properties()->clock_domain = props.clock_domain();
-          }
-          if (props.has_plug_detect_capabilities()) {
-            properties()->plug_detect_capabilities = props.plug_detect_capabilities();
-          }
-          if (props.has_can_mute()) {
-            properties()->can_mute = props.can_mute();
-          }
-          if (props.has_can_agc()) {
-            properties()->can_agc = props.can_agc();
-          }
-          if (props.has_min_gain_db()) {
-            properties()->min_gain_db = props.min_gain_db();
-          }
-          if (props.has_max_gain_db()) {
-            properties()->max_gain_db = props.max_gain_db();
-          }
-          if (props.has_gain_step_db()) {
-            properties()->gain_step_db = props.gain_step_db();
-          }
-        }));
-  }
-  ExpectCallbacks();
-  EXPECT_TRUE(properties().has_value()) << "No GetProperties completion was received";
-}
-
-void BasicTest::ValidateProperties() {
-  ASSERT_TRUE(properties().has_value());
-
-  // The following fields are optional, but must be non-empty if they are specified.
-  EXPECT_FALSE(properties()->manufacturer.has_value() && properties()->manufacturer->empty());
-  EXPECT_FALSE(properties()->product.has_value() && properties()->product->empty());
-
-  // Just check that required fields are present
-  if (device_entry().isCodec()) {
-    EXPECT_TRUE(properties()->plug_detect_capabilities.has_value());
-  } else if (device_entry().isComposite()) {
-    EXPECT_TRUE(properties()->clock_domain.has_value());
-  } else if (device_entry().isDai()) {
-    EXPECT_TRUE(properties()->is_input.has_value());
-    EXPECT_TRUE(properties()->clock_domain.has_value());
-  } else if (device_entry().isStreamConfig()) {
-    ASSERT_TRUE(properties()->is_input.has_value());
-    EXPECT_TRUE(properties()->clock_domain.has_value());
-    EXPECT_TRUE(properties()->plug_detect_capabilities.has_value());
-    ASSERT_TRUE(properties()->min_gain_db.has_value());
-    ASSERT_TRUE(properties()->max_gain_db.has_value());
-    ASSERT_TRUE(properties()->gain_step_db.has_value());
-
-    // For StreamConfig, we can do additional data validity/range checks.
-    EXPECT_EQ(*properties()->is_input, driver_type() == DriverType::StreamConfigInput);
-    ASSERT_TRUE(std::isfinite(*properties()->min_gain_db)) << "irregular min_gain_db";
-    ASSERT_TRUE(std::isfinite(*properties()->max_gain_db)) << "irregular max_gain_db";
-    ASSERT_TRUE(std::isfinite(*properties()->gain_step_db)) << "irregular gain_step_db";
-    EXPECT_LE(*properties()->min_gain_db, *properties()->max_gain_db) << "max_gain_db too small";
-    EXPECT_GE(*properties()->gain_step_db, 0.0f) << "gain_step_db too small";
-    EXPECT_LE(*properties()->gain_step_db, *properties()->max_gain_db - *properties()->min_gain_db)
-        << "gain_step_db too large";
-  } else {
-    FAIL() << "Unknown device type";
-  }
-}
-
 // Request that the driver return its gain capabilities and current state, expecting a response.
 // TODO(b/315051281): If possible, combine this with the corresponding check of the signalprocessing
 // gain element, once that test exists.
@@ -452,15 +285,6 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   WaitForError();
 });
 
-// Verify that a valid toplogy list is successfully received.
-DEFINE_BASIC_TEST_CLASS(GetTopologies, { RequestTopologies(); });
-
-// Verify that a valid toplogy is successfully received.
-DEFINE_BASIC_TEST_CLASS(GetTopology, {
-  RequestTopologies();
-  RequestTopology();
-});
-
 // Register separate test case instances for each enumerated device
 //
 // See googletest/docs/advanced.md for details
@@ -479,12 +303,7 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else if (device_entry.isComposite()) {
-    REGISTER_BASIC_TEST(Health, device_entry);
-    REGISTER_BASIC_TEST(GetTopologies, device_entry);
-    REGISTER_BASIC_TEST(GetTopology, device_entry);
-    REGISTER_BASIC_TEST(GetProperties, device_entry);
-    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
-    REGISTER_BASIC_TEST(DaiFormats, device_entry);
+    // No test cases here.
   } else if (device_entry.isDai()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(GetProperties, device_entry);

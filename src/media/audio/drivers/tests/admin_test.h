@@ -37,6 +37,8 @@ class AdminTest : public TestBase {
   void TearDown() override;
   void DropRingBuffer();
 
+  void ValidateElementTopologyClosure();
+
   void ResetAndExpectResponse();
   void RequestCodecStartAndExpectResponse();
   void RequestCodecStopAndExpectResponse();

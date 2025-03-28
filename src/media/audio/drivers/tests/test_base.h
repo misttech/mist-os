@@ -24,7 +24,7 @@ namespace media::audio::drivers::test {
 
 inline constexpr size_t kUniqueIdLength = 16;
 
-// We enable top-level methods (e.g. TestBase::Retrieve[RingBuffer|Dai]Formats, BasicTest::
+// We enable top-level methods (e.g. TestBase::Retrieve[RingBuffer|Dai]Formats, TestBase::
 // RetrieveProperties, AdminTest::RequestBuffer) to skip or produce multiple errors and then
 // cause a test case to exit-early once they return, even if no fatal errors were triggered.
 // Gtest defines NO macro for this case -- only ASSERT_NO_FATAL_FAILURE -- so we define our own.
@@ -132,9 +132,14 @@ class TestBase : public media::audio::test::TestFixture {
   std::optional<bool> IsIncoming(
       std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id = std::nullopt);
 
+  void RequestHealthAndExpectHealthy();
+  void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
+
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // know at least whether ring buffers are outgoing or incoming, so this is implemented in this
   // shared parent class.
+  void RetrieveProperties();
+  void ValidateProperties();
   void DisplayBaseProperties();
 
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
@@ -203,6 +208,13 @@ class TestBase : public media::audio::test::TestFixture {
     std::optional<float> gain_step_db;  // ...r
   };
   std::optional<BaseProperties>& properties() { return properties_; }
+
+  const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies() const {
+    return topologies_;
+  }
+  const std::vector<fuchsia::hardware::audio::signalprocessing::Element>& elements() const {
+    return elements_;
+  }
 
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);

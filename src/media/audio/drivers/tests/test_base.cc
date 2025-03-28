@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <unordered_set>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -227,6 +228,177 @@ void TestBase::CreateStreamConfigFromChannel(
     __UNREACHABLE;
   }
   AddErrorHandler(stream_config_, "StreamConfig");
+}
+
+// Requests on protocols that are composesd into StreamConfig/Dai/Codec/Composite.
+//
+// fuchsia.hardware.audio.Health
+// We expect a response, and we allow 'healthy' to be either unspecified or TRUE.
+void TestBase::RequestHealthAndExpectHealthy() {
+  GetHealthState(AddCallback("GetHealthState", [](fuchsia::hardware::audio::HealthState state) {
+    EXPECT_TRUE(!state.has_healthy() || state.healthy());
+  }));
+  ExpectCallbacks();
+}
+
+void TestBase::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb) {
+  if (device_entry().isCodec()) {
+    codec()->GetHealthState(std::move(cb));
+  } else if (device_entry().isComposite()) {
+    composite()->GetHealthState(std::move(cb));
+  } else if (device_entry().isDai()) {
+    dai()->GetHealthState(std::move(cb));
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->GetHealthState(std::move(cb));
+  } else {
+    FAIL() << "Unknown device type";
+  }
+}
+
+// Request properties including unique ID (which should be unique across instances).
+// The FIDL table for properties differs across Codec/Composite/Dai/StreamConfig.
+// Extract these into a common struct so that subsequent code can be shared.
+void TestBase::RetrieveProperties() {
+  properties_.reset();
+  // TODO(b/315049103): actually ensure that this differs between input and output.
+  if (device_entry().isCodec()) {
+    codec()->GetProperties(AddCallback(
+        "Codec::GetProperties", [this](fuchsia::hardware::audio::CodecProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id.emplace();
+            std::memcpy(properties_->unique_id->data(), props.unique_id().data(), 16);
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_plug_detect_capabilities()) {
+            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
+          }
+        }));
+  } else if (device_entry().isComposite()) {
+    composite()->GetProperties(AddCallback(
+        "Composite::GetProperties", [this](fuchsia::hardware::audio::CompositeProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_unique_id()) {
+            properties_->unique_id.emplace(props.unique_id());
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+        }));
+  } else if (device_entry().isDai()) {
+    dai()->GetProperties(
+        AddCallback("Dai::GetProperties", [this](fuchsia::hardware::audio::DaiProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id = props.unique_id();
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product_name()) {  // Note: not 'product'
+            properties_->product = props.product_name();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+        }));
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->GetProperties(AddCallback(
+        "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties props) {
+          properties_ = BaseProperties{};
+          if (props.has_is_input()) {
+            properties_->is_input = props.is_input();
+          }
+          if (props.has_unique_id()) {
+            properties_->unique_id = props.unique_id();
+          }
+          if (props.has_manufacturer()) {
+            properties_->manufacturer = props.manufacturer();
+          }
+          if (props.has_product()) {
+            properties_->product = props.product();
+          }
+          if (props.has_clock_domain()) {
+            properties_->clock_domain = props.clock_domain();
+          }
+          if (props.has_plug_detect_capabilities()) {
+            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
+          }
+          if (props.has_can_mute()) {
+            properties_->can_mute = props.can_mute();
+          }
+          if (props.has_can_agc()) {
+            properties_->can_agc = props.can_agc();
+          }
+          if (props.has_min_gain_db()) {
+            properties_->min_gain_db = props.min_gain_db();
+          }
+          if (props.has_max_gain_db()) {
+            properties_->max_gain_db = props.max_gain_db();
+          }
+          if (props.has_gain_step_db()) {
+            properties_->gain_step_db = props.gain_step_db();
+          }
+        }));
+  } else {
+    FAIL() << "Unknown device type";
+  }
+  ExpectCallbacks();
+  EXPECT_TRUE(properties_.has_value()) << "No GetProperties completion was received";
+}
+
+void TestBase::ValidateProperties() {
+  ASSERT_TRUE(properties().has_value());
+
+  // The following fields are optional, but must be non-empty if they are specified.
+  EXPECT_FALSE(properties()->manufacturer.has_value() && properties()->manufacturer->empty());
+  EXPECT_FALSE(properties()->product.has_value() && properties()->product->empty());
+
+  // Just check that required fields are present
+  if (device_entry().isCodec()) {
+    EXPECT_TRUE(properties()->plug_detect_capabilities.has_value());
+  } else if (device_entry().isComposite()) {
+    EXPECT_TRUE(properties()->clock_domain.has_value());
+  } else if (device_entry().isDai()) {
+    EXPECT_TRUE(properties()->is_input.has_value());
+    EXPECT_TRUE(properties()->clock_domain.has_value());
+  } else if (device_entry().isStreamConfig()) {
+    ASSERT_TRUE(properties()->is_input.has_value());
+    EXPECT_TRUE(properties()->clock_domain.has_value());
+    EXPECT_TRUE(properties()->plug_detect_capabilities.has_value());
+    ASSERT_TRUE(properties()->min_gain_db.has_value());
+    ASSERT_TRUE(properties()->max_gain_db.has_value());
+    ASSERT_TRUE(properties()->gain_step_db.has_value());
+
+    // For StreamConfig, we can do additional data validity/range checks.
+    EXPECT_EQ(*properties()->is_input, driver_type() == DriverType::StreamConfigInput);
+    ASSERT_TRUE(std::isfinite(*properties()->min_gain_db)) << "irregular min_gain_db";
+    ASSERT_TRUE(std::isfinite(*properties()->max_gain_db)) << "irregular max_gain_db";
+    ASSERT_TRUE(std::isfinite(*properties()->gain_step_db)) << "irregular gain_step_db";
+    EXPECT_LE(*properties()->min_gain_db, *properties()->max_gain_db) << "max_gain_db too small";
+    EXPECT_GE(*properties()->gain_step_db, 0.0f) << "gain_step_db too small";
+    EXPECT_LE(*properties()->gain_step_db, *properties()->max_gain_db - *properties()->min_gain_db)
+        << "gain_step_db too large";
+  } else {
+    FAIL() << "Unknown device type";
+  }
 }
 
 // For debugging purposes
@@ -1000,15 +1172,6 @@ void TestBase::RequestElements() {
         status = result.is_err() ? result.err() : ZX_OK;
         if (status == ZX_OK) {
           elements_ = std::move(result.response().processing_elements);
-          for (auto& element : elements_) {
-            if (element.type() ==
-                fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
-              ring_buffer_id_.emplace(element.id());  // Override any previous.
-            } else if (element.type() ==
-                       fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
-              dai_id_.emplace(element.id());  // Override any previous.
-            }
-          }
         } else {
           signalprocessing_is_supported_ = false;
         }
@@ -1022,12 +1185,30 @@ void TestBase::RequestElements() {
     signalprocessing_is_supported_ = false;
     return;
   }
-  signalprocessing_is_supported_ = true;
 
   // If supported, GetElements must return at least one element.
   if (elements_.empty()) {
     signalprocessing_is_supported_ = false;
     FAIL() << "elements list is empty";
+  }
+
+  signalprocessing_is_supported_ = true;
+
+  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> element_ids;
+  for (auto& element : elements_) {
+    // All elements must have an id and type
+    ASSERT_TRUE(element.has_id());
+    ASSERT_TRUE(element.has_type());
+    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
+      ring_buffer_id_.emplace(element.id());  // Override any previous.
+    } else if (element.type() ==
+               fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
+      dai_id_.emplace(element.id());  // Override any previous.
+    }
+
+    // No element id may be a duplicate.
+    ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element id " << element.id();
+    element_ids.insert(element.id());
   }
 }
 
@@ -1061,6 +1242,20 @@ void TestBase::RequestTopologies() {
   if (topologies_.empty()) {
     signalprocessing_is_supported_ = false;
     FAIL() << "topologies list is empty";
+  }
+
+  std::unordered_set<fuchsia::hardware::audio::signalprocessing::TopologyId> topology_ids;
+  for (const auto& topology : topologies_) {
+    // All topologies must have an id and a non-empty list of edges.
+    ASSERT_TRUE(topology.has_id());
+    ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
+    ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
+        << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
+
+    // No topology id may be a duplicate.
+    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology id " << topology.id();
+    topology_ids.insert(topology.id());
   }
 }
 
