@@ -1,17 +1,23 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "network_device_client.h"
 
-#include <lib/async/default.h>
-#include <lib/fidl/cpp/wire/wire_messaging.h>
-#include <lib/fpromise/bridge.h>
-#include <lib/fpromise/promise.h>
-#include <lib/fpromise/result.h>
-#include <lib/syslog/cpp/macros.h>
+// #include <lib/async/default.h>
+// #include <lib/fidl/cpp/wire/wire_messaging.h>
+// #include <lib/fpromise/bridge.h>
+// #include <lib/fpromise/promise.h>
+// #include <lib/fpromise/result.h>
+// #include <lib/syslog/cpp/macros.h>
+
 #include <lib/zx/time.h>
+#include <trace.h>
 #include <zircon/status.h>
+
+#define LOCAL_TRACE 0
+
 namespace network {
 namespace client {
 
@@ -20,96 +26,89 @@ namespace {
 // Set to the maximum number of `uint16`s that a zx FIFO can hold.
 constexpr uint64_t kMaxDepth = ZX_PAGE_SIZE / sizeof(uint16_t);
 
-constexpr zx_signals_t kFifoWaitReads = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
-constexpr zx_signals_t kFifoWaitWrites = ZX_FIFO_WRITABLE;
+// constexpr zx_signals_t kFifoWaitReads = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
+// constexpr zx_signals_t kFifoWaitWrites = ZX_FIFO_WRITABLE;
 }  // namespace
 
-zx::result<DeviceInfo> DeviceInfo::Create(const netdev::wire::DeviceInfo& fidl) {
-  if (!(fidl.has_min_descriptor_length() && fidl.has_descriptor_version() &&
-        fidl.has_base_info())) {
+zx::result<DeviceInfo> DeviceInfo::Create(const device_info_t& fidl) {
+  if (!(fidl.min_descriptor_length > 0 && fidl.descriptor_version > 0)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  const netdev::wire::DeviceBaseInfo& base_info = fidl.base_info();
+  const device_base_info_t& base_info = fidl.base_info;
 
-  if (!(base_info.has_rx_depth() && base_info.has_tx_depth() && base_info.has_buffer_alignment() &&
-        base_info.has_min_rx_buffer_length() && base_info.has_min_tx_buffer_length() &&
-        base_info.has_min_tx_buffer_head() && base_info.has_min_tx_buffer_tail() &&
-        base_info.has_max_buffer_parts())) {
+  if (!(base_info.rx_depth > 0 && base_info.tx_depth > 0 && base_info.buffer_alignment > 0 &&
+        base_info.min_rx_buffer_length > 0 && base_info.min_tx_buffer_length > 0 &&
+        base_info.min_tx_buffer_head > 0 && base_info.min_tx_buffer_tail > 0 &&
+        base_info.max_buffer_parts > 0)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   uint32_t max_buffer_length = std::numeric_limits<uint32_t>::max();
-  if (base_info.has_max_buffer_length()) {
-    max_buffer_length = base_info.max_buffer_length();
+  if (base_info.max_buffer_length > 0) {
+    max_buffer_length = base_info.max_buffer_length;
     if (max_buffer_length == 0) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
 
   DeviceInfo info = {
-      .min_descriptor_length = fidl.min_descriptor_length(),
-      .descriptor_version = fidl.descriptor_version(),
-      .rx_depth = base_info.rx_depth(),
-      .tx_depth = base_info.tx_depth(),
-      .buffer_alignment = base_info.buffer_alignment(),
+      .min_descriptor_length = fidl.min_descriptor_length,
+      .descriptor_version = fidl.descriptor_version,
+      .rx_depth = base_info.rx_depth,
+      .tx_depth = base_info.tx_depth,
+      .buffer_alignment = base_info.buffer_alignment,
       .max_buffer_length = max_buffer_length,
-      .min_rx_buffer_length = base_info.min_rx_buffer_length(),
-      .min_tx_buffer_length = base_info.min_tx_buffer_length(),
-      .min_tx_buffer_head = base_info.min_tx_buffer_head(),
-      .min_tx_buffer_tail = base_info.min_tx_buffer_tail(),
-      .max_buffer_parts = base_info.max_buffer_parts(),
+      .min_rx_buffer_length = base_info.min_rx_buffer_length,
+      .min_tx_buffer_length = base_info.min_tx_buffer_length,
+      .min_tx_buffer_head = base_info.min_tx_buffer_head,
+      .min_tx_buffer_tail = base_info.min_tx_buffer_tail,
+      .max_buffer_parts = base_info.max_buffer_parts,
   };
 
-  if (base_info.has_rx_accel()) {
-    auto& rx_accel = base_info.rx_accel();
+  /*if (base_info.rx_accel.size > 0) {
+    auto& rx_accel = base_info.rx_accel;
     std::copy(rx_accel.begin(), rx_accel.end(), std::back_inserter(info.rx_accel));
   }
-  if (base_info.has_tx_accel()) {
-    auto& tx_accel = base_info.tx_accel();
+  if (base_info.tx_accel.size > 0) {
+    auto& tx_accel = base_info.tx_accel;
     std::copy(tx_accel.begin(), tx_accel.end(), std::back_inserter(info.tx_accel));
-  }
+  }*/
 
   return zx::ok(std::move(info));
 }
 
+#if 0
 zx::result<PortInfoAndMac> PortInfoAndMac::Create(
-    const netdev::wire::PortInfo& fidl,
-    const std::optional<fuchsia_net::wire::MacAddress>& unicast_address) {
-  if (!(fidl.has_id() && fidl.has_base_info() && fidl.base_info().has_port_class())) {
+    const port_info_t& fidl, const std::optional<fuchsia_net::wire::MacAddress>& unicast_address) {
+  if (!(fidl.id > 0 && fidl.base_info.port_class > 0)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  const netdev::wire::PortBaseInfo& fidl_base_info = fidl.base_info();
+  const port_base_info_t& fidl_base_info = fidl.base_info;
   PortInfoAndMac info = {
-      .id = fidl.id(),
-      .port_class = fidl_base_info.port_class(),
+      .id = fidl.id,
+      .port_class = fidl_base_info.port_class,
       .unicast_address = unicast_address,
   };
 
-  if (fidl_base_info.has_rx_types()) {
-    auto& rx_types = fidl_base_info.rx_types();
+  if (fidl_base_info.rx_types.size > 0) {
+    auto& rx_types = fidl_base_info.rx_types;
     std::copy(rx_types.begin(), rx_types.end(), std::back_inserter(info.rx_types));
   }
-  if (fidl_base_info.has_tx_types()) {
-    auto& tx_types = fidl_base_info.tx_types();
+  if (fidl_base_info.tx_types.size > 0) {
+    auto& tx_types = fidl_base_info.tx_types;
     std::copy(tx_types.begin(), tx_types.end(), std::back_inserter(info.tx_types));
   }
 
   return zx::ok(std::move(info));
 }
+#endif
+NetworkDeviceClient::NetworkDeviceClient(
+    std::unique_ptr<network::internal::DeviceInterface> device_interface)
+    : device_(ktl::move(device_interface)) {}
 
-NetworkDeviceClient::NetworkDeviceClient(fidl::ClientEnd<netdev::Device> handle,
-                                         async_dispatcher_t* dispatcher)
-    : dispatcher_([dispatcher]() {
-        if (dispatcher != nullptr) {
-          return dispatcher;
-        }
-        return async_get_default_dispatcher();
-      }()),
-      device_(std::move(handle), dispatcher_, this),
-      executor_(std::make_unique<async::Executor>(dispatcher_)) {}
-
+#if 0
 void NetworkDeviceClient::OnDeviceError(fidl::UnbindInfo info) {
   if (info.status() == ZX_ERR_PEER_CLOSED) {
     FX_LOGS(WARNING) << "device detached";
@@ -131,7 +130,7 @@ void NetworkDeviceClient::OnSessionError(fidl::UnbindInfo info) {
   }
   ErrorTeardown(info.status());
 }
-
+#endif
 NetworkDeviceClient::~NetworkDeviceClient() = default;
 
 SessionConfig NetworkDeviceClient::DefaultSessionConfig(const DeviceInfo& dev_info) {
@@ -149,7 +148,7 @@ SessionConfig NetworkDeviceClient::DefaultSessionConfig(const DeviceInfo& dev_in
       .tx_tail_length = dev_info.min_tx_buffer_tail,
       .rx_descriptor_count = dev_info.rx_depth,
       .tx_descriptor_count = dev_info.tx_depth,
-      .options = netdev::wire::SessionFlags::kPrimary,
+      //.options = netdev::wire::SessionFlags::kPrimary,
   };
 }
 
@@ -161,6 +160,41 @@ void NetworkDeviceClient::OpenSession(const std::string& name,
     return;
   }
   session_running_ = true;
+
+  zx::result<DeviceInfo> device_info = DeviceInfo::Create(device_->GetInfo());
+  if (device_info.is_error()) {
+    callback(device_info.error_value());
+    return;
+  }
+
+  session_config_ = config_factory(device_info.value());
+  device_info_ = std::move(device_info.value());
+  zx_status_t status;
+  if ((status = PrepareSession()) != ZX_OK) {
+    callback(status);
+    return;
+  }
+
+  zx::result session_info = MakeSessionInfo();
+  if (session_info.is_error()) {
+    callback(session_info.error_value());
+    return;
+  }
+
+  zx::result open_result = device_->OpenSession(name, session_info.value());
+  if (open_result.is_error()) {
+    callback(open_result.error_value());
+    return;
+  }
+
+  if ((status = PrepareDescriptors()) != ZX_OK) {
+    callback(status);
+    return;
+  }
+
+  callback(ZX_OK);
+
+#if 0
   fpromise::bridge<DeviceInfo, zx_status_t> bridge;
   device_->GetInfo().ThenExactlyOnce(
       [res = std::move(bridge.completer)](
@@ -238,13 +272,13 @@ void NetworkDeviceClient::OpenSession(const std::string& name,
                   .and_then(std::move(prepare_descriptors))
                   .then(std::move(fire_callback));
   fpromise::schedule_for_consumer(executor_.get(), std::move(prom));
+#endif
 }
 
 zx_status_t SessionConfig::Validate() {
   if (buffer_length <= tx_header_length + tx_tail_length) {
-    FX_LOGS(ERROR) << "Invalid buffer length (" << buffer_length
-                   << "), too small for requested Tx tail: (" << tx_tail_length << ") + head: ("
-                   << tx_header_length << ")";
+    LTRACEF("Invalid buffer length (%u), too small for requested Tx tail: (%u) + head: (%u)\n",
+            buffer_length, tx_tail_length, tx_header_length);
     return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;
@@ -253,27 +287,26 @@ zx_status_t SessionConfig::Validate() {
 zx_status_t NetworkDeviceClient::PrepareSession() {
   if (session_config_.descriptor_length < sizeof(buffer_descriptor_t) ||
       (session_config_.descriptor_length % sizeof(uint64_t)) != 0) {
-    FX_LOGS(ERROR) << "Invalid descriptor length " << session_config_.descriptor_length;
+    LTRACEF("Invalid descriptor length %lu\n", session_config_.descriptor_length);
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (session_config_.rx_descriptor_count > kMaxDepth ||
       session_config_.tx_descriptor_count > kMaxDepth) {
-    FX_LOGS(ERROR) << "Invalid descriptor count  " << session_config_.rx_descriptor_count << "/"
-                   << session_config_.tx_descriptor_count
-                   << ", this client supports a maximum depth of " << kMaxDepth << " descriptors";
+    LTRACEF(
+        "Invalid descriptor count %u/%u, this client supports a maximum depth of %lu descriptors\n",
+        session_config_.rx_descriptor_count, session_config_.tx_descriptor_count, kMaxDepth);
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (session_config_.buffer_stride < session_config_.buffer_length) {
-    FX_LOGS(ERROR) << "Stride in VMO can't be smaller than buffer length";
+    LTRACEF("Stride in VMO can't be smaller than buffer length\n");
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (session_config_.buffer_stride % device_info_.buffer_alignment != 0) {
-    FX_LOGS(ERROR) << "Buffer stride " << session_config_.buffer_stride
-                   << "does not meet buffer alignment requirement: "
-                   << device_info_.buffer_alignment;
+    LTRACEF("Buffer stride %lu does not meet buffer alignment requirement: %u\n",
+            session_config_.buffer_stride, device_info_.buffer_alignment);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -281,7 +314,7 @@ zx_status_t NetworkDeviceClient::PrepareSession() {
   // Check if sum of descriptor count overflows.
   if (descriptor_count_ < session_config_.rx_descriptor_count ||
       descriptor_count_ < session_config_.tx_descriptor_count) {
-    FX_LOGS(ERROR) << "Invalid descriptor count, maximum total descriptors must be less than 2^16";
+    LTRACEF("Invalid descriptor count, maximum total descriptors must be less than 2^16\n");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -289,25 +322,30 @@ zx_status_t NetworkDeviceClient::PrepareSession() {
     return status;
   }
 
+  KernelHandle<VmObjectDispatcher> data_vmo;
   uint64_t data_vmo_size = descriptor_count_ * session_config_.buffer_stride;
-  if (zx_status_t status = data_.CreateAndMap(data_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
-                                              nullptr, &data_vmo_);
+  if (zx_status_t status =
+          data_.CreateAndMap(data_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &data_vmo);
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create data VMO: " << zx_status_get_string(status);
+    LTRACEF("Failed to create data VMO: %s\n", zx_status_get_string(status));
     return status;
   }
+  data_vmo_ = data_vmo.release();
 
+  KernelHandle<VmObjectDispatcher> descriptors_vmo;
   uint64_t descriptors_vmo_size = descriptor_count_ * session_config_.descriptor_length;
   if (zx_status_t status = descriptors_.CreateAndMap(
-          descriptors_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &descriptors_vmo_);
+          descriptors_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &descriptors_vmo);
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create descriptors VMO: " << zx_status_get_string(status);
+    LTRACEF("Failed to create descriptors VMO: %s\n", zx_status_get_string(status));
     return status;
   }
+  descriptors_vmo_ = descriptors_vmo.release();
 
   return ZX_OK;
 }
 
+#if 0
 void NetworkDeviceClient::AttachPort(netdev::wire::PortId port_id,
                                      std::vector<netdev::wire::FrameType> rx_frame_types,
                                      ErrorCallback callback) {
@@ -539,24 +577,27 @@ void NetworkDeviceClient::ScheduleCallbackPromise(fpromise::promise<void, zx_sta
         }
       }));
 }
+#endif
 
 zx_status_t NetworkDeviceClient::KillSession() {
-  if (!session_.is_valid()) {
+  if (!session_) {
     return ZX_ERR_BAD_STATE;
   }
   // Cancel all the waits so we stop fetching frames.
-  rx_wait_.Cancel();
-  rx_writable_wait_.Cancel();
-  tx_wait_.Cancel();
-  tx_writable_wait_.Cancel();
+  // rx_wait_.Cancel();
+  // rx_writable_wait_.Cancel();
+  // tx_wait_.Cancel();
+  // tx_writable_wait_.Cancel();
 
-  const fidl::Status result = session_->Close();
-  if (result.is_peer_closed()) {
-    return ZX_OK;
-  }
-  return result.status();
+  // const fidl::Status result = session_->Close();
+  // if (result.is_peer_closed()) {
+  //   return ZX_OK;
+  // }
+  // return result.status();
+  return ZX_OK;
 }
 
+#if 0
 zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>>
 NetworkDeviceClient::WatchStatus(netdev::wire::PortId port_id, StatusCallback callback,
                                  uint32_t buffer) {
@@ -583,36 +624,24 @@ NetworkDeviceClient::WatchStatus(netdev::wire::PortId port_id, StatusCallback ca
   return zx::ok(std::unique_ptr<StatusWatchHandle>(new StatusWatchHandle(
       std::move(watcher_endpoints->client), dispatcher_, std::move(callback))));
 }
+#endif
 
-zx::result<netdev::wire::SessionInfo> NetworkDeviceClient::MakeSessionInfo(fidl::AnyArena& alloc) {
+zx::result<session_info> NetworkDeviceClient::MakeSessionInfo() {
   uint64_t descriptor_length_words = session_config_.descriptor_length / sizeof(uint64_t);
   ZX_DEBUG_ASSERT_MSG(descriptor_length_words <= std::numeric_limits<uint8_t>::max(),
                       "session descriptor length %ld (%ld words) overflows uint8_t",
                       session_config_.descriptor_length, descriptor_length_words);
 
-
-  zx::vmo data_vmo;
-  zx_status_t status;
-  if ((status = data_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &data_vmo)) != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to duplicate data VMO: " << zx_status_get_string(status);
-    return zx::error(status);
-  }
-
-  zx::vmo descriptors_vmo;
-  if ((status = descriptors_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &descriptors_vmo)) != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to duplicate descriptors VMO: " << zx_status_get_string(status);
-    return zx::error(status);
-  }
-
-  netdev::wire::SessionInfo session_info =
-      netdev::wire::SessionInfo::Builder(alloc)
-          .descriptor_version(NETWORK_DEVICE_DESCRIPTOR_VERSION)
-          .descriptor_length(static_cast<uint8_t>(descriptor_length_words))
-          .descriptor_count(descriptor_count_)
-          .options(session_config_.options)
-          .data(std::move(data_vmo))
-          .descriptors(std::move(descriptors_vmo))
-          .Build();
+  session_info session_info = {
+      .descriptors_list = (uint8_t*)fbl::ExportToRawPtr<VmObjectDispatcher>(&descriptors_vmo_),
+      .descriptors_count = 1,
+      .data_list = (uint8_t*)fbl::ExportToRawPtr<VmObjectDispatcher>(&data_vmo_),
+      .data_count = 1,
+      .descriptor_version = NETWORK_DEVICE_DESCRIPTOR_VERSION,
+      .descriptor_length = static_cast<uint8_t>(descriptor_length_words),
+      .descriptor_count = descriptor_count_,
+      .options = session_config_.options,
+  };
   return zx::ok(session_info);
 }
 
@@ -631,7 +660,7 @@ void* NetworkDeviceClient::data(uint64_t offset) {
 void NetworkDeviceClient::ResetRxDescriptor(buffer_descriptor_t* descriptor) {
   *descriptor = {
       .nxt = 0xFFFF,
-      .info_type = static_cast<uint32_t>(netdev::wire::InfoType::kNoInfo),
+      .info_type = static_cast<uint32_t>(INFO_TYPE_NO_INFO),
       .offset = descriptor->offset,
       .data_length = session_config_.buffer_length,
   };
@@ -640,7 +669,7 @@ void NetworkDeviceClient::ResetRxDescriptor(buffer_descriptor_t* descriptor) {
 void NetworkDeviceClient::ResetTxDescriptor(buffer_descriptor_t* descriptor) {
   *descriptor = {
       .nxt = 0xFFFF,
-      .info_type = static_cast<uint32_t>(netdev::wire::InfoType::kNoInfo),
+      .info_type = static_cast<uint32_t>(INFO_TYPE_NO_INFO),
       .offset = descriptor->offset,
       .head_length = session_config_.tx_header_length,
       .tail_length = session_config_.tx_tail_length,
@@ -653,8 +682,15 @@ zx_status_t NetworkDeviceClient::PrepareDescriptors() {
   uint16_t desc = 0;
   uint64_t buff_off = 0;
   auto* pDesc = static_cast<uint8_t*>(descriptors_.start());
-  rx_out_queue_.reserve(session_config_.rx_descriptor_count);
-  tx_out_queue_.reserve(session_config_.tx_descriptor_count);
+  fbl::AllocChecker ac;
+  rx_out_queue_.reserve(session_config_.rx_descriptor_count, &ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  tx_out_queue_.reserve(session_config_.tx_descriptor_count, &ac);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
 
   for (; desc < session_config_.rx_descriptor_count; desc++) {
     auto* descriptor = reinterpret_cast<buffer_descriptor_t*>(pDesc);
@@ -663,7 +699,10 @@ zx_status_t NetworkDeviceClient::PrepareDescriptors() {
 
     buff_off += session_config_.buffer_stride;
     pDesc += session_config_.descriptor_length;
-    rx_out_queue_.push_back(desc);
+    rx_out_queue_.push_back(desc, &ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
   for (; desc < descriptor_count_; desc++) {
     auto* descriptor = reinterpret_cast<buffer_descriptor_t*>(pDesc);
@@ -672,18 +711,21 @@ zx_status_t NetworkDeviceClient::PrepareDescriptors() {
 
     buff_off += session_config_.buffer_stride;
     pDesc += session_config_.descriptor_length;
-    tx_avail_.push(desc);
+    tx_avail_.push_back(desc, &ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
-  rx_wait_.set_object(rx_fifo_.get());
-  rx_wait_.set_trigger(kFifoWaitReads);
-  ZX_ASSERT(rx_wait_.Begin(dispatcher_) == ZX_OK);
-  tx_wait_.set_object(tx_fifo_.get());
-  tx_wait_.set_trigger(kFifoWaitReads);
-  ZX_ASSERT(tx_wait_.Begin(dispatcher_) == ZX_OK);
-  rx_writable_wait_.set_object(rx_fifo_.get());
-  rx_writable_wait_.set_trigger(kFifoWaitWrites);
-  tx_writable_wait_.set_object(tx_fifo_.get());
-  tx_writable_wait_.set_trigger(kFifoWaitWrites);
+  // rx_wait_.set_object(rx_fifo_.get());
+  // rx_wait_.set_trigger(kFifoWaitReads);
+  // ZX_ASSERT(rx_wait_.Begin(dispatcher_) == ZX_OK);
+  // tx_wait_.set_object(tx_fifo_.get());
+  // tx_wait_.set_trigger(kFifoWaitReads);
+  // ZX_ASSERT(tx_wait_.Begin(dispatcher_) == ZX_OK);
+  // rx_writable_wait_.set_object(rx_fifo_.get());
+  // rx_writable_wait_.set_trigger(kFifoWaitWrites);
+  // tx_writable_wait_.set_object(tx_fifo_.get());
+  // tx_writable_wait_.set_trigger(kFifoWaitWrites);
 
   FlushRx();
 
@@ -697,18 +739,20 @@ void NetworkDeviceClient::FlushRx() {
   // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
-  zx_status_t status = rx_fifo_.write(sizeof(uint16_t), rx_out_queue_.data(), flush, &flush);
-  bool sched_more;
+  size_t actual;
+  zx_status_t status = rx_fifo_.dispatcher()->Write(sizeof(uint16_t),
+                                                    (uint8_t*)rx_out_queue_.data(), flush, &actual);
+  // bool sched_more;
   if (status == ZX_OK) {
-    rx_out_queue_.erase(rx_out_queue_.begin(), rx_out_queue_.begin() + flush);
-    sched_more = !rx_out_queue_.empty();
+    // rx_out_queue_.erase(rx_out_queue_.begin(), rx_out_queue_.begin() + flush);
+    // sched_more = !rx_out_queue_.is_empty();
   } else {
-    sched_more = status == ZX_ERR_SHOULD_WAIT;
+    // sched_more = status == ZX_ERR_SHOULD_WAIT;
   }
 
-  if (sched_more && !rx_writable_wait_.is_pending()) {
-    ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  }
+  // if (sched_more && !rx_writable_wait_.is_pending()) {
+  //   ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
+  // }
 }
 
 void NetworkDeviceClient::FlushTx() {
@@ -718,20 +762,23 @@ void NetworkDeviceClient::FlushTx() {
   // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
-  zx_status_t status = tx_fifo_.write(sizeof(uint16_t), tx_out_queue_.data(), flush, &flush);
-  bool sched_more;
+  size_t actual;
+  zx_status_t status = tx_fifo_.dispatcher()->Write(sizeof(uint16_t),
+                                                    (uint8_t*)tx_out_queue_.data(), flush, &actual);
+  // bool sched_more;
   if (status == ZX_OK) {
-    tx_out_queue_.erase(tx_out_queue_.begin(), tx_out_queue_.begin() + flush);
-    sched_more = !tx_out_queue_.empty();
+    // tx_out_queue_.erase(tx_out_queue_.begin(), tx_out_queue_.begin() + flush);
+    // sched_more = !tx_out_queue_.is_empty();
   } else {
-    sched_more = status == ZX_ERR_SHOULD_WAIT;
+    // sched_more = status == ZX_ERR_SHOULD_WAIT;
   }
 
-  if (sched_more && !tx_writable_wait_.is_pending()) {
-    ZX_ASSERT(tx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  }
+  // if (sched_more && !tx_writable_wait_.is_pending()) {
+  //   ZX_ASSERT(tx_writable_wait_.Begin(dispatcher_) == ZX_OK);
+  // }
 }
 
+#if 0
 void NetworkDeviceClient::ErrorTeardown(zx_status_t err) {
   session_running_ = false;
   data_.Unmap();
@@ -807,13 +854,15 @@ void NetworkDeviceClient::RxSignal(async_dispatcher_t* dispatcher, async::WaitBa
     ZX_ASSERT(wait->Begin(dispatcher_) == ZX_OK);
   }
 }
+#endif
 
 void NetworkDeviceClient::FetchRx() {
   uint16_t buff[kMaxDepth];
   size_t read;
   zx_status_t status;
-  if ((status = rx_fifo_.read(sizeof(uint16_t), buff, kMaxDepth, &read)) != ZX_OK) {
-    FX_LOGS(ERROR) << "Error reading from rx queue: " << zx_status_get_string(status);
+  if ((status = rx_fifo_.dispatcher()->Read(sizeof(uint16_t), (uint8_t*)buff, kMaxDepth, &read)) !=
+      ZX_OK) {
+    TRACEF("Error reading from rx queue: %s\n", zx_status_get_string(status));
     return;
   }
   uint16_t* desc_idx = buff;
@@ -844,13 +893,15 @@ zx_status_t NetworkDeviceClient::Send(NetworkDeviceClient::Buffer* buffer) {
     tx_buffer.rx_ = true;
     buffer->rx_ = false;
   }
-  if (!tx_writable_wait_.is_pending()) {
-    zx_status_t status = tx_writable_wait_.Begin(dispatcher_);
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  tx_out_queue_.push_back(buffer->descriptor_);
+  // if (!tx_writable_wait_.is_pending()) {
+  //   zx_status_t status = tx_writable_wait_.Begin(dispatcher_);
+  //   if (status != ZX_OK) {
+  //     return status;
+  //   }
+  // }
+  fbl::AllocChecker ac;
+  tx_out_queue_.push_back(buffer->descriptor_, &ac);
+  ZX_ASSERT(ac.check());
 
   // Don't return this buffer on destruction.
   // Also invalidate it.
@@ -864,7 +915,9 @@ void NetworkDeviceClient::ReturnTxDescriptor(uint16_t idx) {
     ReturnTxDescriptor(desc->nxt);
   }
   ResetTxDescriptor(desc);
-  tx_avail_.push(idx);
+  fbl::AllocChecker ac;
+  tx_avail_.push_back(idx, &ac);
+  ZX_ASSERT(ac.check());
 }
 
 void NetworkDeviceClient::ReturnRxDescriptor(uint16_t idx) {
@@ -873,18 +926,21 @@ void NetworkDeviceClient::ReturnRxDescriptor(uint16_t idx) {
     ReturnRxDescriptor(desc->nxt);
   }
   ResetRxDescriptor(desc);
-  rx_out_queue_.push_back(idx);
-  if (!rx_writable_wait_.is_pending()) {
-    ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  }
+  fbl::AllocChecker ac;
+  rx_out_queue_.push_back(idx, &ac);
+  ZX_ASSERT(ac.check());
+  // if (!rx_writable_wait_.is_pending()) {
+  //   ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
+  // }
 }
 
 void NetworkDeviceClient::FetchTx() {
   uint16_t buff[kMaxDepth];
   size_t read;
   zx_status_t status;
-  if ((status = tx_fifo_.read(sizeof(uint16_t), buff, kMaxDepth, &read)) != ZX_OK) {
-    FX_LOGS(ERROR) << "Error reading from tx queue: " << zx_status_get_string(status);
+  if ((status = tx_fifo_.dispatcher()->Read(sizeof(uint16_t), (uint8_t*)buff, kMaxDepth, &read)) !=
+      ZX_OK) {
+    TRACEF("Error reading from tx queue: %s\n", zx_status_get_string(status));
     return;
   }
   uint16_t* desc_idx = buff;
@@ -897,11 +953,10 @@ void NetworkDeviceClient::FetchTx() {
 }
 
 NetworkDeviceClient::Buffer NetworkDeviceClient::AllocTx() {
-  if (tx_avail_.empty()) {
+  if (tx_avail_.is_empty()) {
     return Buffer();
   } else {
-    auto idx = tx_avail_.front();
-    tx_avail_.pop();
+    auto idx = tx_avail_.erase(0);
     return Buffer(this, idx, false);
   }
 }
@@ -989,15 +1044,15 @@ uint32_t NetworkDeviceClient::BufferData::len() const {
   return c;
 }
 
-netdev::wire::FrameType NetworkDeviceClient::BufferData::frame_type() const {
-  return static_cast<netdev::wire::FrameType>(part(0).desc_->frame_type);
+frame_type_t NetworkDeviceClient::BufferData::frame_type() const {
+  return static_cast<frame_type_t>(part(0).desc_->frame_type);
 }
 
-void NetworkDeviceClient::BufferData::SetFrameType(netdev::wire::FrameType type) {
+void NetworkDeviceClient::BufferData::SetFrameType(frame_type_t type) {
   part(0).desc_->frame_type = static_cast<uint8_t>(type);
 }
 
-netdev::wire::PortId NetworkDeviceClient::BufferData::port_id() const {
+port_id_t NetworkDeviceClient::BufferData::port_id() const {
   const buffer_descriptor_t& desc = *part(0).desc_;
   return {
       .base = desc.port_id.base,
@@ -1005,7 +1060,7 @@ netdev::wire::PortId NetworkDeviceClient::BufferData::port_id() const {
   };
 }
 
-void NetworkDeviceClient::BufferData::SetPortId(netdev::wire::PortId port_id) {
+void NetworkDeviceClient::BufferData::SetPortId(port_id_t port_id) {
   buffer_descriptor_t& desc = *part(0).desc_;
   desc.port_id = {
       .base = port_id.base,
@@ -1013,8 +1068,8 @@ void NetworkDeviceClient::BufferData::SetPortId(netdev::wire::PortId port_id) {
   };
 }
 
-netdev::wire::InfoType NetworkDeviceClient::BufferData::info_type() const {
-  return static_cast<netdev::wire::InfoType>(part(0).desc_->frame_type);
+info_type_t NetworkDeviceClient::BufferData::info_type() const {
+  return static_cast<info_type_t>(part(0).desc_->frame_type);
 }
 
 uint32_t NetworkDeviceClient::BufferData::inbound_flags() const {
@@ -1025,7 +1080,7 @@ uint32_t NetworkDeviceClient::BufferData::return_flags() const {
   return part(0).desc_->return_flags;
 }
 
-void NetworkDeviceClient::BufferData::SetTxRequest(netdev::wire::TxFlags tx_flags) {
+void NetworkDeviceClient::BufferData::SetTxRequest(tx_flags_t tx_flags) {
   part(0).desc_->inbound_flags = static_cast<uint32_t>(tx_flags);
 }
 
@@ -1150,6 +1205,7 @@ size_t NetworkDeviceClient::BufferRegion::PadTo(size_t size) {
   return desc_->data_length;
 }
 
+#if 0
 void NetworkDeviceClient::StatusWatchHandle::Watch() {
   watcher_->WatchStatus().Then(
       [this](fidl::WireUnownedResult<netdev::StatusWatcher::WatchStatus>& result) {
@@ -1161,6 +1217,6 @@ void NetworkDeviceClient::StatusWatchHandle::Watch() {
         Watch();
       });
 }
-
+#endif
 }  // namespace client
 }  // namespace network

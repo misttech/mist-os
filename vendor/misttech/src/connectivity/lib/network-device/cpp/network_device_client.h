@@ -1,26 +1,31 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
-#define SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
+#ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
+#define VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
 
-#include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <lib/async/cpp/executor.h>
-#include <lib/async/cpp/wait.h>
+// #include <fidl/fuchsia.hardware.network/cpp/wire.h>
+#include <fuchsia/hardware/network/c/banjo.h>
+// #include <lib/async/cpp/executor.h>
+// #include <lib/async/cpp/wait.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 
-#include <queue>
+// #include <queue>
 
-#include <src/lib/fxl/macros.h>
+// #include <src/lib/fxl/macros.h>
+#include <fbl/macros.h>
 
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
+#include "vendor/misttech/src/connectivity/network/drivers/network-device/device/device_interface.h"
+#include "vendor/misttech/src/connectivity/network/drivers/network-device/device/session.h"
 
 namespace network {
 namespace client {
 
-namespace netdev = fuchsia_hardware_network;
+// namespace netdev = fuchsia_hardware_network;
 
 // Configuration for sessions opened by a `NetworkDeviceClient`.
 struct SessionConfig {
@@ -39,7 +44,7 @@ struct SessionConfig {
   // Number of tx descriptors to allocate.
   uint16_t tx_descriptor_count;
   // Session flags.
-  netdev::wire::SessionFlags options;
+  session_flags_t options;
 
   // Verifies the session's configured parameters are appropriate for the constraints.
   zx_status_t Validate();
@@ -49,7 +54,7 @@ struct SessionConfig {
 //
 // A newtype for fuchsia.hardware.network/DeviceInfo with owned values.
 struct DeviceInfo {
-  static zx::result<DeviceInfo> Create(const netdev::wire::DeviceInfo& fidl);
+  static zx::result<DeviceInfo> Create(const device_info_t& fidl);
 
   uint8_t min_descriptor_length;
   uint8_t descriptor_version;
@@ -62,10 +67,11 @@ struct DeviceInfo {
   uint16_t min_tx_buffer_head;
   uint16_t min_tx_buffer_tail;
   uint8_t max_buffer_parts;
-  std::vector<fuchsia_hardware_network::wire::RxAcceleration> rx_accel;
-  std::vector<fuchsia_hardware_network::wire::TxAcceleration> tx_accel;
+  fbl::Vector<rx_acceleration_t> rx_accel;
+  fbl::Vector<tx_acceleration_t> tx_accel;
 };
 
+#if 0
 // Port and Mac address information.
 //
 // Contains details about a single port derived from fuchsia.hardware.network/PortInfo
@@ -81,9 +87,11 @@ struct PortInfoAndMac {
   std::vector<fuchsia_hardware_network::wire::FrameTypeSupport> tx_types;
   std::optional<fuchsia_net::wire::MacAddress> unicast_address;
 };
+#endif
 
 namespace internal {
 
+#if 0
 // Forwards FIDL errors in the |netdev::Device| client to |NetworkDeviceClient|,
 // which handles FIDL errors for both |Device| and |Session|.
 template <typename Derived>
@@ -101,12 +109,14 @@ class SessionEventHandlerProxy : public fidl::WireAsyncEventHandler<netdev::Sess
     static_cast<Derived*>(this)->OnSessionError(info);
   }
 };
+#endif
 
 }  // namespace internal
 
 // A client for `fuchsia.hardware.network/Device`.
-class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDeviceClient>,
-                            public internal::SessionEventHandlerProxy<NetworkDeviceClient> {
+class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDeviceClient>,
+                            public internal::SessionEventHandlerProxy<NetworkDeviceClient> */
+{
  public:
   class Buffer;
   class BufferData;
@@ -120,17 +130,17 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
   //
   // If `dispatcher` is `nullptr`, the default dispatcher for the current thread will be used.
   // All the `NetworkDeviceClient` callbacks are called on the dispatcher.
-  explicit NetworkDeviceClient(fidl::ClientEnd<netdev::Device> handle,
-                               async_dispatcher_t* dispatcher = nullptr);
+  explicit NetworkDeviceClient(
+      std::unique_ptr<network::internal::DeviceInterface> device_interface);
   ~NetworkDeviceClient();
 
   using OpenSessionCallback = fit::function<void(zx_status_t)>;
   using SessionConfigFactory = fit::function<SessionConfig(const DeviceInfo&)>;
   using RxCallback = fit::function<void(Buffer buffer)>;
   using ErrorCallback = fit::function<void(zx_status_t)>;
-  using StatusCallback = fit::function<void(netdev::wire::PortStatus)>;
-  using PortInfoWithMacCallback = fit::function<void(zx::result<PortInfoAndMac>)>;
-  using PortsCallback = fit::function<void(zx::result<std::vector<netdev::wire::PortId>>)>;
+  // using StatusCallback = fit::function<void(netdev::wire::PortStatus)>;
+  // using PortInfoWithMacCallback = fit::function<void(zx::result<PortInfoAndMac>)>;
+  // using PortsCallback = fit::function<void(zx::result<std::vector<netdev::wire::PortId>>)>;
 
   // Opens a new session with `name` and invokes `callback` when done.
   //
@@ -150,21 +160,22 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
   // Attaches a port to the current session.
   //
   // Calls callback with the operation's result.
-  void AttachPort(netdev::wire::PortId port_id, std::vector<netdev::wire::FrameType> rx_frame_types,
-                  ErrorCallback callback);
+  // void AttachPort(netdev::wire::PortId port_id, std::vector<netdev::wire::FrameType>
+  // rx_frame_types,
+  //                ErrorCallback callback);
 
   // Detaches a port from the current session.
   //
   // Calls callback with the operation's result.
-  void DetachPort(netdev::wire::PortId port_id, ErrorCallback callback);
+  // void DetachPort(netdev::wire::PortId port_id, ErrorCallback callback);
 
   // Gets information about the given port.
   //
   // Ports may be freely queried without being attached.
-  void GetPortInfoWithMac(netdev::wire::PortId port_id, PortInfoWithMacCallback callback);
+  // void GetPortInfoWithMac(netdev::wire::PortId port_id, PortInfoWithMacCallback callback);
 
   // Gets all ports currently attached to the device.
-  void GetPorts(PortsCallback callback);
+  // void GetPorts(PortsCallback callback);
 
   // Kills the current session.
   //
@@ -179,7 +190,7 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
   // `buffer` is transitioned to an invalid state on success.
   [[nodiscard]] zx_status_t Send(Buffer* buffer);
 
-  bool HasSession() { return session_.is_valid(); }
+  bool HasSession() { return session_ != nullptr; }
 
   // Creates an asynchronous handler for status changes.
   //
@@ -187,8 +198,8 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
   // `StatusWatchHandle` is in scope.
   // `buffer` is the number of changes buffered by the network device, according to the
   // `fuchsia.hardware.network.Device` protocol.
-  zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>> WatchStatus(
-      netdev::wire::PortId port_id, StatusCallback callback, uint32_t buffer = 1);
+  // zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>> WatchStatus(
+  //      netdev::wire::PortId port_id, StatusCallback callback, uint32_t buffer = 1);
 
   const DeviceInfo& device_info() const { return device_info_; }
 
@@ -241,7 +252,7 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
     void* base_;
     buffer_descriptor_t* desc_;
 
-    FXL_DISALLOW_COPY_AND_ASSIGN(BufferRegion);
+    DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(BufferRegion);
   };
 
   // A collection of `BufferRegion`s and metadata associated with a `Buffer`.
@@ -260,15 +271,15 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
     // The total length, in bytes, of the buffer.
     uint32_t len() const;
 
-    netdev::wire::PortId port_id() const;
-    netdev::wire::FrameType frame_type() const;
-    netdev::wire::InfoType info_type() const;
+    port_id_t port_id() const;
+    frame_type_t frame_type() const;
+    info_type_t info_type() const;
     uint32_t inbound_flags() const;
     uint32_t return_flags() const;
 
-    void SetPortId(netdev::wire::PortId port_id);
-    void SetFrameType(netdev::wire::FrameType type);
-    void SetTxRequest(netdev::wire::TxFlags tx_flags);
+    void SetPortId(port_id_t port_id);
+    void SetFrameType(frame_type_t type);
+    void SetTxRequest(tx_flags_t tx_flags);
 
     // Writes up to `len` bytes from `src` into the buffer, returning the number of bytes written.
     size_t Write(const void* src, size_t len);
@@ -297,9 +308,9 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
 
    private:
     uint32_t parts_count_ = 0;
-    std::array<BufferRegion, netdev::wire::kMaxDescriptorChain> parts_{};
+    ktl::array<BufferRegion, MAX_DESCRIPTOR_CHAIN> parts_{};
 
-    FXL_DISALLOW_COPY_AND_ASSIGN(BufferData);
+    DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(BufferData);
   };
 
   class Buffer {
@@ -332,9 +343,10 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
     bool rx_;
     mutable BufferData data_;
 
-    FXL_DISALLOW_COPY_AND_ASSIGN(Buffer);
+    DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Buffer);
   };
 
+#if 0
   // An RAII object that triggers a callback on NetworkDevice status changes.
   class StatusWatchHandle {
    public:
@@ -358,10 +370,11 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
 
   void OnDeviceError(fidl::UnbindInfo info);
   void OnSessionError(fidl::UnbindInfo info);
+#endif
 
  private:
   zx_status_t PrepareSession();
-  zx::result<netdev::wire::SessionInfo> MakeSessionInfo(fidl::AnyArena& alloc);
+  zx::result<session_info_t> MakeSessionInfo();
   zx_status_t PrepareDescriptors();
   buffer_descriptor_t* descriptor(uint16_t idx);
   void* data(uint64_t offset);
@@ -373,47 +386,53 @@ class NetworkDeviceClient : public internal::DeviceEventHandlerProxy<NetworkDevi
   void FlushTx();
   void FetchRx();
   void FetchTx();
+#if 0
   void TxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                 const zx_packet_signal_t* signal);
   void RxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                 const zx_packet_signal_t* signal);
+
   void ErrorTeardown(zx_status_t);
   void ScheduleCallbackPromise(fpromise::promise<void, zx_status_t> promise,
                                ErrorCallback callback);
+#endif
 
   bool session_running_ = false;
   RxCallback rx_callback_;
   ErrorCallback err_callback_;
-  async_dispatcher_t* const dispatcher_;
+  // async_dispatcher_t* const dispatcher_;
   SessionConfig session_config_;
   uint16_t descriptor_count_;
-  zx::vmo data_vmo_;
+  fbl::RefPtr<VmObjectDispatcher> data_vmo_;
   fzl::VmoMapper data_;
-  zx::vmo descriptors_vmo_;
+  fbl::RefPtr<VmObjectDispatcher> descriptors_vmo_;
   fzl::VmoMapper descriptors_;
-  zx::fifo rx_fifo_;
-  zx::fifo tx_fifo_;
-  const fidl::WireClient<netdev::Device> device_;
-  fidl::WireClient<netdev::Session> session_;
+  KernelHandle<FifoDispatcher> rx_fifo_;
+  KernelHandle<FifoDispatcher> tx_fifo_;
+  // const fidl::WireClient<netdev::Device> device_;
+  std::unique_ptr<network::internal::DeviceInterface> device_;
+  // fidl::WireClient<netdev::Session> session_;
+  std::unique_ptr<network::internal::Session> session_;
+
   DeviceInfo device_info_;
   // rx descriptors ready to be sent back to the device.
-  std::vector<uint16_t> rx_out_queue_;
+  fbl::Vector<uint16_t> rx_out_queue_;
   // tx descriptors available to be written.
-  std::queue<uint16_t> tx_avail_;
+  fbl::Vector<uint16_t> tx_avail_;
   // tx descriptors queued to be sent to device.
-  std::vector<uint16_t> tx_out_queue_;
+  fbl::Vector<uint16_t> tx_out_queue_;
 
-  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_wait_{this};
-  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_wait_{this};
-  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_writable_wait_{this};
-  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_writable_wait_{this};
+  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_wait_{this};
+  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_wait_{this};
+  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_writable_wait_{this};
+  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_writable_wait_{this};
 
-  const std::unique_ptr<async::Executor> executor_;
+  // const std::unique_ptr<async::Executor> executor_;
 
-  FXL_DISALLOW_COPY_AND_ASSIGN(NetworkDeviceClient);
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(NetworkDeviceClient);
 };
 
 }  // namespace client
 }  // namespace network
 
-#endif  // SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
+#endif  // VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
