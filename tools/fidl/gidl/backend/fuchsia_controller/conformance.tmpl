@@ -7,7 +7,7 @@
 import fuchsia_controller_py
 from fuchsia_controller_py import BaseHandle, Channel, Event, Handle, Socket
 {{- if .StaticFidlgen }}
-import fidl_test_conformance_python as test_conformance_python
+import fidl_test_conformance as test_conformance
 {{- else }}
 import fidl.test_conformance as test_conformance
 {{- end }}

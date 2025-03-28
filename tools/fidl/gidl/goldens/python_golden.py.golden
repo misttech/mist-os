@@ -2,7 +2,7 @@
 
 import fuchsia_controller_py
 from fuchsia_controller_py import BaseHandle, Channel, Event, Handle, Socket
-import fidl_test_conformance_python as test_conformance_python
+import fidl_test_conformance as test_conformance
 
 import struct
 import unittest

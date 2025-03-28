@@ -90,7 +90,7 @@ rustc_staticlib("lib") {
 python_library("fuchsia_controller_py") {
   visibility += [
     "tests:*",
-    "//src/tests/fidl/conformance_suite/python/*",
+    "//src/tests/fidl/conformance_suite/*",
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//zircon/vdso/*",
@@ -118,7 +118,7 @@ python_library("fidl_bindings") {
     "./*",
     "tests:*",
     "//src/testing/end_to_end/honeydew:*",
-    "//src/tests/fidl/conformance_suite/python/*",
+    "//src/tests/fidl/conformance_suite/*",
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//zircon/vdso/*",
@@ -143,43 +143,14 @@ python_library("fidl_bindings") {
   ]
 }
 
-conformance_test_source = "$target_gen_dir/static_conformance_test.py"
+static_conformance_test_source = "$target_gen_dir/static_conformance_test.py"
 
 gidl("static_conformance_tests_py") {
   type = "conformance"
   language = "python"
-  inputs = [
-    "//src/tests/fidl/conformance_suite/aliases.gidl",
-    "//src/tests/fidl/conformance_suite/alignment.gidl",
-    "//src/tests/fidl/conformance_suite/bits_flexible.gidl",
-    "//src/tests/fidl/conformance_suite/bits_strict.gidl",
-    "//src/tests/fidl/conformance_suite/bool.gidl",
-    "//src/tests/fidl/conformance_suite/conformance.gidl",
-    "//src/tests/fidl/conformance_suite/empty_struct.gidl",
-    "//src/tests/fidl/conformance_suite/enums_flexible.gidl",
-    "//src/tests/fidl/conformance_suite/enums_strict.gidl",
-    "//src/tests/fidl/conformance_suite/float.gidl",
-    "//src/tests/fidl/conformance_suite/golden.gidl",
-    "//src/tests/fidl/conformance_suite/handles.gidl",
-    "//src/tests/fidl/conformance_suite/integer.gidl",
-    "//src/tests/fidl/conformance_suite/memcpy_compatibility.gidl",
-    "//src/tests/fidl/conformance_suite/padding.gidl",
-    "//src/tests/fidl/conformance_suite/ported_from_walker_handles.gidl",
-    "//src/tests/fidl/conformance_suite/ported_from_walker_strings.gidl",
-    "//src/tests/fidl/conformance_suite/ported_from_walker_vectors.gidl",
-    "//src/tests/fidl/conformance_suite/protocol_endpoints.gidl",
-    "//src/tests/fidl/conformance_suite/recursive_depth.gidl",
-    "//src/tests/fidl/conformance_suite/recursive_types.gidl",
-    "//src/tests/fidl/conformance_suite/strings.gidl",
-    "//src/tests/fidl/conformance_suite/strings_utf8.gen.gidl",
-    "//src/tests/fidl/conformance_suite/tables.gidl",
-    "//src/tests/fidl/conformance_suite/transformer1.gidl",
-    "//src/tests/fidl/conformance_suite/transformer2.gidl",
-    "//src/tests/fidl/conformance_suite/union.gidl",
-    "//src/tests/fidl/conformance_suite/vectors.gidl",
-  ]
-  fidl = "//src/tests/fidl/conformance_suite/python:conformance_python_fidl"
-  output = conformance_test_source
+  inputs = conformance_suite_gidl_files
+  fidl = conformance_suite_fidl_target
+  output = static_conformance_test_source
 }
 
 python_host_test("fuchsia_controller_static_conformance_tests") {
@@ -189,13 +160,13 @@ python_host_test("fuchsia_controller_static_conformance_tests") {
   libraries = [ ":fuchsia_controller_py" ]
   deps = [
     ":static_conformance_tests_py",
-    "//src/tests/fidl/conformance_suite/python:conformance_python_fidl_python",
+    "//src/tests/fidl/conformance_suite:conformance_fidl_python",
   ]
   test_data_deps = [
     "tests:fuchsia_controller_host_test_data",
-    "//src/tests/fidl/conformance_suite/python:conformance_python_fidl_host_test_data",
+    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data",
   ]
-  main_source = conformance_test_source
+  main_source = static_conformance_test_source
 }
 
 python_binary("example") {

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 conformance_suite_gidl_files = [
+  "//src/tests/fidl/conformance_suite/aliases.gidl",
   "//src/tests/fidl/conformance_suite/alignment.gidl",
   "//src/tests/fidl/conformance_suite/bits_flexible.gidl",
   "//src/tests/fidl/conformance_suite/bits_strict.gidl",
