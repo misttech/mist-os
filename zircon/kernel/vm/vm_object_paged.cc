@@ -1958,7 +1958,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
   auto alloc_list_cleanup = fit::defer([&alloc_list, this]() -> void {
     if (!list_is_empty(&alloc_list)) {
       AssertHeld(lock_ref());
-      cow_pages_locked()->FreePagesLocked(&alloc_list, true);
+      cow_pages_locked()->FreePagesLocked(&alloc_list);
     }
   });
   do {

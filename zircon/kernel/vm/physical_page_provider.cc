@@ -26,7 +26,6 @@ const PageSourceProperties kProperties{
     .is_user_pager = false,
     .is_preserving_page_content = false,
     .is_providing_specific_physical_pages = true,
-    .is_handling_free = true,
 };
 
 }  // namespace

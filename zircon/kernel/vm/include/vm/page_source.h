@@ -118,12 +118,9 @@ struct PageSourceProperties {
   const bool is_preserving_page_content;
 
   // Iff true, the PageSource (and PageProvider) must be used to allocate all pages.  Pre-allocating
-  // generic pages from the pmm won't work.
+  // generic pages from the pmm won't work. These pages must be specifically returned via
+  // PageSource::FreePages instead of pmm_free.
   const bool is_providing_specific_physical_pages;
-
-  // true - PageSource::FreePages() must be used instead of pmm_free().
-  // false - pmm_free() must be used; PageSource::FreePages() will assert.
-  const bool is_handling_free;
 };
 
 // Interface for providing pages to a VMO through page requests.

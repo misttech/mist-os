@@ -838,33 +838,37 @@ class VmCowPages final : public VmHierarchyBase,
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
   zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
-  // Helper to free |pages| to the PMM. |freeing_owned_pages| is set to true to indicate that this
-  // object had ownership of |pages|. This could either be true ownership, where the |pages| have
-  // been removed from this object's page list, or logical ownership, e.g. when a source page list
-  // has been handed over to SupplyPagesLocked(). If |freeing_owned_pages| is true, this function
-  // will also try to invoke FreePages() on the backing page source if it supports it.
+  // Helper to free |pages| to the PMM. This function will also try to invoke FreePages() on the
+  // backing page source if it supports it. Given the allowance of freeing pages from any object in
+  // the hierarchy, but the page source only being on the root, it is a requirement (and checked on
+  // clone creation), that if a page source is handling free then it may not have CoW children.
+  // There is also an equivalent assumption that if the page source is handling free, then the page
+  // source will be supplying all the pages and this object must never allocate directly from the
+  // PMM.
   //
   // Callers should avoid calling pmm_free() directly from inside VmCowPages, and instead should use
   // this helper.
-  void FreePagesLocked(list_node* pages, bool freeing_owned_pages) TA_REQ(lock()) {
-    if (!freeing_owned_pages || !is_source_handling_free_locked()) {
+  void FreePagesLocked(list_node* pages) TA_REQ(lock()) {
+    if (!is_source_handling_free_locked()) {
       CacheFree(pages);
       return;
     }
     page_source_->FreePages(pages);
   }
 
-  // Helper to free |page| to the PMM. |freeing_owned_page| is set to true to indicate that this
-  // object had ownership of |page|. This could either be true ownership, where the |page| has
-  // been removed from this object's page list, or logical ownership, e.g. when a source page list
-  // has been handed over to SupplyPagesLocked(). If |freeing_owned_pages| is true, this function
-  // will also try to invoke FreePages() on the backing page source if it supports it.
+  // Helper to free |pages| to the PMM. This function will also try to invoke FreePages() on the
+  // backing page source if it supports it. Given the allowance of freeing pages from any object in
+  // the hierarchy, but the page source only being on the root, it is a requirement (and checked on
+  // clone creation), that if a page source is handling free then it may not have CoW children.
+  // There is also an equivalent assumption that if the page source is handling free, then the page
+  // source will be supplying all the pages and this object must never allocate directly from the
+  // PMM.
   //
   // Callers should avoid calling pmm_free_page() directly from inside VmCowPages, and instead
   // should use this helper.
-  void FreePageLocked(vm_page_t* page, bool freeing_owned_page) TA_REQ(lock()) {
+  void FreePageLocked(vm_page_t* page) TA_REQ(lock()) {
     DEBUG_ASSERT(!list_in_list(&page->queue_node));
-    if (!freeing_owned_page || !is_source_handling_free_locked()) {
+    if (!is_source_handling_free_locked()) {
       CacheFree(page);
       return;
     }
@@ -1137,7 +1141,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper for removing a page from the PageQueues and freeing it (either to the PMM, or the owning
   // page source).
-  void RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_page) TA_REQ(lock());
+  void RemoveAndFreePageLocked(vm_page_t* page) TA_REQ(lock());
 
   // Helper for removing a page from the page queues and either returning it immediately to the PMM
   // if it's a loaned page, or appending it to the supplied list.
@@ -1503,7 +1507,9 @@ class VmCowPages final : public VmHierarchyBase,
   bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
 
   bool is_source_handling_free_locked() const TA_REQ(lock()) {
-    return page_source_ && page_source_->properties().is_handling_free;
+    // As specified in the PageSourceProperties, the page source handles free iff it is specifying
+    // specific pages.
+    return is_source_supplying_specific_physical_pages();
   }
 
   // Swap an old page for a new page in the page list. The old page must be at offset. The new page
@@ -2036,10 +2042,11 @@ class ScopedPageFreedList {
   ~ScopedPageFreedList() { ASSERT(list_is_empty(&list_)); }
 
   void FreePagesLocked(VmCowPages* cow_pages) TA_REQ(cow_pages->lock()) {
-    cow_pages->FreePagesLocked(&list_, owned_pages_);
+    if (!list_is_empty(&list_)) {
+      cow_pages->FreePagesLocked(&list_);
+    }
   }
 
-  bool owned_pages_ = true;
   list_node_t list_;
 };
 
