@@ -60,3 +60,24 @@ class ConstTestsuite(unittest.TestCase):
             test_constants.BitsType.VALUE
             | test_constants.BitsType.SECOND_VALUE,
         )
+
+    def test_struct_defaults_not_supported_at_runtime(self) -> None:
+        with self.assertRaises(NotImplementedError) as e:
+            test_constants.Struct(_unsupported=None)  # type: ignore[arg-type]
+        exception_message = e.exception.args[0]
+        self.assertIn("int64_with_default", exception_message)
+        self.assertIn("string_with_default", exception_message)
+        self.assertIn("bool_with_default", exception_message)
+        self.assertIn("enum_with_default", exception_message)
+        self.assertIn("bits_with_default", exception_message)
+
+    def test_struct_defaults_not_supported_at_compile_time(self) -> None:
+        with self.assertRaises(TypeError) as e:
+            test_constants.Struct()  # type: ignore[call-arg]
+        exception_message_no_args = e.exception.args[0]
+        self.assertIn("unsupported", exception_message_no_args)
+
+        with self.assertRaises(TypeError):
+            test_constants.Struct(None)  # type: ignore[arg-type, call-arg]
+        exception_message_args = e.exception.args[0]
+        self.assertIn("unsupported", exception_message_args)

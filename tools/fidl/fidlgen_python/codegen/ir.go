@@ -97,17 +97,26 @@ type PythonAlias struct {
 	PythonName        string
 }
 
+type UnsupportedMessage string
+
+type PythonUnsupported struct {
+	Identifier fidlgen.EncodedCompoundIdentifier
+	PythonName string
+	Message    UnsupportedMessage
+}
+
 type PythonRoot struct {
 	fidlgen.Root
-	PythonModuleName      string
-	PythonTables          []PythonTable
-	PythonStructs         []PythonStruct
-	PythonUnions          []PythonUnion
-	PythonAliases         []PythonAlias
-	PythonConsts          []PythonConst
-	PythonBits            []PythonBits
-	PythonEnums           []PythonEnum
-	PythonExternalModules []string
+	PythonModuleName       string
+	PythonTables           []PythonTable
+	PythonStructs          []PythonStruct
+	PythonUnions           []PythonUnion
+	PythonAliases          []PythonAlias
+	PythonConsts           []PythonConst
+	PythonBits             []PythonBits
+	PythonEnums            []PythonEnum
+	PythonExternalModules  []string
+	PythonUnsupportedTypes []PythonUnsupported
 }
 
 type compiler struct {
@@ -367,19 +376,24 @@ func (c *compiler) compileTable(val fidlgen.Table) PythonTable {
 	return python_table
 }
 
-func (c *compiler) compileStructMember(val fidlgen.StructMember) PythonStructMember {
+func (c *compiler) compileStructMember(val fidlgen.StructMember) (PythonStructMember, *UnsupportedMessage) {
+	if _, ok := val.Attributes.LookupAttribute("allow_deprecated_struct_defaults"); ok {
+		message := UnsupportedMessage(fmt.Sprintf("%s annotated with allow_deprecated_struct_defaults", val.Name))
+		return PythonStructMember{}, &message
+	}
 	t := c.compileType(val.Type, val.MaybeFromAlias)
 	if t == nil {
-		log.Fatalf("Type not supported")
+		message := UnsupportedMessage(fmt.Sprintf("Failed to compile type of %s", val.Name))
+		return PythonStructMember{}, &message
 	}
 	return PythonStructMember{
 		StructMember: val,
 		PythonType:   *t,
 		PythonName:   changeIfReserved(compileSnakeIdentifier(val.Name)),
-	}
+	}, nil
 }
 
-func (c *compiler) compileStruct(val fidlgen.Struct) PythonStruct {
+func (c *compiler) compileStruct(val fidlgen.Struct) (PythonStruct, *PythonUnsupported) {
 	name := *c.compileDeclIdentifier(val.Name)
 	python_struct := PythonStruct{
 		Struct:        val,
@@ -388,12 +402,25 @@ func (c *compiler) compileStruct(val fidlgen.Struct) PythonStruct {
 		PythonMembers: []PythonStructMember{},
 	}
 
+	unsupported_message := ""
 	for _, v := range val.Members {
-		member := c.compileStructMember(v)
+		member, message := c.compileStructMember(v)
+		if message != nil {
+			unsupported_message = fmt.Sprintf("%s\n    - %s", unsupported_message, *message)
+			continue
+		}
 		python_struct.PythonMembers = append(python_struct.PythonMembers, member)
 	}
+	if unsupported_message != "" {
+		unsupported := PythonUnsupported{
+			Identifier: val.Name,
+			PythonName: name,
+			Message:    UnsupportedMessage("\n" + unsupported_message),
+		}
+		return PythonStruct{}, &unsupported
+	}
 
-	return python_struct
+	return python_struct, nil
 }
 
 var pythonReservedWords = map[string]struct{}{
@@ -645,7 +672,12 @@ func Compile(root fidlgen.Root) PythonRoot {
 		if v.IsEmptySuccessStruct {
 			continue
 		}
-		python_root.PythonStructs = append(python_root.PythonStructs, c.compileStruct(v))
+		python_struct, python_unsupported := c.compileStruct(v)
+		if python_unsupported != nil {
+			python_root.PythonUnsupportedTypes = append(python_root.PythonUnsupportedTypes, *python_unsupported)
+		} else {
+			python_root.PythonStructs = append(python_root.PythonStructs, python_struct)
+		}
 	}
 
 	for _, v := range root.Aliases {

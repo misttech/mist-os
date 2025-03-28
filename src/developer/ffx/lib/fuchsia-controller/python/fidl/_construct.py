@@ -23,6 +23,11 @@ _ZX_TYPES = [
 ]
 
 
+class Unsupported:
+    def __init__(self, _unsupported: typing.Self) -> None:
+        raise NotImplementedError
+
+
 def construct_response_object(response_ident: str, response_obj: Any) -> Any:
     obj = make_default_obj_from_ident(response_ident)
     return construct_result(obj, response_obj)

@@ -27,6 +27,13 @@ add_ir_path(_ir_path)
 import {{ . }}
 {{ end }}
 
+{{ range .PythonUnsupportedTypes }}
+class {{ .PythonName }}:
+    def __init__(self, *args: list[typing.Any], _unsupported: fidl.Unsupported, **kwargs: dict[str, typing.Any]) -> None:
+        raise NotImplementedError("""{{ .Identifier }} not supported. {{ .Message }}""")
+{{ end }}
+
+
 {{ range .PythonStructs }}
 {{- template "StructDeclaration" . -}}
 {{ end -}}
