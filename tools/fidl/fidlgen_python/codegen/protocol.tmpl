@@ -1,0 +1,54 @@
+{{/*
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+*/}}
+
+{{ define "ProtocolDeclaration" -}}
+class {{ .PythonServerName }}(fidl._server.ServerBase):
+    """
+    {{- range .DocComments }}
+    {{ . }}
+    {{- end }}
+    """
+    __fidl_kind__ = "server"
+    library = "{{ .Library }}"
+    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+
+class {{ .PythonClientName }}(fidl._client.FidlClient):
+    """
+    {{- range .DocComments }}
+    {{ . }}
+    {{- end }}
+    """
+    __fidl_kind__ = "client"
+    library = "{{ .Library }}"
+    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+
+class {{ .PythonEventHandlerName }}(fidl._client.EventHandlerBase):
+    """
+    {{- range .DocComments }}
+    {{ . }}
+    {{- end }}
+    """
+    __fidl_kind__ = "event_handler"
+    library = "{{ .Library }}"
+    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+
+class {{ .PythonName }}(fidl._library.ProtocolBase):
+    """
+    {{- range .DocComments }}
+    {{ . }}
+    {{- end }}
+    """
+    __fidl_kind__ = "protocol"
+    Server = {{ .PythonServerName }}
+    Client = {{ .PythonClientName }}
+    EventHandler = {{ .PythonEventHandlerName }}
+    MARKER = "{{ .Marker }}"
+
+
+{{ end }}

@@ -26,11 +26,13 @@ conformance_python_fidl_source_basenames = [
   "ported_from_walker_strings.test.fidl",
   "ported_from_walker_vectors.test.fidl",
   "primitives.test.fidl",
+  "protocol_endpoints.test.fidl",
   "recursive_depth.test.fidl",
   "recursive_types.test.fidl",
   "strings.test.fidl",
   "structs.test.fidl",
   "tables.test.fidl",
+  "transformer.test.fidl",
   "union.test.fidl",
   "vectors.test.fidl",
 ]

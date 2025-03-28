@@ -12,6 +12,7 @@ go_library("codegen") {
     "codegen.go",
     "enum.tmpl",
     "ir.go",
+    "protocol.tmpl",
     "sourcefile.tmpl",
     "struct.tmpl",
     "table.tmpl",

@@ -105,6 +105,29 @@ type PythonUnsupported struct {
 	Message    UnsupportedMessage
 }
 
+type PythonProtocol struct {
+	fidlgen.Protocol
+	Discoverable           bool
+	Marker                 string
+	Library                string
+	PythonName             string
+	PythonClientName       string
+	PythonServerName       string
+	PythonEventHandlerName string
+}
+
+type PythonRequest struct {
+	DeclType         fidlgen.DeclType
+	PythonType       PythonType
+	PythonParameters []PythonParameter
+}
+
+type PythonParameter struct {
+	PythonType    PythonType
+	PythonName    string
+	PythonDefault *string
+}
+
 type PythonRoot struct {
 	fidlgen.Root
 	PythonModuleName       string
@@ -115,6 +138,7 @@ type PythonRoot struct {
 	PythonConsts           []PythonConst
 	PythonBits             []PythonBits
 	PythonEnums            []PythonEnum
+	PythonProtocols        []PythonProtocol
 	PythonExternalModules  []string
 	PythonUnsupportedTypes []PythonUnsupported
 }
@@ -215,6 +239,13 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		}
 		element_type := *element_type_ptr
 		name += fmt.Sprintf("typing.Sequence[%s]", element_type.PythonName)
+	case fidlgen.EndpointType:
+		switch val.Role {
+		case fidlgen.ClientRole, fidlgen.ServerRole:
+			name += "int"
+		default:
+			log.Fatalf("Unsupported endpoint role: %v", val)
+		}
 	default:
 		log.Fatalf("Unknown kind: %v", val)
 	}
@@ -649,6 +680,32 @@ func (c *compiler) compileUnion(val fidlgen.Union) PythonUnion {
 	return python_union
 }
 
+func (c *compiler) compileRequest(m fidlgen.Method) *PythonRequest {
+	return nil
+}
+
+func (c *compiler) compileProtocol(val fidlgen.Protocol) PythonProtocol {
+	name := *c.compileDeclIdentifier(val.Name)
+	r := PythonProtocol{
+		Protocol:               val,
+		PythonName:             name,
+		Library:                string(c.library),
+		PythonClientName:       name + "Client",
+		PythonServerName:       name + "Server",
+		PythonEventHandlerName: name + "EventHandler",
+	}
+
+	// Compile the marker for discovering a protocol, if it's discoverable,
+	// e.g. "fuchsia.developer.ffx.Echo".
+	if _, r.Discoverable = val.LookupAttribute("discoverable"); r.Discoverable {
+		r.Marker = strings.Trim(val.GetProtocolName(), "\"")
+	} else {
+		r.Marker = fmt.Sprintf("(nondiscoverable) %s", val.Name)
+	}
+
+	return r
+}
+
 func Compile(root fidlgen.Root) PythonRoot {
 	root = root.ForBindings("python")
 	root = root.ForTransports([]string{"Channel"})
@@ -702,6 +759,10 @@ func Compile(root fidlgen.Root) PythonRoot {
 		// TODO(https://fxbug.dev/394421154): If v is a result, then its creation should
 		// be deferred to when the corresponding protocol method is compiled.
 		python_root.PythonUnions = append(python_root.PythonUnions, c.compileUnion(v))
+	}
+
+	for _, v := range root.Protocols {
+		python_root.PythonProtocols = append(python_root.PythonProtocols, c.compileProtocol(v))
 	}
 
 	// Sort the external modules to make sure the generated file is
