@@ -420,7 +420,7 @@ mod tests {
 
     use crate::test::{with_raw_dispatcher, with_raw_dispatcher_flags};
     use crate::tests::DropSender;
-    use crate::{DispatcherBuilder, MixedHandleType, OnDispatcher};
+    use crate::{CurrentDispatcher, Dispatcher, DispatcherBuilder, MixedHandleType, OnDispatcher};
 
     use super::*;
 
@@ -451,9 +451,8 @@ mod tests {
             let (first, second) = Channel::create();
 
             dispatcher
-                .clone()
                 .spawn_task(async move {
-                    fin_tx.send(first.read_bytes(dispatcher.clone()).await.unwrap()).unwrap();
+                    fin_tx.send(first.read_bytes(CurrentDispatcher).await.unwrap()).unwrap();
                 })
                 .unwrap();
             second.write_with_data(arena, |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
@@ -570,12 +569,16 @@ mod tests {
                         .create()
                         .expect("failure creating blocking dispatcher for rust async");
 
-                    dispatcher.spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan)).unwrap();
-                    let dispatcher = dispatcher.clone();
+                    dispatcher
+                        .clone()
+                        .spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan))
+                        .unwrap();
                     rust_async_dispatcher
                         .post_task_sync(move |_| {
-                            let mut executor = fuchsia_async::LocalExecutor::new();
-                            executor.run_singlethreaded(ping(dispatcher, ping_chan));
+                            Dispatcher::override_current(dispatcher.as_dispatcher_ref(), || {
+                                let mut executor = fuchsia_async::LocalExecutor::new();
+                                executor.run_singlethreaded(ping(CurrentDispatcher, ping_chan));
+                            });
                         })
                         .unwrap();
                 })
@@ -617,13 +620,12 @@ mod tests {
             let (a, b) = Channel::create();
             let dispatcher = dispatcher.clone();
             dispatcher
-                .clone()
                 .spawn_task(async move {
                     // create, poll, and then immediately drop a read future for channel `a`
                     // so that it properly sets up the wait.
-                    read_and_drop(&a, dispatcher.clone()).await;
+                    read_and_drop(&a, CurrentDispatcher).await;
                     b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
-                    assert_eq!(a.read(dispatcher.clone()).await.unwrap().unwrap().data(), Some(&1));
+                    assert_eq!(a.read(CurrentDispatcher).await.unwrap().unwrap().data(), Some(&1));
                     fin_tx.send(()).unwrap();
                 })
                 .unwrap();
@@ -639,10 +641,9 @@ mod tests {
 
             let dispatcher = dispatcher.clone();
             dispatcher
-                .clone()
                 .spawn_task(async move {
                     // drop before even polling it should drop the arc correctly
-                    let fut = read_raw(&a.0, dispatcher.clone());
+                    let fut = read_raw(&a.0, CurrentDispatcher);
                     let op_arc = Arc::downgrade(&fut.raw_fut.op);
                     assert_strong_count(&op_arc, 1);
                     drop(fut);
@@ -662,9 +663,8 @@ mod tests {
 
             let dispatcher = dispatcher.clone();
             dispatcher
-                .clone()
                 .spawn_task(async move {
-                    assert_strong_count(&read_and_drop(&a, dispatcher.clone()).await, 0);
+                    assert_strong_count(&read_and_drop(&a, CurrentDispatcher).await, 0);
                     fin_tx.send(()).unwrap();
                 })
                 .unwrap();
@@ -683,14 +683,13 @@ mod tests {
             |dispatcher| {
                 let (fin_tx, fin_rx) = mpsc::channel();
 
-                let inner_dispatcher = dispatcher.clone();
                 dispatcher
                     .spawn_task(async move {
                         // We send the arc out to be checked after the dispatcher has shut down so
                         // that we can be sure that the callback has had a chance to be called.
                         // We send the channel back out so that it lives long enough for the
                         // cancellation to be called on it.
-                        let res = read_and_drop(&a, inner_dispatcher.clone()).await;
+                        let res = read_and_drop(&a, CurrentDispatcher).await;
                         fin_tx.send((res, a)).unwrap();
                     })
                     .unwrap();

@@ -6,7 +6,7 @@
 
 use fdf_sys::*;
 
-use core::cell::UnsafeCell;
+use core::cell::{RefCell, UnsafeCell};
 use core::ffi;
 use core::future::Future;
 use core::marker::PhantomData;
@@ -156,6 +156,9 @@ pub struct Dispatcher(pub(crate) NonNull<fdf_dispatcher_t>);
 // SAFETY: The api of fdf_dispatcher_t is thread safe.
 unsafe impl Send for Dispatcher {}
 unsafe impl Sync for Dispatcher {}
+thread_local! {
+    static OVERRIDE_DISPATCHER: RefCell<Option<NonNull<fdf_dispatcher_t>>> = const { RefCell::new(None) };
+}
 
 impl Dispatcher {
     /// Creates a dispatcher ref from a raw handle.
@@ -231,6 +234,18 @@ impl Dispatcher {
     /// `self`.
     pub fn as_dispatcher_ref(&self) -> DispatcherRef<'_> {
         DispatcherRef(ManuallyDrop::new(Dispatcher(self.0)), PhantomData)
+    }
+
+    /// Overrides the current dispatcher used by [`CurrentDispatcher::on_dispatcher`] while the
+    /// callback is being called.
+    #[doc(hidden)]
+    pub fn override_current<R>(dispatcher: DispatcherRef<'_>, f: impl FnOnce() -> R) -> R {
+        OVERRIDE_DISPATCHER.with(|global| {
+            let previous = global.replace(Some(dispatcher.0 .0));
+            let res = f();
+            global.replace(previous);
+            res
+        })
     }
 }
 
@@ -342,6 +357,34 @@ impl OnDispatcher for Weak<Dispatcher> {
             Some(dispatcher) => f(Some(dispatcher.as_dispatcher_ref())),
             None => f(None),
         }
+    }
+}
+
+/// A placeholder for the currently active dispatcher. Use [`OnDispatcher::on_dispatcher`] to
+/// access it when needed.
+#[derive(Clone, Copy)]
+pub struct CurrentDispatcher;
+
+impl OnDispatcher for CurrentDispatcher {
+    fn on_dispatcher<R>(&self, f: impl FnOnce(Option<DispatcherRef<'_>>) -> R) -> R {
+        let dispatcher = OVERRIDE_DISPATCHER
+            .with(|global| global.borrow().clone())
+            .or_else(|| {
+                // SAFETY: NonNull::new will null-check that we have a current dispatcher.
+                NonNull::new(unsafe { fdf_dispatcher_get_current_dispatcher() })
+            })
+            .map(|dispatcher| {
+                // SAFETY: We constrain the lifetime of the `DispatcherRef` we provide to the
+                // function below to the span of the current function. Since we are running on
+                // the dispatcher, or another dispatcher that is bound to the same lifetime (through
+                // override_dispatcher), we can be sure that the dispatcher will not be shut
+                // down before that function completes.
+                DispatcherRef(
+                    ManuallyDrop::new(unsafe { Dispatcher::from_raw(dispatcher) }),
+                    Default::default(),
+                )
+            });
+        f(dispatcher)
     }
 }
 
