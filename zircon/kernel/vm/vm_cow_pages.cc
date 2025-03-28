@@ -3550,15 +3550,12 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                        bool dirty_track, MultiPageRequest* page_request,
-                                        uint64_t* zeroed_len_out) {
+zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
+                                        MultiPageRequest* page_request, uint64_t* zeroed_len_out) {
   canary_.Assert();
 
-  DEBUG_ASSERT(page_start_base <= page_end_base);
-  DEBUG_ASSERT(page_end_base <= size_);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_start_base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_end_base));
+  DEBUG_ASSERT(range.IsBoundedBy(size_));
+  DEBUG_ASSERT(range.is_page_aligned());
   ASSERT(zeroed_len_out);
 
   // This function tries to zero pages as optimally as possible for most cases, so we attempt
@@ -3582,10 +3579,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   //
   // Zeroing doesn't decommit pages of contiguous VMOs.
   if (can_decommit_zero_pages()) {
-    zx_status_t status =
-        DecommitRangeLocked(VmCowRange(page_start_base, page_end_base - page_start_base));
+    zx_status_t status = DecommitRangeLocked(range);
     if (status == ZX_OK) {
-      *zeroed_len_out = page_end_base - page_start_base;
+      *zeroed_len_out = range.len;
       return ZX_OK;
     }
   }
@@ -3595,7 +3591,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // or by turning them into markers and it's more efficient to unmap once in bulk here.
   {
     __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    const VmCowRange range = VmCowRange(page_start_base, page_end_base - page_start_base);
     RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
   }
 
@@ -3621,8 +3616,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   };
 
   // Give us easier names for our range.
-  const uint64_t start = page_start_base;
-  const uint64_t end = page_end_base;
+  const uint64_t start = range.offset;
+  const uint64_t end = range.end();
 
   // If the VMO is directly backed by a page source that preserves content, it should be the root
   // VMO of the hierarchy.
