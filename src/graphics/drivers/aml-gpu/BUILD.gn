@@ -41,6 +41,10 @@ source_set("sources") {
     "s912-gpu.h",
     "t931-gpu.h",
   ]
+  deps = [
+    "//sdk/lib/driver/platform-device/cpp",
+    "//zircon/system/ulib/ddk-platform-defs",
+  ]
   public_deps = [
     ":aml_gpu_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
@@ -53,7 +57,6 @@ source_set("sources") {
     "//sdk/lib/driver/runtime:driver_runtime",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",

@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -31,10 +30,8 @@ constexpr uint32_t kMaxGpuClkFreq = 6;
 constexpr uint32_t kFinalMuxBitShift = 31;
 constexpr uint32_t kClockInputs = 8;
 
-enum {
-  MMIO_GPU,
-  MMIO_HIU,
-};
+constexpr uint32_t kMmioGpuIndex = 0;
+constexpr uint32_t kMmioHiuIndex = 1;
 
 typedef struct {
   // Byte offsets of the reset registers in the reset mmio region.
@@ -90,10 +87,7 @@ class AmlGpu final : public fdf::DriverBase,
 
   void UpdateClockProperties();
 
-  ddk::PDevFidl pdev_;
   fidl::Arena<> arena_;
-
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
 
   fuchsia_hardware_gpu_mali::wire::MaliProperties properties_;
 

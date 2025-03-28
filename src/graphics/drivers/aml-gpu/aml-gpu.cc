@@ -10,6 +10,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
@@ -380,41 +381,44 @@ zx::result<> AmlGpu::Start() {
     }
   }
 
-  auto platform_device =
+  zx::result pdev_client_end =
       incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-  pdev_ = ddk::PDevFidl(std::move(platform_device.value()));
-  if (!pdev_.is_valid()) {
-    FDF_LOG(ERROR, "could not get platform device protocol");
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  if (pdev_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.take_error();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  zx_status_t status = pdev_.MapMmio(MMIO_GPU, &gpu_buffer_);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "MapMmio failed");
-    return zx::error(status);
+  zx::result gpu_buffer = pdev.MapMmio(kMmioGpuIndex);
+  if (gpu_buffer.is_error()) {
+    FDF_LOG(ERROR, "Failed to map gpu buffer: %s", gpu_buffer.status_string());
+    return gpu_buffer.take_error();
   }
+  gpu_buffer_ = std::move(gpu_buffer.value());
 
-  status = pdev_.MapMmio(MMIO_HIU, &hiu_buffer_);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "MapMmio failed");
-    return zx::error(status);
+  zx::result hiu_buffer = pdev.MapMmio(kMmioHiuIndex);
+  if (hiu_buffer.is_error()) {
+    FDF_LOG(ERROR, "Failed to map hiu buffer: %s", hiu_buffer.status_string());
+    return hiu_buffer.take_error();
   }
+  hiu_buffer_ = std::move(hiu_buffer.value());
 
-  pdev_device_info_t info;
-  status = pdev_.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "GetDeviceInfo failed");
-    return zx::error(status);
+  zx::result info_result = pdev.GetDeviceInfo();
+  if (info_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get device info: %s", info_result.status_string());
+    return info_result.take_error();
   }
+  fdf::PDev::DeviceInfo info = std::move(info_result.value());
 
   if (info.vid == PDEV_VID_GENERIC && info.pid == PDEV_PID_GENERIC &&
       info.did == PDEV_DID_DEVICETREE_NODE) {
     // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    pdev_board_info_t board_info;
-    if ((status = pdev_.GetBoardInfo(&board_info)) != ZX_OK) {
-      FDF_LOG(ERROR, "GetBoardInfo failed");
-      return zx::error(status);
+    zx::result board_info_result = pdev.GetBoardInfo();
+    if (board_info_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to get board info: %s", board_info_result.status_string());
+      return board_info_result.take_error();
     }
+    fdf::PDev::BoardInfo board_info = std::move(board_info_result.value());
     if (board_info.vid == PDEV_VID_KHADAS) {
       switch (board_info.pid) {
         case PDEV_PID_VIM3:
@@ -458,14 +462,14 @@ zx::result<> AmlGpu::Start() {
   reset_register_ = fidl::WireSyncClient(std::move(reset_register_client.value()));
 
   if (info.pid == PDEV_PID_AMLOGIC_S905D3 && builder.supports_protected_mode()) {
-    zx_status_t status;
     // S905D3 needs to use an SMC into the TEE to do protected mode switching.
     static constexpr uint32_t kTrustedOsSmcIndex = 0;
-    status = pdev_.GetSmc(kTrustedOsSmcIndex, &secure_monitor_);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Unable to retrieve secure monitor SMC: %d", status);
-      return zx::error(status);
+    zx::result secure_monitor = pdev.GetSmc(kTrustedOsSmcIndex);
+    if (secure_monitor.is_error()) {
+      FDF_LOG(ERROR, "Failed to retrieve secure monitor SMC: %s", secure_monitor.status_string());
+      secure_monitor.take_error();
     }
+    secure_monitor_ = std::move(secure_monitor.value());
     builder.use_protected_mode_callbacks(true);
   }
 
@@ -495,22 +499,13 @@ zx::result<> AmlGpu::Start() {
     }
   }
 
-  fidl::Arena arena;
-  node_ = fidl::WireSyncClient<fuchsia_driver_framework::Node>(std::move(node()));
+  std::vector offers = {fdf::MakeOffer2<fuchsia_hardware_gpu_mali::Service>("default")};
 
-  auto offers = std::vector{fdf::MakeOffer2<fuchsia_hardware_gpu_mali::Service>("default")};
-  auto args =
-      fuchsia_driver_framework::NodeAddArgs{{.name = "aml-gpu", .offers2 = std::move(offers)}};
-
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT(controller_endpoints.is_ok());
-
-  auto result = node_->AddChild(fidl::ToWire(arena, std::move(args)),
-                                std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
-    return zx::error(result.status());
+  zx::result child =
+      AddChild("aml-gpu", std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
+  if (child.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", child.status_string());
+    return child.take_error();
   }
 
   return zx::ok();
