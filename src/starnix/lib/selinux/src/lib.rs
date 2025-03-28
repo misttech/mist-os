@@ -793,6 +793,8 @@ common_permission_enum! {
         // keep-sorted start
         /// Permission to bind to a name.
         Bind("bind"),
+        /// Permission to initiate a connection.
+        Connect("connect"),
         // keep-sorted end
     }
 }

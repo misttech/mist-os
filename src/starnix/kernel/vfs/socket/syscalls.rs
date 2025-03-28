@@ -335,6 +335,7 @@ pub fn sys_connect(
     user_address_length: usize,
 ) -> Result<(), Errno> {
     let client_file = current_task.files.get(fd)?;
+    let client_node = client_file.node();
     let client_socket = Socket::get_from_file(&client_file)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
@@ -344,21 +345,26 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
             log_trace!("connect to inet socket named {:?}", addr);
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
-        SocketAddress::Netlink(_) => SocketPeer::Address(address),
+        SocketAddress::Netlink(_) => {
+            security::check_socket_connect_access(current_task, client_node, &address)?;
+            SocketPeer::Address(address)
+        }
         SocketAddress::Packet(ref addr) => {
             log_trace!("connect to packet socket named {:?}", addr);
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
     };
-
     let result = client_socket.connect(locked, current_task, peer.clone());
 
     if client_file.is_non_blocking() {

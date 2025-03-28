@@ -125,6 +125,30 @@ pub(in crate::security) fn check_socket_bind_access(
     )
 }
 
+/// Checks that `current_task` has the right permissions to initiate a connection with
+/// `socket_node`.
+pub(in crate::security) fn check_socket_connect_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket_node: &FsNode,
+    _socket_address: &SocketAddress,
+) -> Result<(), Errno> {
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_connect_access called for non-Socket class")
+    };
+
+    // TODO(https://fxbug.dev/364568577): Add checks for `name_connect` between the socket and the
+    // SID of the port number for TCP sockets.
+    has_socket_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        socket_node,
+        &CommonSocketPermission::Connect.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::get_cached_sid;
