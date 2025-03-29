@@ -67,6 +67,12 @@
             availability: "optional",
         },
         {
+            directory: "dev-trippoint",
+            rights: [ "r*" ],
+            path: "/dev/class/trippoint",
+            availability: "optional",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",

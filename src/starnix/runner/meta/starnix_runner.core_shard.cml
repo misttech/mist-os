@@ -151,6 +151,13 @@
             subdir: "serial",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-trippoint",
+            to: [ "#starnix_runner" ],
+            subdir: "trippoint",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             from: "parent",

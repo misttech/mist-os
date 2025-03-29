@@ -24,6 +24,7 @@ use starnix_modules_input::{
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_nanohub::nanohub_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
+use starnix_modules_thermal::thermal_device_init;
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
@@ -98,6 +99,8 @@ pub struct Features {
     pub nanohub: bool,
 
     pub enable_utc_time_adjustment: bool,
+
+    pub thermal: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug)]
@@ -144,6 +147,7 @@ impl Features {
                 network_manager,
                 nanohub,
                 enable_utc_time_adjustment,
+                thermal,
             } => {
                 inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -183,6 +187,13 @@ impl Features {
                 inspect_node.record_bool("rootfs_rw", *rootfs_rw);
                 inspect_node.record_bool("network_manager", *network_manager);
                 inspect_node.record_bool("nanohub", *nanohub);
+                inspect_node.record_string(
+                    "thermal",
+                    match thermal {
+                        Some(devices) => devices.join(","),
+                        None => "".to_string(),
+                    },
+                );
 
                 inspect_node.record_child("kernel", |kernel_node| {
                     kernel_node.record_bool("bpf_v2", *bpf_v2);
@@ -282,6 +293,9 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
                 features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
             }
             ("test_data", _) => features.test_data = true,
+            ("thermal", Some(arg)) =>
+                features.thermal = Some(
+                    arg.split(',').map(String::from).collect::<Vec<String>>()),
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
             }
@@ -466,6 +480,9 @@ pub fn run_container_features(
     }
     if features.nanohub {
         nanohub_device_init(locked, system_task);
+    }
+    if let Some(devices) = &features.thermal {
+        thermal_device_init(locked, system_task, devices.clone());
     }
 
     Ok(())
