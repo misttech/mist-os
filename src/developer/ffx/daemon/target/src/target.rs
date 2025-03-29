@@ -5,6 +5,7 @@
 use crate::overnet::host_pipe::{
     spawn, HostPipeChildBuilder, HostPipeChildDefaultBuilder, LogBuffer,
 };
+use crate::overnet::vsock::spawn_vsock;
 use crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE};
 use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{anyhow, bail, Context, Result};
@@ -49,6 +50,7 @@ pub use self::update::{TargetUpdate, TargetUpdateBuilder};
 
 const DEFAULT_SSH_PORT: u16 = 22;
 const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
+const CONFIG_ENABLE_VSOCK: &str = "connectivity.enable_vsock";
 
 pub(crate) type SharedIdentity = Rc<Identity>;
 pub(crate) type WeakIdentity = Weak<Identity>;
@@ -62,6 +64,14 @@ pub struct TargetAddrStatus {
 }
 
 impl TargetAddrStatus {
+    pub fn vsock() -> Self {
+        Self {
+            protocol: TargetProtocol::Vsock,
+            transport: TargetTransport::Network,
+            source: TargetSource::Discovered,
+        }
+    }
+
     pub fn ssh() -> Self {
         Self {
             protocol: TargetProtocol::Ssh,
@@ -171,6 +181,7 @@ impl PartialOrd for TargetAddrEntry {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TargetProtocol {
     Ssh,
+    Vsock,
     Netsvc,
     Fastboot,
 }
@@ -881,7 +892,9 @@ impl Target {
             // If a target is observed over mdns, as happens regularly due to broadcasts, or it is
             // re-added manually, if the target is presently in an RCS state, that state is
             // preserved, and the last response time is just adjusted to represent the observation.
-            TargetConnectionState::Mdns(_) | TargetConnectionState::Manual(_) => {
+            TargetConnectionState::Mdns(_)
+            | TargetConnectionState::Manual(_)
+            | TargetConnectionState::Vsock(_) => {
                 // Do not transition connection state for RCS -> MDNS.
                 if former_state.is_rcs() {
                     self.update_last_response(Utc::now());
@@ -1265,7 +1278,7 @@ impl Target {
             // active, we don't need a host pipe. This will start happening more as we introduce USB
             // links, where the first thing we hear about a target is its appearance as an Overnet peer,
             // and thus we have an RCS connection from inception.
-            {
+            let cid = {
                 let Some(target) = weak_target.upgrade() else {
                     // weird that self is already gone, but ¯\_(ツ)_/¯
                     // Unfortunately that means we have no access to its remote-overnet-id waiters :-(
@@ -1279,6 +1292,29 @@ impl Target {
                         }
                         return;
                     }
+                }
+
+                target.addrs().into_iter().find_map(|addr| {
+                    if let TargetAddr::VSockCtx(cid) = addr {
+                        Some(cid)
+                    } else {
+                        None
+                    }
+                })
+            };
+
+            if ffx_config::get(CONFIG_ENABLE_VSOCK).unwrap_or(false) {
+                if let Some(cid) = cid {
+                    // We have a VSOCK. Use that to connect instead of SSH.
+
+                    spawn_vsock(cid, node).await;
+                    weak_target.upgrade().and_then(|target| {
+                        tracing::debug!(
+                            "Exiting run_host_pipe for {target_name_str} (VSOCK connection)"
+                        );
+                        target.host_pipe.borrow_mut().take()
+                    });
+                    return;
                 }
             }
 
@@ -1574,7 +1610,8 @@ impl From<&Target> for ffx::TargetInfo {
                 TargetConnectionState::Disconnected => TargetState::Disconnected,
                 TargetConnectionState::Manual(_)
                 | TargetConnectionState::Mdns(_)
-                | TargetConnectionState::Rcs(_) => TargetState::Product,
+                | TargetConnectionState::Rcs(_)
+                | TargetConnectionState::Vsock(_) => TargetState::Product,
                 TargetConnectionState::Fastboot(_) => TargetState::Fastboot,
                 TargetConnectionState::Zedboot(_) => TargetState::Zedboot,
             }),
