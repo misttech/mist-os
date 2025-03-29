@@ -123,7 +123,34 @@ std::unique_ptr<uint8_t[]> DebugFont::GetFontPixels() {
   // == 1010 1111 1010 1011 1110 1010
   glyph_bits[int32_t{'#'}] = 0xafabea;
 
-  // TODO(https://fxbug.dev/42152489): glyphs for $%&\()*+
+  // TODO(https://fxbug.dev/42152489): glyphs for $%&\+
+
+  // '('
+  // ...1.
+  // ..1..
+  // ..1..
+  // ..1..
+  // ...1.
+  // == 00010 00100 00100 00100 00010
+  glyph_bits[int32_t{'('}] = 0x221082;
+
+  // ')'
+  // .1...
+  // ..1..
+  // ..1..
+  // ..1..
+  // .1...
+  // == 01000 00100 00100 00100 01000
+  glyph_bits[int32_t{')'}] = 0x821088;
+
+  // '*'
+  // 1.1.1
+  // .111.
+  // ..1..
+  // .111.
+  // 1.1.1
+  // == 10101 01110 00100 01110 10101
+  glyph_bits[int32_t{'*'}] = 0x15711D5;
 
   // '-'
   // .....
@@ -370,7 +397,16 @@ std::unique_ptr<uint8_t[]> DebugFont::GetFontPixels() {
   // == 11111 00100 00100 00100 11111
   glyph_bits[int32_t{'I'}] = 0x1F2109F;
 
-  // TODO(https://fxbug.dev/42152489): glyphs for ASCII 0x4A - 0x4C
+  // TODO(https://fxbug.dev/42152489): glyphs for ASCII 0x4A - 0x4B
+
+  // ‘L’
+  // 1....
+  // 1....
+  // 1....
+  // 1....
+  // 11111
+  // == 10000 10000 10000 10000 11111
+  glyph_bits[int32_t{'L'}] = 0x108421F;
 
   // ‘M’
   // .1.1.
