@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <bit>
 #include <cassert>
+#include <compare>
+#include <concepts>
+#include <type_traits>
 
 #include "constants.h"
 #include "layout.h"
@@ -34,6 +37,26 @@ class TlsLayout {
   using Addr = typename Elf::Addr;
   using size_type = typename Elf::size_type;
   using Phdr = typename Elf::Phdr;
+
+  // A default-constructed TlsLayout is trivially zero-initialized and ready to
+  // be updated using the Assign() method.
+  constexpr TlsLayout() = default;
+
+  // Construct a pre-existing layout from another source.  Unless zero, this
+  // size_bytes must already include any ABI-specified kTlsLocalExecOffset.
+  constexpr TlsLayout(Addr size_bytes, Addr alignment)
+      : size_bytes_(size_bytes), alignment_(alignment) {
+    assert(std::has_single_bit(alignment_()));
+    static_assert(std::is_trivially_copyable_v<TlsLayout>);
+    static_assert(std::is_trivially_copy_assignable_v<TlsLayout>);
+    static_assert(std::is_trivially_destructible_v<TlsLayout>);
+    static_assert(std::equality_comparable<TlsLayout>);
+    static_assert(std::three_way_comparable<TlsLayout>);
+  }
+
+  // Sortable first on size, and secondarily on alignment.
+  // The == and != operators are implicitly defaulted.
+  constexpr auto operator<=>(const TlsLayout&) const = default;
 
   template <ElfMachine Machine = ElfMachine::kNative, size_type RedZone = 0>
   constexpr size_type Assign(const Phdr& phdr) {
@@ -92,6 +115,7 @@ class TlsLayout {
     return (size + alignment - 1) & -alignment;
   }
 
+  // *Note:* The member order matters for operator<=> ordering.
   Addr size_bytes_ = 0;
   Addr alignment_ = 0;
 
