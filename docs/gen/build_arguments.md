@@ -699,7 +699,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8719152984198888753"`
+**Current value for `target_cpu = "arm64"`:** `"8719107679063588593"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +707,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8719152984198888753"`
+**Current value for `target_cpu = "riscv64"`:** `"8719107679063588593"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +715,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8719152984198888753"`
+**Current value for `target_cpu = "x64"`:** `"8719107679063588593"`
 
 From //out/not-default/args.gn:10
 
@@ -4911,7 +4911,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:429
+From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -4919,7 +4919,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:429
+From //build/assembly/developer_overrides.gni:443
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -4927,7 +4927,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:429
+From //build/assembly/developer_overrides.gni:443
 
 ### product_assembly_overrides_contents
 
@@ -4943,7 +4943,7 @@ for the "main" product assembly as if the following were set:
 
 **Current value (from the default):** `false`
 
-From //build/assembly/developer_overrides.gni:445
+From //build/assembly/developer_overrides.gni:459
 
 ### product_assembly_overrides_label
 
@@ -4953,7 +4953,7 @@ assembly defined, then a GN error will be generated.
 
 **Current value (from the default):** `false`
 
-From //build/assembly/developer_overrides.gni:434
+From //build/assembly/developer_overrides.gni:448
 
 ### product_bundle_labels
 
