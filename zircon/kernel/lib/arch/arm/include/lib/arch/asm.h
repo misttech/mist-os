@@ -41,6 +41,12 @@ pcrel.bias = 8
   .endr
 .endm
 
+.macro .cfi.all_call_used op
+  .irp reg,r0,r1,r2,r3,r9,r12,q0,q1,q2,q3,q8,q9,q10,q11,q12,q13,q14,q15
+    \op \reg
+  .endr
+.endm
+
 // Add an immediate value to SP, adjusting CFI assuming the CFA rule
 // uses an offset from SP.
 .macro .add.sp imm

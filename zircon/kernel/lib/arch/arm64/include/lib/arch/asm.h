@@ -46,6 +46,12 @@ shadow_call_sp .req x18
   .endr
 .endm
 
+.macro .cfi.all_call_used op
+  .irp reg,x0,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,q8,q9,q10,q11,q12,q13,q14,q15
+    \op \reg
+  .endr
+.endm
+
 // Add an immediate value to SP, adjusting CFI assuming the CFA rule
 // uses an offset from SP.
 .macro .add.sp imm
