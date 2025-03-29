@@ -49,7 +49,6 @@ def main() -> int:
         help="Whether this library is stabilized",
         action="store_true",
     )
-    parser.add_argument("--plasa", help="Path to the plasa metadata, optional")
     parser.add_argument("--area", help="API council area that owns the atom")
     parser.add_argument(
         "--areas-file-path",
@@ -80,14 +79,6 @@ def main() -> int:
         else dict(extra_files)
     )
 
-    plasa_fragments = []
-    if args.plasa:
-        with open(args.plasa, "r") as plasa_file:
-            data = json.load(plasa_file)
-            for d in data:
-                files[d["dest"]] = d["path"]
-                plasa_fragments += [d["dest"]]
-
     atoms.update(
         [
             Atom(
@@ -106,7 +97,6 @@ def main() -> int:
                         for destination, source in files.items()
                     ],
                     "type": args.type,
-                    "plasa": plasa_fragments,
                     "stable": args.stable,
                 }
             )

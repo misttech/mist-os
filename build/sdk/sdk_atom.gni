@@ -6,7 +6,6 @@ import("//build/compiled_action.gni")
 import("//build/config/fuchsia/target_api_level.gni")
 import("//build/json/validate_json.gni")
 import("//build/python/python_action.gni")
-import("//build/sdk/plasa/config.gni")
 import("//build/testing/golden_files.gni")
 import("config.gni")
 
@@ -504,13 +503,6 @@ template("sdk_atom") {
       args += [
         "--area",
         invoker.sdk_area,
-      ]
-    }
-
-    if (generate_plasa_artifacts && defined(meta.plasa_manifest)) {
-      args += [
-        "--plasa",
-        rebase_path(meta.plasa_manifest, root_build_dir),
       ]
     }
 

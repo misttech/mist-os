@@ -67,13 +67,6 @@
                         "null"
                     ]
                 },
-                "plasa": {
-                    "description": "The plasa API fragment files",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "files": {
                     "description": "Paths to files making up the atom, relative to the SDK root",
                     "type": "array",
@@ -122,7 +115,6 @@
                 "gn-label",
                 "id",
                 "meta",
-                "plasa",
                 "stable",
                 "type"
             ],
