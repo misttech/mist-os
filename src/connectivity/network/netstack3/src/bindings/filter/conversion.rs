@@ -408,6 +408,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
             // converted routine if it's already been converted, or recursively convert the
             // target routine before continuing.
             |name, rule_id| {
+                #[allow(clippy::map_entry)] // TODO(https://fxbug.dev/407087136)
                 if self.routine_types.contains_key(&name) {
                     self.expect_routine_resolved(&name, routine_type, rule_id)
                 } else {
