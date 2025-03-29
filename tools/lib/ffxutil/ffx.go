@@ -191,8 +191,9 @@ func (b *strictFfxCmdBuilder) commandWithConfigs(ffxPath string, supportsStrict 
 		cmd = append(cmd, "--isolate-dir", b.tmpIsolateDir)
 	}
 
-	// The caller may have already provided the "--machine" argument
-	if !slices.Contains(args, "--machine") {
+	// Commands that support strict always need a machine argument. If none is supplied,
+	// default to "json".
+	if !slices.Contains(args, "--machine") && supportsStrict {
 		cmd = append(cmd, "--machine", "json")
 	}
 
@@ -581,9 +582,30 @@ func (f *FFXInstance) ConfigSet(ctx context.Context, key, value string) error {
 	return nil
 }
 
+type MachineFormat int
+
+const (
+	MachineJson MachineFormat = iota + 1
+	MachineJsonPretty
+	MachineRaw
+	MachineNone
+)
+
+func (mf MachineFormat) str() string {
+	if mf == MachineJson {
+		return "json"
+	} else if mf == MachineJsonPretty {
+		return "json-pretty"
+	} else if mf == MachineRaw {
+		return "raw"
+	} else {
+		return "none"
+	}
+}
+
 func (f *FFXInstance) invoker(args []string) *ffxInvoker {
 	// By default, use the FFXInstance's stdout/stderr
-	return &ffxInvoker{ffx: f, args: args, stdout: f.stdout, stderr: f.stderr}
+	return &ffxInvoker{ffx: f, args: args, stdout: f.stdout, stderr: f.stderr, machineFormat: MachineNone}
 }
 
 type ffxInvoker struct {
@@ -595,7 +617,7 @@ type ffxInvoker struct {
 	output         *bytes.Buffer
 	stdout         io.Writer
 	stderr         io.Writer
-	noMachine      bool
+	machineFormat  MachineFormat
 	configs        map[string]any
 	supportsStrict bool // TODO(slgrady) Remove once all required commands support --strict
 }
@@ -605,17 +627,16 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
 	}
-	ffx_cmd := f.ffx.cmdBuilder.commandWithConfigs(f.ffx.ffxPath, f.supportsStrict, args, f.configs)
-	if f.noMachine {
-		// Strip out the "--machine", "json" flags if they exist
-		for i, arg := range ffx_cmd {
-			if arg == "--machine" {
-				// Note: i+2 because we want to remove both "--machine"
-				// and the following arg
-				ffx_cmd = append(ffx_cmd[:i], ffx_cmd[i+2:]...)
-			}
+	// Priority logic for setting machine format:
+	// 1: if command includes "--machine", use it
+	// 2: instead, if invoker sets the machine format, use that
+	// 3: otherwise, cmdBuilder may add --machine json (only if supportsStrict).
+	if !slices.Contains(args, "--machine") {
+		if f.machineFormat != MachineNone {
+			args = append([]string{"--machine", f.machineFormat.str()}, args...)
 		}
 	}
+	ffx_cmd := f.ffx.cmdBuilder.commandWithConfigs(f.ffx.ffxPath, f.supportsStrict, args, f.configs)
 
 	return f.ffx.runner.Command(ffx_cmd, subprocess.RunOptions{
 		Stdout: f.stdout,
@@ -686,11 +707,13 @@ func (i *ffxInvoker) setConfigs(configs map[string]any) *ffxInvoker {
 	return i
 }
 
-// Temporary function to tell strict invocations not to use "--machine"
-// if a command (such as "ffx daemon start" doesn't support the flag.
-// TODO(slgrady): remove once all commands support "--machine"
-func (i *ffxInvoker) setNoMachine() *ffxInvoker {
-	i.noMachine = true
+// Command to set the format. It defaults to MachineNone (no machine format).
+// Strict commands always require a format, but the format can be
+// MachineRaw, which means the caller is accepting the output in
+// whatever format the ffx subtool provides. The strict cmdBuilder
+// will add "--machine json" if no format has been specified.
+func (i *ffxInvoker) setMachineFormat(format MachineFormat) *ffxInvoker {
+	i.machineFormat = format
 	return i
 }
 
@@ -788,8 +811,8 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 10), func() error {
 		// "ffx daemon echo" _does_ support "--machine json", but when it is specified, the error comes
 		// on stdout, so tefmo catches it despite the redirection of stderr. To preserve the redirection,
-		// we'll tell the invoker to use "--machine".
-		return f.invoker([]string{"daemon", "echo"}).setTimeout(0).setNoMachine().run(ctx)
+		// we'll tell the invoker not to use "--machine".
+		return f.invoker([]string{"daemon", "echo"}).setTimeout(0).setMachineFormat(MachineNone).run(ctx)
 	}, nil)
 	if err != nil {
 		logger.Warningf(ctx, "failed to echo daemon: %s", output.String())
@@ -850,8 +873,8 @@ func (f *FFXInstance) EmuStop(ctx context.Context, args ...string) error {
 	return f.invoker(append([]string{"emu", "stop"}, args...)).setStrict().run(ctx)
 }
 
-// Test runs a test suite.
-func (f *FFXInstance) Test(
+// TestRun runs a test suite.
+func (f *FFXInstance) TestRun(
 	ctx context.Context,
 	testList build.TestList,
 	outDir string,
@@ -880,7 +903,7 @@ func (f *FFXInstance) Test(
 			"--show-full-moniker-in-logs",
 		},
 		args...)
-	if err := f.invoker(args).setTarget(f.target).setTimeout(0).setNoMachine().run(ctx); err != nil {
+	if err := f.invoker(args).setTarget(f.target).setTimeout(0).setStrict().setMachineFormat(MachineRaw).run(ctx); err != nil {
 		return nil, err
 	}
 
@@ -939,9 +962,9 @@ func (f *FFXInstance) GetSshAuthorizedKeys() string {
 
 func (f *FFXInstance) getSshKeyFromEnvironment(ctx context.Context, key string) (string, error) {
 	args := []string{"config", "get", key}
-	// TODO(slgrady): when `ffx --machine json config get` works, parse
-	// the json output
-	i := f.invoker(args).setCaptureOutput().setNoMachine()
+	// TODO(slgrady): when `ffx --machine json config get` works, change to MachineJson, and parse
+	// the output
+	i := f.invoker(args).setCaptureOutput().setMachineFormat(MachineRaw)
 	err := i.run(ctx)
 	if err != nil {
 		return "", err

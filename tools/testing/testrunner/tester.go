@@ -523,7 +523,7 @@ type FFXInstance interface {
 	Stdout() io.Writer
 	Stderr() io.Writer
 	SetStdoutStderr(stdout, stderr io.Writer)
-	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
+	TestRun(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
 	Stop() error
 	TargetWait(ctx context.Context, args ...string) error
@@ -638,7 +638,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 		extraArgs = append(extraArgs, "--experimental-parallel-execution", "8")
 	}
 	startTime := clock.Now(ctx)
-	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
+	runResult, err := t.ffx.TestRun(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
 	if runResult == nil && err == nil {
 		err = fmt.Errorf("no test result was found")
 	}

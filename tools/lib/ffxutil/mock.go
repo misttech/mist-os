@@ -68,7 +68,7 @@ func (f *MockFFXInstance) TestEarlyBootProfile(_ context.Context, outDir string)
 	return nil
 }
 
-func (f *MockFFXInstance) Test(_ context.Context, testList build.TestList, outDir string, args ...string) (*TestRunResult, error) {
+func (f *MockFFXInstance) TestRun(_ context.Context, testList build.TestList, outDir string, args ...string) (*TestRunResult, error) {
 	if testList.SchemaID != build.TestListSchemaIDExperimental {
 		return nil, fmt.Errorf(`schema_id must be %q, found %q`, build.TestListSchemaIDExperimental, testList.SchemaID)
 	}

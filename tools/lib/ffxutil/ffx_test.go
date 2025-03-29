@@ -65,7 +65,7 @@ func TestFFXInstance(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(testOutputDir, runSummaryFilename), runSummaryBytes, os.ModePerm); err != nil {
 		t.Errorf("failed to write run_summary.json: %s", err)
 	}
-	_, err := ffx.Test(ctx, build.TestList{}, outDir)
+	_, err := ffx.TestRun(ctx, build.TestList{}, outDir)
 	assertRunsExpectedCmd(
 		err,
 		stdout,
