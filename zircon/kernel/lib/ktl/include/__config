@@ -24,4 +24,30 @@
 // libcalls if atomics can't be lowered to real hardware instructions.
 #undef _LIBCPP_ATOMIC_ONLY_USE_BUILTINS
 
+// These are used by <__configuration/availability.h> to decide when headers
+// should expect things to be defined in the library.  For the kernel, there is
+// no library and so everything must be defined in headers.
+#undef _LIBCPP_INTRODUCED_IN_LLVM_21
+#define _LIBCPP_INTRODUCED_IN_LLVM_21 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_20
+#define _LIBCPP_INTRODUCED_IN_LLVM_20 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_19
+#define _LIBCPP_INTRODUCED_IN_LLVM_19 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_18
+#define _LIBCPP_INTRODUCED_IN_LLVM_18 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_16
+#define _LIBCPP_INTRODUCED_IN_LLVM_16 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_15
+#define _LIBCPP_INTRODUCED_IN_LLVM_15 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_14
+#define _LIBCPP_INTRODUCED_IN_LLVM_14 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_12
+#define _LIBCPP_INTRODUCED_IN_LLVM_12 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_11
+#define _LIBCPP_INTRODUCED_IN_LLVM_11 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_9
+#define _LIBCPP_INTRODUCED_IN_LLVM_9 0
+#undef _LIBCPP_INTRODUCED_IN_LLVM_4
+#define _LIBCPP_INTRODUCED_IN_LLVM_4 0
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_
