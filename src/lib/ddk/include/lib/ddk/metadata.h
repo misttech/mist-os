@@ -93,10 +93,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // Type: FIDL fuchsia.hardware.trippoint/TripDeviceMetadata
 #define DEVICE_METADATA_TRIP 0x50495254  // TRIP
 
-// type: FIDL fuchsia.scheduler/RoleName
-// TODO(b/395140408): Remove once no longer used.
-#define DEVICE_METADATA_SCHEDULER_ROLE_NAME 0x454C4F52  // ROLE
-
 // Metadata types that have least significant byte set to lowercase 'd'
 // signify private driver data.
 // This allows creating metadata types to be defined local to a particular
