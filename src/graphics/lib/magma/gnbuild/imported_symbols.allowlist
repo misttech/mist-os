@@ -279,6 +279,7 @@ printf
 putc
 putchar
 puts
+setbuf
 snprintf
 sprintf
 sscanf
