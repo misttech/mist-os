@@ -198,8 +198,7 @@ struct __attribute__((__packed__)) ucontext_with_pstate {
 };
 #endif
 
-RegistersValue
-GetTestRegistersFromUcontext(ucontext_t* ucontext) {
+RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
   RegistersValue result;
 
 #if defined(__x86_64__)
