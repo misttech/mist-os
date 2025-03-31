@@ -6,6 +6,7 @@
 import unittest
 
 import build_summary
+import textpb
 
 
 class LabelsToDictTests(unittest.TestCase):
@@ -1076,12 +1077,49 @@ machine_info: {
 build_latency: 28
 """
 
+RBE_METRICS_TXT_LINES = RBE_METRICS_TXT_DATA.split("\n")
 
-class PrintBuildSummarySmokeTest(unittest.TestCase):
+
+class BuildSummaryTestBase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.parsed_input = textpb.parse(RBE_METRICS_TXT_LINES)
+
+
+class LoadRbeMetricsTest(BuildSummaryTestBase):
+    def test_load(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        self.assertEqual(
+            rbe_data.status_metrics["CompletionStatus"]["cxx"][
+                "STATUS_NON_ZERO_EXIT"
+            ],
+            2,
+        )
+        self.assertEqual(
+            rbe_data.bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"][
+                "cxx"
+            ],
+            35608332,
+        )
+
+
+class PrepareSummaryTableTest(BuildSummaryTestBase):
+    def test_prepare(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        table = build_summary.prepare_summary_table(rbe_data)
+        found_bytes_downloaded = False
+        for row in table:
+            if row[0] == "BytesDownloaded":
+                self.assertEqual(row[1], "34.0 MiB")  # formatted
+                found_bytes_downloaded = True
+
+        self.assertTrue(found_bytes_downloaded)
+
+
+class PrintBuildSummarySmokeTest(BuildSummaryTestBase):
     def test_build_summary(self) -> None:
         # Smoke test that `print_build_summary()` does not error.
-        lines = RBE_METRICS_TXT_DATA.split("\n")
-        build_summary.print_build_summary(lines, "reproxy_logdir")
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        build_summary.print_build_summary(rbe_data, "reproxy_logdir")
 
 
 if __name__ == "__main__":

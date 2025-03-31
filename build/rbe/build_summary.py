@@ -7,10 +7,11 @@
 
 import argparse
 import collections
+import dataclasses
 import os
 import sys
 from pathlib import Path
-from typing import Any, Iterable, Sequence, Tuple
+from typing import Any, Callable, Iterable, Optional, Sequence, Tuple
 
 import tablefmt
 
@@ -138,12 +139,17 @@ def build_metric_row(
     data_source: dict[str, int],  # [action_category]: number
     column_headers: Sequence[str],
     include_header: bool = True,
-) -> Sequence[Sequence[Any]]:
+    formatter: Optional[Callable[[int], str]] = None,
+) -> Sequence[Sequence[str | int]]:
     """Construct one 1xN array (row) of data."""
     row = tablefmt.create_row(len(column_headers) + 1)
     row[0] = name
     for c, col in enumerate(column_headers):
-        row[c + 1] = data_source.get(col, 0)
+        value = data_source.get(col, 0)
+        if formatter is not None:
+            row[c + 1] = formatter(value)
+        else:
+            row[c + 1] = value
 
     if include_header:
         return [tablefmt.make_table_header(column_headers), row]
@@ -160,15 +166,25 @@ def main(argv: Sequence[str]) -> int:
         return 0
 
     with open(rbe_metrics_txt) as f:
-        return print_build_summary(f, args.reproxy_logdir)
-
-
-def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
-    data = textpb.parse(lines)
+        data = textpb.parse(f)
 
     if "stats" not in data:
         return 0
 
+    rbe_data = load_rbe_metrics(data)
+
+    # TODO(b/405231158): output alternative formats
+    return print_build_summary(rbe_data, args.reproxy_logdir)
+
+
+@dataclasses.dataclass
+class RbeMetrics(object):
+    status_metrics: dict[str, dict[str, Any]]
+    bandwidth_metrics: dict[str, dict[str, Any]]
+
+
+def load_rbe_metrics(data: dict[str, Any]) -> RbeMetrics:
+    """Extracts RBE metrics into a structure of tables."""
     stats = {_get_stat_name(stat): stat for stat in data["stats"]}
 
     # Construct a table by action type
@@ -192,15 +208,39 @@ def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
             or "Uploaded" in metric_name
             or "TotalOutputBytes" in metric_name
         ):
-            # pre-format size numbers into readable str.
-            # No need for any math operations on these values.
-            readable_size = tablefmt.human_readable_size(
-                _get_stat_count(fields), "B", 1
+            bandwidth_metrics[metric_name][action_category] = _get_stat_count(
+                fields
             )
-            bandwidth_metrics[metric_name][action_category] = readable_size
 
+    return RbeMetrics(
+        status_metrics=status_metrics,
+        bandwidth_metrics=bandwidth_metrics,
+    )
+
+
+def print_build_summary(rbe_data: RbeMetrics, reproxy_logdir: str) -> int:
+    joint_table = prepare_summary_table(rbe_data)
+
+    # Render multi-table.
+    script_rel = os.path.relpath(str(_SCRIPT), start=os.curdir)
+    print(f"=== Remote build summary (from: {script_rel} {reproxy_logdir})")
+    for row in tablefmt.format_numeric_table(joint_table):
+        print(row)
+    return 0
+
+
+def _format_num_bytes(x: int) -> str:
+    """Format readable numbers, e.g. "6.4 MiB"."""
+    return tablefmt.human_readable_size(x, "B", 1)
+
+
+def prepare_summary_table(
+    rbe_data: RbeMetrics,
+) -> Sequence[Sequence[str | int]]:
     # Prepare table columns, by action categories.
-    action_categories = {k for v in status_metrics.values() for k in v.keys()}
+    action_categories = {
+        k for v in rbe_data.status_metrics.values() for k in v.keys()
+    }
     action_categories.remove("all")  # "all" is special, always in last position
     ordered_action_categories = sorted(action_categories) + ["all"]
 
@@ -215,7 +255,7 @@ def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
         shared_header,
         *build_metric_table(
             "CompletionStatus",
-            status_metrics["CompletionStatus"],
+            rbe_data.status_metrics["CompletionStatus"],
             ordered_action_categories,
             include_header=False,
             with_totals=True,
@@ -223,30 +263,27 @@ def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
         blank_row,
         *build_metric_row(
             "OutputBytes",
-            bandwidth_metrics["RemoteMetadata.TotalOutputBytes"],
+            rbe_data.bandwidth_metrics["RemoteMetadata.TotalOutputBytes"],
             ordered_action_categories,
             include_header=False,
+            formatter=_format_num_bytes,
         ),
         *build_metric_row(
             "BytesDownloaded",
-            bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"],
+            rbe_data.bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"],
             ordered_action_categories,
             include_header=False,
+            formatter=_format_num_bytes,
         ),
         *build_metric_row(
             "BytesUploaded",
-            bandwidth_metrics["RemoteMetadata.RealBytesUploaded"],
+            rbe_data.bandwidth_metrics["RemoteMetadata.RealBytesUploaded"],
             ordered_action_categories,
             include_header=False,
+            formatter=_format_num_bytes,
         ),
     ]
-
-    # Render multi-table.
-    script_rel = os.path.relpath(str(_SCRIPT), start=os.curdir)
-    print(f"=== Remote build summary (from: {script_rel} {reproxy_logdir})")
-    for row in tablefmt.format_numeric_table(joint_table):
-        print(row)
-    return 0
+    return joint_table
 
 
 if __name__ == "__main__":
