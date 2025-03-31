@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::nmfs::NetworkMessage;
+use crate::fs::fuchsia::nmfs::NetworkMessage;
 use crate::task::Kernel;
 use bstr::BString;
 use fuchsia_component::client::connect_to_protocol_sync;
