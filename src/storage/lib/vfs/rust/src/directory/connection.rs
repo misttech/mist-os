@@ -463,13 +463,8 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         }
 
-        if path.is_dot() && !flags.create_unnamed_temporary_in_directory_path() {
-            if !flags.is_dir_allowed() {
-                return Err(Status::INVALID_ARGS);
-            }
-            if flags.creation_mode() == CreationMode::Always {
-                return Err(Status::ALREADY_EXISTS);
-            }
+        if path.is_dot() && flags.creation_mode() == CreationMode::Always {
+            return Err(Status::ALREADY_EXISTS);
         }
 
         self.directory.clone().open3_async(self.scope.clone(), path, flags, object_request).await

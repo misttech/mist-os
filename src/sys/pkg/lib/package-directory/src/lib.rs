@@ -28,8 +28,12 @@ pub use vfs::execution_scope::ExecutionScope;
 pub(crate) const DIRECTORY_ABILITIES: fio::Abilities =
     fio::Abilities::GET_ATTRIBUTES.union(fio::Abilities::ENUMERATE).union(fio::Abilities::TRAVERSE);
 
-pub(crate) const MUTABLE_FLAGS: fio::Flags =
-    fio::Flags::PERM_MODIFY.union(fio::Flags::PERM_SET_ATTRIBUTES).union(fio::Flags::PERM_WRITE);
+pub(crate) const ALLOWED_FLAGS: fio::Flags = fio::Flags::empty()
+    .union(fio::MASK_KNOWN_PROTOCOLS)
+    .union(fio::PERM_READABLE)
+    .union(fio::PERM_EXECUTABLE)
+    .union(fio::Flags::PERM_INHERIT_EXECUTE)
+    .union(fio::Flags::FLAG_SEND_REPRESENTATION);
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

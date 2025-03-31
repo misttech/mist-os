@@ -52,7 +52,7 @@ impl ObjectRequest {
     pub fn new(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
         Self::new_deprecated(
             object_request,
-            if flags.get_representation() {
+            if flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION) {
                 ObjectRequestSend::OnRepresentation
             } else {
                 ObjectRequestSend::Nothing

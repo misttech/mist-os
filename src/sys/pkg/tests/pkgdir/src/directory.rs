@@ -58,22 +58,19 @@ async fn open_per_package_source(source: PackageSource) {
     assert_open_content_file(&source, "dir", "dir/file").await;
 }
 
-const ALL_FLAGS: [fio::OpenFlags; 15] = [
-    fio::OpenFlags::empty(),
-    fio::OpenFlags::RIGHT_READABLE,
-    fio::OpenFlags::RIGHT_WRITABLE,
-    fio::OpenFlags::RIGHT_EXECUTABLE,
-    fio::OpenFlags::CREATE,
-    fio::OpenFlags::empty().union(fio::OpenFlags::CREATE).union(fio::OpenFlags::CREATE_IF_ABSENT),
-    fio::OpenFlags::CREATE_IF_ABSENT,
-    fio::OpenFlags::TRUNCATE,
-    fio::OpenFlags::DIRECTORY,
-    fio::OpenFlags::NODE_REFERENCE,
-    fio::OpenFlags::DESCRIBE,
-    fio::OpenFlags::POSIX_WRITABLE,
-    fio::OpenFlags::POSIX_EXECUTABLE,
-    fio::OpenFlags::NOT_DIRECTORY,
-    fio::OpenFlags::APPEND,
+const ALL_FLAGS: [fio::Flags; 12] = [
+    fio::PERM_READABLE,
+    fio::PERM_WRITABLE,
+    fio::PERM_EXECUTABLE,
+    fio::Flags::FLAG_MAYBE_CREATE,
+    fio::Flags::FLAG_MUST_CREATE,
+    fio::Flags::FLAG_MAYBE_CREATE.union(fio::Flags::FLAG_MUST_CREATE),
+    fio::Flags::FILE_APPEND,
+    fio::Flags::FILE_TRUNCATE,
+    fio::Flags::FLAG_SEND_REPRESENTATION,
+    fio::Flags::PERM_INHERIT_WRITE,
+    fio::Flags::PERM_INHERIT_EXECUTE,
+    fio::Flags::PROTOCOL_SYMLINK,
 ];
 
 async fn assert_open_root_directory(
@@ -84,14 +81,13 @@ async fn assert_open_root_directory(
     let package_root = &source.dir;
 
     let success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
+        fio::PERM_READABLE,
+        fio::PERM_EXECUTABLE,
+        fio::Flags::PROTOCOL_DIRECTORY,
+        fio::Flags::PROTOCOL_NODE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
     ];
 
     let child_paths = generate_valid_directory_paths(child_base_path);
@@ -120,9 +116,9 @@ async fn assert_open_root_directory(
 }
 
 fn filter_out_contradictory_open_parameters(
-    (flag, child_path): (fio::OpenFlags, &str),
-) -> Option<(fio::OpenFlags, &'_ str)> {
-    if flag.intersects(fio::OpenFlags::NOT_DIRECTORY) && child_path.ends_with('/') {
+    (flag, child_path): (fio::Flags, &str),
+) -> Option<(fio::Flags, &'_ str)> {
+    if flag.intersects(fio::Flags::PROTOCOL_FILE) && child_path.ends_with('/') {
         None
     } else {
         Some((flag, child_path))
@@ -132,10 +128,10 @@ fn filter_out_contradictory_open_parameters(
 async fn assert_open_success<V, Fut>(
     package_root: &fio::DirectoryProxy,
     parent_path: &str,
-    allowed_flags_and_child_paths: impl Iterator<Item = (fio::OpenFlags, &str)>,
+    allowed_flags_and_child_paths: impl Iterator<Item = (fio::Flags, &str)>,
     verifier: V,
 ) where
-    V: Fn(fio::NodeProxy, fio::OpenFlags) -> Fut,
+    V: Fn(fio::NodeProxy, fio::Flags) -> Fut,
     Fut: Future<Output = Result<(), Error>>,
 {
     let parent = open_parent(package_root, parent_path).await;
@@ -158,14 +154,13 @@ async fn assert_open_content_directory(
     let package_root = &source.dir;
 
     let success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
+        fio::PERM_READABLE,
+        fio::PERM_EXECUTABLE,
+        fio::Flags::PROTOCOL_DIRECTORY,
+        fio::Flags::PROTOCOL_NODE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
     ];
     let child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
@@ -211,7 +206,7 @@ fn test_subtract() {
 async fn assert_open_flag_and_child_path_failure<V, Fut>(
     package_root: &fio::DirectoryProxy,
     parent_path: &str,
-    disallowed_flags_and_child_paths: impl Iterator<Item = (fio::OpenFlags, &str)>,
+    disallowed_flags_and_child_paths: impl Iterator<Item = (fio::Flags, &str)>,
     verifier: V,
 ) where
     V: Fn(fio::NodeProxy) -> Fut,
@@ -237,15 +232,13 @@ async fn assert_open_content_file(
     let package_root = &source.dir;
 
     let success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::OpenFlags::APPEND,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::NOT_DIRECTORY,
+        fio::PERM_READABLE,
+        fio::PERM_EXECUTABLE,
+        fio::Flags::PROTOCOL_NODE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
+        fio::Flags::PROTOCOL_FILE,
     ];
 
     let child_paths = generate_valid_file_paths(child_base_path);
@@ -280,20 +273,19 @@ async fn assert_open_meta_as_directory_and_file(
 ) {
     let package_root = &source.dir;
 
+    // To open "meta" as a directory either PROTOCOL_DIRECTORY or PROTOCOL_NODE must be specified.
     let directory_success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
+        fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
+        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_INHERIT_EXECUTE,
+        fio::Flags::PROTOCOL_DIRECTORY
+            | fio::Flags::PROTOCOL_NODE
+            | fio::Flags::PERM_GET_ATTRIBUTES,
+        fio::Flags::PROTOCOL_DIRECTORY
+            | fio::Flags::PROTOCOL_NODE
+            | fio::Flags::FLAG_SEND_REPRESENTATION,
     ];
-
-    // To open "meta" as a directory at least one of the following must be true:
-    //   1. OPEN_FLAG_DIRECTORY is set
-    //   2. OPEN_FLAG_NODE_REFERENCE is set
-    let directory_flags = std::iter::empty()
-        .chain(directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::DIRECTORY))
-        .chain(directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::NODE_REFERENCE));
 
     let directory_child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
@@ -302,13 +294,15 @@ async fn assert_open_meta_as_directory_and_file(
     let all_flag_and_child_paths =
         itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let directory_flags_and_child_paths =
-        itertools::iproduct!(directory_flags, directory_child_paths.iter().map(String::as_str))
-            .chain(itertools::iproduct!(
-                directory_success_flags,
-                directory_only_child_paths.iter().map(String::as_str)
-            ))
-            .filter_map(filter_out_contradictory_open_parameters);
+    let directory_flags_and_child_paths = itertools::iproduct!(
+        directory_success_flags,
+        directory_child_paths.iter().map(String::as_str)
+    )
+    .chain(itertools::iproduct!(
+        directory_success_flags,
+        directory_only_child_paths.iter().map(String::as_str)
+    ))
+    .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
@@ -317,17 +311,14 @@ async fn assert_open_meta_as_directory_and_file(
     )
     .await;
 
-    // To open "meta" as a file none of the following are true:
-    //   1. OPEN_FLAG_DIRECTORY is set
-    //   2. OPEN_FLAG_NODE_REFERENCE is set
+    // To open "meta" as a directory, no protocols or PROTOCOL_FILE must be specified.
     let file_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::NOT_DIRECTORY,
-        fio::OpenFlags::APPEND,
+        fio::PERM_READABLE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
+        fio::Flags::PROTOCOL_FILE,
+        fio::Flags::PROTOCOL_FILE | fio::Flags::PROTOCOL_NODE,
     ];
 
     let file_child_paths = generate_valid_file_paths(child_base_path);
@@ -349,6 +340,7 @@ async fn assert_open_meta_as_directory_and_file(
         file_flags_and_child_paths,
     )
     .into_iter();
+
     assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
@@ -366,13 +358,12 @@ async fn assert_open_meta_subdirectory(
     let package_root = &source.dir;
 
     let success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
+        fio::PERM_READABLE,
+        fio::Flags::PROTOCOL_DIRECTORY,
+        fio::Flags::PROTOCOL_NODE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
     ];
 
     let child_paths = generate_valid_directory_paths(child_base_path);
@@ -405,14 +396,12 @@ async fn assert_open_meta_file(source: &PackageSource, parent_path: &str, child_
     let package_root = &source.dir;
 
     let success_flags = [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_WRITABLE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::NOT_DIRECTORY,
-        fio::OpenFlags::APPEND,
+        fio::PERM_READABLE,
+        fio::Flags::PROTOCOL_NODE,
+        fio::Flags::FLAG_SEND_REPRESENTATION,
+        fio::Flags::PERM_INHERIT_WRITE,
+        fio::Flags::PERM_INHERIT_EXECUTE,
+        fio::Flags::PROTOCOL_FILE,
     ];
 
     let child_paths = generate_valid_file_paths(child_base_path);
@@ -456,9 +445,9 @@ async fn open_parent(package_root: &fio::DirectoryProxy, parent_path: &str) -> f
         .expect("open parent directory")
 }
 
-fn open_node(parent: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> fio::NodeProxy {
+fn open_node(parent: &fio::DirectoryProxy, flags: fio::Flags, path: &str) -> fio::NodeProxy {
     let (node, server_end) = create_proxy::<fio::NodeMarker>();
-    parent.deprecated_open(flags, fio::ModeType::empty(), path, server_end).expect("open node");
+    parent.open(path, flags, &Default::default(), server_end.into_channel()).expect("open node");
     node
 }
 
@@ -504,10 +493,10 @@ fn generate_valid_file_paths(base: &str) -> Vec<String> {
     vec![base.to_string(), format!("/{base}")]
 }
 
-async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
+async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::Flags) -> Result<(), Error> {
     let protocol =
         String::from_utf8(node.query().await.context("failed to call describe")?).unwrap();
-    let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
+    let expected = if flag.intersects(fio::Flags::PROTOCOL_NODE) {
         crate::NODE_PROTOCOL_NAMES
     } else {
         crate::DIRECTORY_PROTOCOL_NAMES
@@ -516,42 +505,35 @@ async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> 
         return Err(anyhow!("wrong protocol returned: {:?}", protocol));
     }
 
-    if flag.intersects(fio::OpenFlags::DESCRIBE) {
+    if flag.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
         let event = node.take_event_stream().next().await.ok_or_else(|| anyhow!("no events!"))?;
         let event = event.context("event error")?;
         match event {
-            fio::NodeEvent::OnOpen_ { s, info } => {
-                let () = zx::Status::ok(s).context("OnOpen failed")?;
-                let info = info.ok_or_else(|| anyhow!("missing info"))?;
-                let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-                    fio::NodeInfoDeprecated::Service(fio::Service)
-                } else {
-                    fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
-                };
-                if *info != expected {
-                    return Err(anyhow!("wrong protocol returned: {:?}", info));
+            fio::NodeEvent::OnRepresentation { payload: representation } => match representation {
+                fio::Representation::Node(_) => {
+                    if !flag.contains(fio::Flags::PROTOCOL_NODE) {
+                        return Err(anyhow!("wrong protocol returned: {:?}", representation));
+                    }
                 }
-            }
-            event @ fio::NodeEvent::OnRepresentation { .. } => {
-                return Err(anyhow!("unexpected event returned: {:?}", event));
-            }
-            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
-                return Err(anyhow!("unknown event returned: {:?}", ordinal))
-            }
+                fio::Representation::Directory(_) => {
+                    if flag.contains(fio::Flags::PROTOCOL_NODE) {
+                        return Err(anyhow!("wrong protocol returned: {:?}", representation));
+                    }
+                }
+                _ => return Err(anyhow!("wrong protocol returned: {:?}", representation)),
+            },
+            event => return Err(anyhow!("unexpected event returned: {:?}", event)),
         }
     };
     Ok(())
 }
 
-async fn verify_content_file_opened(
-    node: fio::NodeProxy,
-    flag: fio::OpenFlags,
-) -> Result<(), Error> {
-    // Calling Node.Query to determine the channel's protocol causes the OnOpen event to be read
-    // from the channel and stored in the NodeProxy. When the channel is then moved from the
-    // NodeProxy to the FileProxy, the OnOpen event gets dropped. The event is read here so it
-    // doesn't get dropped.
-    let on_open_event = if flag.intersects(fio::OpenFlags::DESCRIBE) {
+async fn verify_content_file_opened(node: fio::NodeProxy, flag: fio::Flags) -> Result<(), Error> {
+    // Calling Node.Query to determine the channel's protocol causes the OnRepresentation event to
+    // be read from the channel and stored in the NodeProxy. When the channel is then moved from the
+    // NodeProxy to the FileProxy, the OnRepresentation event gets dropped. The event is read here
+    // so it doesn't get dropped.
+    let on_representation = if flag.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
         Some(
             node.take_event_stream()
                 .next()
@@ -564,85 +546,62 @@ async fn verify_content_file_opened(
     };
 
     let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
-    if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
+
+    // The entry should always be opened as a file unless we explicitly specified the node protocol.
+    if flag.intersects(fio::Flags::PROTOCOL_NODE) {
         if !crate::NODE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
             return Err(anyhow!("wrong protocol returned: {:?}", protocol));
         }
-        if let Some(event) = on_open_event {
-            match event {
-                fio::NodeEvent::OnOpen_ { s, info } => {
-                    let () = zx::Status::ok(s).context("OnOpen failed")?;
-                    let info = info.ok_or_else(|| anyhow!("missing info"))?;
-                    if *info != fio::NodeInfoDeprecated::Service(fio::Service) {
-                        return Err(anyhow!("wrong protocol returned: {:?}", info));
-                    }
-                }
-                event @ fio::NodeEvent::OnRepresentation { .. } => {
-                    return Err(anyhow!("unexpected event returned: {:?}", event));
-                }
-                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
-                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
-                }
-            }
+        if let Some(event) = on_representation {
+            let fio::NodeEvent::OnRepresentation { payload: representation } = event else {
+                return Err(anyhow!("unexpected event returned: {:?}", event));
+            };
+            let fio::Representation::Node(_) = representation else {
+                return Err(anyhow!("unexpected representation returned: {:?}", representation));
+            };
         }
-    } else {
-        if !crate::FILE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
-            return Err(anyhow!("wrong protocol returned: {:?}", protocol));
+        return Ok(());
+    }
+    if !crate::FILE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
+        return Err(anyhow!("wrong protocol returned: {:?}", protocol));
+    }
+    {
+        let file = fio::FileProxy::new(node.into_channel().unwrap());
+        let fio::FileInfo { observer, .. } =
+            file.describe().await.context("failed to call describe")?;
+        // Only blobfs blobs set the observer to indicate when the blob is readable. The blobs
+        // should be immediately readable here.
+        if let Some(observer) = observer {
+            let _: zx::Signals = observer
+                .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+                .context("FILE_SIGNAL_READABLE not set")?;
         }
-        {
-            let file = fio::FileProxy::new(node.into_channel().unwrap());
-            let fio::FileInfo { observer, .. } =
-                file.describe().await.context("failed to call describe")?;
-            // Only blobfs blobs set the observer to indicate when the blob is readable. The blobs
-            // should be immediately readable here.
-            if let Some(observer) = observer {
-                let _: zx::Signals = observer
-                    .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
-                    .context("FILE_SIGNAL_READABLE not set")?;
-            }
-        }
+    }
 
-        if let Some(event) = on_open_event {
-            match event {
-                fio::NodeEvent::OnOpen_ { s, info } => {
-                    let () = zx::Status::ok(s).context("OnOpen failed")?;
-                    let info = info.ok_or_else(|| anyhow!("missing info"))?;
-                    if let fio::NodeInfoDeprecated::File(fio::FileObject { event, stream: _ }) =
-                        *info
-                    {
-                        // Only blobfs blobs set the event to indicate when the blob is readable.
-                        // The blobs should be immediately readable here.
-                        if let Some(event) = event {
-                            let _: zx::Signals = event
-                                .wait_handle(
-                                    zx::Signals::USER_0,
-                                    zx::MonotonicInstant::INFINITE_PAST,
-                                )
-                                .context("FILE_SIGNAL_READABLE not set")?;
-                        }
-                    } else {
-                        return Err(anyhow!("wrong protocol returned: {:?}", info));
-                    }
-                }
-                event @ fio::NodeEvent::OnRepresentation { .. } => {
-                    return Err(anyhow!("unexpected event returned: {:?}", event));
-                }
-                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
-                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
+    if let Some(event) = on_representation {
+        match event {
+            fio::NodeEvent::OnRepresentation { payload: representation } => {
+                let fio::Representation::File(file_info) = representation else {
+                    return Err(anyhow!("wrong representation returned: {:?}", representation));
+                };
+                // Only blobfs blobs set the event to indicate when the blob is readable.
+                // The blobs should be immediately readable here.
+                if let Some(event) = file_info.observer {
+                    let _: zx::Signals = event
+                        .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+                        .context("FILE_SIGNAL_READABLE not set")?;
                 }
             }
+            event => return Err(anyhow!("unexpected event returned: {:?}", event)),
         }
     }
     Ok(())
 }
 
-async fn verify_meta_as_file_opened(
-    node: fio::NodeProxy,
-    flag: fio::OpenFlags,
-) -> Result<(), Error> {
+async fn verify_meta_as_file_opened(node: fio::NodeProxy, flag: fio::Flags) -> Result<(), Error> {
     let protocol =
         String::from_utf8(node.query().await.context("failed to call describe")?).unwrap();
-    let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
+    let expected = if flag.intersects(fio::Flags::PROTOCOL_NODE) {
         crate::NODE_PROTOCOL_NAMES
     } else {
         crate::FILE_PROTOCOL_NAMES
@@ -651,23 +610,17 @@ async fn verify_meta_as_file_opened(
         return Err(anyhow!("wrong protocol returned: {:?}", protocol));
     }
 
-    if flag.intersects(fio::OpenFlags::DESCRIBE) {
+    if flag.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
         let event = node.take_event_stream().next().await.ok_or_else(|| anyhow!("no events!"))?;
         let event = event.context("event error")?;
         match event {
-            fio::NodeEvent::OnOpen_ { s, info } => {
-                let () = zx::Status::ok(s).context("OnOpen failed")?;
-                let info = info.ok_or_else(|| anyhow!("missing info"))?;
-                match *info {
-                    fio::NodeInfoDeprecated::File(fio::FileObject { .. }) => {}
-                    info => return Err(anyhow!("wrong protocol returned: {:?}", info)),
-                }
+            fio::NodeEvent::OnRepresentation { payload: representation } => {
+                let fio::Representation::File(_) = representation else {
+                    return Err(anyhow!("wrong representation returned: {:?}", representation));
+                };
             }
-            event @ fio::NodeEvent::OnRepresentation { .. } => {
+            event => {
                 return Err(anyhow!("unexpected event returned: {:?}", event));
-            }
-            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
-                return Err(anyhow!("unknown event returned: {:?}", ordinal))
             }
         }
     }
@@ -692,21 +645,7 @@ async fn clone() {
 async fn clone_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
 
-    for flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::RIGHT_WRITABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::OpenFlags::APPEND,
-        fio::OpenFlags::DESCRIBE,
-    ] {
-        if flag.intersects(fio::OpenFlags::APPEND) {
-            continue;
-        }
-        if flag.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
-            continue;
-        }
-
+    for flag in [fio::PERM_READABLE, fio::PERM_EXECUTABLE, fio::Flags::FLAG_SEND_REPRESENTATION] {
         assert_clone_directory_overflow(
             root_dir,
             ".",
@@ -738,7 +677,7 @@ async fn clone_per_package_source(source: PackageSource) {
             ],
         )
         .await;
-        if flag.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
+        if flag.intersects(fio::PERM_EXECUTABLE) {
             // neither the "meta" dir nor meta subdirectories can be opened with the executable
             // right, so they can not be cloned with the executable right.
         } else {
@@ -781,24 +720,12 @@ async fn clone_per_package_source(source: PackageSource) {
 async fn assert_clone_directory_no_overflow(
     package_root: &fio::DirectoryProxy,
     path: &str,
-    flags_deprecated: fio::OpenFlags,
+    flags: fio::Flags,
     expected_dirents: Vec<DirEntry>,
 ) {
-    // Only interested in opening connection to path with READABLE and EXECUTABLE rights.
-    let mut flags = fio::Flags::empty();
-    if flags_deprecated.intersects(fio::OpenFlags::RIGHT_READABLE) {
-        flags |= fuchsia_fs::PERM_READABLE;
-    }
-    if flags_deprecated.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
-        flags |= fuchsia_fs::PERM_EXECUTABLE;
-    }
     let parent = open_directory(package_root, path, flags).await.expect("open parent directory");
     let (clone, server_end) = create_proxy::<fio::DirectoryMarker>();
-
-    let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent
-        .deprecated_open(flags_deprecated, fio::ModeType::empty(), ".", node_request)
-        .expect("cloned node");
+    parent.open(".", flags, &Default::default(), server_end.into_channel()).expect("cloned node");
     assert_read_dirents_no_overflow(&clone, expected_dirents).await;
 }
 
@@ -843,7 +770,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "meta", fio::Flags::empty())
+        &fuchsia_fs::directory::open_directory(&root_dir, "meta", fio::PERM_READABLE)
             .await
             .expect("open meta as dir"),
         vec![
@@ -866,7 +793,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
         &fuchsia_fs::directory::open_directory(
             &root_dir,
             "dir_overflow_readdirents",
-            fio::Flags::empty(),
+            fio::PERM_READABLE,
         )
         .await
         .expect("open dir_overflow_readdirents"),
@@ -877,7 +804,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
         &fuchsia_fs::directory::open_directory(
             &root_dir,
             "meta/dir_overflow_readdirents",
-            fio::Flags::empty(),
+            fio::PERM_READABLE,
         )
         .await
         .expect("open meta/dir_overflow_readdirents"),
@@ -887,7 +814,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
 
     // Handle no-overflow cases (e.g. when size of total dirents does not exceed MAX_BUF).
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "dir", fio::Flags::empty())
+        &fuchsia_fs::directory::open_directory(&root_dir, "dir", fio::PERM_READABLE)
             .await
             .expect("open dir"),
         vec![
@@ -897,7 +824,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "meta/dir", fio::Flags::empty())
+        &fuchsia_fs::directory::open_directory(&root_dir, "meta/dir", fio::PERM_READABLE)
             .await
             .expect("open meta/dir"),
         vec![
@@ -973,7 +900,7 @@ async fn rewind_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
     // Handle overflow cases.
     for path in [".", "meta", "dir_overflow_readdirents", "meta/dir_overflow_readdirents"] {
-        let dir = fuchsia_fs::directory::open_directory(&root_dir, path, fio::Flags::empty())
+        let dir = fuchsia_fs::directory::open_directory(&root_dir, path, fio::PERM_READABLE)
             .await
             .unwrap();
         assert_rewind_overflow_when_seek_offset_at_end(&dir).await;
@@ -983,7 +910,7 @@ async fn rewind_per_package_source(source: PackageSource) {
     // Handle non-overflow cases.
     for path in ["dir", "meta/dir"] {
         assert_rewind_no_overflow(
-            &fuchsia_fs::directory::open_directory(&root_dir, path, fio::Flags::empty())
+            &fuchsia_fs::directory::open_directory(&root_dir, path, fio::PERM_READABLE)
                 .await
                 .unwrap(),
         )
@@ -1060,7 +987,7 @@ async fn get_token() {
 async fn get_token_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     for path in [".", "dir", "meta", "meta/dir"] {
-        let dir = fuchsia_fs::directory::open_directory(root_dir, path, fio::Flags::empty())
+        let dir = fuchsia_fs::directory::open_directory(root_dir, path, fio::PERM_READABLE)
             .await
             .unwrap();
 

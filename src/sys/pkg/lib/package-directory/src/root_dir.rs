@@ -284,6 +284,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         // The VFS should disallow file creation since we cannot serve a mutable connection.
         assert!(!flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT));
 
+        // Handle case where the request is for this directory itself (e.g. ".").
         if path.is_empty() {
             flags.to_object_request(server_end).handle(|object_request| {
                 // NOTE: Some older CTF tests still rely on being able to use the APPEND flag in
@@ -300,13 +301,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             return;
         }
 
-        // vfs::path::Path::as_str() is an object relative path expression [1], except that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        // `path` is relative, and may include a trailing slash.
         let canonical_path = path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref());
 
         if canonical_path == "meta" {
@@ -379,14 +374,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        // Disallow creating a mutable connection to this node or any children.
-        if flags.intersects(crate::MUTABLE_FLAGS) {
+        if !flags.difference(crate::ALLOWED_FLAGS).is_empty() {
             return Err(zx::Status::NOT_SUPPORTED);
         }
-        // The VFS should disallow file creation or append/truncate as these require mutable rights.
-        assert!(flags.creation_mode() == vfs::CreationMode::Never);
-        assert!(!flags.intersects(fio::Flags::FILE_APPEND | fio::Flags::FILE_TRUNCATE));
 
+        // Handle case where the request is for this directory itself (e.g. ".").
         if path.is_empty() {
             // `ImmutableConnection` checks that only directory flags are specified.
             object_request
@@ -395,13 +387,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             return Ok(());
         }
 
-        // vfs::path::Path::as_str() is an object relative path expression [1], except that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        // `path` is relative, and may include a trailing slash.
         let canonical_path = path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref());
 
         if canonical_path == "meta" {
@@ -412,27 +398,26 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
             // the attribute instead of opening as a file to read the merkle root content.
 
             // To remain POSIX compliant, we must default to opening meta as a file unless the
-            // directory protocol (which maps to O_DIRECTORY) is specified. Otherwise, it would be
-            // impossible to open as a directory, since there is no equivalent flag in POSIX that
-            // maps to the file protocol (the lack of O_DIRECTORY is used to specify this).
-            let open_meta_as_file =
-                !flags.intersects(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PROTOCOL_NODE);
-            return if open_meta_as_file {
+            // directory protocol (i.e. O_DIRECTORY) is explicitly requested.
+            let open_meta_as_dir = flags.is_dir_allowed() && !flags.is_file_allowed();
+            if !open_meta_as_dir {
+                if path.is_dir() {
+                    return Err(zx::Status::NOT_DIR);
+                }
                 let file = self.create_meta_as_file().map_err(|e| {
                     error!("Error creating the meta file: {:?}", e);
                     zx::Status::INTERNAL
                 })?;
-                vfs::file::serve(file, scope, &flags, object_request)
-            } else if flags.is_node() || flags.is_dir_allowed() {
-                MetaAsDir::new(self).open3(scope, vfs::Path::dot(), flags, object_request)
-            } else {
-                // Reject opening as a symlink.
-                Err(zx::Status::WRONG_TYPE)
-            };
+                return vfs::file::serve(file, scope, &flags, object_request);
+            }
+            return MetaAsDir::new(self).open3(scope, vfs::Path::dot(), flags, object_request);
         }
 
         if canonical_path.starts_with("meta/") {
             if let Some(file) = self.get_meta_file(canonical_path)? {
+                if path.is_dir() {
+                    return Err(zx::Status::NOT_DIR);
+                }
                 return vfs::file::serve(file, scope, &flags, object_request);
             }
 
@@ -443,6 +428,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if let Some(blob) = self.non_meta_files.get(canonical_path) {
+            if path.is_dir() {
+                return Err(zx::Status::NOT_DIR);
+            }
             return self.non_meta_storage.open3(blob, flags, scope, object_request);
         }
 
@@ -827,33 +815,28 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn root_dir_open_non_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
-        for path in ["resource", "resource/"] {
-            let proxy = fuchsia_fs::directory::open_file(&root_dir, path, fio::PERM_READABLE)
-                .await
-                .unwrap();
-            assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"blob-contents".to_vec());
-        }
+        let proxy = fuchsia_fs::directory::open_file(&root_dir, "resource", fio::PERM_READABLE)
+            .await
+            .unwrap();
+        assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"blob-contents".to_vec());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn root_dir_open_meta_as_file() {
         let (env, root_dir) = TestEnv::new().await;
-        for path in ["meta", "meta/"] {
-            let proxy = fuchsia_fs::directory::open_file(&root_dir, path, fio::PERM_READABLE)
-                .await
-                .unwrap();
-            assert_eq!(
-                fuchsia_fs::file::read(&proxy).await.unwrap(),
-                env.root_dir.hash.to_string().as_bytes()
-            );
-            // Ensure the connection is cloned correctly (i.e. we don't get meta-as-dir).
-            let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>();
-            proxy.clone(server_end.into_channel().into()).unwrap();
-            assert_eq!(
-                fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
-                env.root_dir.hash.to_string().as_bytes()
-            );
-        }
+        let proxy =
+            fuchsia_fs::directory::open_file(&root_dir, "meta", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            fuchsia_fs::file::read(&proxy).await.unwrap(),
+            env.root_dir.hash.to_string().as_bytes()
+        );
+        // Ensure the connection is cloned correctly (i.e. we don't get meta-as-dir).
+        let (cloned_proxy, server_end) = create_proxy::<fio::FileMarker>();
+        proxy.clone(server_end.into_channel().into()).unwrap();
+        assert_eq!(
+            fuchsia_fs::file::read(&cloned_proxy).await.unwrap(),
+            env.root_dir.hash.to_string().as_bytes()
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -896,7 +879,9 @@ mod tests {
             let proxy = fuchsia_fs::directory::open_node(
                 &root_dir,
                 path,
-                fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+                fio::Flags::PROTOCOL_NODE
+                    | fio::Flags::PROTOCOL_DIRECTORY
+                    | fio::Flags::PERM_GET_ATTRIBUTES,
             )
             .await
             .unwrap();
@@ -918,38 +903,40 @@ mod tests {
                 )
             );
         }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn root_dir_open_meta_as_symlink_wrong_type() {
-        let (_env, root_dir) = TestEnv::new().await;
-        // Opening as symlink should return an error
-        for path in ["meta", "meta/"] {
-            let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
-            root_dir
-                .open(
-                    path,
-                    fio::Flags::PROTOCOL_SYMLINK | fio::Flags::FLAG_SEND_REPRESENTATION,
-                    &Default::default(),
-                    server_end.into_channel(),
-                )
-                .unwrap();
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
-            );
-        }
+        // We should also be able to open the meta file as a node.
+        let proxy = fuchsia_fs::directory::open_node(
+            &root_dir,
+            "meta",
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+        )
+        .await
+        .unwrap();
+        let (mutable_attributes, immutable_attributes) = proxy
+            .get_attributes(
+                fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            fio::NodeAttributes2 { mutable_attributes, immutable_attributes },
+            immutable_attributes!(
+                fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
+                Immutable {
+                    protocols: fio::NodeProtocolKinds::FILE,
+                    abilities: fio::Abilities::READ_BYTES | fio::Abilities::GET_ATTRIBUTES,
+                }
+            )
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn root_dir_open_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
-        for path in ["meta/file", "meta/file/"] {
-            let proxy = fuchsia_fs::directory::open_file(&root_dir, path, fio::PERM_READABLE)
-                .await
-                .unwrap();
-            assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"meta-contents0".to_vec());
-        }
+        let proxy = fuchsia_fs::directory::open_file(&root_dir, "meta/file", fio::PERM_READABLE)
+            .await
+            .unwrap();
+        assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"meta-contents0".to_vec());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

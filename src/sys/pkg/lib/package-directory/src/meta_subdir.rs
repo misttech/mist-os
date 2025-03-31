@@ -11,7 +11,7 @@ use vfs::directory::entry::EntryInfo;
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
-use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest as _};
+use vfs::{immutable_attributes, ObjectRequestRef, ToObjectRequest as _};
 
 pub(crate) struct MetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -75,6 +75,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         // The VFS should disallow file creation since we cannot serve a mutable connection.
         assert!(!flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT));
 
+        // Handle case where the request is for this directory itself (e.g. ".").
         if path.is_empty() {
             flags.to_object_request(server_end).handle(|object_request| {
                 // NOTE: Some older CTF tests still rely on being able to use the APPEND flag in
@@ -91,14 +92,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
             return;
         }
 
-        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
-        // that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        // `path` is relative, and may include a trailing slash.
         let file_path = format!(
             "{}{}",
             self.path,
@@ -134,14 +128,15 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        // Disallow creating a mutable or executable connection to this node or any children.
-        if flags.intersects(crate::MUTABLE_FLAGS.union(fio::Flags::PERM_EXECUTE)) {
+        if !flags.difference(crate::ALLOWED_FLAGS).is_empty() {
             return Err(zx::Status::NOT_SUPPORTED);
         }
-        // The VFS should disallow file creation or append/truncate as these require mutable rights.
-        assert!(flags.creation_mode() == vfs::CreationMode::Never);
-        assert!(!flags.intersects(fio::Flags::FILE_APPEND | fio::Flags::FILE_TRUNCATE));
+        // Disallow creating an executable connection to this node or any children.
+        if flags.contains(fio::Flags::PERM_EXECUTE) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
 
+        // Handle case where the request is for this directory itself (e.g. ".").
         if path.is_empty() {
             // `ImmutableConnection` checks that only directory flags are specified.
             object_request
@@ -150,14 +145,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
             return Ok(());
         }
 
-        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
-        // that it may:
-        //   1. have a trailing "/"
-        //   2. be exactly "."
-        //   3. be longer than 4,095 bytes
-        // The .is_empty() check above rules out "." and the following line removes the possible
-        // trailing "/".
-        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        // `path` is relative, and may include a trailing slash.
         let file_path = format!(
             "{}{}",
             self.path,
@@ -165,6 +153,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         );
 
         if let Some(file) = self.root_dir.get_meta_file(&file_path)? {
+            if path.is_dir() {
+                return Err(zx::Status::NOT_DIR);
+            }
             return vfs::file::serve(file, scope, &flags, object_request);
         }
 
@@ -310,11 +301,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn meta_subdir_open_file() {
         let (_env, sub_dir) = TestEnv::new().await;
-        for path in ["dir/file", "dir/file/"] {
-            let proxy =
-                fuchsia_fs::directory::open_file(&sub_dir, path, fio::PERM_READABLE).await.unwrap();
-            assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"contents".to_vec());
-        }
+        let proxy = fuchsia_fs::directory::open_file(&sub_dir, "dir/file", fio::PERM_READABLE)
+            .await
+            .unwrap();
+        assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"contents".to_vec());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
