@@ -73,6 +73,7 @@ rustc_library_with_features("netstack3-ip") {
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:lru-cache",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:sha2",
