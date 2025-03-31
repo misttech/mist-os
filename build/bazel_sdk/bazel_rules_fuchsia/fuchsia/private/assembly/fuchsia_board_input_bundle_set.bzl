@@ -6,7 +6,7 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo", "FuchsiaBoardInputBundleSetInfo")
-load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir_with_file")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_input_bundle_set_impl(ctx):
@@ -64,7 +64,7 @@ fuchsia_board_input_bundle_set = rule(
 )
 
 def _fuchsia_prebuilt_board_input_bundle_set_impl(ctx):
-    directory = select_root_dir(ctx.files.files)
+    directory = select_root_dir_with_file(ctx.files.files, "board_input_bundle_set.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardInputBundleSetInfo(

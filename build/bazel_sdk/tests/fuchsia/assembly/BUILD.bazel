@@ -179,6 +179,23 @@ fuchsia_prebuilt_board_configuration(
 )
 
 filegroup(
+    name = "prebuilt_nested_board_config_files",
+    srcs = glob(["test_data/prebuilt_nested_board_config/**/*"]),
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "prebuilt_nested_board_config",
+    files = ":prebuilt_nested_board_config_files",
+)
+
+fuchsia_board_configuration_test(
+    name = "nested_board_configuration_test",
+    board_config = ":prebuilt_nested_board_config",
+    golden_file = ":test_data/prebuilt_nested_board_config/nested/board_configuration.json",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "prebuilt_replacement_board_config_files",
     srcs = glob(["test_data/prebuilt_replacement_board_config/**/*"]),
 )

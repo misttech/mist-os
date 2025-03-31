@@ -20,7 +20,7 @@ load(
     "LOCAL_ONLY_ACTION_KWARGS",
     "extract_labels",
     "replace_labels_with_files",
-    "select_root_dir",
+    "select_root_dir_with_file",
 )
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
@@ -244,7 +244,7 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
-    directory = select_root_dir(ctx.files.files)
+    directory = select_root_dir_with_file(ctx.files.files, "board_configuration.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardConfigInfo(

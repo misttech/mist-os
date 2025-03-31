@@ -21,7 +21,7 @@ load(
     "LOCAL_ONLY_ACTION_KWARGS",
     "extract_labels",
     "replace_labels_with_files",
-    "select_root_dir",
+    "select_root_dir_with_file",
 )
 
 # Define build types
@@ -180,7 +180,7 @@ def _fuchsia_product_configuration_impl(ctx):
     ]
 
 def _fuchsia_prebuilt_product_configuration_impl(ctx):
-    directory = select_root_dir(ctx.files.files)
+    directory = select_root_dir_with_file(ctx.files.files, "product_configuration.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaProductConfigInfo(

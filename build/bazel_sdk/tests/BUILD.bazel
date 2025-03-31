@@ -40,6 +40,7 @@ test_suite(
         "//fuchsia/assembly:hybrid_board_configuration_golden_test",
         "//fuchsia/assembly:hybrid_board_configuration_with_set_golden_test",
         "//fuchsia/assembly:hybrid_product_config_golden_test",
+        "//fuchsia/assembly:nested_board_configuration_test",
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:prebuilt_product_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",

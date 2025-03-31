@@ -9,6 +9,18 @@ load("//fuchsia/private:utils.bzl", _LOCAL_ONLY_ACTION_KWARGS = "LOCAL_ONLY_ACTI
 
 LOCAL_ONLY_ACTION_KWARGS = _LOCAL_ONLY_ACTION_KWARGS
 
+def select_root_dir_with_file(files, file):
+    """Finds the top-most directory that has a direct file with the name `file`
+
+    Args:
+        files: A list of files.
+        file: The name of a file that should be found in the return directory.
+
+    Returns:
+        The top-most directory that contains the `file`.
+    """
+    return paths.dirname(select_single_file(files, file).path)
+
 def select_root_dir(files):
     """Finds the top-most directory in a set of files.
 
