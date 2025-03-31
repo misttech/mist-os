@@ -1037,7 +1037,7 @@ void Thread::Current::Kill() {
 
 cpu_mask_t Thread::SetCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-  return Scheduler::SetCpuAffinity(*this, affinity, AffinityType::Hard);
+  return Scheduler::SetCpuAffinity<Affinity::Hard>(*this, affinity);
 }
 
 cpu_mask_t Thread::GetCpuAffinity() const {
@@ -1048,7 +1048,7 @@ cpu_mask_t Thread::GetCpuAffinity() const {
 
 cpu_mask_t Thread::SetSoftCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-  return Scheduler::SetCpuAffinity(*this, affinity, AffinityType::Soft);
+  return Scheduler::SetCpuAffinity<Affinity::Soft>(*this, affinity);
 }
 
 cpu_mask_t Thread::GetSoftCpuAffinity() const {
@@ -1933,7 +1933,6 @@ void Thread::Current::BecomeIdle() {
     // Now that we are the idle thread, make sure that we drop out of the
     // scheduler's bookkeeping altogether.
     Scheduler::RemoveFirstThread(t);
-    Scheduler::UnblockIdle(t);
     t->set_running();
 
     // Cpu must be marked active by now, indicate that it is idle as well.
@@ -2123,11 +2122,11 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
   char profile_str[64]{0};
   if (const SchedulerState::EffectiveProfile& ep = t->scheduler_state().effective_profile();
       ep.IsFair()) {
-    snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.weight().raw_value());
+    snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.fair.weight.raw_value());
   } else {
     DEBUG_ASSERT(ep.IsDeadline());
     snprintf(profile_str, sizeof(profile_str), "Deadline (c,d = %ld,%ld)",
-             ep.deadline().capacity_ns.raw_value(), ep.deadline().deadline_ns.raw_value());
+             ep.deadline.capacity_ns.raw_value(), ep.deadline.deadline_ns.raw_value());
   }
 
   if (full_dump) {
@@ -2138,7 +2137,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
             thread_state_to_str(t->state()), (int)t->scheduler_state().curr_cpu(),
             (int)t->scheduler_state().last_cpu(), t->scheduler_state().hard_affinity(),
             t->scheduler_state().soft_affinity(), profile_str,
-            t->scheduler_state().remaining_time_slice_ns().raw_value());
+            t->scheduler_state().time_slice_ns());
     dprintf(INFO, "\truntime_ns %" PRIi64 ", runtime_s %" PRIi64 "\n", runtime,
             runtime / 1000000000);
     t->stack().DumpInfo(INFO);

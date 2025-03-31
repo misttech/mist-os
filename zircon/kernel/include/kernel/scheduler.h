@@ -8,11 +8,9 @@
 
 #include <lib/fit/function.h>
 #include <lib/fxt/interned_string.h>
-#include <lib/fxt/string_ref.h>
 #include <lib/power-management/energy-model.h>
 #include <lib/power-management/power-state.h>
 #include <lib/relaxed_atomic.h>
-#include <lib/sched/affine.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <stdint.h>
@@ -22,8 +20,9 @@
 
 #include <fbl/intrusive_pointer_traits.h>
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/wavl_tree_augmented_invariant_observer.h>
+#include <fbl/wavl_tree_best_node_observer.h>
 #include <ffl/fixed.h>
+#include <kernel/auto_lock.h>
 #include <kernel/dpc.h>
 #include <kernel/mp.h>
 #include <kernel/owned_wait_queue.h>
@@ -31,8 +30,6 @@
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <kernel/wait.h>
-#include <ktl/algorithm.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 
 // Forward declarations.
@@ -65,8 +62,7 @@ constexpr zx_cpu_performance_scale_t ToUserPerformanceScale(SchedPerformanceScal
   const UserScale user_scale{value};
   const uint64_t integral = user_scale.Integral().raw_value() >> UserScale::Format::FractionalBits;
   const uint64_t fractional = user_scale.Fraction().raw_value();
-  return {.integral_part = static_cast<uint32_t>(integral),
-          .fractional_part = static_cast<uint32_t>(fractional)};
+  return {.integral_part = uint32_t(integral), .fractional_part = uint32_t(fractional)};
 }
 
 // Implements fair and deadline scheduling algorithms and manages the associated
@@ -78,18 +74,11 @@ class Scheduler {
   template <typename Op, typename TargetType>
   class PiOperation;
 
-  // Minimum fair time slice. Set to avoid excessive reschedule overhead.
-  // TODO(eieio): This needs to be revised and/or scaled for lower OPPs.
-  static constexpr SchedDuration kMinimumFairCapacity = SchedMs(1);
+  // Default minimum granularity of time slices.
+  static constexpr SchedDuration kDefaultMinimumGranularity = SchedMs(1);
 
-  // The default period for fair tasks when period expansion is not in effect.
-  static constexpr SchedDuration kDefaultFairPeriod = SchedDefaultFairPeriod;
-
-  // The minimum fair utilization before period expansion is needed.
-  static constexpr SchedUtilization kMinFairUtilization = kMinimumFairCapacity / kDefaultFairPeriod;
-
-  // Ensure that the min fair utilization is in the range (0, 1].
-  static_assert(0 < kMinimumFairCapacity && kMinimumFairCapacity <= kDefaultFairPeriod);
+  // Default target latency for a scheduling period.
+  static constexpr SchedDuration kDefaultTargetLatency = SchedMs(8);
 
   // The threshold for cross-cluster work stealing. Queues with an estimated
   // runtime below this value are not stolen from if the target and destination
@@ -139,7 +128,7 @@ class Scheduler {
 
   // Dumps the state of the run queue to the specified output target.  Note that
   // interrupts must be disabled in order to call this method.
-  void Dump(FILE* output_target = stdout, bool queue_state_only = false) TA_EXCL(queue_lock_);
+  void Dump(FILE* output_target = stdout) TA_EXCL(queue_lock_);
 
   // Dumps info about the currently active thread (if any).  Note that
   // interrupts must be disabled in order to call this method.
@@ -200,18 +189,18 @@ class Scheduler {
       TA_REQ(chainlock_transaction_token, thread->get_lock());
   static void RemoveFirstThread(Thread* thread)
       TA_REQ(chainlock_transaction_token, thread->get_lock());
-  static void Block(Thread* current_thread)
+  static void Block(Thread* const current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
-  static void Yield(Thread* current_thread)
+  static void Yield(Thread* const current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // Note; no locks should be held when calling preempt.  The thread's lock will be obtained
   // unconditionally in the process.
   static void Preempt() TA_EXCL(chainlock_transaction_token);
 
-  static void Reschedule(Thread* current_thread)
+  static void Reschedule(Thread* const current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
-  static void RescheduleInternal(Thread* current_thread)
+  static void RescheduleInternal(Thread* const current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // Finish unblocking a thread.  This function expects the thread to be locked
@@ -237,7 +226,11 @@ class Scheduler {
   static void UnblockIdle(Thread* idle_thread)
       TA_REQ(chainlock_transaction_token, idle_thread->get_lock());
 
-  // Migrates any threads that can run on other CPUs off of the current CPU.
+  // Called when something has changed about a thread which may result in it
+  // needing to be migrated to a different CPU.  In particular, a change to
+  // either its soft or hard affinity mask.
+  static void Migrate(Thread* thread) TA_REQ(chainlock_transaction_token)
+      TA_REL(thread->get_lock());
   static void MigrateUnpinnedThreads();
 
   // TimerTick is called when the preemption timer for a CPU has fired.
@@ -322,7 +315,8 @@ class Scheduler {
 
   // Get the mask of valid CPUs that thread may run on. If a new mask
   // is set, the thread will be migrated to satisfy the new constraint.
-  static cpu_mask_t SetCpuAffinity(Thread& thread, cpu_mask_t affinity, AffinityType affinity_type)
+  template <Affinity AffinityType>
+  static cpu_mask_t SetCpuAffinity(Thread& thread, cpu_mask_t affinity)
       TA_EXCL(chainlock_transaction_token, thread.get_lock());
 
   // Run the passed callable while holding the specified scheduler's lock.
@@ -388,7 +382,7 @@ class Scheduler {
   }
 
   // Accessors for the "idle" state mask; similar to the active state mask.
-  void SetIdle(bool is_idle) const {
+  void SetIdle(bool is_idle) {
     const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
     if (is_idle) {
       idle_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
@@ -462,8 +456,6 @@ class Scheduler {
   using EffectiveProfile = SchedulerState::EffectiveProfile;
   using BaseProfile = SchedulerState::BaseProfile;
 
-  using Disposition = SchedulerQueueState::Disposition;
-
   using SavedState = concurrent::ChainLockTransactionCommon::SavedState;
 
   static void LockHandoffInternal(SavedState saved_state, Thread* current_thread)
@@ -530,9 +522,6 @@ class Scheduler {
     Association,
   };
 
-  // Returns a tracing string ref for the give placement value.
-  static fxt::StringRef<fxt::RefType::kId> ToStringRef(Placement placement);
-
   // Returns the current system time as a SchedTime value.
   static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
 
@@ -557,7 +546,7 @@ class Scheduler {
       Scheduler* const target = Get(target_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-      if (target->IsSchedulerActiveLocked()) {
+      if (target->IsLockedSchedulerActive()) {
         action(thread, target);
         return target_cpu;
       }
@@ -594,7 +583,7 @@ class Scheduler {
   // actually add a thread to a scheduler's queues, we check the active state of
   // the scheduler's assigned CPU from within the safety of the queue lock using
   // IsLockedSchedulerActive()
-  void SetIsActive(bool is_active) const TA_REQ(queue_lock_) {
+  void SetIsActive(bool is_active) TA_REQ(queue_lock_) {
     const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
     if (is_active) {
       active_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
@@ -607,115 +596,26 @@ class Scheduler {
   // Check to see if |this| scheduler is currently active while holding its
   // queue_lock, ensuring that it will stay in its current state until after we
   // drop the lock.
-  bool IsSchedulerActiveLocked() const TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
+  bool IsLockedSchedulerActive() TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
 
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
   // Common logic for reschedule API.
-  void RescheduleCommon(Thread* current_thread, SchedTime now,
+  void RescheduleCommon(Thread* const current_thread, SchedTime now,
                         EndTraceCallback end_outer_trace = nullptr) TA_EXCL(queue_lock_)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
-  // A utility result type to help avoid missing updates to a thread's
-  // start/finish times when dequeuing from a run queue with a variable
-  // timeline.
-  class DequeueResult {
-   public:
-    // Constructs an empty result.
-    DequeueResult() = default;
-
-    // Constructs a result without a pending update to start/finish times. If
-    // the thread argument is nullptr an empty result is constructed.
-    explicit(false) DequeueResult(Thread* thread) : thread_{thread} {}
-
-    // Constructs a result with a pending update to start/finish times. The
-    // thread argument MUST NOT be nullptr and UpdateThreadTimeline() must be
-    // called with the thread's lock held to apply the pending update to
-    // start/finish times before the result is destroyed or reassigned.
-    DequeueResult(Thread* thread, SchedTime mono_start_time_ns, SchedTime mono_finish_time_ns)
-        : thread_{thread},
-          mono_start_time_ns_{mono_start_time_ns},
-          mono_finish_time_ns_{mono_finish_time_ns} {
-      DEBUG_ASSERT(thread_ != nullptr);
-      DEBUG_ASSERT(mono_start_time_ns != 0 || mono_finish_time_ns != 0);
-    }
-
-    // Destroys the result, asserting that there is no pending update the
-    // thread's start/finish times.
-    ~DequeueResult() {
-      DEBUG_ASSERT_MSG(!is_updated_pending(),
-                       "DequeueResult destroyed with a pending timeline update!");
-    }
-
-    // The result type is move-only.
-    DequeueResult(const DequeueResult&) = delete;
-    DequeueResult& operator=(const DequeueResult&) = delete;
-
-    // Moves the given result into this instance, asserting that the current
-    // instance does not have a pending update to the thread's start/finish
-    // times.
-    DequeueResult(DequeueResult&& other) { *this = ktl::move(other); }
-    DequeueResult& operator=(DequeueResult&& other) {
-      if (this != &other) {
-        DEBUG_ASSERT_MSG(!is_updated_pending(),
-                         "DequeueResult destroyed with a pending timeline update!");
-        thread_ = nullptr;
-        ktl::swap(thread_, other.thread_);
-        ktl::swap(mono_start_time_ns_, other.mono_start_time_ns_);
-        ktl::swap(mono_finish_time_ns_, other.mono_finish_time_ns_);
-      }
-      return *this;
-    }
-
-    // Assigns this instance from a thread without a pending update to the
-    // thread's start/finish times, asserting that the previous thread, if any,
-    // does not have a pending update.
-    DequeueResult& operator=(Thread* thread) {
-      *this = DequeueResult{thread};
-      return *this;
-    }
-
-    // Updates the thread's start/finish times while holding the thread's lock.
-    // May be called unconditionally and more than once, whether or not there
-    // are pending updates.
-    void UpdateThreadTimeline() TA_REQ(thread()->get_lock()) {
-      if (is_updated_pending()) {
-        thread()->scheduler_state().start_time_ = mono_start_time_ns_;
-        thread()->scheduler_state().finish_time_ = mono_finish_time_ns_;
-        mono_start_time_ns_ = mono_finish_time_ns_ = SchedTime{0};
-      }
-    }
-
-    // Returns true if thread's timeline needs to be updated by calling
-    // UpdateThreadTimeline.
-    bool is_updated_pending() const {
-      return mono_start_time_ns_ != 0 || mono_finish_time_ns_ != 0;
-    }
-
-    // Contextually evaluates to true if the result is not empty.
-    explicit operator bool() const { return thread_ != nullptr; }
-
-    Thread* thread() { return thread_; }
-    const Thread* thread() const { return thread_; }
-
-   private:
-    Thread* thread_{nullptr};
-    SchedTime mono_start_time_ns_{0};
-    SchedTime mono_finish_time_ns_{0};
-  };
-
-  // Evaluates the schedule and returns the thread that should execute.
-  DequeueResult EvaluateNextThread(SchedTime now, Thread* current_thread, bool current_is_migrating,
-                                   Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
+  // Evaluates the schedule and returns the thread that should execute,
+  // updating the run queue as necessary.
+  Thread* EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
+                             bool current_is_migrating, SchedDuration total_runtime_ns,
+                             Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
       TA_REQ(chainlock_transaction_token, queue_lock_, current_thread->get_lock());
-
-  // Updates the thread's start/finish times and capacity if the current
-  // activation has expired.
-  void UpdateActivation(Thread* thread, SchedTime now) TA_REQ(queue_lock_, thread->get_lock());
 
   // Adds a thread to the run queue tree. The thread must be active on this
   // CPU.
-  void QueueThread(Thread* thread, Placement placement, SchedTime now = SchedTime{0})
+  void QueueThread(Thread* thread, Placement placement, SchedTime now = SchedTime{0},
+                   SchedDuration total_runtime_ns = SchedDuration{0})
       TA_REQ(queue_lock_, thread->get_lock());
 
   // Removes the thread at the head of the first eligible run queue, or attempt
@@ -739,35 +639,23 @@ class Scheduler {
   //    re-inserted into its new scheduler's run queue.
   //
   // Note that these rules apply to *all* the versions of Dequeue listed below.
-  DequeueResult DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
+  Thread* DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
       TA_REQ(chainlock_transaction_token, queue_lock_);
 
   // Removes the thread at the head of the fair run queue and returns it.
-  DequeueResult DequeueFairThread(SchedTime eligible_time) TA_REQ(queue_lock_);
+  Thread* DequeueFairThread() TA_REQ(queue_lock_);
 
-  // Removes the eligible fair thread with a finish time earlier than the given
-  // finish time and returns it or nullptr if one does not exist.
-  DequeueResult DequeueEarlierFairThread(SchedTime eligible_time, SchedTime finish_time)
+  // Removes the eligible thread with the earliest deadline in the deadline run
+  // queue and returns it.
+  Thread* DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_);
+
+  // Removes the eligible thread with a deadline earlier than the given deadline
+  // and returns it or nullptr if one does not exist.
+  Thread* DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
       TA_REQ(queue_lock_);
 
-  // Removes the eligible deadline thread with the earliest finish time in the
-  // deadline run queue and returns it.
-  DequeueResult DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_);
-
-  // Removes the eligible deadline thread with a finish time earlier than the
-  // given finish time and returns it or nullptr if one does not exist.
-  DequeueResult DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
-      TA_REQ(queue_lock_);
-
-  // Returns the eligible fair thread in the run queue with a finish time
-  // earlier than the given finish time, or nullptr if one does not exist.
-  //
-  // See the note in |FindEarliestEligibleThread| for lifecycle rules for the
-  // returned pointer (if any)
-  Thread* FindEarlierFairThread(SchedTime eligible_time, SchedTime finish_time) TA_REQ(queue_lock_);
-
-  // Returns the eligible deadline thread in the run queue with a finish time
-  // earlier than the given finish time, or nullptr if one does not exist.
+  // Returns the eligible thread in the run queue with a deadline earlier than
+  // the given deadline, or nullptr if one does not exist.
   //
   // See the note in |FindEarliestEligibleThread| for lifecycle rules for the
   // returned pointer (if any)
@@ -775,9 +663,9 @@ class Scheduler {
       TA_REQ(queue_lock_);
 
   // Attempts to steal work from other busy CPUs. Returns nullptr if no work was
-  // stolen, otherwise returns a pointer to the stolen thread that is partially
+  // stolen, otherwise returns a pointer to the stolen thread that is now
   // associated with the local Scheduler instance.
-  DequeueResult StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
+  Thread* StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
       TA_REQ(chainlock_transaction_token) TA_EXCL(queue_lock_);
 
   // Returns the time that the next deadline task will become eligible or infinite
@@ -795,7 +683,7 @@ class Scheduler {
 
   // Returns the completion time clamped to the start of the earliest deadline
   // thread that will become eligible in that time frame and also has an earlier
-  // finish time than the given finish time.
+  // deadline than the given finish time.
   SchedTime ClampToEarlierDeadline(SchedTime completion_time, SchedTime finish_time)
       TA_REQ(queue_lock_);
 
@@ -806,9 +694,11 @@ class Scheduler {
   SchedTime NextThreadTimeslice(Thread* thread, SchedTime now)
       TA_REQ(queue_lock_, thread->get_lock());
 
-  // Updates the fair bandwidth scheduling period based on the number of active
-  // threads.
-  void UpdateFairBandwidthPeriod(SchedTime now) TA_REQ(queue_lock_);
+  // Updates the scheduling period based on the number of active threads.
+  void UpdatePeriod() TA_REQ(queue_lock_);
+
+  // Updates the global virtual timeline.
+  void UpdateTimeline(SchedTime now) TA_REQ(queue_lock_);
 
   static void SetThreadMigrateFnInternal(Thread* thread, Thread::MigrateFn migrate_fn)
       TA_REQ(thread->get_lock(), Thread::get_list_lock());
@@ -818,64 +708,62 @@ class Scheduler {
   void Insert(SchedTime now, Thread* thread, Placement placement = Placement::Insertion)
       TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock());
 
-  // Removes the thread from this CPU's scheduler to move it to another CPU
-  // (i.e. stealing or migration). This method does not require the thread to be
-  // locked exclusively, and consequently leaves a stale value for the thread's
-  // current CPU id. The stale value is later corrected when the thread is
-  // locked exclusively and added to the new target CPU by calling Insert.
-  void Remove(SchedTime now, Thread* thread, cpu_num_t stolen_by = INVALID_CPU)
+  // Removes the thread from this CPU's scheduler as it transitions to another
+  // CPU (either because it is being stolen, or migrated). The thread's lock
+  // cannot be held exclusively at this point, so some of the thread's state
+  // will remain in a transient state until the thread can be re-inserted in its
+  // new home.  Specifically, this includes:
+  //
+  // 1) The thread's current CPU id.
+  // 2) The thread's start time (if it is a fair thread).
+  // 3) The thread's finish time (if it is a fair thread).
+  //
+  // This state will be cleaned up by FinishTransition once the thread has been
+  // locked exclusively.
+  void RemoveForTransition(Thread* thread, SchedulerQueueState::TransientState target_state)
       TA_REQ(queue_lock_, thread->get_scheduler_variable_lock()) TA_REQ_SHARED(thread->get_lock());
 
-  // Removes the thread from this CPU's scheduler and updates the current CPU
-  // id. The thread must not be in the run queue.
-  void RemoveThreadLocked(SchedTime now, Thread* thread)
+  void FinishTransition(SchedTime now, Thread* thread)
       TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock());
+
+  // Removes the thread from this CPU's scheduler. The thread must not be in
+  // the run queue tree.  This is the same operation as RemoveForTransition, but it
+  // requires that the thread's lock is held exclusively, which allows the CPU
+  // id, start time, and finish time to be updated.
+  void Remove(Thread* thread, SchedulerQueueState::TransientState reason =
+                                  SchedulerQueueState::TransientState::None)
+      TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock()) {
+    SchedulerState& state = thread->scheduler_state();
+
+    RemoveForTransition(thread, reason);
+    state.curr_cpu_ = INVALID_CPU;
+    if (IsFairThread(thread)) {
+      state.start_time_ = SchedNs(0);
+      state.finish_time_ = SchedNs(0);
+    }
+  }
 
   // Removes a specific thread from its current RunQueue.  Note that the thread
   // must currently exist in its queue, it is an error otherwise.
   void EraseFromQueue(Thread* thread) TA_REQ(queue_lock_, thread->get_scheduler_variable_lock())
-      TA_REQ(thread->get_lock()) {
-    DEBUG_ASSERT(thread->scheduler_queue_state().in_queue());
-    SchedulerState& state = thread->scheduler_state();
-
-    const bool is_fair = state.discipline() == SchedDiscipline::Fair;
-    RunQueue& queue = is_fair ? fair_run_queue_ : deadline_run_queue_;
+      TA_REQ_SHARED(thread->get_lock()) {
+    DEBUG_ASSERT(thread->scheduler_queue_state().InQueue());
+    const SchedulerState& state = const_cast<const Thread*>(thread)->scheduler_state();
+    RunQueue& queue =
+        state.discipline() == SchedDiscipline::Fair ? fair_run_queue_ : deadline_run_queue_;
     queue.erase(*thread);
-
-    if (is_fair) {
-      VariableToMonotonicInPlace(state.start_time_);
-      VariableToMonotonicInPlace(state.finish_time_);
-    }
   }
 
-  // Adjusts the given fair thread's bandwidth and dynamic parameters for
-  // changes in bandwidth demand since it was last scheduled.
-  void AdjustFairBandwidth(Thread* thread, SchedTime now) TA_REQ(queue_lock_, thread->get_lock());
-
-  // Returns true if there is at least one eligible deadline thread in the run
-  // queue.
-  bool IsDeadlineThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {
+  // Returns true if there is at least one eligible deadline thread in the
+  // run queue.
+  inline bool IsDeadlineThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {
     if (deadline_run_queue_.is_empty()) {
       return false;
     }
 
     const Thread& front = deadline_run_queue_.front();
     AssertInRunQueue(front);
-    return front.scheduler_state().start_time() <= eligible_time;
-  }
-
-  // Returns true if there is at least one eligible fair thread in the run
-  // queue.
-  bool IsFairThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {
-    if (fair_run_queue_.is_empty()) {
-      return false;
-    }
-
-    const SchedTime variable_eligible_time = MonotonicToVariable(eligible_time);
-
-    const Thread& front = fair_run_queue_.front();
-    AssertInRunQueue(front);
-    return front.scheduler_state().start_time() <= variable_eligible_time;
+    return front.scheduler_state().start_time_ <= eligible_time;
   }
 
   // Updates the total expected runtime estimator and exports the atomic shadow
@@ -914,45 +802,35 @@ class Scheduler {
     static bool LessThan(KeyType a, KeyType b) { return a < b; }
     static bool EqualTo(KeyType a, KeyType b) { return a == b; }
     static auto& node_state(Thread& thread) TA_NO_THREAD_SAFETY_ANALYSIS {
-      return thread.scheduler_queue_state().run_queue_node();
+      return thread.scheduler_queue_state().run_queue_node;
     }
   };
 
-  // Observer that maintains the subtree invariant min_finish_time and
-  // min_weight as nodes are added to and removed from the run queue.
-  struct SubtreeInvariantTraits {
-    using SubtreeInvariants = SchedulerState::SubtreeInvariants;
-
-    static SubtreeInvariants GetNodeValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
-      const SchedulerState& scheduler_state = node.scheduler_state();
-      const EffectiveProfile& effective_profile = scheduler_state.effective_profile();
-
-      return {.min_finish_time = scheduler_state.finish_time_,
-              .min_weight = effective_profile.weight_or(SchedWeight::Max())};
+  // Observer that maintains the subtree invariant min_finish_time as nodes are
+  // added to and removed from the run queue.
+  struct SubtreeMinTraits {
+    static SchedTime GetValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
+      return node.scheduler_state().finish_time_;
     }
 
-    static SubtreeInvariants GetSubtreeValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
-      return node.scheduler_state().subtree_invariants_;
+    static SchedTime GetSubtreeBest(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
+      return node.scheduler_state().min_finish_time_;
     }
 
-    static SubtreeInvariants CombineValues(SubtreeInvariants subtree, SubtreeInvariants node) {
-      return {.min_finish_time = ktl::min(subtree.min_finish_time, node.min_finish_time),
-              .min_weight = ktl::min(subtree.min_weight, node.min_weight)};
+    static bool Compare(SchedTime a, SchedTime b) { return a < b; }
+
+    static void AssignBest(Thread& node, SchedTime val) TA_NO_THREAD_SAFETY_ANALYSIS {
+      node.scheduler_state().min_finish_time_ = val;
     }
 
-    static void SetSubtreeValue(Thread& node,
-                                SubtreeInvariants value) TA_NO_THREAD_SAFETY_ANALYSIS {
-      node.scheduler_state().subtree_invariants_ = value;
-    }
-
-    static void ResetSubtreeValue(Thread& target) {}
+    static void ResetBest(Thread& target) {}
   };
 
-  using SubtreeObserver = fbl::WAVLTreeAugmentedInvariantObserver<SubtreeInvariantTraits>;
+  using SubtreeMinObserver = fbl::WAVLTreeBestNodeObserver<SubtreeMinTraits>;
 
   // Alias of the WAVLTree type for the run queue.
   using RunQueue = fbl::WAVLTree<TaskTraits::KeyType, Thread*, TaskTraits, fbl::DefaultObjectTag,
-                                 TaskTraits, SubtreeObserver>;
+                                 TaskTraits, SubtreeMinObserver>;
 
   // Finds the next eligible thread in the given run queue.
   //
@@ -994,11 +872,6 @@ class Scheduler {
     return !thread->IsIdle() && IsFairThread(thread) && thread->state() == THREAD_READY;
   }
 
-  // Called by code paths that encounter a thread in the READY state with a
-  // disposition other than Enqueued. Updates a kcounter to track the rate of
-  // updates that race with lock juggling.
-  static void CountUpdateInTransition();
-
   // Protects run queues and associated metadata for this Scheduler instance.
   // The queue lock is the bottom most lock in the system for the CPU it is
   // associated with: no other locks may be nested within a queue lock. A queue
@@ -1034,17 +907,16 @@ class Scheduler {
   // Asserts that a given thread belongs to |this| Scheduler instance.
   // Requires holding the scheduler's queue_lock_.
   //
-  void AssertInScheduler(const Thread& thread) const TA_REQ(queue_lock_)
-      TA_ASSERT_SHARED(thread.get_lock())
-          TA_ASSERT(thread.get_scheduler_variable_lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
-    // TODO(johngro): Come back here and remove the `&t == active_thread_`
-    // clause once other system-wide invariants have been cleaned up.  See
-    // https://fxbug.dev/340551498 for details.
-    DEBUG_ASSERT_MSG(thread.scheduler_state().curr_cpu() == this_cpu() ||
-                         thread.scheduler_queue_state().stolen_by() == this_cpu() ||
-                         &thread == active_thread_,
-                     "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
-                     thread.tid(), this_cpu_, thread.scheduler_state().curr_cpu());
+  void AssertInScheduler(const Thread& t) const TA_REQ(queue_lock_) TA_ASSERT_SHARED(t.get_lock())
+      TA_ASSERT(t.get_scheduler_variable_lock()) {
+    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
+      // TODO(johngro): Come back here and remove the `&t == active_thread_`
+      // clause once other system-wide invariants have been cleaned up.  See
+      // https://fxbug.dev/340551498 for details.
+      DEBUG_ASSERT_MSG((t.scheduler_state().curr_cpu() == this_cpu_) || (&t == active_thread_),
+                       "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
+                       t.tid(), this_cpu_, t.scheduler_state().curr_cpu());
+    }();
   }
 
   // It would be nice to be able to make a stronger assertion here (that the
@@ -1055,10 +927,12 @@ class Scheduler {
   // it is pretty obvious from the context that the assertion is true.  It might
   // be reasonably to (someday) consider removing even this weak runtime check,
   // and just leaving this as a static analysis workaround, and nothing more.
-  void AssertInRunQueue(const Thread& t) const TA_REQ(queue_lock_) TA_ASSERT_SHARED(t.get_lock())
-      TA_ASSERT(t.get_scheduler_variable_lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
-    DEBUG_ASSERT((t.scheduler_state().curr_cpu_ == this_cpu_) &&
-                 (t.scheduler_queue_state().in_queue()));
+  inline void AssertInRunQueue(const Thread& t) const TA_REQ(queue_lock_)
+      TA_ASSERT_SHARED(t.get_lock()) TA_ASSERT(t.get_scheduler_variable_lock()) {
+    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
+      DEBUG_ASSERT((t.scheduler_state().curr_cpu_ == this_cpu_) &&
+                   (t.scheduler_queue_state().InQueue()));
+    }();
   }
 
   // Add a couple of small no-op helpers which inform the static analyzer of
@@ -1088,10 +962,10 @@ class Scheduler {
   //
   // See StealWork for a practical example of where these methods are useful.
   //
-  static void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
-  static void MarkHasOwnedThreadAccess(const Thread& t) TA_ASSERT(t.get_scheduler_variable_lock())
-      TA_ASSERT_SHARED(t.get_lock()) {}
-  static void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
+  static inline void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
+  static inline void MarkHasOwnedThreadAccess(const Thread& t)
+      TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT_SHARED(t.get_lock()) {}
+  static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
 
   // A mask of all of the currently active scheduler's in the system.  An
@@ -1143,13 +1017,23 @@ class Scheduler {
   TA_GUARDED(queue_lock_)
   Thread* active_thread_{nullptr};
 
+  // Monotonically increasing counter to break ties when queuing tasks with
+  // the same key. This has the effect of placing newly queued tasks behind
+  // already queued tasks with the same key. This is also necessary to
+  // guarantee uniqueness of the key as required by the WAVLTree container.
   TA_GUARDED(queue_lock_)
-  SchedWeight active_thread_weight_{SchedWeight::Max()};
+  uint64_t generation_count_{0};
 
-  // Count of the threads running on this CPU, including threads in the run
+  // Count of the fair threads running on this CPU, including threads in the run
   // queue and the currently running thread. Does not include the idle thread.
   TA_GUARDED(queue_lock_)
-  int32_t runnable_task_count_{0};
+  int32_t runnable_fair_task_count_{0};
+
+  // Count of the deadline threads running on this CPU, including threads in the
+  // run queue and the currently running thread. Does not include the idle
+  // thread.
+  TA_GUARDED(queue_lock_)
+  int32_t runnable_deadline_task_count_{0};
 
   // Total weights of threads running on this CPU, including threads in the
   // run queue and the currently running thread. Does not include the idle
@@ -1162,31 +1046,9 @@ class Scheduler {
   // since the last reschedule.
   SchedWeight scheduled_weight_total_{0};
 
-  // Alias of the affine transform type used for variable <-> monotonic timeline
-  // conversions.
-  using Affine = sched::Affine<10>;
-
-  // The affine transform for converting between monotonic and variable
-  // timelines for the fair run queue.
+  // The global virtual time of this run queue.
   TA_GUARDED(queue_lock_)
-  Affine fair_affine_transform_;
-
-  TA_GUARDED(queue_lock_)
-  SchedDuration fair_period_{kDefaultFairPeriod};
-
-  // Utilities to streamline affine transformations.
-  constexpr SchedTime MonotonicToVariable(SchedTime t) TA_REQ(queue_lock_) {
-    return fair_affine_transform_.MonotonicToVariable(t);
-  }
-  constexpr SchedTime VariableToMonotonic(SchedTime v) TA_REQ(queue_lock_) {
-    return fair_affine_transform_.VariableToMonotonic(v);
-  }
-  constexpr void MonotonicToVariableInPlace(SchedTime& ref) TA_REQ(queue_lock_) {
-    fair_affine_transform_.MonotonicToVariableInPlace(ref);
-  }
-  constexpr void VariableToMonotonicInPlace(SchedTime& ref) TA_REQ(queue_lock_) {
-    fair_affine_transform_.VariableToMonotonicInPlace(ref);
-  }
+  SchedTime virtual_time_{0};
 
   // The system time since the last update to the global virtual time.
   TA_GUARDED(queue_lock_)
@@ -1211,6 +1073,22 @@ class Scheduler {
   // this CPU.
   TA_GUARDED(queue_lock_)
   SchedUtilization total_deadline_utilization_{0};
+
+  // Scheduling period in which every runnable task executes once in units of
+  // minimum granularity.
+  TA_GUARDED(queue_lock_)
+  SchedDuration scheduling_period_grans_{kDefaultTargetLatency / kDefaultMinimumGranularity};
+
+  // The smallest timeslice a thread is allocated in a single round.
+  TA_GUARDED(queue_lock_)
+  SchedDuration minimum_granularity_ns_{kDefaultMinimumGranularity};
+
+  // The target scheduling period. The scheduling period is set to this value
+  // when the number of tasks is low enough for the sum of all timeslices to
+  // fit within this duration. This has the effect of increasing the size of
+  // the timeslices under nominal load to reduce scheduling overhead.
+  TA_GUARDED(queue_lock_)
+  SchedDuration target_latency_grans_{kDefaultTargetLatency / kDefaultMinimumGranularity};
 
   // Performance scale of this CPU relative to the highest performance CPU. This
   // value is initially determined from the system topology, when available, and

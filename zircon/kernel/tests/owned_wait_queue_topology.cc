@@ -22,10 +22,10 @@ struct OwnedWaitQueueTopologyTests {
     constexpr TestThread() = default;
     ~TestThread() { Shutdown(); }
 
-    static SchedDuration DeadlineForIndex(size_t index) {
-      constexpr SchedDuration kBaseDuration{ZX_MSEC(10)};
-      constexpr SchedDuration kDurationInc{ZX_MSEC(1)};
-      return kBaseDuration + (index * kDurationInc);
+    static SchedDuration DeadlineForNdx(size_t ndx) {
+      constexpr SchedDuration kBaseDuration{ZX_USEC(500)};
+      constexpr SchedDuration kDurationInc{ZX_USEC(10)};
+      return kBaseDuration + (ndx * kDurationInc);
     }
 
     bool Init(const SchedulerState::BaseProfile* base_profile = nullptr) {
@@ -56,8 +56,6 @@ struct OwnedWaitQueueTopologyTests {
     }
 
     bool DoBlock(TestQueue& queue, TestThread* new_owner);
-    void SetStartTimeGate(zx_instant_mono_t time) { start_time_gate_ = time; }
-
     Thread* thread() { return thread_; }
     const OwnedWaitQueue* target_queue() const { return target_queue_; }
     const OwnedWaitQueue* blocking_queue() const TA_EXCL(chainlock_transaction_token) {
@@ -68,20 +66,6 @@ struct OwnedWaitQueueTopologyTests {
       return OwnedWaitQueue::DowncastToOwq(thread_->wait_queue_state().blocking_wait_queue());
     }
 
-    zx_instant_mono_t start_time() const {
-      ASSERT(thread_ != nullptr);
-      SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
-                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::start_time")};
-      return thread_->scheduler_state().start_time().raw_value();
-    }
-
-    zx_instant_mono_t finish_time() const {
-      ASSERT(thread_ != nullptr);
-      SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
-                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::start_time")};
-      return thread_->scheduler_state().finish_time().raw_value();
-    }
-
    private:
     int Main();
 
@@ -89,7 +73,6 @@ struct OwnedWaitQueueTopologyTests {
 
     ktl::atomic<bool> exit_now_{false};
     ktl::atomic<bool> do_baao_{false};
-    ktl::optional<zx_instant_mono_t> start_time_gate_{ktl::nullopt};
     OwnedWaitQueue* target_queue_{nullptr};
     Thread* target_owner_{nullptr};
     Thread* thread_{nullptr};
@@ -103,39 +86,39 @@ struct OwnedWaitQueueTopologyTests {
     bool Init() {
       BEGIN_TEST;
 
-      ASSERT_NULL(wait_queue_);
+      ASSERT_NULL(owq_);
       fbl::AllocChecker ac;
-      wait_queue_.reset(new (&ac) OwnedWaitQueue{});
+      owq_.reset(new (&ac) OwnedWaitQueue{});
       ASSERT_TRUE(ac.check());
 
       END_TEST;
     }
 
-    OwnedWaitQueue* wait_queue() { return wait_queue_.get(); }
+    OwnedWaitQueue* owq() { return owq_.get(); }
     Thread* owner() {
-      ASSERT(wait_queue_ != nullptr);
-      SingleChainLockGuard guard{IrqSaveOption, wait_queue_->get_lock(),
+      ASSERT(owq_ != nullptr);
+      SingleChainLockGuard guard{IrqSaveOption, owq_->get_lock(),
                                  CLT_TAG("OwnedWaitQueueTopologyTests::TestQueue::owner")};
-      return wait_queue_->owner();
+      return owq_->owner();
     }
 
    private:
-    ktl::unique_ptr<OwnedWaitQueue> wait_queue_;
+    ktl::unique_ptr<OwnedWaitQueue> owq_;
   };
 
   struct Action {
-    uint32_t thread_index;         // Index of the blocking thread.
-    uint32_t queue_index;          // Index of the queue which the thread blocks behind
-    uint32_t owning_thread_index;  // Index of the thread declared to be the owner.
-    bool owner_expected;           // True if we expect the owner to be accepted, false if
-                                   // we expect the owner to be rejected (and end up with
-                                   // no owner after the action.
+    uint32_t t_ndx;       // ndx of the blocking thread.
+    uint32_t bq_ndx;      // ndx of the queue which the thread blocks behind
+    uint32_t ot_ndx;      // ndx of the thread declared to be the owner.
+    bool owner_expected;  // true if we expect the owner to be accepted, false if
+                          // we expect the owner to be rejected (and end up with
+                          // no owner after the action.
   };
 
   struct RequeueAction {
     uint32_t wake_count;
     uint32_t requeue_count;
-    uint32_t requeue_owner_index;
+    uint32_t requeue_owner_ndx;
     bool assign_woken;
   };
 
@@ -156,96 +139,62 @@ struct OwnedWaitQueueTopologyTests {
     // Initialize all of the threads and queues.  We cannot proceed if any of this
     // fails.
     for (size_t i = 0; i < threads.size(); ++i) {
+      TestThread& t = threads[i];
       if (!setup_for_requeue_test) {
-        ASSERT_TRUE(threads[i].Init());
+        ASSERT_TRUE(t.Init());
       } else {
-        const SchedDuration deadline = TestThread::DeadlineForIndex(i);
+        const SchedDuration deadline = TestThread::DeadlineForNdx(i);
         const SchedDuration capacity = deadline / 2;
         const SchedDeadlineParams params{capacity, deadline};
         const SchedulerState::BaseProfile profile{params};
-        ASSERT_TRUE(threads[i].Init(&profile));
+        ASSERT_TRUE(t.Init(&profile));
       }
     }
 
-    for (TestQueue& queue : queues) {
-      ASSERT_TRUE(queue.Init());
+    for (TestQueue& q : queues) {
+      ASSERT_TRUE(q.Init());
     }
 
     // Perform each of the actions, blocking a given thread behind a given wait
     // queue and optionally declaring an owner as we do.  Afterwards, verify that
     // each of the threads is blocked behind the queue we expect, and that the
     // owner is who we expect.
-    TestThread* previous_thread{nullptr};
-    for (const Action& action : actions) {
+    for (const Action& a : actions) {
       // Make sue the action indexes are valid.
-      ASSERT_LT(action.thread_index, threads.size());
-      ASSERT_LT(action.queue_index, queues.size());
+      ASSERT_LT(a.t_ndx, threads.size());
+      ASSERT_LT(a.bq_ndx, queues.size());
 
-      TestThread& blocking_thread = threads[action.thread_index];
-      TestQueue& target_queue = queues[action.queue_index];
+      TestThread& blocking_thread = threads[a.t_ndx];
+      TestQueue& target_queue = queues[a.bq_ndx];
       TestThread* new_owner{nullptr};
-      if (action.owning_thread_index != Invalid) {
-        ASSERT_LT(action.owning_thread_index, threads.size());
-        new_owner = &threads[action.owning_thread_index];
+      if (a.ot_ndx != Invalid) {
+        ASSERT_LT(a.ot_ndx, threads.size());
+        new_owner = &threads[a.ot_ndx];
       }
-
-      // Make certain that when we are setting up for a re-queue test that we
-      // carefully control the order that the threads will be selected from the
-      // wait queue when it is time to perform the actual wake-and-requeue
-      // operation.
-      //
-      // Note; this is not normally something that tests can depend on.  In
-      // theory, the priority order of a wait queue is officially "not your
-      // business" and not formally specified.  When it comes to the specific
-      // case of in-kernel unit tests and keeping them deterministic, it is
-      // probably OK to be aware of the specifics of how things are ordered,
-      // even though this means that when the sorting invariant for the wait
-      // queue changes (not a common thing at all), this test will need to be
-      // updated as well.
-      //
-      // At any rate, currently the wake order of threads in a wait queue is
-      // controlled completely by their finish time.  Threads with earlier
-      // finish times get woken before threads with later finish times.  The
-      // finish time of a deadline thread is its start time + its period.  We
-      // want the threads to wake in the order that they were setup (T0 wakes
-      // first, then T1, then T2 and so on).
-      //
-      // We have already made certain that the periods of these threads are
-      // strictly monotonically increasing, so now we just need to ensure that
-      // the start times are monotonically increasing and we should be good to
-      // go.
-      //
-      // To accomplish this, each thread has an optional "start time gate" which
-      // can be assigned.  The first thread can start whenever it wants to, but
-      // the thread T(x) needs to make sure that its start time is >= the start
-      // time of T(x-1).
-      //
-      // So, we set T(x).start_time_gate = T(x - 1).start_time for x > 0.  These
-      // threads, when released from their initial spin phase of the test, will
-      // make certain that their start time is >= their start time gate (when
-      // they have one) by sleeping until their finish time until they hit the
-      // point that the condition is satisfied.
-      //
-      if (setup_for_requeue_test && (previous_thread != nullptr)) {
-        blocking_thread.SetStartTimeGate(previous_thread->start_time());
-      }
-      previous_thread = &blocking_thread;
 
       // Then perform the block operation.
       ASSERT_TRUE(blocking_thread.DoBlock(target_queue, new_owner));
 
       // Now validate everything.
       Thread* expected_owner =
-          action.owner_expected && (new_owner != nullptr) ? new_owner->thread() : nullptr;
+          a.owner_expected && (new_owner != nullptr) ? new_owner->thread() : nullptr;
       EXPECT_EQ(expected_owner, target_queue.owner());
       for (const TestThread& t : threads) {
         EXPECT_EQ(t.target_queue(), t.blocking_queue());
       }
     }
 
-    // If this is not simply setting up for a Requeue test, then we are finished and can shut our
-    // threads down now.
-    if (!setup_for_requeue_test) {
+    if (setup_for_requeue_test) {
+      // Sleep for longer than the longest relative deadline we assigned to our
+      // threads.  This will ensure that none of the currently blocked threads
+      // have an active deadline (all of their deadlines will have expired).
+      // Since the relative deadlines of the threads were assigned in increasing
+      // order relative to their index in the test thread array, this means that
+      // when it comes time to choose a thread to wake up from the blocked
+      // queue, we should always end up choosing the thread in the queue with
+      // the lowest index in the test thread array.
+      Thread::Current::SleepRelative(TestThread::DeadlineForNdx(threads.size()).raw_value());
+    } else {
       ShutdownThreads(threads);
     }
 
@@ -261,20 +210,20 @@ struct OwnedWaitQueueTopologyTests {
                              const ktl::array<uint32_t, QueueCount>& expected_owners) {
     BEGIN_TEST;
 
-    auto GetThread = [&](uint32_t index) -> Thread* {
-      if (index == Invalid) {
+    auto NdxToThread = [&](uint32_t ndx) -> Thread* {
+      if (ndx == Invalid) {
         return nullptr;
       }
-      DEBUG_ASSERT(index < threads.size());
-      return threads[index].thread();
+      DEBUG_ASSERT(ndx < threads.size());
+      return threads[ndx].thread();
     };
 
-    auto GetQueue = [&](uint32_t index) -> OwnedWaitQueue* {
-      if (index == Invalid) {
+    auto NdxToQueue = [&](uint32_t ndx) -> OwnedWaitQueue* {
+      if (ndx == Invalid) {
         return nullptr;
       }
-      DEBUG_ASSERT(index < queues.size());
-      return queues[index].wait_queue();
+      DEBUG_ASSERT(ndx < queues.size());
+      return queues[ndx].owq();
     };
 
     static_assert(QueueCount >= 2, "Requeue tests must always involve at least two queues");
@@ -283,10 +232,10 @@ struct OwnedWaitQueueTopologyTests {
     ASSERT_TRUE(RunBAAOTest(threads, queues, setup_actions, true));
 
     // Now perform the requeue action
-    Thread* const new_requeue_owner = GetThread(requeue_action.requeue_owner_index);
+    Thread* const new_requeue_owner = NdxToThread(requeue_action.requeue_owner_ndx);
     OwnedWaitQueue::IWakeRequeueHook& hooks = OwnedWaitQueue::default_wake_hooks();
-    OwnedWaitQueue& src_queue = *queues[0].wait_queue();
-    OwnedWaitQueue& dst_queue = *queues[1].wait_queue();
+    OwnedWaitQueue& src_queue = *queues[0].owq();
+    OwnedWaitQueue& dst_queue = *queues[1].owq();
     src_queue.WakeAndRequeue(dst_queue, new_requeue_owner, requeue_action.wake_count,
                              requeue_action.requeue_count, hooks, hooks,
                              requeue_action.assign_woken ? OwnedWaitQueue::WakeOption::AssignOwner
@@ -295,16 +244,16 @@ struct OwnedWaitQueueTopologyTests {
     // Now verify that all of the threads are blocked (or not) in the proper
     // queues, and that all queues are owned by the expected threads (or no
     // thread).
-    for (size_t thread_index = 0; thread_index < expected_blocking_queues.size(); ++thread_index) {
-      const uint32_t queue_index = expected_blocking_queues[thread_index];
-      OwnedWaitQueue* const expected_queue = GetQueue(queue_index);
-      EXPECT_EQ(expected_queue, threads[thread_index].blocking_queue());
+    for (size_t tndx = 0; tndx < expected_blocking_queues.size(); ++tndx) {
+      const uint32_t qndx = expected_blocking_queues[tndx];
+      OwnedWaitQueue* const expected_queue = NdxToQueue(qndx);
+      EXPECT_EQ(expected_queue, threads[tndx].blocking_queue());
     }
 
-    for (size_t queue_index = 0; queue_index < expected_owners.size(); ++queue_index) {
-      const uint32_t thread_index = expected_owners[queue_index];
-      Thread* const expected = GetThread(thread_index);
-      EXPECT_EQ(expected, queues[queue_index].owner());
+    for (size_t qndx = 0; qndx < expected_owners.size(); ++qndx) {
+      const uint32_t tndx = expected_owners[qndx];
+      Thread* const expected = NdxToThread(tndx);
+      EXPECT_EQ(expected, queues[qndx].owner());
     }
 
     // Cleanup and we are done.
@@ -318,21 +267,6 @@ int OwnedWaitQueueTopologyTests::TestThread::Main() {
     Thread::Current::SleepRelative(ZX_USEC(100));
     if (exit_now_.load()) {
       return -1;
-    }
-  }
-
-  // If we have a "start time gate", then we need make sure that our start time
-  // >= to our gate time in order to ensure a deterministic wake order when
-  // running requeue tests.  This is a pretty simple operation; while our start
-  // time is not large enough, we can just sleep until our finish time (getting
-  // a new start time in the process).
-  //
-  // Note that we know that it is safe to observe the start_time_gate value
-  // (from a memory order perspective) as it was stored before the CST store to
-  // do_baao_ performed by the test setup thread.
-  if (start_time_gate_.has_value()) {
-    while (start_time() < start_time_gate_.value()) {
-      Thread::Current::Sleep(finish_time());
     }
   }
 
@@ -373,12 +307,12 @@ bool OwnedWaitQueueTopologyTests::TestThread::DoBlock(TestQueue& queue, TestThre
   ASSERT_FALSE(do_baao_.load());
   ASSERT_NULL(target_queue_);
   ASSERT_NULL(target_owner_);
-  ASSERT_NONNULL(queue.wait_queue());
+  ASSERT_NONNULL(queue.owq());
   if (new_owner) {
     ASSERT_NONNULL(new_owner->thread());
     target_owner_ = new_owner->thread();
   }
-  target_queue_ = queue.wait_queue();
+  target_queue_ = queue.owq();
   do_baao_.store(true);
 
   while (true) {
@@ -421,10 +355,7 @@ bool owq_topology_test_simple() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 1> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -460,8 +391,8 @@ bool owq_topology_test_simple_owner_change() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 2, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 2, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -496,8 +427,7 @@ bool owq_topology_test_deny_self_own() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 1> threads;
   constexpr ktl::array actions{
-      Action{
-          .thread_index = 0, .queue_index = 0, .owning_thread_index = 0, .owner_expected = false},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 0, .owner_expected = false},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -534,11 +464,8 @@ bool owq_topology_test_owner_becomes_blocked_no_new_owner() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 2> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -574,8 +501,8 @@ bool owq_topology_test_owner_becomes_blocked_yes_new_owner() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 2, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 2, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -624,9 +551,8 @@ bool owq_topology_test_owner_becomes_blocked_deny_blocked_new_owner() {
   ktl::array<TestQueue, 1> queues;
   ktl::array<TestThread, 2> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{
-          .thread_index = 1, .queue_index = 0, .owning_thread_index = 0, .owner_expected = false},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 0, .owner_expected = false},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -671,16 +597,10 @@ bool owq_topology_test_blocked_owners() {
   ktl::array<TestQueue, 3> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 1,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 2,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 0, .owning_thread_index = 2, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 1, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 2, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 0, .ot_ndx = 2, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -731,10 +651,9 @@ bool owq_topology_test_blocking_thread_downstream_of_owner_no_owner_change() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 1, .owning_thread_index = 2, .owner_expected = true},
-      Action{
-          .thread_index = 2, .queue_index = 0, .owning_thread_index = 1, .owner_expected = false},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 1, .ot_ndx = 2, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = false},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -799,10 +718,9 @@ bool owq_topology_test_blocking_thread_downstream_of_owner_yes_owner_change() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 1, .owning_thread_index = 3, .owner_expected = true},
-      Action{
-          .thread_index = 3, .queue_index = 0, .owning_thread_index = 2, .owner_expected = false},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 1, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 0, .ot_ndx = 2, .owner_expected = false},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -846,11 +764,11 @@ bool owq_topology_test_intersecting_owner_chains() {
   ktl::array<TestQueue, 3> queues;
   ktl::array<TestThread, 6> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 1, .owning_thread_index = 2, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 2, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 4, .queue_index = 2, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 5, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 1, .ot_ndx = 2, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 2, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 4, .bq_ndx = 2, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 5, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -892,10 +810,10 @@ bool owq_topology_test_intersecting_owner_chains_old_owner_target_of_new_owner_c
   ktl::array<TestQueue, 3> queues;
   ktl::array<TestThread, 5> threads;
   constexpr ktl::array actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 1, .owning_thread_index = 2, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 2, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 4, .queue_index = 0, .owning_thread_index = 1, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 1, .ot_ndx = 2, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 2, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 4, .bq_ndx = 0, .ot_ndx = 1, .owner_expected = true},
   };
 
   ASSERT_TRUE(OwnedWaitQueueTopologyTests::RunBAAOTest(threads, queues, actions));
@@ -943,21 +861,12 @@ bool owq_topology_test_basic_requeue() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = false};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = false};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u};
   constexpr ktl::array expected_owners{Invalid, Invalid};
 
@@ -1004,21 +913,12 @@ bool owq_topology_test_requeue_assign_woken_owner() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1065,21 +965,12 @@ bool owq_topology_test_requeue_assign_both_owners() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 3, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 3, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, Invalid};
   constexpr ktl::array expected_owners{0u, 3u};
 
@@ -1122,21 +1013,12 @@ bool owq_topology_test_requeue_owner_in_wake_queue() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 2, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 2, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u};
   constexpr ktl::array expected_owners{0u, 2u};
 
@@ -1184,21 +1066,12 @@ bool owq_topology_test_requeue_owner_is_new_wake_owner() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 0, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 0, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u};
   constexpr ktl::array expected_owners{0u, 0u};
 
@@ -1258,21 +1131,12 @@ bool owq_topology_test_requeue_owner_is_in_requeue_target() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 3> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 1, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 1, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1319,12 +1183,12 @@ bool owq_topology_test_wake_owner_becomes_requeue_owner() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 3, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 3, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, Invalid};
   constexpr ktl::array expected_owners{0u, 3u};
 
@@ -1380,13 +1244,13 @@ bool owq_topology_test_wake_and_requeue_have_same_owner_keep_rq_owner() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 5> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 4, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 4, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 4, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 4, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u, Invalid};
   constexpr ktl::array expected_owners{0u, 4u};
 
@@ -1446,13 +1310,13 @@ bool owq_topology_test_wake_and_requeue_have_same_owner_lose_rq_owner() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 5> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 4, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 4, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u, Invalid};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1512,18 +1376,15 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_no_rq_owner_change()
   ktl::array<TestQueue, 4> queues;
   ktl::array<TestThread, 6> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 4, .queue_index = 2, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 5,
-             .queue_index = 3,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 4, .bq_ndx = 2, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 5, .bq_ndx = 3, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 5, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 5, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u, 2u, 3u};
   constexpr ktl::array expected_owners{0u, 5u, 5u, Invalid};
 
@@ -1583,18 +1444,15 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_none()
   ktl::array<TestQueue, 4> queues;
   ktl::array<TestThread, 6> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 4, .queue_index = 2, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 5,
-             .queue_index = 3,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 4, .bq_ndx = 2, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 5, .bq_ndx = 3, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u, 2u, 3u};
   constexpr ktl::array expected_owners{0u, Invalid, 5u, Invalid};
 
@@ -1649,18 +1507,15 @@ bool owq_topology_test_requeue_op_intersecting_owner_chains_change_rqo_to_wq_thr
   ktl::array<TestQueue, 4> queues;
   ktl::array<TestThread, 6> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 4, .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 4, .queue_index = 2, .owning_thread_index = 5, .owner_expected = true},
-      Action{.thread_index = 5,
-             .queue_index = 3,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 4, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 4, .bq_ndx = 2, .ot_ndx = 5, .owner_expected = true},
+      Action{.t_ndx = 5, .bq_ndx = 3, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 2u, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 2u, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u, 2u, 3u};
   constexpr ktl::array expected_owners{0u, 2u, 5u, Invalid};
 
@@ -1712,22 +1567,13 @@ bool owq_topology_test_requeue_target_upstream_from_woken_thread() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 0, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 0, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1779,22 +1625,13 @@ bool owq_topology_test_requeue_target_upstream_from_requeue_thread() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 1, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 1, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1846,22 +1683,13 @@ bool owq_topology_test_requeue_target_upstream_from_still_blocked_thread() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 2, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 2, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -1909,22 +1737,13 @@ bool owq_topology_test_requeue_target_upstream_from_requeue_thread_stays_upstrea
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 1,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 2,
-             .queue_index = 0,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
-      Action{.thread_index = 3, .queue_index = 1, .owning_thread_index = 1, .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = Invalid, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = 1, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 2, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 2, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, 2u};
 
@@ -1976,16 +1795,13 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target() {
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 3,
-             .queue_index = 1,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = Invalid, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = Invalid, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, Invalid};
 
@@ -2033,16 +1849,13 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target_swaps_position() 
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 3,
-             .queue_index = 1,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 2, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 2, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, 2u};
 
@@ -2094,16 +1907,13 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target_shares_new_wq_own
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 3,
-             .queue_index = 1,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 0, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 0, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, 0u};
 
@@ -2171,16 +1981,13 @@ bool owq_topology_test_wake_queue_upstream_from_requeue_target_rejects_new_rq_th
   ktl::array<TestQueue, 2> queues;
   ktl::array<TestThread, 4> threads;
   constexpr ktl::array setup_actions{
-      Action{.thread_index = 0, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 1, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 2, .queue_index = 0, .owning_thread_index = 3, .owner_expected = true},
-      Action{.thread_index = 3,
-             .queue_index = 1,
-             .owning_thread_index = Invalid,
-             .owner_expected = true},
+      Action{.t_ndx = 0, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 1, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 2, .bq_ndx = 0, .ot_ndx = 3, .owner_expected = true},
+      Action{.t_ndx = 3, .bq_ndx = 1, .ot_ndx = Invalid, .owner_expected = true},
   };
   constexpr RequeueAction requeue_action = {
-      .wake_count = 1, .requeue_count = 1, .requeue_owner_index = 1, .assign_woken = true};
+      .wake_count = 1, .requeue_count = 1, .requeue_owner_ndx = 1, .assign_woken = true};
   constexpr ktl::array expected_blocking_queues{Invalid, 1u, 0u, 1u};
   constexpr ktl::array expected_owners{0u, Invalid};
 

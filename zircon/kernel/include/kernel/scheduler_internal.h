@@ -98,7 +98,8 @@ inline void Scheduler::UpdateTotalDeadlineUtilization(SchedUtilization delta) {
 }
 
 inline void Scheduler::TraceTotalRunnableThreads() const {
-  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(), ("Queue Length", runnable_task_count_));
+  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(),
+                       ("Queue Length", runnable_fair_task_count_ + runnable_deadline_task_count_));
 }
 
 inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
