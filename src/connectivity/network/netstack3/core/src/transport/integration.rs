@@ -4,7 +4,7 @@
 
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
-use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::socket::MaybeDualStack;
 use netstack3_base::{
     CoreTimerContext, CounterContext, ResourceCounterContext, Uninstantiable,
@@ -332,14 +332,6 @@ impl<I: Ip, BC: BindingsContext, L: LockBefore<crate::lock_ordering::UdpAllSocke
             locked.write_lock_with_and::<crate::lock_ordering::UdpSocketState<I>, _>(|c| c.right());
         let mut restricted = restricted.cast_core_ctx();
         cb(&mut restricted, &mut socket_state)
-    }
-
-    fn should_send_port_unreachable(&mut self) -> bool {
-        self.cast_with(|s| match I::VERSION {
-            IpVersion::V4 => &s.transport.udpv4.send_port_unreachable,
-            IpVersion::V6 => &s.transport.udpv6.send_port_unreachable,
-        })
-        .copied()
     }
 
     fn for_each_socket<

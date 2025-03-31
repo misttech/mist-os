@@ -67,23 +67,16 @@ use netstack3_tcp::{
     self as tcp, TcpCountersWithSocket, TcpCountersWithoutSocket, TcpState, TcpTimerId,
 };
 use netstack3_udp::{
-    UdpCountersWithSocket, UdpCountersWithoutSocket, UdpSocketTxMetadata, UdpState, UdpStateBuilder,
+    UdpCountersWithSocket, UdpCountersWithoutSocket, UdpSocketTxMetadata, UdpState,
 };
 
 use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 /// A builder for transport layer state.
 #[derive(Default, Clone)]
-pub struct TransportStateBuilder {
-    udp: UdpStateBuilder,
-}
+pub struct TransportStateBuilder;
 
 impl TransportStateBuilder {
-    /// Get the builder for the UDP state.
-    pub fn udp_builder(&mut self) -> &mut UdpStateBuilder {
-        &mut self.udp
-    }
-
     pub(crate) fn build_with_ctx<BC: BindingsContext>(
         self,
         bindings_ctx: &mut BC,
@@ -91,8 +84,8 @@ impl TransportStateBuilder {
         let now = bindings_ctx.now();
         let mut rng = bindings_ctx.rng();
         TransportLayerState {
-            udpv4: self.udp.clone().build(),
-            udpv6: self.udp.build(),
+            udpv4: Default::default(),
+            udpv6: Default::default(),
             tcpv4: TcpState::new(now, &mut rng),
             tcpv6: TcpState::new(now, &mut rng),
             icmp_echo_v4: Default::default(),

@@ -333,11 +333,7 @@ fn test_port_unreachable(test_mark_reflection: bool) {
             .unwrap();
         test_receive_ip_packet::<I, _, _, _, _, _>(
             |_| {},
-            // Enable the `send_port_unreachable` feature.
-            |builder| {
-                let _builder: &mut _ =
-                    builder.transport_builder().udp_builder().send_port_unreachable(true);
-            },
+            |_| {},
             buffer.as_mut(),
             I::TEST_ADDRS.local_ip,
             64,
@@ -346,19 +342,6 @@ fn test_port_unreachable(test_mark_reflection: bool) {
             Some((IcmpDestUnreachable::default(), code)),
             // Ensure packet is truncated to the right length.
             |packet| assert_eq!(packet.original_packet().len(), original_packet_len),
-            test_mark_reflection,
-        );
-        test_receive_ip_packet::<I, C, IcmpDestUnreachable, _, _, _>(
-            |_| {},
-            // Leave the `send_port_unreachable` feature disabled.
-            |_: &mut StackStateBuilder| {},
-            buffer.as_mut(),
-            I::TEST_ADDRS.local_ip,
-            64,
-            IpProto::Udp.into(),
-            &[],
-            None,
-            |_| {},
             test_mark_reflection,
         );
     }

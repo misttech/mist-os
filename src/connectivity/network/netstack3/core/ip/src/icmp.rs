@@ -79,7 +79,11 @@ pub const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
 /// The default number of ICMP error messages to send per second.
 ///
 /// Beyond this rate, error messages will be silently dropped.
-pub const DEFAULT_ERRORS_PER_SECOND: u64 = 2 << 16;
+///
+/// The current value (1000) was inspired by Netstack2 (gVisor).
+// TODO(https://fxbug.dev/407541323): Consider tuning the ICMP rate limiting
+// behavior to conform more closely to Linux.
+pub const DEFAULT_ERRORS_PER_SECOND: u64 = 1000;
 /// The IP layer's ICMP state.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]

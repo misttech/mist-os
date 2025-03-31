@@ -25,6 +25,6 @@ pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,
     SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext, UdpBindingsTypes,
     UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext, UdpRemotePort, UdpSocketId,
-    UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState, UdpStateBuilder, UdpStateContext,
+    UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState, UdpStateContext,
     UseUdpIpTransportContextBlanket,
 };
