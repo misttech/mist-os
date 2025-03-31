@@ -546,7 +546,7 @@ if (is_linux) {
 resource("extended_pstate_initial_state_child_resource") {
   testonly = true
   binary_name = "extended_pstate_initial_state_child"
-  exe_label = ":${binary_name}"
+  exe_label = ":${binary_name}($target_linux_toolchain)"
   out_dir = get_label_info(exe_label, "root_out_dir")
   sources = [ "${out_dir}/${binary_name}" ]
   outputs = [ "data/tests/${binary_name}" ]
@@ -593,7 +593,7 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
   }
 
   deps += [
-    ":extended_pstate_initial_state_child_resource($target_linux_toolchain)",
+    ":extended_pstate_initial_state_child_resource",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
 
@@ -631,7 +631,7 @@ if (starnix_enable_arch32) {
     }
 
     deps += [
-      ":extended_pstate_initial_state_child_resource($target_linux_arch32_toolchain)",
+      ":extended_pstate_initial_state_child_resource",
       "//src/lib/testing/expectation:expectation_comparer",
     ]
 

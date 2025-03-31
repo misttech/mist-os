@@ -19,7 +19,8 @@ typedef struct ucontext {
   stack_t uc_stack;
   mcontext_t uc_mcontext;
   sigset64_t uc_sigmask64;
-  uint8_t extended_pstate[4096];
+  /* The kernel adds extra padding after uc_sigmask to match glibc sigset_t on ARM. */
+  char __padding[640];
 } ucontext_t;
 
 #if defined(sa_handler)

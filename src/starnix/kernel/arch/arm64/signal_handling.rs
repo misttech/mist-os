@@ -94,7 +94,6 @@ impl SignalStackFrame {
                 uc_stack: uc_stack.try_into().map_err(|_| errno!(EINVAL))?,
                 uc_sigmask64: uapi::sigset_t::from(signal_state.mask()).into(),
                 uc_mcontext: zerocopy::transmute!(regs),
-                extended_pstate: get_pstate_extended_data(extended_pstate),
                 ..Default::default()
             };
             context32.write_to_prefix(&mut context).unwrap();
@@ -112,7 +111,7 @@ impl SignalStackFrame {
                     pc: registers.pc,
                     pstate: registers.cpsr,
                     fault_address,
-                    __reserved: get_pstate_extended_data(extended_pstate),
+                    __reserved: get_sigcontext64_data(extended_pstate),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -206,11 +205,7 @@ fn restore_registers_32(
         tpidr: current_task.thread_state.registers.tpidr,
     };
     current_task.thread_state.registers = restored_regs.into();
-
-    parse_pstate_extended_data(
-        &signal_stack_frame.get_ucontext32().extended_pstate,
-        &mut current_task.thread_state.extended_pstate,
-    )
+    Ok(())
 }
 
 fn restore_registers_64(
@@ -236,7 +231,7 @@ fn restore_registers_64(
     };
     current_task.thread_state.registers = restored_regs.into();
 
-    parse_pstate_extended_data(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
+    parse_sigcontext_data_64(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
@@ -246,15 +241,15 @@ pub fn align_stack_pointer(pointer: u64) -> u64 {
 }
 
 // Size of `sigcontext::__reserved`.
-const SIGCONTEXT_EXTENDED_PSTATE_DATA_SIZE: usize = 4096;
+const SIGCONTEXT_RESERVED_DATA_SIZE: usize = 4096;
 
 // Returns the array to be saved in `sigcontext.__reserved`. It contains a sequence of sections
 // each identified with a `_aarch64_ctx` header. The end is indicated with both fields in the
 // header set to 0.
-fn get_pstate_extended_data(
+fn get_sigcontext64_data(
     extended_pstate: &ExtendedPstateState,
-) -> [u8; SIGCONTEXT_EXTENDED_PSTATE_DATA_SIZE] {
-    let mut result = [0u8; SIGCONTEXT_EXTENDED_PSTATE_DATA_SIZE];
+) -> [u8; SIGCONTEXT_RESERVED_DATA_SIZE] {
+    let mut result = [0u8; SIGCONTEXT_RESERVED_DATA_SIZE];
 
     let fpsimd = fpsimd_context {
         head: _aarch64_ctx {
@@ -273,8 +268,8 @@ fn get_pstate_extended_data(
     result
 }
 
-fn parse_pstate_extended_data(
-    data: &[u8; SIGCONTEXT_EXTENDED_PSTATE_DATA_SIZE],
+fn parse_sigcontext_data_64(
+    data: &[u8; SIGCONTEXT_RESERVED_DATA_SIZE],
     extended_pstate: &mut ExtendedPstateState,
 ) -> Result<(), Errno> {
     const FPSIMD_CONTEXT_SIZE: u32 = std::mem::size_of::<fpsimd_context>() as u32;
