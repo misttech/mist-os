@@ -36,6 +36,9 @@ todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default fd
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default file
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default anon_inode
 
+// https://fxbug.dev/385121365 - Kernel threads perform I/O on "adbd" FDs, failing checks.
+todo_deny https://fxbug.dev/385121365 kernel adbd fd
+
 //
 // Exceptions required for the SELinux Test Suite container.
 //

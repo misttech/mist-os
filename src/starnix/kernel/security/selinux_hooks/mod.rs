@@ -75,14 +75,7 @@ fn has_file_permissions(
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
     let file_sid = file.security_state.state.sid;
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || file_sid == SecurityId::initial(InitialSid::Kernel)
-    {
-        track_stub!(
-            TODO("https://fxbug.dev/385121365"),
-            "Enforce fs:use where source or target is the kernel SID?"
-        );
-    } else if subject_sid != file_sid {
+    if subject_sid != file_sid {
         let node = file.node().as_ref().as_ref();
         let audit_context = [audit_context, file.into(), node.into()];
         check_permission(
@@ -122,14 +115,7 @@ fn todo_has_file_permissions(
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
     let file_sid = file.security_state.state.sid;
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || file_sid == SecurityId::initial(InitialSid::Kernel)
-    {
-        track_stub!(
-            TODO("https://fxbug.dev/385121365"),
-            "Enforce fs:use where source or target is the kernel SID?"
-        );
-    } else if subject_sid != file_sid {
+    if subject_sid != file_sid {
         let node = file.node().as_ref().as_ref();
         let audit_context = [audit_context, file.into(), node.into()];
         todo_check_permission(
