@@ -36,10 +36,8 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     "none" or "static".
 #     Defaults to "none".
 #
-#   sdk_name (required for non-internal libraries)
+#   sdk_name (required)
 #     Name of the library in the SDK.
-#     For internal libraries, defaults to ${fully_qualified_target_path}_${target_name}.
-#     e.g. (target) //src/lib/fxl:fxl -> (default sdk_name) //src/lib/fxl_fxl
 #
 #   include_base (optional)
 #     Path to the root directory for includes.
@@ -105,25 +103,11 @@ template("sdk_static_library") {
     output_name = invoker.output_name
   }
 
-  # Though internal libraries specify sdk_name, it is overridden below.
   assert(
       defined(invoker.sdk_name),
       "Libraries in the IDK must specify a name that is meaningful in that context.")
-
-  if (is_internal) {
-    # If not defined by the invoker, the sdk_name is the fully qualified target name with some tweaks. For example:
-    #    //src/lib/fxl:fxl            sdk_name = //src/lib/fxl_fxl          sdk_root_path= src/lib/fxl_fxl
-    #    //src/lib/fxl:functional     sdk_name = //src/lib/fxl_functional   sdk_root_path= src/lib/fxl_functional
-    #    //src/lib/fxl/files:files    sdk_name = //src/lib/fxl/files_files  sdk_root_path= src/lib/fxl/files_files
-    full_label = get_label_info(":${target_name}", "label_no_toolchain")
-    path = get_label_info(full_label, "dir")
-    path = "${path}_${invoker.target_name}"
-    sdk_name = path
-    sdk_root_path = string_replace(sdk_name, "//", "")
-  } else {
-    sdk_name = invoker.sdk_name
-    sdk_root_path = "pkg/${sdk_name}"
-  }
+  sdk_name = invoker.sdk_name
+  sdk_root_path = "pkg/${sdk_name}"
   sdk_id = "sdk://${sdk_root_path}"
 
   main_target_name = target_name
@@ -244,7 +228,6 @@ template("sdk_static_library") {
     sdk_metas += [ "$gen_dir/$name.meta.json" ]
   }
 
-  include_dest = "${sdk_root_path}/include"
   sdk_header_files = []
   sdk_metadata_headers = []
 
