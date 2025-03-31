@@ -26,10 +26,10 @@
 
 #include "geometry.h"
 #include "h264_accelerator.h"
-#include "media/gpu/h264_decoder.h"
-#include "media/gpu/vp9_decoder.h"
 #include "mjpeg_accelerator.h"
 #include "mjpeg_decoder.h"
+#include "src/media/third_party/chromium_media/media/gpu/h264_decoder.h"
+#include "src/media/third_party/chromium_media/media/gpu/vp9_decoder.h"
 #include "vp9_accelerator.h"
 
 // This class manages output buffers when the client selects a linear buffer output. Since the

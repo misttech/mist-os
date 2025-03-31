@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef MEDIA_GPU_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_
-#define MEDIA_GPU_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#ifndef SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#define SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_
 
 #include <stddef.h>
 
 // Fuchsia change.
 // #include "base/containers/circular_deque.h"
-#include "media/filters/h264_bitstream_buffer.h"
-#include "media/gpu/h264_dpb.h"
+#include "src/media/third_party/chromium_media/media/filters/h264_bitstream_buffer.h"
+#include "src/media/third_party/chromium_media/media/gpu/h264_dpb.h"
 #include "vaapi_video_encoder_delegate.h"
 
 namespace media {
@@ -163,4 +163,4 @@ class H264VaapiVideoEncoderDelegate : public VaapiVideoEncoderDelegate {
 
 }  // namespace media
 
-#endif  // MEDIA_GPU_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#endif  // SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_H264_VAAPI_VIDEO_ENCODER_DELEGATE_H_

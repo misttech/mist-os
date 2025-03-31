@@ -11,7 +11,7 @@
 
 #include <vector>
 
-#include "media/base/decoder_buffer.h"
+#include "src/media/third_party/chromium_media/media/base/decoder_buffer.h"
 
 // TODO(https://fxbug.dev/42177138): Move to a centralized location.
 class AvccProcessor {

@@ -9,7 +9,7 @@
 
 #include <src/lib/fxl/macros.h>
 
-#include "media/gpu/vp9_decoder.h"
+#include "src/media/third_party/chromium_media/media/gpu/vp9_decoder.h"
 #include "vaapi_utils.h"
 
 class CodecAdapterVaApiDecoder;

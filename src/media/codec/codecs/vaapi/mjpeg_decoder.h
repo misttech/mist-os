@@ -9,9 +9,9 @@
 #include <memory>
 #include <optional>
 
-#include "media/gpu/accelerated_video_decoder.h"
-#include "media/gpu/codec_picture.h"
-#include "media/parsers/jpeg_parser.h"
+#include "src/media/third_party/chromium_media/media/gpu/accelerated_video_decoder.h"
+#include "src/media/third_party/chromium_media/media/gpu/codec_picture.h"
+#include "src/media/third_party/chromium_media/media/parsers/jpeg_parser.h"
 
 namespace media {
 
@@ -106,4 +106,4 @@ class MJPEGDecoder : public media::AcceleratedVideoDecoder {
 
 }  // namespace media
 
-#endif /* SRC_MEDIA_CODEC_CODECS_VAAPI_MJPEG_DECODER_H_ */
+#endif  // SRC_MEDIA_CODEC_CODECS_VAAPI_MJPEG_DECODER_H_

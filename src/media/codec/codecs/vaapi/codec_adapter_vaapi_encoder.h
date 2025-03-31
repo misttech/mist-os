@@ -22,10 +22,10 @@
 #include <va/va.h>
 
 #include "buffer_pool.h"
-#include "media/gpu/accelerated_video_decoder.h"
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/media/lib/blocking_mpsc_queue/blocking_mpsc_queue.h"
+#include "src/media/third_party/chromium_media/media/gpu/accelerated_video_decoder.h"
 #include "src/media/third_party/chromium_media/media/gpu/gpu_video_encode_accelerator_helpers.h"
 #include "vaapi_utils.h"
 

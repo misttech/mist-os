@@ -9,8 +9,8 @@
 
 #include <va/va.h>
 
-#include "media/parsers/jpeg_parser.h"
 #include "mjpeg_decoder.h"
+#include "src/media/third_party/chromium_media/media/parsers/jpeg_parser.h"
 #include "vaapi_utils.h"
 
 class CodecAdapterVaApiDecoder;
@@ -76,4 +76,4 @@ class MJPEGAccelerator : public media::MJPEGDecoder::MJPEGAccelerator {
   CodecAdapterVaApiDecoder* adapter_;
 };
 
-#endif /* SRC_MEDIA_CODEC_CODECS_VAAPI_MJPEG_ACCELERATOR_H_ */
+#endif  // SRC_MEDIA_CODEC_CODECS_VAAPI_MJPEG_ACCELERATOR_H_

@@ -6,10 +6,10 @@
 
 #include <va/va.h>
 
-#include "media/video/video_encode_accelerator.h"
 #include "src/media/codec/codecs/vaapi/vaapi_utils.h"
 #include "src/media/third_party/chromium_media/chromium_utils.h"
 #include "src/media/third_party/chromium_media/geometry.h"
+#include "src/media/third_party/chromium_media/media/video/video_encode_accelerator.h"
 
 namespace media {
 
