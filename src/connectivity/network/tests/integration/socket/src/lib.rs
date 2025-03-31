@@ -54,18 +54,23 @@ use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpTimeExceeded,
     IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem,
     Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
-    Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
+    Icmpv6PacketTooBig, Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+    MessageBody,
 };
 use packet_formats::igmp::messages::IgmpPacket;
 use packet_formats::ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
-use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilder};
+use packet_formats::tcp::options::TcpOption;
+use packet_formats::tcp::{
+    TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions,
+};
 use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::{test_case, test_matrix};
-use zx::{self as zx, AsHandleRef as _};
+use test_util::assert_gt;
+use zx::AsHandleRef as _;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
@@ -4027,6 +4032,194 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
 
     let (error, ()) = future::join(client, server).await;
     error
+}
+
+trait TestPmtuIpExt: TestIpExt {
+    type Message: IcmpMessage<Self> + Debug;
+
+    fn packet_too_big() -> (Self::Message, <Self::Message as IcmpMessage<Self>>::Code);
+}
+
+impl TestPmtuIpExt for Ipv4 {
+    type Message = IcmpDestUnreachable;
+
+    fn packet_too_big() -> (IcmpDestUnreachable, Icmpv4DestUnreachableCode) {
+        let lowered_mtu =
+            NonZeroU16::new(Self::MINIMUM_LINK_MTU.get().try_into().unwrap()).unwrap();
+        (
+            IcmpDestUnreachable::new_for_frag_req(lowered_mtu),
+            Icmpv4DestUnreachableCode::FragmentationRequired,
+        )
+    }
+}
+
+impl TestPmtuIpExt for Ipv6 {
+    type Message = Icmpv6PacketTooBig;
+
+    fn packet_too_big() -> (Icmpv6PacketTooBig, IcmpZeroCode) {
+        (Icmpv6PacketTooBig::new(Self::MINIMUM_LINK_MTU.get()), IcmpZeroCode)
+    }
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
+    use packet_formats::ip::IpPacket as _;
+
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let net = sandbox.create_network("net").await.expect("failed to create network");
+    let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
+    let client =
+        sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
+    let client_interface =
+        client.join_network(&net, "ep").await.expect("failed to join network in realm");
+    client_interface
+        .add_address_and_subnet_route(I::CLIENT_SUBNET)
+        .await
+        .expect("configure address");
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
+
+    // Filter frames observed on the fake endpoint to just those containing a TCP
+    // segment in an IP packet.
+    let fake_ep = &fake_ep;
+    let mut frames = fake_ep.frame_stream().filter_map(|result| {
+        Box::pin(async {
+            let (frame, dropped) = result.unwrap();
+            assert_eq!(dropped, 0);
+
+            let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                .expect("valid ethernet frame");
+            let ip = I::Packet::parse(&mut eth.body(), ()).ok()?;
+            let tcp =
+                TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                    .ok()?;
+
+            let (eth, ip_builder, tcp) = (
+                eth.builder(),
+                ip.builder(),
+                tcp.builder(ip.src_ip(), ip.dst_ip()).prefix_builder().clone(),
+            );
+            drop(ip);
+
+            Some((eth, ip_builder, tcp, frame))
+        })
+    });
+
+    let server = async {
+        // Wait for an incoming TCP connection.
+        let (eth, ip, tcp, _frame) = frames.next().await.unwrap();
+        assert!(tcp.syn_set());
+
+        // Send a SYN/ACK in response, and wait for the ACK response.
+        let ethernet_builder = EthernetFrameBuilder::new(
+            eth.dst_mac(),
+            eth.src_mac(),
+            EtherType::from_ip_version(I::VERSION),
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        );
+
+        let mut syn_ack = TcpSegmentBuilder::new(
+            ip.dst_ip(),
+            ip.src_ip(),
+            tcp.dst_port().unwrap(),
+            tcp.src_port().unwrap(),
+            tcp.seq_num(),
+            Some(tcp.seq_num() + 1),
+            tcp.window_size(),
+        );
+        syn_ack.syn(true);
+        let frame = packet::Buf::new([], ..)
+            .encapsulate(
+                // Advertise an initial MSS that is large enough to fit the sender's payload in
+                // a single segment.
+                TcpSegmentBuilderWithOptions::new(syn_ack, [TcpOption::Mss(1500)]).unwrap(),
+            )
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                IpProto::Tcp.into(),
+            ))
+            .encapsulate(ethernet_builder.clone())
+            .serialize_vec_outer()
+            .expect("serialize SYN/ACK")
+            .unwrap_b();
+        fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
+        let _ack = frames.next().await.unwrap();
+
+        // Now that the connection is established, respond to the next packet with an
+        // ICMP error indicating the packet was too big and providing a lower MTU.
+        let (_eth, ip, tcp, too_large_frame) = frames.next().await.unwrap();
+
+        // Ensure that the initial frame sent was larger than the updated PMTU we
+        // provided, so that we can be sure we're actually exercising a reduction in the
+        // PMTU.
+        let too_large_frame =
+            EthernetFrame::parse(&mut &too_large_frame[..], EthernetFrameLengthCheck::NoCheck)
+                .expect("valid ethernet frame");
+        assert_gt!(too_large_frame.body().len(), usize::try_from(I::MINIMUM_LINK_MTU).unwrap());
+
+        let (message, code) = I::packet_too_big();
+        let icmp_error = packet::Buf::new([], ..)
+            .encapsulate(tcp)
+            .encapsulate(ip.clone())
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
+            ))
+            .encapsulate(ethernet_builder)
+            .serialize_vec_outer()
+            .expect("serialize ICMP error")
+            .unwrap_b();
+        fake_ep.write(icmp_error.as_ref()).await.expect("write ICMP error");
+
+        // The initial segment should be retransmitted in smaller pieces, respecting the
+        // reduced PMTU.
+        let (_eth, _ip, _tcp, frame) = frames.next().await.unwrap();
+
+        let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+            .expect("valid ethernet frame");
+        assert_eq!(eth.body().len(), usize::try_from(I::MINIMUM_LINK_MTU).unwrap());
+        let ip = I::Packet::parse(&mut eth.body(), ()).expect("valid IP packet");
+        let retransmitted_segment =
+            TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                .expect("valid TCP segment");
+
+        let ip = I::Packet::parse(&mut too_large_frame.body(), ()).expect("valid IP packet");
+        let too_large_segment =
+            TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                .expect("valid TCP segment");
+
+        assert_eq!(
+            retransmitted_segment.body(),
+            &too_large_segment.body()[..retransmitted_segment.body().len()]
+        );
+    };
+
+    let client = async {
+        let server_addr: net_types::ip::IpAddr = I::SERVER_ADDR.into();
+        let server_addr = std::net::SocketAddr::new(server_addr.into(), 8080);
+        let mut socket = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+            .await
+            .expect("connect to server");
+
+        // Send a payload that will not fit in a single segment. (The PMTU is updated to
+        // `I::MINIMUM_LINK_MTU`, which is too small due to the need to also fit the TCP
+        // and IP headers).
+        let len = usize::try_from(I::MINIMUM_LINK_MTU).unwrap();
+        let payload = vec![0xFF; len];
+        socket.write_all(&payload[..]).await.unwrap();
+        socket
+    };
+
+    let (_socket, ()) = future::join(client, server).await;
 }
 
 /// Tests that a connection pending in an accept queue can be accepted and

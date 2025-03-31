@@ -8,7 +8,7 @@ use core::num::NonZeroU32;
 
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6SourceAddr, Mtu};
 use packet_formats::icmp::{
-    Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4RedirectCode,
+    IcmpDestUnreachable, Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4RedirectCode,
     Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode,
     Icmpv6TimeExceededCode,
 };
@@ -60,11 +60,11 @@ impl Mms {
 /// An ICMPv4 error type and code.
 ///
 /// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
+/// relevant information (e.g. code) for that error type.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Icmpv4ErrorCode {
-    DestUnreachable(Icmpv4DestUnreachableCode),
+    DestUnreachable(Icmpv4DestUnreachableCode, IcmpDestUnreachable),
     Redirect(Icmpv4RedirectCode),
     TimeExceeded(Icmpv4TimeExceededCode),
     ParameterProblem(Icmpv4ParameterProblemCode),
@@ -77,12 +77,12 @@ impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4ErrorCode {
 /// An ICMPv6 error type and code.
 ///
 /// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
+/// relevant information (e.g. code) for that error type.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Icmpv6ErrorCode {
     DestUnreachable(Icmpv6DestUnreachableCode),
-    PacketTooBig,
+    PacketTooBig(Mtu),
     TimeExceeded(Icmpv6TimeExceededCode),
     ParameterProblem(Icmpv6ParameterProblemCode),
 }

@@ -26,7 +26,7 @@ use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
 use crate::internal::base::{
-    BufferSizes, BuffersRefMut, ConnectionError, KeepAlive, SocketOptions,
+    BufferSizes, BuffersRefMut, ConnectionError, IcmpErrorResult, KeepAlive, SocketOptions,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
@@ -1778,6 +1778,63 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             (None, data_acked)
         }
     }
+
+    fn update_mss(&mut self, mss: Mss, seq: SeqNum) -> ShouldRetransmit {
+        // Only update the MSS if the provided value is a valid MSS that is less than
+        // the current sender MSS. From [RFC 8201 section 5.4]:
+        //
+        //    A node must not increase its estimate of the Path MTU in response to
+        //    the contents of a Packet Too Big message.  A message purporting to
+        //    announce an increase in the Path MTU might be a stale packet that has
+        //    been floating around in the network, a false packet injected as part
+        //    of a denial-of-service (DoS) attack, or the result of having multiple
+        //    paths to the destination, each with a different PMTU.
+        //
+        // [RFC 8201 section 5.4]: https://datatracker.ietf.org/doc/html/rfc8201#section-5.4
+        if mss >= self.congestion_control.mss() {
+            return ShouldRetransmit::No;
+        }
+
+        // Update the MSS, and let congestion control update the congestion window
+        // accordingly.
+        self.congestion_control.update_mss(mss);
+
+        // Per [RFC 8201 section 5.4], rewind SND.NXT to the sequence number of the
+        // segment that exceeded the MTU, and try to send some more data. This will
+        // cause us to retransmit all unacknowledged data starting from that segment in
+        // segments that fit into the new path MTU.
+        //
+        //    Reception of a Packet Too Big message implies that a packet was
+        //    dropped by the node that sent the ICMPv6 message.  A reliable upper-
+        //    layer protocol will detect this loss by its own means, and recover it
+        //    by its normal retransmission methods.  The retransmission could
+        //    result in delay, depending on the loss detection method used by the
+        //    upper-layer protocol. ...
+        //
+        //    Alternatively, the retransmission could be done in immediate response
+        //    to a notification that the Path MTU was decreased, but only for the
+        //    specific connection specified by the Packet Too Big message.  The
+        //    packet size used in the retransmission should be no larger than the
+        //    new PMTU.
+        //
+        // [RFC 8201 section 5.4]: https://datatracker.ietf.org/doc/html/rfc8201#section-5.4
+        self.nxt = seq;
+
+        // Have the caller trigger an immediate retransmit of up to the new MSS.
+        //
+        // We do this to allow PMTUD to continue immediately in case there are further
+        // updates to be discovered along the path in use. We could also eagerly
+        // retransmit *all* data that was sent after the too-big packet, but if there
+        // are further updates to the PMTU, this could cause a packet storm, so we let
+        // the retransmission timer take care of any remaining in-flight packets that
+        // were too large.
+        ShouldRetransmit::Yes(mss)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn congestion_control(&self) -> &CongestionControl<I> {
+        &self.congestion_control
+    }
 }
 
 impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
@@ -2092,6 +2149,11 @@ impl<'a, T> TakeableRef<'a, T> {
 pub(crate) enum NewlyClosed {
     No,
     Yes,
+}
+
+pub(crate) enum ShouldRetransmit {
+    No,
+    Yes(Mss),
 }
 
 impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
@@ -3358,9 +3420,20 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         counters: &TcpCountersRefs<'_>,
         err: IcmpErrorCode,
         seq: SeqNum,
-    ) -> (Option<ConnectionError>, NewlyClosed) {
-        let Some(err) = ConnectionError::try_from_icmp_error(err) else {
-            return (None, NewlyClosed::No);
+    ) -> (Option<ConnectionError>, NewlyClosed, ShouldRetransmit) {
+        let Some(result) = IcmpErrorResult::try_from_icmp_error(err) else {
+            return (None, NewlyClosed::No, ShouldRetransmit::No);
+        };
+        let err = match result {
+            IcmpErrorResult::ConnectionError(err) => err,
+            IcmpErrorResult::PmtuUpdate(mms) => {
+                let should_send = if let Some(mss) = Mss::from_mms(mms) {
+                    self.on_pmtu_update(mss, seq)
+                } else {
+                    ShouldRetransmit::No
+                };
+                return (None, NewlyClosed::No, should_send);
+            }
         };
         // We consider the following RFC quotes when implementing this function.
         // Per RFC 5927 Section 4.1:
@@ -3417,6 +3490,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             counters,
                             State::Closed(Closed { reason: Some(err) }),
                         ),
+                        ShouldRetransmit::No,
                     );
                 }
                 None
@@ -3436,7 +3510,39 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // they don't expect any incoming ICMP error.
             State::FinWait2(_) | State::TimeWait(_) => None,
         };
-        (connect_error, NewlyClosed::No)
+        (connect_error, NewlyClosed::No, ShouldRetransmit::No)
+    }
+
+    fn on_pmtu_update(&mut self, mss: Mss, seq: SeqNum) -> ShouldRetransmit {
+        // If the sequence number of the segment that was too large does not correspond
+        // to an in-flight segment, ignore the error.
+        match self {
+            State::Listen(listen) => unreachable!(
+                "PMTU updates should not be delivered to a listener, received {mss:?} on {listen:?}"
+            ),
+            State::Closed(_)
+            | State::SynRcvd(_)
+            | State::SynSent(_)
+            | State::FinWait2(_)
+            | State::TimeWait(_) => {}
+            State::Established(Established { snd, .. })
+            | State::CloseWait(CloseWait { snd, .. }) => {
+                if !snd.una.after(seq) && seq.before(snd.nxt) {
+                    return snd.update_mss(mss, seq);
+                }
+            }
+            State::LastAck(LastAck { snd, .. }) | State::Closing(Closing { snd, .. }) => {
+                if !snd.una.after(seq) && seq.before(snd.nxt) {
+                    return snd.update_mss(mss, seq);
+                }
+            }
+            State::FinWait1(FinWait1 { snd, .. }) => {
+                if !snd.una.after(seq) && seq.before(snd.nxt) {
+                    return snd.update_mss(mss, seq);
+                }
+            }
+        }
+        ShouldRetransmit::No
     }
 }
 

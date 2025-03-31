@@ -54,9 +54,10 @@ use netstack3_base::{
     DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
     IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt, InstantBindingsTypes, IpDeviceAddr,
     IpExt, LocalAddressError, Mark, MarkDomain, Mss, OwnedOrRefsBidirectionalConverter,
-    PortAllocImpl, ReferenceNotifiersExt as _, RemoveResourceResult, ResourceCounterContext as _,
-    RngContext, Segment, SeqNum, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext,
-    TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
+    PayloadLen as _, PortAllocImpl, ReferenceNotifiersExt as _, RemoveResourceResult,
+    ResourceCounterContext as _, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
+    TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    ZonedAddressError,
 };
 use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
@@ -79,8 +80,8 @@ use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::state::{
-    CloseError, CloseReason, Closed, Initial, NewlyClosed, State, StateMachineDebugId, Takeable,
-    TakeableRef,
+    CloseError, CloseReason, Closed, Initial, NewlyClosed, ShouldRetransmit, State,
+    StateMachineDebugId, Takeable, TakeableRef,
 };
 
 /// A marker trait for dual-stack socket features.
@@ -1762,12 +1763,12 @@ impl<
         id: &TcpSocketId<SockI, D, BT>,
         seq: SeqNum,
         error: IcmpErrorCode,
-    ) -> NewlyClosed {
+    ) -> (NewlyClosed, ShouldRetransmit) {
         let Connection { soft_error, state, .. } = self;
-        let (new_soft_error, newly_closed) =
+        let (new_soft_error, newly_closed, should_send) =
             state.on_icmp_error(&TcpCountersRefs::from_ctx(core_ctx, id), error, seq);
         *soft_error = soft_error.or(new_soft_error);
-        newly_closed
+        (newly_closed, should_send)
     }
 }
 
@@ -3031,7 +3032,16 @@ where
                             ) {
                                 Err(CloseError::NoConnection) => NewlyClosed::No,
                                 Err(CloseError::Closing) | Ok(NewlyClosed::No) => {
-                                    do_send_inner(&id, conn, &addr, timer, core_ctx, bindings_ctx)
+                                    let limit = None;
+                                    do_send_inner(
+                                        &id,
+                                        conn,
+                                        limit,
+                                        &addr,
+                                        timer,
+                                        core_ctx,
+                                        bindings_ctx,
+                                    )
                                 }
                                 Ok(NewlyClosed::Yes) => NewlyClosed::Yes,
                             };
@@ -3184,11 +3194,13 @@ where
                                 &conn.socket_options,
                             ) {
                                 Ok(newly_closed) => {
+                                    let limit = None;
                                     let newly_closed = match newly_closed {
                                         NewlyClosed::Yes => NewlyClosed::Yes,
                                         NewlyClosed::No => do_send_inner(
                                             id,
                                             conn,
+                                            limit,
                                             addr,
                                             timer,
                                             core_ctx,
@@ -3675,13 +3687,15 @@ where
                     conn, sharing: _, timer
                 }) => (conn, timer)
             );
+            let limit = None;
             match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn);
                     do_send_inner_and_then_handle_newly_closed(
                         conn_id,
-                        I::into_demux_socket_id(conn_id.clone()),
+                        &I::into_demux_socket_id(conn_id.clone()),
                         conn,
+                        limit,
                         addr,
                         timer,
                         core_ctx,
@@ -3692,8 +3706,9 @@ where
                     EitherStack::ThisStack((conn, addr)) => {
                         do_send_inner_and_then_handle_newly_closed(
                             conn_id,
-                            I::into_demux_socket_id(conn_id.clone()),
+                            &I::into_demux_socket_id(conn_id.clone()),
                             conn,
+                            limit,
                             addr,
                             timer,
                             core_ctx,
@@ -3704,8 +3719,9 @@ where
                         let other_demux_id = core_ctx.into_other_demux_socket_id(conn_id.clone());
                         do_send_inner_and_then_handle_newly_closed(
                             conn_id,
-                            other_demux_id,
+                            &other_demux_id,
                             conn,
+                            limit,
                             addr,
                             timer,
                             core_ctx,
@@ -3765,7 +3781,16 @@ where
                         + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
                 {
                     let time_wait = matches!(conn.state, State::TimeWait(_));
-                    let newly_closed = do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
+                    let limit = None;
+                    let newly_closed = do_send_inner(
+                        id,
+                        conn,
+                        limit,
+                        addr,
+                        timer,
+                        core_ctx,
+                        bindings_ctx,
+                    );
                     match (newly_closed, time_wait) {
                         // Moved to closed state, remove from demux and cancel
                         // timers.
@@ -3850,6 +3875,7 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let TcpSocketState { socket_state, ip_options: _ } = socket_state;
+            let limit = None;
             match socket_state {
                 TcpSocketStateInner::Unbound(unbound) => f(&mut unbound.socket_options),
                 TcpSocketStateInner::Bound(BoundSocketState::Listener((
@@ -3874,8 +3900,9 @@ where
                         if old != conn.socket_options {
                             do_send_inner_and_then_handle_newly_closed(
                                 id,
-                                I::into_demux_socket_id(id.clone()),
+                                &I::into_demux_socket_id(id.clone()),
                                 conn,
+                                limit,
                                 &*addr,
                                 timer,
                                 core_ctx,
@@ -3892,8 +3919,9 @@ where
                                 if old != conn.socket_options {
                                     do_send_inner_and_then_handle_newly_closed(
                                         id,
-                                        I::into_demux_socket_id(id.clone()),
+                                        &I::into_demux_socket_id(id.clone()),
                                         conn,
+                                        limit,
                                         &*addr,
                                         timer,
                                         core_ctx,
@@ -3910,8 +3938,9 @@ where
                                         core_ctx.into_other_demux_socket_id(id.clone());
                                     do_send_inner_and_then_handle_newly_closed(
                                         id,
-                                        other_demux_id,
+                                        &other_demux_id,
                                         conn,
+                                        limit,
                                         &*addr,
                                         timer,
                                         core_ctx,
@@ -4138,40 +4167,87 @@ where
             ) = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn_and_addr);
-                    let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
+                    let (newly_closed, should_send) = conn.on_icmp_error(core_ctx, &id, seq, error);
+                    let core_ctx = core_ctx.as_this_stack();
+                    let demux_id = I::into_demux_socket_id(id.clone());
+
+                    match should_send {
+                        ShouldRetransmit::No => {}
+                        ShouldRetransmit::Yes(mss) => do_send_inner_and_then_handle_newly_closed(
+                            &id,
+                            &demux_id,
+                            conn,
+                            Some(mss.into()),
+                            addr,
+                            timer,
+                            core_ctx,
+                            bindings_ctx,
+                        ),
+                    }
+
                     (
                         newly_closed,
                         &mut conn.accept_queue,
                         &mut conn.state,
                         &mut conn.soft_error,
                         &mut conn.handshake_status,
-                        EitherStack::ThisStack((
-                            core_ctx.as_this_stack(),
-                            I::into_demux_socket_id(id.clone()),
-                            addr,
-                        )),
+                        EitherStack::ThisStack((core_ctx, demux_id, addr)),
                     )
                 }
                 MaybeDualStack::DualStack((core_ctx, converter)) => {
                     match converter.convert(conn_and_addr) {
                         EitherStack::ThisStack((conn, addr)) => {
-                            let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
+                            let (newly_closed, should_send) =
+                                conn.on_icmp_error(core_ctx, &id, seq, error);
+                            let core_ctx = core_ctx.as_this_stack();
+                            let demux_id = I::into_demux_socket_id(id.clone());
+
+                            match should_send {
+                                ShouldRetransmit::No => {}
+                                ShouldRetransmit::Yes(mss) => {
+                                    do_send_inner_and_then_handle_newly_closed(
+                                        &id,
+                                        &demux_id,
+                                        conn,
+                                        Some(mss.into()),
+                                        addr,
+                                        timer,
+                                        core_ctx,
+                                        bindings_ctx,
+                                    )
+                                }
+                            }
+
                             (
                                 newly_closed,
                                 &mut conn.accept_queue,
                                 &mut conn.state,
                                 &mut conn.soft_error,
                                 &mut conn.handshake_status,
-                                EitherStack::ThisStack((
-                                    core_ctx.as_this_stack(),
-                                    I::into_demux_socket_id(id.clone()),
-                                    addr,
-                                )),
+                                EitherStack::ThisStack((core_ctx, demux_id, addr)),
                             )
                         }
                         EitherStack::OtherStack((conn, addr)) => {
-                            let newly_closed = conn.on_icmp_error(core_ctx, &id, seq, error);
+                            let (newly_closed, should_send) =
+                                conn.on_icmp_error(core_ctx, &id, seq, error);
                             let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+
+                            match should_send {
+                                ShouldRetransmit::No => {}
+                                ShouldRetransmit::Yes(mss) => {
+                                    do_send_inner_and_then_handle_newly_closed(
+                                        &id,
+                                        &demux_id,
+                                        conn,
+                                        Some(mss.into()),
+                                        addr,
+                                        timer,
+                                        core_ctx,
+                                        bindings_ctx,
+                                    )
+                                }
+                            }
+
                             (
                                 newly_closed,
                                 &mut conn.accept_queue,
@@ -4710,8 +4786,9 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
 // Calls `do_send_inner` and handle the result.
 fn do_send_inner_and_then_handle_newly_closed<SockI, WireI, CC, BC>(
     conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
-    demux_id: WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+    demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+    limit: Option<u32>,
     addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     timer: &mut BC::Timer,
     core_ctx: &mut CC,
@@ -4724,8 +4801,8 @@ fn do_send_inner_and_then_handle_newly_closed<SockI, WireI, CC, BC>(
         + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
-    let newly_closed = do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx);
-    handle_newly_closed(core_ctx, bindings_ctx, newly_closed, &demux_id, addr, timer);
+    let newly_closed = do_send_inner(conn_id, conn, limit, addr, timer, core_ctx, bindings_ctx);
+    handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, addr, timer);
 }
 
 #[inline]
@@ -4753,6 +4830,7 @@ fn handle_newly_closed<I, D, CC, BC>(
 fn do_send_inner<SockI, WireI, CC, BC>(
     conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
     conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+    mut limit: Option<u32>,
     addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     timer: &mut BC::Timer,
     core_ctx: &mut CC,
@@ -4768,11 +4846,12 @@ where
         match conn.state.poll_send(
             &conn_id.either(),
             &TcpCountersRefs::from_ctx(core_ctx, conn_id),
-            u32::MAX,
+            limit.unwrap_or(u32::MAX),
             bindings_ctx.now(),
             &conn.socket_options,
         ) {
             Ok(seg) => {
+                let sent = u32::try_from(seg.data.len()).unwrap();
                 send_tcp_segment(
                     core_ctx,
                     bindings_ctx,
@@ -4782,6 +4861,13 @@ where
                     seg,
                     &conn.socket_options.ip_options,
                 );
+
+                if let Some(limit) = limit.as_mut() {
+                    let Some(remaining) = limit.checked_sub(sent) else {
+                        break NewlyClosed::No;
+                    };
+                    *limit = remaining;
+                }
             }
             Err(newly_closed) => break newly_closed,
         }
@@ -5543,7 +5629,7 @@ mod tests {
     use netstack3_base::{
         ContextProvider, CounterContext, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _,
         InstantContext, LinkDevice, Mms, ReferenceNotifiers, ResourceCounterContext,
-        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper, WindowSize,
     };
     use netstack3_filter::{TransportPacketSerializer, Tuple};
     use netstack3_ip::device::IpDeviceStateIpExt;
@@ -5557,12 +5643,14 @@ mod tests {
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::icmp::{
-        Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode,
-        Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+        IcmpDestUnreachable, Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode,
+        Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode,
+        Icmpv6TimeExceededCode,
     };
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
     use test_case::test_case;
+    use test_util::assert_gt;
 
     use super::*;
     use crate::internal::base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT};
@@ -5574,7 +5662,7 @@ mod tests {
         CounterExpectations, CounterExpectationsWithoutSocket,
     };
     use crate::internal::counters::TcpCountersWithoutSocket;
-    use crate::internal::state::{TimeWait, MSL};
+    use crate::internal::state::{Established, TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
         type SingleStackConverter: SingleStackConverter<
@@ -5887,6 +5975,8 @@ mod tests {
         }
     }
 
+    const LINK_MTU: Mtu = Mtu::new(1500);
+
     impl<I, D, BC> DeviceIpSocketHandler<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
@@ -5902,7 +5992,7 @@ mod tests {
         where
             O: RouteResolutionOptions<I>,
         {
-            Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
+            Ok(Mms::from_mtu::<I>(LINK_MTU, 0).unwrap())
         }
     }
 
@@ -8189,21 +8279,21 @@ mod tests {
         );
     }
 
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable, IcmpDestUnreachable::default()) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable, IcmpDestUnreachable::default()) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed, IcmpDestUnreachable::default()) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown, IcmpDestUnreachable::default()) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated, IcmpDestUnreachable::default()) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
@@ -8266,21 +8356,21 @@ mod tests {
         api.get_socket_error(&connection).unwrap()
     }
 
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable, IcmpDestUnreachable::default()) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable, IcmpDestUnreachable::default()) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed, IcmpDestUnreachable::default()) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown, IcmpDestUnreachable::default()) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated, IcmpDestUnreachable::default()) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS, IcmpDestUnreachable::default()) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect, IcmpDestUnreachable::default()) => ConnectionError::HostUnreachable)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
     #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
@@ -8414,7 +8504,12 @@ mod tests {
         });
         let icmp_error = I::map_ip(
             (),
-            |()| Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable),
+            |()| {
+                Icmpv4ErrorCode::DestUnreachable(
+                    Icmpv4DestUnreachableCode::DestPortUnreachable,
+                    IcmpDestUnreachable::default(),
+                )
+            },
             |()| Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable),
         );
         net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
@@ -9379,5 +9474,154 @@ mod tests {
             // update was sent.
             assert_eq!(send_buf_len, EXTRA_DATA_AMOUNT);
         }
+    }
+
+    impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocketId<I, D, BT> {
+        fn established_state(
+            state: &impl Deref<Target = TcpSocketState<I, D, BT>>,
+        ) -> &Established<BT::Instant, BT::ReceiveBuffer, BT::SendBuffer> {
+            assert_matches!(
+                &state.deref().socket_state,
+                TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
+                    assert_matches!(I::get_state(conn), State::Established(e) => e)
+                }
+            )
+        }
+
+        fn mss(&self) -> Mss {
+            Self::established_state(&self.get()).snd.congestion_control().mss()
+        }
+
+        fn cwnd(&self) -> WindowSize {
+            Self::established_state(&self.get()).snd.congestion_control().cwnd()
+        }
+    }
+
+    #[derive(PartialEq)]
+    enum MssUpdate {
+        Decrease,
+        Same,
+        Increase,
+    }
+
+    #[ip_test(I)]
+    #[test_case(MssUpdate::Decrease; "update if decrease")]
+    #[test_case(MssUpdate::Same; "ignore if same")]
+    #[test_case(MssUpdate::Increase; "ignore if increase")]
+    fn pmtu_update_mss<I: TcpTestIpExt + IcmpIpExt>(mss_update: MssUpdate)
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
+            + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut net = new_test_net::<I>();
+
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.bind(&server, None, Some(PORT_1)).expect("bind to port");
+            api.listen(&server, NonZeroUsize::MIN).expect("can listen");
+            server
+        });
+
+        let client_buffers = WriteBackClientBuffers::default();
+        let client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let client = api.create(ProvidedBuffers::Buffers(client_buffers.clone()));
+            api.connect(&client, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), PORT_1)
+                .expect("connect to server");
+            client
+        });
+
+        // Allow the connection to be established.
+        net.run_until_idle();
+        let (_accepted, accepted_buffers) = net.with_context(REMOTE, |ctx| {
+            let (accepted, _addr, accepted_ends) =
+                ctx.tcp_api::<I>().accept(&server).expect("accept incoming connection");
+            (accepted, accepted_ends)
+        });
+
+        let initial_mss = client.mss();
+
+        let pmtu_update = match mss_update {
+            MssUpdate::Decrease => I::MINIMUM_LINK_MTU,
+            MssUpdate::Same => LINK_MTU,
+            MssUpdate::Increase => Mtu::max(),
+        };
+        let icmp_error = I::map_ip(
+            (),
+            |()| {
+                let mtu = u16::try_from(pmtu_update.get()).unwrap_or(u16::MAX);
+                let mtu = NonZeroU16::new(mtu).unwrap();
+                Icmpv4ErrorCode::DestUnreachable(
+                    Icmpv4DestUnreachableCode::FragmentationRequired,
+                    IcmpDestUnreachable::new_for_frag_req(mtu),
+                )
+            },
+            |()| Icmpv6ErrorCode::PacketTooBig(pmtu_update),
+        );
+
+        // Send a payload that is large enough that it will need to be re-segmented if
+        // the PMTU decreases, and deliver a PMTU update.
+        let ClientBuffers { send: client_snd_end, receive: _ } =
+            client_buffers.0.as_ref().lock().take().unwrap();
+        let payload = vec![0xFF; I::MINIMUM_LINK_MTU.into()];
+        client_snd_end.lock().extend_from_slice(&payload);
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().do_send(&client);
+            let (core_ctx, bindings_ctx) = ctx.contexts();
+            let frames = core_ctx.ip_socket_ctx.take_frames();
+            let frame = assert_matches!(&frames[..], [(_meta, frame)] => frame);
+
+            deliver_icmp_error::<I, _, _>(
+                core_ctx,
+                bindings_ctx,
+                I::TEST_ADDRS.local_ip,
+                I::TEST_ADDRS.remote_ip,
+                &frame[0..8],
+                icmp_error,
+            );
+        });
+
+        let mms = Mms::from_mtu::<I>(pmtu_update, 0 /* no IP options */).unwrap();
+        let mss = Mss::from_mms(mms).unwrap();
+        match mss_update {
+            MssUpdate::Decrease => {
+                assert!(mss < initial_mss);
+            }
+            MssUpdate::Same => {
+                assert_eq!(mss, initial_mss);
+            }
+            MssUpdate::Increase => {
+                assert!(mss > initial_mss);
+            }
+        };
+
+        // The socket should only update its MSS if the new MSS is a decrease.
+        if mss_update != MssUpdate::Decrease {
+            assert_eq!(client.mss(), initial_mss);
+            return;
+        }
+        assert_eq!(client.mss(), mss);
+        // The PMTU update should not represent a congestion event.
+        assert_gt!(u32::from(client.cwnd()), u32::from(mss));
+
+        // The segment that was too large should be eagerly retransmitted.
+        net.with_context(LOCAL, |ctx| {
+            let frames = ctx.core_ctx().ip_socket_ctx.frames();
+            let frame = assert_matches!(&frames[..], [(_meta, frame)] => frame);
+            let expected_len: usize = mms.get().get().try_into().unwrap();
+            assert_eq!(frame.len(), expected_len);
+        });
+
+        // The remaining in-flight segment(s) are retransmitted via the retransmission
+        // timer (rather than immediately).
+        net.run_until_idle();
+        let ClientBuffers { send: _, receive: accepted_rcv_end } = accepted_buffers;
+        let read = accepted_rcv_end.lock().read_with(|avail| {
+            let avail = avail.concat();
+            assert_eq!(avail, payload);
+            avail.len()
+        });
+        assert_eq!(read, payload.len());
     }
 }

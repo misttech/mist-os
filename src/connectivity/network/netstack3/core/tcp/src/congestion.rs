@@ -69,7 +69,7 @@ impl CongestionControlParams {
 /// - Fast retransmit
 /// - Fast recovery: https://datatracker.ietf.org/doc/html/rfc5681#section-3
 #[derive(Debug)]
-pub(super) struct CongestionControl<I> {
+pub(crate) struct CongestionControl<I> {
     params: CongestionControlParams,
     algorithm: LossBasedAlgorithm<I>,
     /// The connection is in fast recovery when this field is a [`Some`].
@@ -215,6 +215,27 @@ impl<I: Instant> CongestionControl<I> {
 
     pub(super) fn mss(&self) -> Mss {
         self.params.mss
+    }
+
+    pub(super) fn update_mss(&mut self, mss: Mss) {
+        // From [RFC 5681 section 3.1]:
+        //
+        //    When initial congestion windows of more than one segment are
+        //    implemented along with Path MTU Discovery [RFC1191], and the MSS
+        //    being used is found to be too large, the congestion window cwnd
+        //    SHOULD be reduced to prevent large bursts of smaller segments.
+        //    Specifically, cwnd SHOULD be reduced by the ratio of the old segment
+        //    size to the new segment size.
+        //
+        // [RFC 5681 section 3.1]: https://datatracker.ietf.org/doc/html/rfc5681#section-3.1
+        if self.params.ssthresh == u32::MAX {
+            self.params.cwnd = self
+                .params
+                .cwnd
+                .saturating_div(u32::from(self.params.mss))
+                .saturating_mul(u32::from(mss));
+        }
+        self.params.mss = mss;
     }
 
     /// Returns true if this [`CongestionControl`] is in fast recovery.

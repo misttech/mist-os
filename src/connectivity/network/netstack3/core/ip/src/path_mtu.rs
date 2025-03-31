@@ -59,23 +59,27 @@ pub(crate) trait PmtuHandler<I: Ip, BC> {
     /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than
     /// the current PMTU and does not violate the minimum MTU size requirements
     /// for an IP.
+    ///
+    /// Returns the new PMTU, if it was updated.
     fn update_pmtu_if_less(
         &mut self,
         bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
-    );
+    ) -> Option<Mtu>;
 
     /// Updates the PMTU between `src_ip` and `dst_ip` to the next lower
     /// estimate from `from`.
+    ///
+    /// Returns the new PMTU, if it was updated.
     fn update_pmtu_next_lower(
         &mut self,
         bindings_ctx: &mut BC,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         from: Mtu,
-    );
+    ) -> Option<Mtu>;
 }
 
 fn maybe_schedule_timer<BC: PmtuBindingsContext>(
@@ -108,12 +112,16 @@ fn handle_update_result<BC: PmtuBindingsContext>(
     timer: &mut BC::Timer,
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
-) {
-    // TODO(https://fxbug.dev/42174290): Do something with this `Result`.
-    let _: Result<_, _> = result.map(|ret| {
-        maybe_schedule_timer(bindings_ctx, timer, cache_is_empty);
-        ret
-    });
+) -> Option<Mtu> {
+    match result {
+        Ok(Some(new_mtu)) => {
+            maybe_schedule_timer(bindings_ctx, timer, cache_is_empty);
+            Some(new_mtu)
+        }
+        Ok(None) => None,
+        // TODO(https://fxbug.dev/42174290): Do something with this `Err`.
+        Err(_) => None,
+    }
 }
 
 impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> for CC {
@@ -123,12 +131,12 @@ impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> 
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
-    ) {
+    ) -> Option<Mtu> {
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             let res = cache.update_pmtu_if_less(src_ip, dst_ip, new_mtu, now);
             let is_empty = cache.is_empty();
-            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty);
+            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty)
         })
     }
 
@@ -138,12 +146,12 @@ impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> 
         src_ip: I::Addr,
         dst_ip: I::Addr,
         from: Mtu,
-    ) {
+    ) -> Option<Mtu> {
         self.with_state_mut(|cache| {
             let now = bindings_ctx.now();
             let res = cache.update_pmtu_next_lower(src_ip, dst_ip, from, now);
             let is_empty = cache.is_empty();
-            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty);
+            handle_update_result(bindings_ctx, &mut cache.timer, res, is_empty)
         })
     }
 }
@@ -213,9 +221,15 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
         self.cache.get(&PmtuCacheKey::new(src_ip, dst_ip)).map(|x| x.pmtu)
     }
 
-    /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than
-    /// the current PMTU and does not violate the minimum MTU size requirements
-    /// for an IP.
+    /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` is less than the
+    /// current PMTU and does not violate the minimum MTU size requirements for an
+    /// IP.
+    ///
+    /// Returns `Ok(x)` on success, where `x` is `Some` if the update actually
+    /// resulted in a change to the PMTU, or `None` if the existing PMTU was already
+    /// less than or equal to the new PMTU (and therefore it was not updated).
+    ///
+    /// Returns `Err(x)` on failure, where `x` is the existing PMTU in the cache.
     fn update_pmtu_if_less(
         &mut self,
         src_ip: I::Addr,
@@ -225,14 +239,16 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
     ) -> Result<Option<Mtu>, Option<Mtu>> {
         match self.get_pmtu(src_ip, dst_ip) {
             // No PMTU exists so update.
-            None => self.update_pmtu(src_ip, dst_ip, new_mtu, now),
+            None => self.update_pmtu(src_ip, dst_ip, new_mtu, now).map(Some),
             // A PMTU exists but it is greater than `new_mtu` so update.
-            Some(prev_mtu) if new_mtu < prev_mtu => self.update_pmtu(src_ip, dst_ip, new_mtu, now),
+            Some(prev_mtu) if new_mtu < prev_mtu => {
+                self.update_pmtu(src_ip, dst_ip, new_mtu, now).map(Some)
+            }
             // A PMTU exists but it is less than or equal to `new_mtu` so no need to
             // update.
             Some(prev_mtu) => {
                 trace!("update_pmtu_if_less: Not updating the PMTU between src {} and dest {} to {:?}; is {:?}", src_ip, dst_ip, new_mtu, prev_mtu);
-                Ok(Some(prev_mtu))
+                Ok(None)
             }
         }
     }
@@ -240,10 +256,14 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
     /// Updates the PMTU between `src_ip` and `dst_ip` to the next lower
     /// estimate from `from`.
     ///
-    /// Returns `Ok((a, b))` on successful update (a lower PMTU value, `b`,
-    /// exists that does not violate IP specific minimum MTU requirements and it
-    /// is less than the current PMTU estimate, `a`). Returns `Err(a)`
-    /// otherwise, where `a` is the same `a` as in the success case.
+    /// Returns `Ok(x)` on successful update (either PMTU is already lower than
+    /// `from`, in which case `x` is `None`, or a lower PMTU value exists that does
+    /// not violate IP specific minimum MTU requirements and it is less than the
+    /// current PMTU estimate, in which case `x` is `Some(a)` where `a` is the new
+    /// lower value.
+    ///
+    /// Returns `Err(x)` if no suitable lower PMTU value exists, where `x` is the
+    /// existing PMTU in the cache.
     fn update_pmtu_next_lower(
         &mut self,
         src_ip: I::Addr,
@@ -268,30 +288,29 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
         }
     }
 
-    /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` does not
-    /// violate IP-specific minimum MTU requirements.
+    /// Updates the PMTU between `src_ip` and `dst_ip` if `new_mtu` does not violate
+    /// IP-specific minimum MTU requirements.
     ///
-    /// Returns `Err(x)` if the `new_mtu` is less than the minimum MTU for an IP
-    /// where the same `x` is returned in the success case (`Ok(x)`). `x` is the
-    /// PMTU known by this `PmtuCache` before being updated. `x` will be `None`
-    /// if no PMTU is known, else `Some(y)` where `y` is the last estimate of
-    /// the PMTU.
+    /// Returns `Ok(x)` if the `new_mtu` is greater than or equal to the IP-specific
+    /// minimum MTU, where `x` is the new MTU; returns `Err(x)` otherwise, where `x`
+    /// is the PMTU already in the cache.
     fn update_pmtu(
         &mut self,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         new_mtu: Mtu,
         now: BT::Instant,
-    ) -> Result<Option<Mtu>, Option<Mtu>> {
+    ) -> Result<Mtu, Option<Mtu>> {
         // New MTU must not be smaller than the minimum MTU for an IP.
         if new_mtu < I::MINIMUM_LINK_MTU {
             return Err(self.get_pmtu(src_ip, dst_ip));
         }
+        let _previous =
+            self.cache.insert(PmtuCacheKey::new(src_ip, dst_ip), PmtuCacheData::new(new_mtu, now));
 
-        Ok(self
-            .cache
-            .insert(PmtuCacheKey::new(src_ip, dst_ip), PmtuCacheData::new(new_mtu, now))
-            .map(|PmtuCacheData { pmtu, last_updated: _ }| pmtu))
+        log::debug!("updated PMTU for path {src_ip} -> {dst_ip} to {new_mtu:?}");
+
+        Ok(new_mtu)
     }
 
     fn handle_timer(&mut self, now: BT::Instant) {
@@ -383,7 +402,7 @@ pub(crate) mod testutil {
                     _src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     _dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     _new_mtu: Mtu,
-                ) {
+                ) -> Option<Mtu> {
                     unimplemented!()
                 }
 
@@ -393,7 +412,7 @@ pub(crate) mod testutil {
                     _src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     _dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
                     _from: Mtu,
-                ) {
+                ) -> Option<Mtu> {
                     unimplemented!()
                 }
             }
@@ -511,12 +530,15 @@ mod tests {
         // Update pmtu from local to remote. PMTU should be updated to
         // `new_mtu1` and last updated instant should be updated to the start of
         // the test + 1s.
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            new_mtu1,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                new_mtu1,
+            ),
+            Some(new_mtu1)
         );
 
         // Advance time to 2s.
@@ -543,12 +565,15 @@ mod tests {
         // Updating again should return the last pmtu PMTU should be updated to
         // `new_mtu2` and last updated instant should be updated to the start of
         // the test + 3s.
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            new_mtu2,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                new_mtu2,
+            ),
+            Some(new_mtu2)
         );
 
         // Advance time to 4s.
@@ -575,12 +600,15 @@ mod tests {
         // Make sure update only if new PMTU is less than current (it is). PMTU
         // should be updated to `new_mtu3` and last updated instant should be
         // updated to the start of the test + 5s.
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            new_mtu3,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                new_mtu3,
+            ),
+            Some(new_mtu3)
         );
 
         // Advance time to 6s.
@@ -606,12 +634,15 @@ mod tests {
         assert_empty(bindings_ctx.trigger_timers_for(duration, &mut core_ctx));
 
         // Make sure update only if new PMTU is less than current (it isn't)
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            new_mtu4,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                new_mtu4,
+            ),
+            None
         );
 
         // Advance time to 8s.
@@ -635,12 +666,15 @@ mod tests {
         assert_empty(bindings_ctx.trigger_timers_for(duration, &mut core_ctx));
 
         // Updating with MTU value less than the minimum MTU should fail.
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            low_mtu,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                low_mtu,
+            ),
+            None
         );
 
         // Advance time to 10s.
@@ -677,12 +711,15 @@ mod tests {
         // Update pmtu from local to remote. PMTU should be updated to
         // `new_mtu1` and last updated instant should be updated to the start of
         // the test + 1s.
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            fake_config.remote_ip.get(),
-            new_mtu1,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get(),
+                new_mtu1,
+            ),
+            Some(new_mtu1)
         );
 
         // Make sure a task got scheduled.
@@ -715,12 +752,15 @@ mod tests {
         // the test + 1s.
         let other_ip = get_other_ip_address::<I>();
         let new_mtu2 = Mtu::new(u32::from(I::MINIMUM_LINK_MTU) + 100);
-        PmtuHandler::update_pmtu_if_less(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            fake_config.local_ip.get(),
-            other_ip.get(),
-            new_mtu2,
+        assert_eq!(
+            PmtuHandler::update_pmtu_if_less(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                fake_config.local_ip.get(),
+                other_ip.get(),
+                new_mtu2,
+            ),
+            Some(new_mtu2)
         );
 
         // Make sure there is still a task scheduled. (we know no timers got

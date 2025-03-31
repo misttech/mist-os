@@ -102,6 +102,7 @@ rustc_library_with_features("netstack3-tcp") {
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
         "//src/lib/proptest-support",
+        "//src/lib/test_util",
         "//third_party/rust_crates:proptest",
         "//third_party/rust_crates:test-case",
       ]

@@ -7,10 +7,10 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
-use net_types::ip::{GenericOverIp, Ip, Mtu};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, Marks, UnscaledWindowSize,
+    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, Marks, Mms, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
@@ -59,95 +59,109 @@ pub enum ConnectionError {
     ProtocolError,
 }
 
-impl ConnectionError {
+/// The meaning of a particular ICMP error to a TCP socket.
+pub(crate) enum IcmpErrorResult {
+    /// There has been an error on the connection that must be handled.
+    ConnectionError(ConnectionError),
+    /// The PMTU used by the connection has been updated.
+    PmtuUpdate(Mms),
+}
+
+impl IcmpErrorResult {
     // Notes: the following mappings are guided by the packetimpact test here:
     // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
-    pub(crate) fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
+    pub(crate) fn try_from_icmp_error(err: IcmpErrorCode) -> Option<IcmpErrorResult> {
         match err {
-            IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
-                Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
-                    Some(ConnectionError::NetworkUnreachable)
+            IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code, message)) => {
+                match code {
+                    Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestHostUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestProtocolUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestPortUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::PortUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::SourceRouteFailed => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::SourceRouteFailed))
+                    }
+                    Icmpv4DestUnreachableCode::DestNetworkUnknown => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestHostUnknown => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::DestinationHostDown))
+                    }
+                    Icmpv4DestUnreachableCode::SourceHostIsolated => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::SourceHostIsolated))
+                    }
+                    Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::NetworkUnreachableForToS => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostUnreachableForToS => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostPrecedenceViolation => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::FragmentationRequired => {
+                        let mtu = message.next_hop_mtu().expect("stack should always fill in MTU");
+                        let mtu = Mtu::new(mtu.get().into());
+                        let mms = Mms::from_mtu::<Ipv4>(mtu, 0 /* no IP options used */)?;
+                        Some(IcmpErrorResult::PmtuUpdate(mms))
+                    }
                 }
-                Icmpv4DestUnreachableCode::DestHostUnreachable => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestProtocolUnreachable => {
-                    Some(ConnectionError::ProtocolUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestPortUnreachable => {
-                    Some(ConnectionError::PortUnreachable)
-                }
-                // TODO(https://fxbug.dev/404628798): update PMTU/MSS.
-                Icmpv4DestUnreachableCode::FragmentationRequired => None,
-                Icmpv4DestUnreachableCode::SourceRouteFailed => {
-                    Some(ConnectionError::SourceRouteFailed)
-                }
-                Icmpv4DestUnreachableCode::DestNetworkUnknown => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestHostUnknown => {
-                    Some(ConnectionError::DestinationHostDown)
-                }
-                Icmpv4DestUnreachableCode::SourceHostIsolated => {
-                    Some(ConnectionError::SourceHostIsolated)
-                }
-                Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::NetworkUnreachableForToS => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostUnreachableForToS => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostPrecedenceViolation => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-            },
+            }
             IcmpErrorCode::V4(Icmpv4ErrorCode::ParameterProblem(_)) => {
-                Some(ConnectionError::ProtocolError)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolError))
             }
             IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
                 Icmpv4TimeExceededCode::TtlExpired,
-            )) => Some(ConnectionError::HostUnreachable),
+            )) => Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable)),
             IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
                 Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded,
-            )) => Some(ConnectionError::TimedOut),
+            )) => Some(IcmpErrorResult::ConnectionError(ConnectionError::TimedOut)),
             IcmpErrorCode::V4(Icmpv4ErrorCode::Redirect(_)) => None,
-            IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => match code {
-                Icmpv6DestUnreachableCode::NoRoute => Some(ConnectionError::NetworkUnreachable),
-                Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::PermissionDenied)
-                }
-                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::HostUnreachable),
-                Icmpv6DestUnreachableCode::AddrUnreachable => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv6DestUnreachableCode::PortUnreachable => {
-                    Some(ConnectionError::PortUnreachable)
-                }
-                Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
-                    Some(ConnectionError::PermissionDenied)
-                }
-                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::PermissionDenied),
-            },
+            IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => {
+                Some(IcmpErrorResult::ConnectionError(match code {
+                    Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable,
+                    Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
+                        ConnectionError::PermissionDenied
+                    }
+                    Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::HostUnreachable,
+                    Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable,
+                    Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable,
+                    Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
+                        ConnectionError::PermissionDenied
+                    }
+                    Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::PermissionDenied,
+                }))
+            }
             IcmpErrorCode::V6(Icmpv6ErrorCode::ParameterProblem(_)) => {
-                Some(ConnectionError::ProtocolError)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolError))
             }
             IcmpErrorCode::V6(Icmpv6ErrorCode::TimeExceeded(_)) => {
-                Some(ConnectionError::HostUnreachable)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
             }
-            // TODO(https://fxbug.dev/404628798): update PMTU/MSS.
-            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig) => None,
+            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig(mtu)) => {
+                let mms = Mms::from_mtu::<Ipv6>(mtu, 0 /* no IP options used */)?;
+                Some(IcmpErrorResult::PmtuUpdate(mms))
+            }
         }
     }
 }

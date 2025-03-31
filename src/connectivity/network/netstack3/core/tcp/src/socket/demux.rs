@@ -740,10 +740,12 @@ where
     }
 
     // Send any enqueued data, if there is any.
+    let limit = None;
     socket::do_send_inner_and_then_handle_newly_closed(
         conn_id,
-        demux_id,
+        &demux_id,
         conn,
+        limit,
         &conn_addr,
         timer,
         core_ctx,

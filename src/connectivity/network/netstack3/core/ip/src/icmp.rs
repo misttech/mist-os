@@ -6,7 +6,7 @@
 
 use alloc::boxed::Box;
 use core::convert::TryInto as _;
-use core::num::NonZeroU8;
+use core::num::{NonZeroU16, NonZeroU8};
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
@@ -988,24 +988,26 @@ impl<
                     Received a Destination Unreachable message"
                 );
 
-                if dest_unreachable.code() == Icmpv4DestUnreachableCode::FragmentationRequired {
-                    if let Some(next_hop_mtu) = dest_unreachable.message().next_hop_mtu() {
+                let error = if dest_unreachable.code()
+                    == Icmpv4DestUnreachableCode::FragmentationRequired
+                {
+                    let mtu = if let Some(next_hop_mtu) = dest_unreachable.message().next_hop_mtu()
+                    {
                         // We are updating the path MTU from the destination
                         // address of this `packet` (which is an IP address on
                         // this node) to some remote (identified by the source
                         // address of this `packet`).
                         //
-                        // `update_pmtu_if_less` may return an error, but it
-                        // will only happen if the Dest Unreachable message's
-                        // MTU field had a value that was less than the IPv4
-                        // minimum MTU (which as per IPv4 RFC 791, must not
-                        // happen).
+                        // `update_pmtu_if_less` will only update the PMTU if
+                        // the Dest Unreachable message's MTU field had a value
+                        // that was at least the IPv4 minimum MTU (which is
+                        // required by IPv4 RFC 791).
                         core_ctx.update_pmtu_if_less(
                             bindings_ctx,
                             dst_ip.get(),
                             src_ip,
                             Mtu::new(u32::from(next_hop_mtu.get())),
-                        );
+                        )
                     } else {
                         // If the Next-Hop MTU from an incoming ICMP message is
                         // `0`, then we assume the source node of the ICMP
@@ -1049,7 +1051,7 @@ impl<
                                 dst_ip.get(),
                                 src_ip,
                                 Mtu::new(u32::from(total_len)),
-                            );
+                            )
                         } else {
                             // Ok to silently ignore as RFC 792 requires nodes
                             // to send the original IP packet header + 64 bytes
@@ -1060,17 +1062,27 @@ impl<
                                 receive_ip_packet: Original packet buf is too small to get \
                                 original packet len so ignoring"
                             );
+                            None
                         }
-                    }
-                }
+                    };
+                    mtu.and_then(|mtu| {
+                        let mtu = u16::try_from(mtu.get()).unwrap_or(u16::MAX);
+                        let mtu = NonZeroU16::new(mtu)?;
+                        Some(Icmpv4ErrorCode::DestUnreachable(
+                            dest_unreachable.code(),
+                            IcmpDestUnreachable::new_for_frag_req(mtu),
+                        ))
+                    })
+                } else {
+                    Some(Icmpv4ErrorCode::DestUnreachable(
+                        dest_unreachable.code(),
+                        *dest_unreachable.message(),
+                    ))
+                };
 
-                receive_icmpv4_error(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                    &dest_unreachable,
-                    Icmpv4ErrorCode::DestUnreachable(dest_unreachable.code()),
-                );
+                if let Some(error) = error {
+                    receive_icmpv4_error(core_ctx, bindings_ctx, device, &dest_unreachable, error);
+                }
             }
             Icmpv4Packet::TimeExceeded(time_exceeded) => {
                 CounterContext::<IcmpRxCounters<Ipv4>>::counters(core_ctx)
@@ -1760,30 +1772,34 @@ impl<
                     .packet_too_big
                     .increment();
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
-                if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
+                let new_mtu = if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
                     // of this `packet` (which is an IP address on this node) to
                     // some remote (identified by the source address of this
                     // `packet`).
                     //
-                    // `update_pmtu_if_less` may return an error, but it will
-                    // only happen if the Packet Too Big message's MTU field had
-                    // a value that was less than the IPv6 minimum MTU (which as
-                    // per IPv6 RFC 8200, must not happen).
+                    // `update_pmtu_if_less` will only update the PMTU if the
+                    // Packet Too Big message's MTU field had a value that was
+                    // at least the IPv6 minimum MTU (which is required by IPv6
+                    // RFC 8200).
                     core_ctx.update_pmtu_if_less(
                         bindings_ctx,
                         dst_ip.get(),
                         src_ip.get(),
                         Mtu::new(packet_too_big.message().mtu()),
+                    )
+                } else {
+                    None
+                };
+                if let Some(mtu) = new_mtu {
+                    receive_icmpv6_error(
+                        core_ctx,
+                        bindings_ctx,
+                        device,
+                        &packet_too_big,
+                        Icmpv6ErrorCode::PacketTooBig(mtu),
                     );
                 }
-                receive_icmpv6_error(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                    &packet_too_big,
-                    Icmpv6ErrorCode::PacketTooBig,
-                );
             }
             Icmpv6Packet::Mld(packet) => {
                 core_ctx.receive_mld_packet(
@@ -3747,6 +3763,7 @@ mod tests {
                 assert_eq!(core_ctx.icmp.rx_counters.error_delivered_to_socket.get(), 1);
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
+                    IcmpDestUnreachable::default(),
                 );
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -3806,6 +3823,7 @@ mod tests {
                 assert_eq!(core_ctx.icmp.rx_counters.error_delivered_to_socket.get(), 0);
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
+                    IcmpDestUnreachable::default(),
                 );
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
@@ -3864,6 +3882,7 @@ mod tests {
                 assert_eq!(core_ctx.icmp.rx_counters.error_delivered_to_socket.get(), 0);
                 let err = Icmpv4ErrorCode::DestUnreachable(
                     Icmpv4DestUnreachableCode::DestNetworkUnreachable,
+                    IcmpDestUnreachable::default(),
                 );
                 assert_eq!(core_ctx.icmp.receive_icmp_error, [err]);
             },
