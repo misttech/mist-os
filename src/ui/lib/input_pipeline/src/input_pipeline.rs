@@ -752,15 +752,12 @@ mod tests {
         observe_fake_events_input_handler,
     };
     use diagnostics_assertions::AnyProperty;
-    use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
+    use fidl::endpoints::{create_proxy_and_stream, create_request_stream};
     use fuchsia_async as fasync;
     use futures::FutureExt;
     use pretty_assertions::assert_eq;
     use rand::Rng;
     use std::collections::HashSet;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::path::Path;
     use vfs::{pseudo_directory, service as pseudo_fs_service};
 
     const COUNTS_PER_MM: u32 = 12;
@@ -984,26 +981,11 @@ mod tests {
         };
 
         // Create a Watcher on the pseudo directory.
-        let pseudo_dir_clone = dir.clone();
-        let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
-        let scope_for_watcher = ExecutionScope::new();
-        dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
+        let dir_proxy_for_watcher = vfs::directory::serve_read_only(dir.clone());
         let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
-
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
-        let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
-        let scope_for_pipeline = ExecutionScope::new();
-        pseudo_dir_clone.open(
-            scope_for_pipeline,
-            fio::OpenFlags::empty(),
-            Path::dot(),
-            server_end_for_pipeline,
-        );
+        let dir_proxy_for_pipeline = vfs::directory::serve_read_only(dir);
 
         let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
@@ -1107,26 +1089,11 @@ mod tests {
         };
 
         // Create a Watcher on the pseudo directory.
-        let pseudo_dir_clone = dir.clone();
-        let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
-        let scope_for_watcher = ExecutionScope::new();
-        dir.open(scope_for_watcher, fio::OpenFlags::empty(), Path::dot(), server_end_for_watcher);
+        let dir_proxy_for_watcher = vfs::directory::serve_read_only(dir.clone());
         let device_watcher = Watcher::new(&dir_proxy_for_watcher).await.unwrap();
-
         // Get a proxy to the pseudo directory for the input pipeline. The input pipeline uses this
         // proxy to get connections to input devices.
-        let (dir_proxy_for_pipeline, dir_server_for_pipeline) =
-            create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_pipeline = dir_server_for_pipeline.into_channel().into();
-        let scope_for_pipeline = ExecutionScope::new();
-        pseudo_dir_clone.open(
-            scope_for_pipeline,
-            fio::OpenFlags::empty(),
-            Path::dot(),
-            server_end_for_pipeline,
-        );
+        let dir_proxy_for_pipeline = vfs::directory::serve_read_only(dir);
 
         let (input_event_sender, _input_event_receiver) = futures::channel::mpsc::unbounded();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));

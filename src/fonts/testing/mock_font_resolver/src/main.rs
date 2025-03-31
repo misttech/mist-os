@@ -12,7 +12,7 @@ use log::*;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
-use vfs::pseudo_directory;
+use vfs::{pseudo_directory, ToObjectRequest as _};
 use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -71,10 +71,9 @@ async fn resolve(
         }
     };
 
-    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-    let node = ServerEnd::from(directory_request.into_channel());
-
-    root.open(ExecutionScope::new(), flags, vfs::path::Path::dot(), node);
+    fio::PERM_READABLE.to_object_request(directory_request.into_channel()).handle(|request| {
+        root.open3(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_READABLE, request)
+    });
 
     Ok(())
 }
