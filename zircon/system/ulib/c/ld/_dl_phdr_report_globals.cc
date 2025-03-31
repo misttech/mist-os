@@ -4,10 +4,10 @@
 
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/phdr.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/sanitizer.h>
 
 #include <cstdint>
+#include <span>
 
 #include "dynlink.h"
 
@@ -16,7 +16,7 @@ void _dl_phdr_report_globals(sanitizer_memory_snapshot_callback_t* callback, voi
   using ElfPhdr = elfldltl::Elf<>::Phdr;
   static_assert(sizeof(ElfPhdr) == sizeof(Phdr));
 
-  const cpp20::span<const ElfPhdr> elf_phdrs{
+  const std::span<const ElfPhdr> elf_phdrs{
       reinterpret_cast<const ElfPhdr*>(phdrs),
       phnum,
   };

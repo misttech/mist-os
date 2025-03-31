@@ -55,7 +55,6 @@ if (zircon_toolchain != false) {
 libc_source_set("backtrace") {
   sources = [ "backtrace.cc" ]
   public = [ "backtrace.h" ]
-  public_deps = [ "//sdk/lib/stdcompat" ]
   deps = [
     "//zircon/kernel/lib/arch",
     "//zircon/third_party/ulib/musl:musl_internal",
