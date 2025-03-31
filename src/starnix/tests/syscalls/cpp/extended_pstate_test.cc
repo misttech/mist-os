@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// AArch32 doesn't have extneded pstate
-#if !defined(__arm__)
-
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -65,6 +62,14 @@ void SetTestRegisters(const RegistersValue* value) {
       "movups 16(%0), %%xmm1\n"
       :
       : "r"(value));
+#elif defined(__arm__)
+  asm volatile(
+      "vldr d0, [%0, #0]\n"
+      "vldr d1, [%0, #8]\n"
+      "vldr d2, [%0, #16]\n"
+      "vldr d3, [%0, #24]\n"
+      :
+      : "r"(value));
 #elif defined(__aarch64__)
   asm volatile(
       "ldr q0, [%0, #0]\n"
@@ -98,6 +103,14 @@ RegistersValue GetTestRegisters() {
       "movups %%xmm1, 16(%0)\n"
       :
       : "r"(&value));
+#elif defined(__arm__)
+  asm volatile(
+      "vstr d0, [%0, #0]\n"
+      "vstr d1, [%0, #8]\n"
+      "vstr d2, [%0, #16]\n"
+      "vstr d3, [%0, #24]\n"
+      :
+      : "r"(&value));
 #elif defined(__aarch64__)
   asm volatile(
       "str q0, [%0, #0]\n"
@@ -122,7 +135,71 @@ RegistersValue GetTestRegisters() {
   return value;
 }
 
-RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
+// FP/SIMD registers should be initialized to 0 for new processes.
+TEST(ExtendedPstate, InitialState) {
+  // When running in Starnix the child binary is mounted at this path in the test's namespace.
+  std::string child_path = "data/tests/extended_pstate_initial_state_child";
+  if (!files::IsFile(child_path)) {
+    // When running on host the child binary is next to the test binary.
+    char self_path[PATH_MAX];
+    realpath("/proc/self/exe", self_path);
+
+    child_path =
+        files::JoinPath(files::GetDirectoryName(self_path), "extended_pstate_initial_state_child");
+  }
+  ASSERT_TRUE(files::IsFile(child_path)) << child_path;
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&child_path] {
+    // Set some registers. execve() should reset them to 0.
+    const auto kTestData = RegistersValue{
+        {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
+    fprintf(stderr, "XXX HELLO1\n");
+    SetTestRegisters(&kTestData);
+    fprintf(stderr, "XXX HELLO2\n");
+
+    char* argv[] = {nullptr};
+    char* envp[] = {nullptr};
+    ASSERT_EQ(execve(child_path.c_str(), argv, envp), 0)
+        << "execve error: " << errno << " (" << strerror(errno) << ")";
+  });
+}
+
+// Verify that FP/SIMD registers are preserved by syscalls.
+TEST(ExtendedPstate, Syscall) {
+  const auto kTestRegisters = RegistersValue{
+      {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
+
+  SetTestRegisters(&kTestRegisters);
+
+  // Make several syscalls. Kernel uses floating point to generate `/proc/uptime` content, which
+  // may affect the registers being tested.
+  int fd = open("/proc/uptime", O_RDONLY);
+  EXPECT_GT(fd, 0);
+  char c;
+  EXPECT_EQ(read(fd, &c, 1), 1);
+  EXPECT_EQ(close(fd), 0);
+
+  EXPECT_EQ(GetTestRegisters(), kTestRegisters);
+}
+
+struct SignalHandlerData {
+  void* sigsegv_target;
+  bool received_sigsegv = false;
+  RegistersValue sigsegv_regs;
+
+  RegistersValue sigusr1_regs;
+};
+
+#if defined(__arm__)
+// Layout of the ucontext struct that allows access to the pstate
+struct __attribute__((__packed__)) ucontext_with_pstate {
+  char prefix[124];
+  RegistersValue pstate;
+};
+#endif
+
+RegistersValue
+GetTestRegistersFromUcontext(ucontext_t* ucontext) {
   RegistersValue result;
 
 #if defined(__x86_64__)
@@ -139,6 +216,9 @@ RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
   uint32_t* magic2_ptr =
       reinterpret_cast<uint32_t*>(fpstate_ptr + sw_bytes->extended_size - FP_XSTATE_MAGIC2_SIZE);
   EXPECT_EQ(*magic2_ptr, FP_XSTATE_MAGIC2);
+#elif defined(__arm__)
+  ucontext_with_pstate* fp_context = reinterpret_cast<ucontext_with_pstate*>(ucontext);
+  memcpy(&result, &fp_context->pstate, sizeof(result));
 #elif defined(__aarch64__)
   fpsimd_context* fp_context = reinterpret_cast<fpsimd_context*>(ucontext->uc_mcontext.__reserved);
   EXPECT_EQ(fp_context->head.magic, static_cast<uint32_t>(FPSIMD_MAGIC));
@@ -174,59 +254,6 @@ RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
 
   return result;
 }
-
-// FP/SIMD registers should be initialized to 0 for new processes.
-TEST(ExtendedPstate, InitialState) {
-  // When running in Starnix the child binary is mounted at this path in the test's namespace.
-  std::string child_path = "data/tests/extended_pstate_initial_state_child";
-  if (!files::IsFile(child_path)) {
-    // When running on host the child binary is next to the test binary.
-    char self_path[PATH_MAX];
-    realpath("/proc/self/exe", self_path);
-
-    child_path =
-        files::JoinPath(files::GetDirectoryName(self_path), "extended_pstate_initial_state_child");
-  }
-  ASSERT_TRUE(files::IsFile(child_path)) << child_path;
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([&child_path] {
-    // Set some registers. execve() should reset them to 0.
-    const auto kTestData = RegistersValue{
-        {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
-    SetTestRegisters(&kTestData);
-
-    char* argv[] = {nullptr};
-    char* envp[] = {nullptr};
-    ASSERT_EQ(execve(child_path.c_str(), argv, envp), 0)
-        << "execve error: " << errno << " (" << strerror(errno) << ")";
-  });
-}
-
-// Verify that FP/SIMD registers are preserved by syscalls.
-TEST(ExtendedPstate, Syscall) {
-  const auto kTestRegisters = RegistersValue{
-      {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
-
-  SetTestRegisters(&kTestRegisters);
-
-  // Make several syscalls. Kernel uses floating point to generate `/proc/uptime` content, which
-  // may affect the registers being tested.
-  int fd = open("/proc/uptime", O_RDONLY);
-  EXPECT_GT(fd, 0);
-  char c;
-  EXPECT_EQ(read(fd, &c, 1), 1);
-  EXPECT_EQ(close(fd), 0);
-
-  EXPECT_EQ(GetTestRegisters(), kTestRegisters);
-}
-
-struct SignalHandlerData {
-  void* sigsegv_target;
-  bool received_sigsegv = false;
-  RegistersValue sigsegv_regs;
-
-  RegistersValue sigusr1_regs;
-};
 
 SignalHandlerData signal_data;
 
@@ -307,5 +334,3 @@ TEST(ExtendedPstate, Signals) {
 }
 
 }  // namespace
-
-#endif  // defined(__arm__)

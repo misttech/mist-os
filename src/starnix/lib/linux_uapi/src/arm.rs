@@ -18352,7 +18352,7 @@ pub struct ucontext {
     pub uc_stack: stack_t,
     pub uc_mcontext: mcontext_t,
     pub uc_sigmask64: sigset64_t,
-    pub __padding: [crate::types::arch32::c_char; 640usize],
+    pub extended_pstate: [u8; 4096usize],
 }
 impl Default for ucontext {
     fn default() -> Self {
