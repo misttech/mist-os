@@ -7,7 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #include <memory>
 
@@ -45,20 +45,24 @@ zx_status_t TestBti::Create(void*, zx_device_t* parent) {
   return ZX_OK;
 }
 void TestBti::GetKoid(GetKoidCompleter::Sync& completer) {
-  ddk::PDevFidl pdev(parent());
-  if (!pdev.is_valid()) {
-    completer.Close(ZX_ERR_INTERNAL);
+  zx::result pdev_client_end =
+      DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent());
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    completer.Close(pdev_client_end.status_value());
     return;
   }
-  zx::bti bti;
-  zx_status_t status = pdev.GetBti(0, &bti);
-  if (status != ZX_OK) {
-    completer.Close(status);
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    completer.Close(bti.status_value());
     return;
   }
 
   zx_info_handle_basic_t info;
-  status = bti.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  zx_status_t status = bti->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK) {
     completer.Close(status);
     return;

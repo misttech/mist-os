@@ -332,8 +332,7 @@ fuchsia_cc_driver("test-bti-driver") {
   deps = [
     ":fuchsia.hardware.btitest_cpp",
     ":test-bti-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
