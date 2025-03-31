@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
+                "fuchsia.driver.crash.CrashIntrospect",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.token.NodeBusTopology",
@@ -107,6 +108,7 @@
             protocol: [
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
+                "fuchsia.driver.crash.CrashIntrospect",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.system.state.Administrator",

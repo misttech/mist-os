@@ -263,12 +263,48 @@ zx::result<fuchsia_driver_host::ProcessInfo> DriverHostComponent::GetProcessInfo
   return zx::ok(*process_info_);
 }
 
+void DriverHostComponent::GetCrashInfo(
+    uint64_t thread_koid,
+    fit::callback<void(zx::result<fuchsia_driver_host::DriverCrashInfo>)> info_callback) const {
+  // Bypass the driver host if the crashing thread is the main thread which means the driver host
+  // itself is what crashed.
+  if (GetMainThreadKoid() == thread_koid) {
+    info_callback(zx::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+
+  driver_host_->FindDriverCrashInfoByThreadKoid(thread_koid)
+      .Then([callback = std::move(info_callback)](
+                fidl::WireUnownedResult<
+                    fuchsia_driver_host::DriverHost::FindDriverCrashInfoByThreadKoid>&
+                    result) mutable {
+        if (!result.ok()) {
+          callback(zx::error(result.status()));
+          return;
+        }
+        if (result->is_error()) {
+          callback(zx::error(result->error_value()));
+          return;
+        }
+
+        callback(zx::ok(fidl::ToNatural(*result->value())));
+      });
+}
+
 zx::result<uint64_t> DriverHostComponent::GetJobKoid() const {
   zx::result result = GetProcessInfo();
   if (result.is_error()) {
     return result.take_error();
   }
   return zx::ok(result->job_koid());
+}
+
+zx::result<uint64_t> DriverHostComponent::GetMainThreadKoid() const {
+  zx::result result = GetProcessInfo();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok(result->main_thread_koid());
 }
 
 zx::result<uint64_t> DriverHostComponent::GetProcessKoid() const {

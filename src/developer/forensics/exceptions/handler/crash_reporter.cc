@@ -96,15 +96,19 @@ fpromise::promise<> Delay(async_dispatcher_t* dispatcher, const zx::duration dur
 
 }  // namespace
 
-CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
-                             std::shared_ptr<sys::ServiceDirectory> services,
-                             zx::duration component_lookup_timeout,
-                             std::unique_ptr<WakeLeaseBase> wake_lease)
+CrashReporter::CrashReporter(
+    async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
+    zx::duration component_lookup_timeout, std::unique_ptr<WakeLeaseBase> wake_lease,
+    fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect> driver_crash_introspect)
     : dispatcher_(dispatcher),
       executor_(dispatcher_),
       services_(std::move(services)),
       component_lookup_timeout_(component_lookup_timeout),
-      wake_lease_(std::move(wake_lease)) {}
+      wake_lease_(std::move(wake_lease)) {
+  if (driver_crash_introspect) {
+    driver_crash_introspect_.Bind(std::move(driver_crash_introspect), dispatcher_);
+  }
+}
 
 void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
                          zx::thread crashed_thread, SendCallback callback) {
@@ -141,9 +145,12 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
           : fpromise::make_result_promise<LeaseToken, Error>(fpromise::ok(LeaseToken()));
 
   const auto thread_koid = fsl::GetKoid(crashed_thread.get());
+  const auto process_koid = fsl::GetKoid(crashed_process.get());
+
   auto join = fpromise::join_promises(
       std::move(wake_lease_promise),
-      GetComponentInfo(dispatcher_, services_, component_lookup_timeout_, thread_koid));
+      GetComponentInfo(dispatcher_, services_, driver_crash_introspect_, component_lookup_timeout_,
+                       process_koid, thread_koid));
 
   auto join_promise = join.and_then(
       [dispatcher = dispatcher_, services = services_, builder = std::move(builder),

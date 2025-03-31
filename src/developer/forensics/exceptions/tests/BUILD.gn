@@ -91,6 +91,7 @@ cc_test_executable("exception_broker_unittest_exe") {
 
   deps = [
     ":test_lib",
+    "//sdk/fidl/fuchsia.driver.crash:fuchsia.driver.crash_cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/exceptions:lib",

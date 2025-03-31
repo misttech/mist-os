@@ -68,6 +68,8 @@ source_set("driver") {
 
 source_set("lib") {
   sources = [
+    "crash_listener.cc",
+    "crash_listener.h",
     "driver_host.cc",
     "driver_host.h",
   ]
@@ -85,6 +87,7 @@ source_set("lib") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/log",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",

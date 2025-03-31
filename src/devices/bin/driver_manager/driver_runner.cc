@@ -372,6 +372,59 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
       });
 }
 
+void DriverRunner::FindDriverCrash(FindDriverCrashRequestView request,
+                                   FindDriverCrashCompleter::Sync& completer) {
+  for (const DriverHostComponent& host : driver_hosts_) {
+    zx::result process_koid = host.GetProcessKoid();
+    if (process_koid.is_ok() && process_koid.value() == request->process_koid) {
+      host.GetCrashInfo(
+          request->thread_koid,
+          [this, async_completer = completer.ToAsync()](
+              zx::result<fuchsia_driver_host::DriverCrashInfo> info_result) mutable {
+            if (info_result.is_error()) {
+              async_completer.ReplyError(info_result.error_value());
+              return;
+            }
+            fuchsia_driver_host::DriverCrashInfo& found = info_result.value();
+            zx_info_handle_basic_t info;
+            zx_status_t status = found.node_token()->get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                              sizeof(info), nullptr, nullptr);
+            if (status != ZX_OK) {
+              async_completer.ReplyError(ZX_ERR_INTERNAL);
+              return;
+            }
+
+            const Node* node = nullptr;
+            PerformBFS(root_node_, [&node, token_koid = info.koid](
+                                       const std::shared_ptr<driver_manager::Node>& current) {
+              if (node != nullptr) {
+                // Already found it.
+                return false;
+              }
+              std::optional current_koid = current->token_koid();
+              if (current_koid && current_koid.value() == token_koid) {
+                node = current.get();
+                return false;
+              }
+              return true;
+            });
+            if (node == nullptr) {
+              async_completer.ReplyError(ZX_ERR_NOT_FOUND);
+              return;
+            }
+
+            fidl::Arena arena;
+            async_completer.ReplySuccess(fuchsia_driver_crash::wire::DriverCrashInfo::Builder(arena)
+                                             .node_moniker(arena, node->MakeComponentMoniker())
+                                             .url(arena, found.url().value())
+                                             .Build());
+          });
+      return;
+    }
+  }
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
+}
+
 void DriverRunner::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
@@ -506,6 +559,10 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
         LOGF(WARNING, "Unexpected closure of NodeBusTopology: %s",
              info.FormatDescription().c_str());
       }));
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+
+  result = outgoing.AddUnmanagedProtocol<fuchsia_driver_crash::CrashIntrospect>(
+      crash_introspect_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 

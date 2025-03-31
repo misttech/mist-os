@@ -32,7 +32,10 @@
     ],
     collections: [
         {
+            // LINT.IfChange
             name: "driver-hosts",
+
+            // LINT.ThenChange(//src/developer/forensics/exceptions/handler/component_lookup.cc)
             environment: "#driver-host-env",
             durability: "single_run",
         },
@@ -403,6 +406,10 @@
     expose: [
         {
             protocol: [ "fuchsia.driver.development.Manager" ],
+            from: "#driver_manager",
+        },
+        {
+            protocol: "fuchsia.driver.crash.CrashIntrospect",
             from: "#driver_manager",
         },
         {

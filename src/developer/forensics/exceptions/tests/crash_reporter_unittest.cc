@@ -3,6 +3,7 @@
 
 #include "src/developer/forensics/exceptions/handler/crash_reporter.h"
 
+#include <fidl/fuchsia.driver.crash/cpp/fidl.h>
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/sys2/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -41,6 +42,9 @@ namespace {
 using ::testing::UnorderedElementsAreArray;
 
 constexpr zx::duration kDefaultTimeout{zx::duration::infinite()};
+
+constexpr std::string kDriverUrl = "test-driver-url";
+constexpr std::string kDriverMoniker = "test-driver-moniker";
 
 class StubCrashReporter : public fuchsia::feedback::CrashReporter {
  public:
@@ -130,13 +134,46 @@ class StubCrashIntrospect : public fuchsia::sys2::CrashIntrospect {
   fidl::BindingSet<fuchsia::sys2::CrashIntrospect> bindings_;
 };
 
+class DriverCrashIntrospect final : public fidl::Server<fuchsia_driver_crash::CrashIntrospect> {
+ public:
+  void FindDriverCrash(FindDriverCrashRequest& request,
+                       FindDriverCrashCompleter::Sync& completer) override {
+    if (failing_) {
+      completer.Reply(fit::error(ZX_ERR_INTERNAL));
+      return;
+    }
+
+    completer.Reply(fit::ok(fuchsia_driver_crash::CrashIntrospectFindDriverCrashResponse{
+        fuchsia_driver_crash::DriverCrashInfo{{
+            .url = kDriverUrl,
+            .node_moniker = kDriverMoniker,
+        }}}));
+  }
+
+  fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect> GetClient(async_dispatcher_t* dispatcher) {
+    auto [client, server] = fidl::Endpoints<fuchsia_driver_crash::CrashIntrospect>::Create();
+    bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+    return std::move(client);
+  }
+
+  void SetFailing() { failing_ = true; }
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_driver_crash::CrashIntrospect> bindings_;
+  bool failing_ = false;
+};
+
 class HandlerTest : public UnitTestFixture {
  public:
   void HandleException(
       zx::exception exception, zx::duration component_lookup_timeout,
-      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
-                                               /*wake_lease=*/nullptr);
+      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {},
+      bool driver_introspect = true) {
+    handler_ = std::make_unique<CrashReporter>(
+        dispatcher(), services(), component_lookup_timeout,
+        /*wake_lease=*/nullptr,
+        driver_introspect ? driver_introspect_.GetClient(dispatcher())
+                          : fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect>{});
 
     zx::process process;
     exception.get_process(&process);
@@ -151,9 +188,13 @@ class HandlerTest : public UnitTestFixture {
 
   void HandleException(
       zx::process process, zx::thread thread, zx::duration component_lookup_timeout,
-      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {}) {
-    handler_ = std::make_unique<CrashReporter>(dispatcher(), services(), component_lookup_timeout,
-                                               /*wake_lease=*/nullptr);
+      CrashReporter::SendCallback callback = [](const ::fidl::StringPtr& moniker) {},
+      bool driver_introspect = true) {
+    handler_ = std::make_unique<CrashReporter>(
+        dispatcher(), services(), component_lookup_timeout,
+        /*wake_lease=*/nullptr,
+        driver_introspect ? driver_introspect_.GetClient(dispatcher())
+                          : fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect>{});
 
     handler_->Send(zx::exception{}, std::move(process), std::move(thread), std::move(callback));
     RunLoopUntilIdle();
@@ -161,6 +202,8 @@ class HandlerTest : public UnitTestFixture {
 
   void SetUpCrashReporter() { InjectServiceProvider(&crash_reporter_); }
   void SetUpCrashIntrospect() { InjectServiceProvider(&introspect_); }
+
+  void SetupFailingDriverIntrospect() { driver_introspect_.SetFailing(); }
 
   const StubCrashReporter& crash_reporter() const { return crash_reporter_; }
 
@@ -172,6 +215,7 @@ class HandlerTest : public UnitTestFixture {
 
   StubCrashReporter crash_reporter_;
   StubCrashIntrospect introspect_;
+  DriverCrashIntrospect driver_introspect_;
 };
 
 bool RetrieveExceptionContext(ExceptionContext* pe, const std::string& process_name = "crasher") {
@@ -440,6 +484,156 @@ TEST_F(HandlerTest, DelayForFeedbackCrash) {
   exception.job.kill();
 }
 
+TEST_F(HandlerTest, DriverHostCrash) {
+  SetUpCrashReporter();
+  SetUpCrashIntrospect();
+
+  // Create the exception.
+  ExceptionContext exception;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception));
+
+  zx::process process;
+  ASSERT_EQ(exception.exception.get_process(&process), ZX_OK);
+  const std::string process_name = fsl::GetObjectName(process.get());
+  const zx_koid_t process_koid = fsl::GetKoid(process.get());
+
+  zx::thread thread;
+  ASSERT_EQ(exception.exception.get_thread(&thread), ZX_OK);
+  const std::string thread_name = fsl::GetObjectName(thread.get());
+  const zx_koid_t thread_koid = fsl::GetKoid(thread.get());
+
+  const std::string kComponentUrl = "driver_host_url";
+  const std::string kComponentMoniker = "/bootstrap/driver-hosts:x";
+  introspect().AddThreadKoidToComponentInfo(thread_koid, StubCrashIntrospect::ComponentInfo{
+                                                             .url = kComponentUrl,
+                                                             .moniker = kComponentMoniker,
+                                                         });
+
+  bool called = false;
+  HandleException(std::move(exception.exception), zx::duration::infinite(),
+                  [&called](const ::fidl::StringPtr& moniker) {
+                    EXPECT_EQ(kDriverMoniker, moniker.value());
+                    called = true;
+                  });
+
+  ASSERT_TRUE(called);
+
+  ASSERT_EQ(crash_reporter().reports().size(), 1u);
+  auto& report = crash_reporter().reports().front();
+
+  ValidateCrashReport(report, kDriverUrl, process_name, process_koid, thread_name, thread_koid,
+                      {
+                          {kCrashProcessStateKey, "in exception"},
+                      });
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception.job.kill();
+}
+
+TEST_F(HandlerTest, DriverHostCrashFallback) {
+  SetUpCrashReporter();
+  SetUpCrashIntrospect();
+
+  // Create the exception.
+  ExceptionContext exception;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception));
+
+  zx::process process;
+  ASSERT_EQ(exception.exception.get_process(&process), ZX_OK);
+  const std::string process_name = fsl::GetObjectName(process.get());
+  const zx_koid_t process_koid = fsl::GetKoid(process.get());
+
+  zx::thread thread;
+  ASSERT_EQ(exception.exception.get_thread(&thread), ZX_OK);
+  const std::string thread_name = fsl::GetObjectName(thread.get());
+  const zx_koid_t thread_koid = fsl::GetKoid(thread.get());
+
+  const std::string kComponentUrl = "driver_host_url";
+  const std::string kComponentMoniker = "/bootstrap/driver-hosts:x";
+  introspect().AddThreadKoidToComponentInfo(thread_koid, StubCrashIntrospect::ComponentInfo{
+                                                             .url = kComponentUrl,
+                                                             .moniker = kComponentMoniker,
+                                                         });
+
+  // The driver introspect returning failure will cause us to fallback to component attribution.
+  SetupFailingDriverIntrospect();
+
+  bool called = false;
+  HandleException(std::move(exception.exception), zx::duration::infinite(),
+                  [&called, kComponentMoniker](const ::fidl::StringPtr& moniker) {
+                    EXPECT_EQ(kComponentMoniker.substr(1), moniker.value());
+                    called = true;
+                  });
+
+  ASSERT_TRUE(called);
+
+  ASSERT_EQ(crash_reporter().reports().size(), 1u);
+  auto& report = crash_reporter().reports().front();
+
+  ValidateCrashReport(report, kComponentUrl, process_name, process_koid, thread_name, thread_koid,
+                      {
+                          {kCrashProcessStateKey, "in exception"},
+                      });
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception.job.kill();
+}
+
+TEST_F(HandlerTest, DriverHostCrashNoDriverIntrospect) {
+  SetUpCrashReporter();
+  SetUpCrashIntrospect();
+
+  // Create the exception.
+  ExceptionContext exception;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception));
+
+  zx::process process;
+  ASSERT_EQ(exception.exception.get_process(&process), ZX_OK);
+  const std::string process_name = fsl::GetObjectName(process.get());
+  const zx_koid_t process_koid = fsl::GetKoid(process.get());
+
+  zx::thread thread;
+  ASSERT_EQ(exception.exception.get_thread(&thread), ZX_OK);
+  const std::string thread_name = fsl::GetObjectName(thread.get());
+  const zx_koid_t thread_koid = fsl::GetKoid(thread.get());
+
+  const std::string kComponentUrl = "driver_host_url";
+  const std::string kComponentMoniker = "/bootstrap/driver-hosts:x";
+  introspect().AddThreadKoidToComponentInfo(thread_koid, StubCrashIntrospect::ComponentInfo{
+                                                             .url = kComponentUrl,
+                                                             .moniker = kComponentMoniker,
+                                                         });
+
+  bool called = false;
+  // Setup without a valid driver introspect channel will cause fallback to component attribution.
+  HandleException(
+      std::move(exception.exception), zx::duration::infinite(),
+      [&called, kComponentMoniker](const ::fidl::StringPtr& moniker) {
+        EXPECT_EQ(kComponentMoniker.substr(1), moniker.value());
+        called = true;
+      },
+      /*driver_introspect=*/false);
+
+  ASSERT_TRUE(called);
+
+  ASSERT_EQ(crash_reporter().reports().size(), 1u);
+  auto& report = crash_reporter().reports().front();
+
+  ValidateCrashReport(report, kComponentUrl, process_name, process_koid, thread_name, thread_koid,
+                      {
+                          {kCrashProcessStateKey, "in exception"},
+                      });
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception.job.kill();
+}
+
 using HandlerTestWithPF = UnitTestFixture;
 
 TEST_F(HandlerTestWithPF, HoldsWakeLeaseUntilFeedbackResponse) {
@@ -448,6 +642,8 @@ TEST_F(HandlerTestWithPF, HoldsWakeLeaseUntilFeedbackResponse) {
 
   StubCrashIntrospect introspect;
   InjectServiceProvider(&introspect);
+
+  DriverCrashIntrospect driver_introspect;
 
   // Create the exception.
   ExceptionContext exception_context;
@@ -465,7 +661,8 @@ TEST_F(HandlerTestWithPF, HoldsWakeLeaseUntilFeedbackResponse) {
   auto wake_lease = std::make_unique<stubs::WakeLease>(dispatcher());
   stubs::WakeLease* wake_lease_ptr = wake_lease.get();
   CrashReporter handler(dispatcher(), services(), zx::duration::infinite(),
-                        /*wake_lease=*/std::move(wake_lease));
+                        /*wake_lease=*/std::move(wake_lease),
+                        driver_introspect.GetClient(dispatcher()));
 
   zx::process process;
   exception_context.exception.get_process(&process);

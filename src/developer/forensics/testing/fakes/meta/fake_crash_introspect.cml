@@ -9,12 +9,18 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.sys2.CrashIntrospect" ],
+            protocol: [
+                "fuchsia.driver.crash.CrashIntrospect",
+                "fuchsia.sys2.CrashIntrospect",
+            ],
         },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.sys2.CrashIntrospect" ],
+            protocol: [
+                "fuchsia.driver.crash.CrashIntrospect",
+                "fuchsia.sys2.CrashIntrospect",
+            ],
             from: "self",
         },
     ],

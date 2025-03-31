@@ -74,13 +74,24 @@ int main(const std::string& process_name, const std::string& suspend_enabled_fla
     return EXIT_FAILURE;
   }
 
+  fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect> driver_crash_introspect_client_end;
+  {
+    zx::result driver_crash_introspect_result =
+        component::Connect<fuchsia_driver_crash::CrashIntrospect>();
+    if (driver_crash_introspect_result.is_error()) {
+      FX_LOGS(WARNING) << "Failed to connect to driver crash introspect channel.";
+    } else {
+      driver_crash_introspect_client_end = std::move(driver_crash_introspect_result).value();
+    }
+  }
+
   std::unique_ptr<WakeLease> wake_lease = suspend_enabled_flag == kSuspendEnabledFlag
                                               ? CreateWakeLease(loop.dispatcher(), handler_index)
                                               : nullptr;
 
   auto crash_reporter = std::make_unique<forensics::exceptions::handler::CrashReporter>(
       loop.dispatcher(), sys::ServiceDirectory::CreateFromNamespace(), kComponentLookupTimeout,
-      std::move(wake_lease));
+      std::move(wake_lease), std::move(driver_crash_introspect_client_end));
 
   Binding crash_reporter_binding(std::move(crash_reporter), std::move(channel), loop.dispatcher());
   crash_reporter_binding.set_error_handler([&loop](const zx_status_t status) {

@@ -19,6 +19,9 @@ use {
     fidl_fuchsia_ldsvc as fldsvc, fidl_fuchsia_system_state as fss,
 };
 
+/// Any stored data is removed after this amount of time
+const EXCEPTIONS_CLEANUP_DEADLINE_SECONDS: i64 = 600;
+
 /// We use Weak<Driver> to avoid accidentally extending the lifetime of the Driver. Driver must be
 /// droped and have it's destroy hook called in the driver runtime's shutdown observer callback in
 /// order to comply with the guarantees the driver framework provides for drivers. The driver host
@@ -46,10 +49,21 @@ impl PartialEq for WeakDriver {
 
 impl Eq for WeakDriver {}
 
+#[derive(Debug)]
+pub(crate) struct ExceptionRecord {
+    // The point at which this record should be deleted
+    deadline: zx::MonotonicInstant,
+    // The koid of the thread an exception was observed on
+    koid: zx::Koid,
+    // The driver info that was associated with the exception
+    info: fdh::DriverCrashInfo,
+}
+
 pub(crate) struct DriverHost {
     env: fdf_env::Environment,
     drivers: RefCell<BTreeSet<WeakDriver>>,
     no_more_drivers_signaler: RefCell<Option<oneshot::Sender<()>>>,
+    exceptions: RefCell<Vec<ExceptionRecord>>,
     scope: fuchsia_async::Scope,
 }
 
@@ -62,6 +76,7 @@ impl DriverHost {
             env,
             drivers: RefCell::new(BTreeSet::new()),
             no_more_drivers_signaler: RefCell::new(Some(no_more_drivers_signaler)),
+            exceptions: RefCell::new(Vec::new()),
             scope: fuchsia_async::Scope::new(),
         }
     }
@@ -101,12 +116,84 @@ impl DriverHost {
                         fdh::DriverHostRequest::InstallLoader { loader, .. } => {
                             install_loader(loader);
                         }
+                        fdh::DriverHostRequest::FindDriverCrashInfoByThreadKoid {
+                            thread_koid,
+                            responder,
+                        } => {
+                            let info = this
+                                .take_exception_by_thread_koid(&zx::Koid::from_raw(thread_koid));
+                            responder
+                                .send(info.ok_or_else(|| Status::NOT_FOUND.into_raw()))
+                                .or_else(ignore_peer_closed)?;
+                        }
                     }
                     Ok(())
                 }
             })
             .await
             .expect("Failed to handle request")
+    }
+
+    pub fn run_exception_listener(self: Rc<Self>) {
+        let this = Rc::downgrade(&self);
+        self.scope.spawn_local(async move {
+            let mut exceptions = task_exceptions::ExceptionsStream::register_with_task(
+                &*fuchsia_runtime::process_self(),
+            )
+            .expect("To create exception stream on process.");
+            loop {
+                match exceptions.try_next().await {
+                    Ok(Some(exception_info)) => {
+                        if let Some(this) = this.upgrade() {
+                            this.add_exception(exception_info);
+                        } else {
+                            break;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(error) => {
+                        log::error!("failed to read exception stream: {}", error);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn run_exception_cleanup_task(self: Rc<Self>) {
+        let this = Rc::downgrade(&self);
+        self.scope.spawn_local(async move {
+            loop {
+                let sleep_until = this.upgrade().map(|s| {
+                    if s.exceptions.borrow().is_empty() {
+                        // If we have no records, then we can sleep for as long as the timeout and
+                        // check again
+                        zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+                            EXCEPTIONS_CLEANUP_DEADLINE_SECONDS,
+                        ))
+                    } else {
+                        s.exceptions.borrow()[0].deadline.clone()
+                    }
+                });
+
+                let Some(sleep_until) = sleep_until else {
+                    break;
+                };
+
+                let timer = fuchsia_async::Timer::new(sleep_until);
+                timer.await;
+
+                let Some(this) = this.upgrade() else {
+                    break;
+                };
+
+                let mut exceptions = this.exceptions.borrow_mut();
+                while !exceptions.is_empty() && zx::MonotonicInstant::get() > exceptions[0].deadline
+                {
+                    exceptions.remove(0);
+                }
+            }
+        });
     }
 
     async fn start_driver(
@@ -188,6 +275,65 @@ impl DriverHost {
         });
         Ok(())
     }
+
+    fn add_exception(&self, info: task_exceptions::ExceptionInfo) {
+        let Ok(thread_koid) = info.thread.get_koid() else {
+            log::error!("failed to get the exception thread's koid.");
+            return;
+        };
+        let driver_on_thread_koid = self.env.get_driver_on_thread_koid(thread_koid);
+
+        // No driver on exception thread indicates the exception occurred in the driver runtime.
+        // Forensics can just fallback to component attribution and report the driver host.
+        if let Some(driver_ref) = driver_on_thread_koid {
+            let found = self.drivers.borrow().iter().find_map(|d| {
+                let locked_driver = d.0.upgrade();
+                if let Some(driver) = locked_driver {
+                    if *driver == driver_ref {
+                        return Some(driver);
+                    }
+                }
+
+                None
+            });
+
+            if let Some(found) = found {
+                let mut exceptions = self.exceptions.borrow_mut();
+                let crash_info = fdh::DriverCrashInfo {
+                    url: Some(found.get_url().to_string()),
+                    node_token: found.duplicate_node_token(),
+                    ..Default::default()
+                };
+                exceptions.push(ExceptionRecord {
+                    deadline: zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+                        EXCEPTIONS_CLEANUP_DEADLINE_SECONDS,
+                    )),
+                    koid: thread_koid,
+                    info: crash_info,
+                });
+                log::error!("Driver exception in driver host: Driver url: {}", found.get_url());
+            } else {
+                log::error!("Failed to validate driver with the driver host.");
+            }
+        }
+    }
+
+    fn take_exception_by_thread_koid(
+        &self,
+        thread_koid: &zx::Koid,
+    ) -> Option<fdh::DriverCrashInfo> {
+        let mut exceptions = self.exceptions.borrow_mut();
+
+        let index_to_remove = exceptions.iter().enumerate().find_map(|(i, exception)| {
+            if &exception.koid == thread_koid {
+                Some(i)
+            } else {
+                None
+            }
+        });
+
+        index_to_remove.map(|i| exceptions.remove(i).info)
+    }
 }
 
 impl Drop for DriverHost {
@@ -200,14 +346,16 @@ impl Drop for DriverHost {
 }
 
 fn get_process_info(
-) -> Result<(u64, u64, &'static [fdh::ThreadInfo], &'static [fdh::DispatcherInfo]), i32> {
+) -> Result<(u64, u64, u64, &'static [fdh::ThreadInfo], &'static [fdh::DispatcherInfo]), i32> {
     let job_koid =
         fuchsia_runtime::job_default().get_koid().map_err(zx::Status::into_raw)?.raw_koid();
     let process_koid =
         fuchsia_runtime::process_self().get_koid().map_err(Status::into_raw)?.raw_koid();
+    let main_thread_koid =
+        fuchsia_runtime::thread_self().get_koid().map_err(zx::Status::into_raw)?.raw_koid();
     static THREAD_INFO: [fdh::ThreadInfo; 0] = [];
     static DISPATCHER_INFO: [fdh::DispatcherInfo; 0] = [];
-    Ok((job_koid, process_koid, &THREAD_INFO, &DISPATCHER_INFO))
+    Ok((job_koid, process_koid, main_thread_koid, &THREAD_INFO, &DISPATCHER_INFO))
 }
 
 extern "C" {

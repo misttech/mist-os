@@ -74,11 +74,14 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
   // This may be called from the context of the |client_dispatcher_|.
   void Unbind() __TA_EXCLUDES(lock_);
 
+  zx::event node_token() const;
+
  private:
   std::string url_;
   void* library_;
   std::vector<void*> modules_;
   std::vector<Symbol> symbols_;
+  zx::event node_token_;
 
   fbl::Mutex lock_;
 

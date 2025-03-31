@@ -55,6 +55,7 @@ executable("fake_crash_introspect_exe") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.driver.crash:fuchsia.driver.crash_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",

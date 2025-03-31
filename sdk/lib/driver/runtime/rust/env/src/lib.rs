@@ -156,6 +156,12 @@ pub struct Driver<T> {
     shutdown_triggered: bool,
 }
 
+/// An unowned handle to the driver that is returned through certain environment APIs like
+/// |get_driver_on_thread_koid|.
+pub struct UnownedDriver {
+    inner: *const ffi::c_void,
+}
+
 /// SAFETY: This inner pointer is movable across threads.
 unsafe impl<T: Send> Send for Driver<T> {}
 
@@ -226,8 +232,14 @@ impl<T> Drop for Driver<T> {
     }
 }
 
+impl<T> PartialEq<UnownedDriver> for Driver<T> {
+    fn eq(&self, other: &UnownedDriver) -> bool {
+        return self.inner.as_ptr() as *const _ == other.inner;
+    }
+}
+
 // Note that inner type is not guaranteed to not be null.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct DriverRefTypeErased<'a>(*const ffi::c_void, PhantomData<&'a u32>);
 
 impl Default for DriverRefTypeErased<'_> {
@@ -337,5 +349,19 @@ impl Environment {
         Status::ok(unsafe {
             fdf_env_set_thread_limit(scheduler_role_ptr, scheduler_role_len, max_threads)
         })
+    }
+
+    /// Gets the driver currently running on the thread identified by |thread_koid|, if the thread
+    /// is running on this driver host with a driver.
+    pub fn get_driver_on_thread_koid(&self, thread_koid: zx::Koid) -> Option<UnownedDriver> {
+        let mut driver = std::ptr::null();
+        unsafe {
+            Status::ok(fdf_env_get_driver_on_tid(thread_koid.raw_koid(), &mut driver)).ok()?;
+        }
+        if driver.is_null() {
+            None
+        } else {
+            Some(UnownedDriver { inner: driver })
+        }
     }
 }

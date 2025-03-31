@@ -62,6 +62,10 @@ class FakeDriverHost : public driver_manager::DriverHost {
     cb(zx::ok());
   }
 
+  zx::result<uint64_t> GetMainThreadKoid() const override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
   zx::result<uint64_t> GetProcessKoid() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
   void CloseDriver(std::string node_name) {

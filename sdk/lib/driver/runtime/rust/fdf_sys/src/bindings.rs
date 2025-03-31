@@ -800,6 +800,12 @@ unsafe extern "C" {
     );
 }
 unsafe extern "C" {
+    pub fn fdf_env_get_driver_on_tid(
+        tid: zx_koid_t,
+        out_driver: *mut *const ::core::ffi::c_void,
+    ) -> zx_status_t;
+}
+unsafe extern "C" {
     pub fn fdf_testing_create_unmanaged_dispatcher(
         driver: *const ::core::ffi::c_void,
         options: u32,

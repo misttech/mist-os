@@ -29,6 +29,7 @@ Symbols:
   - { Name: fdf_env_dispatcher_get_dump_deprecated, Type: Func }
   - { Name: fdf_env_dispatcher_has_queued_tasks, Type: Func }
   - { Name: fdf_env_get_current_driver, Type: Func }
+  - { Name: fdf_env_get_driver_on_tid, Type: Func }
   - { Name: fdf_env_get_thread_limit, Type: Func }
   - { Name: fdf_env_register_driver_entry, Type: Func }
   - { Name: fdf_env_register_driver_exit, Type: Func }

@@ -49,6 +49,7 @@ source_set("driver_runtime_impl") {
     "//src/devices/lib/log",
     "//zircon/system/public",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace",
   ]
 }

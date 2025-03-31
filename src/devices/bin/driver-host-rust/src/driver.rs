@@ -18,7 +18,7 @@ use namespace::Namespace;
 use std::ffi::c_char;
 use std::ptr::NonNull;
 use std::sync::{Arc, Weak};
-use zx::Status;
+use zx::{HandleBased, Status};
 use {
     fidl_fuchsia_data as fdata, fidl_fuchsia_driver_framework as fidl_fdf,
     fidl_fuchsia_driver_host as fdh,
@@ -196,6 +196,9 @@ struct DriverInner {
 
     // This signals to the driver_host that the driver has been shutdown.
     shutdown_signaler: Option<oneshot::Sender<Weak<Driver>>>,
+
+    // This is the token representing the node of this driver in the driver manager.
+    node_token: Option<fidl::Event>,
 }
 
 impl Drop for DriverInner {
@@ -208,7 +211,7 @@ impl Drop for DriverInner {
 
 #[derive(Debug)]
 pub(crate) struct Driver {
-    _url: String,
+    url: String,
     inner: Mutex<DriverInner>,
 }
 impl Driver {
@@ -255,8 +258,12 @@ impl Driver {
         modules_and_symbols.copy_to_start_args(&mut start_args);
         let legacy_state = Some(LegacyDynamicallyLinkedState { library, modules_and_symbols });
         let dispatcher_name = basename(&url);
+        let node_token = start_args.node_token.as_ref().map(|t| {
+            t.duplicate_handle(fidl::Rights::SAME_RIGHTS)
+                .expect("Failed to duplicate node token handle.")
+        });
         let driver = Arc::new(Driver {
-            _url: url.clone(),
+            url: url.clone(),
             inner: Mutex::new(DriverInner {
                 legacy_state,
                 hooks,
@@ -264,6 +271,7 @@ impl Driver {
                 runtime_handle: None,
                 token: None,
                 shutdown_signaler: None,
+                node_token,
             }),
         });
         let driver_runtime_handle = env.new_driver(Arc::into_raw(driver.clone()));
@@ -325,8 +333,12 @@ impl Driver {
         let mut symbols = loaded_driver.get_symbols(program)?;
         start_args.symbols.get_or_insert_default().append(&mut symbols);
         let dispatcher_name = basename(&url);
+        let node_token = start_args.node_token.as_ref().map(|t| {
+            t.duplicate_handle(fidl::Rights::SAME_RIGHTS)
+                .expect("Failed to duplicate node token handle.")
+        });
         let driver = Arc::new(Driver {
-            _url: url.clone(),
+            url: url.clone(),
             inner: Mutex::new(DriverInner {
                 legacy_state: None,
                 hooks,
@@ -334,6 +346,7 @@ impl Driver {
                 runtime_handle: None,
                 token: None,
                 shutdown_signaler: None,
+                node_token,
             }),
         });
         let driver_runtime_handle = env.new_driver(Arc::into_raw(driver.clone()));
@@ -522,6 +535,18 @@ impl Driver {
         Ok(())
     }
 
+    pub fn get_url(&self) -> &str {
+        return self.url.as_str();
+    }
+
+    pub fn duplicate_node_token(&self) -> Option<fidl::Event> {
+        self.inner.lock().node_token.as_ref().map(|token| {
+            token
+                .duplicate_handle(fidl::Rights::SAME_RIGHTS)
+                .expect("Failed to duplicate node token handle.")
+        })
+    }
+
     /// Shutdown the driver. The process is asynchronous. All references to the driver should be
     /// dropped prior to invoking this method.
     /// This method will do nothing if invoked multiple times or if runtime_handle was never
@@ -545,6 +570,12 @@ impl Driver {
                     .expect("Someone unexpected is holding onto a reference of driver");
             });
         };
+    }
+}
+
+impl PartialEq<fdf_env::UnownedDriver> for Driver {
+    fn eq(&self, other: &fdf_env::UnownedDriver) -> bool {
+        self.inner.lock().runtime_handle.as_ref().map(|h| h == other).unwrap_or(false)
     }
 }
 

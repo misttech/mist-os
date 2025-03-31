@@ -26,7 +26,8 @@ namespace fdh = fuchsia_driver_host;
 
 namespace driver_host {
 
-DriverHost::DriverHost(inspect::Inspector& inspector, async::Loop& loop) : loop_(loop) {
+DriverHost::DriverHost(inspect::Inspector& inspector, async::Loop& loop)
+    : loop_(loop), crash_listener_(loop.dispatcher(), this) {
   inspector.GetRoot().CreateLazyNode("drivers", [this] { return Inspect(); }, &inspector);
 }
 
@@ -46,6 +47,13 @@ fpromise::promise<inspect::Inspector> DriverHost::Inspect() {
 }
 
 zx::result<> DriverHost::PublishDriverHost(component::OutgoingDirectory& outgoing_directory) {
+  zx::result init_result = crash_listener_.Init();
+  if (init_result.is_error()) {
+    FX_LOG_KV(ERROR, "Failed to initialize crash listener",
+              FX_KV("status_str", init_result.status_string()));
+    return init_result.take_error();
+  }
+
   const auto service = [this](fidl::ServerEnd<fdh::DriverHost> request) {
     fidl::BindServer(loop_.dispatcher(), std::move(request), this);
   };
@@ -57,6 +65,27 @@ zx::result<> DriverHost::PublishDriverHost(component::OutgoingDirectory& outgoin
   }
 
   return status;
+}
+
+std::optional<const Driver*> DriverHost::ValidateAndGetDriver(const void* driver) {
+  if (unlikely(driver == nullptr)) {
+    return std::nullopt;
+  }
+
+  // Using try_lock since if there is an exception during the destroy hook, the mutex is
+  // already taken by |ShutdownDriver|.
+  if (mutex_.try_lock()) {
+    for (auto& entry : drivers_) {
+      if (&entry == driver) {
+        mutex_.unlock();
+        return &entry;
+      }
+    }
+
+    mutex_.unlock();
+  }
+
+  return std::nullopt;
 }
 
 void DriverHost::Start(StartRequest& request, StartCompleter::Sync& completer) {
@@ -109,9 +138,20 @@ void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   }
   uint64_t job_koid = info.koid;
 
+  status =
+      zx::thread::self()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    FX_LOG_KV(ERROR, "Failed to get info about main thread handle",
+              FX_KV("status_str", zx_status_get_string(status)));
+    completer.Reply(zx::error(status));
+    return;
+  }
+  uint64_t main_thread_koid = info.koid;
+
   completer.Reply(zx::ok(fuchsia_driver_host::ProcessInfo{{
       .job_koid = job_koid,
       .process_koid = process_koid,
+      .main_thread_koid = main_thread_koid,
       .threads = {},
       .dispatchers = {},
   }}));
@@ -120,6 +160,19 @@ void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
 void DriverHost::InstallLoader(InstallLoaderRequest& request,
                                InstallLoaderCompleter::Sync& completer) {
   zx::handle old_handle(dl_set_loader_service(request.loader().TakeChannel().release()));
+}
+
+void DriverHost::FindDriverCrashInfoByThreadKoid(
+    FindDriverCrashInfoByThreadKoidRequest& request,
+    FindDriverCrashInfoByThreadKoidCompleter::Sync& completer) {
+  std::optional<fuchsia_driver_host::DriverCrashInfo> entry =
+      crash_listener_.TakeByTid(request.thread_koid());
+  if (!entry) {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+
+  completer.Reply(zx::ok(std::move(entry.value())));
 }
 
 void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,

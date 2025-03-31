@@ -61,6 +61,11 @@
             to: "#exception_handler",
         },
         {
+            protocol: "fuchsia.driver.crash.CrashIntrospect",
+            from: "#crash_introspect",
+            to: "#exception_handler",
+        },
+        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: [ "#exception_handler" ],

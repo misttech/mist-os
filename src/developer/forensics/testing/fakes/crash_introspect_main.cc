@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.driver.crash/cpp/fidl.h>
 #include <fidl/fuchsia.sys2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -27,6 +28,13 @@ int main(int argc, const char** argv) {
   }
 
   if (const zx::result result = outgoing.AddProtocol<fuchsia_sys2::CrashIntrospect>(
+          std::make_unique<forensics::fakes::CrashIntrospect>());
+      result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add CrashIntrospect protocol: " << result.status_string();
+    return EXIT_FAILURE;
+  }
+
+  if (const zx::result result = outgoing.AddProtocol<fuchsia_driver_crash::CrashIntrospect>(
           std::make_unique<forensics::fakes::CrashIntrospect>());
       result.is_error()) {
     FX_LOGS(ERROR) << "Failed to add CrashIntrospect protocol: " << result.status_string();

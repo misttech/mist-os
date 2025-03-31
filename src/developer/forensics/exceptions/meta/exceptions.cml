@@ -23,6 +23,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.driver.crash.CrashIntrospect",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",

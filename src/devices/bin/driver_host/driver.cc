@@ -366,6 +366,8 @@ void Driver::Start(fbl::RefPtr<Driver> self, fdf::DriverStartArgs start_args,
     }});
   }
 
+  start_args.node_token()->duplicate(ZX_RIGHT_SAME_RIGHTS, &node_token_);
+
   fbl::AutoLock al(&lock_);
   initial_dispatcher_ = std::move(dispatcher);
 
@@ -415,6 +417,12 @@ void Driver::Unbind() {
     // multiple times.
     binding_.reset();
   }
+}
+
+zx::event Driver::node_token() const {
+  zx::event res;
+  node_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &res);
+  return res;
 }
 
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program) {

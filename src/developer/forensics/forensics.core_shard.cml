@@ -16,6 +16,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.driver.crash.CrashIntrospect",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
             ],

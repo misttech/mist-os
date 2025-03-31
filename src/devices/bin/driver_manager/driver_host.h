@@ -82,6 +82,8 @@ class DriverHost {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  virtual zx::result<uint64_t> GetMainThreadKoid() const = 0;
+
   virtual zx::result<uint64_t> GetProcessKoid() const = 0;
 
   virtual bool IsDynamicLinkingEnabled() const { return false; }
@@ -111,6 +113,11 @@ class DriverHostComponent final
                               StartCallback cb) override;
 
   zx::result<fuchsia_driver_host::ProcessInfo> GetProcessInfo() const;
+  void GetCrashInfo(
+      uint64_t thread_koid,
+      fit::callback<void(zx::result<fuchsia_driver_host::DriverCrashInfo>)> info_callback) const;
+
+  zx::result<uint64_t> GetMainThreadKoid() const override;
   zx::result<uint64_t> GetProcessKoid() const override;
   zx::result<uint64_t> GetJobKoid() const;
 
