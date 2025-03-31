@@ -209,8 +209,8 @@ fn test_lengths() {
     // Runtime is O(length), so exhaustively testing all legal lengths
     // would take too long (at least without --release). Only test a
     // subset: the first 500, the last 10, and every 100th in between.
-    let lengths = (0..MAX_SHA256_LENGTH + 1)
-        .filter(|&len| len < 500 || len > MAX_SHA256_LENGTH - 10 || len % 100 == 0);
+    let range = 500..MAX_SHA256_LENGTH - 10;
+    let lengths = (0..MAX_SHA256_LENGTH + 1).filter(|len| !range.contains(len) || *len % 100 == 0);
 
     for length in lengths {
         let mut okm = vec![0u8; length];
@@ -446,3 +446,10 @@ new_test!(
     "wycheproof-sha512",
     SimpleHkdf::<Sha512>
 );
+
+#[test]
+fn test_debug_impls() {
+    fn needs_debug<T: std::fmt::Debug>() {}
+    needs_debug::<Hkdf<Sha256>>();
+    needs_debug::<HkdfExtract<Sha256>>();
+}

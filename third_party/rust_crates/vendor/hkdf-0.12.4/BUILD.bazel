@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "hkdf",
     package_url = "https://github.com/RustCrypto/KDFs/",
-    package_version = "0.12.3",
+    package_version = "0.12.4",
 )
 
 license(
@@ -70,7 +70,7 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.12.3",
+    version = "0.12.4",
     deps = [
         "//third_party/rust_crates/vendor/hmac-0.12.1:hmac",
     ],

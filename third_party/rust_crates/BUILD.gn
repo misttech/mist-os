@@ -408,7 +408,7 @@ group("hex") {
 }
 
 group("hkdf") {
-  public_deps = [ ":hkdf-v0_12_3" ]
+  public_deps = [ ":hkdf-v0_12_4" ]
 }
 
 group("hmac") {
@@ -5513,7 +5513,7 @@ rust_library("elliptic-curve-v0_12_3") {
   deps += [ ":ff-v0_12_1" ]
   deps += [ ":generic-array-v0_14_7" ]
   deps += [ ":group-v0_12_1" ]
-  deps += [ ":hkdf-v0_12_3" ]
+  deps += [ ":hkdf-v0_12_4" ]
   deps += [ ":pem-rfc7468-v0_6_0" ]
   deps += [ ":pkcs8-v0_9_0" ]
   deps += [ ":rand_core-v0_6_4" ]
@@ -7336,18 +7336,18 @@ rust_library("hex-v0_4_3") {
   applicable_licenses = [ ":hex-v0_4_3.license" ]
 }
 
-license("hkdf-v0_12_3.license") {
+license("hkdf-v0_12_4.license") {
   public_package_name = "hkdf"
   license_files = [
-    "//third_party/rust_crates/vendor/hkdf-0.12.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/hkdf-0.12.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/hkdf-0.12.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/hkdf-0.12.4/LICENSE-MIT",
   ]
 }
 
-rust_library("hkdf-v0_12_3") {
+rust_library("hkdf-v0_12_4") {
   crate_name = "hkdf"
-  crate_root = "//third_party/rust_crates/vendor/hkdf-0.12.3/src/lib.rs"
-  output_name = "hkdf-59183894568a732f"
+  crate_root = "//third_party/rust_crates/vendor/hkdf-0.12.4/src/lib.rs"
+  output_name = "hkdf-3daaccf32847ff7d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -7358,13 +7358,13 @@ rust_library("hkdf-v0_12_3") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=59183894568a732f",
-    "-Cextra-filename=-59183894568a732f",
+    "-Cmetadata=3daaccf32847ff7d",
+    "-Cextra-filename=-3daaccf32847ff7d",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":hkdf-v0_12_3.license" ]
+  applicable_licenses = [ ":hkdf-v0_12_4.license" ]
 }
 
 license("hmac-v0_12_1.license") {

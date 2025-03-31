@@ -1147,14 +1147,14 @@ alias(
 )
 
 alias(
-    name = "hkdf-0.12.3",
-    actual = "//third_party/rust_crates/vendor/hkdf-0.12.3:hkdf",
+    name = "hkdf-0.12.4",
+    actual = "//third_party/rust_crates/vendor/hkdf-0.12.4:hkdf",
     tags = ["manual"],
 )
 
 alias(
     name = "hkdf",
-    actual = "//third_party/rust_crates/vendor/hkdf-0.12.3:hkdf",
+    actual = "//third_party/rust_crates/vendor/hkdf-0.12.4:hkdf",
     tags = ["manual"],
 )
 
