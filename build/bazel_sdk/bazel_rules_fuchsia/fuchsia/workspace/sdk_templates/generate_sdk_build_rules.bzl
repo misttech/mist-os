@@ -1723,7 +1723,13 @@ def _generate_sdk_build_rules(
                 pkg = rest
                 target = rest.split("/")[-1]
 
-            def _fmt(r, p, t):
+            if target == "*":
+                fail(
+                    "When using wildcard expansion for visibility templates you " +
+                    "must specify a target. Failing label is '{}'".format(value),
+                )
+
+            def _fmt_label(r, p, t):
                 return "{}//{}:{}".format(r, p, t)
 
             # Check for wildcards and expand. This currently, only supports a
@@ -1731,7 +1737,7 @@ def _generate_sdk_build_rules(
             if "*" in pkg:
                 if repo != "@@":
                     fail(
-                        "Wildcard expansions are only supported in the main" +
+                        "Wildcard expansions are only supported in the main " +
                         "repository in fuchsia.git",
                     )
                 left, rest = pkg.split("*", 1)
@@ -1743,9 +1749,9 @@ def _generate_sdk_build_rules(
                         # the path we are appending or else bazel will think it is an absolute
                         # path and get_child will just return the new path and ignore entry.
                         if entry.get_child(rest.lstrip("/")).get_child("BUILD.bazel").exists:
-                            all_values.append(_fmt(repo, left + entry.basename + rest, target))
+                            all_values.append(_fmt_label(repo, left + entry.basename + rest, target))
             else:
-                all_values.append(_fmt(repo, pkg, target))
+                all_values.append(_fmt_label(repo, pkg, target))
 
         return all_values
 
