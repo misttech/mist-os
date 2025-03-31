@@ -52,6 +52,14 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/ioctl_policy.conf",
+        ],
+        "ioctl_policy.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/minimal_policy.conf",
         ],
         "minimal_policy.pp",

@@ -91,7 +91,6 @@ pub(in crate::security) fn check_file_ioctl_access(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let subject_sid = current_task.security_state.lock().current_sid;
-    has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
 
     let file_class = file.node().security_state.lock().class;
     let permissions: &[Permission] = match request {
@@ -105,15 +104,7 @@ pub(in crate::security) fn check_file_ioctl_access(
         _ => &[CommonFsNodePermission::Ioctl.for_class(file_class)],
     };
 
-    let audit_context = [current_task.into(), file.into()];
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/385077129", "Enforce file_ioctl() fs-node checks"),
-        &permission_check,
-        subject_sid,
-        file.node(),
-        permissions,
-        (&audit_context).into(),
-    )
+    has_file_permissions(&permission_check, subject_sid, file, permissions, current_task.into())
 }
 
 /// Returns whether `current_task` can perform a lock operation on the given `file`.
