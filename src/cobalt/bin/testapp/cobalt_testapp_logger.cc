@@ -67,7 +67,7 @@ bool CobaltTestAppLogger::LogIntegerHistogram(
   metric_event_logger_->LogIntegerHistogram(metric_id, std::move(histogram), std::move(indices),
                                             &result);
   if (result.is_err()) {
-    FX_LOGS(ERROR) << "LogString() => " << ResultToString(std::move(result));
+    FX_LOGS(ERROR) << "LogIntegerHistogram() => " << ResultToString(std::move(result));
     return false;
   }
   FX_LOGS(DEBUG) << "LogIntegerHistogram() => OK";
