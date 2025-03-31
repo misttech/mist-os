@@ -115,6 +115,7 @@
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",
+                "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",

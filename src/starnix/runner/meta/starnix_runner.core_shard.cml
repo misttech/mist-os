@@ -64,6 +64,12 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            from: "#network",
+            to: "#starnix_runner",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.posix.socket.packet.Provider_OnlyForStarnix" ],
             from: "#network",
             as: "fuchsia.posix.socket.packet.Provider",
