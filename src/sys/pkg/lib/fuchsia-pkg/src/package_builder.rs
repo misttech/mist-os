@@ -57,6 +57,9 @@ pub struct PackageBuilder {
 
     /// Whether new files with the same path should overwrwite previous files at that path.
     overwrite_files: bool,
+
+    /// Whether new subpackages with the same url should overwrite previous subpackages at that url.
+    overwrite_subpackages: bool,
 }
 
 impl PackageBuilder {
@@ -76,6 +79,7 @@ impl PackageBuilder {
             repository: None,
             subpackages: BTreeMap::default(),
             overwrite_files: false,
+            overwrite_subpackages: true,
         }
     }
 
@@ -390,6 +394,12 @@ impl PackageBuilder {
         Ok(file_path)
     }
 
+    /// Specify whether new additions of a subpackage that have already been added should overwrite,
+    /// or fail
+    pub fn overwrite_subpackages(&mut self, overwrite_subpackages: bool) {
+        self.overwrite_subpackages = overwrite_subpackages
+    }
+
     /// Helper fn to include a subpackage into this package.
     pub fn add_subpackage(
         &mut self,
@@ -397,7 +407,7 @@ impl PackageBuilder {
         package_hash: Hash,
         package_manifest_path: PathBuf,
     ) -> Result<()> {
-        if self.subpackages.contains_key(url) {
+        if self.subpackages.contains_key(url) && !self.overwrite_subpackages {
             return Err(anyhow!("duplicate entry for {:?}", url));
         }
         self.subpackages.insert(url.clone(), (package_hash, package_manifest_path));
@@ -462,6 +472,7 @@ impl PackageBuilder {
             repository,
             subpackages,
             overwrite_files: _,
+            overwrite_subpackages: _,
         } = self;
 
         far_contents.insert(
@@ -1138,15 +1149,24 @@ mod tests {
     }
 
     #[test]
-    fn test_builder_rejects_subpackages_collisions() {
+    fn test_builder_allows_overwrite_subpackages_when_flag_set() {
+        let mut builder = PackageBuilder::new("some_pkg_name", FAKE_ABI_REVISION);
+        builder.overwrite_subpackages(true);
+
         let url = "pkg".parse::<RelativePackageUrl>().unwrap();
-        let hash1 = Hash::from([0; fuchsia_hash::HASH_SIZE]);
-        let package_manifest_path1 = PathBuf::from("path1/package_manifest.json");
-        let hash2 = Hash::from([0; fuchsia_hash::HASH_SIZE]);
+        let package_hash: fuchsia_hash::GenericDigest<fuchsia_hash::FuchsiaMerkleMarker> =
+            Hash::from([0; fuchsia_hash::HASH_SIZE]);
+        let package_manifest_path = PathBuf::from("path/package_manifest.json");
+
+        let package_hash2: fuchsia_hash::GenericDigest<fuchsia_hash::FuchsiaMerkleMarker> =
+            Hash::from([0; fuchsia_hash::HASH_SIZE]);
         let package_manifest_path2 = PathBuf::from("path2/package_manifest.json");
 
-        let mut builder = PackageBuilder::new("some_pkg_name", FAKE_ABI_REVISION);
-        builder.add_subpackage(&url, hash1, package_manifest_path1).unwrap();
-        assert!(builder.add_subpackage(&url, hash2, package_manifest_path2).is_err());
+        builder.add_subpackage(&url, package_hash, package_manifest_path).unwrap();
+        assert!(builder
+            .add_subpackage(&url, package_hash2, package_manifest_path2.clone())
+            .is_ok());
+        assert!(builder.subpackages.get(&url).unwrap().0 == package_hash2);
+        assert!(builder.subpackages.get(&url).unwrap().1 == package_manifest_path2);
     }
 }
