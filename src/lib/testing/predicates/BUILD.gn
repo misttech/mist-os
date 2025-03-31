@@ -18,8 +18,8 @@ source_set("predicates") {
     # "status.h" has #include <zircon/status.h>.
     "//src/zircon/lib/zircon:headers",
 
-    # "status.h" has #include <lib/zx/result.h>
-    "//zircon/system/ulib/zx",
+    # "status.h" has #include <lib/fit/result.h>
+    "//sdk/lib/fit",
   ]
 }
 
@@ -28,6 +28,7 @@ test("predicates-lib-unittests") {
   deps = [
     ":predicates",
     "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/zx",
   ]
 }
 

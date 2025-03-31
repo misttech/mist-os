@@ -7,6 +7,8 @@
 
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <gtest/gtest.h>
+#include <src/lib/testing/predicates/status.h>
+
 namespace testing {
 
 class ParentDriverTestEnvironment : public fdf_testing::Environment {
@@ -22,14 +24,8 @@ class TestConfig final {
 
 class ParentDriverTest : public ::testing::Test {
  public:
-  void SetUp() override {
-    zx::result<> result = driver_test.StartDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
-  void TearDown() override {
-    zx::result<> result = driver_test.StopDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
+  void SetUp() override { ASSERT_OK(driver_test.StartDriver()); }
+  void TearDown() override { ASSERT_OK(driver_test.StopDriver()); }
 
  protected:
   fdf_testing::BackgroundDriverTest<TestConfig> driver_test;
@@ -47,12 +43,12 @@ TEST_F(ParentDriverTest, VerifyChildNode) {
 
 TEST_F(ParentDriverTest, ConnectAndGetName) {
   zx::result connect_result = driver_test.Connect<fuchsia_hardware_i2c::Service::Device>();
-  ASSERT_TRUE(connect_result.is_ok());
+  ASSERT_OK(connect_result);
 
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client(std::move(connect_result.value()));
   auto result = client->GetName();
   ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_ok());
+  ASSERT_OK(*result);
   ASSERT_STREQ((*result)->name.cbegin(), "rust i2c server");
 }
 

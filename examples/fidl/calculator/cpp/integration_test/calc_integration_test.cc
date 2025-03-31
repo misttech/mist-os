@@ -8,11 +8,9 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <string>
-
 #include <gtest/gtest.h>
-
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include <src/lib/testing/loop_fixture/test_loop_fixture.h>
+#include <src/lib/testing/predicates/status.h>
 
 // This is an [Integration
 // Test](https://fuchsia.dev/fuchsia-src/contribute/testing/scope?hl=en#integration-tests) as this
@@ -24,11 +22,7 @@
 // The simplest form of a test with the synchronous client
 TEST(CalcIntegrationTest, TestCalcSync) {
   zx::result client_end = component::Connect<fuchsia_examples_calculator::Calculator>();
-  if (!client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Synchronous error when connecting to the |Calculator| protocol: "
-                   << client_end.status_string();
-    FAIL();
-  }
+  ASSERT_OK(client_end) << "Synchronous error when connecting to the |Calculator| protocol";
 
   // Create a fidl::SyncClient
   fidl::SyncClient client{std::move(*client_end)};
@@ -36,13 +30,9 @@ TEST(CalcIntegrationTest, TestCalcSync) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Add> result =
       client->Add({{.a = 4.5, .b = 3.2}});
 
-  if (!result.is_ok()) {
-    // If the call failed, log the error, and quit the program.
-    // Production code should do more graceful error handling depending
-    // on the situation.
-    FX_LOGS(ERROR) << "Calc Add() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  // If the call failed, log the error, and quit the program.
+  // Production code should do more graceful error handling depending on the situation.
+  ASSERT_OK(result) << "Calc Add() failed";
   FX_LOGS(INFO) << "Calculator client got response " << result->sum() << std::endl;
 
   ASSERT_EQ(result->sum(), 7.7);
@@ -51,11 +41,7 @@ TEST(CalcIntegrationTest, TestCalcSync) {
 // The simplest form of a test with the asynchronous client
 TEST(CalcIntegrationTest, TestCalcAsync) {
   zx::result client_end = component::Connect<fuchsia_examples_calculator::Calculator>();
-  if (!client_end.is_ok()) {
-    FX_LOGS(ERROR) << "Synchronous error when connecting to the |Calculator| protocol: "
-                   << client_end.status_string();
-    FAIL();
-  }
+  ASSERT_OK(client_end) << "Synchronous error when connecting to the |Calculator| protocol";
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
@@ -66,10 +52,7 @@ TEST(CalcIntegrationTest, TestCalcAsync) {
   // Make an Add() call, building the request object inline and the result handler lambda
   client->Add({{.a = 4, .b = 2}})
       .ThenExactlyOnce([&](fidl::Result<fuchsia_examples_calculator::Calculator::Add>& result) {
-        if (!result.is_ok()) {
-          FX_LOGS(ERROR) << "Failure receiving response to Add" << result.error_value();
-          FAIL();
-        }
+        ASSERT_OK(result) << "Failure receiving response to Add";
         FX_LOGS(INFO) << "Calculator client got response " << result->sum() << std::endl;
         // Shut the dispatcher loop down so the test can exit cleanly
         loop.Quit();
@@ -98,11 +81,7 @@ class CalcTestFixture : public gtest::TestLoopFixture {
   // structure.  Mirrors the client implementation in ../client, but uses the synchronous interface
   void GetClient(void) {
     zx::result client_end = component::Connect<fuchsia_examples_calculator::Calculator>();
-    if (!client_end.is_ok()) {
-      FX_LOGS(ERROR) << "Synchronous error when connecting to the |Calculator| protocol: "
-                     << client_end.status_string();
-      FAIL() << "Failed setting up client endpoint.";
-    }
+    ASSERT_OK(client_end) << "Synchronous error when connecting to the |Calculator| protocol";
     client.Bind(std::move(*client_end));
     ASSERT_TRUE(client.is_valid());
   }
@@ -114,49 +93,34 @@ class CalcTestFixture : public gtest::TestLoopFixture {
 TEST_F(CalcTestFixture, AddIntegrationTest) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Add> result =
       client->Add({{.a = 4.5, .b = 3.2}});
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Calc Add() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  ASSERT_OK(result) << "Calc Add() failed";
   ASSERT_EQ(result->sum(), 7.7);
 }
 
 TEST_F(CalcTestFixture, SubtractIntegrationTest) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Subtract> result =
       client->Subtract({{.a = 7.7, .b = 3.2}});
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Calc Subtract() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  ASSERT_OK(result) << "Calc Subtract() failed";
   ASSERT_EQ(result->difference(), 4.5);
 }
 
 TEST_F(CalcTestFixture, MultiplyIntegrationTest) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Multiply> result =
       client->Multiply({{.a = 1.5, .b = 2.0}});
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Calc Multiply() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  ASSERT_OK(result) << "Calc Multiply() failed";
   ASSERT_EQ(result->product(), 3.0);
 }
 
 TEST_F(CalcTestFixture, DivideIntegrationTest) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Divide> result =
       client->Divide({{.dividend = 2.0, .divisor = 4.0}});
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Calc Divide() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  ASSERT_OK(result) << "Calc Divide() failed";
   ASSERT_EQ(result->quotient(), 0.5);
 }
 
 TEST_F(CalcTestFixture, PowIntegrationTest) {
   fidl::Result<fuchsia_examples_calculator::Calculator::Pow> result =
       client->Pow({{.base = 3.0, .exponent = 4.0}});
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Calc Pow() failed: " << result.error_value() << std::endl;
-    FAIL();
-  }
+  ASSERT_OK(result) << "Calc Pow() failed";
   ASSERT_EQ(result->power(), 81);
 }

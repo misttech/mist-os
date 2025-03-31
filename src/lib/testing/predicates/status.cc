@@ -5,7 +5,10 @@
 #include "status.h"
 
 namespace testing_predicates {
-::testing::AssertionResult CmpZxOk(const char* l_expr, zx_status_t l) {
+
+zx_status_t internal::StatusValue(zx_status_t status) { return status; }
+
+::testing::AssertionResult CmpOk(const char* l_expr, zx_status_t l) {
   if (l == ZX_OK) {
     return ::testing::AssertionSuccess();
   }
@@ -25,14 +28,18 @@ namespace testing_predicates {
                                        << "Expected: " << r_expr << "\n"
                                        << "Which is: " << zx_status_get_string(r);
 }
-
-::testing::AssertionResult CmpZxOk(const char* l_expr, const zx::result<>& l) {
-  return CmpZxOk(l_expr, l.status_value());
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, zx_status_t l,
+                                     const fit::result<zx_status_t>& r) {
+  return CmpStatus(l_expr, r_expr, internal::StatusValue(l), internal::StatusValue(r));
 }
-
-::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, const zx::result<>& l,
-                                     const zx::result<>& r) {
-  return CmpStatus(l_expr, r_expr, l.status_value(), r.status_value());
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr,
+                                     const fit::result<zx_status_t>& l, zx_status_t r) {
+  return CmpStatus(l_expr, r_expr, internal::StatusValue(l), internal::StatusValue(r));
+}
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr,
+                                     const fit::result<zx_status_t>& l,
+                                     const fit::result<zx_status_t>& r) {
+  return CmpStatus(l_expr, r_expr, internal::StatusValue(l), internal::StatusValue(r));
 }
 
 }  // namespace testing_predicates

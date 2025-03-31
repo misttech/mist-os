@@ -19,6 +19,7 @@ test("metadata-example-test") {
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
   ]
 }
 

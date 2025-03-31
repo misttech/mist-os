@@ -54,6 +54,7 @@ test("test") {
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates:predicates",
   ]
 }
 

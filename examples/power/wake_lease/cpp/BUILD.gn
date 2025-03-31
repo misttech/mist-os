@@ -29,6 +29,7 @@ executable("wake_lease_cpp_integration_test") {
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
+    "//src/lib/testing/predicates",
   ]
 }
 
