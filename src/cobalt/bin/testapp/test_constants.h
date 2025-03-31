@@ -51,6 +51,14 @@ const uint32_t kBandwidthUsageNewApplicationStateIndices[] = {0, 1};
 const uint32_t kBandwidthUsageNewApplicationNameIndices[] = {0, 1};
 const int64_t kBandwidthUsageNewBuckets = 22;
 
+// data_usage_with_impossible_bucket metric constants.
+const uint32_t kDataUsageWithImpossibleBucketApplicationStateIndices[] = {0, 1};
+const uint32_t kDataUsageWithImpossibleBucketApplicationNameIndices[] = {0, 1};
+const int32_t kDataUsageWithImpossibleBucketValidBucketIndices[] = {0, 1, 2, 9, 11};
+const int32_t kDataUsageWithImpossibleBucketValidBuckets = 5;
+const int32_t kDataUsageWithImpossibleBucketInvalidBucketIndices[] = {3, 4, 5, 6, 7, 8, 10};
+const int32_t kDataUsageWithImpossibleBucketInvalidBuckets = 7;
+
 // error_occurred_new metric constants.
 const uint32_t kErrorOccurredNewIndicesToUse[] = {0, 1, 2, 9};
 const uint32_t kErrorOccurredNewCounts[] = {0, 1, 100, 1000};
