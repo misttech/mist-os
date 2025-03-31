@@ -11,49 +11,27 @@ use log::warn;
 use std::sync::Arc;
 use zx::{AsHandleRef, Task};
 
-/// The signal that the runner raises when handing over an event to the kernel.
-pub const RUNNER_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that a message has been handled.
-pub const KERNEL_SIGNAL: zx::Signals = zx::Signals::USER_1;
-
 /// The signal that the kernel raises to indicate that it's awake.
 pub const AWAKE_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
 /// The signal that the kernel raises to indicate that it's suspended.
 pub const ASLEEP_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
-enum WakeSourceType {
-    Event(zx::EventPair),
-    Counter(zx::Counter),
-}
-
 pub struct WakeSource {
-    wake_source_type: WakeSourceType,
+    counter: zx::Counter,
     name: String,
 }
 
 impl WakeSource {
-    pub fn new_event(event: zx::EventPair, name: String) -> Self {
-        Self { wake_source_type: WakeSourceType::Event(event), name }
-    }
-
-    pub fn new_counter(event: zx::Counter, name: String) -> Self {
-        Self { wake_source_type: WakeSourceType::Counter(event), name }
+    pub fn new(counter: zx::Counter, name: String) -> Self {
+        Self { counter, name }
     }
 
     fn as_wait_item(&self) -> zx::WaitItem<'_> {
-        match &self.wake_source_type {
-            WakeSourceType::Event(event) => zx::WaitItem {
-                handle: event.as_handle_ref(),
-                waitfor: RUNNER_SIGNAL,
-                pending: zx::Signals::empty(),
-            },
-            WakeSourceType::Counter(counter) => zx::WaitItem {
-                handle: counter.as_handle_ref(),
-                waitfor: zx::Signals::COUNTER_POSITIVE,
-                pending: zx::Signals::empty(),
-            },
+        zx::WaitItem {
+            handle: self.counter.as_handle_ref(),
+            waitfor: zx::Signals::COUNTER_POSITIVE,
+            pending: zx::Signals::empty(),
         }
     }
 }
@@ -153,7 +131,7 @@ pub async fn suspend_container(
 
     let mut resume_reason: Option<String> = None;
     for wait_item in &wait_items {
-        if wait_item.pending.contains(RUNNER_SIGNAL) {
+        if wait_item.pending.contains(zx::Signals::COUNTER_POSITIVE) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = wake_sources.get(&koid) {
                 log::info!("Woke container from sleep for: {}", event.name);

@@ -235,42 +235,24 @@ pub async fn serve_starnix_manager(
                     container_job: Some(_container_job),
                     remote_channel: Some(remote_channel),
                     container_channel: Some(container_channel),
-                    resume_event,
-                    counter,
                     name: Some(name),
+                    counter: Some(message_counter),
                     ..
                 } = payload
                 else {
                     continue;
                 };
 
-                let proxy = ChannelProxy {
-                    container_channel,
-                    remote_channel,
-                    resume_event,
-                    message_counter: counter,
-                    name: name.clone(),
-                };
+                suspend_context.wake_sources.lock().insert(
+                    message_counter.get_koid().unwrap(),
+                    WakeSource::new(
+                        message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                        name.clone(),
+                    ),
+                );
 
-                if let Some(resume_event) = proxy.resume_event.as_ref() {
-                    suspend_context.wake_sources.lock().insert(
-                        resume_event.get_koid().unwrap(),
-                        WakeSource::new_event(
-                            resume_event.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                            name.clone(),
-                        ),
-                    );
-                }
-
-                if let Some(message_counter) = proxy.message_counter.as_ref() {
-                    suspend_context.wake_sources.lock().insert(
-                        message_counter.get_koid().unwrap(),
-                        WakeSource::new_counter(
-                            message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                            name,
-                        ),
-                    );
-                }
+                let proxy =
+                    ChannelProxy { container_channel, remote_channel, message_counter, name };
 
                 sender.try_send((proxy, suspend_context.wake_sources.clone())).unwrap();
             }
