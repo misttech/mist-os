@@ -30,7 +30,6 @@ impl InspectSinkProvider {
         Self { inspect_tree_server_tasks: Mutex::new(TaskGroup::new()), inspector }
     }
 
-    #[allow(unused)]
     pub fn inspector(&self) -> &Inspector {
         &self.inspector
     }

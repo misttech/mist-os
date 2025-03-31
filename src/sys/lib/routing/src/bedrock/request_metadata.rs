@@ -4,12 +4,8 @@
 
 use crate::rights::Rights;
 use cm_rust::Availability;
-use fidl::{persist, unpersist};
 use sandbox::{Capability, Data, Dict, DictKey};
-use {
-    fidl_fuchsia_component_internal as finternal, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio,
-};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 /// A route request metadata key for the capability type.
 pub const METADATA_KEY_TYPE: &'static str = "type";
@@ -94,35 +90,6 @@ impl Metadata<Rights> for Dict {
     }
 }
 
-impl Metadata<finternal::EventStreamRouteMetadata> for Dict {
-    const KEY: &'static str = "event_stream_route_metadata";
-
-    fn set_metadata(&self, esrm: finternal::EventStreamRouteMetadata) {
-        let key = DictKey::new(<Self as Metadata<Rights>>::KEY)
-            .expect("dict key creation failed unexpectedly");
-        let value = persist(&esrm).expect("failed to persist event stream route metadata");
-        match self.insert(key, Data::Bytes(value).into()) {
-            // When an entry already exists for a key in a Dict, insert() will
-            // still replace that entry with the new value, even though it
-            // returns an ItemAlreadyExists error. As a result, we can treat
-            // ItemAlreadyExists as a success case.
-            Ok(()) | Err(fsandbox::CapabilityStoreError::ItemAlreadyExists) => (),
-            // Dict::insert() only returns `CapabilityStoreError::ItemAlreadyExists` variant
-            Err(e) => panic!("unexpected error variant returned from Dict::insert(): {e:?}"),
-        }
-    }
-
-    fn get_metadata(&self) -> Option<finternal::EventStreamRouteMetadata> {
-        let key = DictKey::new(<Self as Metadata<Rights>>::KEY)
-            .expect("dict key creation failed unexpectedly");
-        let capability = self.get(&key).ok()??;
-        match capability {
-            Capability::Data(Data::Bytes(bytes)) => Some(unpersist(&bytes).ok()?),
-            _ => None,
-        }
-    }
-}
-
 /// Returns a `Dict` containing Router Request metadata specifying a Protocol porcelain type.
 pub fn protocol_metadata(availability: cm_types::Availability) -> sandbox::Dict {
     let metadata = sandbox::Dict::new();
@@ -204,23 +171,5 @@ pub fn service_metadata(availability: cm_types::Availability) -> sandbox::Dict {
         )
         .unwrap();
     metadata.set_metadata(availability);
-    metadata
-}
-
-pub fn event_stream_metadata(
-    availability: cm_types::Availability,
-    route_metadata: finternal::EventStreamRouteMetadata,
-) -> sandbox::Dict {
-    let metadata = sandbox::Dict::new();
-    metadata
-        .insert(
-            cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-            sandbox::Capability::Data(sandbox::Data::String(
-                cm_rust::CapabilityTypeName::EventStream.to_string(),
-            )),
-        )
-        .unwrap();
-    metadata.set_metadata(availability);
-    metadata.set_metadata(route_metadata);
     metadata
 }

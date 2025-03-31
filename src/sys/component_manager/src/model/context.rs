@@ -10,7 +10,6 @@ use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
 use errors::ModelError;
-use fuchsia_inspect::Inspector;
 use futures::lock::Mutex;
 use moniker::Moniker;
 use std::collections::HashMap;
@@ -29,7 +28,6 @@ pub struct ModelContext {
     instance_registry: Arc<InstanceRegistry>,
     config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
     pub scope_factory: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
-    inspector: Inspector,
 }
 
 impl ModelContext {
@@ -38,7 +36,6 @@ impl ModelContext {
     pub fn new(
         runtime_config: Arc<RuntimeConfig>,
         instance_registry: Arc<InstanceRegistry>,
-        inspector: Inspector,
         #[cfg(test)] scope_factory: Option<Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>>,
     ) -> Result<Self, ModelError> {
         #[cfg(not(test))]
@@ -57,7 +54,6 @@ impl ModelContext {
             instance_registry,
             config_developer_overrides: Mutex::new(HashMap::new()),
             scope_factory,
-            inspector,
         })
     }
 
@@ -65,11 +61,7 @@ impl ModelContext {
     pub fn new_for_test() -> Self {
         let runtime_config = Arc::new(RuntimeConfig::default());
         let instance_registry = InstanceRegistry::new();
-        let inspector = fuchsia_inspect::component::init_inspector_with_size(
-            crate::builtin_environment::INSPECTOR_SIZE,
-        )
-        .clone();
-        Self::new(runtime_config, instance_registry, inspector, None).unwrap()
+        Self::new(runtime_config, instance_registry, None).unwrap()
     }
 
     /// Returns the runtime policy checker for the model.
@@ -91,10 +83,6 @@ impl ModelContext {
 
     pub fn instance_registry(&self) -> &Arc<InstanceRegistry> {
         &self.instance_registry
-    }
-
-    pub fn inspector(&self) -> &Inspector {
-        &self.inspector
     }
 
     pub async fn init_internal_capabilities(

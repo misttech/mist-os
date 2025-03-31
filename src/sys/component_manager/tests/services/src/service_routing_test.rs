@@ -74,22 +74,10 @@ enum TestType {
 #[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
 async fn list_instances_test(test_type: TestType) {
-    let event_stream = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
-    let event_stream_2 = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
     let input = TestInput::new(test_type);
     let branch = start_branch(&input).await.expect("failed to start branch component");
-    start_provider(event_stream, &branch, input.provider_a_moniker)
-        .await
-        .expect("failed to start provider a");
-    start_provider(event_stream_2, &branch, input.provider_b_moniker)
-        .await
-        .expect("failed to start provider b");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service_dir = fuchsia_fs::directory::open_directory(
@@ -113,23 +101,10 @@ async fn list_instances_test(test_type: TestType) {
 #[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
 async fn connect_to_instances_test(test_type: TestType) {
-    let event_stream = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
-    let event_stream_2 = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
-
     let input = TestInput::new(test_type);
     let branch = start_branch(&input).await.expect("failed to start branch component");
-    start_provider(event_stream, &branch, input.provider_a_moniker)
-        .await
-        .expect("failed to start provider a");
-    start_provider(event_stream_2, &branch, input.provider_b_moniker)
-        .await
-        .expect("failed to start provider b");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service =
@@ -157,23 +132,10 @@ async fn connect_to_instances_test(test_type: TestType) {
 #[test_case(TestType::TwoCollections)]
 #[fuchsia::test]
 async fn create_destroy_instance_test(test_type: TestType) {
-    let event_stream = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
-    let event_stream_2 = EventStream::open_at_path("/events/started")
-        .await
-        .context("failed to subscribe to EventSource")
-        .unwrap();
-
     let input = TestInput::new(test_type);
     let branch = start_branch(&input).await.expect("failed to start branch component");
-    start_provider(event_stream, &branch, input.provider_a_moniker)
-        .await
-        .expect("failed to start provider a");
-    start_provider(event_stream_2, &branch, input.provider_b_moniker)
-        .await
-        .expect("failed to start provider b");
+    start_provider(&branch, input.provider_a_moniker).await.expect("failed to start provider a");
+    start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
     let service_dir = fuchsia_fs::directory::open_directory(
@@ -376,14 +338,14 @@ async fn start_branch(input: &TestInput) -> Result<ScopedInstance, Error> {
 }
 
 /// Starts the provider with the name `child_name` in the branch component.
-async fn start_provider(
-    event_stream: EventStream,
-    branch: &ScopedInstance,
-    child_moniker: &str,
-) -> Result<(), Error> {
+async fn start_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<(), Error> {
     let lifecycle_controller_proxy =
         client::connect_to_protocol::<fsys2::LifecycleControllerMarker>()
             .context("failed to connect to LifecycleController")?;
+
+    let event_stream = EventStream::open_at_path("/events/started")
+        .await
+        .context("failed to subscribe to EventSource")?;
 
     let provider_moniker =
         format!("./{}:{}/{}", BRANCHES_COLLECTION, branch.child_name(), child_moniker);

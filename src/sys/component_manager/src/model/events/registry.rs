@@ -441,7 +441,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    #[ignore]
     async fn drop_dispatcher_when_event_stream_dropped() {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
         let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
@@ -507,7 +506,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    #[ignore]
     async fn capability_requested_over_two_event_streams() {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
         let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
