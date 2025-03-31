@@ -32,6 +32,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 use vfs::directory::entry_container::Directory;
+use vfs::ToObjectRequest;
 use zx::Status;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_space as fidl_space, fuchsia_async as fasync};
 
@@ -375,12 +376,14 @@ impl MockPackageResolverService {
                         .push(CapturedPackageResolverRequest::Resolve { package_url });
 
                     let (dir_server, res) = self.resolve_response.lock().take().unwrap();
-                    let () = dir_server.open(
-                        vfs::execution_scope::ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        vfs::path::Path::dot(),
-                        dir.into_channel().into(),
-                    );
+                    fio::PERM_READABLE.to_object_request(dir).handle(|request| {
+                        dir_server.open3(
+                            vfs::execution_scope::ExecutionScope::new(),
+                            vfs::Path::dot(),
+                            fio::PERM_READABLE,
+                            request,
+                        )
+                    });
                     responder.send(res.as_ref().map_err(|e| *e)).unwrap()
                 }
                 PackageResolverRequest::ResolveWithContext {
