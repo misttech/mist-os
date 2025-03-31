@@ -85,7 +85,9 @@ impl<'a> Deref for DriverHandleRef<'a> {
 /// An enum of the two types of handles that can be represented in a [`MixedHandle`].
 #[derive(Debug)]
 pub enum MixedHandleType<Driver, Zircon> {
+    /// A driver runtime managed handle
     Driver(Driver),
+    /// A kernel handle
     Zircon(Zircon),
 }
 

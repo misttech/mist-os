@@ -3,16 +3,12 @@
 // found in the LICENSE file.
 
 //! Bindings for the fuchsia driver framework C API
-#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(unsafe_op_in_unsafe_fn, missing_docs)]
 
-mod arena;
-mod channel;
-mod dispatcher;
-mod handle;
-mod message;
-
-pub use arena::*;
-pub use channel::*;
-pub use dispatcher::*;
-pub use handle::*;
-pub use message::*;
+// Note: we explicitly export only the parts of the sub-crates that we expect to be used in user
+// code to allow for sharing utility and internal access code between these crates.
+pub use fdf_channel::arena::*;
+pub use fdf_channel::channel::*;
+pub use fdf_channel::message::*;
+pub use fdf_core::dispatcher::*;
+pub use fdf_core::handle::*;

@@ -22,8 +22,9 @@ use futures::task::{waker_ref, ArcWake};
 
 pub use fdf_sys::fdf_dispatcher_t;
 
-pub trait ShutdownObserverFn: FnOnce(DispatcherRef<'_>) + Send + Sync + 'static {}
-impl<T> ShutdownObserverFn for T where T: FnOnce(DispatcherRef<'_>) + Send + Sync + 'static {}
+/// A marker trait for a function type that can be used as a shutdown observer for [`Dispatcher`].
+pub trait ShutdownObserverFn: FnOnce(DispatcherRef<'_>) + Send + 'static {}
+impl<T> ShutdownObserverFn for T where T: FnOnce(DispatcherRef<'_>) + Send + 'static {}
 
 /// A builder for [`Dispatcher`]s
 #[derive(Default)]
@@ -84,7 +85,7 @@ impl DispatcherBuilder {
         self
     }
 
-    // Whether or not this dispatcher allows synchronous calls
+    /// Whether or not this dispatcher allows synchronous calls
     pub fn allows_thread_blocking(&self) -> bool {
         (self.options & Self::ALLOW_THREAD_BLOCKING) == Self::ALLOW_THREAD_BLOCKING
     }
@@ -150,6 +151,7 @@ impl DispatcherBuilder {
     }
 }
 
+/// An owned handle for a dispatcher managed by the driver runtime.
 #[derive(Debug)]
 pub struct Dispatcher(pub(crate) NonNull<fdf_dispatcher_t>);
 
@@ -388,6 +390,7 @@ impl OnDispatcher for CurrentDispatcher {
     }
 }
 
+/// A marker trait for a callback that can be used with [`Dispatcher::post_task_sync`].
 pub trait TaskCallback: FnOnce(Status) + 'static + Send {}
 impl<T> TaskCallback for T where T: FnOnce(Status) + 'static + Send {}
 
@@ -522,12 +525,17 @@ impl ShutdownObserver {
     }
 }
 
-pub mod test {
-    use core::ffi::{c_char, c_void};
-    use core::ptr::null_mut;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     use std::sync::{mpsc, Once};
 
-    use super::*;
+    use futures::channel::mpsc as async_mpsc;
+    use futures::{SinkExt, StreamExt};
+
+    use core::ffi::{c_char, c_void};
+    use core::ptr::null_mut;
 
     static GLOBAL_DRIVER_ENV: Once = Once::new();
 
@@ -596,17 +604,6 @@ pub mod test {
 
         res
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::test::*;
-    use super::*;
-
-    use std::sync::mpsc;
-
-    use futures::channel::mpsc as async_mpsc;
-    use futures::{SinkExt, StreamExt};
 
     #[test]
     fn start_test_dispatcher() {

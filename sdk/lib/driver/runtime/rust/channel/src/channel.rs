@@ -8,7 +8,10 @@ use core::future::Future;
 use std::mem::ManuallyDrop;
 use zx::Status;
 
-use crate::{Arena, ArenaBox, DriverHandle, Message, MixedHandle, OnDispatcher};
+use crate::arena::{Arena, ArenaBox};
+use crate::message::Message;
+use fdf_core::dispatcher::OnDispatcher;
+use fdf_core::handle::{DriverHandle, MixedHandle};
 use fdf_sys::*;
 
 use core::marker::PhantomData;
@@ -344,7 +347,11 @@ impl ReadMessageState {
                         // SAFETY: the `ReadMessageStateOp` starts with an `fdf_channel_read` struct and
                         // has `repr(C)` layout, so is safe to be cast to the latter.
                         let res = Status::ok(unsafe {
-                            fdf_channel_wait_async(dispatcher.0.as_ptr(), op.cast_mut().cast(), 0)
+                            fdf_channel_wait_async(
+                                dispatcher.inner().as_ptr(),
+                                op.cast_mut().cast(),
+                                0,
+                            )
                         });
                         // if the dispatcher we're waiting on is unsynchronized, the callback
                         // will drop the Arc and we need to indicate to our own Drop impl
@@ -418,11 +425,13 @@ mod tests {
     use std::pin::pin;
     use std::sync::{mpsc, Weak};
 
-    use crate::test::{with_raw_dispatcher, with_raw_dispatcher_flags};
-    use crate::tests::DropSender;
-    use crate::{CurrentDispatcher, Dispatcher, DispatcherBuilder, MixedHandleType, OnDispatcher};
+    use fdf_core::dispatcher::{CurrentDispatcher, Dispatcher, DispatcherBuilder, OnDispatcher};
+    use fdf_core::handle::MixedHandleType;
+    use fdf_env::test::{spawn_in_driver, spawn_in_driver_etc};
+    use futures::poll;
 
     use super::*;
+    use crate::test_utils::*;
 
     #[test]
     fn send_and_receive_bytes_synchronously() {
@@ -445,18 +454,16 @@ mod tests {
 
     #[test]
     fn send_and_receive_bytes_asynchronously() {
-        with_raw_dispatcher("channel async", |dispatcher| {
+        spawn_in_driver("channel async", async {
             let arena = Arena::new();
-            let (fin_tx, fin_rx) = mpsc::channel();
             let (first, second) = Channel::create();
 
-            dispatcher
-                .spawn_task(async move {
-                    fin_tx.send(first.read_bytes(CurrentDispatcher).await.unwrap()).unwrap();
-                })
-                .unwrap();
+            assert!(poll!(pin!(first.read_bytes(CurrentDispatcher))).is_pending());
             second.write_with_data(arena, |arena| arena.insert_slice(&[1, 2, 3, 4])).unwrap();
-            assert_eq!(fin_rx.recv().unwrap().unwrap().data().unwrap(), &[1, 2, 3, 4]);
+            assert_eq!(
+                first.read_bytes(CurrentDispatcher).await.unwrap().unwrap().data().unwrap(),
+                &[1, 2, 3, 4]
+            );
         });
     }
 
@@ -511,23 +518,19 @@ mod tests {
         assert_eq!(inner_second.try_read().unwrap().unwrap().data().unwrap(), &"boom".to_string());
     }
 
-    async fn ping<D: OnDispatcher>(dispatcher: D, chan: Channel<u8>) {
+    async fn ping(chan: Channel<u8>) {
         println!("starting ping!");
         chan.write_with_data(Arena::new(), |arena| arena.insert(0)).unwrap();
-        while let Ok(Some(msg)) = chan.read(dispatcher.clone()).await {
+        while let Ok(Some(msg)) = chan.read(CurrentDispatcher).await {
             let next = *msg.data().unwrap();
             println!("ping! {next}");
             chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
         }
     }
 
-    async fn pong<D: OnDispatcher>(
-        dispatcher: D,
-        fin_tx: std::sync::mpsc::Sender<()>,
-        chan: Channel<u8>,
-    ) {
+    async fn pong(chan: Channel<u8>) {
         println!("starting pong!");
-        while let Some(msg) = chan.read(dispatcher.clone()).await.unwrap() {
+        while let Some(msg) = chan.read(CurrentDispatcher).await.unwrap() {
             let next = *msg.data().unwrap();
             println!("pong! {next}");
             if next > 10 {
@@ -536,56 +539,45 @@ mod tests {
             }
             chan.write_with_data(msg.take_arena(), |arena| arena.insert(next + 1)).unwrap();
         }
-        fin_tx.send(()).unwrap();
     }
 
     #[test]
     fn async_ping_pong() {
-        with_raw_dispatcher("async ping pong", |dispatcher| {
-            let (fin_tx, fin_rx) = mpsc::channel();
+        spawn_in_driver("async ping pong", async {
             let (ping_chan, pong_chan) = Channel::create();
-            dispatcher.spawn_task(ping(dispatcher.clone(), ping_chan)).unwrap();
-            dispatcher.spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan)).unwrap();
-
-            fin_rx.recv().expect("to receive final value");
+            CurrentDispatcher.spawn_task(ping(ping_chan)).unwrap();
+            pong(pong_chan).await;
         });
     }
 
     #[test]
     fn async_ping_pong_on_fuchsia_async() {
-        with_raw_dispatcher("async ping pong", |dispatcher| {
-            let (fin_tx, fin_rx) = mpsc::channel();
+        spawn_in_driver("async ping pong", async {
             let (ping_chan, pong_chan) = Channel::create();
 
-            let dispatcher = Weak::upgrade(&dispatcher).unwrap();
-            dispatcher
-                .clone()
-                .post_task_sync(move |_status| {
-                    let rust_async_dispatcher_fin_tx = fin_tx.clone();
-                    let rust_async_dispatcher = crate::DispatcherBuilder::new()
-                        .name("fuchsia-async")
-                        .allow_thread_blocking()
-                        .shutdown_observer(move |_| rust_async_dispatcher_fin_tx.send(()).unwrap())
-                        .create()
-                        .expect("failure creating blocking dispatcher for rust async");
+            let fdf_dispatcher = DispatcherBuilder::new()
+                .name("fdf-async")
+                .create()
+                .expect("failure creating non-blocking dispatcher for fdf operations on rust-async dispatcher")
+                .release();
 
-                    dispatcher
-                        .clone()
-                        .spawn_task(pong(dispatcher.clone(), fin_tx, pong_chan))
-                        .unwrap();
-                    rust_async_dispatcher
-                        .post_task_sync(move |_| {
-                            Dispatcher::override_current(dispatcher.as_dispatcher_ref(), || {
-                                let mut executor = fuchsia_async::LocalExecutor::new();
-                                executor.run_singlethreaded(ping(CurrentDispatcher, ping_chan));
-                            });
-                        })
-                        .unwrap();
+            let rust_async_dispatcher = DispatcherBuilder::new()
+                .name("fuchsia-async")
+                .allow_thread_blocking()
+                .create()
+                .expect("failure creating blocking dispatcher for rust async")
+                .release();
+
+            rust_async_dispatcher
+                .post_task_sync(move |_| {
+                    Dispatcher::override_current(fdf_dispatcher, || {
+                        let mut executor = fuchsia_async::LocalExecutor::new();
+                        executor.run_singlethreaded(ping(ping_chan));
+                    });
                 })
                 .unwrap();
 
-            // wait for everything to shut down.
-            while fin_rx.recv().is_ok() {}
+            pong(pong_chan).await
         });
     }
 
@@ -615,60 +607,37 @@ mod tests {
 
     #[test]
     fn early_cancel_future() {
-        with_raw_dispatcher("early cancellation", |dispatcher| {
-            let (fin_tx, fin_rx) = mpsc::channel();
+        spawn_in_driver("early cancellation", async {
             let (a, b) = Channel::create();
-            let dispatcher = dispatcher.clone();
-            dispatcher
-                .spawn_task(async move {
-                    // create, poll, and then immediately drop a read future for channel `a`
-                    // so that it properly sets up the wait.
-                    read_and_drop(&a, CurrentDispatcher).await;
-                    b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
-                    assert_eq!(a.read(CurrentDispatcher).await.unwrap().unwrap().data(), Some(&1));
-                    fin_tx.send(()).unwrap();
-                })
-                .unwrap();
-            fin_rx.recv().unwrap();
+
+            // create, poll, and then immediately drop a read future for channel `a`
+            // so that it properly sets up the wait.
+            read_and_drop(&a, CurrentDispatcher).await;
+            b.write_with_data(Arena::new(), |arena| arena.insert(1)).unwrap();
+            assert_eq!(a.read(CurrentDispatcher).await.unwrap().unwrap().data(), Some(&1));
         })
     }
 
     #[test]
     fn very_early_cancel_state_drops_correctly() {
-        with_raw_dispatcher("early cancellation drop correctness", |dispatcher| {
+        spawn_in_driver("early cancellation drop correctness", async {
             let (a, _b) = Channel::<[u8]>::create();
-            let (fin_tx, fin_rx) = mpsc::channel();
 
-            let dispatcher = dispatcher.clone();
-            dispatcher
-                .spawn_task(async move {
-                    // drop before even polling it should drop the arc correctly
-                    let fut = read_raw(&a.0, CurrentDispatcher);
-                    let op_arc = Arc::downgrade(&fut.raw_fut.op);
-                    assert_strong_count(&op_arc, 1);
-                    drop(fut);
-                    assert_strong_count(&op_arc, 0);
-                    fin_tx.send(()).unwrap();
-                })
-                .unwrap();
-            fin_rx.recv().unwrap()
+            // drop before even polling it should drop the arc correctly
+            let fut = read_raw(&a.0, CurrentDispatcher);
+            let op_arc = Arc::downgrade(&fut.raw_fut.op);
+            assert_strong_count(&op_arc, 1);
+            drop(fut);
+            assert_strong_count(&op_arc, 0);
         })
     }
 
     #[test]
     fn synchronized_early_cancel_state_drops_correctly() {
-        with_raw_dispatcher("early cancellation drop correctness", |dispatcher| {
+        spawn_in_driver("early cancellation drop correctness", async {
             let (a, _b) = Channel::<[u8]>::create();
-            let (fin_tx, fin_rx) = mpsc::channel();
 
-            let dispatcher = dispatcher.clone();
-            dispatcher
-                .spawn_task(async move {
-                    assert_strong_count(&read_and_drop(&a, CurrentDispatcher).await, 0);
-                    fin_tx.send(()).unwrap();
-                })
-                .unwrap();
-            fin_rx.recv().unwrap()
+            assert_strong_count(&read_and_drop(&a, CurrentDispatcher).await, 0);
         });
     }
 
@@ -677,25 +646,15 @@ mod tests {
         // the channel needs to outlive the dispatcher for this test because the channel shouldn't
         // be closed before the read wait has been cancelled.
         let (a, _b) = Channel::<[u8]>::create();
-        let (unsync_op, _a) = with_raw_dispatcher_flags(
-            "early cancellation drop correctness",
-            DispatcherBuilder::UNSYNCHRONIZED,
-            |dispatcher| {
-                let (fin_tx, fin_rx) = mpsc::channel();
-
-                dispatcher
-                    .spawn_task(async move {
-                        // We send the arc out to be checked after the dispatcher has shut down so
-                        // that we can be sure that the callback has had a chance to be called.
-                        // We send the channel back out so that it lives long enough for the
-                        // cancellation to be called on it.
-                        let res = read_and_drop(&a, CurrentDispatcher).await;
-                        fin_tx.send((res, a)).unwrap();
-                    })
-                    .unwrap();
-                fin_rx.recv().unwrap()
-            },
-        );
+        let (unsync_op, _a) =
+            spawn_in_driver_etc("early cancellation drop correctness", false, true, async move {
+                // We send the arc out to be checked after the dispatcher has shut down so
+                // that we can be sure that the callback has had a chance to be called.
+                // We send the channel back out so that it lives long enough for the
+                // cancellation to be called on it.
+                let res = read_and_drop(&a, CurrentDispatcher).await;
+                (res, a)
+            });
 
         // check that there are no more owners of the inner op for the unsynchronized dispatcher.
         assert_strong_count(&unsync_op, 0);

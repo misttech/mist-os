@@ -4,11 +4,12 @@
 
 //! A helper for managing a self-contained arena-allocated buffer along with its arena handle.
 
-use crate::{Arena, ArenaBox, MixedHandle};
+use crate::arena::{Arena, ArenaBox};
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
+use fdf_core::handle::MixedHandle;
 
 use fdf_sys::*;
 
@@ -293,10 +294,11 @@ impl Message<[MaybeUninit<u8>]> {
 
 #[cfg(test)]
 mod test {
+    use crate::channel::Channel;
+    use fdf_core::handle::MixedHandleType;
     use zx::HandleBased;
 
     use super::*;
-    use crate::*;
 
     #[test]
     #[should_panic]

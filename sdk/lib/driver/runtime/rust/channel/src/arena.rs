@@ -554,6 +554,8 @@ impl<'a, T: 'a> IntoIterator for ArenaBox<'a, [T]> {
     }
 }
 
+/// The implementation for an [`IntoIterator`] of an [`ArenaBox`] of a slice that manages the
+/// memory behind it and ensures that it's cleaned up.
 pub struct IntoIter<T, A> {
     ptr: NonNull<T>,
     end: NonNull<T>,
@@ -690,6 +692,8 @@ impl<T: ?Sized> DerefMut for ArenaStaticBox<T> {
 /// inner [`ArenaStaticBox`].
 #[derive(Clone, Debug)]
 pub struct ArenaRc<T: ?Sized>(Arc<ArenaStaticBox<T>>);
+
+/// A weak reference to an [`ArenaRc`].
 #[derive(Clone, Debug)]
 pub struct ArenaWeak<T: ?Sized>(Weak<ArenaStaticBox<T>>);
 
@@ -739,6 +743,8 @@ impl<T: ?Sized> Deref for ArenaRc<T> {
 }
 
 impl<T: ?Sized> ArenaWeak<T> {
+    /// Converts this [`ArenaWeak`] into a strong reference [`ArenaRc`] if there are still any
+    /// outstanding strong references to it.
     pub fn upgrade(&self) -> Option<ArenaRc<T>> {
         self.0.upgrade().map(ArenaRc)
     }
@@ -771,41 +777,11 @@ unsafe fn global_alloc<T>(layout: Layout) -> NonNull<T> {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use std::cell::Cell;
+mod tests {
     use std::sync::mpsc;
 
     use super::*;
-
-    /// Implements a cloneable object that will send only one message
-    /// on an [`mpsc::Sender`] when its 'last' clone is dropped. It will assert
-    /// if an attempt to re-clone an already cloned [`DropSender`] happens,
-    /// ensuring that the object is only cloned in a linear path.
-    pub struct DropSender<T: Clone>(pub T, Cell<Option<mpsc::Sender<T>>>);
-    impl<T: Clone> DropSender<T> {
-        pub fn new(val: T, sender: mpsc::Sender<T>) -> Self {
-            Self(val, Cell::new(Some(sender)))
-        }
-    }
-    impl<T: Clone> Drop for DropSender<T> {
-        fn drop(&mut self) {
-            match self.1.get_mut() {
-                Some(sender) => {
-                    println!("dropping a drop sender");
-                    sender.send(self.0.clone()).unwrap();
-                }
-                _ => {}
-            }
-        }
-    }
-    impl<T: Clone> Clone for DropSender<T> {
-        fn clone(&self) -> Self {
-            Self(
-                self.0.clone(),
-                Cell::new(Some(self.1.take().expect("Attempted to re-clone a `DropSender`"))),
-            )
-        }
-    }
+    use crate::test_utils::*;
 
     #[test]
     fn arena_allocations() {
