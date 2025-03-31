@@ -10,24 +10,20 @@ import (
 
 // Flash flashes the target.
 func (f *FFXInstance) Flash(ctx context.Context, target, sshKey, productBundle string, tcp bool) error {
-	if err := f.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
-		return err
-	}
-	ffxArgs := []string{"-v", "--target", target, "-c", "discovery.mdns.enabled=false", "-c", "fastboot.usb.disabled=true", "-c", "discovery.timeout=12000"}
-	if !tcp {
-		ffxArgs = append(ffxArgs, "--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}")
-	}
-
-	ffxArgs = append(ffxArgs,
-		"target", "flash")
-	if sshKey != "" {
-		ffxArgs = append(ffxArgs, "--authorized-keys", sshKey)
+	configs := map[string]any{
+		"discovery.mdns.enabled":      false,
+		"fastboot.usb.disabled":       true,
+		"discovery.timeout":           12000,
+		"fastboot.flash.timeout_rate": "4",
 	}
 
-	ffxArgs = append(ffxArgs, "--product-bundle", productBundle)
+	args := []string{"-v", "target", "flash", "--product-bundle", productBundle}
 	if tcp {
 		// Rebooting while flashing over TCP will error out.
-		ffxArgs = append(ffxArgs, "--no-bootloader-reboot")
+		args = append(args, "--no-bootloader-reboot")
 	}
-	return f.RunWithTimeout(ctx, 0, ffxArgs...)
+	if sshKey != "" {
+		args = append(args, "--authorized-keys", sshKey)
+	}
+	return f.invoker(args).setConfigs(configs).setTarget(target).setStrict().setTimeout(0).run(ctx)
 }
