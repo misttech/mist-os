@@ -1099,3 +1099,16 @@ func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver
 
 	return &image, nil
 }
+
+// Log runs "ffx log <args>", optionally sending the output to "output"
+func (f *FFXInstance) Log(ctx context.Context, output *io.Writer, args ...string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	args = append([]string{"log"}, args...)
+	i := f.invoker(args).setTarget(f.target).setMachineFormat(MachineRaw).setStrict()
+	if output != nil {
+		i.setStdout(*output)
+	}
+	return i.run(ctx)
+}
