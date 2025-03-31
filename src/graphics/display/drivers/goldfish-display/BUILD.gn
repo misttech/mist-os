@@ -89,7 +89,6 @@ test("goldfish-unittests") {
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fdio",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

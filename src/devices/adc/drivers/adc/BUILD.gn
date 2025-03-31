@@ -26,7 +26,6 @@ source_set("common") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/fidl-metadata",
     "//src/devices/lib/mmio",

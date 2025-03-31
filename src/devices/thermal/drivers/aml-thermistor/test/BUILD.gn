@@ -22,7 +22,6 @@ cc_test_executable("aml-thermistor-test-bin") {
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/lib/thermal",

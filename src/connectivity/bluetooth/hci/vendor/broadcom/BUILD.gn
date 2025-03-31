@@ -119,7 +119,6 @@ cc_test_executable("tests_executable") {
     "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",

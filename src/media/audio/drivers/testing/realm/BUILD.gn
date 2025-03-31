@@ -90,7 +90,6 @@ fuchsia_cc_driver("dai-test-driver") {
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

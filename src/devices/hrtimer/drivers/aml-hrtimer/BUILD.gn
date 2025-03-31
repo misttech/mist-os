@@ -68,6 +68,8 @@ source_set("common") {
     ":aml-hrtimer-config",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/compat/cpp:cpp",
@@ -75,7 +77,6 @@ source_set("common") {
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/hwreg",
@@ -95,6 +96,7 @@ test("aml-hrtimer-test") {
     "//src/devices/testing/fake-bti",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fzl",
   ]
 }
