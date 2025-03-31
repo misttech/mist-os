@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use cm_rust::{ComponentDecl, ConfigValuesData};
 use fidl::endpoints::{create_endpoints, Proxy, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
-use fidl_fuchsia_diagnostics_types::{
+use fidl_fuchsia_component_runner::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
 };
 use futures::channel::oneshot;

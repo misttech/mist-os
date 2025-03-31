@@ -31,11 +31,22 @@
         "kind": "struct/member",
         "name": "fuchsia.component.runner/ComponentControllerOnPublishDiagnosticsRequest.payload",
         "ordinal": "1",
-        "type": "fuchsia.diagnostics.types/ComponentDiagnostics"
+        "type": "fuchsia.component.runner/ComponentDiagnostics"
     },
     {
         "kind": "struct",
         "name": "fuchsia.component.runner/ComponentControllerOnPublishDiagnosticsRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.runner/ComponentDiagnostics.tasks",
+        "ordinal": "1",
+        "type": "fuchsia.component.runner/ComponentTasks"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.runner/ComponentDiagnostics",
         "resourceness": "resource"
     },
     {
@@ -140,6 +151,23 @@
         "resourceness": "resource"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.component.runner/ComponentTasks.component_task",
+        "ordinal": "1",
+        "type": "fuchsia.component.runner/Task"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.runner/ComponentTasks.parent_task",
+        "ordinal": "2",
+        "type": "fuchsia.component.runner/Task"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.runner/ComponentTasks",
+        "resourceness": "resource"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.component.runner/MAX_HANDLE_COUNT",
         "type": "uint32",
@@ -150,6 +178,30 @@
         "name": "fuchsia.component.runner/MAX_NAMESPACE_COUNT",
         "type": "uint32",
         "value": "32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.component.runner/Task.job",
+        "ordinal": "1",
+        "type": "zx/Handle:JOB"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.component.runner/Task.process",
+        "ordinal": "2",
+        "type": "zx/Handle:PROCESS"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.component.runner/Task.thread",
+        "ordinal": "3",
+        "type": "zx/Handle:THREAD"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.component.runner/Task",
+        "strictness": "flexible",
+        "resourceness": "resource"
     },
     {
         "kind": "library",
