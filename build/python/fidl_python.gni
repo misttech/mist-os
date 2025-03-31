@@ -53,6 +53,7 @@ template("fidl_python") {
                  "deps",
                  "visibility",
                  "library_name",
+                 "fidl_target",
                ])
     compiled_action(generation_target) {
       forward_variables_from(invoker,
@@ -104,7 +105,9 @@ template("fidl_python") {
                                "visibility",
                                "deps",
                                "library_name",
+                               "fidl_target",
                              ])
+
       library_name = "fidl_" + string_replace(library_name, ".", "_")
       source_root = "$fidl_gen_dir"
 
@@ -116,6 +119,10 @@ template("fidl_python") {
         "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
         "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
         "//src/developer/ffx/lib/fuchsia-controller/cpp:fidl_codec",
+      ]
+      data_deps = [
+        ":${fidl_target}_host_test_data",
+        "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
       ]
       if (defined(invoker.public_deps)) {
         foreach(dep, invoker.public_deps) {

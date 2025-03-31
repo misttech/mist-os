@@ -132,10 +132,6 @@ python_host_test("fuchsia_controller_static_conformance_tests") {
     ":static_conformance_tests_py",
     "//src/tests/fidl/conformance_suite:conformance_fidl_python",
   ]
-  test_data_deps = [
-    "tests:fuchsia_controller_host_test_data",
-    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data",
-  ]
   main_source = static_conformance_test_source
 }
 

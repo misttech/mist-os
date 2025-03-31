@@ -131,6 +131,9 @@ template("python_host_test") {
     if (defined(invoker.test_data_deps)) {
       data_deps += invoker.test_data_deps
     }
+    if (defined(invoker.libraries)) {
+      data_deps += invoker.libraries
+    }
   }
 
   host_test(target_name) {

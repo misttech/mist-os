@@ -684,6 +684,7 @@ template("fidl") {
                                "public_deps",
                              ])
       forward_variables_from(common_parameters, "*")
+      fidl_target = _fidl_target_name
       fidl_gen_dir += "/python"
     }
   }
