@@ -68,9 +68,6 @@ message Static {
   // Whether to build generated source files specified in the generated sources manifest.
   bool include_generated_sources = 15;
 
-  // Whether to build ZBI tests.
-  bool include_zbi_tests = 16;
-
   // Whether to build host tests.
   bool include_host_tests = 17;
 
