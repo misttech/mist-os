@@ -17,7 +17,7 @@ pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::{DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
+use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
 use crate::TODO_DENY;
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
@@ -148,13 +148,17 @@ fn todo_has_file_permissions(
 fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    node: &FsNode,
+    fs_node: &FsNode,
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let target = fs_node_effective_sid_and_class(node);
+    if Anon::is_private(fs_node) {
+        return Ok(());
+    }
 
-    let audit_context = [audit_context, node.into()];
+    let target = fs_node_effective_sid_and_class(fs_node);
+
+    let audit_context = [audit_context, fs_node.into()];
     for permission in permissions {
         check_permission(
             permission_check,
@@ -173,11 +177,15 @@ fn todo_has_fs_node_permissions(
     bug: BugRef,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    node: &FsNode,
+    fs_node: &FsNode,
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let target = fs_node_effective_sid_and_class(node);
+    if Anon::is_private(fs_node) {
+        return Ok(());
+    }
+
+    let target = fs_node_effective_sid_and_class(fs_node);
 
     for permission in permissions {
         todo_check_permission(
@@ -253,12 +261,6 @@ fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::AnonFsNode.into() {
-        // TODO: https://fxbug.dev/404773987 - Skip all `anon_inode` checks, since most should be
-        // treated as "private" to the kernel, and therefore un-checked.
-        return Ok(());
-    }
-
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
@@ -284,11 +286,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::AnonFsNode.into() {
-        // TODO: https://fxbug.dev/404773987 - Skip all `anon_inode` checks, since most should be
-        // treated as "private" to the kernel, and therefore un-checked.
-        return Ok(());
-    } else if permission.class() == FileClass::SockFile.into() {
+    if permission.class() == FileClass::SockFile.into() {
         return todo_check_permission(
             TODO_DENY!(
                 "https://fxbug.dev/364568517",

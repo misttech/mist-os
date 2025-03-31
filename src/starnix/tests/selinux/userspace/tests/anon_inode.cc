@@ -21,8 +21,7 @@
 
 namespace {
 
-// TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
-TEST(AnonInodeTest, DISABLED_EventFdIsUnlabeled) {
+TEST(AnonInodeTest, EventFdIsUnlabeled) {
   LoadPolicy("anon_inode_policy.pp");
 
   fbl::unique_fd fd(eventfd(0, 0));
@@ -57,8 +56,7 @@ TEST(AnonInodeTest, UserfaultFdHasLabel) {
   EXPECT_EQ(fd_label.value(), "system_u:object_r:anon_inode_unconfined_userfaultfd_t:s0");
 }
 
-// TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
-TEST(AnonInodeTest, DISABLED_EpollIsUnlabeled) {
+TEST(AnonInodeTest, EpollIsUnlabeled) {
   LoadPolicy("anon_inode_policy.pp");
 
   fbl::unique_fd fd(epoll_create1(0));
@@ -70,8 +68,7 @@ TEST(AnonInodeTest, DISABLED_EpollIsUnlabeled) {
   EXPECT_EQ(fd_label.error_value(), ENOTSUP);
 }
 
-// TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
-TEST(AnonInodeTest, DISABLED_InotifyIsUnlabeled) {
+TEST(AnonInodeTest, InotifyIsUnlabeled) {
   LoadPolicy("anon_inode_policy.pp");
 
   fbl::unique_fd fd(inotify_init());
@@ -83,8 +80,7 @@ TEST(AnonInodeTest, DISABLED_InotifyIsUnlabeled) {
   EXPECT_EQ(fd_label.error_value(), ENOTSUP);
 }
 
-// TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
-TEST(AnonInodeTest, DISABLED_PidFdIsUnlabeled) {
+TEST(AnonInodeTest, PidFdIsUnlabeled) {
   LoadPolicy("anon_inode_policy.pp");
 
   fbl::unique_fd fd(static_cast<int>(syscall(SYS_pidfd_open, getpid(), 0)));
@@ -96,8 +92,7 @@ TEST(AnonInodeTest, DISABLED_PidFdIsUnlabeled) {
   EXPECT_EQ(fd_label.error_value(), ENOTSUP);
 }
 
-// TODO: https://fxbug.dev/404773987 - Enable once these anon_inodes have been marked "private".
-TEST(AnonInodeTest, DISABLED_TimerFdIsUnlabeled) {
+TEST(AnonInodeTest, TimerFdIsUnlabeled) {
   LoadPolicy("anon_inode_policy.pp");
 
   fbl::unique_fd fd(timerfd_create(CLOCK_MONOTONIC, 0));

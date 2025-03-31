@@ -89,7 +89,7 @@ impl TimerFile {
             }
         };
 
-        Ok(Anon::new_file(
+        Ok(Anon::new_private_file(
             current_task,
             Box::new(TimerFile {
                 timer,

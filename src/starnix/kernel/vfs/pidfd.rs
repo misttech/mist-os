@@ -53,7 +53,7 @@ impl PidFdFileObject {
 }
 
 pub fn new_pidfd(current_task: &CurrentTask, proc: &ThreadGroup, flags: OpenFlags) -> FileHandle {
-    Anon::new_file(
+    Anon::new_private_file(
         current_task,
         Box::new(PidFdFileObject {
             pid: proc.leader,

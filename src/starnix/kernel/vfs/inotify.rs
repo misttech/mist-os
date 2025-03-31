@@ -103,7 +103,7 @@ impl InotifyFileObject {
         let max_queued_events =
             current_task.kernel().system_limits.inotify.max_queued_events.load(Ordering::Relaxed);
         assert!(max_queued_events >= 0);
-        Anon::new_file(
+        Anon::new_private_file(
             current_task,
             Box::new(InotifyFileObject {
                 state: InotifyState {
