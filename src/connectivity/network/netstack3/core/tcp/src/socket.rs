@@ -5365,7 +5365,7 @@ where
     );
 
     let now = bindings_ctx.now();
-    let mms = Mss::from_mms(device_mms).ok_or(ConnectError::NoRoute)?;
+    let mss = Mss::from_mms(device_mms).ok_or(ConnectError::NoRoute)?;
 
     // No more errors can occur after here, because we're taking active_open
     // buffers out. Use a closure to guard against bad evolution.
@@ -5376,7 +5376,7 @@ where
             now,
             active_open,
             buffer_sizes,
-            mms,
+            mss,
             Mss::default::<WireI>(),
             &socket_options,
         );
