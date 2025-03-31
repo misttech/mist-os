@@ -162,8 +162,6 @@ mkdir "${bazel_workspace}"
 prepare_bazel_workspace "${bazel_workspace}"
 (cd "${bazel_workspace}" && ./bazel run --enable_bzlmod=false :crates_vendor)
 
-$FUCHSIA_DIR/third_party/rust_crates/plus_to_minus.py --vendor-dir $VENDOR_DIR
-
 # Restore files for unchanged directories.
 shopt -s nullglob
 for f in $TMP/*
