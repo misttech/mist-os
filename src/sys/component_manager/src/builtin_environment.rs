@@ -95,7 +95,7 @@ use elf_runner::process_launcher::ProcessLauncher;
 use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_component_internal::BuiltinBootResolver;
-use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
+use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
 use fuchsia_component::server::*;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::stats::InspectorExt;

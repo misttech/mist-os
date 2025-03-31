@@ -19,6 +19,7 @@ rustc_library("elf_runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
+    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",

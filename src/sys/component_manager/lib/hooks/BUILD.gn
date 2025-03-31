@@ -11,7 +11,7 @@ rustc_library("hooks") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/sys/component_manager/lib/errors",

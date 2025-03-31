@@ -15,8 +15,8 @@ use futures::FutureExt;
 use serve_processargs::NamespaceBuilder;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
 };
 
 mod component_controller;
@@ -99,7 +99,7 @@ impl Program {
         runner: &RemoteRunner,
         start_info: StartInfo,
         escrowed_state: EscrowedState,
-        diagnostics_sender: oneshot::Sender<fcrunner::ComponentDiagnostics>,
+        diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>();

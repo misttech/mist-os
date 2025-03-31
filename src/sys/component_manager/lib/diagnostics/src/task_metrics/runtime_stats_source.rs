@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fidl_fuchsia_component_runner::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown};
+use fidl_fuchsia_diagnostics_types::{ComponentDiagnostics, Task as DiagnosticsTask, TaskUnknown};
 use futures::channel::oneshot;
 use hooks::RuntimeInfo;
 use zx::{self as zx, sys as zx_sys, AsHandleRef, Task};

@@ -9,7 +9,10 @@ use futures::future::{BoxFuture, Shared};
 use futures::{FutureExt, StreamExt};
 use std::ops::Deref;
 use std::sync::Arc;
-use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fuchsia_async as fasync,
+};
 
 /// Wrapper around the `ComponentControllerProxy` with utilities for handling events.
 pub struct ComponentController {
@@ -45,7 +48,7 @@ impl<'a> ComponentController {
     /// A task will be spawned to dispatch events on the `ComponentControllerProxy`.
     pub fn new(
         proxy: fcrunner::ComponentControllerProxy,
-        diagnostics_sender: Option<oneshot::Sender<fcrunner::ComponentDiagnostics>>,
+        diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) -> Self {
         let (epitaph_sender, termination_value_recv) = oneshot::channel();
 
@@ -95,7 +98,7 @@ impl<'a> ComponentController {
         mut event_stream: fcrunner::ComponentControllerEventStream,
         termination_sender: oneshot::Sender<StopInfo>,
         state: Arc<Mutex<State>>,
-        mut diagnostics_sender: Option<oneshot::Sender<fcrunner::ComponentDiagnostics>>,
+        mut diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) {
         let mut termination_sender = Some(termination_sender);
         while let Some(value) = event_stream.next().await {
@@ -168,12 +171,15 @@ mod tests {
         let _controller = ComponentController::new(proxy, Some(sender));
         stream
             .control_handle()
-            .send_on_publish_diagnostics(fcrunner::ComponentDiagnostics {
-                tasks: Some(fcrunner::ComponentTasks::default()),
+            .send_on_publish_diagnostics(fdiagnostics::ComponentDiagnostics {
+                tasks: Some(fdiagnostics::ComponentTasks::default()),
                 ..Default::default()
             })
             .expect("sent diagnostics");
-        assert_matches!(receiver.await, Ok(fcrunner::ComponentDiagnostics { tasks: Some(_), .. }));
+        assert_matches!(
+            receiver.await,
+            Ok(fdiagnostics::ComponentDiagnostics { tasks: Some(_), .. })
+        );
     }
 
     #[fuchsia::test]

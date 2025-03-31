@@ -7,7 +7,6 @@ library fuchsia.diagnostics.types;
 using zx;
 
 // Task associated with a running component.
-@available(removed=NEXT)
 type Task = flexible resource union {
     1: job zx.Handle:JOB;
     2: process zx.Handle:PROCESS;
@@ -17,7 +16,6 @@ type Task = flexible resource union {
 // Contains handles for tasks of the running component. This is emitted by
 // runners and handled by component manager to obtain information about the
 // process and record diagnostics.
-@available(removed=NEXT)
 type ComponentTasks = resource table {
     // The Zircon task for the running component.
     // Resource usage for the component is attributed to this task.
@@ -37,7 +35,6 @@ type ComponentTasks = resource table {
 };
 
 // Diagnostics information about a component provided by the runner.
-@available(removed=NEXT)
 type ComponentDiagnostics = resource table {
     // Tasks associated with the running component.
     1: tasks ComponentTasks;
