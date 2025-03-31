@@ -298,6 +298,7 @@ fuchsia_sdk_repository(
             # Limit the scope of hlcpp to the sdk itself
             "@internal_sdk//:__subpackages__",
             "@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
         ],
     },
 )
@@ -317,6 +318,7 @@ fuchsia_sdk_repository(
             # Limit the scope of hlcpp to the sdk itself
             "@internal_sdk//:__subpackages__",
             "@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
         ],
     },
 )

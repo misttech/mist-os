@@ -1713,12 +1713,48 @@ def _generate_sdk_build_rules(
             else:
                 dir_to_meta[dir] = {meta_file_rel: meta}
 
+    def _expand_values(values):
+        all_values = []
+        for value in values:
+            repo, rest = value.split("//", 1)
+            if ":" in rest:
+                pkg, target = rest.split(":", 1)
+            else:
+                pkg = rest
+                target = rest.split("/")[-1]
+
+            def _fmt(r, p, t):
+                return "{}//{}:{}".format(r, p, t)
+
+            # Check for wildcards and expand. This currently, only supports a
+            # single "*" expansion.
+            if "*" in pkg:
+                if repo != "@@":
+                    fail(
+                        "Wildcard expansions are only supported in the main" +
+                        "repository in fuchsia.git",
+                    )
+                left, rest = pkg.split("*", 1)
+                directory = ctx.path(Label("@@//:BUILD.bazel")).dirname.get_child(left)
+                if directory.exists:
+                    for entry in directory.readdir():
+                        # Check to see if the directory we are trying to add has a BUILD.bazel
+                        # file and if it does add it here. We have to strip the leading "/" from
+                        # the path we are appending or else bazel will think it is an absolute
+                        # path and get_child will just return the new path and ignore entry.
+                        if entry.get_child(rest.lstrip("/")).get_child("BUILD.bazel").exists:
+                            all_values.append(_fmt(repo, left + entry.basename + rest, target))
+            else:
+                all_values.append(_fmt(repo, pkg, target))
+
+        return all_values
+
     process_context = runtime.make_struct(
         files_to_copy = files_to_copy,
         component_manifest_targets = [],
         constants = constants,
         visibility_templates = {
-            key: [Label(v) for v in values]
+            key: [Label(v) for v in _expand_values(values)]
             for key, values in ctx.attr.visibility_templates.items()
         },
     )

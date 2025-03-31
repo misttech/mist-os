@@ -216,6 +216,20 @@ Loads a particular version of the Fuchsia IDK.
             use a path like @@//foo:__pkg__. If you were to pass in this value as
             //foo:__pkg__ then it will be passed into the template in a way that makes
             bazel think it belongs to the repository you are generating.
+
+            The values in this list can contain a wildcard ("*") expanded out to include
+            all of the directories at that location but there are restrictions to the
+            usage.
+              - The expansion will only work on repos that are name "@@".
+              - The expansion only supports a single "*"
+              - The expansion will check that a BUILD.bazel file exists at the location
+                  that is being expanded and will add it if true but will not check that
+                  the BUILD.bazel file contains the target that is being expanded.
+
+            Examples of the wildcard expansion are:
+              - @@//src/*/foo:bar
+              - @@//src/*:bar
+              - @@//src/*/foo
             """,
         ),
     },
