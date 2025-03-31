@@ -53,25 +53,42 @@
     .code = BPF_ALU64 | BPF_MOV | BPF_X, .dst_reg = dst, .src_reg = src, .off = 0, .imm = 0, \
   }
 
+#define BPF_ADD_IMM(reg, value)                                                  \
+  bpf_insn {                                                                     \
+    .code = BPF_ALU64 | BPF_ADD | BPF_K, .dst_reg = reg, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                          \
+  }
+
 #define BPF_CALL_EXTERNAL(function)                                   \
   bpf_insn {                                                          \
     .code = BPF_JMP | BPF_CALL, .dst_reg = 0, .src_reg = 0, .off = 0, \
     .imm = static_cast<int32_t>(function),                            \
   }
 
-#define BPF_STORE(ptr, value)                                                 \
+#define BPF_STORE_B(ptr, value)                                               \
   bpf_insn {                                                                  \
     .code = BPF_ST | BPF_B | BPF_MEM, .dst_reg = ptr, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                       \
+  }
+
+#define BPF_STORE_W(ptr, value)                                               \
+  bpf_insn {                                                                  \
+    .code = BPF_ST | BPF_W | BPF_MEM, .dst_reg = ptr, .src_reg = 0, .off = 0, \
     .imm = static_cast<int32_t>(value),                                       \
   }
 
 #define BPF_RETURN() \
   bpf_insn { .code = BPF_JMP | BPF_EXIT, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, }
 
-#define BPF_JNE_IMM(dst, value, offset)                                     \
-  bpf_insn {                                                                \
-    .code = BPF_JMP | BPF_JNE, .dst_reg = dst, .src_reg = 0, .off = offset, \
-    .imm = static_cast<int32_t>(value),                                     \
+#define BPF_JNE_IMM(dst, value, offset)                                             \
+  bpf_insn {                                                                        \
+    .code = BPF_JMP | BPF_JNE | BPF_K, .dst_reg = dst, .src_reg = 0, .off = offset, \
+    .imm = static_cast<int32_t>(value),                                             \
+  }
+
+#define BPF_JLT_REG(dst, src, offset)                                                           \
+  bpf_insn {                                                                                    \
+    .code = BPF_JMP | BPF_JLT | BPF_X, .dst_reg = dst, .src_reg = src, .off = offset, .imm = 0, \
   }
 
 namespace {
@@ -256,9 +273,52 @@ class BpfMapTest : public testing::Test {
         // exit
         BPF_RETURN(),
         // *r0 = `v`
-        BPF_STORE(0, v),
+        BPF_STORE_B(0, v),
         // r1 <- r0,
         BPF_MOV_REG(1, 0),
+        // r2 <- `submit_flag`,
+        BPF_MOV_IMM(2, submit_flag),
+        // Call bpf_ringbuf_submit
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_submit),
+        // r0 <- 0,
+        BPF_MOV_IMM(0, 0),
+        // exit
+        BPF_RETURN(),
+    };
+    Run(program, sizeof(program) / sizeof(program[0]));
+  }
+
+  // Writes a new message with the specified `size`, which must be a multiple
+  // of 4. `v` is written throughout the message.
+  void WriteToRingBufferLarge(uint32_t v, size_t size, uint32_t submit_flag = 0) {
+    ASSERT_TRUE(size % 4 == 0);
+
+    // A bpf program that write a record in the ringbuffer.
+    bpf_insn program[] = {
+        // r1 <- ringbuf_fd_
+        BPF_LOAD_MAP(1, ringbuf_fd()),
+        // r2 <- `size`
+        BPF_MOV_IMM(2, size),
+        // r3 <- 0
+        BPF_MOV_IMM(3, 0),
+        // Call bpf_ringbuf_reserve
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_reserve),
+        // r0 != 0 -> JMP 1
+        BPF_JNE_IMM(0, 0, 1),
+        // exit
+        BPF_RETURN(),
+        // r1 <- r0,
+        BPF_MOV_REG(1, 0),
+        // r2 <- r0,
+        BPF_MOV_REG(2, 0),
+        // r2 <- r2 + `size`
+        BPF_ADD_IMM(2, size),
+        // *r0 = `v`
+        BPF_STORE_W(0, v),
+        // r0 <- r0 + 4
+        BPF_ADD_IMM(0, 4),
+        // r0 < r2 -> JMP -3
+        BPF_JLT_REG(0, 2, -3),
         // r2 <- `submit_flag`,
         BPF_MOV_IMM(2, submit_flag),
         // Call bpf_ringbuf_submit
@@ -308,7 +368,7 @@ class BpfMapTest : public testing::Test {
   int array_fd_ = -1;
   int map_fd_ = -1;
   int ringbuf_fd_ = -1;
-};
+};  // namespace
 
 TEST_F(BpfMapTest, Map) {
   EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
@@ -526,6 +586,43 @@ TEST_F(BpfMapTest, IdenticalPagesRingBufTest) {
 
   // Check that they are still equals after some operations.
   ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+}
+
+TEST_F(BpfMapTest, RingBufferWrapAround) {
+  auto pagewr = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
+  auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
+  std::atomic<uint32_t>* consumer_pos = static_cast<std::atomic<uint32_t>*>(pagewr.mapping());
+  std::atomic<uint32_t>* producer_pos = static_cast<std::atomic<uint32_t>*>(pagero.mapping());
+  uint8_t* data = static_cast<uint8_t*>(pagero.mapping()) + getpagesize();
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(0u, producer_pos->load(std::memory_order_acquire));
+
+  // Write first message that's 3016 bytes long.
+  size_t msg_size = 3016;
+  uint32_t value = 0x6143abcd;
+  WriteToRingBufferLarge(value, msg_size);
+  ASSERT_EQ(3024u, producer_pos->load(std::memory_order_acquire));
+  uint32_t* msg_ptr = reinterpret_cast<uint32_t*>(data + 8);
+  for (size_t i = 0; i < msg_size / 4; ++i) {
+    ASSERT_EQ(msg_ptr[i], value);
+  }
+
+  // Consume the message.
+  uint32_t pos = producer_pos->load(std::memory_order_acquire);
+  consumer_pos->store(pos, std::memory_order_release);
+
+  // Write a second message that wraps around to the head of the buffer.
+  uint32_t value2 = 0xc23414f2;
+  size_t msg_size2 = 2072;
+  WriteToRingBufferLarge(value2, msg_size2);
+
+  EXPECT_GT(producer_pos->load(std::memory_order_acquire), static_cast<uint32_t>(getpagesize()));
+  msg_ptr = reinterpret_cast<uint32_t*>(data + pos + 8);
+  for (size_t i = 0; i < msg_size2 / 4; ++i) {
+    ASSERT_EQ(msg_ptr[i], value2);
+  }
 }
 
 TEST_F(BpfMapTest, NotificationsRingBufTest) {

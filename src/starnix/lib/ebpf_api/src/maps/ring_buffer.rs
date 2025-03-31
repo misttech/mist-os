@@ -156,7 +156,7 @@ impl RingBuffer {
         vmar.map(
             page_size + vmo_size,
             &vmo,
-            0,
+            (page_size * 2) as u64,
             size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
