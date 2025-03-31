@@ -48,6 +48,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(cow_pages_->lock_ref()) {
     return cow_pages_->lock_ref();
   }
+  uint64_t lock_order() const { return cow_pages_->lock_order(); }
 
   VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
 
