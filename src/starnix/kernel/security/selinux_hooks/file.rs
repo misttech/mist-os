@@ -20,7 +20,7 @@ use selinux::{CommonFsNodePermission, FsNodeClass, Permission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
-    error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
+    error, FIBMAP, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
     FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
 };
 
@@ -95,8 +95,7 @@ pub(in crate::security) fn check_file_ioctl_access(
 
     let file_class = file.node().security_state.lock().class;
     let permissions: &[Permission] = match request {
-        // The NSA report also has `FIBMAP` follow this branch.
-        FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
+        FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
             &[CommonFsNodePermission::GetAttr.for_class(file_class)]
         }
         FS_IOC_SETFLAGS | FS_IOC_SETVERSION => {

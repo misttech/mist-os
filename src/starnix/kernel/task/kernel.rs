@@ -92,6 +92,12 @@ pub struct KernelFeatures {
     /// Components can override this by setting the `seclabel` field in their program block.
     pub default_seclabel: Option<String>,
 
+    /// Whether the kernel is being used to run the SELinux Test Suite.
+    ///
+    /// TODO: https://fxbug.dev/388077431 - remove this once we no longer need workarounds for the
+    /// SELinux Test Suite.
+    pub selinux_test_suite: bool,
+
     /// The default mount options to use when mounting directories from a component's namespace.
     ///
     /// The key is the path in the component's namespace, and the value is the mount options

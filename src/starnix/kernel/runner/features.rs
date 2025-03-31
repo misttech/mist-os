@@ -124,6 +124,7 @@ impl Features {
                         error_on_failed_reboot,
                         default_uid,
                         default_seclabel,
+                        selinux_test_suite,
                         default_ns_mount_options,
                         mlock_always_onfault,
                         mlock_pin_flavor,
@@ -206,6 +207,7 @@ impl Features {
                         "default_seclabel",
                         default_seclabel.as_deref().unwrap_or_default(),
                     );
+                    kernel_node.record_bool("selinux_test_suite", *selinux_test_suite);
                     inspect_node.record_string(
                         "default_ns_mount_options",
                         format!("{:?}", default_ns_mount_options),
@@ -292,6 +294,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             ("selinux", arg) => {
                 features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
             }
+            ("selinux_test_suite", _) => features.kernel.selinux_test_suite = true,
             ("test_data", _) => features.test_data = true,
             ("thermal", Some(arg)) =>
                 features.thermal = Some(
