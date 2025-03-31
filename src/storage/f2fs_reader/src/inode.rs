@@ -1,11 +1,12 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::crypto;
 use crate::dir::InlineDentry;
-use crate::reader::{Reader, NULL_ADDR};
+use crate::reader::{Reader, NEW_ADDR, NULL_ADDR};
+use crate::superblock::BLOCK_SIZE;
 use crate::xattr::{decode_xattr, XattrEntry};
-use crate::{crypto, BLOCK_SIZE};
-use anyhow::{anyhow, bail, ensure, Error};
+use anyhow::{anyhow, ensure, Error};
 use bitflags::bitflags;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -169,17 +170,17 @@ pub struct Inode {
     pub header: InodeHeader,
     pub extra: Option<InodeExtraAttr>,
     pub inline_data: Option<Box<[u8]>>,
-    pub inline_dentry: Option<InlineDentry>,
-    pub i_addrs: Vec<u32>,
-    pub nids: [u32; 5],
+    pub(super) inline_dentry: Option<InlineDentry>,
+    pub(super) i_addrs: Vec<u32>,
+    nids: [u32; 5],
     pub footer: InodeFooter,
 
     // These are loaded from additional nodes.
-    pub nid_pages: HashMap<u32, Box<RawAddrBlock>>,
+    nid_pages: HashMap<u32, Box<RawAddrBlock>>,
     pub xattr: Vec<XattrEntry>,
 
     // Crypto context, if present in xattr.
-    pub context: Option<crypto::Context>,
+    pub(super) context: Option<crypto::Context>,
 }
 
 /// Both direct and indirect node address pages use this same format.
@@ -435,14 +436,14 @@ impl Inode {
     }
 
     /// Convenience function that reads and returns the data for a block.
-    /// Note that performance of this method is poor.
-    /// We shouldn't need this outside of tests.
+    /// Note that performance of this method is (very) poor but we don't need
+    /// this outside of tests. Will return 'None' for empty pages.
     #[cfg(test)]
     pub(super) async fn read_data_block<'a>(
         &self,
         f2fs: &'a impl Reader,
         block_num: u32,
-    ) -> Result<Buffer<'a>, Error> {
+    ) -> Result<Option<Buffer<'a>>, Error> {
         let mut addr = None;
         self.for_each_data_block(|ix, block_addr| {
             if block_num == ix {
@@ -450,9 +451,17 @@ impl Inode {
             }
         });
         if let Some(block_addr) = addr {
-            f2fs.read_raw_block(block_addr).await
+            if block_addr == NEW_ADDR {
+                // Treat as an empty page
+                return Ok(None);
+            }
+            let mut buffer = f2fs.read_raw_block(block_addr).await?;
+            if let Some(decryptor) = f2fs.get_decryptor_for_inode(self) {
+                decryptor.decrypt_data(block_num, buffer.as_mut().as_mut_slice());
+            }
+            Ok(Some(buffer))
         } else {
-            bail!("Not found");
+            Ok(None)
         }
     }
 }
@@ -460,7 +469,7 @@ impl Inode {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{reader, BLOCK_SIZE};
+    use crate::reader;
     use anyhow;
     use async_trait::async_trait;
     use storage_device::buffer_allocator::{BufferAllocator, BufferSource};

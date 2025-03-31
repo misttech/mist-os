@@ -87,7 +87,8 @@ fscryptctl set_policy --padding=16 ${KEY_IDENTIFIER} ${MOUNT_PATH}/fscrypt
 
 mkdir -p ${MOUNT_PATH}/fscrypt/a/b
 # Nb: encrypted files should never be inlined.
-echo "test" > ${MOUNT_PATH}/fscrypt/a/b/inlined
+# The following data is more than 16 bytes to ensure that we validate the xts tweak during decoding.
+echo -n "test45678abcdef_12345678" > ${MOUNT_PATH}/fscrypt/a/b/inlined
 dd if=/dev/zero bs=4096 count=1 of=${MOUNT_PATH}/fscrypt/a/b/regular
 ln -s "inlined" ${MOUNT_PATH}/fscrypt/a/b/symlink
 

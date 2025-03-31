@@ -20,7 +20,6 @@ use zerocopy::FromBytes;
 // Used to indicate zero pages (when used as block_addr) and end of list (when used as nid).
 pub const NULL_ADDR: u32 = 0;
 // Used to indicate a new page that hasn't been allocated yet.
-#[allow(unused)]
 pub const NEW_ADDR: u32 = 0xffffffff;
 
 /// This trait is exposed to allow unit testing of Inode and other structs.
@@ -33,13 +32,29 @@ pub(super) trait Reader {
 
     /// Reads a logical 'node' block from the disk (i.e. via NAT indirection)
     async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error>;
+
+    /// Attempt to retrieve a key given its identifier.
+    fn get_key(&self, _identifier: &[u8; 16]) -> Option<&[u8; 64]> {
+        None
+    }
+
+    /// Attempt to obtain a decryptor for a given crypto context.
+    /// Will return None if the main key is not known.
+    fn get_decryptor_for_inode(&self, inode: &Inode) -> Option<crypto::PerFileDecryptor> {
+        if let Some(context) = inode.context {
+            if let Some(main_key) = self.get_key(&context.main_key_identifier) {
+                return Some(crypto::PerFileDecryptor::new(main_key, &context.nonce));
+            }
+        }
+        None
+    }
 }
 
 pub struct F2fsReader {
-    pub device: Box<dyn Device>,
-    pub superblock: SuperBlock,     // 1kb, points at checkpoints
-    pub checkpoint: CheckpointPack, // pair of a/b segments (alternating versions)
-    pub nat: Option<Nat>,
+    device: Box<dyn Device>,
+    pub superblock: SuperBlock, // 1kb, points at checkpoints
+    checkpoint: CheckpointPack, // pair of a/b segments (alternating versions)
+    nat: Option<Nat>,
 
     // A simple key store.
     keys: HashMap<[u8; 16], [u8; 64]>,
@@ -185,17 +200,6 @@ impl F2fsReader {
         .unwrap())
     }
 
-    /// Attempt to obtain a decryptor for a given crypto context.
-    /// Will return None if the main key is not known.
-    fn get_decryptor_for_inode(&self, inode: &Inode) -> Option<crypto::PerFileDecryptor> {
-        if let Some(context) = inode.context {
-            if let Some(main_key) = self.get_key(&context.main_key_identifier) {
-                return Some(crypto::PerFileDecryptor::new(main_key, &context.nonce));
-            }
-        }
-        None
-    }
-
     pub fn root_ino(&self) -> u32 {
         self.superblock.root_ino
     }
@@ -207,11 +211,6 @@ impl F2fsReader {
         println!("Adding key with identifier {}", hex::encode(identifier));
         self.keys.insert(identifier.clone(), main_key.clone());
         identifier
-    }
-
-    /// Attempt to retrieve a key given its identifier.
-    pub fn get_key(&self, identifier: &[u8; 16]) -> Option<&[u8; 64]> {
-        self.keys.get(identifier)
     }
 
     /// Read an inode for a directory and return entries.
@@ -251,6 +250,7 @@ impl F2fsReader {
         }
     }
 
+    /// Takes an inode for a symlink and the link as a set of bytes, decrypted if possible.
     pub fn read_symlink(&self, inode: &Inode) -> Result<Box<[u8]>, Error> {
         if let Some(inline_data) = inode.inline_data.as_deref() {
             let mut filename = inline_data.to_vec();
@@ -280,7 +280,6 @@ impl F2fsReader {
 
 #[async_trait]
 impl Reader for F2fsReader {
-    /// Read a raw block from disk.
     /// `block_addr` is the physical block offset on the device.
     async fn read_raw_block(&self, block_addr: u32) -> Result<Buffer<'_>, Error> {
         let mut block = self.device.allocate_buffer(BLOCK_SIZE).await;
@@ -291,10 +290,13 @@ impl Reader for F2fsReader {
         Ok(block)
     }
 
-    /// Reads a logical 'node' block from the disk (i.e. via NAT indirection)
     async fn read_node(&self, nid: u32) -> Result<Buffer<'_>, Error> {
         let nat_entry = self.get_nat_entry(nid).await?;
         self.read_raw_block(nat_entry.block_addr).await
+    }
+
+    fn get_key(&self, identifier: &[u8; 16]) -> Option<&[u8; 64]> {
+        self.keys.get(identifier)
     }
 }
 
@@ -385,12 +387,12 @@ mod test {
         assert!(inode.inline_data.is_none());
         for i in 0..8 {
             assert_eq!(
-                inode.read_data_block(&f2fs, i).await.expect("read data").as_slice(),
+                inode.read_data_block(&f2fs, i).await.expect("read data").unwrap().as_slice(),
                 &[0u8; BLOCK_SIZE]
             );
         }
         assert_eq!(
-            &inode.read_data_block(&f2fs, 8).await.expect("read data").as_slice()[..9],
+            &inode.read_data_block(&f2fs, 8).await.expect("read data").unwrap().as_slice()[..9],
             b"01234567\0"
         );
 
@@ -427,6 +429,7 @@ mod test {
         let data_blocks = inode.data_blocks();
         assert_eq!(data_blocks.len(), 7);
         assert_eq!(data_blocks[0].0, 0);
+        // Raw read of block.
         let block = f2fs.read_raw_block(data_blocks[0].1).await.expect("read sparse");
         assert_eq!(&block.as_slice()[..3], b"foo");
         // The following chain of blocks are designed to land in each of the self.nids[] ranges.
@@ -438,8 +441,22 @@ mod test {
         let block = f2fs.read_raw_block(data_blocks[5].1).await.expect("read sparse");
         assert_eq!(block.as_slice(), &[0; BLOCK_SIZE]);
         assert_eq!(data_blocks[6].0, 104671684);
-        let block = f2fs.read_raw_block(data_blocks[6].1).await.expect("read sparse");
-        assert_eq!(&block.as_slice()[..3], b"bar");
+        // Exercise helper method to read block.
+        assert_eq!(
+            &inode
+                .read_data_block(&f2fs, data_blocks[6].0)
+                .await
+                .expect("read data block")
+                .unwrap()
+                .as_slice()[..3],
+            b"bar"
+        );
+        // Exercise helper method on zero page. Expect to get back 'None'.
+        assert!(inode
+            .read_data_block(&f2fs, data_blocks[6].0 - 10)
+            .await
+            .expect("read data block")
+            .is_none());
     }
 
     #[fuchsia::test]
@@ -468,7 +485,18 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_fbe_metadata() {
+    async fn test_fbe() {
+        // Note: The synthetic filenames below are based on the nonce generated at file/directory
+        // creation time. This will differ each time a new image is generated.
+        // They can be extracted with a simple 'ls -l' by mounting the generated image. i.e.
+        //   $ zstd -d testdata/f2fs.img.st
+        //   $ sudo mount testdata/f2fs.img /mnt
+        //   $ ls /mnt/fscrypt -lR
+        let str_a = "1MlxmgAAAABGF-g8bpY6tCmZkSQ6fX5B"; // a
+        let str_b = "k-0PaAAAAAAsmkfe08Tct0sY3qOCTIz7"; // b
+        let str_symlink = "mL-MQAAAAAD5OtxaBPEyR4bDbxi9njs2"; // symlink
+        let bytes_symlink_content = b"AAAAAAAAAAAP9_L7hMspCYVAMJCQOi2N";
+
         let device = open_test_image("/pkg/testdata/f2fs.img.zst");
 
         let mut f2fs = F2fsReader::open_device(Box::new(device)).await.expect("open ok");
@@ -483,17 +511,18 @@ mod test {
             resolve_inode_path(&f2fs, "/fscrypt").await.expect("resolve encrypted dir");
         let entries = f2fs.readdir(fscrypt_dir_ino).await.expect("readdir");
         println!("entries {entries:?}");
-        resolve_inode_path(&f2fs, "/fscrypt/cDryWQAAAAC2r2Wiva8rXc37LNtT68RS")
+        resolve_inode_path(&f2fs, &format!("/fscrypt/{str_a}"))
             .await
             .expect("resolve encrypted dir");
-        let enc_symlink_ino = resolve_inode_path(&f2fs, "/fscrypt/cDryWQAAAAC2r2Wiva8rXc37LNtT68RS/X9wppgAAAAB8U-pbz-IdHG0UEqOCDTWe/KjTgzgAAAABJKjW51UQmpQ9Gz5oMq-9_")
-            .await
-            .expect("resolve encrypted symlink");
+        let enc_symlink_ino =
+            resolve_inode_path(&f2fs, &format!("/fscrypt/{str_a}/{str_b}/{str_symlink}"))
+                .await
+                .expect("resolve encrypted symlink");
         let symlink_inode =
             Inode::try_load(&f2fs, enc_symlink_ino).await.expect("load symlink inode");
         assert_eq!(
-            *f2fs.read_symlink(&symlink_inode).expect("read_symlink"),
-            *b"AAAAAAAAAABv1KhJ2kCMGviXSrK8wnfQ"
+            &*f2fs.read_symlink(&symlink_inode).expect("read_symlink"),
+            bytes_symlink_content
         );
 
         // ...now try with the key
@@ -507,6 +536,16 @@ mod test {
             !short_file.header.inline_flags.contains(inode::InlineFlags::Data),
             "encrypted files shouldn't be inlined"
         );
+        let short_data = short_file
+            .read_data_block(&f2fs, 0)
+            .await
+            .expect("read_data_block")
+            .expect("non-empty page");
+        assert_eq!(
+            &short_data.as_slice()[..short_file.header.size as usize],
+            b"test45678abcdef_12345678"
+        );
+
         let symlink_ino = resolve_inode_path(&f2fs, "/fscrypt/a/b/symlink")
             .await
             .expect("resolve fscrypt symlink");

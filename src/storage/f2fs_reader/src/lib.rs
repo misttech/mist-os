@@ -11,9 +11,7 @@ mod superblock;
 mod xattr;
 
 // Explicitly re-export things we want to expose.
-pub use crypto::Context;
 pub use dir::DirEntry;
 pub use inode::Inode;
 pub use reader::F2fsReader;
-pub use superblock::BLOCK_SIZE;
 pub use xattr::XattrEntry;

@@ -6,7 +6,7 @@ mod hkdf;
 
 use crate::xattr;
 use aes::cipher::inout::InOutBuf;
-use aes::cipher::{BlockDecryptMut, KeyIvInit};
+use aes::cipher::{BlockDecrypt, BlockDecryptMut, BlockEncrypt, KeyInit, KeyIvInit};
 use aes::Block;
 use anyhow::{anyhow, ensure, Error};
 use base64::engine::general_purpose::URL_SAFE;
@@ -73,7 +73,8 @@ impl Context {
 
 pub struct PerFileDecryptor {
     // For file contents (XTS)
-    // TODO(b/406351838): Implement XTS support.
+    key1: aes::Aes256,
+    key2: aes::Aes256,
     // For file names (CTS)
     cbc: cbc::Decryptor<aes::Aes256>,
     // For seeding SipHasher for directory entry hashes
@@ -86,12 +87,28 @@ impl PerFileDecryptor {
         let key = hkdf::fscrypt_hkdf::<64>(main_key, nonce, HKDF_CONTEXT_PER_FILE_ENC_KEY);
         let dirhash_key = hkdf::fscrypt_hkdf::<16>(main_key, nonce, HKDF_CONTEXT_DIRHASH_KEY);
         Self {
+            key1: aes::Aes256::new((&key[..32]).into()),
+            key2: aes::Aes256::new((&key[32..]).into()),
             cbc: cbc::Decryptor::<aes::Aes256>::new((&key[..32]).into(), (&[0u8; 16]).into()),
             dirhash_key,
         }
     }
 
-    // TODO(b/406351838): Implement XTS method for data blocks.
+    pub fn decrypt_data(&self, block_num: u32, buffer: &mut [u8]) {
+        assert_eq!((buffer.as_ptr() as usize) % 16, 0, "Require 16-byte aligned buffers");
+        assert_eq!(buffer.len() % 16, 0, "Require buffters be multiple of 16-bytes");
+        // TODO(b/406351838): Migrate to share implementation with fxfs-crypto?
+        let key1 = self.key1.clone();
+        let key2 = self.key2.clone();
+        let mut tweak: u128 = block_num as u128;
+        key2.encrypt_block(tweak.as_mut_bytes().into());
+        for chunk in buffer.chunks_exact_mut(16) {
+            *u128::mut_from_bytes(chunk).unwrap() ^= tweak;
+            key1.decrypt_block(chunk.into());
+            *u128::mut_from_bytes(chunk).unwrap() ^= tweak;
+            tweak = (tweak << 1) ^ (if tweak >> 127 != 0 { 0x87 } else { 0 });
+        }
+    }
 
     /// Decrypt a filename (from a dentry or symlink).
     pub fn decrypt_filename_data(&self, data: &mut [u8]) {
