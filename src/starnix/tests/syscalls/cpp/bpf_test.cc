@@ -95,20 +95,33 @@ namespace {
 
 int bpf(int cmd, union bpf_attr attr) { return (int)syscall(__NR_bpf, cmd, &attr, sizeof(attr)); }
 
-TEST(BpfTest, ArraySizeOverflow) {
+void TestMapCreationFail(uint32_t type, uint32_t key_size, uint32_t value_size,
+                         uint32_t max_entries, int expected_errno) {
   int result = bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                       .map_type = BPF_MAP_TYPE_ARRAY,
-                                       .key_size = sizeof(int),
-                                       .value_size = 1024,
-                                       .max_entries = INT_MAX / 8,
+                                       .map_type = type,
+                                       .key_size = key_size,
+                                       .value_size = value_size,
+                                       .max_entries = max_entries,
                                    });
   EXPECT_EQ(result, -1);
   // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (errno == EPERM) {
     GTEST_SKIP() << "Permission denied.";
   }
-  EXPECT_EQ(errno, ENOMEM);
+  EXPECT_EQ(errno, expected_errno);
 }
+
+TEST(BpfTest, ArraySizeOverflow) {
+  TestMapCreationFail(BPF_MAP_TYPE_ARRAY, sizeof(int), 1024, INT_MAX / 8, ENOMEM);
+}
+
+TEST(BpfTest, ArraySizeZero) {
+  TestMapCreationFail(BPF_MAP_TYPE_ARRAY, sizeof(int), 1024, 0, EINVAL);
+}
+
+TEST(BpfTest, HashMapSizeZero) { TestMapCreationFail(BPF_MAP_TYPE_HASH, 1, 1024, 0, EINVAL); }
+
+TEST(BpfTest, HashMapZeroKeySize) { TestMapCreationFail(BPF_MAP_TYPE_HASH, 0, 1024, 10, EINVAL); }
 
 class BpfMapTest : public testing::Test {
  protected:

@@ -89,6 +89,9 @@ pub struct HashMap {
 
 impl HashMap {
     pub fn new(schema: &MapSchema) -> Result<Self, MapError> {
+        if schema.key_size == 0 || schema.max_entries == 0 {
+            return Err(MapError::InvalidParam);
+        }
         let buffer_size = compute_map_storage_size(schema)? as usize;
         let data = new_pinned_buffer(buffer_size);
         Ok(Self {

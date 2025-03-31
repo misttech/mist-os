@@ -49,6 +49,9 @@ impl Array {
         let size = bytes_per_element
             .checked_mul(schema.max_entries as usize)
             .ok_or(MapError::InvalidParam)?;
+        if size == 0 {
+            return Err(MapError::InvalidParam);
+        }
         if size > Self::MAX_ARRAY_SIZE {
             return Err(MapError::NoMemory);
         }

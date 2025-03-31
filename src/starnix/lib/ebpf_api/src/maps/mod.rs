@@ -190,7 +190,7 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
         }
         bpf_map_type_BPF_MAP_TYPE_SK_STORAGE => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SK_STORAGE");
-            Ok(Box::pin(array::Array::new(schema)?))
+            Ok(Box::pin(array::Array::new(&MapSchema { max_entries: 1, ..*schema })?))
         }
 
         // Unimplemented types
