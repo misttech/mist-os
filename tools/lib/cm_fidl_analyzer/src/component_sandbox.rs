@@ -6,6 +6,8 @@ use crate::component_instance::ComponentInstanceForAnalyzer;
 use crate::component_model::DynamicDictionaryConfig;
 use ::routing::bedrock::aggregate_router::AggregateSource;
 use ::routing::bedrock::program_output_dict;
+use ::routing::bedrock::request_metadata::event_stream_metadata;
+use ::routing::bedrock::sandbox_construction::EventStreamSourceRouter;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
 use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
@@ -23,6 +25,7 @@ use cm_config::RuntimeConfig;
 use cm_rust::{CapabilityTypeName, ComponentDecl, DeliveryType, DictionaryDecl, ProtocolDecl};
 use cm_types::Path;
 use fidl::endpoints::DiscoverableProtocolMarker;
+use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{future, FutureExt};
 use moniker::{ChildName, ExtendedMoniker};
 use router_error::RouterError;
@@ -334,4 +337,40 @@ pub fn new_aggregate_router(
     capability_source: CapabilitySource,
 ) -> Router<DirEntry> {
     new_debug_only_specific_router(capability_source)
+}
+
+pub fn new_event_stream_multiplexing_router(
+    sources: Vec<EventStreamSourceRouter>,
+) -> Router<Connector> {
+    Router::new(move |request: Option<sandbox::Request>, debug: bool| {
+        assert!(debug, "non-debug routing is unsupported");
+        let sources = sources.clone();
+        async move {
+            let request = request.ok_or(RouterError::InvalidArgs)?;
+            let mut routing_tasks = FuturesUnordered::new();
+            for EventStreamSourceRouter { router, availability, route_metadata, .. } in
+                sources.iter()
+            {
+                let metadata = event_stream_metadata(*availability, route_metadata.clone());
+                let request = Request { metadata, target: request.target.clone() };
+                routing_tasks.push(router.route(Some(request), true));
+            }
+            let mut any_result = None;
+            while let Some(result) = routing_tasks.next().await {
+                match result {
+                    Ok(result) => any_result = Some(result),
+                    Err(e) => return Err(e),
+                }
+            }
+            match any_result {
+                Some(RouterResponse::Debug(data)) => Ok(RouterResponse::Debug(data)),
+                Some(RouterResponse::Unavailable) => Ok(RouterResponse::Unavailable),
+                Some(RouterResponse::Capability(_)) => {
+                    panic!("debug route returned capability, which is disallowed")
+                }
+                None => panic!("no result produced, is sources empty?"),
+            }
+        }
+        .boxed()
+    })
 }

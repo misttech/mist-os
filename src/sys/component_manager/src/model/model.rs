@@ -12,6 +12,7 @@ use crate::model::token::InstanceRegistry;
 use cm_config::RuntimeConfig;
 use cm_types::Url;
 use errors::ModelError;
+use fuchsia_inspect::Inspector;
 use log::warn;
 use routing::bedrock::structured_dict::ComponentInput;
 use std::sync::Arc;
@@ -30,6 +31,9 @@ pub struct ModelParams {
     pub top_instance: Arc<ComponentManagerInstance>,
     /// The [`InstanceRegistry`] to attach to the model.
     pub instance_registry: Arc<InstanceRegistry>,
+    /// The inspector instance which controls what information is exposed by component manager over
+    /// inspect.
+    pub inspector: Inspector,
     /// The execution scope to assign to components, for dependency injection in tests.
     /// If `None`, use the default.
     #[cfg(test)]
@@ -61,6 +65,7 @@ impl Model {
         let context = Arc::new(ModelContext::new(
             params.runtime_config,
             params.instance_registry,
+            params.inspector,
             #[cfg(test)]
             params.scope_factory,
         )?);

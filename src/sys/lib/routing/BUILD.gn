@@ -75,6 +75,7 @@ rustc_library("routing") {
     "src/bedrock/with_availability.rs",
     "src/bedrock/with_default.rs",
     "src/bedrock/with_error_reporter.rs",
+    "src/bedrock/with_event_stream_scope.rs",
     "src/bedrock/with_policy_check.rs",
     "src/bedrock/with_porcelain_type.rs",
     "src/bedrock/with_rights.rs",
