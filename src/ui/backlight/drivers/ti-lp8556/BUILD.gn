@@ -28,30 +28,45 @@ fidl("fuchsia.hardware.adhoc.lp8556") {
   ]
 }
 
-fuchsia_cc_driver("ti-lp8556-driver") {
-  legacy = true
-  output_name = "ti-lp8556"
+source_set("metadata") {
+  sources = [ "ti-lp8556Metadata.h" ]
+}
+
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "ti-lp8556.cc" ]
+  sources = [
+    "ti-lp8556.cc",
+    "ti-lp8556.h",
+  ]
   deps = [
-    ":fuchsia.hardware.adhoc.lp8556_cpp",
-    ":ti-lp8556-bind",
-    "//sdk/lib/fidl",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
     "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
+  ]
+  public_deps = [
+    ":fuchsia.hardware.adhoc.lp8556_cpp",
+    ":metadata",
+    "//src/devices/i2c/lib/device-protocol-i2c-channel",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
+
+fuchsia_cc_driver("ti-lp8556-driver") {
+  legacy = true
+  output_name = "ti-lp8556"
+  deps = [
+    ":common",
+    ":ti-lp8556-bind",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -73,35 +88,19 @@ fuchsia_driver_package("package") {
 
 test("ti-lp8556-test") {
   output_name = "ti-lp8556-test"
-  sources = [
-    "ti-lp8556-test.cc",
-    "ti-lp8556.cc",
-  ]
+  sources = [ "ti-lp8556-test.cc" ]
   deps = [
-    ":fuchsia.hardware.adhoc.lp8556_cpp",
-    ":ti-lp8556-bind",
+    ":common",
     "//sdk/lib/async-loop",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/mock-mmio/cpp",
-    "//sdk/lib/fidl",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",
-    "//src/devices/lib/mmio",
     "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 

@@ -153,6 +153,7 @@ fuchsia_cc_driver("nelson-module-driver") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
+    "//src/ui/backlight/drivers/ti-lp8556:metadata",
 
     # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
