@@ -166,3 +166,16 @@ impl Into<String> for ProxyFilename {
         URL_SAFE.encode(bytes)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_main_key_to_identifier() {
+        // Nb: Hard coded test vector from an fscrypt instance.
+        let key_digest = "dc34d175ba21b27e2e92829b0dc12666ce8bfbcbae387014c6bb0d8b7678dafa6466bd7565b1a5999cd3f8a39a470528fa6816768e6985f0b10804af7d657810";
+        let key: [u8; 64] = hex::decode(&key_digest).unwrap().try_into().unwrap();
+        assert_eq!(hex::encode(main_key_to_identifier(&key)), "fc7f69a149f89a7529374cf9e96a6d13");
+    }
+}

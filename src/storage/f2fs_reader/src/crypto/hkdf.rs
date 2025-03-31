@@ -12,7 +12,7 @@ pub fn fscrypt_hkdf<const L: usize>(
     context: u8,
 ) -> [u8; L] {
     let mut out = [0u8; L];
-    let mut fscrypt_info = Vec::new();
+    let mut fscrypt_info = Vec::with_capacity(9 + info.len());
     fscrypt_info.extend_from_slice(b"fscrypt\0");
     fscrypt_info.push(context);
     debug_assert_eq!(fscrypt_info.len(), 9);
@@ -33,22 +33,21 @@ fn hkdf<const L: usize>(initial_key_material: &[u8], info: &[u8], out: &mut [u8;
     hmac.update(initial_key_material);
     let prk = hmac.finalize().into_bytes();
     // HKDF-expand
-    let n = (L + HASH_LEN - 1) / HASH_LEN;
-    let mut t: Vec<Vec<u8>> = Vec::new();
-    t.push(vec![]);
-    for i in 0..n {
-        let mut payload = Vec::new();
-        payload.extend_from_slice(&t[i]);
-        payload.extend_from_slice(info);
-        payload.push((i + 1) as u8);
+    let mut last = [].as_slice();
+    let mut out = out.as_mut_slice();
+    let mut i = 1;
+    loop {
         let mut hmac = hmac::Hmac::<sha2::Sha512>::new_from_slice(&prk).unwrap();
-        hmac.update(&payload[..]);
+        hmac.update(&last);
+        hmac.update(&info);
+        hmac.update(&[i as u8]);
         let val = hmac.finalize().into_bytes();
-        t.push(val.to_vec());
+        if out.len() < HASH_LEN {
+            out.copy_from_slice(&val.as_slice()[..out.len()]);
+            break;
+        }
+        out[..HASH_LEN].copy_from_slice(&val.as_slice());
+        (last, out) = out.split_at_mut(HASH_LEN);
+        i += 1;
     }
-    let mut result = Vec::new();
-    for slice in t {
-        result.extend_from_slice(&slice);
-    }
-    out.copy_from_slice(&result[..L]);
 }
