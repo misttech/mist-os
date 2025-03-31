@@ -801,11 +801,21 @@ function track-build-event {
   local args_json2="${args_json:500:500}"
 
   if [[ "${FUCHSIA_FX_ITERATIVE}" -eq 1 ]]; then
-    env_flags="${env_flags}|iterative"
+    env_flags="${env_flags}+iterative"
+  else
+    env_flags="${env_flags}-iterative"
   fi
 
   if [[ "${FUCHSIA_FX_TEST_RUN}" -eq 1 ]]; then
-    env_flags="${env_flags}|test"
+    env_flags="${env_flags}+test"
+  else
+    env_flags="${env_flags}-test"
+  fi
+
+  if [[ "${FUCHSIA_FX_MULTI_RUN}" -eq 1 ]]; then
+    env_flags="${env_flags}+multi"
+  else
+    env_flags="${env_flags}-multi"
   fi
 
   event_params=$(fx-command-run jq -c -n \
