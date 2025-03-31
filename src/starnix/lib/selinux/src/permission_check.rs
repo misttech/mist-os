@@ -65,6 +65,36 @@ impl<'a> PermissionCheck<'a> {
         )
     }
 
+    /// Returns whether the `source_sid` has both the `ioctl` permission and the specified extended
+    /// permission on `target_sid`, and whether the decision should be audited.
+    ///
+    /// A request is allowed if the ioctl permission is `allow`ed and either the numeric ioctl
+    /// extended permission is `allowxperm`, or ioctl extended permissions are not filtered for this
+    /// domain.
+    ///
+    /// A granted request is audited if the ioctl permission is `auditallow` and the numeric ioctl
+    /// extended permission is `auditallowxperm`.
+    ///
+    /// A denied request is audited if the ioctl permission is `dontaudit` or the numeric ioctl
+    /// extended permission is `dontauditxperm`.
+    pub fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        permission: P,
+        ioctl: u16,
+    ) -> PermissionCheckResult {
+        has_ioctl_permission(
+            self.security_server.is_enforcing(),
+            self.access_vector_cache,
+            self.security_server,
+            source_sid,
+            target_sid,
+            permission,
+            ioctl,
+        )
+    }
+
     // TODO: https://fxbug.dev/362699811 - Remove this once `SecurityServer` APIs such as `sid_to_security_context()`
     // are exposed via a trait rather than directly by that implementation.
     pub fn security_server(&self) -> &SecurityServer {
@@ -116,7 +146,6 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         access_vector_computer.access_vector_from_permissions(&[permission])
     {
         let permit = permission_access_vector & decision.allow == permission_access_vector;
-
         let audit = if permit {
             permission_access_vector & decision.auditallow != AccessVector::NONE
         } else {
@@ -146,15 +175,88 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     result
 }
 
+fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    is_enforcing: bool,
+    query: &impl Query,
+    access_vector_computer: &impl AccessVectorComputer,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: P,
+    ioctl: u16,
+) -> PermissionCheckResult {
+    let target_class = permission.class();
+
+    let permission_decision =
+        query.compute_access_decision(source_sid, target_sid, target_class.into());
+
+    let [ioctl_postfix, ioctl_prefix] = ioctl.to_le_bytes();
+    let xperm_decision = query.compute_ioctl_access_decision(
+        source_sid,
+        target_sid,
+        target_class.into(),
+        ioctl_prefix,
+    );
+
+    let permission_result = if let Some(permission_access_vector) =
+        access_vector_computer.access_vector_from_permissions(&[permission])
+    {
+        let permit =
+            permission_access_vector & permission_decision.allow == permission_access_vector;
+        let audit = if permit {
+            permission_access_vector & permission_decision.auditallow != AccessVector::NONE
+        } else {
+            permission_access_vector & permission_decision.auditdeny != AccessVector::NONE
+        };
+        println!("permission_access_vector is some; permit: {}, audit: {}", permit, audit);
+        PermissionCheckResult { permit, audit, todo_bug: None }
+    } else {
+        PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+    };
+
+    let xperm_result = {
+        let permit = xperm_decision.allow.contains(ioctl_postfix);
+        let audit = if permit {
+            xperm_decision.auditallow.contains(ioctl_postfix)
+        } else {
+            xperm_decision.auditdeny.contains(ioctl_postfix)
+        };
+        println!("xperm result: permit: {}, audit: {}", permit, audit);
+        PermissionCheckResult { permit, audit, todo_bug: None }
+    };
+
+    let mut result = PermissionCheckResult {
+        permit: permission_result.permit && xperm_result.permit,
+        audit: permission_result.audit && xperm_result.audit,
+        todo_bug: None,
+    };
+
+    if !result.permit {
+        if !is_enforcing {
+            result.permit = true;
+        } else if permission_decision.flags & SELINUX_AVD_FLAGS_PERMISSIVE != 0 {
+            result.permit = true;
+        } else if permission_decision.todo_bug.is_some() {
+            // Currently we can make an exception for the overall `ioctl` permission,
+            // but not for specific ioctl xperms.
+            result.permit = true;
+            result.todo_bug = permission_decision.todo_bug;
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
-    use crate::{AbstractObjectClass, ProcessPermission};
+    use crate::{
+        AbstractObjectClass, CommonFilePermission, CommonFsNodePermission, FileClass,
+        FilePermission, ProcessPermission,
+    };
 
-    use std::any::Any;
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::LazyLock;
@@ -171,15 +273,14 @@ mod tests {
     fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
         permission: P,
     ) -> AccessVector {
-        let any = &permission as &dyn Any;
-        let permission_ref = match any.downcast_ref::<ProcessPermission>() {
-            Some(permission_ref) => permission_ref,
-            None => return AccessVector::NONE,
-        };
-
-        match permission_ref {
-            ProcessPermission::Fork => ACCESS_VECTOR_0001,
-            ProcessPermission::Transition => ACCESS_VECTOR_0010,
+        match permission.into() {
+            // Process class permissions
+            Permission::Process(ProcessPermission::Fork) => ACCESS_VECTOR_0001,
+            Permission::Process(ProcessPermission::Transition) => ACCESS_VECTOR_0010,
+            // File class permissions
+            Permission::File(FilePermission::Common(CommonFilePermission::Common(
+                CommonFsNodePermission::Ioctl,
+            ))) => ACCESS_VECTOR_0001,
             _ => AccessVector::NONE,
         }
     }
@@ -231,14 +332,12 @@ mod tests {
 
         fn compute_ioctl_access_decision(
             &self,
-            _source_sid: SecurityId,
-            _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
-            _ioctl_prefix: u8,
+            source_sid: SecurityId,
+            target_sid: SecurityId,
+            target_class: AbstractObjectClass,
+            ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
-            // ioctl access decisions are only checked if the `ioctl` permission is allowed, which is
-            // never the case for `DenyAllPermissions`.
-            unreachable!()
+            self.0.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
         }
     }
 
@@ -342,5 +441,60 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn has_ioctl_permission_enforcing() {
+        let deny_all: DenyAllPermissions = Default::default();
+        let allow_all: AllowAllPermissions = Default::default();
+        let permission = CommonFsNodePermission::Ioctl.for_class(FileClass::File);
+
+        // DenyAllPermissions denies.
+        assert_eq!(
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ true,
+                &deny_all,
+                &deny_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission.clone(),
+                0xabcd
+            )
+        );
+        // AllowAllPermissions allows.
+        assert_eq!(
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ true,
+                &allow_all,
+                &allow_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission,
+                0xabcd
+            )
+        );
+    }
+
+    #[test]
+    fn has_ioctl_permission_not_enforcing() {
+        let deny_all: DenyAllPermissions = Default::default();
+        let permission = CommonFsNodePermission::Ioctl.for_class(FileClass::File);
+
+        // DenyAllPermissions denies, but the permission is allowed when the security server
+        // is not in enforcing mode. The decision should still be audited.
+        assert_eq!(
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ false,
+                &deny_all,
+                &deny_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission,
+                0xabcd
+            )
+        );
     }
 }
