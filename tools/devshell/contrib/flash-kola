@@ -47,7 +47,7 @@ ${FASTBOOT} flash dtbo_b "$DTBO_PATH"
 # pick up the new firmware we just flashed. For builds that don't put firmware
 # in boot, this is still fine and just triggers a reboot now rather than at the
 # end of flashing.
-fx-info "Rebooting into the latest bootloader"
+fx-info "Rebooting to bootloader"
 ${FASTBOOT} reboot bootloader
 # Pause to make sure fastboot actually drops the device; sometimes without this
 # the next fastboot command will execute before the host realizes the device is
