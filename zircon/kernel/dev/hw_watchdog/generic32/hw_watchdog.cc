@@ -41,6 +41,9 @@ class GenericWatchdog32 {
   // Actions
   void Pet() TA_EXCL(lock_) {
     Guard<SpinLock, IrqSave> guard{&lock_};
+    if (!is_enabled_) {
+      return;
+    }
     PetLocked();
   }
 
