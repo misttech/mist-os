@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/media/codec_impl/codec_diagnostics.h>
 #include <lib/trace/event.h>
 #include <lib/zx/channel.h>
@@ -942,11 +943,13 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   TRACE_DURATION("media", "AmlogicVideo::InitRegisters");
   parent_ = parent;
 
-  pdev_ = ddk::PDevFidl::FromFragment(parent_);
-  if (!pdev_.is_valid()) {
-    DECODE_ERROR("Failed to get pdev protocol");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
+  if (pdev_client_end.is_error()) {
+    DECODE_ERROR("Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   auto sysmem_result = ConnectToSysmem();
   if (sysmem_result.is_error()) {
@@ -1023,65 +1026,76 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   }
 
   static constexpr uint32_t kTrustedOsSmcIndex = 0;
-  status = pdev_.GetSmc(kTrustedOsSmcIndex, &secure_monitor_);
-  if (status != ZX_OK) {
+  zx::result secure_monitor = pdev.GetSmc(kTrustedOsSmcIndex);
+  if (secure_monitor.is_ok()) {
+    secure_monitor_ = std::move(secure_monitor.value());
+  } else {
     // On systems where there's no protected memory it's fine if we can't get
     // a handle to the secure monitor.
     LOG(INFO, "amlogic-video: Unable to get secure monitor handle, assuming no protected memory");
   }
 
-  std::optional<fdf::MmioBuffer> cbus_mmio;
-  status = pdev_.MapMmio(kCbus, &cbus_mmio);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed map cbus");
-    return ZX_ERR_NO_MEMORY;
+  zx::result cbus_mmio = pdev.MapMmio(kCbus);
+  if (cbus_mmio.is_error()) {
+    DECODE_ERROR("Failed to map cbus mmio: %s", cbus_mmio.status_string());
+    return cbus_mmio.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev_.MapMmio(kDosbus, &mmio);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed map dosbus");
-    return ZX_ERR_NO_MEMORY;
+  zx::result dosbus_mmio = pdev.MapMmio(kDosbus);
+  if (dosbus_mmio.is_error()) {
+    DECODE_ERROR("Failed to map dosbus mmio: %s", dosbus_mmio.status_string());
+    return dosbus_mmio.status_value();
   }
-  dosbus_.emplace(*std::move(mmio));
-  status = pdev_.MapMmio(kHiubus, &mmio);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed map hiubus");
-    return ZX_ERR_NO_MEMORY;
+  dosbus_.emplace(std::move(dosbus_mmio.value()));
+
+  zx::result hiubus_mmio = pdev.MapMmio(kHiubus);
+  if (hiubus_mmio.is_error()) {
+    DECODE_ERROR("Failed to map hiubus mmio: %s", hiubus_mmio.status_string());
+    return hiubus_mmio.status_value();
   }
-  hiubus_.emplace(*std::move(mmio));
-  status = pdev_.MapMmio(kAobus, &mmio);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed map aobus");
-    return ZX_ERR_NO_MEMORY;
+  hiubus_.emplace(std::move(hiubus_mmio.value()));
+
+  zx::result aobus_mmio = pdev.MapMmio(kAobus);
+  if (aobus_mmio.is_error()) {
+    DECODE_ERROR("Failed to map aobus mmio: %s", aobus_mmio.status_string());
+    return aobus_mmio.status_value();
   }
-  aobus_.emplace(*std::move(mmio));
-  status = pdev_.MapMmio(kDmc, &mmio);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed map dmc");
-    return ZX_ERR_NO_MEMORY;
+  aobus_.emplace(std::move(aobus_mmio.value()));
+
+  zx::result dmc_mmio = pdev.MapMmio(kDmc);
+  if (dmc_mmio.is_error()) {
+    DECODE_ERROR("Failed to map dmc mmio: %s", dmc_mmio.status_string());
+    return dmc_mmio.status_value();
   }
-  dmc_.emplace(*std::move(mmio));
-  status = pdev_.GetInterrupt(kParserIrq, 0, &parser_interrupt_handle_);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed get parser interrupt");
-    return ZX_ERR_NO_MEMORY;
+  dmc_.emplace(std::move(dmc_mmio.value()));
+
+  zx::result parser_interrupt = pdev.GetInterrupt(kParserIrq);
+  if (parser_interrupt.is_error()) {
+    DECODE_ERROR("Failed to get parser interrupt: %s", parser_interrupt.status_string());
+    return parser_interrupt.status_value();
   }
-  status = pdev_.GetInterrupt(kDosMbox0Irq, 0, &vdec0_interrupt_handle_);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed get vdec0 interrupt");
-    return ZX_ERR_NO_MEMORY;
+  parser_interrupt_handle_ = std::move(parser_interrupt.value());
+
+  zx::result vdec0_interrupt = pdev.GetInterrupt(kDosMbox0Irq);
+  if (vdec0_interrupt.is_error()) {
+    DECODE_ERROR("Failed to get vdec0 interrupt: %s", vdec0_interrupt.status_string());
+    return vdec0_interrupt.status_value();
   }
-  status = pdev_.GetInterrupt(kDosMbox1Irq, 0, &vdec1_interrupt_handle_);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed get vdec interrupt");
-    return ZX_ERR_NO_MEMORY;
+  vdec0_interrupt_handle_ = std::move(vdec0_interrupt.value());
+
+  zx::result vdec1_interrupt = pdev.GetInterrupt(kDosMbox1Irq);
+  if (vdec1_interrupt.is_error()) {
+    DECODE_ERROR("Failed to get vdec1 interrupt: %s", vdec1_interrupt.status_string());
+    return vdec1_interrupt.status_value();
   }
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed get bti");
-    return ZX_ERR_NO_MEMORY;
+  vdec1_interrupt_handle_ = std::move(vdec1_interrupt.value());
+
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    DECODE_ERROR("Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
   int64_t reset_register_offset = 0x1100 * 4;
   int64_t parser_register_offset = 0;
