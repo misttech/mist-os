@@ -784,7 +784,7 @@ impl FileOps for MagmaFile {
                         b"magma semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
                     let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
 
-                    let file = Anon::new_file(
+                    let file = Anon::new_private_file(
                         current_task,
                         Box::new(sync_file),
                         OpenFlags::RDWR,
