@@ -72,6 +72,7 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
     filesystems = {
       fvm = {
         sparse_output = {
