@@ -730,6 +730,7 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         BPF_FUSE_ID.clone(),
         vec![
+            scalar_field(0, offset_of!(fuse_bpf_args, out_args)),
             FieldDescriptor {
                 offset: (offset_of!(fuse_bpf_args, out_args) + offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
