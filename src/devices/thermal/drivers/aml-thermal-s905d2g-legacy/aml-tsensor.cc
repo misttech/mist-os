@@ -5,7 +5,7 @@
 #include "aml-tsensor.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>
@@ -344,37 +344,43 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) const {
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
                                fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-voltage: failed to get pdev protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Map amlogic temperature sensor peripheral control registers.
-  zx_status_t status = pdev.MapMmio(kPllMmio, &pll_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result pll_mmio = pdev.MapMmio(kPllMmio);
+  if (pll_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map pll mmio: %s", pll_mmio.status_string());
+    return pll_mmio.status_value();
   }
+  pll_mmio_.emplace(std::move(pll_mmio.value()));
 
-  status = pdev.MapMmio(kTrimMmio, &trim_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result trim_mmio = pdev.MapMmio(kTrimMmio);
+  if (trim_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map trim mmio: %s", trim_mmio.status_string());
+    return trim_mmio.status_value();
   }
+  trim_mmio_.emplace(std::move(trim_mmio.value()));
 
-  status = pdev.MapMmio(kHiuMmio, &hiu_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result hiu_mmio = pdev.MapMmio(kHiuMmio);
+  if (hiu_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map hiu mmio: %s", hiu_mmio.status_string());
+    return hiu_mmio.status_value();
   }
+  hiu_mmio_.emplace(std::move(hiu_mmio.value()));
 
   // Map tsensor interrupt.
-  status = pdev.GetInterrupt(0, 0, &tsensor_irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map tsensor interrupt");
-    return status;
+  zx::result tsensor_irq = pdev.GetInterrupt(0);
+  if (tsensor_irq.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", tsensor_irq.status_string());
+    return tsensor_irq.status_value();
   }
+  tsensor_irq_ = std::move(tsensor_irq.value());
 
   return InitSensor(thermal_config);
 }
