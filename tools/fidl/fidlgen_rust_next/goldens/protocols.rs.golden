@@ -5386,6 +5386,16 @@ where
     }
 }
 
+pub type WithErrorSyntaxErrorAsPrimitiveResponse = ();
+
+/// The wire type corresponding to [`WithErrorSyntaxErrorAsPrimitiveResponse`].
+pub type WireWithErrorSyntaxErrorAsPrimitiveResponse = ();
+
+pub type WithErrorSyntaxErrorAsEnumResponse = ();
+
+/// The wire type corresponding to [`WithErrorSyntaxErrorAsEnumResponse`].
+pub type WireWithErrorSyntaxErrorAsEnumResponse = ();
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithErrorSyntaxHandleInResultResponse {
@@ -5518,6 +5528,10 @@ pub mod with_error_syntax {
 
         pub use crate::ErrorEnum;
 
+        pub use crate::WithErrorSyntaxErrorAsEnumResponse;
+
+        pub use crate::WithErrorSyntaxErrorAsPrimitiveResponse;
+
         pub use crate::WithErrorSyntaxHandleInResultResponse;
 
         pub use crate::WithErrorSyntaxResponseAsStructResponse;
@@ -5547,7 +5561,10 @@ pub mod with_error_syntax {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireU32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireWithErrorSyntaxErrorAsPrimitiveResponse,
+            ::fidl_next::WireU32,
+        >;
     }
 
     pub struct ErrorAsEnum;
@@ -5559,7 +5576,10 @@ pub mod with_error_syntax {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), crate::WireErrorEnum>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireWithErrorSyntaxErrorAsEnumResponse,
+            crate::WireErrorEnum,
+        >;
     }
 
     pub struct HandleInResult;

@@ -22,6 +22,8 @@
             {% let strct = schema.struct_declarations[ident] %}
             {% if !strct.is_empty_success_struct %}
                 {{ self.strct(schema.struct_declarations[ident]) }}
+            {% else %}
+                {{ self.empty_success_struct(schema.struct_declarations[ident]) }}
             {% endif %}
         {% when DeclType::Table %}
             {{ self.table(schema.table_declarations[ident]) }}

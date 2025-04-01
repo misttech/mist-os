@@ -42,14 +42,10 @@
             {%- when DeclType::Enum -%} {{ context.natural_id(identifier) }}
             {%- when DeclType::Table -%} {{ context.natural_id(identifier) }}
             {%- when DeclType::Struct -%}
-                {%- if identifier.library() != context.schema.name || !context.schema.struct_declarations[identifier].is_empty_success_struct -%}
-                    {%- if nullable -%}
-                        Option<Box<{{ context.natural_id(identifier) }}>>
-                    {%- else -%}
-                        {{ context.natural_id(identifier) }}
-                    {%- endif -%}
+                {%- if nullable -%}
+                    Option<Box<{{ context.natural_id(identifier) }}>>
                 {%- else -%}
-                    ()
+                    {{ context.natural_id(identifier) }}
                 {%- endif -%}
             {%- when DeclType::Union -%}
                 {%- if nullable -%}

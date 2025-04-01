@@ -531,6 +531,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarDriverProtocolStrictTwoWa
     }
 }
 
+pub type UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -1082,6 +1087,8 @@ pub mod unknown_interactions_ajar_driver_protocol {
 
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse;
@@ -1170,7 +1177,10 @@ pub mod unknown_interactions_ajar_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -2278,6 +2288,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictTwoWayTable
             .finish()
     }
 }
+
+pub type UnknownInteractionsAjarProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse = ();
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -3859,6 +3874,8 @@ pub mod unknown_interactions_ajar_protocol {
 
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse;
@@ -3947,7 +3964,10 @@ pub mod unknown_interactions_ajar_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -5419,6 +5439,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedDriverProtocolStrictTwo
     }
 }
 
+pub type UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -5980,6 +6005,8 @@ pub mod unknown_interactions_closed_driver_protocol {
 
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse;
@@ -6057,7 +6084,10 @@ pub mod unknown_interactions_closed_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -7137,6 +7167,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictTwoWayTab
     }
 }
 
+pub type UnknownInteractionsClosedProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
@@ -8203,6 +8238,8 @@ pub mod unknown_interactions_closed_protocol {
 
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse;
@@ -8279,7 +8316,10 @@ pub mod unknown_interactions_closed_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -9503,6 +9543,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayTab
     }
 }
 
+pub type UnknownInteractionsDriverProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -10027,6 +10072,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayTab
     }
 }
 
+pub type UnknownInteractionsDriverProtocolFlexibleTwoWayResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayResponse`].
+pub type WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
@@ -10546,6 +10596,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolFlexibleTwoWayT
             .finish()
     }
 }
+
+pub type UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse`].
+pub type WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse = ();
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -11097,6 +11152,8 @@ pub mod unknown_interactions_driver_protocol {
 
         pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse;
@@ -11108,6 +11165,10 @@ pub mod unknown_interactions_driver_protocol {
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
+
+        pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
 
         pub use crate::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse;
 
@@ -11197,7 +11258,10 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -11254,7 +11318,9 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexible<()>;
+        type Response = ::fidl_next::WireFlexible<
+            crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse,
+        >;
     }
 
     pub struct FlexibleTwoWayFields;
@@ -11308,7 +11374,10 @@ pub mod unknown_interactions_driver_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexibleResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireFlexibleResult<
+            crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct FlexibleTwoWayFieldsErr;
@@ -12791,6 +12860,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayTableResp
     }
 }
 
+pub type UnknownInteractionsProtocolStrictTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayErrResponse`].
+pub type WireUnknownInteractionsProtocolStrictTwoWayErrResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
@@ -13305,6 +13379,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayTableErrR
     }
 }
 
+pub type UnknownInteractionsProtocolFlexibleTwoWayResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayResponse`].
+pub type WireUnknownInteractionsProtocolFlexibleTwoWayResponse = ();
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
@@ -13816,6 +13895,11 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolFlexibleTwoWayTableRe
             .finish()
     }
 }
+
+pub type UnknownInteractionsProtocolFlexibleTwoWayErrResponse = ();
+
+/// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayErrResponse`].
+pub type WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse = ();
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -15366,6 +15450,8 @@ pub mod unknown_interactions_protocol {
 
         pub use crate::UnknownInteractionsProtocolStrictTwoWayUnionResponse;
 
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayErrResponse;
+
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse;
 
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse;
@@ -15377,6 +15463,10 @@ pub mod unknown_interactions_protocol {
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse;
 
         pub use crate::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse;
+
+        pub use crate::UnknownInteractionsProtocolFlexibleTwoWayResponse;
+
+        pub use crate::UnknownInteractionsProtocolStrictTwoWayErrResponse;
 
         pub use crate::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse;
 
@@ -15466,7 +15556,10 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireResult<
+            crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct StrictTwoWayFieldsErr;
@@ -15523,7 +15616,8 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexible<()>;
+        type Response =
+            ::fidl_next::WireFlexible<crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse>;
     }
 
     pub struct FlexibleTwoWayFields;
@@ -15577,7 +15671,10 @@ pub mod unknown_interactions_protocol {
 
         type Request = ();
 
-        type Response = ::fidl_next::WireFlexibleResult<(), ::fidl_next::WireI32>;
+        type Response = ::fidl_next::WireFlexibleResult<
+            crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse,
+            ::fidl_next::WireI32,
+        >;
     }
 
     pub struct FlexibleTwoWayFieldsErr;

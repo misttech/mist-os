@@ -233,6 +233,7 @@ template!(enm(enm: Enum) -> EnumTemplate = "enum.askama");
 template!(protocol(protocol: Protocol) -> ProtocolTemplate = "protocol.askama");
 template!(service(service: Service) -> ServiceTemplate = "service.askama");
 template!(strct(strct: Struct) -> StructTemplate = "struct.askama");
+template!(empty_success_struct(strct: Struct) -> EmptySuccessStructTemplate = "empty_success_struct.askama");
 template!(table(table: Table) -> TableTemplate = "table.askama");
 template!(union(union: Union) -> UnionTemplate = "union.askama");
 
@@ -273,17 +274,8 @@ impl ProtocolTemplate<'_> {
             if let Some(success) = method.maybe_response_success_type.as_deref() {
                 // The response type is a result, so we only want to include the success and error
                 // types in the prelude
-                if let Some(ident) = get_identifier(success) {
-                    if self
-                        .context
-                        .schema
-                        .struct_declarations
-                        .get(&ident)
-                        .is_none_or(|strct| !strct.is_empty_success_struct)
-                    {
-                        result.insert(ident);
-                    }
-                }
+                result.extend(get_identifier(success));
+
                 if let Some(error) = method.maybe_response_err_type.as_deref() {
                     result.extend(get_identifier(error));
                 }
