@@ -17,5 +17,6 @@ pub use api::*;
 pub use converter::*;
 pub use error::*;
 pub use maps::*;
+pub use memio::*;
 pub use program::*;
 pub use verifier::*;

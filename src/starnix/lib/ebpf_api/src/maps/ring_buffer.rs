@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::buffer::MapBuffer;
 use super::vmar::AllocatedVmar;
 use super::{MapError, MapImpl, MapKey};
 use ebpf::MapSchema;
@@ -15,10 +16,8 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use zx::AsHandleRef;
-
-static PAGE_SIZE: LazyLock<usize> = LazyLock::new(|| zx::system_get_page_size() as usize);
 
 // Signal used on ring buffer VMOs to indicate that the buffer has
 // incoming data.
@@ -104,12 +103,17 @@ impl RingBuffer {
     ///
     /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
     /// required never to move in memory.
-    pub fn new(schema: &MapSchema) -> Result<Pin<Box<Self>>, MapError> {
+    pub fn new(schema: &MapSchema, vmo: Option<zx::Vmo>) -> Result<Pin<Box<Self>>, MapError> {
+        if vmo.is_some() {
+            // Ring buffer sharing is not implemented yet.
+            return Err(MapError::Internal);
+        }
+
         if schema.key_size != 0 || schema.value_size != 0 {
             return Err(MapError::InvalidParam);
         }
 
-        let page_size = *PAGE_SIZE;
+        let page_size = *MapBuffer::PAGE_SIZE;
         // Size must be a power of 2 and a multiple of page_size.
         let size = schema.max_entries as usize;
         if size == 0 || size % page_size != 0 || size & (size - 1) != 0 {
@@ -258,7 +262,7 @@ impl RingBuffer {
     unsafe fn get_ringbug_and_header_by_addr(
         addr: usize,
     ) -> (&'static RingBuffer, &'static RingBufferRecordHeader) {
-        let page_size = *PAGE_SIZE;
+        let page_size = *MapBuffer::PAGE_SIZE;
         // addr is the data section. First access the header.
         let header = &*((addr - std::mem::size_of::<RingBufferRecordHeader>())
             as *const RingBufferRecordHeader);
@@ -339,7 +343,7 @@ impl MapImpl for RingBuffer {
         }
         let data_position = state.data_position(producer_position + BPF_RINGBUF_HDR_SZ);
         let data_length = size | BPF_RINGBUF_BUSY_BIT;
-        let page_count = ((data_position - state.data) / *PAGE_SIZE + 3)
+        let page_count = ((data_position - state.data) / *MapBuffer::PAGE_SIZE + 3)
             .try_into()
             .map_err(|_| MapError::SizeLimit)?;
         let header = state.header_mut(producer_position);

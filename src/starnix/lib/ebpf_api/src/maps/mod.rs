@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 mod array;
+mod buffer;
 mod hashmap;
 mod ring_buffer;
 mod vmar;
@@ -12,9 +13,10 @@ mod vmar;
 pub use ring_buffer::{RingBuffer, RingBufferWakeupPolicy, RINGBUF_SIGNAL};
 
 use ebpf::{BpfValue, MapReference, MapSchema};
+use fidl_fuchsia_ebpf as febpf;
 use inspect_stubs::track_stub;
 use linux_uapi::{
-    bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
+    bpf_map_type, bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
     bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER, bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY,
     bpf_map_type_BPF_MAP_TYPE_CGROUP_STORAGE, bpf_map_type_BPF_MAP_TYPE_CGRP_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_CPUMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP,
@@ -37,9 +39,13 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
+use zx::HandleBased;
 
 /// Counter for map identifiers.
 static MAP_IDS: AtomicU32 = AtomicU32::new(1);
+fn new_map_id() -> u32 {
+    MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
 
 #[derive(Debug)]
 pub enum MapError {
@@ -57,6 +63,9 @@ pub enum MapError {
 
     // Cannot allocate memory.
     NoMemory,
+
+    // Invalid VMO was passed for a shared map.
+    InvalidVmo,
 
     // An internal issue, e.g. failed to allocate VMO.
     Internal,
@@ -120,9 +129,41 @@ pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<PinnedMap, MapError> {
-        let id = MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into();
-        let map_impl = create_map_impl(&schema)?;
-        Ok(PinnedMap(Arc::pin(Self { id, schema, flags, map_impl })))
+        let map_impl = create_map_impl(&schema, None)?;
+        Ok(PinnedMap(Arc::pin(Self { id: new_map_id(), schema, flags, map_impl })))
+    }
+
+    pub fn new_shared(shared: febpf::Map) -> Result<PinnedMap, MapError> {
+        let febpf::Map { schema: Some(fidl_schema), vmo: Some(vmo), .. } = shared else {
+            return Err(MapError::InvalidParam);
+        };
+
+        let schema = MapSchema {
+            map_type: fidl_map_type_to_bpf_map_type(fidl_schema.type_),
+            key_size: fidl_schema.key_size,
+            value_size: fidl_schema.value_size,
+            max_entries: fidl_schema.max_entries,
+        };
+
+        let map_impl = create_map_impl(&schema, Some(vmo))?;
+        Ok(PinnedMap(Arc::pin(Self { id: new_map_id(), schema, flags: 0, map_impl })))
+    }
+
+    pub fn share(&self) -> Result<febpf::Map, MapError> {
+        let mut result = febpf::Map::default();
+        result.schema = Some(febpf::MapSchema {
+            type_: bpf_map_type_to_fidl_map_type(self.schema.map_type),
+            key_size: self.schema.key_size,
+            value_size: self.schema.value_size,
+            max_entries: self.schema.max_entries,
+        });
+        result.vmo = Some(
+            self.map_impl
+                .vmo()
+                .and_then(|vmo| (*vmo).duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
+                .ok_or(MapError::Internal)?,
+        );
+        Ok(result)
     }
 
     pub fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
@@ -164,33 +205,36 @@ fn new_pinned_buffer(size: usize) -> PinnedBuffer {
     vec![0u8; size].into_boxed_slice().into()
 }
 
-fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError> {
+fn create_map_impl(
+    schema: &MapSchema,
+    vmo: Option<zx::Vmo>,
+) -> Result<Pin<Box<dyn MapImpl>>, MapError> {
     match schema.map_type {
-        bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema)?)),
-        bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema)?)),
-        bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema)?),
+        bpf_map_type_BPF_MAP_TYPE_ARRAY => Ok(Box::pin(array::Array::new(schema, vmo)?)),
+        bpf_map_type_BPF_MAP_TYPE_HASH => Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?)),
+        bpf_map_type_BPF_MAP_TYPE_RINGBUF => Ok(ring_buffer::RingBuffer::new(schema, vmo)?),
 
         // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
         // these
         bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP_HASH");
-            Ok(Box::pin(hashmap::HashMap::new(schema)?))
+            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LPM_TRIE");
-            Ok(Box::pin(hashmap::HashMap::new(schema)?))
+            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
-            Ok(Box::pin(hashmap::HashMap::new(schema)?))
+            Ok(Box::pin(hashmap::HashMap::new(schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_ARRAY");
-            Ok(Box::pin(array::Array::new(schema)?))
+            Ok(Box::pin(array::Array::new(schema, vmo)?))
         }
         bpf_map_type_BPF_MAP_TYPE_SK_STORAGE => {
             track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SK_STORAGE");
-            Ok(Box::pin(array::Array::new(&MapSchema { max_entries: 1, ..*schema })?))
+            Ok(Box::pin(array::Array::new(&MapSchema { max_entries: 1, ..*schema }, vmo)?))
         }
 
         // Unimplemented types
@@ -307,4 +351,56 @@ fn create_map_impl(schema: &MapSchema) -> Result<Pin<Box<dyn MapImpl>>, MapError
 
 pub fn compute_map_storage_size(schema: &MapSchema) -> Result<usize, MapError> {
     schema.value_size.checked_mul(schema.max_entries).map(|v| v as usize).ok_or(MapError::NoMemory)
+}
+
+fn bpf_map_type_to_fidl_map_type(map_type: bpf_map_type) -> febpf::MapType {
+    match map_type {
+        bpf_map_type_BPF_MAP_TYPE_ARRAY => febpf::MapType::Array,
+        bpf_map_type_BPF_MAP_TYPE_HASH => febpf::MapType::HashMap,
+        bpf_map_type_BPF_MAP_TYPE_RINGBUF => febpf::MapType::RingBuffer,
+        bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY => febpf::MapType::PercpuArray,
+        bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => febpf::MapType::DevmapHash,
+        bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => febpf::MapType::LpmTrie,
+        _ =>
+        // Other map types are rejected in `create_map_impl()`.
+        {
+            unreachable!("unsupported map type")
+        }
+    }
+}
+
+fn fidl_map_type_to_bpf_map_type(map_type: febpf::MapType) -> bpf_map_type {
+    match map_type {
+        febpf::MapType::Array => bpf_map_type_BPF_MAP_TYPE_ARRAY,
+        febpf::MapType::HashMap => bpf_map_type_BPF_MAP_TYPE_HASH,
+        febpf::MapType::RingBuffer => bpf_map_type_BPF_MAP_TYPE_RINGBUF,
+        febpf::MapType::PercpuArray => bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY,
+        febpf::MapType::DevmapHash => bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
+        febpf::MapType::LpmTrie => bpf_map_type_BPF_MAP_TYPE_LPM_TRIE,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[fuchsia::test]
+    fn test_sharing() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_ARRAY,
+            key_size: 4,
+            value_size: 4,
+            max_entries: 10,
+        };
+
+        // Create two array maps sharing the content.
+        let map1 = Map::new(schema, 0).unwrap();
+        let map2 = Map::new_shared(map1.share().unwrap()).unwrap();
+
+        // Set a value in one map and check that it's updated in the other.
+        let key = vec![0, 0, 0, 0];
+        let value = [0, 1, 2, 3];
+        map1.update(MapKey::from_vec(key.clone()), &value, 0).unwrap();
+        assert_eq!(&map2.lookup(&key).unwrap(), &value);
+    }
 }

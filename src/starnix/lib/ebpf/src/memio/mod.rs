@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use std::marker::PhantomData;
+use std::ops::Range;
+use zerocopy::{FromBytes, IntoBytes};
 
 #[cfg(target_arch = "aarch64")]
 mod arm64;
@@ -55,6 +57,105 @@ impl EbpfPtr<'_, u64> {
     /// is guaranteed if and only if the pointer is 8-byte aligned.
     pub fn store_relaxed(&self, value: u64) {
         unsafe { arch::store_u64(self.ptr, value) }
+    }
+}
+
+/// Wraps a pointer to buffer used in eBPF runtime, such as an eBPF maps
+/// entry. The referenced data may be access from multiple threads in parallel,
+/// which makes it unsafe to access it using standard Rust types.
+/// `EbpfBufferPtr` allows to access these buffers safely. It may be used to
+/// reference either a whole VMO allocated for and eBPF map or individual
+/// elements of that VMO (see `slice()`). The address and the size of the
+/// buffer are always 8-byte aligned.
+pub struct EbpfBufferPtr<'a> {
+    ptr: *mut u8,
+    size: usize,
+    phantom: PhantomData<&'a u8>,
+}
+
+impl<'a> EbpfBufferPtr<'a> {
+    pub const ALIGNMENT: usize = size_of::<u64>();
+
+    /// Creates a new `EbpfBufferPtr` from the specified pointer. `ptr` must be
+    /// 8-byte aligned. `size` must be multiple of 8.
+    ///
+    /// # Safety
+    /// Caller must ensure that the buffer referenced by `ptr` is valid for
+    /// lifetime `'a`.
+    pub unsafe fn new(ptr: *mut u8, size: usize) -> Self {
+        assert!((ptr as usize) % Self::ALIGNMENT == 0);
+        assert!(size % Self::ALIGNMENT == 0);
+        assert!(size < isize::MAX as usize);
+        Self { ptr, size, phantom: PhantomData }
+    }
+
+    /// Size of the buffer in bytes.
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    /// Raw pointer to the start of the buffer.
+    pub fn raw_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    // SAFETY: caller must ensure that the value at the specified offset fits
+    // the buffer.
+    unsafe fn get_ptr_internal<T>(&self, offset: usize) -> EbpfPtr<'a, T> {
+        EbpfPtr::new(self.ptr.byte_offset(offset as isize) as *mut T)
+    }
+
+    /// Returns a pointer to a value of type `T` at the specified `offset`.
+    pub fn get_ptr<T>(&self, offset: usize) -> Option<EbpfPtr<'a, T>> {
+        if offset + std::mem::size_of::<T>() <= self.size {
+            // SAFETY: Buffer bounds are verified above.
+            Some(unsafe { self.get_ptr_internal(offset) })
+        } else {
+            None
+        }
+    }
+
+    /// Returns pointer to the specified range in the buffer.
+    /// Range bounds must be multiple of 8.
+    pub fn slice(&self, range: Range<usize>) -> Option<Self> {
+        assert!(range.start <= range.end);
+        (range.end <= self.size).then(|| {
+            // SAFETY: Returned buffer has the same lifetime as `self`, which
+            // ensures that the `ptr` stays valid for the lifetime of the
+            // result.
+            unsafe {
+                Self {
+                    ptr: self.ptr.byte_offset(range.start as isize),
+                    size: range.end - range.start,
+                    phantom: PhantomData,
+                }
+            }
+        })
+    }
+
+    /// Loads contents of the buffer to a `Vec<u8>`.
+    pub fn load(&self) -> Vec<u8> {
+        let mut result = Vec::with_capacity(self.size);
+
+        for pos in (0..self.size).step_by(Self::ALIGNMENT) {
+            // SAFETY: pos is guaranteed to be within the buffer bounds.
+            let value: u64 = unsafe { self.get_ptr_internal(pos).load_relaxed() };
+            result.extend_from_slice(value.as_bytes());
+        }
+
+        result
+    }
+
+    /// Stores `data` at the head of the buffer. `data` must be the same size
+    /// as the buffer.
+    pub fn store(&self, data: &[u8]) {
+        assert!(data.len() == self.size);
+
+        for pos in (0..self.size).step_by(Self::ALIGNMENT) {
+            let value = u64::read_from_bytes(&data[pos..(pos + Self::ALIGNMENT)]).unwrap();
+            // SAFETY: pos is guaranteed to be within the buffer bounds.
+            unsafe { self.get_ptr_internal(pos).store_relaxed(value) };
+        }
     }
 }
 
@@ -123,5 +224,46 @@ mod test {
         });
 
         unsafe { vmar_root_self().unmap(addr, vmo_size).unwrap() };
+    }
+
+    #[test]
+    fn test_buffer_slice() {
+        const SIZE: usize = 32;
+
+        let mut buf = [0; SIZE];
+        let buf_ptr = unsafe { EbpfBufferPtr::new(buf.as_mut_ptr(), SIZE) };
+
+        buf_ptr.slice(8..16).unwrap().store(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(
+            buf_ptr.slice(0..24).unwrap().load(),
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+
+        assert!(buf_ptr.slice(8..40).is_none());
+    }
+
+    #[test]
+    fn test_buffer_load() {
+        const SIZE: usize = 32;
+
+        let mut buf = (0..(SIZE as u8)).map(|v| v as u8).collect::<Vec<_>>();
+        let buf_ptr = unsafe { EbpfBufferPtr::new(buf.as_mut_ptr(), SIZE) };
+        let v = buf_ptr.load();
+        assert_eq!(v, (0..SIZE).map(|v| v as u8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_buffer_store() {
+        const SIZE: usize = 32;
+
+        let mut buf = [0u8; SIZE];
+        let buf_ptr = unsafe { EbpfBufferPtr::new(buf.as_mut_ptr(), SIZE) };
+
+        // Write values from `s` to `e` to range `s..e`.
+        buf_ptr.store(&(0..SIZE).map(|v| v as u8).collect::<Vec<_>>());
+
+        // Read the content and verify that it matches the expectation.
+        let data = buf_ptr.load();
+        assert_eq!(&data, &(0..SIZE).map(|v| v as u8).collect::<Vec<_>>());
     }
 }

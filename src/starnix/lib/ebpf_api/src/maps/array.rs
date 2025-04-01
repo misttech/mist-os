@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{new_pinned_buffer, MapError, MapImpl, MapKey, PinnedBuffer};
-use ebpf::MapSchema;
-use fuchsia_sync::Mutex;
+use super::buffer::MapBuffer;
+use super::{MapError, MapImpl, MapKey};
+use ebpf::{EbpfBufferPtr, MapSchema};
 use linux_uapi::BPF_NOEXIST;
 use std::fmt::Debug;
-use std::ops::Range;
 use std::sync::Arc;
 
 fn array_key_to_index(key: &[u8]) -> u32 {
@@ -15,15 +14,12 @@ fn array_key_to_index(key: &[u8]) -> u32 {
 }
 
 fn get_value_storage_size(value_size: usize) -> Option<usize> {
-    // Ensure 8-byte alignment for all values stored in the map.
-    const ALIGNMENT: usize = 8;
-    Some(value_size.checked_add(ALIGNMENT - 1)? & !(ALIGNMENT - 1))
+    Some(value_size.checked_add(MapBuffer::ALIGNMENT - 1)? & !(MapBuffer::ALIGNMENT - 1))
 }
 
 #[derive(Debug)]
 pub struct Array {
-    // TODO(https://fxbug.dev/378507648): replace with a VMO.
-    buffer: Mutex<PinnedBuffer>,
+    buffer: MapBuffer,
 
     num_entries: usize,
     value_size: usize,
@@ -36,7 +32,7 @@ pub struct Array {
 impl Array {
     const MAX_ARRAY_SIZE: usize = u32::MAX as usize;
 
-    pub fn new(schema: &MapSchema) -> Result<Self, MapError> {
+    pub fn new(schema: &MapSchema, vmo: Option<zx::Vmo>) -> Result<Self, MapError> {
         // From <https://man7.org/linux/man-pages/man2/bpf.2.html>:
         //   The key is an array index, and must be exactly four
         //   bytes.
@@ -56,44 +52,58 @@ impl Array {
             return Err(MapError::NoMemory);
         }
 
+        let buffer = MapBuffer::new(size, vmo)?;
         Ok(Array {
-            buffer: Mutex::new(new_pinned_buffer(size)),
+            buffer,
             num_entries: schema.max_entries as usize,
             value_size: schema.value_size as usize,
             bytes_per_element,
         })
     }
 
-    fn array_key_to_range(&self, key: &[u8]) -> Option<Range<usize>> {
+    fn value_ptr<'a>(&'a self, key: &[u8]) -> Option<EbpfBufferPtr<'a>> {
         let index = array_key_to_index(key) as usize;
-        if index >= self.num_entries {
-            return None;
-        }
         let base = index * self.bytes_per_element;
-        let limit = base + self.value_size;
-        Some((base as usize)..(limit as usize))
+        let limit = base + self.bytes_per_element;
+        self.buffer.ptr().slice(base..limit)
     }
 }
 
 impl MapImpl for Array {
     fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
-        Some(self.buffer.lock()[self.array_key_to_range(key)?].as_ptr() as *mut u8)
+        self.value_ptr(key).map(|buf| buf.raw_ptr())
     }
 
     fn lookup(&self, key: &[u8]) -> Option<Vec<u8>> {
-        Some(self.buffer.lock()[self.array_key_to_range(key)?].to_vec())
+        let buf = self.value_ptr(key)?;
+        let mut result = buf.load();
+
+        // Remove the padding.
+        result.resize(self.value_size, 0);
+
+        Some(result)
     }
 
     fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {
         assert!(value.len() == self.value_size);
 
-        let range = self.array_key_to_range(&key).ok_or(MapError::SizeLimit)?;
+        let ptr = self.value_ptr(&key).ok_or(MapError::SizeLimit)?;
 
         if flags == BPF_NOEXIST as u64 {
             return Err(MapError::EntryExists);
         }
 
-        self.buffer.lock()[range].copy_from_slice(value);
+        let mut copy_buf;
+        let value = if self.value_size == self.bytes_per_element {
+            value
+        } else {
+            // Add padding if necessary.
+            copy_buf = Vec::with_capacity(self.bytes_per_element);
+            copy_buf.extend_from_slice(value);
+            copy_buf.resize(self.bytes_per_element, 0);
+            &copy_buf
+        };
+        ptr.store(value);
 
         Ok(())
     }
@@ -115,8 +125,7 @@ impl MapImpl for Array {
     }
 
     fn vmo(&self) -> Option<Arc<zx::Vmo>> {
-        // TODO(https://fxbug.dev/378507648): Store the value in VMO and return it here.
-        None
+        Some(self.buffer.vmo().clone())
     }
 }
 
@@ -135,7 +144,7 @@ mod test {
             max_entries: 10,
         };
 
-        let array = Array::new(&schema).unwrap();
+        let array = Array::new(&schema, None).unwrap();
         assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
         assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
 
@@ -146,7 +155,7 @@ mod test {
             max_entries: 10,
         };
 
-        let array = Array::new(&schema).unwrap();
+        let array = Array::new(&schema, None).unwrap();
         assert_eq!(array.get_raw(&[0, 0, 0, 0]).unwrap() as usize % 8, 0);
         assert_eq!(array.get_raw(&[1, 0, 0, 0]).unwrap() as usize % 8, 0);
     }
