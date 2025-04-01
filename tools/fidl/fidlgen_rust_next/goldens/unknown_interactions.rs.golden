@@ -203,7 +203,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     ) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -260,7 +260,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -739,7 +739,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     ) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -796,7 +796,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -1970,7 +1970,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionR
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2024,7 +2024,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -2491,7 +2491,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionE
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2545,7 +2545,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -3007,7 +3007,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventUnionRe
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3061,7 +3061,7 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -3523,7 +3523,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventUnion
     fn take_from(from: &WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -3577,7 +3577,7 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -5111,7 +5111,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     ) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -5168,7 +5168,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -5651,7 +5651,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     ) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -5708,7 +5708,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -6846,7 +6846,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -6900,7 +6900,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -7371,7 +7371,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -7427,7 +7427,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -7893,7 +7893,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventUnion
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -7947,7 +7947,7 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -9222,7 +9222,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -9276,7 +9276,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -9747,7 +9747,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -9803,7 +9803,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -10274,7 +10274,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -10328,7 +10328,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -10804,7 +10804,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
     ) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -10861,7 +10861,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -12548,7 +12548,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionRespo
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -12598,7 +12598,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -13060,7 +13060,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionErrRe
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -13114,7 +13114,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -13577,7 +13577,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionRes
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -13631,7 +13631,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -14098,7 +14098,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErr
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -14152,7 +14152,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -14606,7 +14606,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventUnionReques
     fn take_from(from: &WireUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -14656,7 +14656,7 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 
@@ -15108,7 +15108,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventUnionRequ
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -15158,7 +15158,7 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
         match self.raw.ordinal() {
 
                 1 => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::SomeField(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>() }
                 ),
 
 

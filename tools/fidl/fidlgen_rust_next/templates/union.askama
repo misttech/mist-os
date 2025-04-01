@@ -110,7 +110,7 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
         match from.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(::fidl_next::TakeFrom::take_from(
-                    unsafe { from.raw.get().deref_unchecked() }
+                    unsafe { from.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
                 )),
             {% endfor %}
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -169,7 +169,7 @@ impl {{ wire_name }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name.camel()|ident }}(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
                 ),
             {% endfor %}
             {% if union.is_strict %}

@@ -715,15 +715,15 @@ impl ::fidl_next::TakeFrom<WireExpression> for Expression {
     fn take_from(from: &WireExpression) -> Self {
         match from.raw.ordinal() {
             1 => Self::Value(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireU64>()
             })),
 
             2 => Self::BinOp(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<crate::WireOverrideTest>()
             })),
 
             3 => Self::FunctionApplication(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<crate::WireFunctionApplication>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -771,12 +771,16 @@ pub mod expression {
 impl WireExpression {
     pub fn as_ref(&self) -> crate::expression::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::expression::Ref::Value(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::expression::Ref::Value(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireU64>()
+            }),
 
-            2 => crate::expression::Ref::BinOp(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::expression::Ref::BinOp(unsafe {
+                self.raw.get().deref_unchecked::<crate::WireOverrideTest>()
+            }),
 
             3 => crate::expression::Ref::FunctionApplication(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<crate::WireFunctionApplication>()
             }),
 
             unknown => crate::expression::Ref::UnknownOrdinal_(unknown),
@@ -963,7 +967,7 @@ impl ::fidl_next::TakeFrom<WireUnionMember> for UnionMember {
     fn take_from(from: &WireUnionMember) -> Self {
         match from.raw.ordinal() {
             2 => Self::UnionData(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<u8>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1007,7 +1011,9 @@ pub mod union_member {
 impl WireUnionMember {
     pub fn as_ref(&self) -> crate::union_member::Ref<'_> {
         match self.raw.ordinal() {
-            2 => crate::union_member::Ref::UnionData(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::union_member::Ref::UnionData(unsafe {
+                self.raw.get().deref_unchecked::<u8>()
+            }),
 
             unknown => crate::union_member::Ref::UnknownOrdinal_(unknown),
         }

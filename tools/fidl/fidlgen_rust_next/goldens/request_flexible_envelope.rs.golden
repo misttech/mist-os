@@ -80,11 +80,11 @@ impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
     fn take_from(from: &WireFlexibleFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireString>()
             })),
 
             2 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -130,9 +130,13 @@ pub mod flexible_foo {
 impl WireFlexibleFoo {
     pub fn as_ref(&self) -> crate::flexible_foo::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::flexible_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::flexible_foo::Ref::S(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireString>()
+            }),
 
-            2 => crate::flexible_foo::Ref::I(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::flexible_foo::Ref::I(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            }),
 
             unknown => crate::flexible_foo::Ref::UnknownOrdinal_(unknown),
         }
@@ -309,11 +313,11 @@ impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
     fn take_from(from: &WireStrictFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireString>()
             })),
 
             2 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -357,9 +361,13 @@ pub mod strict_foo {
 impl WireStrictFoo {
     pub fn as_ref(&self) -> crate::strict_foo::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::strict_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::strict_foo::Ref::S(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireString>()
+            }),
 
-            2 => crate::strict_foo::Ref::I(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::strict_foo::Ref::I(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

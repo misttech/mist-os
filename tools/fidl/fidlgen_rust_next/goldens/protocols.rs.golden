@@ -2879,7 +2879,7 @@ impl ::fidl_next::TakeFrom<WireTheUnion> for TheUnion {
     fn take_from(from: &WireTheUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::V(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2923,7 +2923,9 @@ pub mod the_union {
 impl WireTheUnion {
     pub fn as_ref(&self) -> crate::the_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::the_union::Ref::V(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::the_union::Ref::V(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            }),
 
             unknown => crate::the_union::Ref::UnknownOrdinal_(unknown),
         }

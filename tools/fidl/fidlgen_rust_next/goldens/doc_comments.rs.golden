@@ -76,7 +76,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleUnion> for FlexibleUnion {
     fn take_from(from: &WireFlexibleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Field(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -120,7 +120,9 @@ pub mod flexible_union {
 impl WireFlexibleUnion {
     pub fn as_ref(&self) -> crate::flexible_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::flexible_union::Ref::Field(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::flexible_union::Ref::Field(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            }),
 
             unknown => crate::flexible_union::Ref::UnknownOrdinal_(unknown),
         }
@@ -885,7 +887,7 @@ impl ::fidl_next::TakeFrom<WireStrictUnion> for StrictUnion {
     fn take_from(from: &WireStrictUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Field(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -927,7 +929,9 @@ pub mod strict_union {
 impl WireStrictUnion {
     pub fn as_ref(&self) -> crate::strict_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::strict_union::Ref::Field(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::strict_union::Ref::Field(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

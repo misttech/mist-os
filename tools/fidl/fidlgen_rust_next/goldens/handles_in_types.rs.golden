@@ -696,7 +696,7 @@ impl ::fidl_next::TakeFrom<WireUnionWithHandle> for UnionWithHandle {
     fn take_from(from: &WireUnionWithHandle) -> Self {
         match from.raw.ordinal() {
             1 => Self::H(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::fuchsia::WireHandle>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -740,7 +740,9 @@ pub mod union_with_handle {
 impl WireUnionWithHandle {
     pub fn as_ref(&self) -> crate::union_with_handle::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::union_with_handle::Ref::H(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_with_handle::Ref::H(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::fuchsia::WireHandle>()
+            }),
 
             unknown => crate::union_with_handle::Ref::UnknownOrdinal_(unknown),
         }

@@ -306,7 +306,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding6> for ShouldNeverAp
     fn take_from(from: &WireShouldNeverAppearInAnyBinding6) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -353,7 +353,7 @@ impl WireShouldNeverAppearInAnyBinding6 {
     pub fn as_ref(&self) -> crate::should_never_appear_in_any_binding6::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::should_never_appear_in_any_binding6::Ref::A(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<bool>()
             }),
 
             unknown => crate::should_never_appear_in_any_binding6::Ref::UnknownOrdinal_(unknown),
@@ -1171,7 +1171,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding3> for ShouldNeverAp
     fn take_from(from: &WireShouldNeverAppearInAnyBinding3) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1218,7 +1218,7 @@ impl WireShouldNeverAppearInAnyBinding3 {
     pub fn as_ref(&self) -> crate::should_never_appear_in_any_binding3::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::should_never_appear_in_any_binding3::Ref::A(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<bool>()
             }),
 
             unknown => crate::should_never_appear_in_any_binding3::Ref::UnknownOrdinal_(unknown),
@@ -1943,7 +1943,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding9> for ShouldNeverAp
     fn take_from(from: &WireShouldNeverAppearInAnyBinding9) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1990,7 +1990,7 @@ impl WireShouldNeverAppearInAnyBinding9 {
     pub fn as_ref(&self) -> crate::should_never_appear_in_any_binding9::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::should_never_appear_in_any_binding9::Ref::A(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<bool>()
             }),
 
             unknown => crate::should_never_appear_in_any_binding9::Ref::UnknownOrdinal_(unknown),
@@ -5073,7 +5073,7 @@ impl ::fidl_next::TakeFrom<WireOnlyLlcpp> for OnlyLlcpp {
     fn take_from(from: &WireOnlyLlcpp) -> Self {
         match from.raw.ordinal() {
             1 => Self::X(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -5115,7 +5115,9 @@ pub mod only_llcpp {
 impl WireOnlyLlcpp {
     pub fn as_ref(&self) -> crate::only_llcpp::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::only_llcpp::Ref::X(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::only_llcpp::Ref::X(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireU32>()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }

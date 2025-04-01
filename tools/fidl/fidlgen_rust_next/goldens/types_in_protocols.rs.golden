@@ -689,7 +689,7 @@ impl ::fidl_next::TakeFrom<WireUnion> for Union {
     fn take_from(from: &WireUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -733,7 +733,7 @@ pub mod union {
 impl WireUnion {
     pub fn as_ref(&self) -> crate::union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union::Ref::B(unsafe { self.raw.get().deref_unchecked::<bool>() }),
 
             unknown => crate::union::Ref::UnknownOrdinal_(unknown),
         }
@@ -2430,7 +2430,7 @@ impl ::fidl_next::TakeFrom<WireResourceUnion> for ResourceUnion {
     fn take_from(from: &WireResourceUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<bool>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2474,7 +2474,7 @@ pub mod resource_union {
 impl WireResourceUnion {
     pub fn as_ref(&self) -> crate::resource_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::resource_union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::resource_union::Ref::B(unsafe { self.raw.get().deref_unchecked::<bool>() }),
 
             unknown => crate::resource_union::Ref::UnknownOrdinal_(unknown),
         }

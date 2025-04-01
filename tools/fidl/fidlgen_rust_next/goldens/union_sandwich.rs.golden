@@ -68,7 +68,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize12Alignment4> for UnionSize12Alignment4 
     fn take_from(from: &WireUnionSize12Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<[u8; 6]>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -113,7 +113,7 @@ impl WireUnionSize12Alignment4 {
     pub fn as_ref(&self) -> crate::union_size12_alignment4::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size12_alignment4::Ref::Variant(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<[u8; 6]>()
             }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -540,7 +540,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize24Alignment8> for UnionSize24Alignment8 
     fn take_from(from: &WireUnionSize24Alignment8) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<crate::WireStructSize16Alignment8>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -585,7 +585,7 @@ impl WireUnionSize24Alignment8 {
     pub fn as_ref(&self) -> crate::union_size24_alignment8::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size24_alignment8::Ref::Variant(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<crate::WireStructSize16Alignment8>()
             }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -890,7 +890,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize36Alignment4> for UnionSize36Alignment4 
     fn take_from(from: &WireUnionSize36Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<[u8; 32]>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -935,7 +935,7 @@ impl WireUnionSize36Alignment4 {
     pub fn as_ref(&self) -> crate::union_size36_alignment4::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size36_alignment4::Ref::Variant(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<[u8; 32]>()
             }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1232,7 +1232,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
     fn take_from(from: &WireUnionSize8Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireU32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1275,7 +1275,7 @@ impl WireUnionSize8Alignment4 {
     pub fn as_ref(&self) -> crate::union_size8_alignment4::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size8_alignment4::Ref::Variant(unsafe {
-                self.raw.get().deref_unchecked()
+                self.raw.get().deref_unchecked::<::fidl_next::WireU32>()
             }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
