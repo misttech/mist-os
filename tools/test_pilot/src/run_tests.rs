@@ -6,10 +6,13 @@ use crate::errors::TestRunError;
 use crate::invocation_log::CommandInvocationLog;
 use crate::std_writer::StdWriter;
 use crate::test_config::{OutputProcessor, TestConfig};
-use crate::test_output::OutputDirectory;
+use crate::test_output::{
+    is_fail_exit_status, outcome_from_exit_status, OutputDirectory, Summary, SummaryArtifact,
+};
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
+use std::time::Instant;
 use std::{fs, io};
 use tokio::io::AsyncReadExt;
 use tokio::process::{self, Command};
@@ -17,8 +20,8 @@ use tokio::process::{self, Command};
 const STDIO_BUFFER_SIZE: usize = 2 * 1024;
 const ENV_PATH: &str = "PATH";
 
-/// Exit status meaning tests were run correctly but failed.
-const FAIL_EXIT_STATUS: i32 = 86;
+const ARTIFACT_TYPE_STDOUT: &str = "stdout";
+const ARTIFACT_TYPE_STDERR: &str = "stderr";
 
 pub async fn run_test(
     test_config: &TestConfig,
@@ -40,12 +43,14 @@ async fn run_test_inner(
     path_env_var_value: &str,
     log: &mut CommandInvocationLog,
 ) -> Result<ExitStatus, TestRunError> {
+    let mut main_summary = Summary::default();
     let mut cmd =
         create_test_launch_command(test_config, &outdir.test_config(), path_env_var_value);
 
     let exit_status = {
         let mut stdout_writer = StdWriter::new(outdir.test_stdout(), Box::new(io::stdout()))?;
         let mut stderr_writer = StdWriter::new(outdir.test_stderr(), Box::new(io::stderr()))?;
+        let start_time = Instant::now();
         let exit_status = run_command(&mut cmd, &mut stdout_writer, &mut stderr_writer).await?;
         log.record_test(
             &cmd,
@@ -54,7 +59,23 @@ async fn run_test_inner(
             stderr_writer.path_if_wrote().and_then(|p| outdir.make_relative(&p)),
         );
 
-        if !exit_status.success() && exit_status.code() != Some(FAIL_EXIT_STATUS) {
+        // Populate the main summary based on test run results.
+        main_summary.common.duration = start_time.elapsed().as_millis() as i64;
+        main_summary.common.outcome = String::from(outcome_from_exit_status(exit_status));
+        if let Some(stdout) = stdout_writer.path_if_wrote() {
+            main_summary.common.artifacts.insert(
+                outdir.make_relative(&stdout).expect("stdout file is in output directory"),
+                SummaryArtifact { artifact_type: String::from(ARTIFACT_TYPE_STDOUT) },
+            );
+        }
+        if let Some(stderr) = stderr_writer.path_if_wrote() {
+            main_summary.common.artifacts.insert(
+                outdir.make_relative(&stderr).expect("stdout file is in output directory"),
+                SummaryArtifact { artifact_type: String::from(ARTIFACT_TYPE_STDERR) },
+            );
+        }
+
+        if !exit_status.success() && is_fail_exit_status(exit_status) {
             eprintln!(
                 "host test binary {0} returned bad exit status {1}",
                 test_config.host_test_binary.display(),
@@ -69,6 +90,10 @@ async fn run_test_inner(
         // respective output files.
         exit_status
     };
+
+    if main_summary.maybe_merge_file(&outdir.subdir_summary("target"))? {
+        main_summary.write(&outdir.main_summary())?;
+    }
 
     for output_processor in &test_config.output_processors {
         if (exit_status.success() && !output_processor.use_on_success)
@@ -101,7 +126,13 @@ async fn run_test_inner(
                 stderr_writer.path_if_wrote().and_then(|p| outdir.make_relative(&p)),
             );
 
-            if !exit_status.success() && exit_status.code() != Some(FAIL_EXIT_STATUS) {
+            if main_summary
+                .maybe_merge_file(&outdir.postprocessor_summary(&output_processor.binary))?
+            {
+                main_summary.write(&outdir.main_summary())?;
+            }
+
+            if !exit_status.success() && is_fail_exit_status(exit_status) {
                 eprintln!(
                     "output processor {0:?} returned bad exit status {1}",
                     output_processor.binary.display(),

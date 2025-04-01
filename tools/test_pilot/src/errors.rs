@@ -31,6 +31,20 @@ pub enum TestRunError {
     #[error("Error writing stderr: {0:?}")]
     StderrWrite(#[source] io::Error),
 
+    #[error("Error reading output summary file {path}")]
+    OutputSummaryRead {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("Error writing output summary file {path}")]
+    OutputSummaryWrite {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+
     #[error("Error creating output file {path}")]
     FailedToCreateFile {
         path: PathBuf,
