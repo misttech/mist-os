@@ -5,6 +5,7 @@
 import unittest
 
 import fidl_fuchsia_controller_test as fc_test
+import fidl_test_python_protocol as test_python_protocol
 from fidl import FrameworkError
 
 
@@ -70,3 +71,33 @@ class UnionTestSuite(unittest.TestCase):
                 framework_err=FrameworkError.UNKNOWN_METHOD
             ),
         )
+
+    def test_union_unwrap_response(self) -> None:
+        response = test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult(
+            response=test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResponse(
+                b=True
+            )
+        ).unwrap()
+        self.assertEqual(
+            response,
+            test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResponse(
+                b=True
+            ),
+        )
+
+    def test_union_unwrap_response_none(self) -> None:
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+            response=None
+        ).unwrap()
+
+    def test_union_unwrap_framework_err(self) -> None:
+        with self.assertRaises(RuntimeError):
+            test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+                framework_err=FrameworkError.UNKNOWN_METHOD
+            ).unwrap()
+
+    def test_union_unwrap__err(self) -> None:
+        with self.assertRaises(RuntimeError):
+            test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+                err=3
+            ).unwrap()

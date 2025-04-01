@@ -12,7 +12,7 @@ class {{ .PythonName }}:
     {{- end }}
     """
     {{- range .PythonMembers }}
-    _{{ .PythonName }}: {{ .PythonType.PythonName }} | None
+    _{{ .PythonName }}: typing.Optional[{{ .PythonType.PythonName }}]
     {{- range .DocComments }}
     """
     {{ . }}
@@ -88,6 +88,31 @@ class {{ .PythonName }}:
     # TODO(https://fxbug.dev/394421154): We should probably return a more readable type.
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "{{ .Library }}", "{{ .Name }}")
+
+
+    {{ if .IsResult }}
+    def unwrap(self) -> {{ .PythonSuccessType.PythonName }}:
+        """Returns the response if result does not contain an error. Otherwise, raises an exception."""
+        try:
+            if hasattr(self, "_framework_err") and self._framework_err is not None:
+                raise RuntimeError(
+                    f"{self.__fidl_raw_type__} framework error {self._framework_err}"
+                )
+        except AttributeError:
+            pass
+        try:
+            if hasattr(self, "_err") and self._err is not None:
+                raise RuntimeError(f"{self.__fidl_raw_type__} error {self._err}")
+        except AttributeError:
+            pass
+
+        {{ if (eq .PythonSuccessType.PythonName "None") -}}
+        assert not hasattr(self, "_response") or self._response is None, f"Failed to unwrap {self.__fidl_raw_type__}. Response value present when it should be None: {self._response}"
+        {{ else -}}
+        assert self._response is not None, f"Failed to unwrap {self.__fidl_raw_type__}. Result does not contain an error or response."
+        return self._response
+        {{- end }}
+    {{ end }}
 
     @classmethod
     def make_default(cls) -> typing.Self:

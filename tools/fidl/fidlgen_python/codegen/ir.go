@@ -80,9 +80,10 @@ type PythonStructMember struct {
 
 type PythonUnion struct {
 	fidlgen.Union
-	Library       string
-	PythonName    string
-	PythonMembers []PythonUnionMember
+	Library           string
+	PythonName        string
+	PythonMembers     []PythonUnionMember
+	PythonSuccessType *PythonType
 }
 
 type PythonUnionMember struct {
@@ -693,6 +694,9 @@ func (c *compiler) compileUnion(val fidlgen.Union) PythonUnion {
 	for _, v := range val.Members {
 		member := c.compileUnionMember(v)
 		python_union.PythonMembers = append(python_union.PythonMembers, member)
+		if python_union.IsResult && member.PythonName == "response" {
+			python_union.PythonSuccessType = &member.PythonType
+		}
 	}
 
 	return python_union

@@ -185,5 +185,6 @@ python_host_test("fuchsia_controller_fidl_union_test") {
   test_data_deps = [
     ":fuchsia_controller_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data",
+    "//tools/fidl/fidlgen_python/tests/fidl:test.python.protocol_host_test_data",
   ]
 }

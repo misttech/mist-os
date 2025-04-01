@@ -42,5 +42,6 @@ python_host_test("fidlgen_python_union_test") {
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
+    "fidl:test.python.protocol_python",
   ]
 }
