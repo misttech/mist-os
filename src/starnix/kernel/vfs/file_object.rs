@@ -35,7 +35,7 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::Releasable;
 use starnix_uapi::as_any::AsAny;
-use starnix_uapi::auth::CAP_FOWNER;
+use starnix_uapi::auth::{CAP_FOWNER, CAP_SYS_RAWIO};
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
 use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::Access;
@@ -45,12 +45,13 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIGETBSZ,
-    FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER,
-    FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_ENABLE_VERITY,
-    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA,
-    FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS, FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL,
-    SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
+    errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIBMAP,
+    FIGETBSZ, FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE,
+    FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY,
+    FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_MEASURE_VERITY,
+    FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS,
+    FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
+    TCGETS,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -1918,6 +1919,20 @@ impl FileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        security::check_file_ioctl_access(current_task, &self, request)?;
+
+        if request == FIBMAP {
+            security::check_task_capable(current_task, CAP_SYS_RAWIO)?;
+
+            // TODO: https://fxbug.dev/404795644 - eliminate this phoney response when the SELinux
+            // Test Suite no longer requires it.
+            if current_task.kernel().features.selinux_test_suite {
+                let phoney_block = 0xbadf000du32;
+                current_task.write_object(arg.into(), &phoney_block)?;
+                return Ok(SUCCESS);
+            }
+        }
+
         self.ops().ioctl(locked, self, current_task, request, arg)
     }
 
