@@ -121,6 +121,16 @@ void PrintTo(const fit::result<E, T>& result, std::ostream* os) {
   }
 }
 
+template <typename E, typename T>
+bool operator==(const fit::result<E, T>& result, const fit::error<E>& expected) {
+  return result == fit::result<E, T>(expected);
+}
+
+template <typename E, typename T, typename T2>
+bool operator==(const fit::result<E, T>& result, const fit::success<T2>& expected) {
+  return result == fit::result<E, T>(expected);
+}
+
 }  // namespace fit
 
 #endif  // SRC_STARNIX_TESTS_SELINUX_USERSPACE_UTIL_H_

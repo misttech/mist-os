@@ -27,10 +27,39 @@ TEST(AnonInodeTest, EventFdIsUnlabeled) {
   fbl::unique_fd fd(eventfd(0, 0));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_error());
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
+}
 
-  EXPECT_EQ(fd_label.error_value(), ENOTSUP);
+TEST(AnonInodeTest, PrivateFdIsUnchecked) {
+  LoadPolicy("anon_inode_policy.pp");
+
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  // Create an eventfd within a test domain, then validate whether the FD is usable from a set
+  // of test domains with differing levels of access.
+  ASSERT_TRUE(RunSubprocessAs("test_u:test_r:anon_inode_test_t:s0", [] {
+    fbl::unique_fd fd(eventfd(0, 0));
+    ASSERT_TRUE(fd.is_valid());
+    auto fd_label = GetLabel(fd.get());
+
+    // Ensure that `fd` is of an un-labeled, aka "private", kind.
+    ASSERT_EQ(fd_label, fit::error(ENOTSUP));
+
+    uint64_t event_buf = 1;
+
+    ASSERT_TRUE(RunSubprocessAs("test_u:test_r:anon_inode_use_fd_and_perms:s0", [&] {
+      EXPECT_THAT(write(fd.get(), &event_buf, sizeof(event_buf)), SyscallSucceeds())
+          << "Domain granted FD-use and permissions should have access";
+    }));
+    ASSERT_TRUE(RunSubprocessAs("test_u:test_r:anon_inode_use_fd_no_perms:s0", [&] {
+      EXPECT_THAT(write(fd.get(), &event_buf, sizeof(event_buf)), SyscallSucceeds())
+          << "Domain granted FD-use but no file node permissions should have access";
+    }));
+    ASSERT_TRUE(RunSubprocessAs("test_u:test_r:anon_inode_no_use_fd:s0", [&] {
+      EXPECT_THAT(write(fd.get(), &event_buf, sizeof(event_buf)), SyscallFailsWithErrno(EACCES))
+          << "Domain not granted FD-use should not have access";
+    }));
+  }));
 }
 
 TEST(AnonInodeTest, TmpFileHasLabel) {
@@ -40,8 +69,7 @@ TEST(AnonInodeTest, TmpFileHasLabel) {
   fbl::unique_fd fd(open(kTmpPath, O_RDWR | O_TMPFILE));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_ok());
+  EXPECT_EQ(GetLabel(fd.get()), fit::ok());
 }
 
 TEST(AnonInodeTest, UserfaultFdHasLabel) {
@@ -50,10 +78,8 @@ TEST(AnonInodeTest, UserfaultFdHasLabel) {
   fbl::unique_fd fd(static_cast<int>(syscall(SYS_userfaultfd, O_CLOEXEC)));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_ok());
-
-  EXPECT_EQ(fd_label.value(), "system_u:object_r:anon_inode_unconfined_userfaultfd_t:s0");
+  EXPECT_EQ(GetLabel(fd.get()),
+            fit::ok("system_u:object_r:anon_inode_unconfined_userfaultfd_t:s0"));
 }
 
 TEST(AnonInodeTest, EpollIsUnlabeled) {
@@ -62,10 +88,7 @@ TEST(AnonInodeTest, EpollIsUnlabeled) {
   fbl::unique_fd fd(epoll_create1(0));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_error());
-
-  EXPECT_EQ(fd_label.error_value(), ENOTSUP);
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
 TEST(AnonInodeTest, InotifyIsUnlabeled) {
@@ -74,10 +97,7 @@ TEST(AnonInodeTest, InotifyIsUnlabeled) {
   fbl::unique_fd fd(inotify_init());
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_error());
-
-  EXPECT_EQ(fd_label.error_value(), ENOTSUP);
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
 TEST(AnonInodeTest, PidFdIsUnlabeled) {
@@ -86,10 +106,7 @@ TEST(AnonInodeTest, PidFdIsUnlabeled) {
   fbl::unique_fd fd(static_cast<int>(syscall(SYS_pidfd_open, getpid(), 0)));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd_label.is_error());
-
-  EXPECT_EQ(fd_label.error_value(), ENOTSUP);
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
 TEST(AnonInodeTest, TimerFdIsUnlabeled) {
@@ -98,10 +115,7 @@ TEST(AnonInodeTest, TimerFdIsUnlabeled) {
   fbl::unique_fd fd(timerfd_create(CLOCK_MONOTONIC, 0));
   ASSERT_TRUE(fd.is_valid());
 
-  auto fd1_label = GetLabel(fd.get());
-  ASSERT_TRUE(fd1_label.is_error());
-
-  EXPECT_EQ(fd1_label.error_value(), ENOTSUP);
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
 }  // namespace
