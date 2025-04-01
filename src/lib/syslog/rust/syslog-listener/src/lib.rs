@@ -8,10 +8,8 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_logger::{
-    LogFilterOptions, LogListenerSafeRequest, LogListenerSafeRequestStream, LogMarker, LogMessage,
-    LogProxy,
+    LogFilterOptions, LogListenerSafeRequest, LogListenerSafeRequestStream, LogMessage, LogProxy,
 };
-use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::TryStreamExt;
 
@@ -61,16 +59,6 @@ pub async fn run_log_listener_with_proxy<'a>(
     logger.listen_safe(listener_ptr, options).context("failed to register listener")?;
     log_listener(processor, listener_stream).await?;
     Ok(())
-}
-
-/// This fn will connect to fuchsia.logger.Log service and then
-/// register listener or log dumper based on the parameters passed.
-pub async fn run_log_listener<'a>(
-    processor: impl LogProcessor + 'a,
-    options: Option<&'a LogFilterOptions>,
-) -> Result<(), Error> {
-    let logger = connect_to_protocol::<LogMarker>()?;
-    run_log_listener_with_proxy(&logger, processor, options).await
 }
 
 impl LogProcessor for mpsc::UnboundedSender<LogMessage> {

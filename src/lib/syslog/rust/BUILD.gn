@@ -12,7 +12,6 @@ rustc_library("syslog-listener") {
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
