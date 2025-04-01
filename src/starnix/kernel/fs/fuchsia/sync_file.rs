@@ -217,7 +217,8 @@ impl FileOps for SyncFile {
                 }
 
                 let name = merge_data.name.map(|x| x as u8);
-                let file = Anon::new_file(
+                // TODO: https://fxbug.dev/407611229 - Verify whether "sync_file" should be private.
+                let file = Anon::new_private_file(
                     current_task,
                     Box::new(SyncFile::new(name, fence)),
                     OpenFlags::RDWR,

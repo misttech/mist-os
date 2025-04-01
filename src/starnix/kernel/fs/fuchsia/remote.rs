@@ -338,11 +338,13 @@ pub fn new_remote_file(
         // Set the file mode to socket.
         mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
     }
-    let file_handle = Anon::new_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
-        let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-        update_info_from_attrs(&mut info, &attrs);
-        info
-    });
+    // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
+    let file_handle =
+        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
+            let mut info = FsNodeInfo::new(id, mode, FsCred::root());
+            update_info_from_attrs(&mut info, &attrs);
+            info
+        });
     Ok(file_handle)
 }
 

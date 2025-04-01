@@ -82,8 +82,24 @@ impl Anon {
         flags: OpenFlags,
         name: &'static str,
     ) -> FileHandle {
+        Self::new_private_file_extended(
+            current_task,
+            ops,
+            flags,
+            name,
+            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+        )
+    }
+
+    /// Returns a new private anonymous node, applying caller-supplied `info`.
+    pub fn new_private_file_extended(
+        current_task: &CurrentTask,
+        ops: Box<dyn FileOps>,
+        flags: OpenFlags,
+        name: &'static str,
+        info: impl FnOnce(ino_t) -> FsNodeInfo,
+    ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        let info = FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred());
         let node = fs.create_node(current_task, Anon { name: Some(name), is_private: true }, info);
         security::fs_node_init_anon(current_task, &node, name);
         FileObject::new_anonymous(current_task, ops, node, flags)
