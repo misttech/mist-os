@@ -41,7 +41,7 @@
         "kind": "table/member",
         "name": "fuchsia.archivist.test/ComponentInitialInterest.log_severity",
         "ordinal": "2",
-        "type": "fuchsia.diagnostics/Severity"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "table/member",
@@ -302,7 +302,7 @@
         "kind": "table/member",
         "name": "fuchsia.archivist.test/LogPuppetLogRequest.severity",
         "ordinal": "2",
-        "type": "fuchsia.diagnostics/Severity"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "table/member",
@@ -328,7 +328,7 @@
         "kind": "table/member",
         "name": "fuchsia.archivist.test/LogPuppet_WaitForInterestChange_Response.severity",
         "ordinal": "1",
-        "type": "fuchsia.diagnostics/Severity"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "table",

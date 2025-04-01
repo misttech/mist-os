@@ -118,7 +118,7 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   }
 
   void CheckLog(std::optional<diagnostics::reader::LogsData> maybeLog,
-                fuchsia_diagnostics::Severity severity, const std::string& message,
+                fuchsia_diagnostics_types::Severity severity, const std::string& message,
                 const std::vector<std::string>& tags) {
     ASSERT_TRUE(maybeLog.has_value());
     auto& log = maybeLog.value();
@@ -309,10 +309,12 @@ TEST_F(ArchiveReaderTest, ReadLogs) {
     return result.take_value();
   };
 
-  CheckLog(next_log(), fuchsia_diagnostics::Severity::kInfo, "I'm an info log",
+  CheckLog(next_log(), fuchsia_diagnostics_types::Severity::kInfo, "I'm an info log",
            {"test_program", "hello"});
-  CheckLog(next_log(), fuchsia_diagnostics::Severity::kWarn, "I'm a warn log", {"test_program"});
-  CheckLog(next_log(), fuchsia_diagnostics::Severity::kError, "I'm an error log", {"test_program"});
+  CheckLog(next_log(), fuchsia_diagnostics_types::Severity::kWarn, "I'm a warn log",
+           {"test_program"});
+  CheckLog(next_log(), fuchsia_diagnostics_types::Severity::kError, "I'm an error log",
+           {"test_program"});
 }
 
 }  // namespace

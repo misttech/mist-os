@@ -17,6 +17,7 @@ fidl("fuchsia.developer.remotecontrol") {
     "//sdk/fidl/fuchsia.buildinfo",
     "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//sdk/fidl/fuchsia.hwinfo",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.net",

@@ -4,7 +4,7 @@
 
 use crate::puppet::LogMessage;
 use diagnostics_data::{ExtendedMoniker, LogsData};
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 use futures::{Stream, StreamExt};
 
 type LogStreamItem = Result<LogsData, diagnostics_reader::Error>;

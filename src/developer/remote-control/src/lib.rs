@@ -17,7 +17,7 @@ use std::rc::{Rc, Weak};
 use {
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
-    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
+    fidl_fuchsia_diagnostics_types as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
     fidl_fuchsia_sys2 as fsys,
 };
 
@@ -116,6 +116,9 @@ impl RemoteControlService {
                     diagnostics::Severity::Error => error!(tag:%; "{}", message),
                     // Tracing crate doesn't have a Fatal level, just log an error with a FATAL message embedded.
                     diagnostics::Severity::Fatal => error!(tag:%; "<FATAL> {}", message),
+                    diagnostics::Severity::__SourceBreaking { .. } => {
+                        error!(tag:%; "<UNKNOWN> {message}")
+                    }
                 }
                 responder.send()?;
                 Ok(())

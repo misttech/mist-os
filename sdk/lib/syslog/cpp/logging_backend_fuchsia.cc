@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <assert.h>
+#include <fidl/fuchsia.diagnostics.types/cpp/fidl.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -32,6 +33,16 @@
 
 namespace syslog_runtime {
 
+namespace {
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
+#else
+using FidlInterest = fuchsia_diagnostics::wire::Interest;
+#endif
+
+}  // namespace
+
 class GlobalStateLock;
 namespace internal {
 class LogState {
@@ -52,7 +63,7 @@ class LogState {
 
   void PollInterest();
 
-  void HandleInterest(fuchsia_diagnostics::wire::Interest interest);
+  void HandleInterest(FidlInterest interest);
 
   fidl::WireSharedClient<fuchsia_logger::LogSink> log_sink_;
   void (*on_severity_changed_)(fuchsia_logging::RawLogSeverity severity);
@@ -191,7 +202,7 @@ void internal::LogState::PollInterest() {
       });
 }
 
-void internal::LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
+void internal::LogState::HandleInterest(FidlInterest interest) {
   if (!interest.has_min_severity()) {
     min_severity_ = default_severity_;
   } else {

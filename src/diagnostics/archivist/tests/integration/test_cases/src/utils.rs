@@ -5,10 +5,9 @@
 use anyhow::{Context, Error, Result};
 use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_diagnostics::{
-    self as fdiagnostics, Interest, LogSettingsSetComponentInterestRequest, Severity,
-};
+use fidl_fuchsia_diagnostics::{self as fdiagnostics, LogSettingsSetComponentInterestRequest};
 use fidl_fuchsia_diagnostics_host as fdiagnostics_host;
+use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 use realm_proxy_client::RealmProxyClient;
 use selectors::{parse_component_selector, VerboseError};
 use std::borrow::Cow;

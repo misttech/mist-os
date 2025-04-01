@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 use fidl_fuchsia_validate_logs::{
     Argument, EncodingPuppetMarker, EncodingValidatorRequest, EncodingValidatorRequestStream,
     Record, TestFailure, TestSuccess, ValidateResult, ValidateResultsIteratorGetNextResponse,

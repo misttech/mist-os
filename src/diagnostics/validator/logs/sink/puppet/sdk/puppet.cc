@@ -58,19 +58,21 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
                         GetKoid(zx_process_self()), GetKoid(zx_thread_self()));
   }
 
-  static FuchsiaLogSeverity IntoLogSeverity(fuchsia::diagnostics::Severity severity) {
+  static FuchsiaLogSeverity IntoLogSeverity(fuchsia::diagnostics::types::Severity severity) {
     switch (severity) {
-      case fuchsia::diagnostics::Severity::TRACE:
+      case fuchsia::diagnostics::types::Severity::TRACE:
         return FUCHSIA_LOG_TRACE;
-      case fuchsia::diagnostics::Severity::DEBUG:
+      case fuchsia::diagnostics::types::Severity::DEBUG:
         return FUCHSIA_LOG_DEBUG;
-      case fuchsia::diagnostics::Severity::INFO:
+      case fuchsia::diagnostics::types::Severity::INFO:
         return FUCHSIA_LOG_INFO;
-      case fuchsia::diagnostics::Severity::WARN:
+      case fuchsia::diagnostics::types::Severity::WARN:
         return FUCHSIA_LOG_WARNING;
-      case fuchsia::diagnostics::Severity::ERROR:
+      case fuchsia::diagnostics::types::Severity::ERROR:
         return FUCHSIA_LOG_ERROR;
-      case fuchsia::diagnostics::Severity::FATAL:
+      case fuchsia::diagnostics::types::Severity::FATAL:
+        return FUCHSIA_LOG_FATAL;
+      default:
         return FUCHSIA_LOG_FATAL;
     }
   }

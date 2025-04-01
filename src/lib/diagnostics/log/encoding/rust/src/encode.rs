@@ -5,13 +5,17 @@
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
 use crate::{constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, Value};
-use fidl_fuchsia_diagnostics::Severity;
 use std::array::TryFromSliceError;
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 use thiserror::Error;
+
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
+use fidl_fuchsia_diagnostics::Severity;
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+use fidl_fuchsia_diagnostics_types::Severity;
 
 /// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records
 /// into it.
@@ -888,7 +892,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Info as u8,
+                    severity: Severity::Info.into_primitive(),
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: None,
                     line: None,
@@ -906,7 +910,7 @@ mod tests {
             record,
             Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Info as u8,
+                severity: Severity::Info.into_primitive(),
                 arguments: vec![
                     Argument::pid(zx::Koid::from_raw(0)),
                     Argument::tid(zx::Koid::from_raw(0)),
@@ -921,7 +925,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Error as u8,
+                    severity: Severity::Error.into_primitive(),
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: Some("foo.rs"),
                     line: Some(10),
@@ -939,7 +943,7 @@ mod tests {
             record,
             Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Error as u8,
+                severity: Severity::Error.into_primitive(),
                 arguments: vec![
                     Argument::pid(zx::Koid::from_raw(0)),
                     Argument::tid(zx::Koid::from_raw(0)),
@@ -956,7 +960,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Warn as u8,
+                    severity: Severity::Warn.into_primitive(),
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: None,
                     line: None,
@@ -974,7 +978,7 @@ mod tests {
             record,
             Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Warn as u8,
+                severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument::pid(zx::Koid::from_raw(0)),
                     Argument::tid(zx::Koid::from_raw(0)),

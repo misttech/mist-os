@@ -35,6 +35,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host_rust",
+    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.inspect.deprecated:fuchsia.inspect.deprecated_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

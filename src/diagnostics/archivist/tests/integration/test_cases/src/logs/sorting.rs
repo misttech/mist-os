@@ -7,7 +7,7 @@ use diagnostics_data::ExtendedMoniker;
 use diagnostics_reader::{ArchiveReader, Subscription};
 use futures::StreamExt;
 use realm_proxy_client::RealmProxyClient;
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics_types as fdiagnostics};
 
 #[fuchsia::test]
 async fn timestamp_sorting_for_batches() {

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use fidl_fuchsia_diagnostics::{ComponentSelector, Interest, LogInterestSelector, StringSelector};
+use fidl_fuchsia_diagnostics::{ComponentSelector, LogInterestSelector, StringSelector};
+use fidl_fuchsia_diagnostics_types::Interest;
 use fidl_fuchsia_sys2 as fsys;
 use run_test_suite_lib::TestParams;
 use std::io::Read;

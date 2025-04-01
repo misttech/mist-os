@@ -27,7 +27,7 @@ use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
 use log::{debug, error, info, trace, warn};
 use std::sync::Arc;
-use {fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_diagnostics as fdiagnostics};
+use {fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_diagnostics_types as fdiagnostics};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),

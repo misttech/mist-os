@@ -15,11 +15,17 @@ group("tests") {
 }
 
 LIB_DEPS = [
-  "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
   "//src/lib/diagnostics/log/types",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:log",
 ]
+
+if (current_build_target_api_level_as_integer <= 26) {
+  LIB_DEPS += [ "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust" ]
+} else {
+  LIB_DEPS +=
+      [ "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust" ]
+}
 
 if (is_fuchsia) {
   LIB_DEPS += [

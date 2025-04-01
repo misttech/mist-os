@@ -11,7 +11,7 @@ use diagnostics_log_encoding::encode::EncoderOpts;
 use diagnostics_log_encoding::parse::parse_record;
 use diagnostics_log_encoding::{Argument, Record};
 use diagnostics_log_validator_utils as utils;
-use fidl_fuchsia_diagnostics::{Interest, Severity};
+use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 use fidl_fuchsia_logger::{
     LogSinkMarker, LogSinkRequest, LogSinkRequestStream, LogSinkWaitForInterestChangeResponder,
     MAX_DATAGRAM_LEN_BYTES,
@@ -383,6 +383,7 @@ fn severity_to_string(severity: Severity) -> String {
         Severity::Warn => "Warn".to_string(),
         Severity::Error => "Error".to_string(),
         Severity::Fatal => "Fatal".to_string(),
+        Severity::__SourceBreaking { .. } => panic!("unknown severity"),
     }
 }
 

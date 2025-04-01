@@ -12,7 +12,7 @@ use diagnostics_log_encoding::encode::{
 };
 use diagnostics_log_encoding::Argument;
 use diagnostics_message::LoggerMessage;
-use fidl_fuchsia_diagnostics as fdiagnostics;
+use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use std::fmt::Debug;
 use std::io::Cursor;

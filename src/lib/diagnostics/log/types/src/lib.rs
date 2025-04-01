@@ -5,9 +5,13 @@
 
 #![warn(missing_docs)]
 
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use std::str::FromStr;
 use std::{cmp, fmt};
+
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
+use fidl_fuchsia_diagnostics as fdiagnostics;
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+use fidl_fuchsia_diagnostics_types as fdiagnostics;
 
 #[cfg(feature = "serde")]
 #[doc(hidden)]
@@ -188,6 +192,8 @@ impl From<fdiagnostics::Severity> for Severity {
             fdiagnostics::Severity::Warn => Severity::Warn,
             fdiagnostics::Severity::Error => Severity::Error,
             fdiagnostics::Severity::Fatal => Severity::Fatal,
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            other => panic!("unknown severity type: {other:?}"),
         }
     }
 }

@@ -12,13 +12,20 @@ rustc_library("fuchsia") {
   edition = "2021"
   deps = [
     "macro",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:log",
   ]
+  if (current_build_target_api_level_as_integer <= 26) {
+    deps += [ "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust" ]
+  } else {
+    deps += [
+      "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
+    ]
+  }
+
   if (is_fuchsia) {
     deps += [ "//sdk/lib/scheduler/rust" ]
   }

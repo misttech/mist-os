@@ -6,7 +6,7 @@ use crate::logs::utils::Listener;
 use crate::puppet::PuppetProxyExt;
 use crate::{test_topology, utils};
 use diagnostics_reader::ArchiveReader;
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
 use futures::channel::mpsc;
 use futures::{Stream, StreamExt};

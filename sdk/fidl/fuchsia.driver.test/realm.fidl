@@ -9,6 +9,7 @@ using fuchsia.io;
 using fuchsia.component.resolution;
 using fuchsia.component.test;
 using fuchsia.diagnostics;
+using fuchsia.diagnostics.types;
 
 /// A driver name is the name defined in ZIRCON_DRIVER_BEGIN begin macro
 /// for a specific driver.
@@ -17,9 +18,16 @@ alias DriverName = string:MAX;
 @available(added=HEAD)
 const MAX_SOFTWARE_DEVICES uint32 = 20;
 
+@available(replaced=NEXT)
 type DriverLog = struct {
     name DriverName;
     log_level fuchsia.diagnostics.Severity;
+};
+
+@available(added=NEXT)
+type DriverLog = struct {
+    name DriverName;
+    log_level fuchsia.diagnostics.types.Severity;
 };
 
 @available(added=HEAD)

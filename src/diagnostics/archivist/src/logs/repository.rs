@@ -12,9 +12,8 @@ use crate::logs::shared_buffer::SharedBuffer;
 use crate::logs::stats::LogStreamStats;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
-use fidl_fuchsia_diagnostics::{
-    LogInterestSelector, Selector, Severity as FidlSeverity, StreamMode,
-};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode};
+use fidl_fuchsia_diagnostics_types::Severity as FidlSeverity;
 use flyweights::FlyStr;
 use fuchsia_inspect_derive::WithInspect;
 use fuchsia_sync::Mutex;
@@ -415,6 +414,7 @@ impl LogsRepositoryState {
                         // Log has no "Fatal" level, so set it to Error
                         // instead.
                         FidlSeverity::Fatal => LevelFilter::Error,
+                        FidlSeverity::__SourceBreaking { .. } => return,
                     },
                 );
             }

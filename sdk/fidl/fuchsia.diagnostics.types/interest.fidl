@@ -1,30 +1,39 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.diagnostics;
+library fuchsia.diagnostics.types;
 
-// NOTE TO REVIEWERS:
-// sdk/lib/syslog/duplicate_header_test/duplicate_header_unittest.cc
-// MUST be updated when updating this file. Do not +2 any changes
-// unless that test is updated. Other header files must be kept in-sync with
-// these values.
+/// Interest expresses the scope of clients' desired diagnostics data,
+/// e.g. for filtering messages or controlling their generation.
+@available(added=NEXT)
+type Interest = table {
+    /// Minimum desired severity. Components should include records at or
+    /// above this severity.
+    ///
+    /// If not present, interpreted as Severity.INFO.
+    1: min_severity Severity;
+};
 
 /// The severity of a given record.
 // Note that these severities correspond to and must match the values defined in
 // fuchsia.logger.LogLevelFilter.
-// TODO(https://fxbug.dev/42055808): Change this from `strict` to `flexible` #strictaudit
-@available(removed=NEXT)
-type Severity = strict enum : uint8 {
+@available(added=NEXT)
+type Severity = flexible enum : uint8 {
     /// Trace records include detailed information about program execution.
     TRACE = 0x10;
+
     /// Debug records include development-facing information about program execution.
     DEBUG = 0x20;
+
     /// Info records include general information about program execution. (default)
     INFO = 0x30;
+
     /// Warning records include information about potentially problematic operations.
     WARN = 0x40;
+
     /// Error records include information about failed operations.
     ERROR = 0x50;
+
     /// Fatal records convey information about operations which cause a program's termination.
     FATAL = 0x60;
 };

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("types") {
@@ -10,10 +11,17 @@ rustc_library("types") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
   ]
+
+  if (current_build_target_api_level_as_integer <= 26) {
+    deps += [ "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust" ]
+  } else {
+    deps += [
+      "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
+    ]
+  }
 
   # Some host tools use serde to serialize/deserialize severity.
   features = []

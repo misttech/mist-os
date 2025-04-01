@@ -145,7 +145,12 @@ class Logger final {
 
   static std::unique_ptr<Logger> NoOp();
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void HandleInterest(fuchsia_diagnostics_types::wire::Interest interest);
+#else
   void HandleInterest(fuchsia_diagnostics::wire::Interest interest);
+#endif
+
   void OnInterestChange(
       fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>& result);
 

@@ -11,7 +11,9 @@ fidl("fuchsia.logger") {
   api = "fuchsia.logger.api"
   sources = [ "logger.fidl" ]
   public_deps = [
+    # TODO(https://fxbug.dev/400795196): remove this dep.
     "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//zircon/vdso/zx",
   ]
 

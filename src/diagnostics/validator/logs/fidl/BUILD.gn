@@ -14,7 +14,7 @@ fidl("fuchsia.validate.logs") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]

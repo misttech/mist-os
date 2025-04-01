@@ -6,7 +6,7 @@ use crate::{test_topology, utils};
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Data, Logs, RetryConfig};
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 use futures::StreamExt;
 use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 

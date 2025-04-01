@@ -57,11 +57,11 @@ TEST_F(PciDriverTests, TestRunner) {
     log.name = driver_name;
     switch (test_log_level) {
       case 1:
-        log.log_level = fuchsia::diagnostics::Severity::DEBUG;
+        log.log_level = fuchsia::diagnostics::types::Severity::DEBUG;
         args.log_level.push_back(log);
         break;
       case 2:
-        log.log_level = fuchsia::diagnostics::Severity::TRACE;
+        log.log_level = fuchsia::diagnostics::types::Severity::TRACE;
         args.log_level.push_back(log);
         break;
     }

@@ -116,6 +116,7 @@ test("logging_cpp_unittests") {
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
+      "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_cpp",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//sdk/lib/async",
       "//sdk/lib/async:async-cpp",

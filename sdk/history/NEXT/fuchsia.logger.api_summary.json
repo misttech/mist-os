@@ -285,7 +285,7 @@
         "kind": "struct/member",
         "name": "fuchsia.logger/LogSink_WaitForInterestChange_Response.data",
         "ordinal": "1",
-        "type": "fuchsia.diagnostics/Interest"
+        "type": "fuchsia.diagnostics.types/Interest"
     },
     {
         "kind": "struct",

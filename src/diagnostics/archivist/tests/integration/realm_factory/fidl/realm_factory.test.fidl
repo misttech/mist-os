@@ -7,6 +7,7 @@ library fuchsia.archivist.test;
 using fuchsia.testing.harness;
 using fuchsia.component;
 using fuchsia.diagnostics;
+using fuchsia.diagnostics.types;
 
 /// Subset of Archivist configuration relevant to some test cases.
 type ArchivistConfig = table {
@@ -28,7 +29,10 @@ type ComponentInitialInterest = table {
     /// The moniker to which this interest applies.
     1: moniker string:MAX;
     /// The initial severity for this moniker.
+    @available(replaced=NEXT)
     2: log_severity fuchsia.diagnostics.Severity;
+    @available(added=NEXT)
+    2: log_severity fuchsia.diagnostics.types.Severity;
 };
 
 type PuppetDecl = table {

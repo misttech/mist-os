@@ -3,7 +3,7 @@
         "kind": "struct/member",
         "name": "fuchsia.driver.test/DriverLog.log_level",
         "ordinal": "2",
-        "type": "fuchsia.diagnostics/Severity"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "struct/member",

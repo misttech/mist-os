@@ -5,7 +5,7 @@
 use crate::puppet::PuppetProxyExt;
 use crate::{test_topology, utils};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 use futures::StreamExt;
 use log::warn;
 

@@ -13,27 +13,27 @@ namespace diagnostics::reader {
 
 namespace {
 
-inline fuchsia_diagnostics::Severity StringToSeverity(const std::string& input) {
+inline fuchsia_diagnostics_types::Severity StringToSeverity(const std::string& input) {
   if (strcasecmp(input.c_str(), "trace") == 0) {
-    return fuchsia_diagnostics::Severity::kTrace;
+    return fuchsia_diagnostics_types::Severity::kTrace;
   }
   if (strcasecmp(input.c_str(), "debug") == 0) {
-    return fuchsia_diagnostics::Severity::kDebug;
+    return fuchsia_diagnostics_types::Severity::kDebug;
   }
   if (strcasecmp(input.c_str(), "info") == 0) {
-    return fuchsia_diagnostics::Severity::kInfo;
+    return fuchsia_diagnostics_types::Severity::kInfo;
   }
   if (strcasecmp(input.c_str(), "warn") == 0) {
-    return fuchsia_diagnostics::Severity::kWarn;
+    return fuchsia_diagnostics_types::Severity::kWarn;
   }
   if (strcasecmp(input.c_str(), "error") == 0) {
-    return fuchsia_diagnostics::Severity::kError;
+    return fuchsia_diagnostics_types::Severity::kError;
   }
   if (strcasecmp(input.c_str(), "fatal") == 0) {
-    return fuchsia_diagnostics::Severity::kFatal;
+    return fuchsia_diagnostics_types::Severity::kFatal;
   }
   // We must never get here as long as we are reading data from Archivist.
-  return fuchsia_diagnostics::Severity::kInfo;
+  return fuchsia_diagnostics_types::Severity::kInfo;
 }
 
 }  // namespace
