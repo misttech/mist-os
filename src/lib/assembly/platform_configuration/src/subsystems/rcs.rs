@@ -20,12 +20,9 @@ impl DefineSubsystemConfiguration<()> for RcsSubsystemConfig {
                 FeatureSupportLevel::Utility | FeatureSupportLevel::Standard,
                 BuildType::UserDebug | BuildType::Eng
             )
-        ) {
-            if context.board_info.provides_feature("fuchsia::usb_peripheral_support") {
-                builder.platform_bundle("core_realm_development_access_rcs_usb");
-            } else {
-                builder.platform_bundle("core_realm_development_access_rcs_no_usb");
-            }
+        ) && context.board_info.provides_feature("fuchsia::usb_peripheral_support")
+        {
+            builder.platform_bundle("core_realm_development_access_rcs_usb");
         }
 
         Ok(())

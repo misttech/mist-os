@@ -344,7 +344,6 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "adb_support",
                          "bluetooth_hfp_hf",
                          "core_realm_development_access",
-                         "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
                          "core_realm_development_access_userdebug",
                          "session_manager_enable_pkg_cache",

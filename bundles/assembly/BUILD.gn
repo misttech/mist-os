@@ -1585,7 +1585,7 @@ assembly_input_bundle("core_realm_development_access") {
           shards = [
             "//src/developer/debug/debug_agent/meta/debug_agent.core_shard.cml",
             "//src/developer/remote-control/meta/laboratory.core_shard.cml",
-            "//src/developer/remote-control/meta/remote-control-base.core_shard.cml",
+            "//src/developer/remote-control/meta/remote-control.core_shard.cml",
             "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
             "//src/developer/toolbox/meta/toolbox.core_shard.cml",
           ]
@@ -1742,24 +1742,7 @@ assembly_input_bundle("core_realm_development_access_rcs_usb") {
         {
           component_name = "core"
           shards = [
-            "//src/developer/remote-control/meta/remote-control.core_shard.cml",
             "//src/paravirtualization/vsock/meta/vsock_service.core_shard.cml",
-          ]
-        },
-      ]
-    },
-  ]
-}
-
-assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/developer/remote-control/meta/remote-control.core_shard.cml",
           ]
         },
       ]
