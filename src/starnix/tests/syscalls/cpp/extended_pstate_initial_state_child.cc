@@ -22,6 +22,17 @@ intptr_t syscall4(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_
                    : "=a"(ret)
                    : "a"(syscall_number), "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
                    : "rcx", "r11", "memory");
+#elif defined(__arm__)
+  register intptr_t r0 asm("r0") = arg1;
+  register intptr_t r1 asm("r1") = arg2;
+  register intptr_t r2 asm("r2") = arg3;
+  register intptr_t r3 asm("r3") = arg4;
+  register intptr_t number asm("r7") = syscall_number;
+
+  __asm__ volatile("svc #0"
+                   : "=r"(ret)
+                   : "0"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(number)
+                   : "memory");
 #elif defined(__aarch64__)
   register intptr_t x0 asm("x0") = arg1;
   register intptr_t x1 asm("x1") = arg2;
@@ -105,6 +116,43 @@ extern "C" void _start() {
       message[3] = '0' + (register_number / 10) % 10;
       fail(message, static_cast<int>(i / kXmmRegisterWidth) + 1);
     }
+  }
+#elif defined(__arm__)
+  constexpr size_t kQRegisterWidth = 64;
+  std::byte d_register_buffer[16 * kQRegisterWidth];
+  uint32_t fpscr = 0;
+  __asm__ volatile(
+      "vstr       d0, [%1, #(0 * 8)]\n"
+      "vstr       d1, [%1, #(1 * 8)]\n"
+      "vstr       d2, [%1, #(2 * 8)]\n"
+      "vstr       d3, [%1, #(3 * 8)]\n"
+      "vstr       d4, [%1, #(4 * 8)]\n"
+      "vstr       d5, [%1, #(5 * 8)]\n"
+      "vstr       d6, [%1, #(6 * 8)]\n"
+      "vstr       d7, [%1, #(7 * 8)]\n"
+      "vstr       d8, [%1, #(8 * 8)]\n"
+      "vstr       d9, [%1, #(9 * 8)]\n"
+      "vstr      d10, [%1, #(10 * 8)]\n"
+      "vstr      d11, [%1, #(11 * 8)]\n"
+      "vstr      d12, [%1, #(12 * 8)]\n"
+      "vstr      d13, [%1, #(13 * 8)]\n"
+      "vstr      d14, [%1, #(14 * 8)]\n"
+      "vstr      d15, [%1, #(15 * 8)]\n"
+      "vmrs      %0, fpscr\n"
+      : "=r"(fpscr)
+      : "r"(d_register_buffer)
+      : "memory");
+  for (size_t i = 0; i < 16 * kQRegisterWidth; ++i) {
+    if (d_register_buffer[i] != std::byte{0}) {
+      int register_number = static_cast<int>(i / kQRegisterWidth);
+      char message[] = "D00\n";
+      message[2] = '0' + register_number % 10;
+      message[1] = '0' + (register_number / 10) % 10;
+      fail(message, register_number + 1);
+    }
+  }
+  if (fpscr != 0) {
+    fail("fpscr\n", 16);
   }
 #elif defined(__aarch64__)
   constexpr size_t kQRegisterWidth = 128;
