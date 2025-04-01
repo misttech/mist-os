@@ -34,7 +34,7 @@ function HELP {
     echo "--ahci=<disk image>  : run with disk image file as raw ahci drive"
     echo "--debugger           : Enable gdb stub and wait for connection"
     echo "--dry-run            : do everything but start qemu"
-    echo "--gic=<version>      : use GIC 2, 3, or max supported. default is max"
+    echo "--gic=<version>      : use GIC 2, 3, or max supported. default is 3"
     echo "--no-serial          : Disable writing out to the guest's serial port"
     echo "-S <device>          : output serial port to a QEMU character device. Default is stdio."
     echo "-M <device>          : output QEMU monitor console to a QEMU character device"
@@ -91,7 +91,7 @@ DISKFILE=
 DISKTYPE=
 DISKFMT="raw"
 DRY_RUN=0
-GIC=max
+GIC=3
 GRAPHICS=0
 DO_HVF=
 DO_KVM=
