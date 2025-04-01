@@ -18,7 +18,6 @@ pub(super) mod testing;
 use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
-use crate::TODO_DENY;
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
@@ -286,20 +285,6 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::SockFile.into() {
-        return todo_check_permission(
-            TODO_DENY!(
-                "https://fxbug.dev/364568517",
-                "Re-enable enforcement of FsNode permission checks on sockets"
-            ),
-            permission_check,
-            source_sid,
-            target_sid,
-            permission,
-            audit_context,
-        );
-    }
-
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
