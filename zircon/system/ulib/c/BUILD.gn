@@ -345,13 +345,24 @@ if (zircon_toolchain != false) {
   }
 }
 
+# This gets the actual shared_library() target defined above.
+libc_impl_label = ":libc.so($libc_toolchain)"
+
 source_set("asm-linkage") {
   visibility = [ "./*" ]
   public = [ "asm-linkage.h" ]
 }
 
-# This gets the actual shared_library() target defined above.
-libc_impl_label = ":libc.so($libc_toolchain)"
+source_set("weak") {
+  visibility = [ "./*" ]
+  public = [ "weak.h" ]
+}
+
+libc_test("weak-tests") {
+  visibility = [ ":*" ]
+  sources = [ "weak-tests.cc" ]
+  deps = [ ":weak" ]
+}
 
 # This is used by the sysroot creation (see libc_toolchain.gni and
 # sysroot_entries.gni).  It reaches the actual implementation binary, to get it
