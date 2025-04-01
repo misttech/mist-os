@@ -39,6 +39,7 @@ rustc_test("resolve_bootfs_package") {
 if (current_toolchain == default_toolchain) {
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
   }
 
   product_assembly_configuration("product_config") {
