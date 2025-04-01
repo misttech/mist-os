@@ -233,11 +233,12 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
             ),
             (
                 vec![
+                    ProgramType::CgroupSock,
+                    ProgramType::CgroupSockAddr,
+                    ProgramType::CgroupSockopt,
+                    ProgramType::Fuse,
                     ProgramType::Kprobe,
                     ProgramType::Tracepoint,
-                    ProgramType::CgroupSock,
-                    ProgramType::CgroupSockopt,
-                    ProgramType::CgroupSockAddr,
                 ]
                 .into(),
                 EbpfHelperDefinition {
