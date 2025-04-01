@@ -231,7 +231,7 @@ class LockedParentWalker {
 // This class has a large internal array and should be marked uninitialized.
 class BatchPQRemove {
  public:
-  BatchPQRemove(list_node_t* freed_list) : freed_list_(freed_list) {}
+  explicit BatchPQRemove(ScopedPageFreedList& freed_list) : freed_list_(freed_list) {}
   ~BatchPQRemove() { DEBUG_ASSERT(count_ == 0); }
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(BatchPQRemove);
 
@@ -282,7 +282,7 @@ class BatchPQRemove {
             flph);
         Pmm::Node().FinishFreeLoanedPages(flph);
       } else {
-        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_);
+        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, &freed_list_.list_);
         freed_count_ += count_;
       }
       count_ = 0;
@@ -312,7 +312,7 @@ class BatchPQRemove {
   size_t count_ = 0;
   size_t freed_count_ = 0;
   vm_page_t* pages_[kMaxPages];
-  list_node_t* freed_list_ = nullptr;
+  ScopedPageFreedList& freed_list_;
   bool is_loaned_ = false;
 };
 
@@ -709,7 +709,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
     // Clear out all content that we can see. This means dropping references to any pages in our
     // parents, as well as removing any pages in our own page list.
     ScopedPageFreedList freed_list;
-    ReleaseOwnedPagesLocked(0, parent, &freed_list);
+    ReleaseOwnedPagesLocked(0, parent, freed_list);
     freed_list.FreePagesLocked(this);
 
     DEBUG_ASSERT(parent.get() == parent_.get());
@@ -2129,11 +2129,11 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
 }
 
 void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent,
-                                         ScopedPageFreedList* freed_list) {
+                                         ScopedPageFreedList& freed_list) {
   DEBUG_ASSERT(!is_hidden());
   DEBUG_ASSERT(start <= size_);
 
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_list->list_);
+  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
 
   // If we know that the only pages in this range that need to be freed are from our own page list,
   // and we no longer need to consider our parent, then just remove them.
@@ -3293,15 +3293,12 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
     RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
   }
 
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
+  ScopedPageFreedList freed_list;
+  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
   page_remover.Flush();
-  if (!list_is_empty(&freed_list)) {
-    FreePagesLocked(&freed_list);
-  }
+  freed_list.FreePagesLocked(this);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -4569,7 +4566,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     DEBUG_ASSERT(parent_limit_ <= end);
 
     ScopedPageFreedList freed_list;
-    ReleaseOwnedPagesLocked(start, LockedPtr(), &freed_list);
+    ReleaseOwnedPagesLocked(start, LockedPtr(), freed_list);
     freed_list.FreePagesLocked(this);
 
     // If the tail of a parent disappears, the children shouldn't be able to see that region again,
@@ -5812,9 +5809,6 @@ void VmCowPages::DetachSourceLocked() {
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
 
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-
   // We would like to remove all committed pages so that all future page faults on this VMO and its
   // clones can fail in a deterministic manner. However, if the page source is preserving content
   // (is a userpager), we need to hold on to un-Clean (Dirty and AwaitingClean pages) so that they
@@ -5834,7 +5828,8 @@ void VmCowPages::DetachSourceLocked() {
     RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::Unmap, &deferred);
   }
 
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
+  ScopedPageFreedList freed_list;
+  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
 
   // Remove all clean (or untracked) pages.
   // TODO(rashaeqbal): Pages that linger after this will be written back and marked clean at some
@@ -5875,7 +5870,7 @@ void VmCowPages::DetachSourceLocked() {
       0, size_);
 
   page_remover.Flush();
-  FreePagesLocked(&freed_list);
+  freed_list.FreePagesLocked(this);
 }
 
 void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op,

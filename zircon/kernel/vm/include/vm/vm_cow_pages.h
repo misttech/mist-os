@@ -1433,7 +1433,7 @@ class VmCowPages final : public VmHierarchyBase,
   // If the caller has locked the immediate parent, then it can pass it in as |parent| to avoid
   // double locking, otherwise if no parent or not locked a nullptr can be given.
   void ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent,
-                               ScopedPageFreedList* freed_list) TA_REQ(lock());
+                               ScopedPageFreedList& freed_list) TA_REQ(lock());
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
