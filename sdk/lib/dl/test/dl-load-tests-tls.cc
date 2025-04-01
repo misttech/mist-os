@@ -642,6 +642,12 @@ void DynamicTlsGetAddrRelocTest(auto& self, const TlsLoadedSymbolNames& names) {
     GTEST_SKIP() << "test requires __tls_get_addr to resolve symbols";
   }
 
+  // This is incidental to the actual TLS functionality tested here.  But it's
+  // necessary for DlImplTests::DlIteratePhdr to work when it tries to return
+  // the TLS data pointer, even though the use of GetPhdrInfoForModule here
+  // does not look at that pointer.
+  ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess());
+
   // The TLS modid will be compared with what is shown by dl_iterate_phdr.
   auto info = GetPhdrInfoForModule(self, names.module);
 

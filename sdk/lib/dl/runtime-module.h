@@ -225,7 +225,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   void Initialize();
 
   // Construct the `dl_phdr_info` for this module.
-  dl_phdr_info MakeDlPhdrInfo(ld::DlPhdrInfoCounts counts) const;
+  dl_phdr_info MakeDlPhdrInfo(void* tls_data, ld::DlPhdrInfoCounts counts) const {
+    return ld::MakeDlPhdrInfo(module(), tls_data, counts);
+  }
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

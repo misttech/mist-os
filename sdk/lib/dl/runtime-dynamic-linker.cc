@@ -29,21 +29,19 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   return &found;
 }
 
-size_type RuntimeDynamicLinker::TlsBlock(const RuntimeModule& module) const {
+void* RuntimeDynamicLinker::TlsBlock(const RuntimeModule& module) const {
   assert(module.tls_module_id() > 0);
   if (module.tls_module_id() <= max_static_tls_modid_) {
-    assert(module.uses_static_tls());
     // TODO(https://fxbug.dev/403350238): Have the linker hold a reference to
     // the passive abi so this could pass in ld::InitialExecOffset to
     // ld::TpRelative.
-    return reinterpret_cast<uintptr_t>(
-        ld::TpRelative(static_cast<ptrdiff_t>(module.static_tls_bias())));
+    return ld::TpRelative(static_cast<ptrdiff_t>(module.static_tls_bias()));
   }
   // TODO(https://fxbug.dev/403366387): Introduce a dynamic_tls_index accessor
   // method on RuntimeModule
   auto dynamic_tls_index = module.tls_module_id() - max_static_tls_modid_ - 1;
   DynamicTlsPtr& module_tls = _dl_tlsdesc_runtime_dynamic_blocks[dynamic_tls_index];
-  return reinterpret_cast<uintptr_t>(module_tls.contents(module.tls_module()).data());
+  return module_tls.contents(module.tls_module()).data();
 }
 
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
@@ -57,8 +55,9 @@ fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule
   for (const RuntimeModule& module : root.module_tree()) {
     if (const auto* sym = name.Lookup(module.symbol_info())) {
       bool is_tls = sym->type() == elfldltl::ElfSymType::kTls;
-      return diag.ok(reinterpret_cast<void*>(
-          sym->value + (is_tls ? TlsBlock(module) : static_cast<size_type>(module.load_bias()))));
+      uintptr_t bias = (is_tls ? reinterpret_cast<uintptr_t>(TlsBlock(module))
+                               : static_cast<size_type>(module.load_bias()));
+      return diag.ok(reinterpret_cast<void*>(sym->value + bias));
     }
   }
   diag.UndefinedSymbol(ref);
@@ -142,7 +141,8 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
 // of any locks.
 int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const {
   for (const RuntimeModule& module : modules_) {
-    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(dl_phdr_info_counts());
+    void* tls = module.tls_module_id() == 0 ? nullptr : TlsBlock(module);
+    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(tls, dl_phdr_info_counts());
     // A non-zero return value ends the iteration.
     if (int result = callback(&phdr_info, sizeof(phdr_info), data); result != 0) {
       return result;

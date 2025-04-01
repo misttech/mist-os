@@ -73,10 +73,4 @@ void RuntimeModule::Initialize() {
   module().init.CallInit(load_bias());
 }
 
-dl_phdr_info RuntimeModule::MakeDlPhdrInfo(ld::DlPhdrInfoCounts counts) const {
-  // TODO(https://fxbug.dev/331421403): Include TLS data when supported.
-  void* tls_data = nullptr;
-  return ld::MakeDlPhdrInfo(module(), tls_data, counts);
-}
-
 }  // namespace dl

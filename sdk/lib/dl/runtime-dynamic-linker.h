@@ -192,7 +192,7 @@ class RuntimeDynamicLinker {
   }
 
   // Return a pointer to the beginning of a module's static or dynamic TLS block.
-  size_type TlsBlock(const RuntimeModule& module) const;
+  void* TlsBlock(const RuntimeModule& module) const;
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
