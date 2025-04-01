@@ -6027,13 +6027,12 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
   DEBUG_ASSERT(cumulative_parent_offset == 0);
 }
 
-void VmCowPages::RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
-                                              Guard<VmoLockType>::Adoptable adopt) {
-  Guard<VmoLockType> guard{AdoptLock, lock(), ktl::move(adopt)};
+// static
+void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op) {
   // TODO(https://fxbug.dev/338300943): Once all other usages of RangeChangeUpdateCowChildrenLocked
   // have been removed this call can be replaced with an implementation that correctly walks the
   // tree without relying on a hierarchy lock.
-  RangeChangeUpdateCowChildrenLocked(range, op);
+  self.locked().RangeChangeUpdateCowChildrenLocked(range, op);
 }
 
 template <typename T>
@@ -7096,13 +7095,14 @@ VmCowPages::DeferredOps::~DeferredOps() {
         free_list_.FreePagesLocked(self_);
       }
     } else {
-      Guard<VmoLockType> guard{AssertOrderedLock, self_->lock(), self_->lock_order(),
-                               VmLockAcquireMode::First};
       if (range_op_.has_value()) {
-        self_->RangeChangeUpdateCowChildren(range_op_->range, range_op_->op, guard.take());
+        LockedPtr self(self_, VmLockAcquireMode::First);
+        VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
       }
       // The pages must be freed *after* any range update is performed.
       if (!list_empty) {
+        Guard<VmoLockType> guard{AssertOrderedLock, self_->lock(), self_->lock_order(),
+                                 VmLockAcquireMode::First};
         free_list_.FreePagesLocked(self_);
       }
     }

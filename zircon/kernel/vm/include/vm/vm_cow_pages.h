@@ -740,12 +740,6 @@ class VmCowPages final : public VmHierarchyBase,
   // backed) then a nullptr can be provided.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
-  // Applies the specific operation to all mappings in the given range against descendants/cow
-  // children. The operation is not applied for this object. Only the DeferredOps is expected to
-  // call this.
-  // Takes ownership, and will drop, the lock for this object as children are iterated.
-  void RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
-                                    Guard<VmoLockType>::Adoptable adopt) TA_EXCL(lock());
   // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
   // this VMOs lock is held. This method exists while call sites transition to the above method that
   // takes ownership of the lock.
@@ -1565,6 +1559,12 @@ class VmCowPages final : public VmHierarchyBase,
                                                bool dirty_track, list_node_t* freed_list,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
+
+  // Applies the specific operation to all mappings in the given range against descendants/cow
+  // children. The operation is not applied for this object. Only the DeferredOps is expected to
+  // call this.
+  // Takes ownership, and will drop, the lock for this object as children are iterated.
+  static void RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op);
 
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
