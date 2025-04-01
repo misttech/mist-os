@@ -693,7 +693,7 @@ func (m *fakeModules) PackageRepositories() []build.PackageRepo { return m.packa
 func (m *fakeModules) PrebuiltVersions() ([]build.PrebuiltVersion, error) {
 	return []build.PrebuiltVersion{
 		{
-			Name:    "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
+			Name:    "fuchsia/third_party/android/aemu/release/${platform}",
 			Version: "aemu_version",
 		}, {
 			Name:    "fuchsia/third_party/qemu/${platform}",

@@ -49,7 +49,7 @@ readonly HOST_PLATFORM="${HOST_OS}-${HOST_CPU}"
 readonly PREBUILT_3P_DIR="${FUCHSIA_DIR}/prebuilt/third_party"
 readonly PREBUILT_TOOLS_DIR="${FUCHSIA_DIR}/prebuilt/tools"
 
-readonly PREBUILT_AEMU_DIR="${PREBUILT_3P_DIR}/android/aemu/release-gfxstream/${HOST_PLATFORM}"
+readonly PREBUILT_AEMU_DIR="${PREBUILT_3P_DIR}/android/aemu/release/${HOST_PLATFORM}"
 readonly PREBUILT_BAZEL="${PREBUILT_3P_DIR}/bazel/${HOST_PLATFORM}/bazel"
 readonly PREBUILT_BINUTILS_DIR="${PREBUILT_3P_DIR}/binutils-gdb/${HOST_PLATFORM}"
 readonly PREBUILT_BLACK_DIR="${PREBUILT_3P_DIR}/black/${HOST_PLATFORM}"
