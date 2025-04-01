@@ -50,6 +50,7 @@ zx_status_t UsbFunction::AddDevice(const std::string& name) {
 
   std::array offers = {
       fuchsia_hardware_usb_function::UsbFunctionService::Name,
+      ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
   };
   status = DdkAdd(ddk::DeviceAddArgs(name.c_str())
                       .set_str_props(props)
@@ -277,6 +278,23 @@ zx_status_t UsbFunction::Control(const usb_setup_t* setup, const void* write_buf
     zxlogf(ERROR, "Control failed as the interface is invalid.");
     return ZX_ERR_BAD_STATE;
   }
+}
+
+zx::result<> UsbFunction::Init() {
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent_);
+      result.is_error()) {
+    zxlogf(ERROR, "Failed to forward mac address: %s", result.status_string());
+    return result.take_error();
+  }
+
+  if (zx_status_t status = mac_address_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve mac address: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  return zx::ok();
 }
 
 }  // namespace usb_peripheral

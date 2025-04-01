@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_FUNCTION_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_FUNCTION_H_
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/fidl.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
@@ -14,6 +15,7 @@
 #include <threads.h>
 
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 #include <fbl/array.h>
 #include <fbl/ref_counted.h>
 #include <usb/usb.h>
@@ -40,6 +42,8 @@ class UsbFunction : public UsbFunctionType,
         function_descriptor_(desc),
         dispatcher_(dispatcher),
         outgoing_(dispatcher) {}
+
+  zx::result<> Init();
 
   // Device protocol implementation.
   void DdkRelease();
@@ -121,6 +125,7 @@ class UsbFunction : public UsbFunctionType,
   async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_usb_function::UsbFunction> bindings_;
+  ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata> mac_address_metadata_server_;
 };
 
 }  // namespace usb_peripheral
