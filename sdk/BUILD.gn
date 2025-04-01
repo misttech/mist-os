@@ -100,7 +100,7 @@ if (!sdk_inside_sub_build) {
 
       # Ensure that the host tools in-tree developers expect are always built
       # in a default build regardless of which IDK is built.
-      ":non_build_host_tools($host_toolchain)",
+      ":idk_host_tools_collection($host_toolchain)",
     ]
 
     # Ensure the full IDK collection build is not accidentally a dependency.
@@ -157,7 +157,7 @@ group("final_fuchsia_idk") {
   ]
   testonly = true
 
-  # Ensure the non-in-tree IDK does not depend on the legadcy "core" target.
+  # Ensure the non-in-tree IDK does not depend on the legacy "core" target.
   # TODO(https://fxbug.dev/317385989): Remove when deleting "core" target.
   assert_no_deps = [ ":core" ]
 }
@@ -405,7 +405,7 @@ if (!is_host) {
         deps = invoker.atoms_to_include_in_deprecated_arch_directory
 
         # While the Vulkan layers support being built at individual API levels,
-        # the SDK atom is not aware of API levels so each subbuilds would be
+        # the SDK atom is not aware of API levels so each sub-build would be
         # written to the same path in the IDK, clobbering all but one for each
         # CPU architecture.
         # TODO(https://fxbug.dev/327223536): Make an SDK atom for loadable
@@ -900,7 +900,6 @@ sdk_collection("zircon_sysroot") {
 if (is_host) {
   # Tools and data used on a host development machine (usually Linux or macOS).
   sdk_molecule("host_tools_for_single_toolchain") {
-    visibility += [ "//tools/docsgen:invoke_clidoc" ]
     category = "partner"
     deps = [
       ":build_host_tools",
@@ -1427,6 +1426,26 @@ if (current_toolchain == default_toolchain) {
 }  # current_toolchain == default_toolchain
 
 if (is_host) {
+  # A collection of all host tools in the IDK for the current (host) toolchain.
+  # This must contain exactly the set of host tools (for a single CPI
+  # architecture) included in ":final_fuchsia_idk". It is used to generate
+  # documentation for the tools.
+  # Its "SDK root" is at:
+  # `get_label_info("//sdk:idk_host_tools_collection", "root_out_dir") + "/sdk/exported/idk_host_tools_collection"`
+  sdk_collection("idk_host_tools_collection") {
+    visibility = []
+    visibility = [
+      ":sdk",
+      "//tools/docsgen:invoke_clidoc",
+    ]
+
+    # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
+    # sdk_* templates.
+    category = "internal"
+
+    deps = [ ":host_tools_for_single_toolchain" ]
+  }
+
   # A collection that only contains host tools that are used by the Fuchsia
   # build when running ffx tools via the `ffx_action()` template. This allows
   # "ffx-assembly" to find the tools it needs via an IDK manifest just as it
