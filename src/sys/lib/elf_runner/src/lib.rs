@@ -26,7 +26,7 @@ use crate::vdso_vmo::get_next_vdso_vmo;
 use ::routing::policy::ScopedPolicyChecker;
 use chrono::{NaiveDateTime, TimeZone as _, Utc};
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_diagnostics_types::{
+use fidl_fuchsia_component_runner::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
 };
 use fidl_fuchsia_process_lifecycle::LifecycleMarker;
@@ -716,7 +716,7 @@ mod tests {
         create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy,
     };
     use fidl_connector::Connect;
-    use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+    use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::LifecycleProxy;
     use fidl_test_util::spawn_stream_handler;

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex as StdMutex, Weak};
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
 };
 
@@ -252,8 +252,7 @@ pub enum EventPayload {
 /// Information about a component's runtime provided to `Started`.
 #[derive(Clone)]
 pub struct RuntimeInfo {
-    pub diagnostics_receiver:
-        Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
+    pub diagnostics_receiver: Arc<Mutex<Option<oneshot::Receiver<fcrunner::ComponentDiagnostics>>>>,
     pub start_time: zx::BootInstant,
     pub start_time_monotonic: zx::MonotonicInstant,
 }
@@ -262,7 +261,7 @@ impl RuntimeInfo {
     pub fn new(
         timestamp: zx::BootInstant,
         timestamp_monotonic: zx::MonotonicInstant,
-        diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
+        diagnostics_receiver: oneshot::Receiver<fcrunner::ComponentDiagnostics>,
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
