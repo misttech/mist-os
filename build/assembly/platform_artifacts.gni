@@ -18,7 +18,13 @@ import("//build/python/python_action.gni")
 #     [list] Deps to metadata walk to find the platform artifacts which will
 #     be copied into the output directory.
 #
+#   version (required)
+#     [string] Release version for these platform artifacts.
+#
 template("platform_artifacts") {
+  assert(defined(invoker.version),
+         "platform_artifacts(\"target_name\") must define `version`")
+
   files = {
     aib_list = "$target_out_dir/$target_name/aib_list.json"
     platform_artifacts = "$target_out_dir/$target_name/platform_artifacts"
@@ -60,7 +66,7 @@ template("platform_artifacts") {
     hermetic_action_ignored_prefixes = [ "${files.platform_artifacts}" ]
 
     binary_label = "//build/assembly/scripts:generate_platform_artifacts"
-    outputs = [ "${files.platform_artifacts}/stamp" ]
+    outputs = [ "${files.platform_artifacts}/platform_artifacts.json" ]
     deps = [ ":${labels.aib_list}" ]
     depfile = files.depfile
 
@@ -72,6 +78,13 @@ template("platform_artifacts") {
       "--depfile",
       rebase_path(files.depfile, root_build_dir),
     ]
+
+    if (invoker.version != "") {
+      args += [
+        "--version",
+        invoker.version,
+      ]
+    }
   }
 
   bazel_input_directory(labels.bazel_inputs) {

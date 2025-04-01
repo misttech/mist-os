@@ -8,7 +8,6 @@ import json
 import os
 import shutil
 import sys
-import time
 
 import depfile
 
@@ -22,6 +21,7 @@ def main() -> int:
     )
     parser.add_argument("--outdir", type=str, required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--version", type=str)
     args = parser.parse_args()
 
     shutil.rmtree(args.outdir)
@@ -39,11 +39,13 @@ def main() -> int:
         except OSError:
             shutil.copytree(src, dst)
 
-    stamp = os.path.join(args.outdir, "stamp")
-    with open(stamp, "w") as f:
-        f.write(str(time.time()))
+    version = args.version if args.version else "unversioned"
+    config_data = {"release_version": version}
+    config = os.path.join(args.outdir, "platform_artifacts.json")
+    with open(config, "w") as f:
+        json.dump(config_data, f, indent=2)
 
-    depfile.DepFile.from_deps(stamp, deps).write_to(args.depfile)
+    depfile.DepFile.from_deps(config, deps).write_to(args.depfile)
 
     return 0
 

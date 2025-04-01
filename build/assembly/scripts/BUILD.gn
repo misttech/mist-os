@@ -25,6 +25,12 @@ python_binary("generate_platform_artifacts") {
   deps = [ "//build/python/modules/depfile" ]
 }
 
+python_host_test("generate_platform_artifacts_test") {
+  main_source = "generate_platform_artifacts_test.py"
+  sources = [ "generate_platform_artifacts.py" ]
+  libraries = [ "//build/python/modules/depfile" ]
+}
+
 python_binary("generated_assembly_inputs") {
   main_source = "generated_assembly_inputs.py"
   deps = [ "//build/python/modules/assembly" ]
@@ -134,5 +140,6 @@ group("tests") {
     ":check_size_hermetic_inputs_test",
     ":compare_json_list_test",
     ":convert_size_limits_test",
+    ":generate_platform_artifacts_test",
   ]
 }
