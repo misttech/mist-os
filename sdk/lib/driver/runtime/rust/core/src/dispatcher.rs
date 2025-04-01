@@ -405,8 +405,8 @@ impl<D: OnDispatcher + 'static> ArcWake for Task<D> {
             Err(e) if e == Status::from_raw(ZX_ERR_BAD_STATE) => {
                 // the dispatcher is shutting down so drop the future, if there
                 // is one, to cancel it.
-                let mut future_slot = arc_self.future.lock().unwrap();
-                core::mem::drop(future_slot.take());
+                let future_slot = arc_self.future.lock().unwrap().take();
+                core::mem::drop(future_slot);
             }
             res => res.expect("Unexpected error waking dispatcher task"),
         }
