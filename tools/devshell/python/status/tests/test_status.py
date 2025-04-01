@@ -284,6 +284,7 @@ Build Info:
   Base packages: [//other:tests] (--with-base argument of `fx set`)
   Cache packages: [//src/other:tests] (--with-cache argument of `fx set`)
   Universe packages: [//scripts:tests, //tools/devshell/python:tests] (--with argument of `fx set`)
+  Developer tests: [//src/other:tests] (--with-test argument of `fx set`)
   Compilation mode: debug
 """
 
@@ -349,6 +350,13 @@ EXPECTED_JSON_OUTPUT = """
           "//tools/devshell/python:tests"
         ],
         "notes": "--with argument of `fx set`"
+      },
+      "developer_test_labels": {
+        "title": "Developer tests",
+        "value": [
+          "//src/other:tests"
+        ],
+        "notes": "--with-test argument of `fx set`"
       },
       "compilation_mode": {
         "title": "Compilation mode",
