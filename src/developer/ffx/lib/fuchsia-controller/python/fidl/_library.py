@@ -121,7 +121,7 @@ class Method(dict):
         return self["ordinal"]
 
     def name(self) -> str:
-        return self["name"]
+        return normalize_member_name(self["name"])
 
     def raw_name(self) -> str:
         return self.name()
@@ -979,7 +979,7 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         # Methods without a request are event methods.
         if method.has_request():
             continue
-        method_snake_case = camel_case_to_snake_case(method.name())
+        method_snake_case = method.name()
         properties[method_snake_case] = event_method(
             method, root_ir, get_fidl_request_server_lambda
         )
@@ -1067,7 +1067,7 @@ def protocol_client_type(ir: IR, root_ir) -> type:
         if not method.has_request():
             # This is an event. This needs to be handled on its own.
             continue
-        method_snake_case = camel_case_to_snake_case(method.name())
+        method_snake_case = method.name()
         properties[method_snake_case] = protocol_method(
             method, root_ir, get_fidl_request_client_lambda
         )
@@ -1123,7 +1123,7 @@ def send_event_lambda(method: Method, root_ir: IR, msg) -> Callable:
 
 
 def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
-    snake_case_name = camel_case_to_snake_case(ir.name())
+    snake_case_name = ir.name()
     if msg:
 
         def server_lambda(self, request):
@@ -1222,7 +1222,7 @@ def create_method(
     elif payload_kind == "table":
         params = [
             inspect.Parameter(
-                member["name"],
+                normalize_member_name(member["name"]),
                 inspect.Parameter.KEYWORD_ONLY,
                 default=None,
                 annotation=type_annotation(member["type"], root_ir),
@@ -1235,7 +1235,7 @@ def create_method(
     elif payload_kind == "union":
         params = [
             inspect.Parameter(
-                member["name"],
+                normalize_member_name(member["name"]),
                 inspect.Parameter.KEYWORD_ONLY,
                 annotation=type_annotation(member["type"], root_ir),
             )

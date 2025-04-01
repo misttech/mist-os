@@ -99,7 +99,7 @@ class RtcUisngFc(rtc.Rtc):
         )
 
         try:
-            result = asyncio.run(self._proxy.set(rtc=ftime))
+            result = asyncio.run(self._proxy.set_(rtc=ftime))
         except fuchsia_controller_py.ZxStatus as status:
             msg = f"Device.Set() error {status}"
             raise HoneydewRtcError(msg) from status

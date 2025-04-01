@@ -23,3 +23,9 @@ fidl("test.python.protocol") {
 
   sources = [ "test.python.protocol/protocol.test.fidl" ]
 }
+
+fidl("test.python.reserved") {
+  testonly = true
+
+  sources = [ "test.python.reserved/reserved.test.fidl" ]
+}

@@ -175,6 +175,7 @@ group("tests") {
       "tests:fuchsia_controller_fidl_client_test",
       "tests:fuchsia_controller_fidl_common_test",
       "tests:fuchsia_controller_fidl_construct_test",
+      "tests:fuchsia_controller_fidl_reserved_names_test",
       "tests:fuchsia_controller_fidl_server_test",
       "tests:fuchsia_controller_fidl_union_test",
       "tests:fuchsia_controller_importing_test",

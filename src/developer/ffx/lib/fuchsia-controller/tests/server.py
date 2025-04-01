@@ -39,7 +39,7 @@ class TargetCollectionReaderImpl(ffx.TargetCollectionReaderServer):
         super().__init__(channel)
         self.target_list = target_list
 
-    def next(self, request: ffx.TargetCollectionReaderNextRequest) -> None:
+    def next_(self, request: ffx.TargetCollectionReaderNextRequest) -> None:
         if not request.entry:
             raise StopServer
         self.target_list.extend(request.entry)
@@ -50,18 +50,18 @@ class TargetCollectionImpl(ffx.TargetCollectionServer):
         self, request: ffx.TargetCollectionListTargetsRequest
     ) -> None:
         reader = ffx.TargetCollectionReaderClient(request.reader)
-        await reader.next(
+        await reader.next_(
             entry=[
                 ffx.TargetInfo(nodename="foo"),
                 ffx.TargetInfo(nodename="bar"),
             ]
         )
-        await reader.next(
+        await reader.next_(
             entry=[
                 ffx.TargetInfo(nodename="baz"),
             ]
         )
-        await reader.next(entry=[])
+        await reader.next_(entry=[])
 
 
 class StubFileServer(f_io.FileServer):

@@ -97,7 +97,7 @@ class RtcFcTests(unittest.TestCase):
         )
 
         self.rtc.set(time)
-        self.m_proxy.set.assert_called_once_with(rtc=want)
+        self.m_proxy.set_.assert_called_once_with(rtc=want)
         self.m_run.assert_called_once()
 
     def test_rtc_set_error(self) -> None:
@@ -116,7 +116,7 @@ class RtcFcTests(unittest.TestCase):
         with self.assertRaisesRegex(HoneydewRtcError, msg):
             self.rtc.set(time)
 
-        self.m_proxy.set.assert_called_once()
+        self.m_proxy.set_.assert_called_once()
         self.m_run.assert_called_once()
 
     def test_rtc_set_exception(self) -> None:
@@ -135,7 +135,7 @@ class RtcFcTests(unittest.TestCase):
         with self.assertRaisesRegex(HoneydewRtcError, msg):
             self.rtc.set(time)
 
-        self.m_proxy.set.assert_called_once()
+        self.m_proxy.set_.assert_called_once()
         self.m_run.assert_called_once()
 
 
