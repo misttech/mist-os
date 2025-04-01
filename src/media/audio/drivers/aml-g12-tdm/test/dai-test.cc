@@ -10,17 +10,16 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/sync/completion.h>
 
 #include <thread>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace audio::aml_g12 {
@@ -84,17 +83,17 @@ class FakeMmio {
 
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
 
-  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
+  fake_mmio::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
   static constexpr size_t kRegCount =
       S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 class TestAmlG12TdmDai : public AmlG12TdmDai {
  public:
-  explicit TestAmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev)
+  explicit TestAmlG12TdmDai(zx_device_t* parent, fdf::PDev pdev)
       : AmlG12TdmDai(parent, std::move(pdev)) {}
   dai_protocol_t GetProto() { return {&this->dai_protocol_ops_, this}; }
   bool AllowNonContiguousRingBuffer() override { return true; }
@@ -112,7 +111,7 @@ class TestAmlG12TdmDai : public AmlG12TdmDai {
 };
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
 };
 
 class AmlG12TdmDaiTest : public zxtest::Test {
@@ -120,7 +119,7 @@ class AmlG12TdmDaiTest : public zxtest::Test {
   void SetUp() override {}
 
  protected:
-  zx::result<ddk::PDevFidl> StartPDev() {
+  zx::result<fdf::PDev> StartPDev() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
     if (endpoints.is_error()) {
       return endpoints.take_error();
@@ -131,7 +130,7 @@ class AmlG12TdmDaiTest : public zxtest::Test {
       return zx::error(status);
     }
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.mmios[0] = mmio_.mmio();
     config.use_fake_bti = true;
 
@@ -140,7 +139,7 @@ class AmlG12TdmDaiTest : public zxtest::Test {
       infra->pdev_server.SetConfig(std::move(config));
       infra->pdev_server.Connect(std::move(server));
     });
-    return zx::ok(ddk::PDevFidl(std::move(endpoints->client)));
+    return zx::ok(fdf::PDev(std::move(endpoints->client)));
   }
 
   FakeMmio mmio_;

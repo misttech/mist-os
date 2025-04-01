@@ -81,7 +81,6 @@ zx_library("amlogic") {
     "s905d2-pll-rates.cc",
   ]
   deps = [
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
@@ -91,6 +90,7 @@ zx_library("amlogic") {
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//src/devices/lib/mmio",
     "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/fbl",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

@@ -10,43 +10,23 @@ import("//build/testing/cc_test_executable.gni")
 cc_test_executable("aml-g12-tdm-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
-  sources = [
-    "../aml-tdm-config-device.cc",
-    "../aml-tdm-config-device.h",
-    "../audio-stream.cc",
-    "stream-test.cc",
-  ]
+  sources = [ "stream-test.cc" ]
   deps = [
-    "../:aml-g12-tdm-bind",
+    "..:aml-g12-tdm-source",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.pin:fuchsia.hardware.pin_cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/media/audio/drivers/lib/audio-driver-proto",
-    "//src/media/audio/drivers/lib/audio-proto-utils",
-    "//src/media/audio/lib/simple-audio-stream",
     "//src/media/audio/lib/simple-codec",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 
@@ -61,41 +41,21 @@ cc_test_executable("aml-g12-tdm-test-bin") {
 cc_test_executable("aml-g12-tdm-dai-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
-  sources = [
-    "../aml-tdm-config-device.cc",
-    "../aml-tdm-config-device.h",
-    "../dai.cc",
-    "dai-test.cc",
-  ]
+  sources = [ "dai-test.cc" ]
   deps = [
-    "../:aml-g12-tdm-dai-bind",
-    "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
+    "..:aml-g12-tdm-dai-source",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
-
-    # TODO(andresoportus): Remove dependency on TLS (maybe done by C++ bindings unification).
-    "//sdk/lib/async-loop:async-loop-default",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
