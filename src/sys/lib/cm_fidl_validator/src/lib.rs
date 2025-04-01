@@ -368,11 +368,9 @@ fn ref_to_dependency_node<'a>(ref_: Option<&'a fdecl::Ref>) -> Option<Dependency
     }
 }
 
-fn generate_dependency_graph<'a>(
+fn get_dependencies_from_uses<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
-    dynamic_children: &Vec<(&'a str, &'a str)>,
-    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
 ) {
     if let Some(uses) = decl.uses.as_ref() {
         for use_ in uses.iter() {
@@ -400,6 +398,86 @@ fn generate_dependency_graph<'a>(
             }
         }
     }
+}
+
+fn get_dependencies_from_capabilities<'a>(
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    decl: &'a fdecl::Component,
+) {
+    if let Some(capabilities) = decl.capabilities.as_ref() {
+        for cap in capabilities {
+            match cap {
+                #[cfg(fuchsia_api_level_at_least = "25")]
+                fdecl::Capability::Dictionary(dictionary) => {
+                    if dictionary.source_path.as_ref().is_some() {
+                        if let Some(name) = dictionary.name.as_ref() {
+                            // If `source_path` is set that means the dictionary is provided by the program,
+                            // which implies a dependency from `self` to the dictionary declaration.
+                            strong_dependencies
+                                .add_edge(DependencyNode::Self_, DependencyNode::Capability(name));
+                        }
+                    }
+                }
+                fdecl::Capability::Storage(storage) => {
+                    if let (Some(name), Some(_backing_dir)) =
+                        (storage.name.as_ref(), storage.backing_dir.as_ref())
+                    {
+                        if let Some(source_node) = ref_to_dependency_node(storage.source.as_ref()) {
+                            strong_dependencies
+                                .add_edge(source_node, DependencyNode::Capability(name));
+                        }
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+}
+
+fn get_dependencies_from_environments<'a>(
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    decl: &'a fdecl::Component,
+) {
+    if let Some(environment) = decl.environments.as_ref() {
+        for environment in environment {
+            if let Some(name) = &environment.name {
+                let target = DependencyNode::Environment(name);
+                if let Some(debugs) = environment.debug_capabilities.as_ref() {
+                    for debug in debugs {
+                        if let fdecl::DebugRegistration::Protocol(o) = debug {
+                            if let Some(source_node) = ref_to_dependency_node(o.source.as_ref()) {
+                                strong_dependencies.add_edge(source_node, target);
+                            }
+                        }
+                    }
+                }
+                if let Some(runners) = environment.runners.as_ref() {
+                    for runner in runners {
+                        if let Some(source_node) = ref_to_dependency_node(runner.source.as_ref()) {
+                            strong_dependencies.add_edge(source_node, target);
+                        }
+                    }
+                }
+                if let Some(resolvers) = environment.resolvers.as_ref() {
+                    for resolver in resolvers {
+                        if let Some(source_node) = ref_to_dependency_node(resolver.source.as_ref())
+                        {
+                            strong_dependencies.add_edge(source_node, target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn generate_dependency_graph<'a>(
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
+    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+) {
+    get_dependencies_from_uses(strong_dependencies, decl);
 
     let mut all_offers: Vec<&fdecl::Offer> = vec![];
 
@@ -447,34 +525,8 @@ fn generate_dependency_graph<'a>(
         }
     }
 
-    if let Some(capabilities) = decl.capabilities.as_ref() {
-        for cap in capabilities {
-            match cap {
-                #[cfg(fuchsia_api_level_at_least = "25")]
-                fdecl::Capability::Dictionary(dictionary) => {
-                    if dictionary.source_path.as_ref().is_some() {
-                        if let Some(name) = dictionary.name.as_ref() {
-                            // If `source_path` is set that means the dictionary is provided by the program,
-                            // which implies a dependency from `self` to the dictionary declaration.
-                            strong_dependencies
-                                .add_edge(DependencyNode::Self_, DependencyNode::Capability(name));
-                        }
-                    }
-                }
-                fdecl::Capability::Storage(storage) => {
-                    if let (Some(name), Some(_backing_dir)) =
-                        (storage.name.as_ref(), storage.backing_dir.as_ref())
-                    {
-                        if let Some(source_node) = ref_to_dependency_node(storage.source.as_ref()) {
-                            strong_dependencies
-                                .add_edge(source_node, DependencyNode::Capability(name));
-                        }
-                    }
-                }
-                _ => continue,
-            }
-        }
-    }
+    get_dependencies_from_capabilities(strong_dependencies, decl);
+    get_dependencies_from_environments(strong_dependencies, decl);
 
     if let Some(children) = decl.children.as_ref() {
         for child in children {
@@ -495,23 +547,6 @@ fn generate_dependency_graph<'a>(
                     let source = DependencyNode::Environment(env.as_str());
                     let target = DependencyNode::Collection(name.as_str());
                     strong_dependencies.add_edge(source, target);
-                }
-            }
-        }
-    }
-
-    if let Some(environment) = decl.environments.as_ref() {
-        for environment in environment {
-            if let Some(debugs) = environment.debug_capabilities.as_ref() {
-                for debug in debugs {
-                    if let Some(name) = environment.name.as_ref() {
-                        if let fdecl::DebugRegistration::Protocol(o) = debug {
-                            if let Some(source_node) = ref_to_dependency_node(o.source.as_ref()) {
-                                let target = DependencyNode::Environment(name);
-                                strong_dependencies.add_edge(source_node, target);
-                            }
-                        }
-                    }
                 }
             }
         }
