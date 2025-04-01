@@ -9,7 +9,7 @@ import logging
 import os
 import subprocess
 import sys
-from typing import Any, List, TextIO
+from typing import Any, TextIO
 
 from assembly import (
     AIBCreator,
@@ -125,7 +125,7 @@ def create_bundle(args: argparse.Namespace) -> None:
 def add_pkg_list_from_file(
     aib_creator: AIBCreator, pkg_list_file: TextIO, pkg_set_name: str
 ) -> None:
-    pkg_list: List[str] = _read_json_file(pkg_list_file)  # type: ignore
+    pkg_list: list[str] = _read_json_file(pkg_list_file)  # type: ignore
     for package in [PackageDetails(m, pkg_set_name) for m in pkg_list]:
         if package in aib_creator.packages:
             raise ValueError(f"duplicate pkg manifest found: {package.package}")
@@ -135,7 +135,7 @@ def add_pkg_list_from_file(
 def add_kernel_cmdline_from_file(
     aib_creator: AIBCreator, kernel_cmdline_file: TextIO
 ) -> None:
-    cmdline_list: List[str] = _read_json_file(kernel_cmdline_file)  # type: ignore
+    cmdline_list: list[str] = _read_json_file(kernel_cmdline_file)  # type: ignore
     for cmd in cmdline_list:
         if cmd in aib_creator.kernel.args:
             raise ValueError(f"duplicate kernel cmdline arg found: {cmd}")

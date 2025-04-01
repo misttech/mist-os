@@ -9,7 +9,7 @@ import os
 import shutil
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from assembly import FilePath, PackageCopier, PackageDetails, fast_copy_makedirs
 from assembly.assembly_input_bundle import (
@@ -27,7 +27,7 @@ from serialization import instance_from_dict, json_dump, json_load
 @dataclass
 class ShellCommandEntryFromGN:
     package: str
-    components: List[str]
+    components: list[str]
 
 
 @dataclass
@@ -46,17 +46,17 @@ class DeveloperOverridesFromGN:
     bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
-    packages: List[PackageDetails] = field(default_factory=list)
-    packages_to_compile: List[CompiledPackageDefinition] = field(
+    packages: list[PackageDetails] = field(default_factory=list)
+    packages_to_compile: list[CompiledPackageDefinition] = field(
         default_factory=list
     )
 
     # The type that's deserialized from what GN writes is different from that which will be written
     # out for Assembly to use.
-    shell_commands: List[ShellCommandEntryFromGN] = field(default_factory=list)
+    shell_commands: list[ShellCommandEntryFromGN] = field(default_factory=list)
 
 
-ShellCommandsForAssembly = Dict[str, List[str]]
+ShellCommandsForAssembly = dict[str, list[str]]
 
 
 @dataclass
@@ -93,8 +93,8 @@ class DeveloperOverridesForAssembly:
     bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
-    packages: List[PackageDetails] = field(default_factory=list)
-    packages_to_compile: List[CompiledPackageDefinition] = field(
+    packages: list[PackageDetails] = field(default_factory=list)
+    packages_to_compile: list[CompiledPackageDefinition] = field(
         default_factory=list
     )
 
@@ -182,7 +182,7 @@ def main() -> int:
     # TODO(https://fxbug.dev/406838880) - Refactor this to use the same mechanisms in
     # assembly_input_bundle.py.
     if overrides_from_gn.packages_to_compile:
-        packages_to_compile: List[CompiledPackageDefinition] = []
+        packages_to_compile: list[CompiledPackageDefinition] = []
         for package in overrides_from_gn.packages_to_compile:
             if package.contents:
                 raise ValueError(
@@ -192,9 +192,9 @@ def main() -> int:
                 raise ValueError(
                     "\nExtra component includes for compiled_packages are not supported at this time.\n"
                 )
-            components: List[CompiledComponentDefinition] = []
+            components: list[CompiledComponentDefinition] = []
             for component in package.components:
-                shards: Set[FilePath] = set()
+                shards: set[FilePath] = set()
                 for shard in component.shards:
                     dest = os.path.join(
                         args.outdir,
@@ -234,7 +234,7 @@ def main() -> int:
     # Copy the files to a pair of resources dirs:
     for raw_entry in input_file_path_entries:
         # The input_file_path_entries is a list of dicts, as the serialization library doesn't
-        # want to deserialize a 'List[Foo]'.
+        # want to deserialize a 'list[Foo]'.
         #
         # So here the list of dicts parsed from json above is individually deserialized into
         # the appropriate class.

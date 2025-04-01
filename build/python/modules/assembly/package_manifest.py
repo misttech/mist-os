@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Optional
 
 from serialization import serialize_fields_as
 
@@ -51,7 +51,7 @@ class BlobEntry:
 
     def compare_with(
         self, other: "BlobEntry", allow_source_path_differences=False
-    ) -> List[str]:
+    ) -> list[str]:
         """Compare this BlobEntry with the other, reporting any differences.
 
         If 'allow_source_path_differences' is True, then the source_paths of
@@ -93,12 +93,12 @@ class PackageManifest:
     """The output manifest for a Fuchsia package."""
 
     package: PackageMetaData
-    blobs: List[BlobEntry]
+    blobs: list[BlobEntry]
     version: str = "1"
     # TODO(https://fxbug.dev/42066050): Change this to `paths_relative`, because it
     # applies to both blob source and subpackage manifest.
     blob_sources_relative: Optional[str] = None
-    subpackages: List[SubpackageEntry] = field(default_factory=list)
+    subpackages: list[SubpackageEntry] = field(default_factory=list)
     repository: Optional[str] = None
 
     def set_paths_relative(self, relative_to_file: bool):
@@ -106,12 +106,12 @@ class PackageManifest:
             "file" if relative_to_file else "working_dir"
         )
 
-    def blobs_by_path(self) -> Dict[FilePath, BlobEntry]:
+    def blobs_by_path(self) -> dict[FilePath, BlobEntry]:
         return {blob.path: blob for blob in self.blobs}
 
     def compare_with(
         self, other: "PackageManifest", allow_source_path_differences=False
-    ) -> List[str]:
+    ) -> list[str]:
         """Compare this package manifest with the other, reporting any
         differences.
 

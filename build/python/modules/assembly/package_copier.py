@@ -8,16 +8,15 @@ blobstore.
 """
 
 import os
-from typing import Dict, List, Set, Tuple
 
 from serialization import json_dump, json_load
 
 from .common import FileEntry, FilePath, fast_copy
 from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
 
-DepSet = Set[FilePath]
+DepSet = set[FilePath]
 Merkle = str
-BlobSources = Dict[Merkle, FilePath]
+BlobSources = dict[Merkle, FilePath]
 
 __all__ = [
     "PackageCopier",
@@ -84,17 +83,17 @@ class PackageCopier:
         self.blobstore = os.path.join(outdir, "blobs")
 
         # The package manifests:
-        self.manifests: Dict[str, Tuple[FileEntry, PackageManifest]] = {}
+        self.manifests: dict[str, tuple[FileEntry, PackageManifest]] = {}
 
         # The subpackages of each package
-        self.subpackages: Dict[Merkle, Tuple[FileEntry, PackageManifest]] = {}
+        self.subpackages: dict[Merkle, tuple[FileEntry, PackageManifest]] = {}
 
         # The files opened by the package copier
         self.deps: DepSet = set()
 
     def add_package(
         self, package_manifest_path: FilePath
-    ) -> Tuple[FilePath, PackageManifest]:
+    ) -> tuple[FilePath, PackageManifest]:
         """Add a package manifest to the set of packages to copy.
 
         Packages may not be fully copied until the 'perform_copy()' function is called.
@@ -160,7 +159,7 @@ class PackageCopier:
                     subpackage_manifest,
                 )
 
-    def perform_copy(self) -> Tuple[List[FilePath], DepSet]:
+    def perform_copy(self) -> tuple[list[FilePath], DepSet]:
         """Finalize the copy operation.
 
         All actual copying may be deferred until this function is called.
@@ -170,7 +169,7 @@ class PackageCopier:
         blobs: BlobSources = {}
 
         # The blob destination paths (relative to the outdir)
-        blob_paths: List[FilePath] = []
+        blob_paths: list[FilePath] = []
 
         if self.manifests:
             os.makedirs(self.packages_dir)
@@ -220,7 +219,7 @@ def _copy_package(
     manifest: PackageManifest,
     subpackages_dir: FilePath,
     blobstore: FilePath,
-) -> Tuple[BlobSources, DepSet]:
+) -> tuple[BlobSources, DepSet]:
     """Copy a package manifest to the assembly bundle outdir, adding its
     blobs to the set of blobs that need to be copied as well. If the package
     has subpackages, recursively copy those as well, skipping any
