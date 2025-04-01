@@ -164,20 +164,24 @@ impl FileOps for BpfHandle {
 
         let memory_object = match schema.map_type {
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
+                let page_size = *PAGE_SIZE as usize;
                 // Starting from the second page, this cannot be mapped writable.
-                if length > *PAGE_SIZE as usize {
+                if length > page_size {
                     if prot.contains(ProtectionFlags::WRITE) {
                         return error!(EPERM);
                     }
                     // This cannot be mapped outside of the 2 control pages and the 2 data sections.
-                    if length > 2 * (*PAGE_SIZE as usize) + 2 * schema.max_entries as usize {
+                    if length > 2 * page_size + 2 * schema.max_entries as usize {
                         return error!(EINVAL);
                     }
                 }
 
+                // The first page of the ring buffer VMO is not visible to
+                // user-space processes. Return a VMO slice that doesn't
+                // include the first page.
+                let clone_size = 2 * page_size + schema.max_entries as usize;
                 let vmo_dup = vmo
-                    .as_handle_ref()
-                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .create_child(zx::VmoChildOptions::SLICE, page_size as u64, clone_size as u64)
                     .map_err(|_| errno!(EIO))?
                     .into();
                 Arc::new(MemoryObject::RingBuf(vmo_dup))

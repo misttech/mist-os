@@ -90,13 +90,17 @@ impl RingBuffer {
     ///
     /// This will create a mapping in the kernel user space with the following layout:
     ///
-    /// |T| |C| |P| |D| |D|
+    /// | T | L | C | P | D | D |
     ///
     /// where:
     /// - T is 1 page containing at its 0 index a pointer to the `RingBuffer` itself.
-    /// - C is 1 page containing at its 0 index a atomic u32 for the consumer position
-    /// - P is 1 page containing at its 0 index a atomic u32 for the producer position
+    /// - L is 1 page reserved for a lock. Currently unused. Hidden from user-space.
+    /// - C is 1 page containing at its 0 index a atomic u32 for the consumer position.
+    ///   Accessible in user-space for write.
+    /// - P is 1 page containing at its 0 index a atomic u32 for the producer position.
+    ///   Accessible in user-space for read-only access.
     /// - D is size bytes and is the content of the ring buffer.
+    ///   Accessible in user-space for read-only access.
     ///
     /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
     /// required never to move in memory.
@@ -112,8 +116,16 @@ impl RingBuffer {
             return Err(MapError::InvalidParam);
         }
         let mask: u32 = (size - 1).try_into().map_err(|_| MapError::InvalidParam)?;
-        // Add the 2 control pages
-        let vmo_size = 2 * page_size + size;
+
+        // Technical VMO is mapped at the head of the VMAR used by the
+        // ring-buffer. It's used to store a pointer to the `RingBuffer`. This
+        // VMO is specific to this process.
+        let technical_vmo_size = page_size;
+
+        // Add 3 control pages at the head of the ring-buffer VMO.
+        let control_pages_size = 3 * page_size;
+        let vmo_size = control_pages_size + size;
+
         let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
         // SAFETY
         //
@@ -124,15 +136,16 @@ impl RingBuffer {
             AllocatedVmar::allocate(
                 &kernel_root_vmar,
                 0,
-                // Allocate for one technical page, the 2 control pages and twice the size.
-                page_size + vmo_size + size,
+                // Allocate for one technical page, the control pages and twice the size.
+                technical_vmo_size + control_pages_size + 2 * size,
                 zx::VmarFlags::CAN_MAP_SPECIFIC
                     | zx::VmarFlags::CAN_MAP_READ
                     | zx::VmarFlags::CAN_MAP_WRITE,
             )
             .map_err(|_| MapError::Internal)?
         };
-        let technical_vmo = zx::Vmo::create(page_size as u64).map_err(|_| MapError::Internal)?;
+        let technical_vmo =
+            zx::Vmo::create(technical_vmo_size as u64).map_err(|_| MapError::Internal)?;
         technical_vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
             0,
@@ -146,17 +159,19 @@ impl RingBuffer {
         let vmo = zx::Vmo::create(vmo_size as u64).map_err(|_| MapError::Internal)?;
         vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
-            page_size,
+            technical_vmo_size,
             &vmo,
             0,
             vmo_size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
         .map_err(|_| MapError::Internal)?;
+
+        // Map the data again at the end.
         vmar.map(
-            page_size + vmo_size,
+            technical_vmo_size + vmo_size,
             &vmo,
-            (page_size * 2) as u64,
+            control_pages_size as u64,
             size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
@@ -167,9 +182,9 @@ impl RingBuffer {
         // This is safe as long as the vmar mapping stays alive. This will be ensured by the
         // `RingBuffer` itself.
         let storage_position = unsafe { &mut *((base) as *mut *const Self) };
-        let consumer_position = unsafe { &*((base + page_size) as *const AtomicU32) };
-        let producer_position = unsafe { &*((base + 2 * page_size) as *const AtomicU32) };
-        let data = base + 3 * page_size;
+        let consumer_position = unsafe { &*((base + 2 * page_size) as *const AtomicU32) };
+        let producer_position = unsafe { &*((base + 3 * page_size) as *const AtomicU32) };
+        let data = base + technical_vmo_size + control_pages_size;
         let storage = Box::pin(Self {
             vmo: Arc::new(vmo),
             state: Mutex::new(RingBufferState { mask, consumer_position, producer_position, data }),
@@ -248,7 +263,7 @@ impl RingBuffer {
         let header = &*((addr - std::mem::size_of::<RingBufferRecordHeader>())
             as *const RingBufferRecordHeader);
         let addr_page = addr / page_size;
-        let mapping_start_page = addr_page - header.page_count as usize;
+        let mapping_start_page = addr_page - header.page_count as usize - 1;
         let mapping_start_address = mapping_start_page * page_size;
         let ringbuf_impl = &*(mapping_start_address as *const &RingBuffer);
         (ringbuf_impl, header)
