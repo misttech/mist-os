@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::BoardInputBundleArgs;
+use crate::{common, BoardInputBundleArgs};
 
 use anyhow::{Context, Result};
 use assembly_config_schema::{
@@ -28,7 +28,8 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         thread_roles,
         power_metrics_recorder_config,
         sysmem_format_costs_config,
-        release_version,
+        version,
+        version_file,
         depfile,
     } = args.to_owned();
 
@@ -91,7 +92,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),
         configuration,
-        release_version: Some(release_version.to_string()),
+        release_version: Some(common::get_release_version(version, version_file)?),
     };
     bundle.write_to_dir(output, depfile.as_ref())?;
 

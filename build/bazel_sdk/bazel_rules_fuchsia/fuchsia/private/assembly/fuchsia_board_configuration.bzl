@@ -35,10 +35,6 @@ def _fuchsia_board_configuration_impl(ctx):
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
 
-    board_config["release_version"] = "unversioned"
-    if ctx.attr.release_version:
-        board_config["release_version"] = ctx.attr.release_version
-
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
     if kernel != {}:
@@ -86,6 +82,18 @@ def _fuchsia_board_configuration_impl(ctx):
     check_type(filesystems, "dict")
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
     board_config["filesystems"] = filesystems
+
+    if ctx.attr.version and ctx.attr.version_file:
+        fail("Only one of \"version\" or \"version_file\" can be set.")
+        # TODO(https://fxbug.dev/397489730):
+        # Make it required to have exactly one of these set
+        # once these changes have rolled into all downstream repositories.
+
+    if ctx.attr.version:
+        creation_args += ["--version", ctx.attr.version]
+    if ctx.file.version_file:
+        creation_args += ["--version-file", ctx.file.version_file.path]
+        input_files.append(ctx.file.version_file)
 
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
@@ -166,11 +174,12 @@ _fuchsia_board_configuration = rule(
             doc = "Name of this board.",
             mandatory = True,
         ),
-        "release_version": attr.string(
+        "version": attr.string(
             doc = "Release version of this board.",
-            # TODO: https://fxbug.dev/397489730 - Make this a mandatory field
-            # once these changes have rolled into all downstream repositories.
-            default = "",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
         ),
         "hardware_info": attr.string(
             doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",

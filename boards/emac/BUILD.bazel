@@ -90,5 +90,5 @@ fuchsia_board_configuration(
         "fuchsia::paver",
         "fuchsia::usb_peripheral_support",
     ],
-    release_version = build_info_version,
+    version = build_info_version,
 )

@@ -14,6 +14,7 @@ rustc_binary("generate_config") {
     "src/board_config.rs",
     "src/board_input_bundle.rs",
     "src/board_input_bundle_set.rs",
+    "src/common.rs",
     "src/main.rs",
     "src/product_config.rs",
   ]

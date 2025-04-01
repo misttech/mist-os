@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{BoardArgs, HybridBoardArgs};
+use crate::{common, BoardArgs, HybridBoardArgs};
 
 use anyhow::Result;
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
@@ -16,6 +16,8 @@ pub fn new(args: &BoardArgs) -> Result<()> {
         let directory = DirectoryPathBuf(board_input_bundle.clone());
         config.input_bundles.insert(key, directory);
     }
+
+    config.release_version = Some(common::get_release_version(&args.version, &args.version_file)?);
 
     // Build systems do not know the name of the BIBs, so they serialize index
     // numbers in place of BIB names by default. We add the BIB names in now,
@@ -124,6 +126,8 @@ mod tests {
     use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry};
     use camino::Utf8PathBuf;
     use std::collections::BTreeSet;
+    use std::fs::File;
+    use std::io::Write;
     use tempfile::{tempdir, NamedTempFile};
 
     #[test]
@@ -167,6 +171,7 @@ mod tests {
             board_input_bundle_sets: vec![bib_set_path],
             output: board_path.clone(),
             depfile: None,
+            ..Default::default()
         };
         new(&args).unwrap();
 
@@ -178,6 +183,99 @@ mod tests {
         let bib = BoardInputBundle::from_dir(bib_path).unwrap();
         let expected = BTreeSet::<String>::from(["arg".to_string()]);
         assert_eq!(expected, bib.kernel_boot_args);
+    }
+
+    fn new_board_with_version_or_version_file(
+        tmp_path: Utf8PathBuf,
+        version: Option<String>,
+        version_file: Option<Utf8PathBuf>,
+    ) -> (Result<(), anyhow::Error>, Utf8PathBuf, Utf8PathBuf) {
+        let config_file = NamedTempFile::new().unwrap();
+        let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
+        let config_value = serde_json::json!({
+            "name": "my_board",
+        });
+        serde_json::to_writer(&config_file, &config_value).unwrap();
+
+        // Create a BIB.
+        let bib_path = tmp_path.join("my_bib");
+        let bib = BoardInputBundle {
+            name: "my_bib".to_string(),
+            kernel_boot_args: ["arg".to_string()].into(),
+            ..Default::default()
+        };
+        bib.write_to_dir(&bib_path, None::<Utf8PathBuf>).unwrap();
+
+        // Add the BIB to a set.
+        let bib_set_path = tmp_path.join("my_bib_set");
+        let bib_set = BoardInputBundleSet {
+            name: "my_bib_set".to_string(),
+            board_input_bundles: [(
+                "my_bib".to_string(),
+                BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
+            )]
+            .into(),
+        };
+        bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
+
+        // Create a board.
+        let board_path = tmp_path.join("my_board");
+        let args = BoardArgs {
+            config: config_path,
+            board_input_bundles: vec![],
+            board_input_bundle_sets: vec![bib_set_path.clone()],
+            output: board_path.clone(),
+            version,
+            version_file,
+            depfile: None,
+        };
+        (new(&args), board_path, bib_set_path)
+    }
+
+    #[test]
+    fn test_new_board_unversioned() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+        let (_, board_path, _) = new_board_with_version_or_version_file(tmp_path, None, None);
+
+        // Ensure the Board config has the correct version string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "unversioned".to_string();
+        assert_eq!(expected, board.release_version.unwrap());
+    }
+
+    #[test]
+    fn test_new_board_version_string() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+        let (_, board_path, _) = new_board_with_version_or_version_file(
+            tmp_path,
+            Some("fake_version".to_string()),
+            None,
+        );
+
+        // Ensure the Board config has the correct version string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "fake_version".to_string();
+        assert_eq!(expected, board.release_version.unwrap());
+    }
+
+    #[test]
+    fn test_new_board_version_file() {
+        let tmp_dir = tempdir().unwrap();
+        let tmp_path = Utf8PathBuf::from_path_buf(tmp_dir.path().to_path_buf()).unwrap();
+
+        let version_file_path = tmp_path.join("version.txt");
+        let version_file = File::create(&version_file_path);
+        version_file.unwrap().write_all("fake_version".as_bytes()).unwrap();
+
+        let (_, board_path, _) =
+            new_board_with_version_or_version_file(tmp_path, None, Some(version_file_path));
+
+        // Ensure the Board config has the correct version string.
+        let board = BoardInformation::from_dir(board_path).unwrap();
+        let expected = "fake_version".to_string();
+        assert_eq!(expected, board.release_version.unwrap());
     }
 
     #[test]

@@ -5,6 +5,7 @@
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
 import("//build/assembly/board_input_bundle_set.gni")
+import("//build/info/info.gni")
 
 assert(current_toolchain == default_toolchain,
        "The x64 board can only be defined in the default toolchain.")
@@ -13,6 +14,8 @@ assert(current_cpu == "x64",
 
 common_board_configuration = {
   name = "x64"
+
+  version = build_info_version
 
   hardware_info = {
     name = "default-board"
@@ -121,6 +124,7 @@ board_input_bundle("reduced_perf_variation_args") {
     # performance differences when spectre mitigations are in place.
     "kernel.x86.disable_spec_mitigations=true",
   ]
+  version = build_info_version
 }
 
 board_input_bundle("main_bundle") {
@@ -161,6 +165,7 @@ board_input_bundle("main_bundle") {
     "//src/graphics/drivers/gfxstream-vulkan",
     "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen",
   ]
+  version = build_info_version
 }
 
 board_input_bundle("x64_common") {
@@ -304,10 +309,12 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/e1000.cm" ]
     },
   ]
+  version = build_info_version
 }
 
 board_input_bundle("paver") {
   bootfs_packages = [ "//src/bringup/bin/paver:package-uefi" ]
+  version = build_info_version
 }
 
 board_input_bundle_set("x64_bibs") {

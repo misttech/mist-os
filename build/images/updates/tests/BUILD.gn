@@ -20,6 +20,7 @@ if (is_fuchsia) {
   import("//build/assembly/product_assembly_configuration.gni")
   import("//build/bazel/assembly/bazel_product_bundle.gni")
   import("//build/images/paths.gni")
+  import("//build/info/info.gni")
   import("//build/product.gni")
 
   product_assembly_configuration("product_assembly_config") {
@@ -49,6 +50,7 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
     filesystems = {
       fvm = {
         sparse_output = {

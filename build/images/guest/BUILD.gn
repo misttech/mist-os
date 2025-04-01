@@ -8,6 +8,7 @@ import("//build/assembly/board_input_bundle.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/paths.gni")
+import("//build/info/info.gni")
 import("//build/product.gni")
 
 #########
@@ -101,6 +102,7 @@ if (labels.images == "//build/images/bringup") {
         },
       ]
     }
+    version = build_info_version
   }
 
   board_configuration("board") {
@@ -117,6 +119,7 @@ if (labels.images == "//build/images/bringup") {
       ":main_bundle",
       "//boards/emulation/virtio",
     ]
+    version = build_info_version
   }
 
   # Guest's specific product assembly.  It's based on the minimal feature set

@@ -9,6 +9,7 @@
 mod board_config;
 mod board_input_bundle;
 mod board_input_bundle_set;
+mod common;
 mod product_config;
 
 use anyhow::Result;
@@ -159,8 +160,12 @@ struct BoardInputBundleArgs {
     sysmem_format_costs_config: Vec<Utf8PathBuf>,
 
     /// release version that this BIB corresponds to.
-    #[argh(option, default = "\"unversioned\".to_string()")]
-    release_version: String,
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this BIB matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
 
     /// a depfile to write.
     #[argh(option)]
@@ -168,7 +173,7 @@ struct BoardInputBundleArgs {
 }
 
 /// Arguments to generate a board config.
-#[derive(FromArgs)]
+#[derive(FromArgs, Default)]
 #[argh(subcommand, name = "board")]
 struct BoardArgs {
     /// the input board config with absolute paths.
@@ -179,13 +184,21 @@ struct BoardArgs {
     #[argh(option)]
     board_input_bundles: Vec<Utf8PathBuf>,
 
-    /// paths to baord input bundle sets to make available.
+    /// paths to board input bundle sets to make available.
     #[argh(option)]
     board_input_bundle_sets: Vec<Utf8PathBuf>,
 
     /// the directory to write the board config to.
     #[argh(option)]
     output: Utf8PathBuf,
+
+    /// release version that this board config corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this config matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
 
     /// a depfile to write.
     #[argh(option)]

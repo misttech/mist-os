@@ -4,7 +4,6 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
-import("//build/info/info.gni")
 
 # Creates the assembly Board configuration file, and it's main Hardware Support
 # Bundle, which respectively provide information about the board and components
@@ -83,6 +82,16 @@ import("//build/info/info.gni")
 #    anything in this list will cause tee_manager to be included in the core
 #    realm and have the protocols specified routed to the /core/trusted_apps
 #    realm.
+#
+#  version (optional)
+#    [string] String representing the release version for this board config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
+#    must be set.
+#
+#  version_file (optional)
+#    [string] Path to a file containing the release version for this config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
+#    be set.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -212,11 +221,6 @@ template("board_configuration") {
                   get_label_info(invoker.devicetree, "name") + ".dtb",
               root_build_dir)
     }
-
-    release_version = "unversioned"
-    if (defined(build_info_version) && build_info_version != "") {
-      release_version = build_info_version
-    }
   }
 
   generated_file(labels.base_info) {
@@ -244,6 +248,7 @@ template("board_configuration") {
 
     tool = "//build/assembly/tools/generate_config"
     tool_output_name = "assembly_generate_config"
+    inputs = []
     outputs = [ files.board_config_file ]
     depfile = "${target_out_dir}/${target_name}.d"
 
@@ -266,6 +271,20 @@ template("board_configuration") {
       args += [
         "--board-input-bundle-sets",
         rebase_path(board_input_bundle_set, root_build_dir),
+      ]
+    }
+
+    if (defined(invoker.version) && invoker.version != "") {
+      args += [
+        "--version",
+        invoker.version,
+      ]
+    }
+    if (defined(invoker.version_file) && invoker.version_file != "") {
+      inputs += [ invoker.version_file ]
+      args += [
+        "--version-file",
+        invoker.version_file,
       ]
     }
 

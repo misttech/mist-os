@@ -75,8 +75,8 @@ fuchsia_board_input_bundle(
         ":prebuilt_driver",
     ],
     cpu_manager_config = "test_data/config_data.json",
-    release_version = "fake_version_123",
     thread_roles = [],
+    version = "fake_version_123",
 )
 
 filegroup(

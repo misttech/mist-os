@@ -48,8 +48,17 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     creation_args = ["--drivers", driver_list_file.path]
 
-    if ctx.attr.release_version:
-        creation_args.extend(["--release-version", ctx.attr.release_version])
+    if ctx.attr.version and ctx.file.version_file:
+        fail("Only one of \"version\" or \"version_file\" can be set.")
+        # TODO(https://fxbug.dev/397489730):
+        # Make it required to have exactly one of these set
+        # once these changes have rolled into all downstream repositories.
+
+    if ctx.attr.version:
+        creation_args.extend(["--version", ctx.attr.version])
+    elif ctx.file.version_file:
+        creation_args.extend(["--version-file", ctx.file.version_file.path])
+        creation_inputs.append(ctx.file.version_file)
 
     # Add single-file configs
     for (arg, file) in [
@@ -185,9 +194,12 @@ fuchsia_board_input_bundle = rule(
             default = [],
             allow_files = True,
         ),
-        "release_version": attr.string(
+        "version": attr.string(
             doc = "Release version string",
-            default = "unversioned",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

@@ -5,6 +5,7 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/info/info.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 
@@ -28,6 +29,7 @@ template("assemble_network_conformance_system") {
 
   board_configuration(labels.board_config) {
     name = "network-conformance"
+    version = build_info_version
     kernel = {
       halt_on_panic = true
     }
