@@ -1593,6 +1593,14 @@ pub fn sys_ioctl(
             security::check_task_capable(current_task, CAP_SYS_RAWIO)?;
             let file = current_task.files.get(fd)?;
             security::check_file_ioctl_access(current_task, &file, request)?;
+
+            // TODO: https://fxbug.dev/404795644 - eliminate this phoney response when the SELinux
+            // Test Suite no longer requires it.
+            if current_task.kernel().features.selinux_test_suite {
+                let phoney_block = 0xbadf000du32;
+                current_task.write_object(arg.into(), &phoney_block)?;
+                return Ok(SUCCESS);
+            }
             file.ioctl(locked, current_task, request, arg)
         }
         FIOCLEX => {

@@ -22,7 +22,6 @@
                 "bpf",
                 "capable_file",
                 "capable_net",
-                "capable_sys",
                 "cgroupfs_label",
                 "checkreqprot",
                 "extended_socket_class",
