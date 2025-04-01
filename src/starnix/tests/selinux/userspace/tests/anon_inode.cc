@@ -118,4 +118,15 @@ TEST(AnonInodeTest, TimerFdIsUnlabeled) {
   EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
 }
 
+TEST(AnonInodeTest, SignalFdIsUnlabeled) {
+  LoadPolicy("anon_inode_policy.pp");
+
+  sigset_t signals;
+  sigemptyset(&signals);
+  fbl::unique_fd fd(signalfd(-1, &signals, SFD_CLOEXEC));
+  ASSERT_TRUE(fd.is_valid());
+
+  EXPECT_EQ(GetLabel(fd.get()), fit::error(ENOTSUP));
+}
+
 }  // namespace
