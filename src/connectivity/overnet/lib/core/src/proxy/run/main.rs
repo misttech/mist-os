@@ -21,9 +21,6 @@ use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 use zx_status;
 
-#[cfg(not(target_os = "fuchsia"))]
-use fuchsia_async::emulated_handle::ChannelProxyProtocol;
-
 // We run two tasks to proxy a handle - one to handle handle->stream, the other to handle
 // stream->handle. When we want to perform a transfer operation we end up wanting to think about
 // just one task, so we provide a join operation here.
@@ -121,9 +118,6 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     initial_stream_reader: Option<FramedStreamReader>,
     stream_reader: FramedStreamReader,
 ) -> Result<(), Error> {
-    #[cfg(not(target_os = "fuchsia"))]
-    proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Cso);
-
     assert!(Arc::strong_count(&proxy) == 1);
     let (tx_join, rx_join) = new_task_joiner();
     let hdl = proxy.hdl();

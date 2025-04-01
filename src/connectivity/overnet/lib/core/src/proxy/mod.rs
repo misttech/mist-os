@@ -26,9 +26,6 @@ pub(crate) use self::run::spawn::{recv as spawn_recv, send as spawn_send};
 
 pub use self::run::set_proxy_drop_event_handler;
 
-#[cfg(not(target_os = "fuchsia"))]
-use fuchsia_async::emulated_handle::ChannelProxyProtocol;
-
 #[derive(Debug)]
 pub(crate) enum RemoveFromProxyTable {
     InitiateTransfer {
@@ -178,13 +175,6 @@ impl<Hdl: 'static + Proxyable> Proxy<Hdl> {
 
     fn hdl(&self) -> &ProxyableHandle<Hdl> {
         self.hdl.as_ref().unwrap()
-    }
-
-    #[cfg(not(target_os = "fuchsia"))]
-    fn set_channel_proxy_protocol(&self, proto: ChannelProxyProtocol) {
-        if let Some(hdl) = self.hdl.as_ref() {
-            hdl.set_channel_proxy_protocol(proto)
-        }
     }
 
     async fn write_to_handle(&self, msg: &mut Hdl::Message) -> Result<(), zx_status::Status>

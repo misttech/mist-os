@@ -20,9 +20,6 @@ use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 use zx_status;
 
-#[cfg(not(target_os = "fuchsia"))]
-use fuchsia_async::emulated_handle::ChannelProxyProtocol;
-
 /// Holds a reference to a router.
 /// We start out `Unused` with a weak reference to the router, but various methods
 /// need said router, and so we can transition to `Used` with a reference when the router
@@ -115,9 +112,6 @@ pub(crate) trait Proxyable: Send + Sync + Sized + std::fmt::Debug {
     fn into_fidl_handle(self) -> Result<fidl::Handle, Error>;
     /// Clear/set signals on this handle's peer.
     fn signal_peer(&self, clear: Signals, set: Signals) -> Result<(), Error>;
-    /// Let the channel (if this is one) know what protocol we're using to proxy it.
-    #[cfg(not(target_os = "fuchsia"))]
-    fn set_channel_proxy_protocol(&self, _proto: ChannelProxyProtocol) {}
     /// Set a reason for this handle to close.
     fn close_with_reason(self, _msg: String) {}
 }
@@ -149,11 +143,6 @@ impl<Hdl: Proxyable> std::fmt::Debug for ProxyableHandle<Hdl> {
 impl<Hdl: Proxyable> ProxyableHandle<Hdl> {
     pub(crate) fn new(hdl: Hdl, router: Weak<Router>) -> Self {
         Self { hdl, router }
-    }
-
-    #[cfg(not(target_os = "fuchsia"))]
-    pub(crate) fn set_channel_proxy_protocol(&self, proto: ChannelProxyProtocol) {
-        self.hdl.set_channel_proxy_protocol(proto)
     }
 
     pub(crate) fn into_fidl_handle(self) -> Result<fidl::Handle, Error> {

@@ -9,7 +9,6 @@ pub mod socket;
 
 use crate::invoke_for_handle_types;
 use bitflags::bitflags;
-use futures::channel::oneshot;
 use futures::ready;
 use futures::task::noop_waker_ref;
 #[cfg(debug_assertions)]
@@ -447,26 +446,6 @@ impl Drop for Channel {
     }
 }
 
-/// Enum indicating which protocol is being used to proxy a channel, assuming the channel is
-/// proxied.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum ChannelProxyProtocol {
-    /// CSO protocol
-    Cso,
-    /// Legacy protocol
-    Legacy,
-}
-
-impl ChannelProxyProtocol {
-    /// Get a &str representation of the protocol.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ChannelProxyProtocol::Cso => "cso",
-            ChannelProxyProtocol::Legacy => "legacy",
-        }
-    }
-}
-
 impl Channel {
     /// Create a channel, resulting in a pair of `Channel` objects representing both
     /// sides of the channel. Messages written into one maybe read from the opposite.
@@ -538,77 +517,6 @@ impl Channel {
         };
 
         c.closed_reason = Some(msg)
-    }
-
-    /// Overnet announcing to us what protocol is being used to proxy this channel.
-    pub fn set_channel_proxy_protocol(&self, proto: ChannelProxyProtocol) {
-        assert!(!self.is_invalid());
-        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object))
-        else {
-            return;
-        };
-
-        let mut object = object.lock().unwrap();
-
-        if !object.is_open() {
-            return;
-        }
-
-        let KObjectEntry::Channel(object) = &mut *object else {
-            unreachable!("Channel handle wasn't a channel in the handle table!");
-        };
-
-        if let ChannelProxyProtocolState::Waiting(waiters) = std::mem::replace(
-            &mut object.proxy_protocol_state,
-            ChannelProxyProtocolState::Set(proto),
-        ) {
-            for waiter in waiters.into_iter() {
-                let _ = waiter.send(proto);
-            }
-        }
-    }
-
-    /// Receive an announcement from overnet if this channel is proxied via a particular protocol.
-    /// Note that this will block forever if the channel does not become the endpoint of an Overnet
-    /// proxy.
-    pub async fn get_channel_proxy_protocol(&self) -> Option<ChannelProxyProtocol> {
-        assert!(!self.is_invalid());
-        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object))
-        else {
-            return None;
-        };
-
-        // this seemingly redundant block lets us avoid holding the object lock
-        // across the receiver await, potentially causing a deadlock.
-        let receiver = {
-            let mut object = object.lock().unwrap();
-
-            if !object.is_open() {
-                return None;
-            }
-
-            let KObjectEntry::Channel(object) = &mut *object else {
-                unreachable!("Channel handle wasn't a channel in the handle table!");
-            };
-
-            match &mut object.proxy_protocol_state {
-                ChannelProxyProtocolState::Set(state) => {
-                    return Some(*state);
-                }
-                ChannelProxyProtocolState::Unset => {
-                    let (sender, receiver) = oneshot::channel();
-                    object.proxy_protocol_state = ChannelProxyProtocolState::Waiting(vec![sender]);
-                    receiver
-                }
-                ChannelProxyProtocolState::Waiting(waiters) => {
-                    let (sender, receiver) = oneshot::channel();
-                    waiters.push(sender);
-                    receiver
-                }
-            }
-        };
-
-        receiver.await.ok()
     }
 
     /// Read a message from a channel.
@@ -1835,15 +1743,8 @@ trait HdlData {
     fn is_side_open(&self, side: Side) -> bool;
 }
 
-enum ChannelProxyProtocolState {
-    Unset,
-    Waiting(Vec<oneshot::Sender<ChannelProxyProtocol>>),
-    Set(ChannelProxyProtocol),
-}
-
 struct KObject<Q> {
     two_sided: bool,
-    proxy_protocol_state: ChannelProxyProtocolState,
     q: Sided<Q>,
     wakers: Sided<Wakers>,
     open_count: Sided<usize>,
@@ -1900,7 +1801,6 @@ impl<Q> KObject<Q> {
         *open_count = open_count.saturating_sub(1);
 
         if *open_count == 0 {
-            self.proxy_protocol_state = ChannelProxyProtocolState::Unset;
             self.wakers.side_mut(side).wake(Signals::HANDLE_CLOSED);
 
             if *self.open_count.side(side.opposite()) != 0 {
@@ -2018,7 +1918,6 @@ fn new_handle_pair(hdl_type: HdlType, rights: Rights) -> (u32, u32, Arc<Mutex<KO
     fn new_kobject<T: Default>() -> KObject<T> {
         KObject {
             two_sided: true,
-            proxy_protocol_state: ChannelProxyProtocolState::Unset,
             q: Default::default(),
             wakers: Default::default(),
             open_count: Sided { left: 1, right: 1 },
@@ -2056,7 +1955,6 @@ fn new_handle(hdl_type: HdlType, rights: Rights) -> (u32, Arc<Mutex<KObjectEntry
     fn new_kobject<T: Default>() -> KObject<T> {
         KObject {
             two_sided: false,
-            proxy_protocol_state: ChannelProxyProtocolState::Unset,
             q: Default::default(),
             wakers: Default::default(),
             open_count: Sided { left: 1, right: 0 },

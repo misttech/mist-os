@@ -16,9 +16,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use zx_status;
 
-#[cfg(not(target_os = "fuchsia"))]
-use fuchsia_async::emulated_handle::ChannelProxyProtocol;
-
 pub(crate) struct Channel {
     chan: AsyncChannel,
 }
@@ -44,11 +41,6 @@ impl Proxyable for Channel {
         let chan: &fidl::Channel = self.chan.as_ref();
         chan.signal_peer(clear, set)?;
         Ok(())
-    }
-
-    #[cfg(not(target_os = "fuchsia"))]
-    fn set_channel_proxy_protocol(&self, proto: ChannelProxyProtocol) {
-        self.chan.set_channel_proxy_protocol(proto);
     }
 
     #[cfg(not(target_os = "fuchsia"))]

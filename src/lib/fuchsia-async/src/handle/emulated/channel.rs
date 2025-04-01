@@ -56,15 +56,6 @@ impl Channel {
         self.channel.close_with_reason(msg)
     }
 
-    /// Overnet announcing to us what protocol is being used to proxy this channel.
-    pub fn set_channel_proxy_protocol(&self, proto: super::ChannelProxyProtocol) {
-        self.channel.set_channel_proxy_protocol(proto)
-    }
-    /// Receive an announcement from overnet if this channel is proxied via a particular protocol
-    pub async fn get_channel_proxy_protocol(&self) -> Option<super::ChannelProxyProtocol> {
-        self.channel.get_channel_proxy_protocol().await
-    }
-
     /// Returns a future that completes when `is_closed()` is true.
     pub fn on_closed(&self) -> OnSignalsRef<'_> {
         OnSignalsRef::new(self, Signals::CHANNEL_PEER_CLOSED)
