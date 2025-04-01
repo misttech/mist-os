@@ -96,6 +96,7 @@ function prepare_bazel_workspace {
 
   ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/BUILD.bazel" "${workspace_dir}/BUILD.bazel"
   ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/WORKSPACE.bazel" "${workspace_dir}/WORKSPACE.bazel"
+  ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/crate_annotations.bzl" "${workspace_dir}/crate_annotations.bzl"
 
   ln -s "${FUCHSIA_DIR}/prebuilt/third_party/bazel/linux-x64/bazel-real" "${workspace_dir}/bazel"
   ln -s "${FUCHSIA_DIR}/prebuilt/third_party/buildifier/linux-x64/buildifier" "${workspace_dir}/buildifier"

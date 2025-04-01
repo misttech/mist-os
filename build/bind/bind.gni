@@ -581,7 +581,6 @@ template("_bind_library_rust") {
   library_name_underscore = string_replace(library_name, ".", "_")
   rust_file =
       "${target_gen_dir}/${target_name}/rust/${library_name_underscore}_lib.rs"
-  crate_name = "bind_${library_name_underscore}"
   rust_file_gen_target = "${target_name}_rust_file_gen"
   rust_library_target = "${target_name}_rust"
   crate_output_directory = "${target_out_dir}/${target_name}"
@@ -648,7 +647,7 @@ template("_bind_library_rust") {
     }
 
     edition = "2018"
-    name = crate_name
+    name = "bind_${library_name_underscore}"
     output_dir = crate_output_directory
     sources = [ rust_file ]
     source_root = rust_file

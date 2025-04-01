@@ -549,7 +549,6 @@ if (support_rust) {
                                "visibility",
                                "testonly",
                              ])
-      name = crate_name
       edition = "2021"
       source_root = crate_root
 

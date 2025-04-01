@@ -1,0 +1,25 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "lib",
+    srcs = ["src/lib.rs"],
+    crate_name = "netext",
+    edition = "2021",
+    target_compatible_with = HOST_CONSTRAINTS,
+    version = "0.1.0",
+    deps = [
+        "//third_party/rust_crates/forks/nix-0.29.0:nix",
+        "//third_party/rust_crates/vendor:anyhow",
+        "//third_party/rust_crates/vendor:futures",
+        "//third_party/rust_crates/vendor:itertools",
+        "//third_party/rust_crates/vendor:lazy_static",
+        "//third_party/rust_crates/vendor:libc",
+        "//third_party/rust_crates/vendor:regex",
+        "//third_party/rust_crates/vendor:tokio",
+    ],
+)

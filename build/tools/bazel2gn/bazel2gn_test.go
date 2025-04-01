@@ -315,7 +315,7 @@ func TestDepsConversion(t *testing.T) {
   deps = [
     "//third_party/rust_crates/vendor:foo",
     "//third_party/rust_crates/ask2patch:bar",
-    "//third_party/rust_crates/intree:baz",
+    "//third_party/rust_crates/forks/baz-v0.4.2:baz",
     "//path/to/dep",
   ],
 )`,

@@ -14,6 +14,10 @@ import("//build/rust/rustc_test.gni")
 #     assumed to be the same as the target name. All dashes will be replaced
 #     with underscores in the library name: <name_underscored>
 #
+#   crate_name
+#     Same as name. This param is set by auto-synced targets by bazel2gn. This
+#     matches the name of the same field in Bazel.
+#
 #   version
 #     Semver version of the crate as seen on crates.io.
 #
@@ -183,14 +187,23 @@ template("rustc_library") {
     _original_target_name = target_name
   }
 
+  _crate_name = target_name
+  assert(
+      !(defined(invoker.name) && defined(invoker.crate_name)),
+      "name and crate_name should not be defined at the same time, they mean the same thing")
+  if (defined(invoker.name)) {
+    _crate_name = invoker.name
+  }
+  if (defined(invoker.crate_name)) {
+    _crate_name = invoker.crate_name
+  }
+  _crate_name = string_replace(_crate_name, "-", "_")
+
   # if "with_unit_tests" is set to true, generate an additional rust test target
   # TODO(https://fxbug.dev/42152447): accept a string.
   if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
     rustc_test_internal("${target_name}_test") {
-      name = invoker.target_name + "_lib_test"
-      if (defined(invoker.name)) {
-        name = invoker.name + "_lib_test"
-      }
+      name = _crate_name + "_lib_test"
       original_target_name = target_name
 
       # It's valid for the test to use dependencies that were declared
@@ -227,13 +240,6 @@ template("rustc_library") {
   } else {
     source_root = "src/lib.rs"
   }
-
-  if (defined(invoker.name)) {
-    package_name = invoker.name
-  } else {
-    package_name = target_name
-  }
-  _crate_name = string_replace(package_name, "-", "_")
 
   rustc_artifact(target_name) {
     target_type = "rust_library"

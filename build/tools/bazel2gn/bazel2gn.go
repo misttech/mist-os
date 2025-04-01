@@ -7,6 +7,7 @@ package bazel2gn
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"go.starlark.net/syntax"
@@ -15,25 +16,24 @@ import (
 // indentPrefix is the string value used to indent a line by one level.
 const indentPrefix = "  "
 
-// knownRules assigns true to known rules that can be converted from Bazel to GN.
-var knownRules = map[string]bool{
-	"go_binary":          true,
-	"go_library":         true,
-	"go_test":            true,
-	"install_host_tools": true,
-	"package":            true,
-	"rust_binary":        true,
-	"sdk_host_tool":      true,
+// bazelRuleToGNTemplate maps from Bazel rule names to GN template names. They can
+// be the same if Bazel and GN shared the same template name.
+//
+// This map is also used to check known Bazel rules that can be converted to GN.
+// i.e. Bazel rules not found in this map is not supported by bazel2gn yet.
+var bazelRuleToGNTemplate = map[string]string{
+	"go_binary":          "go_binary",
+	"go_library":         "go_library",
+	"go_test":            "go_test",
+	"install_host_tools": "install_host_tools",
+	"package":            "package",
+	"rust_binary":        "rustc_binary",
+	"rust_library":       "rustc_library",
+	"sdk_host_tool":      "sdk_host_tool",
 }
 
-// bazelToGNRuleName maps from Bazel rule names to GN template names _iff_ they
-// are different.
-var bazelToGNRuleName = map[string]string{
-	"rust_binary": "rustc_binary",
-}
-
-// attrsToOmitByRules stores a mapping from known rules to attributes to omit when
-// converting them to GN.
+// attrsToOmitByRules stores a mapping from known Bazel rules to attributes to
+// omit when converting them to GN.
 var attrsToOmitByRules = map[string]map[string]bool{
 	"go_library": {
 		// In GN we default cgo to true when compiling Go code, and explicitly disable
@@ -62,13 +62,7 @@ var bazelConstraintsToGNConditions = map[string]string{
 	"HOST_CONSTRAINTS": "is_host",
 }
 
-var thirdPartyRustCrateDirs = []string{
-	"//third_party/rust_crates/ask2patch",
-	"//third_party/rust_crates/empty",
-	"//third_party/rust_crates/forks",
-	"//third_party/rust_crates/intree",
-	"//third_party/rust_crates/vendor",
-}
+var thirdPartyRustCrateRE = regexp.MustCompile(`^"\/\/third_party\/rust_crates.+:`)
 
 // indent indents input lines by input levels.
 func indent(lines []string, level int) []string {
@@ -198,17 +192,10 @@ func bazelDepToGN(expr syntax.Expr) (syntax.Expr, error) {
 	if !ok {
 		return expr, nil
 	}
-	var is3pRustCrate bool
-	for _, dir := range thirdPartyRustCrateDirs {
-		dir = `"` + dir // String literals in Starlark are quoted.
-		lit.Raw, is3pRustCrate = strings.CutPrefix(lit.Raw, dir)
-		if is3pRustCrate {
-			break
-		}
-	}
-	if is3pRustCrate {
-		lit.Raw = `"//third_party/rust_crates` + lit.Raw
-	}
+	lit.Raw = thirdPartyRustCrateRE.ReplaceAllString(
+		lit.Raw,
+		`"//third_party/rust_crates:`,
+	)
 	return lit, nil
 }
 
@@ -218,16 +205,18 @@ func bazelDepToGN(expr syntax.Expr) (syntax.Expr, error) {
 // [0] https://github.com/bazelbuild/starlark/blob/master/spec.md#function-and-method-calls
 func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	fn := expr.Fn.(*syntax.Ident)
-	if !knownRules[fn.Name] {
-		return nil, fmt.Errorf("%s is not a known Bazel rule to convert to GN", fn.Name)
+	bazelRule := fn.Name
+	gnTemplateName, ok := bazelRuleToGNTemplate[bazelRule]
+	if !ok {
+		return nil, fmt.Errorf("%s is not a known Bazel rule to convert to GN", bazelRule)
 	}
 
 	// TODO(jayzhuang): Handle package level settings, e.g. visibility.
-	if fn.Name == "package" {
+	if bazelRule == "package" {
 		return nil, nil
 	}
 
-	attrsToOmit := attrsToOmitByRules[fn.Name]
+	attrsToOmit := attrsToOmitByRules[bazelRule]
 
 	// Loops through all arguments to handle special ones first.
 	var name string
@@ -267,11 +256,7 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		return nil, errors.New("missing `name` attribute in Bazel target")
 	}
 
-	gnRuleName := fn.Name
-	if n, ok := bazelToGNRuleName[fn.Name]; ok {
-		gnRuleName = n
-	}
-	ret := []string{fmt.Sprintf("%s(%s) {", gnRuleName, name)}
+	ret := []string{fmt.Sprintf("%s(%s) {", gnTemplateName, name)}
 
 	// Loop through all args again to actually build the content of this target.
 	for _, arg := range remainingArgs {

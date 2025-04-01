@@ -2,11 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@rules_rust//crate_universe:defs.bzl", "crates_vendor", "render_config")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_vendor", "render_config")
 load("@rules_rust//rust:toolchain.bzl", "rust_stdlib_filegroup", "rust_toolchain")
+load("//:crate_annotations.bzl", "CRATE_ANNOTATIONS")
 
 crates_vendor(
     name = "crates_vendor",
+    annotations = CRATE_ANNOTATIONS,
     bazel = "//:bazel",
     buildifier = "//:buildifier",
     cargo_lockfile = "//:third_party/rust_crates/Cargo.lock",
