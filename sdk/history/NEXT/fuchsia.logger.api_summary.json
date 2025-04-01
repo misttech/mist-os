@@ -36,14 +36,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.logger/Log.DumpLogsSafe",
-        "strictness": "strict",
-        "ordinal": "1505222195749004569",
-        "direction": "one_way",
-        "request": "fuchsia.logger/LogDumpLogsSafeRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.logger/Log.ListenSafe",
         "strictness": "strict",
         "ordinal": "5643638173917143473",
@@ -51,35 +43,10 @@
         "request": "fuchsia.logger/LogListenSafeRequest"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.logger/Log.ListenSafeWithSelectors",
-        "strictness": "strict",
-        "ordinal": "1960844265602547838",
-        "direction": "one_way",
-        "request": "fuchsia.logger/LogListenSafeWithSelectorsRequest"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.logger/Log",
         "openness": "closed",
         "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogDumpLogsSafeRequest.log_listener",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.logger/LogListenerSafe"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogDumpLogsSafeRequest.options",
-        "ordinal": "2",
-        "type": "box<fuchsia.logger/LogFilterOptions>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.logger/LogDumpLogsSafeRequest",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -183,29 +150,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.logger/LogListenSafeRequest",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.log_listener",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.logger/LogListenerSafe"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.options",
-        "ordinal": "2",
-        "type": "box<fuchsia.logger/LogFilterOptions>"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest.selectors",
-        "ordinal": "3",
-        "type": "vector<fuchsia.diagnostics/LogInterestSelector>:64"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.logger/LogListenSafeWithSelectorsRequest",
         "resourceness": "resource"
     },
     {
