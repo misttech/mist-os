@@ -565,7 +565,7 @@ group("mockall") {
 }
 
 group("munge") {
-  public_deps = [ ":munge-v0_4_1" ]
+  public_deps = [ ":munge-v0_4_3" ]
 }
 
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
@@ -9431,44 +9431,44 @@ rust_library("multimap-v0_8_3") {
   applicable_licenses = [ ":multimap-v0_8_3.license" ]
 }
 
-license("munge-v0_4_1.license") {
+license("munge-v0_4_3.license") {
   public_package_name = "munge"
-  license_files = [ "//third_party/rust_crates/vendor/munge-0.4.1/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/munge-0.4.3/LICENSE" ]
 }
 
-rust_library("munge-v0_4_1") {
+rust_library("munge-v0_4_3") {
   crate_name = "munge"
-  crate_root = "//third_party/rust_crates/vendor/munge-0.4.1/src/lib.rs"
-  output_name = "munge-74906358e355fb86"
+  crate_root = "//third_party/rust_crates/vendor/munge-0.4.3/src/lib.rs"
+  output_name = "munge-15f0599b6c83c3f7"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":munge_macro-v0_4_1($host_toolchain)" ]
+  deps += [ ":munge_macro-v0_4_3($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=74906358e355fb86",
-    "-Cextra-filename=-74906358e355fb86",
+    "-Cmetadata=15f0599b6c83c3f7",
+    "-Cextra-filename=-15f0599b6c83c3f7",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":munge-v0_4_1.license" ]
+  applicable_licenses = [ ":munge-v0_4_3.license" ]
 }
 
-license("munge_macro-v0_4_1.license") {
+license("munge_macro-v0_4_3.license") {
   public_package_name = "munge_macro"
   license_files =
-      [ "//third_party/rust_crates/vendor/munge_macro-0.4.1/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/munge_macro-0.4.3/LICENSE" ]
 }
 
-rust_proc_macro("munge_macro-v0_4_1") {
+rust_proc_macro("munge_macro-v0_4_3") {
   crate_name = "munge_macro"
-  crate_root = "//third_party/rust_crates/vendor/munge_macro-0.4.1/src/lib.rs"
-  output_name = "munge_macro-2c8cbd7a937e6983"
+  crate_root = "//third_party/rust_crates/vendor/munge_macro-0.4.3/src/lib.rs"
+  output_name = "munge_macro-c355c6513eb7439c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9481,13 +9481,13 @@ rust_proc_macro("munge_macro-v0_4_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=2c8cbd7a937e6983",
-    "-Cextra-filename=-2c8cbd7a937e6983",
+    "-Cmetadata=c355c6513eb7439c",
+    "-Cextra-filename=-c355c6513eb7439c",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":munge_macro-v0_4_1.license" ]
+  applicable_licenses = [ ":munge_macro-v0_4_3.license" ]
 }
 
 license("nix-v0_29_0.license") {

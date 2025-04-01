@@ -11,16 +11,17 @@
 
 [package]
 edition = "2021"
-name = "munge_macro"
-version = "0.4.1"
+name = "munge"
+version = "0.4.3"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 build = false
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
 autobenches = false
 description = "Macro for custom destructuring"
-documentation = "https://docs.rs/munge_macro"
+documentation = "https://docs.rs/munge"
 readme = "README.md"
 keywords = [
     "macro",
@@ -35,24 +36,21 @@ license = "MIT"
 repository = "https://github.com/djkoloski/munge"
 
 [lib]
-name = "munge_macro"
+name = "munge"
 path = "src/lib.rs"
-proc-macro = true
 
-[dependencies.proc-macro2]
+[[test]]
+name = "tests"
+path = "tests/tests.rs"
+
+[dependencies.munge_macro]
+version = "=0.4.3"
+default-features = false
+
+[dev-dependencies.rustversion]
 version = "1"
 default-features = false
 
-[dependencies.quote]
+[dev-dependencies.trybuild]
 version = "1"
-default-features = false
-
-[dependencies.syn]
-version = "2"
-features = [
-    "full",
-    "parsing",
-    "printing",
-    "proc-macro",
-]
 default-features = false

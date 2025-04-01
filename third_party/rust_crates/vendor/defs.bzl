@@ -397,7 +397,7 @@ _NORMAL_DEPENDENCIES = {
             "miniz_oxide": Label("//third_party/rust_crates/vendor/miniz_oxide-0.3.6:miniz_oxide"),
             "mock-omaha-server": Label("//third_party/rust_crates/vendor/mock-omaha-server-0.3.3:mock_omaha_server"),
             "mockall": Label("//third_party/rust_crates/vendor/mockall-0.9.0:mockall"),
-            "munge": Label("//third_party/rust_crates/vendor/munge-0.4.1:munge"),
+            "munge": Label("//third_party/rust_crates/vendor/munge-0.4.3:munge"),
             "nix": Label("//third_party/rust_crates/vendor/nix-0.29.0:nix"),
             "nom": Label("//third_party/rust_crates/vendor/nom-8.0.0:nom"),
             "nom-language": Label("//third_party/rust_crates/vendor/nom-language-0.1.0:nom_language"),
