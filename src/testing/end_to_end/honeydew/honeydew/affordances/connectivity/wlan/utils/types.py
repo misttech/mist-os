@@ -515,8 +515,7 @@ class CredentialNone(Credential):
         return ""
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.none = f_wlan_policy.Empty()
+        cred = f_wlan_policy.Credential(none=f_wlan_policy.Empty())
         return cred
 
 
@@ -534,8 +533,9 @@ class CredentialPassword(Credential):
         return self.password
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.password = list(self.password.encode("utf-8"))
+        cred = f_wlan_policy.Credential(
+            password=list(self.password.encode("utf-8"))
+        )
         return cred
 
 
@@ -553,8 +553,7 @@ class CredentialPsk(Credential):
         return self.psk
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.psk = list(bytes.fromhex(self.psk))
+        cred = f_wlan_policy.Credential(psk=list(bytes.fromhex(self.psk)))
         return cred
 
 
@@ -831,11 +830,11 @@ class WepCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wep = f_wlan_common_security.WepCredentials(
-            key=list(self.key.encode("utf-8"))
+        return f_wlan_common_security.Credentials(
+            wep=f_wlan_common_security.WepCredentials(
+                key=list(self.key.encode("utf-8"))
+            )
         )
-        return credentials
 
 
 @dataclass(frozen=True)
@@ -852,10 +851,9 @@ class WpaPskCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wpa = f_wlan_common_security.WpaCredentials()
-        credentials.wpa.psk = list(self.psk)
-        return credentials
+        return f_wlan_common_security.Credentials(
+            wpa=f_wlan_common_security.WpaCredentials(psk=list(self.psk))
+        )
 
 
 @dataclass(frozen=True)
@@ -873,10 +871,11 @@ class WpaPassphraseCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wpa = f_wlan_common_security.WpaCredentials()
-        credentials.wpa.passphrase = list(self.passphrase.encode("utf-8"))
-        return credentials
+        return f_wlan_common_security.Credentials(
+            wpa=f_wlan_common_security.WpaCredentials(
+                passphrase=list(self.passphrase.encode("utf-8"))
+            )
+        )
 
 
 # TODO(http://b/346424966): Only necessary because Python does not have static

@@ -44,19 +44,15 @@ def construct_result(constructed_obj: T, parsed_obj: Any) -> T:
 
     if getattr(constructed_obj, "__fidl_kind__", None) == "union":
         # Union types only contain one variant when decoded, so take the first key.
-        key = camel_case_to_snake_case(next(iter(parsed_obj.keys())))
-        try:
-            sub_obj_type = getattr(constructed_obj, f"{key}_type")
-        except AttributeError:
-            # When using the static bindings, the type can be read directly from each variant
-            # itself.
-            sub_obj_type = inspect.get_annotations(
-                type(constructed_obj), eval_str=True
-            )[key]
-        sub_parsed_obj = parsed_obj[key]
-        setattr(constructed_obj, key, None)
+        internal_variant_name = (
+            f"_{camel_case_to_snake_case(next(iter(parsed_obj.keys())))}"
+        )
+        sub_obj_type = inspect.get_annotations(
+            type(constructed_obj), eval_str=True
+        )[internal_variant_name]
+        sub_parsed_obj = parsed_obj[internal_variant_name[1:]]
         return construct_from_name_and_type(
-            constructed_obj, sub_parsed_obj, key, sub_obj_type
+            constructed_obj, sub_parsed_obj, internal_variant_name, sub_obj_type
         )
     elements = inspect.get_annotations(type(constructed_obj), eval_str=True)
     for name, ty in elements.items():

@@ -32,11 +32,11 @@ class MethodResponseTypesTestsuite(unittest.TestCase):
         )
 
     def test_empty_response_with_error(self) -> None:
-        test_python_protocol.ClosedProtocolStrictMethodEmptyResponseWithErrorResult.response_variant(
-            None
+        test_python_protocol.ClosedProtocolStrictMethodEmptyResponseWithErrorResult(
+            response=None
         )
-        test_python_protocol.ClosedProtocolStrictMethodEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.ClosedProtocolStrictMethodEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_non_empty_response(self) -> None:
@@ -51,13 +51,13 @@ class MethodResponseTypesTestsuite(unittest.TestCase):
         )
 
     def test_non_empty_response_with_error(self) -> None:
-        test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResult.response_variant(
-            test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResponse(
+        test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResult(
+            response=test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResponse(
                 b=True
             )
         )
-        test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.ClosedProtocolStrictMethodNonEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_with_args_one_way(self) -> None:
@@ -77,11 +77,11 @@ class MethodResponseTypesTestsuite(unittest.TestCase):
         )
 
     def test_with_args_empty_response_with_error(self) -> None:
-        test_python_protocol.ClosedProtocolStrictMethodWithArgsEmptyResponseWithErrorResult.response_variant(
-            None
+        test_python_protocol.ClosedProtocolStrictMethodWithArgsEmptyResponseWithErrorResult(
+            response=None
         )
-        test_python_protocol.ClosedProtocolStrictMethodWithArgsEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.ClosedProtocolStrictMethodWithArgsEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_with_args_non_empty_response(self) -> None:
@@ -96,13 +96,13 @@ class MethodResponseTypesTestsuite(unittest.TestCase):
         )
 
     def test_with_args_non_empty_response_with_error(self) -> None:
-        test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResult.response_variant(
-            test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResponse(
+        test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResult(
+            response=test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResponse(
                 b=True
             )
         )
-        test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.ClosedProtocolStrictMethodWithArgsNonEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_empty_event(self) -> None:
@@ -146,85 +146,85 @@ class MethodResponseTypesTestsuite(unittest.TestCase):
         test_python_protocol.AjarProtocolOnFlexibleNonEmptyEventRequest(b=True)
 
     def test_flexible_empty_response(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseResult.response_variant(
-            None
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseResult(
+            response=None
         )
-        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
 
     def test_flexible_empty_response_with_error(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult.response_variant(
-            None
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+            response=None
         )
-        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
-        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.OpenProtocolFlexibleMethodEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_flexible_non_empty_response(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResult.response_variant(
-            test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResponse(
+        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResult(
+            response=test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResponse(
                 b=True
             )
         )
-        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
 
     def test_flexible_non_empty_response_with_error(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult.response_variant(
-            test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResponse(
+        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult(
+            response=test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResponse(
                 b=True
             )
         )
-        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
-        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.OpenProtocolFlexibleMethodNonEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_flexible_with_args_empty_response(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseResult.response_variant(
-            None
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseResult(
+            response=None
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
 
     def test_flexible_with_args_empty_response_with_error(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult.response_variant(
-            None
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult(
+            response=None
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsEmptyResponseWithErrorResult(
+            err=2
         )
 
     def test_flexible_with_args_non_empty_response(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResult.response_variant(
-            test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResponse(
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResult(
+            response=test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResponse(
                 b=True
             )
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
 
     def test_flexible_with_args_non_empty_response_with_error(self) -> None:
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult.response_variant(
-            test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResponse(
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult(
+            response=test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResponse(
                 b=True
             )
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult.framework_err_variant(
-            FrameworkError.UNKNOWN_METHOD
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult(
+            framework_err=FrameworkError.UNKNOWN_METHOD
         )
-        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult.err_variant(
-            2
+        test_python_protocol.OpenProtocolFlexibleMethodWithArgsNonEmptyResponseWithErrorResult(
+            err=2
         )

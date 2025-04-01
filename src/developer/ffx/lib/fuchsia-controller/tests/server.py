@@ -89,13 +89,13 @@ class FailingFileServer(f_io.File.Server):
 
 class TestingServer(fc_test.Testing.Server):
     def return_union(self):
-        res = fc_test.TestingReturnUnionResponse()
-        res.y = "foobar"
+        res = fc_test.TestingReturnUnionResponse(y="foobar")
         return res
 
     def return_union_with_table(self):
-        res = fc_test.TestingReturnUnionWithTableResponse()
-        res.y = fc_test.NoopTable(str_="bazzz", integer=-2)
+        res = fc_test.TestingReturnUnionWithTableResponse(
+            y=fc_test.NoopTable(str_="bazzz", integer=-2)
+        )
         return res
 
 
@@ -248,7 +248,6 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
             file_server.serve()
         )
         res = await file_proxy.read(count=4)
-        self.assertEqual(res.response, None)
         self.assertEqual(res.err, ZxStatus.ZX_ERR_PEER_CLOSED)
         server_task.cancel()
 
@@ -346,6 +345,62 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await t_client.some_method_just_error()
         with self.assertRaisesRegex(RuntimeError, "Result error"):
             res.unwrap()
+        server_task.cancel()
+
+    async def test_strict_one_way_union(self):
+        class NoopServer(fc_test.Noop.Server):
+            def strict_one_way_union(self, value):
+                pass
+
+        client, server = Channel.create()
+        t_client = fc_test.Noop.Client(client)
+        t_server = NoopServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        self.assertEquals(None, t_client.strict_one_way_union(value=1))
+        server_task.cancel()
+
+    async def test_strict_two_way_union(self):
+        class NoopServer(fc_test.Noop.Server):
+            def strict_two_way_union(self, value):
+                return
+
+        client, server = Channel.create()
+        t_client = fc_test.Noop.Client(client)
+        t_server = NoopServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        self.assertEquals(
+            None, await t_client.strict_two_way_union(other_value="foo")
+        )
+        server_task.cancel()
+
+    async def test_flexible_one_way_union(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def flexible_one_way_union(self, value):
+                pass
+
+        client, server = Channel.create()
+        t_client = fc_test.FlexibleMethodTester.Client(client)
+        t_server = FlexibleMethodTesterServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        self.assertEquals(None, t_client.flexible_one_way_union(value=1))
+        server_task.cancel()
+
+    async def test_flexible_two_way_union(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def flexible_two_way_union(self, value):
+                return fc_test.FlexibleMethodTesterFlexibleTwoWayUnionResult(
+                    response=fc_test.FlexibleMethodTesterFlexibleTwoWayUnionResponse()
+                )
+
+        client, server = Channel.create()
+        t_client = fc_test.FlexibleMethodTester.Client(client)
+        t_server = FlexibleMethodTesterServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        result = await t_client.flexible_two_way_union(other_value="foo")
+        self.assertEquals(
+            result.response,
+            fc_test.FlexibleMethodTesterFlexibleTwoWayUnionResponse(),
+        )
         server_task.cancel()
 
     async def test_sending_and_receiving_event(self):

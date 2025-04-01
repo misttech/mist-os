@@ -42,5 +42,6 @@ group("tests") {
     "tests:fidlgen_python_external_library_test($host_toolchain)",
     "tests:fidlgen_python_method_response_types_test($host_toolchain)",
     "tests:fidlgen_python_protocol_compile_test($host_toolchain)",
+    "tests:fidlgen_python_union_test($host_toolchain)",
   ]
 }

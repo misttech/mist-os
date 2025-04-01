@@ -12,58 +12,71 @@ class {{ .PythonName }}:
     {{- end }}
     """
     {{- range .PythonMembers }}
-    {{ .PythonName }}: {{ .PythonType.PythonName }} | None
+    _{{ .PythonName }}: {{ .PythonType.PythonName }} | None
     {{- range .DocComments }}
     """
     {{ . }}
     """
     {{- end }}
-
-    @classmethod
-    def {{ .PythonName }}_variant(cls, value: {{ .PythonType.PythonName }}, member_name: str="{{ .PythonName }}") -> typing.Self:
-        {{- range .DocComments }}
-        """
-        {{ . }}
-        """
-        {{- end }}
-        res = cls.make_default()
-        setattr(res, member_name, value)
-        return res
-
     {{- end }}
 
     __fidl_kind__ = "union"
     __fidl_type__ = "{{ .PythonName }}"
     __fidl_raw_type__ = "{{ .Name }}"
 
-    def _get_value(self) -> tuple[str | None, typing.Any]:
-        {{- range .PythonMembers }}
-        if self.{{ .PythonName }} is not None:
-            return "{{ .PythonName}}", self.{{ .PythonName }}
-        {{- end }}
-        return None, None
-
-    def __repr__(self) -> str:
-        key, value = self._get_value()
-        string = f"{key}={repr(value)}"
-        if key is None and value is None:
-            string = "None"
-        return f"<'{self.__fidl_type__}' object({string})>"
-
-    def __str__(self) -> str:
-        key, value = self._get_value()
-        string = f"{key}={str(value)}"
-        if key is None and value is None:
-            string = "None"
-        return f"{type(self).__name__}({string})"
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
             return False
-        return True \
+        {{ range .PythonMembers -}}
+        if self.{{ .PythonName }} != other.{{ .PythonName }}:
+            return False
+        {{ end -}}
+        return True
+
+    def __repr__(self) -> str:
+        """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
+
+        If {value} is not set, will write None."""
+        variant = ""
         {{- range .PythonMembers }}
-            and self.{{ .PythonName }} == other.{{ .PythonName }} \
+        if self.{{ .PythonName }}:
+            variant = f"{{ .PythonName }}={self.{{ .PythonName }}!r}"
         {{- end }}
+        return f"<'{self.__fidl_type__}' object({variant})>"
+
+    {{ if .PythonMembers -}}
+    def __init__(
+        self,
+        {{- range .PythonMembers }}
+        {{ .PythonName }}: typing.Optional[{{ .PythonType.PythonName }}] = None,
+        {{- end }}
+        _empty: typing.Optional[tuple[()]]=None,
+    ):
+        object.__init__(self)
+        if _empty is not None:
+            return
+
+        number_of_variants = 0
+        variants = []
+
+        {{ range .PythonMembers -}}
+        if {{ .PythonName }} is not None:
+            self._{{ .PythonName }} = {{ .PythonName }}
+            variants.append('{{ .PythonName }}')
+            number_of_variants += 1
+        {{ end -}}
+
+        if {{ if .IsResult }}number_of_variants > 1{{ else }}number_of_variants != 1{{ end }}:
+            raise TypeError(
+                f"Exactly one variant must be specified for {self.__fidl_raw_type__}: {variants}"
+            )
+    {{- end }}
+
+    {{ range .PythonMembers -}}
+    @property
+    def {{ .PythonName }}(self) -> {{ .PythonType.PythonName }} | None:
+        return getattr(self, "_{{ .PythonName }}", None)
+    {{ end -}}
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
     # start making breaking changes.
@@ -78,14 +91,11 @@ class {{ .PythonName }}:
 
     @classmethod
     def make_default(cls) -> typing.Self:
-        # This steps around setting a default value during the class definition itself
-        # because, when imported, the type of each variant could contain a forward reference that
-        # cannot be resolved.
-        ret = cls()
-        {{- range .PythonMembers }}
-        setattr(ret, "{{ .PythonName }}", None)
+        {{ if .PythonMembers -}}
+        return cls(_empty=())
+        {{- else -}}
+        return cls()
         {{- end }}
-        return ret
 
 
 {{ end }}

@@ -435,8 +435,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         client_sme = await self._get_client_sme(iface_id)
 
         # Perform a passive scan
-        req = f_wlan_sme.ScanRequest()
-        req.passive = f_wlan_sme.PassiveScanRequest()
+        req = f_wlan_sme.ScanRequest(passive=f_wlan_sme.PassiveScanRequest())
 
         try:
             scan = await client_sme.scan_for_controller(req=req)

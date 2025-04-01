@@ -110,17 +110,16 @@ _TEST_BSS_DESC_2 = BssDescription(
     snr_db=2,
 )
 
-_TEST_QUERY_IFACE_RESP_FC = (
-    f_wlan_device_service.DeviceMonitorQueryIfaceResult()
-)
-_TEST_QUERY_IFACE_RESP_FC.response = (
-    f_wlan_device_service.DeviceMonitorQueryIfaceResponse(
-        resp=f_wlan_device_service.QueryIfaceResponse(
-            role=f_wlan_common.WlanMacRole.CLIENT,
-            id_=1,
-            phy_id=1,
-            phy_assigned_id=1,
-            sta_addr=bytes([1, 2, 3, 4, 5, 6]),
+_TEST_QUERY_IFACE_RESP_FC = f_wlan_device_service.DeviceMonitorQueryIfaceResult(
+    response=(
+        f_wlan_device_service.DeviceMonitorQueryIfaceResponse(
+            resp=f_wlan_device_service.QueryIfaceResponse(
+                role=f_wlan_common.WlanMacRole.CLIENT,
+                id_=1,
+                phy_id=1,
+                phy_assigned_id=1,
+                sta_addr=bytes([1, 2, 3, 4, 5, 6]),
+            )
         )
     )
 )
@@ -349,8 +348,9 @@ class WlanFCTests(unittest.TestCase):
 
                     client_sme.connect = mock.Mock(wraps=connect)
 
-                    status_resp = f_wlan_sme.ClientStatusResponse()
-                    status_resp.connected = _TEST_SERVING_AP_INFO
+                    status_resp = f_wlan_sme.ClientStatusResponse(
+                        connected=_TEST_SERVING_AP_INFO
+                    )
                     client_sme.status.return_value = _async_response(
                         f_wlan_sme.ClientSmeStatusResponse(resp=status_resp)
                     )
@@ -502,8 +502,9 @@ class WlanFCTests(unittest.TestCase):
 
             client_sme.connect = mock.Mock(wraps=connect)
 
-            status_resp = f_wlan_sme.ClientStatusResponse()
-            status_resp.connected = copy.deepcopy(_TEST_SERVING_AP_INFO)
+            status_resp = f_wlan_sme.ClientStatusResponse(
+                connected=copy.deepcopy(_TEST_SERVING_AP_INFO)
+            )
             status_resp.connected.ssid.append(ord("2"))
             client_sme.status.return_value = _async_response(
                 f_wlan_sme.ClientSmeStatusResponse(resp=status_resp)
@@ -519,8 +520,9 @@ class WlanFCTests(unittest.TestCase):
 
     def test_connect_fails_client_status_error(self) -> None:
         """Verify connect fails when status() returns an erroneous value."""
-        resp_wrong_ssid = f_wlan_sme.ClientStatusResponse()
-        resp_wrong_ssid.connected = copy.deepcopy(_TEST_SERVING_AP_INFO)
+        resp_wrong_ssid = f_wlan_sme.ClientStatusResponse(
+            connected=copy.deepcopy(_TEST_SERVING_AP_INFO)
+        )
         resp_wrong_ssid.connected.ssid.append(ord("2"))
 
         for msg, status_resp in [
@@ -728,11 +730,12 @@ class WlanFCTests(unittest.TestCase):
                         ZxStatus(zx_err)
                     )
                 else:
-                    res = f_wlan_device_service.DeviceMonitorGetCountryResult()
-                    res.response = (
-                        f_wlan_device_service.DeviceMonitorGetCountryResponse(
-                            resp=f_wlan_device_service.GetCountryResponse(
-                                alpha2=country_code
+                    res = f_wlan_device_service.DeviceMonitorGetCountryResult(
+                        response=(
+                            f_wlan_device_service.DeviceMonitorGetCountryResponse(
+                                resp=f_wlan_device_service.GetCountryResponse(
+                                    alpha2=country_code
+                                )
                             )
                         )
                     )
@@ -810,38 +813,44 @@ class WlanFCTests(unittest.TestCase):
                 self._mock_query_iface()
 
                 with self._mock_client_sme() as client_sme:
-                    if zx_err:
+                    if zx_err is not None:
                         client_sme.scan_for_controller.return_value = (
                             _async_error(ZxStatus(zx_err))
                         )
                     else:
-                        compatibility = f_wlan_sme.Compatibility()
-                        compatibility.compatible = (
-                            f_wlan_common_security.Protocol.WPA2_PERSONAL
-                        )
-                        res = f_wlan_sme.ClientSmeScanForControllerResult()
-                        res.response = (
-                            f_wlan_sme.ClientSmeScanForControllerResponse(
-                                scan_results=[
-                                    f_wlan_sme.ScanResult(
-                                        compatibility=compatibility,
-                                        timestamp_nanos=0,
-                                        bss_description=_TEST_BSS_DESC_1_FC,
-                                    ),
-                                    f_wlan_sme.ScanResult(
-                                        compatibility=compatibility,
-                                        timestamp_nanos=0,
-                                        bss_description=_TEST_BSS_DESC_2_FC,
-                                    ),
-                                ],
+                        compatibility = f_wlan_sme.Compatibility(
+                            compatible=(
+                                f_wlan_common_security.Protocol.WPA2_PERSONAL
                             )
                         )
-                        res.err = err
+                        if err is not None:
+                            res = f_wlan_sme.ClientSmeScanForControllerResult(
+                                err=err
+                            )
+                        else:
+                            res = f_wlan_sme.ClientSmeScanForControllerResult(
+                                response=(
+                                    f_wlan_sme.ClientSmeScanForControllerResponse(
+                                        scan_results=[
+                                            f_wlan_sme.ScanResult(
+                                                compatibility=compatibility,
+                                                timestamp_nanos=0,
+                                                bss_description=_TEST_BSS_DESC_1_FC,
+                                            ),
+                                            f_wlan_sme.ScanResult(
+                                                compatibility=compatibility,
+                                                timestamp_nanos=0,
+                                                bss_description=_TEST_BSS_DESC_2_FC,
+                                            ),
+                                        ],
+                                    )
+                                )
+                            )
                         client_sme.scan_for_controller.return_value = (
                             _async_response(res)
                         )
 
-                    if err or zx_err:
+                    if err is not None or zx_err is not None:
                         with self.assertRaises(HoneydewWlanError):
                             self.wlan_obj.scan_for_bss_info()
                     else:
@@ -880,36 +889,41 @@ class WlanFCTests(unittest.TestCase):
     def test_status(self) -> None:
         """Test if status works."""
 
-        def make_noop(_: f_wlan_sme.ClientStatusResponse) -> None:
-            pass
-
-        def make_idle(r: f_wlan_sme.ClientStatusResponse) -> None:
-            r.idle = f_wlan_sme.Empty()
-
-        def make_connected(r: f_wlan_sme.ClientStatusResponse) -> None:
-            r.connected = _TEST_SERVING_AP_INFO
-
-        def make_connecting(r: f_wlan_sme.ClientStatusResponse) -> None:
-            r.connecting = _TEST_SSID_BYTES
-
-        for msg, make_resp, zx_err, expected in [
-            ("valid - idle", make_idle, None, ClientStatusIdle()),
+        for msg, resp, zx_err, expected in [
+            (
+                "valid - idle",
+                f_wlan_sme.ClientSmeStatusResponse(
+                    resp=f_wlan_sme.ClientStatusResponse(
+                        idle=f_wlan_sme.Empty()
+                    )
+                ),
+                None,
+                ClientStatusIdle(),
+            ),
             (
                 "valid - connected",
-                make_connected,
+                f_wlan_sme.ClientSmeStatusResponse(
+                    resp=f_wlan_sme.ClientStatusResponse(
+                        connected=_TEST_SERVING_AP_INFO
+                    )
+                ),
                 None,
                 _TEST_CLIENT_STATUS_CONNECTED,
             ),
             (
                 "valid - connecting",
-                make_connecting,
+                f_wlan_sme.ClientSmeStatusResponse(
+                    resp=f_wlan_sme.ClientStatusResponse(
+                        connecting=_TEST_SSID_BYTES
+                    )
+                ),
                 None,
                 ClientStatusConnecting(_TEST_SSID_BYTES),
             ),
-            ("invalid", make_noop, ZxStatus.ZX_ERR_INTERNAL, None),
+            ("invalid", None, ZxStatus.ZX_ERR_INTERNAL, None),
         ]:
             with self.subTest(
-                msg=msg, make_resp=make_resp, zx_err=zx_err, expected=expected
+                msg=msg, resp=resp, zx_err=zx_err, expected=expected
             ):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
                     spec=f_wlan_device_service.DeviceMonitor.Client
@@ -919,11 +933,7 @@ class WlanFCTests(unittest.TestCase):
 
                 with self._mock_client_sme() as client_sme:
                     if not zx_err:
-                        resp = f_wlan_sme.ClientStatusResponse()
-                        make_resp(resp)
-                        client_sme.status.return_value = _async_response(
-                            f_wlan_sme.ClientSmeStatusResponse(resp=resp)
-                        )
+                        client_sme.status.return_value = _async_response(resp)
                         got = self.wlan_obj.status()
                         self.assertEqual(got, expected)
                     else:

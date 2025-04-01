@@ -182,9 +182,9 @@ def _custom_test_name_func(
 
 
 def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
-    ret = f_io.ReadableReadResult()
-    ret.response = f_io.ReadableReadResponse(data=data)
-    return ret
+    return f_io.ReadableReadResult(
+        response=f_io.ReadableReadResponse(data=data)
+    )
 
 
 def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:

@@ -120,7 +120,7 @@ class EncodeConformanceTests(unittest.TestCase):
         self.assertEqual(hdls, [])
 
     def test_golden_union_struct_v2_encode(self) -> None:
-        value = test_conformance.GoldenUnionStruct(v=test_conformance.GoldenUnion.v_variant(1))
+        value = test_conformance.GoldenUnionStruct(v=test_conformance.GoldenUnion(v=1))
         encoded_bytes, hdls = value.encode()
         self.assertEqual(encoded_bytes, bytearray([
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -130,7 +130,7 @@ class EncodeConformanceTests(unittest.TestCase):
         self.assertEqual(hdls, [])
 
     def test_golden_nullable_union_struct_non_null_v2_encode(self) -> None:
-        value = test_conformance.GoldenNullableUnionStruct(v=test_conformance.GoldenUnion.v_variant(1))
+        value = test_conformance.GoldenNullableUnionStruct(v=test_conformance.GoldenUnion(v=1))
         encoded_bytes, hdls = value.encode()
         self.assertEqual(encoded_bytes, bytearray([
 0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -416,7 +416,7 @@ class DecodeConformanceTests(unittest.TestCase):
         type_name = "test.conformance/GoldenUnionStruct"
         value = decode_standalone(type_name=type_name, bytes=encoded_bytes, handles=handles)
         value = construct_response_object(type_name, value)
-        self.assertEqual(value, test_conformance.GoldenUnionStruct(v=test_conformance.GoldenUnion.v_variant(1)))
+        self.assertEqual(value, test_conformance.GoldenUnionStruct(v=test_conformance.GoldenUnion(v=1)))
 
 
     def test_golden_nullable_union_struct_non_null_v2_decode(self) -> None:
@@ -429,7 +429,7 @@ class DecodeConformanceTests(unittest.TestCase):
         type_name = "test.conformance/GoldenNullableUnionStruct"
         value = decode_standalone(type_name=type_name, bytes=encoded_bytes, handles=handles)
         value = construct_response_object(type_name, value)
-        self.assertEqual(value, test_conformance.GoldenNullableUnionStruct(v=test_conformance.GoldenUnion.v_variant(1)))
+        self.assertEqual(value, test_conformance.GoldenNullableUnionStruct(v=test_conformance.GoldenUnion(v=1)))
 
 
     def test_golden_nullable_union_struct_null_v2_decode(self) -> None:

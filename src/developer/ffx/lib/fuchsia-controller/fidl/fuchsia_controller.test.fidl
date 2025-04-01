@@ -5,6 +5,8 @@ library fuchsia.controller.test;
 
 using zx;
 
+type EmptyUnion = flexible union {};
+
 type NoopUnion = flexible union {
     1: union_str string:255;
     2: union_bool bool;
@@ -34,6 +36,16 @@ closed protocol Noop {
 
     strict DoTableNoop(struct {
         tab NoopTable;
+    }) -> ();
+
+    strict StrictOneWayUnion(flexible union {
+        1: value int32;
+        2: other_value string:10;
+    });
+
+    strict StrictTwoWayUnion(flexible union {
+        1: value int32;
+        2: other_value string:10;
     }) -> ();
 
     strict DoHandleNoop(resource struct {
@@ -102,6 +114,16 @@ open protocol FlexibleMethodTester {
     });
 
     flexible SomeMethodJustError() -> () error zx.Status;
+
+    flexible FlexibleOneWayUnion(flexible union {
+        1: value int32;
+        2: other_value string:10;
+    });
+
+    flexible FlexibleTwoWayUnion(flexible union {
+        1: value int32;
+        2: other_value string:10;
+    }) -> ();
 };
 
 alias AliasOfArray = array<int16, 3>;

@@ -460,8 +460,9 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
                 self._remote_service_client is not None
             )  # we must have a connected client to make a remote service
             service_handle = f_gatt_controller.ServiceHandle(value=handle)
-            read_options = f_gatt_controller.ReadOptions()
-            read_options.short_read = f_gatt_controller.ShortReadOptions()
+            read_options = f_gatt_controller.ReadOptions(
+                short_read=f_gatt_controller.ShortReadOptions()
+            )
             res = self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._remote_service_client.read_characteristic(

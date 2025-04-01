@@ -516,7 +516,7 @@ func onUnion(value ir.Record, decl *mixer.UnionDecl) string {
 	} else {
 		fieldName := changeIfReserved(fidlgen.ToSnakeCase(field.Key.Name))
 		fieldValueStr := visit(field.Value, decl.Field(field.Key.Name))
-		valueStr = fmt.Sprintf("%s.%s_variant(%s)", declName(decl), fieldName, fieldValueStr)
+		valueStr = fmt.Sprintf("%s(%s=%s)", declName(decl), fieldName, fieldValueStr)
 	}
 	return valueStr
 }

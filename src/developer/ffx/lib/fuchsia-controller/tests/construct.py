@@ -102,7 +102,7 @@ class Construct(unittest.TestCase):
         )
         self.assertEqual(expected, got)
 
-    def test_construct_response_with_unions(self) -> None:
+    def test_construct_response_with_nested_unions(self) -> None:
         raw_object = {
             "nodename": "foobar",
             "addresses": [
@@ -114,10 +114,8 @@ class Construct(unittest.TestCase):
                 }
             ],
         }
-        ip = fnet.IpAddress()
-        ip.ipv4 = fnet.Ipv4Address(addr=[192, 168, 1, 1])
-        addrinfo = ffx.TargetAddrInfo()
-        addrinfo.ip = ffx.TargetIp(ip=ip, scope_id=3)
+        ip = fnet.IpAddress(ipv4=fnet.Ipv4Address(addr=[192, 168, 1, 1]))
+        addrinfo = ffx.TargetAddrInfo(ip=ffx.TargetIp(ip=ip, scope_id=3))
         expected = ffx.TargetInfo(nodename="foobar", addresses=[addrinfo])
         got = construct_response_object(
             "fuchsia.developer.ffx/TargetInfo", raw_object

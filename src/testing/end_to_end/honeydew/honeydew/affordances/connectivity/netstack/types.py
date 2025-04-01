@@ -86,9 +86,10 @@ class InterfaceProperties:
         addresses: list[f_net_interfaces.Address] = []
 
         for ipv4 in self.ipv4_addresses:
-            addr = f_net.IpAddress()
-            addr.ipv4 = f_net.Ipv4Address(
-                addr=list(ipv4.packed),
+            addr = f_net.IpAddress(
+                ipv4=f_net.Ipv4Address(
+                    addr=list(ipv4.packed),
+                )
             )
             addresses.append(
                 f_net_interfaces.Address(
@@ -103,9 +104,10 @@ class InterfaceProperties:
             )
 
         for ipv6 in self.ipv6_addresses:
-            addr = f_net.IpAddress()
-            addr.ipv6 = f_net.Ipv6Address(
-                addr=list(ipv6.packed),
+            addr = f_net.IpAddress(
+                ipv6=f_net.Ipv6Address(
+                    addr=list(ipv6.packed),
+                )
             )
             addresses.append(
                 f_net_interfaces.Address(
@@ -119,11 +121,14 @@ class InterfaceProperties:
                 )
             )
 
-        port_class = f_net_interfaces.PortClass()
         if self.port_class is PortClass.LOOPBACK:
-            port_class.loopback = f_net_interfaces.Empty()
+            port_class = f_net_interfaces.PortClass(
+                loopback=f_net_interfaces.Empty()
+            )
         else:
-            port_class.device = self.port_class.value
+            port_class = f_net_interfaces.PortClass(
+                device=self.port_class.value
+            )
 
         return f_net_interfaces.Properties(
             id_=self.id_,

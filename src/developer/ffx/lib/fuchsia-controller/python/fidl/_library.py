@@ -519,118 +519,121 @@ def enum_type(ir) -> EnumType:
     return bits_or_enum_root_type(ir, "enum")
 
 
-def _union_get_value(self):
-    """Helper function that attempts to get the union value."""
-    items = [
-        m[0].replace("_type", "")
-        for m in inspect.getmembers(self)
-        if m[0].endswith("_type")
-    ]
-    got = None
-    item = None
-    for i in items:
-        got = getattr(self, i)
-        item = i
-        if got is not None:
-            break
-    return item, got
-
-
-def union_repr(self) -> str:
-    """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
-
-    If {value} is not set, will write None."""
-    key, value = _union_get_value(self)
-    string = f"{key}={repr(value)}"
-    if key is None and value is None:
-        string = "None"
-    return f"<'{self.__fidl_type__}' object({string})>"
-
-
-def union_str(self) -> str:
-    """Returns the union string representation, e.g. whatever the union type has been set to."""
-    key, value = _union_get_value(self)
-    string = f"{key}={str(value)}"
-    if key is None and value is None:
-        string = "None"
-    return f"{type(self).__name__}({string})"
-
-
-def union_eq(self, other) -> bool:
-    if not isinstance(other, type(self)):
-        return False
-    items = [
-        m[0].replace("_type", "")
-        for m in inspect.getmembers(self)
-        if m[0].endswith("_type")
-    ]
-    for item in items:
-        if getattr(self, item) == getattr(other, item):
-            return True
-    return False
-
-
 def union_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR Union declaration."""
+    __annotations__ = {}
+    for variant in ir["members"]:
+        variant_name = f"_{normalize_member_name(variant['name'])}"
+        __annotations__[variant_name] = type_annotation(
+            variant["type"], root_ir
+        )
+
     name = fidl_ident_to_py_library_member(ir.name())
     base = type(
         name,
-        (),
+        (object,),
         {
             "__doc__": docstring(ir),
             "__fidl_kind__": "union",
-            "__repr__": union_repr,
-            "__str__": union_str,
-            "__eq__": union_eq,
             "__fidl_type__": ir.name(),
             "__fidl_raw_type__": ir.raw_name(),
-            "make_default": classmethod(lambda cls: cls()),
+            "__annotations__": __annotations__,
+            "make_default": classmethod(lambda cls: cls(_empty=())),
+            "_is_result": ir["is_result"],
         },
     )
-    # TODO(https://fxbug.dev/42078357): Prevent unions from having more than one value set at the same time.
-    # This is silently allowed during encoding, but should either be prevented during encoding, or
-    # prevented from within the object itself. If it cannot be prevented there should be some hook
-    # that sets the previous union variants to None.
-    for member in ir["members"]:
-        member_name = normalize_member_name(member["name"])
-        member_type_name = member_name + "_type"
-        member_constructor_name = member_name + "_variant"
 
-        @classmethod
-        def ctor(cls, value, member_name=member_name):
-            res = cls()
-            setattr(res, member_name, value)
-            return res
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+        for internal_variant_name in base.__annotations__.keys():
+            if getattr(self, internal_variant_name[1:]) != getattr(
+                other, internal_variant_name[1:]
+            ):
+                return False
+        return True
 
+    base.__eq__ = __eq__
+
+    def __repr__(self):
+        """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
+
+        If {value} is not set, will write None."""
+        variant = ""
+        for variant_name in base.__annotations__.keys():
+            try:
+                variant = f"{variant_name}={getattr(self, variant_name)!r}"
+                break
+            except AttributeError:
+                pass
+        return f"<'{base.__fidl_type__}' object({variant})>"
+
+    base.__repr__ = __repr__
+
+    def __init__(self, **kwargs):
+        object.__init__(self)
+        if len(kwargs.keys()) == 0:
+            if len(base.__annotations__) > 0:
+                raise TypeError(
+                    f"No variant specified: {base.__fidl_raw_type__}, {kwargs}"
+                )
+            return
+
+        if len(kwargs.keys()) != 1:
+            raise TypeError(
+                f"Exactly one keyword argument must be specified: {base.__fidl_raw_type__}, {kwargs}"
+            )
+
+        variant_name = next(iter(kwargs.keys()))
+        if variant_name == "_empty":
+            return
+
+        internal_variant_name = f"_{variant_name}"
+        if internal_variant_name not in base.__annotations__:
+            raise TypeError(
+                f"Unexpected keyword argument for union: {base.__fidl_raw_type__}, {variant_name}"
+            )
         setattr(
-            base,
-            member_type_name,
-            type_annotation(member["type"], root_ir),
+            self,
+            internal_variant_name,
+            kwargs[variant_name],
         )
-        setattr(ctor, "__doc__", docstring(member))
-        setattr(base, member_constructor_name, ctor)
-        setattr(base, member_name, None)
+
+    base.__init__ = __init__
+
+    # Each Python union object stores each of its variants in an internal attribute to discourage
+    # consumers of the union object from adding multiple variants. The public attribute for each
+    # variant is read-only.
+    for internal_variant_name in base.__annotations__.keys():
+
+        def getter(self, _internal_variant_name=internal_variant_name):
+            return getattr(self, _internal_variant_name, None)
+
+        setattr(base, internal_variant_name[1:], property(getter))
 
     if ir["is_result"]:
 
         def unwrap(self):
             """Returns the response if result does not contain an error. Otherwise, raises an exception."""
             if (
-                hasattr(self, "framework_err")
+                "_framework_err" in base.__annotations__
                 and self.framework_err is not None
             ):
                 raise RuntimeError(
                     f"{self.__fidl_raw_type__} framework error {self.framework_err}"
                 )
-            if hasattr(self, "err") and self.err is not None:
+            if "_err" in base.__annotations__ and self.err is not None:
                 raise RuntimeError(f"{self.__fidl_raw_type__} error {self.err}")
-            if hasattr(self, "response"):
+            if (
+                "_response" in base.__annotations__
+                and self.response is not None
+            ):
                 return self.response
             raise RuntimeError(
                 f"Failed to unwrap {self.__fidl_raw_type__} with no error or response."
             )
 
-        setattr(base, "unwrap", unwrap)
+        base.unwrap = unwrap
 
     return base
 
@@ -1259,7 +1262,7 @@ def create_method(
         params = [
             inspect.Parameter(
                 member["name"],
-                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.KEYWORD_ONLY,
                 annotation=type_annotation(member["type"], root_ir),
             )
             for member in payload_ir["members"]
