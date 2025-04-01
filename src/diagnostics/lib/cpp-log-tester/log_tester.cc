@@ -12,8 +12,8 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <rapidjson/document.h>
-#include <src/diagnostics/lib/cpp-log-decoder/log_decoder.h>
 #include <src/lib/diagnostics/accessor2logger/log_message.h>
+#include <src/lib/diagnostics/log/message/rust/cpp-log-decoder/log_decoder.h>
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/strings.h>
 #include <src/lib/uuid/uuid.h>

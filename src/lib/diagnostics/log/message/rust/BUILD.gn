@@ -12,7 +12,10 @@ group("rust") {
 
 group("tests") {
   testonly = true
-  deps = [ ":diagnostics-message-tests" ]
+  deps = [
+    ":diagnostics-message-tests",
+    "cpp-log-decoder:tests",
+  ]
 }
 
 rustc_library("lib") {
