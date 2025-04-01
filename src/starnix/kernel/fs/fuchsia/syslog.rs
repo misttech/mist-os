@@ -18,7 +18,13 @@ pub struct SyslogFile;
 
 impl SyslogFile {
     pub fn new_file(current_task: &CurrentTask) -> FileHandle {
-        Anon::new_file(current_task, Box::new(SyslogFile), OpenFlags::RDWR, "[fuchsia:syslog]")
+        // TODO: https://fxbug.dev/404739824 - Use a non-private node once labeling of external resources is addressed.
+        Anon::new_private_file(
+            current_task,
+            Box::new(SyslogFile),
+            OpenFlags::RDWR,
+            "[fuchsia:syslog]",
+        )
     }
 }
 

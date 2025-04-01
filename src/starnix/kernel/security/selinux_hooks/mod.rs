@@ -16,7 +16,7 @@ pub(super) mod task;
 pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
-use crate::task::{CurrentTask, Task};
+use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
@@ -105,6 +105,7 @@ fn has_file_permissions(
 /// `permissions` to the underlying [`crate::vfs::FsNode`], with "todo_deny" on denial.
 fn todo_has_file_permissions(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     file: &FileObject,
@@ -119,6 +120,7 @@ fn todo_has_file_permissions(
         let audit_context = [audit_context, file.into(), node.into()];
         todo_check_permission(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             file_sid,
@@ -132,6 +134,7 @@ fn todo_has_file_permissions(
         let audit_context = [audit_context, file.into()];
         todo_has_fs_node_permissions(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             file.node(),
@@ -174,6 +177,7 @@ fn has_fs_node_permissions(
 /// Checks that `current_task` has `permissions` to `node`, with "todo_deny" on denial.
 fn todo_has_fs_node_permissions(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     fs_node: &FsNode,
@@ -189,6 +193,7 @@ fn todo_has_fs_node_permissions(
     for permission in permissions {
         todo_check_permission(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             target.sid,
@@ -254,27 +259,32 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
 /// the audit output, without actually denying access.
 fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
+    if kernel.features.selinux_test_suite {
+        check_permission(permission_check, source_sid, target_sid, permission, audit_context)
+    } else {
+        let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
-    if result.audit {
-        audit_todo_decision(
-            bug,
-            permission_check,
-            result,
-            source_sid,
-            target_sid,
-            permission.into(),
-            audit_context,
-        );
+        if result.audit {
+            audit_todo_decision(
+                bug,
+                permission_check,
+                result,
+                source_sid,
+                target_sid,
+                permission.into(),
+                audit_context,
+            );
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.

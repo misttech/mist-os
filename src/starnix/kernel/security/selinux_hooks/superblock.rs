@@ -197,6 +197,7 @@ pub(in crate::security) fn sb_mount(
         let audit_context = [current_task.into(), node.into()];
         todo_check_permission(
             TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
+            &current_task.kernel(),
             permission_check,
             source_sid,
             target_sid,

@@ -862,6 +862,7 @@ pub(in crate::security) fn fs_node_permission(
     let fs_node_class = fs_node.security_state.lock().class;
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/380855359", "Enforce fs_node_permission checks."),
+        &current_task.kernel(),
         &security_server.as_permission_check(),
         current_sid,
         fs_node,
@@ -879,6 +880,7 @@ pub(in crate::security) fn check_fs_node_getattr_access(
     let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
+        &current_task.kernel(),
         &security_server.as_permission_check(),
         current_sid,
         fs_node,

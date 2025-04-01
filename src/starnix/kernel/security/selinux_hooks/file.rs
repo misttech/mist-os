@@ -54,6 +54,7 @@ pub(in crate::security) fn file_permission(
 
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission checks"),
+        &current_task.kernel(),
         &security_server.as_permission_check(),
         current_sid,
         &file.name.entry.node,
@@ -74,6 +75,7 @@ pub(in crate::security) fn file_receive(
     let permission_flags = file.flags().into();
     todo_has_file_permissions(
         TODO_DENY!("https://fxbug.dev/399894966", "Check file receive permission."),
+        &current_task.kernel(),
         &permission_check,
         subject_sid,
         file,
@@ -174,6 +176,7 @@ pub(in crate::security) fn check_file_fcntl_access(
             // we need to check for permission.
             todo_has_fs_node_permissions(
                 TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
+                &current_task.kernel(),
                 &security_server.as_permission_check(),
                 subject_sid,
                 file.node(),
@@ -186,6 +189,7 @@ pub(in crate::security) fn check_file_fcntl_access(
         // checked. Now that the append flag was cleared we need to check the WRITE permission.
         todo_has_fs_node_permissions(
             TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
+            &current_task.kernel(),
             &security_server.as_permission_check(),
             subject_sid,
             file.node(),
@@ -217,6 +221,7 @@ pub fn mmap_file(
             let current_sid = current_task.security_state.lock().current_sid;
             todo_check_permission(
                 TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
+                &current_task.kernel(),
                 &security_server.as_permission_check(),
                 current_sid,
                 current_sid,
@@ -246,6 +251,7 @@ pub fn mmap_file(
         let current_sid = current_task.security_state.lock().current_sid;
         todo_has_file_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
+            &current_task.kernel(),
             &security_server.as_permission_check(),
             current_sid,
             file,

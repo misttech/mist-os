@@ -50,3 +50,6 @@ todo_deny https://fxbug.dev/390739936 test_noioctl_t user_tmp_t file
 // https://fxbug.dev/398246622 - Test apks interacting poorly with fuse.
 todo_deny https://fxbug.dev/390739936 platform_app fuse file
 todo_deny https://fxbug.dev/390739936 platform_app fuse dir
+
+// https://fxbug.dev/404739824 - Fuchsia-space resources are mis-classed and/or mis-labeled.
+todo_deny https://fxbug.dev/404739824 unconfined_t unconfined_t anon_inode

@@ -12,10 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(http://b/385121365): `inherit` tests will pass once the `file_permission`
-                // hook correctly enforces the `write` permission.
-                "inherit",
-
                 // keep-sorted start
                 "atsecure",
                 "bounds",
@@ -25,7 +21,6 @@
                 "cgroupfs_label",
                 "checkreqprot",
                 "extended_socket_class",
-                "fdreceive",
                 "file",
                 "filesystem",
                 "fs_filesystem",
@@ -41,13 +36,11 @@
                 "nlmsg",
                 "nnp_nosuid*",
                 "notify",
-                "open",
                 "overlay",
                 "perf_event",
                 "rxdir",
                 "sem",
                 "shm",
-                "stat",
                 "sysctl",
                 "tun_tap",
                 "userfaultfd",
