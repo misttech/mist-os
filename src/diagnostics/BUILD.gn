@@ -17,6 +17,7 @@ group("diagnostics") {
     "log_listener",
     "triage",
     "validator",
+    "//examples/diagnostics",
     "//src/lib/diagnostics",
 
     # Disabled due to lack of support in Clang and Rust toolchain;
@@ -41,6 +42,7 @@ group("tests") {
     "tools:tests($host_toolchain)",
     "triage:tests",
     "validator:tests",
+    "//examples/diagnostics:hermetic_tests",
     "//src/developer/ffx/plugins/inspect:tests($host_toolchain)",
     "//src/developer/ffx/plugins/log:tests($host_toolchain)",
     "//src/developer/ffx/tools/triage:tests($host_toolchain)",

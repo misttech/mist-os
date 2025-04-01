@@ -37,13 +37,11 @@ rustc_test("test") {
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/diagnostics/reader",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/syslog/rust:syslog-listener",
     "//third_party/rust_crates:futures",
   ]
 

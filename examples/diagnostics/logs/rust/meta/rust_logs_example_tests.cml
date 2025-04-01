@@ -17,12 +17,7 @@
         },
     ],
     use: [
-        {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.logger.Log",
-            ],
-        },
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
         {
             protocol: "fuchsia.component.Binder",
             from: "#logs_example",
