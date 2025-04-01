@@ -44,6 +44,7 @@ wlan_astro_env = {
     device_type = "Astro"
     pool = "fuchsia.tests.connectivity"
   }
+  tags = [ "antlion" ]
 }
 
 crosvm_env = {
@@ -220,6 +221,7 @@ wlan_nelson_env = {
     device_type = "Nelson"
     pool = "fuchsia.tests.connectivity"
   }
+  tags = [ "antlion" ]
 }
 
 nuc7_env = {
@@ -252,6 +254,7 @@ wlan_nuc11_env = {
     device_type = "Intel NUC Kit NUC11TNHv5"
     pool = "fuchsia.tests.connectivity"
   }
+  tags = [ "antlion" ]
 }
 
 qemu_env = {
@@ -291,6 +294,7 @@ wlan_sherlock_env = {
     device_type = "Sherlock"
     pool = "fuchsia.tests.connectivity"
   }
+  tags = [ "antlion" ]
 }
 
 vim3_env = {
@@ -310,6 +314,7 @@ wlan_vim3_env = {
     device_type = "Vim3"
     pool = "fuchsia.tests.connectivity"
   }
+  tags = [ "antlion" ]
 }
 
 gce_env = {
