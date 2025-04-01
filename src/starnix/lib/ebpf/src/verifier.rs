@@ -700,6 +700,12 @@ impl Type {
         next: &mut ComputationContext,
     ) -> Result<(), String> {
         match (parameter_type, self) {
+            (Type::NullOrParameter(t), Type::ScalarValue(data))
+                if data.is_known() && data.value == 0 =>
+            {
+                Ok(())
+            }
+            (Type::NullOrParameter(t), _) => self.match_parameter_type(context, t, index, next),
             (Type::ScalarValueParameter, Type::ScalarValue(data))
                 if data.is_fully_initialized() =>
             {
