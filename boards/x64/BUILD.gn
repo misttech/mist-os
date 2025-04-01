@@ -324,4 +324,5 @@ board_input_bundle_set("x64_bibs") {
     ":main_bundle",
     "//boards/emulation/virtio",
   ]
+  version = build_info_version
 }

@@ -12,6 +12,15 @@ import("//build/compiled_action.gni")
 #  board_input_bundles (optional; default = [])
 #    [list of targets] board_input_bundle() targets to include.
 #
+#  version (optional)
+#    [string] String representing the release version for this board config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
+#    must be set.
+#
+#  version_file (optional)
+#    [string] Path to a file containing the release version for this config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
+#    be set.
 template("board_input_bundle_set") {
   labels = {
     main_target = target_name
@@ -63,6 +72,21 @@ template("board_input_bundle_set") {
       args += [
         "--board-input-bundles",
         rebase_path(bib, root_build_dir),
+      ]
+    }
+
+    if (defined(invoker.version) && invoker.version != "") {
+      args += [
+        "--version",
+        invoker.version,
+      ]
+    }
+
+    if (defined(invoker.version_file) && invoker.version_file != "") {
+      inputs = [ invoker.version_file ]
+      args += [
+        "--version-file",
+        rebase_path(invoker.version_file, root_build_dir),
       ]
     }
 

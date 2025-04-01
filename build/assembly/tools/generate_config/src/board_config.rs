@@ -160,6 +160,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
             )]
             .into(),
+            release_version: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -215,6 +216,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
             )]
             .into(),
+            release_version: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -328,6 +330,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf(new_bib_path) },
             )]
             .into(),
+            release_version: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 

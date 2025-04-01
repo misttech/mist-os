@@ -25,6 +25,12 @@ def _fuchsia_board_input_bundle_set_impl(ctx):
         ]
         build_id_dirs += bib_info.build_id_dirs
 
+    if ctx.attr.version:
+        creation_args.extend(["--version", ctx.attr.version])
+    elif ctx.file.version_file:
+        creation_args.extend(["--version-file", ctx.file.version_file.path])
+        creation_inputs.append(ctx.file.version_file)
+
     # Create Board Input Bundle Set
     board_input_bundle_set_dir = ctx.actions.declare_directory(ctx.label.name)
     args = ["board-input-bundle-set", "--name", ctx.label.name, "--output", board_input_bundle_set_dir.path] + creation_args
@@ -59,6 +65,13 @@ fuchsia_board_input_bundle_set = rule(
             doc = "The board input bundles to include in the set.",
             providers = [FuchsiaBoardInputBundleInfo],
             default = [],
+        ),
+        "version": attr.string(
+            doc = "Release version string",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

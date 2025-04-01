@@ -217,6 +217,14 @@ struct BoardInputBundleSetArgs {
     #[argh(option)]
     board_input_bundles: Vec<Utf8PathBuf>,
 
+    /// release version that this BIB corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this BIB matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
+
     /// the directory to write the board config to.
     #[argh(option)]
     output: Utf8PathBuf,

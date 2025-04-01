@@ -74,6 +74,7 @@ fuchsia_board_input_bundle_set(
         ":main_bundle",
         ":bazel_drivers",
     ],
+    version = build_info_version,
 )
 
 _COMMON_FILESYSTEMS = {

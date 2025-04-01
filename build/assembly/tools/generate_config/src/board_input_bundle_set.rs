@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::BoardInputBundleSetArgs;
+use crate::{common, BoardInputBundleSetArgs};
 use anyhow::Result;
 use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
@@ -20,7 +20,11 @@ pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
             Ok((bib.name, entry))
         })
         .collect::<Result<BTreeMap<String, BoardInputBundleEntry>>>()?;
-    let set = BoardInputBundleSet { name, board_input_bundles };
+    let set = BoardInputBundleSet {
+        name,
+        board_input_bundles,
+        release_version: Some(common::get_release_version(&args.version, &args.version_file)?),
+    };
     set.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
