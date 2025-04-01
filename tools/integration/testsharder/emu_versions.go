@@ -13,7 +13,7 @@ import (
 // emuTypeToPackage maps emulator device types to the associated CIPD package and subdir
 // to download the package to with respect to the current working directory of the shard.
 var emuTypeToPackage = map[string]CIPDPackage{
-	"AEMU":   {Name: "fuchsia/third_party/android/aemu/release/${platform}", Subdir: "aemu/bin"},
+	"AEMU":   {Name: "fuchsia/third_party/android/aemu/release-gfxstream/${platform}", Subdir: "aemu/bin"},
 	"QEMU":   {Name: "fuchsia/third_party/qemu/${platform}", Subdir: "qemu"},
 	"crosvm": {Name: "fuchsia/third_party/crosvm/${platform}", Subdir: "crosvm/bin"},
 	"EDK2":   {Name: "fuchsia/third_party/edk2", Subdir: "edk2"},

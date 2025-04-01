@@ -78,7 +78,7 @@
         "expects_ssh": true,
         "cipd_packages": [
             {
-                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "name": "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
                 "version": "aemu_version",
                 "subdir": "aemu/bin"
             },
@@ -135,7 +135,7 @@
         "expects_ssh": true,
         "cipd_packages": [
             {
-                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "name": "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
                 "version": "aemu_version",
                 "subdir": "aemu/bin"
             },

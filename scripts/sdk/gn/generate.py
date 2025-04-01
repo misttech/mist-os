@@ -38,7 +38,7 @@ from frontend import Frontend
 # that ${platform} is actually part of the XML package name, so should
 # not be interpreted.
 EXTRA_PREBUILTS = {
-    "fuchsia/third_party/android/aemu/release/${platform}": "aemu",
+    "fuchsia/third_party/android/aemu/release-gfxstream/${platform}": "aemu",
     "fuchsia/third_party/grpcwebproxy/${platform}": "grpcwebproxy",
 }
 

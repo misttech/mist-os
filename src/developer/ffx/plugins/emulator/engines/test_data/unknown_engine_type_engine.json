@@ -1,5 +1,5 @@
 {
-    "emulator_binary": "/home/developer/fuchsia/prebuilt/third_party/android/aemu/release/linux-x64/emulator",
+    "emulator_binary": "/home/developer/fuchsia/prebuilt/third_party/android/aemu/release-gfxstream/linux-x64/emulator",
     "emulator_configuration": {
         "device": {
             "audio": {
