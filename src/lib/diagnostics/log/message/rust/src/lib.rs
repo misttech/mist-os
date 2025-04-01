@@ -15,8 +15,6 @@ use std::{mem, str};
 mod constants;
 pub mod error;
 pub use constants::*;
-#[cfg(fuchsia_api_level_less_than = "HEAD")]
-use fidl_fuchsia_diagnostics as _;
 
 #[cfg(test)]
 mod test;
