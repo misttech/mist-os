@@ -104,7 +104,7 @@ async def collect_iterator(
 
 @dataclass
 class ClientControllerState:
-    proxy: f_wlan_policy.ClientController.Client
+    proxy: f_wlan_policy.ClientControllerClient
     updates: asyncio.Queue[ClientStateSummary]
     # Keep the async task for fuchsia.wlan.policy/ClientStateUpdates so it
     # doesn't get garbage collected then cancelled.
@@ -196,7 +196,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
     def _connect_proxy(self) -> None:
         """Re-initializes connection to the WLAN stack."""
-        self._client_provider_proxy = f_wlan_policy.ClientProvider.Client(
+        self._client_provider_proxy = f_wlan_policy.ClientProviderClient(
             self._fc_transport.connect_device_proxy(_CLIENT_PROVIDER_PROXY)
         )
 
@@ -258,7 +258,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             self._client_controller = None
 
         controller_client, controller_server = Channel.create()
-        client_controller_proxy = f_wlan_policy.ClientController.Client(
+        client_controller_proxy = f_wlan_policy.ClientControllerClient(
             controller_client.take()
         )
 
@@ -310,7 +310,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             )
 
         client, server = Channel.create()
-        iterator = f_wlan_policy.NetworkConfigIterator.Client(client.take())
+        iterator = f_wlan_policy.NetworkConfigIteratorClient(client.take())
 
         _LOGGER.debug(
             "Calling fuchsia.wlan.policy/ClientController.GetSavedNetworks()"
@@ -517,7 +517,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             )
 
         client, server = Channel.create()
-        iterator = f_wlan_policy.ScanResultIterator.Client(client.take())
+        iterator = f_wlan_policy.ScanResultIteratorClient(client.take())
 
         _LOGGER.debug(
             "Calling fuchsia.wlan.policy/ClientController.ScanForNetworks()"
@@ -572,7 +572,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             self._client_controller.client_state_updates_server_task
         )
 
-        client_listener_proxy = f_wlan_policy.ClientListener.Client(
+        client_listener_proxy = f_wlan_policy.ClientListenerClient(
             self._fc_transport.connect_device_proxy(_CLIENT_LISTENER_PROXY)
         )
 
@@ -678,7 +678,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             ) from status
 
 
-class ClientStateUpdatesImpl(f_wlan_policy.ClientStateUpdates.Server):
+class ClientStateUpdatesImpl(f_wlan_policy.ClientStateUpdatesServer):
     """Server to receive WLAN status changes.
 
     Receives updates for client connections and the associated network state

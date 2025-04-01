@@ -148,8 +148,6 @@ python_host_test("fuchsia_controller_socket_test") {
 }
 
 python_host_test("fuchsia_controller_fidl_server_test") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   main_source = "server.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",

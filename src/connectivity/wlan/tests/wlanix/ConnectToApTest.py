@@ -133,7 +133,7 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
             proxy, server = Channel.create()
             self.supplicant_sta_iface_proxy.add_network(network=server.take())
             supplicant_sta_network_proxy = (
-                fidl_wlanix.SupplicantStaNetwork.Client(proxy)
+                fidl_wlanix.SupplicantStaNetworkClient(proxy)
             )
 
             fidl_ssid = fidl_ieee80211.Ssid(list(ssid.encode("ascii")))
@@ -169,11 +169,11 @@ class SupplicantStaIfaceCallbackContext:
         | fidl_wlanix.SupplicantStaIfaceCallbackOnDisconnectedRequest
         | fidl_wlanix.SupplicantStaIfaceCallbackOnAssociationRejectedRequest
     ]
-    callback_proxy: fidl_wlanix.SupplicantStaIfaceCallback.Client
+    callback_proxy: fidl_wlanix.SupplicantStaIfaceCallbackClient
 
 
 class SupplicantStaIfaceCallbackServer(
-    fidl_wlanix.SupplicantStaIfaceCallback.Server
+    fidl_wlanix.SupplicantStaIfaceCallbackServer
 ):
     def __init__(
         self,
@@ -216,7 +216,7 @@ class SupplicantStaIfaceCallbackServer(
         self.server_task = asyncio.get_running_loop().create_task(self.serve())
         return SupplicantStaIfaceCallbackContext(
             state_change_queue=self.state_change_queue,
-            callback_proxy=fidl_wlanix.SupplicantStaIfaceCallback.Client(proxy),
+            callback_proxy=fidl_wlanix.SupplicantStaIfaceCallbackClient(proxy),
         )
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:

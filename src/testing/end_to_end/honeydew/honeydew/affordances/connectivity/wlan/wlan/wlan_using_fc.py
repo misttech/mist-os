@@ -126,7 +126,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
 
     def _connect_proxy(self) -> None:
         """Re-initializes connection to the WLAN stack."""
-        self._device_monitor_proxy = f_wlan_device_service.DeviceMonitor.Client(
+        self._device_monitor_proxy = f_wlan_device_service.DeviceMonitorClient(
             self._fc_transport.connect_device_proxy(_DEVICE_MONITOR_PROXY)
         )
 
@@ -167,7 +167,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         sme = await self._get_client_sme(iface_id)
 
         client, server = Channel.create()
-        connect_transaction_client = f_wlan_sme.ConnectTransaction.Client(
+        connect_transaction_client = f_wlan_sme.ConnectTransactionClient(
             client.take()
         )
 
@@ -497,7 +497,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
 
     async def _get_client_sme(
         self, iface_id: int
-    ) -> f_wlan_sme.ClientSme.Client:
+    ) -> f_wlan_sme.ClientSmeClient:
         """Get a handle to ClientSme for performing SME actions.
 
         Args:
@@ -511,7 +511,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             for performing driver-layer actions on the underlying WLAN hardware.
         """
         client, server = Channel.create()
-        sme_client = f_wlan_sme.ClientSme.Client(client)
+        sme_client = f_wlan_sme.ClientSmeClient(client)
 
         try:
             await self._device_monitor_proxy.get_client_sme(
@@ -541,7 +541,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
 
         # TODO(http://b/323967235): Move this to its own affordance
         regulatory_region_configurator = (
-            f_location_namedplace.RegulatoryRegionConfigurator.Client(
+            f_location_namedplace.RegulatoryRegionConfiguratorClient(
                 self._fc_transport.connect_device_proxy(
                     _REGULATORY_REGION_CONFIGURATOR_PROXY
                 )
@@ -574,7 +574,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return await self._status(sme)
 
     async def _status(
-        self, sme: f_wlan_sme.ClientSme.Client
+        self, sme: f_wlan_sme.ClientSmeClient
     ) -> ClientStatusResponse:
         try:
             resp = await sme.status()
@@ -586,9 +586,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
         return ClientStatusResponse.from_fidl(resp.resp)
 
 
-class ConnectTransactionEventHandler(
-    f_wlan_sme.ConnectTransaction.EventHandler
-):
+class ConnectTransactionEventHandler(f_wlan_sme.ConnectTransactionEventHandler):
     """Event handler for ClientSme.Connect()."""
 
     def __init__(

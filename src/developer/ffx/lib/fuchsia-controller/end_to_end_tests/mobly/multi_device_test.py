@@ -32,14 +32,14 @@ class BluetoothDevice(object):
     def connect_proxies(self) -> None:
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
-        self.access_proxy = bluetooth_sys.Access.Client(
+        self.access_proxy = bluetooth_sys.AccessClient(
             self.device.ctx.connect_device_proxy(
-                "core/bluetooth-core", bluetooth_sys.Access.MARKER
+                "core/bluetooth-core", bluetooth_sys.AccessMarker
             )
         )
-        self.host_watcher_proxy = bluetooth_sys.HostWatcher.Client(
+        self.host_watcher_proxy = bluetooth_sys.HostWatcherClient(
             self.device.ctx.connect_device_proxy(
-                "core/bluetooth-core", bluetooth_sys.HostWatcher.MARKER
+                "core/bluetooth-core", bluetooth_sys.HostWatcherMarker
             )
         )
 

@@ -30,7 +30,7 @@ async def main() -> None:
             target=target_ip,
         )
         remote_control_proxy = ctx.connect_remote_control_proxy()
-        proxy = fd_rcs.RemoteControl.Client(remote_control_proxy)
+        proxy = fd_rcs.RemoteControlClient(remote_control_proxy)
         return await proxy.identify_host()
 
     # Asynchronously await each RemoteControl.IdentifyHost call.

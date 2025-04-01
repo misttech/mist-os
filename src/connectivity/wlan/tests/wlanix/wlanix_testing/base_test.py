@@ -24,7 +24,7 @@ from mobly.records import TestResultRecord
 
 
 class WlanixBaseTestClass(base_test.BaseTestClass):
-    wlanix_proxy: fidl_wlanix.Wlanix.Client
+    wlanix_proxy: fidl_wlanix.WlanixClient
 
     def setup_class(self) -> None:
         fuchsia_devices = self.register_controller(fuchsia_device)
@@ -39,7 +39,7 @@ class WlanixBaseTestClass(base_test.BaseTestClass):
             "Requires a Honeydew-enabled FuchsiaDevice",
         )
 
-        self.wlanix_proxy = fidl_wlanix.Wlanix.Client(
+        self.wlanix_proxy = fidl_wlanix.WlanixClient(
             self.fuchsia_device.honeydew_fd.fuchsia_controller.connect_device_proxy(
                 FidlEndpoint("core/wlanix", "fuchsia.wlan.wlanix.Wlanix")
             )
@@ -48,7 +48,7 @@ class WlanixBaseTestClass(base_test.BaseTestClass):
 
 class WifiChipBaseTestClass(WlanixBaseTestClass):
     chip_id: int
-    wifi_chip_proxy: fidl_wlanix.WifiChip.Client
+    wifi_chip_proxy: fidl_wlanix.WifiChipClient
     allow_ifaces_between_tests: bool
 
     def __init__(
@@ -65,7 +65,7 @@ class WifiChipBaseTestClass(WlanixBaseTestClass):
 
         proxy, server = Channel.create()
         self.wlanix_proxy.get_wifi(wifi=server.take())
-        wifi_proxy = fidl_wlanix.Wifi.Client(proxy)
+        wifi_proxy = fidl_wlanix.WifiClient(proxy)
 
         response = asyncio.run(wifi_proxy.get_chip_ids()).unwrap()
         assert_is_not(
@@ -84,7 +84,7 @@ class WifiChipBaseTestClass(WlanixBaseTestClass):
         asyncio.run(
             wifi_proxy.get_chip(chip_id=self.chip_id, chip=server.take())
         ).unwrap()
-        self.wifi_chip_proxy = fidl_wlanix.WifiChip.Client(proxy)
+        self.wifi_chip_proxy = fidl_wlanix.WifiChipClient(proxy)
 
     def teardown_test(self) -> None:
         if not self.allow_ifaces_between_tests:
@@ -99,8 +99,8 @@ class WifiChipBaseTestClass(WlanixBaseTestClass):
 
 
 class IfaceBaseTestClass(WifiChipBaseTestClass):
-    wifi_sta_iface_proxy: fidl_wlanix.WifiStaIface.Client
-    supplicant_sta_iface_proxy: fidl_wlanix.SupplicantStaIface.Client
+    wifi_sta_iface_proxy: fidl_wlanix.WifiStaIfaceClient
+    supplicant_sta_iface_proxy: fidl_wlanix.SupplicantStaIfaceClient
     iface_name: str
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -122,7 +122,7 @@ class IfaceBaseTestClass(WifiChipBaseTestClass):
         asyncio.run(
             self.wifi_chip_proxy.create_sta_iface(iface=server.take())
         ).unwrap()
-        self.wifi_sta_iface_proxy = fidl_wlanix.WifiStaIface.Client(proxy)
+        self.wifi_sta_iface_proxy = fidl_wlanix.WifiStaIfaceClient(proxy)
         self.iface_name = (
             asyncio.run(self.wifi_sta_iface_proxy.get_name())
             .unwrap()
@@ -131,14 +131,14 @@ class IfaceBaseTestClass(WifiChipBaseTestClass):
 
         proxy, server = Channel.create()
         self.wlanix_proxy.get_supplicant(supplicant=server.take())
-        supplicant_proxy = fidl_wlanix.Supplicant.Client(proxy)
+        supplicant_proxy = fidl_wlanix.SupplicantClient(proxy)
 
         proxy, server = Channel.create()
         supplicant_proxy.add_sta_interface(
             iface=server.take(),
             iface_name=self.iface_name,
         )
-        self.supplicant_sta_iface_proxy = fidl_wlanix.SupplicantStaIface.Client(
+        self.supplicant_sta_iface_proxy = fidl_wlanix.SupplicantStaIfaceClient(
             proxy
         )
 
@@ -168,7 +168,7 @@ class ConnectionBaseTestClass(IfaceBaseTestClass):
     packet_capture: list[PacketCapture] | None
     packet_logger: PacketCapture | None
     packet_log_pid: dict[str, int] | None
-    nl80211_proxy: fidl_wlanix.Nl80211.Client
+    nl80211_proxy: fidl_wlanix.Nl80211Client
 
     def access_point(self) -> AccessPoint:
         if self.__access_point is None:
@@ -184,7 +184,7 @@ class ConnectionBaseTestClass(IfaceBaseTestClass):
 
         proxy, server = Channel.create()
         self.wlanix_proxy.get_nl80211(nl80211=server.take())
-        self.nl80211_proxy = fidl_wlanix.Nl80211.Client(proxy)
+        self.nl80211_proxy = fidl_wlanix.Nl80211Client(proxy)
 
         access_points = self.register_controller(
             controllers.access_point, min_number=1

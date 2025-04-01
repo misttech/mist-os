@@ -33,7 +33,7 @@ class WlanCanaryTest(AsyncAdapter, base_test.AntlionBaseTest):
             "Requires a Honeydew-enabled FuchsiaDevice",
         )
 
-        self.wlan_device_monitor_proxy = fidl_wlan_device_service.DeviceMonitor.Client(
+        self.wlan_device_monitor_proxy = fidl_wlan_device_service.DeviceMonitorClient(
             self.fuchsia_device.honeydew_fd.fuchsia_controller.connect_device_proxy(
                 FidlEndpoint(
                     "core/wlandevicemonitor",

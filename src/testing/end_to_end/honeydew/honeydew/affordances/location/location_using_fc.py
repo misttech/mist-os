@@ -87,7 +87,7 @@ class LocationUsingFc(location.Location):
     def _connect_proxy(self) -> None:
         """Re-initializes connection to the location stack."""
         self._regulatory_region_configurator = (
-            f_location_namedplace.RegulatoryRegionConfigurator.Client(
+            f_location_namedplace.RegulatoryRegionConfiguratorClient(
                 self._fc_transport.connect_device_proxy(
                     _REGULATORY_REGION_CONFIGURATOR_PROXY
                 )

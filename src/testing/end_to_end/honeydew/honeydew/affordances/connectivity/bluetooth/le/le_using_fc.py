@@ -51,7 +51,7 @@ _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
 ASYNC_OP_TIMEOUT: int = 10
 
 
-class AdvertisedPeripheralImpl(f_ble_controller.AdvertisedPeripheral.Server):
+class AdvertisedPeripheralImpl(f_ble_controller.AdvertisedPeripheralServer):
     def on_connected(
         self, request: f_ble_controller.AdvertisedPeripheralOnConnectedRequest
     ) -> None:
@@ -137,20 +137,20 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             )
 
         assert self._peripheral_controller_proxy is None
-        self._peripheral_controller_proxy = f_ble_controller.Peripheral.Client(
+        self._peripheral_controller_proxy = f_ble_controller.PeripheralClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothLEPeripheral"]
             )
         )
 
         assert self._central_controller_proxy is None
-        self._central_controller_proxy = f_ble_controller.Central.Client(
+        self._central_controller_proxy = f_ble_controller.CentralClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothLECentral"]
             )
         )
         assert self._gatt_server_proxy is None
-        self._gatt_server_proxy = f_gatt_controller.Server.Client(
+        self._gatt_server_proxy = f_gatt_controller.ServerClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothGattServer"]
             )
@@ -194,7 +194,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             A dict of all known LE remote devices.
         """
         (central_client, central_server) = Channel.create()
-        watcher = f_ble_controller.ScanResultWatcher.Client(central_client)
+        watcher = f_ble_controller.ScanResultWatcherClient(central_client)
         filter_options = f_ble_controller.Filter()
         scan_options = f_ble_controller.ScanOptions(filters=[filter_options])
         assert self._central_controller_proxy is not None
@@ -227,7 +227,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         """
         peer_id = f_bt.PeerId(value=identifier)
         (conn_client, conn_server) = Channel.create()
-        self._connection_client = f_ble_controller.Connection.Client(
+        self._connection_client = f_ble_controller.ConnectionClient(
             conn_client.take()
         )
         connection_options = f_ble_controller.ConnectionOptions(
@@ -346,7 +346,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
                 self._connection_client is not None
             )  # the central connection handle should request Gatt client
             (client, server) = Channel.create()
-            client = f_gatt_controller.Client.Client(client)
+            client = f_gatt_controller.ClientClient(client)
             self._connection_client.request_gatt_client(
                 client=server.take()
             )  # bind server end of gatt2 client
@@ -404,7 +404,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             self._gatt_client.connect_to_service(
                 handle=service_handle, service=server.take()
             )
-            client = f_gatt_controller.RemoteService.Client(client)
+            client = f_gatt_controller.RemoteServiceClient(client)
             self._remote_service_client = client
         except Exception as e:
             raise bt_errors.BluetoothError(

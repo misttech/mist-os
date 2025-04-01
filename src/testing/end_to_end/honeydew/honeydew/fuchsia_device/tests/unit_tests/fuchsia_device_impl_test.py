@@ -1329,7 +1329,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
 
     # List all the tests related to private properties
     @mock.patch.object(
-        f_buildinfo.Provider.Client,
+        f_buildinfo.ProviderClient,
         "get_build_info",
         new_callable=mock.AsyncMock,
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
@@ -1356,7 +1356,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_buildinfo_provider.assert_called()
 
     @mock.patch.object(
-        f_buildinfo.Provider.Client,
+        f_buildinfo.ProviderClient,
         "get_build_info",
         new_callable=mock.AsyncMock,
         return_value=f_buildinfo.ProviderGetBuildInfoResponse(
@@ -1386,7 +1386,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called_once()
 
     @mock.patch.object(
-        f_hwinfo.Device.Client,
+        f_hwinfo.DeviceClient,
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.DeviceGetInfoResponse(
@@ -1414,7 +1414,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_hwinfo_device.assert_called()
 
     @mock.patch.object(
-        f_hwinfo.Device.Client,
+        f_hwinfo.DeviceClient,
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.DeviceGetInfoResponse(
@@ -1442,7 +1442,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called_once()
 
     @mock.patch.object(
-        f_hwinfo.Product.Client,
+        f_hwinfo.ProductClient,
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.ProductGetInfoResponse(
@@ -1470,7 +1470,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_hwinfo_product.assert_called()
 
     @mock.patch.object(
-        f_hwinfo.Product.Client,
+        f_hwinfo.ProductClient,
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.ProductGetInfoResponse(
@@ -1525,7 +1525,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        fd_remotecontrol.RemoteControl.Client,
+        fd_remotecontrol.RemoteControlClient,
         "log_message",
         new_callable=mock.AsyncMock,
     )
@@ -1546,7 +1546,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_rcs_log_message.assert_called()
 
     @mock.patch.object(
-        fd_remotecontrol.RemoteControl.Client,
+        fd_remotecontrol.RemoteControlClient,
         "log_message",
         new_callable=mock.AsyncMock,
     )
@@ -1568,7 +1568,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
             )
 
     @mock.patch.object(
-        fhp_statecontrol.Admin.Client,
+        fhp_statecontrol.AdminClient,
         "reboot",
         new_callable=mock.AsyncMock,
     )
@@ -1590,7 +1590,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_admin_reboot.assert_called()
 
     @mock.patch.object(
-        fhp_statecontrol.Admin.Client,
+        fhp_statecontrol.AdminClient,
         "reboot",
         new_callable=mock.AsyncMock,
     )
@@ -1616,7 +1616,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_admin_reboot.assert_called()
 
     @mock.patch.object(
-        fhp_statecontrol.Admin.Client,
+        fhp_statecontrol.AdminClient,
         "reboot",
         new_callable=mock.AsyncMock,
     )
@@ -1641,18 +1641,18 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_admin_reboot.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "get_attr",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "read",
         new_callable=mock.AsyncMock,
         side_effect=[
@@ -1696,7 +1696,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
@@ -1736,12 +1736,12 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "get_attr",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
@@ -1781,12 +1781,12 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "get_attr",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS), 0),
@@ -1825,18 +1825,18 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "get_attr",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "read",
         new_callable=mock.AsyncMock,
         side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
@@ -1875,19 +1875,19 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called()
 
     @mock.patch.object(
-        f_feedback.DataProvider.Client,
+        f_feedback.DataProviderClient,
         "get_snapshot",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "get_attr",
         new_callable=mock.AsyncMock,
         # File reports size of 15 bytes.
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
-        f_io.File.Client,
+        f_io.FileClient,
         "read",
         new_callable=mock.AsyncMock,
         # Only 5 bytes are read.

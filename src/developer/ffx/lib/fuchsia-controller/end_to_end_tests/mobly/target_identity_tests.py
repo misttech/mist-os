@@ -33,9 +33,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         -- call that results in simple output.
         """
         assert self.device.ctx is not None
-        device_proxy = device.NameProvider.Client(
+        device_proxy = device.NameProviderClient(
             self.device.ctx.connect_device_proxy(
-                "/bootstrap/device_name_provider", device.NameProvider.MARKER
+                "/bootstrap/device_name_provider", device.NameProviderMarker
             )
         )
         res = await device_proxy.get_device_name()
@@ -52,14 +52,14 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         -- calls multiple different components in a single test.
         """
         assert self.device.ctx is not None
-        device_proxy = device.NameProvider.Client(
+        device_proxy = device.NameProviderClient(
             self.device.ctx.connect_device_proxy(
-                "/bootstrap/device_name_provider", device.NameProvider.MARKER
+                "/bootstrap/device_name_provider", device.NameProviderMarker
             )
         )
-        product_proxy = hwinfo.Product.Client(
+        product_proxy = hwinfo.ProductClient(
             self.device.ctx.connect_device_proxy(
-                "/core/hwinfo", hwinfo.Product.MARKER
+                "/core/hwinfo", hwinfo.ProductMarker
             )
         )
         loop = asyncio.get_running_loop()
@@ -103,7 +103,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         """
         # [START snapshot_example]
         client, server = Channel.create()
-        file = io.File.Client(client)
+        file = io.FileClient(client)
         params = feedback.GetSnapshotParameters(
             # Two minutes of timeout time.
             collection_timeout_per_data=(2 * 60 * 10**9),
@@ -113,7 +113,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         ch = self.device.ctx.connect_device_proxy(
             "/core/feedback", "fuchsia.feedback.DataProvider"
         )
-        provider = feedback.DataProvider.Client(ch)
+        provider = feedback.DataProviderClient(ch)
         await provider.get_snapshot(params=params)
         attr_res = await file.get_attr()
         asserts.assert_equal(attr_res.s, ZxStatus.ZX_OK)

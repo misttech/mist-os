@@ -17,7 +17,7 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class PairingDelegateImpl(f_btsys_controller.PairingDelegate.Server):
+class PairingDelegateImpl(f_btsys_controller.PairingDelegateServer):
     """Pairing Delegate Server Implementation follows the FIDL SDK
     fuchsia.bluetooth.sys/pairing.fidl:PairingDelegate spec.
     """
@@ -63,7 +63,7 @@ class PairingDelegateImpl(f_btsys_controller.PairingDelegate.Server):
         raise StopServer
 
 
-class GattLocalServerImpl(f_gatt_controller.LocalService.Server):
+class GattLocalServerImpl(f_gatt_controller.LocalServiceServer):
     """Gatt Local Server Implementation follows the FIDL SDK
     fuchsia.bluetooth.gatt2/server.fidl:LocalService spec.
     """

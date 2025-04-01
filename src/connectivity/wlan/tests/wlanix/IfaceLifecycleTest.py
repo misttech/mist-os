@@ -29,7 +29,7 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         asyncio.run(
             self.wifi_chip_proxy.create_sta_iface(iface=server.take())
         ).unwrap()
-        wifi_sta_iface = fidl_wlanix.WifiStaIface.Client(proxy)
+        wifi_sta_iface = fidl_wlanix.WifiStaIfaceClient(proxy)
 
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()

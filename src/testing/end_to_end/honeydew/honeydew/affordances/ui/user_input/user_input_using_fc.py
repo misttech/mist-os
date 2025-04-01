@@ -48,7 +48,7 @@ class TouchDevice(user_input.TouchDevice):
         channel_server, channel_client = fcp.Channel.create()
 
         try:
-            input_registry_proxy = f_test_input.Registry.Client(
+            input_registry_proxy = f_test_input.RegistryClient(
                 fuchsia_controller.connect_device_proxy(
                     _FcProxies.INPUT_REGISTRY
                 )
@@ -61,7 +61,7 @@ class TouchDevice(user_input.TouchDevice):
                 f"Failed to initialize touch device on {self._device_name}"
             ) from status
 
-        self._touch_screen_proxy = f_test_input.TouchScreen.Client(
+        self._touch_screen_proxy = f_test_input.TouchScreenClient(
             channel_client
         )
 
@@ -161,7 +161,7 @@ class KeyboardDevice(user_input.KeyboardDevice):
         channel_server, channel_client = fcp.Channel.create()
 
         try:
-            input_registry_proxy = f_test_input.Registry.Client(
+            input_registry_proxy = f_test_input.RegistryClient(
                 fuchsia_controller.connect_device_proxy(
                     _FcProxies.INPUT_REGISTRY
                 )
@@ -174,7 +174,7 @@ class KeyboardDevice(user_input.KeyboardDevice):
                 f"Failed to initialize keyboard device on {self._device_name}"
             ) from status
 
-        self._keyboard_proxy = f_test_input.Keyboard.Client(channel_client)
+        self._keyboard_proxy = f_test_input.KeyboardClient(channel_client)
 
     def key_press(
         self,

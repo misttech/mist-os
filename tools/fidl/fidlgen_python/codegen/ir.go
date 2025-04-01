@@ -112,6 +112,7 @@ type PythonProtocol struct {
 	Marker                 string
 	Library                string
 	PythonName             string
+	PythonMarkerName       string
 	PythonClientName       string
 	PythonServerName       string
 	PythonEventHandlerName string
@@ -712,6 +713,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) PythonProtocol {
 		Protocol:               val,
 		PythonName:             name,
 		Library:                string(c.library),
+		PythonMarkerName:       name + "Marker",
 		PythonClientName:       name + "Client",
 		PythonServerName:       name + "Server",
 		PythonEventHandlerName: name + "EventHandler",

@@ -250,11 +250,11 @@ class WlanFCTests(unittest.TestCase):
     @contextmanager
     def _mock_client_sme(self) -> Iterator[mock.MagicMock]:
         """Mock fuchsia.wlan.sme.ClientSme for the duration of this context."""
-        client_sme = mock.MagicMock(spec=f_wlan_sme.ClientSme.Client)
+        client_sme = mock.MagicMock(spec=f_wlan_sme.ClientSmeClient)
         with mock.patch(
-            "fidl.fuchsia_wlan_sme.ClientSme", autospec=True
+            "fidl.fuchsia_wlan_sme.ClientSmeClient", autospec=True
         ) as f_client_sme:
-            f_client_sme.Client.return_value = client_sme
+            f_client_sme.return_value = client_sme
             self.wlan_obj._device_monitor_proxy.get_client_sme.return_value = (
                 _async_response(None)
             )
@@ -309,7 +309,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, auth=auth):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()
@@ -335,7 +335,7 @@ class WlanFCTests(unittest.TestCase):
                         self.assertEqual(
                             req.authentication, expect.authentication
                         )
-                        server = f_wlan_sme.ConnectTransaction.Server(
+                        server = f_wlan_sme.ConnectTransactionServer(
                             Channel(txn)
                         )
                         server.on_connect_result(
@@ -375,7 +375,7 @@ class WlanFCTests(unittest.TestCase):
     def test_connect_fails_sme_connect(self) -> None:
         """Verify connect fails when ClientSme.Connect() errors."""
         self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-            spec=f_wlan_device_service.DeviceMonitor.Client
+            spec=f_wlan_device_service.DeviceMonitorClient
         )
         self._mock_list_ifaces()
         self._mock_query_iface()
@@ -395,7 +395,7 @@ class WlanFCTests(unittest.TestCase):
     def test_connect_fails_connect_timeout(self) -> None:
         """Verify connect fails when ClientSme.Connect() takes too long."""
         self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-            spec=f_wlan_device_service.DeviceMonitor.Client
+            spec=f_wlan_device_service.DeviceMonitorClient
         )
         self._mock_list_ifaces()
         self._mock_query_iface()
@@ -431,7 +431,7 @@ class WlanFCTests(unittest.TestCase):
                 is_credentials_rejected=is_credentials_rejected,
             ):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()
@@ -443,7 +443,7 @@ class WlanFCTests(unittest.TestCase):
                         req: f_wlan_sme.ConnectRequest,
                         txn: int,
                     ) -> None:
-                        server = f_wlan_sme.ConnectTransaction.Server(
+                        server = f_wlan_sme.ConnectTransactionServer(
                             Channel(txn)
                         )
                         server.on_connect_result(
@@ -469,7 +469,7 @@ class WlanFCTests(unittest.TestCase):
     def test_connect_fails_client_status_wrong_ssid(self) -> None:
         """Verify connect fails when status() returns the wrong ssid."""
         self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-            spec=f_wlan_device_service.DeviceMonitor.Client
+            spec=f_wlan_device_service.DeviceMonitorClient
         )
         self._mock_list_ifaces()
         self._mock_query_iface()
@@ -491,7 +491,7 @@ class WlanFCTests(unittest.TestCase):
                     req.bss_description.bssid, expect.bss_description.bssid
                 )
                 self.assertEqual(req.authentication, expect.authentication)
-                server = f_wlan_sme.ConnectTransaction.Server(Channel(txn))
+                server = f_wlan_sme.ConnectTransactionServer(Channel(txn))
                 server.on_connect_result(
                     result=f_wlan_sme.ConnectResult(
                         code=f_wlan_ieee80211.StatusCode.SUCCESS,
@@ -539,7 +539,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, status_resp=status_resp):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()
@@ -566,7 +566,7 @@ class WlanFCTests(unittest.TestCase):
                         self.assertEqual(
                             req.authentication, expect.authentication
                         )
-                        server = f_wlan_sme.ConnectTransaction.Server(
+                        server = f_wlan_sme.ConnectTransactionServer(
                             Channel(txn)
                         )
                         server.on_connect_result(
@@ -598,7 +598,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(phy_id=phy_id, sta_addr=sta_addr, role=role):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
 
                 self.wlan_obj._device_monitor_proxy.create_iface.return_value = _async_response(
@@ -635,7 +635,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, iface_id=iface_id, status=status):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self.wlan_obj._device_monitor_proxy.destroy_iface.return_value = _async_response(
                     f_wlan_device_service.DeviceMonitorDestroyIfaceResponse(
@@ -657,7 +657,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()
@@ -683,7 +683,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
 
                 self._mock_list_ifaces(zx_err)
@@ -722,7 +722,7 @@ class WlanFCTests(unittest.TestCase):
                 expected_err=expected_err,
             ):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
 
                 if zx_err:
@@ -758,7 +758,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
 
                 if not zx_err:
@@ -783,7 +783,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
 
                 self._mock_query_iface(zx_err)
@@ -807,7 +807,7 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, err=err, zx_err=zx_err):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()
@@ -868,13 +868,13 @@ class WlanFCTests(unittest.TestCase):
         ]:
             with self.subTest(msg=msg, zx_err=zx_err):
                 regulatory_mock = mock.MagicMock(
-                    spec=f_location_namedplace.RegulatoryRegionConfigurator.Client
+                    spec=f_location_namedplace.RegulatoryRegionConfiguratorClient
                 )
                 with mock.patch(
-                    "fidl.fuchsia_location_namedplace.RegulatoryRegionConfigurator",
+                    "fidl.fuchsia_location_namedplace.RegulatoryRegionConfiguratorClient",
                     autospec=True,
                 ) as f_regulatory_mock:
-                    f_regulatory_mock.Client.return_value = regulatory_mock
+                    f_regulatory_mock.return_value = regulatory_mock
 
                     if not zx_err:
                         regulatory_mock.set_region.return_value = None
@@ -926,7 +926,7 @@ class WlanFCTests(unittest.TestCase):
                 msg=msg, resp=resp, zx_err=zx_err, expected=expected
             ):
                 self.wlan_obj._device_monitor_proxy = mock.MagicMock(
-                    spec=f_wlan_device_service.DeviceMonitor.Client
+                    spec=f_wlan_device_service.DeviceMonitorClient
                 )
                 self._mock_list_ifaces()
                 self._mock_query_iface()

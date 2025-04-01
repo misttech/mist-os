@@ -180,7 +180,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         # pylint: disable-next=unused-argument
         def get_controller(requests: Channel, updates: Channel) -> None:
             self.client_state_updates_proxy = (
-                f_wlan_policy.ClientStateUpdates.Client(updates)
+                f_wlan_policy.ClientStateUpdatesClient(updates)
             )
 
         self.wlan_policy_obj._client_provider_proxy.get_controller = mock.Mock(
@@ -188,12 +188,12 @@ class WlanPolicyFCTests(unittest.TestCase):
         )
 
         client_controller_proxy = mock.MagicMock(
-            spec=f_wlan_policy.ClientController.Client
+            spec=f_wlan_policy.ClientControllerClient
         )
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientController", autospec=True
+            "fidl.fuchsia_wlan_policy.ClientControllerClient", autospec=True
         ) as f_client_controller:
-            f_client_controller.Client.return_value = client_controller_proxy
+            f_client_controller.return_value = client_controller_proxy
             yield client_controller_proxy
 
     @contextmanager
@@ -201,21 +201,21 @@ class WlanPolicyFCTests(unittest.TestCase):
         """Mock the creation of a fuchsia.wlan.policy/ClientListener."""
 
         client_listener_proxy = mock.MagicMock(
-            spec=f_wlan_policy.ClientListener.Client
+            spec=f_wlan_policy.ClientListenerClient
         )
 
         # Create a FIDL client to the ClientListener server.
         def get_listener(updates: Channel) -> None:
             self.client_state_updates_proxy = (
-                f_wlan_policy.ClientStateUpdates.Client(updates)
+                f_wlan_policy.ClientStateUpdatesClient(updates)
             )
 
         client_listener_proxy.get_listener = mock.Mock(wraps=get_listener)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientListener", autospec=True
+            "fidl.fuchsia_wlan_policy.ClientListenerClient", autospec=True
         ) as f_client_listener:
-            f_client_listener.Client.return_value = client_listener_proxy
+            f_client_listener.return_value = client_listener_proxy
             yield client_listener_proxy
 
     def test_verify_supported(self) -> None:
@@ -833,7 +833,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.stop_client_connections()
 
 
-class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
+class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIteratorServer):
     """Iterator for scan results."""
 
     def __init__(self, server: Channel, items: list[list[str]]) -> None:
@@ -851,7 +851,7 @@ class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
         )
 
 
-class TestNetworkConfigIteratorImpl(f_wlan_policy.NetworkConfigIterator.Server):
+class TestNetworkConfigIteratorImpl(f_wlan_policy.NetworkConfigIteratorServer):
     """Iterator for NetworkConfig results."""
 
     def __init__(

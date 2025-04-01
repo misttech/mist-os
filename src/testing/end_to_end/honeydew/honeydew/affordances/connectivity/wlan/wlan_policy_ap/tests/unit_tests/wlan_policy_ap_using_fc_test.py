@@ -131,58 +131,59 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     @contextmanager
     def mock_ap_provider(self) -> Iterator[mock.MagicMock]:
-        """Mock requests to fuchsia.wlan.policy/AccessPointProvider."""
+        """Mock requests to fuchsia.wlan.policy/AccessPointProviderClient."""
         ap_provider_client = mock.MagicMock(
-            spec=f_wlan_policy.AccessPointProvider.Client,
+            spec=f_wlan_policy.AccessPointProviderClient,
             autospec=True,
         )
 
         # pylint: disable-next=unused-argument
         def get_controller(requests: Channel, updates: Channel) -> None:
             self.access_point_state_updates_proxy = (
-                f_wlan_policy.AccessPointStateUpdates.Client(updates)
+                f_wlan_policy.AccessPointStateUpdatesClient(updates)
             )
 
         ap_provider_client.get_controller = mock.Mock(wraps=get_controller)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointProvider", autospec=True
+            "fidl.fuchsia_wlan_policy.AccessPointProviderClient", autospec=True
         ) as fidl_mock:
-            fidl_mock.Client.return_value = ap_provider_client
+            fidl_mock.return_value = ap_provider_client
             yield ap_provider_client
 
     @contextmanager
     def mock_ap_listener(self) -> Iterator[mock.MagicMock]:
-        """Mock requests to fuchsia.wlan.policy/AccessPointListener."""
+        """Mock requests to fuchsia.wlan.policy/AccessPointListenerClient."""
         ap_listener_client = mock.MagicMock(
-            spec=f_wlan_policy.AccessPointListener.Client,
+            spec=f_wlan_policy.AccessPointListenerClient,
             autospec=True,
         )
 
         def get_listener(updates: Channel) -> None:
             self.access_point_state_updates_proxy = (
-                f_wlan_policy.AccessPointStateUpdates.Client(updates)
+                f_wlan_policy.AccessPointStateUpdatesClient(updates)
             )
 
         ap_listener_client.get_listener = mock.Mock(wraps=get_listener)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointListener", autospec=True
+            "fidl.fuchsia_wlan_policy.AccessPointListenerClient", autospec=True
         ) as fidl_mock:
-            fidl_mock.Client.return_value = ap_listener_client
+            fidl_mock.return_value = ap_listener_client
             yield ap_listener_client
 
     @contextmanager
     def mock_ap_controller(self) -> Iterator[mock.MagicMock]:
         ap_controller_client = mock.MagicMock(
-            spec=f_wlan_policy.AccessPointController.Client,
+            spec=f_wlan_policy.AccessPointControllerClient,
             autospec=True,
         )
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.AccessPointController", autospec=True
+            "fidl.fuchsia_wlan_policy.AccessPointControllerClient",
+            autospec=True,
         ) as fidl_mock:
-            fidl_mock.Client.return_value = ap_controller_client
+            fidl_mock.return_value = ap_controller_client
             yield ap_controller_client
 
     def test_verify_supported(self) -> None:

@@ -25,7 +25,7 @@ class RtcFcTests(unittest.TestCase):
     def setUp(self) -> None:
         self.m_run = self.enterContext(mock.patch.object(asyncio, "run"))
         self.m_proxy = self.enterContext(
-            mock.patch.object(frtc.Device, "Client")
+            mock.patch.object(frtc, "DeviceClient")
         ).return_value
 
         self.transport = mock.create_autospec(

@@ -392,17 +392,18 @@ def type_annotation(type_ir, root_ir) -> type:
         ty = type_annotation(element_type, root_ir)
         return wrap_optional(Sequence[ty])
     elif kind == "endpoint":
-        # TODO(https://fxbug.dev/383175226): This inconsistency between client
-        # and server may not be correct. Add test coverage for `client_end`.
         if type_ir["role"] == "client":
+            protocol = type_ir["protocol"]
+            module = fidl_ident_to_py_import(protocol)
             return wrap_optional(
-                get_type_by_identifier(type_ir["protocol"], root_ir)
+                f"{fidl_ident_to_py_library_member(protocol)}Client",
+                module=module,
             )
         elif type_ir["role"] == "server":
             protocol = type_ir["protocol"]
             module = fidl_ident_to_py_import(protocol)
             return wrap_optional(
-                f"{fidl_ident_to_py_library_member(protocol)}.Server",
+                f"{fidl_ident_to_py_library_member(protocol)}Server",
                 module=module,
             )
         else:
@@ -431,15 +432,6 @@ def fidl_ident_to_py_import(name: str) -> str:
     """Python import from fidl identifier: foo.bar.baz/Foo would return fidl.foo_bar_baz"""
     fidl_lib = fidl_ident_to_library(name)
     return fidl_library_to_py_module_path(fidl_lib)
-
-
-def fidl_ident_to_marker(name: str) -> str:
-    """Changes a fidl library member to a marker used for protocol lookup.
-
-    Returns: foo.bar.baz/Foo returns foo.bar.baz.Foo
-    """
-    name = normalize_identifier(name)
-    return name.replace("/", ".")
 
 
 def fidl_ident_to_py_library_member(name: str) -> str:
@@ -975,35 +967,6 @@ def alias_declaration(ir, root_ir) -> type:
         return type(name, (base_type,), base_params)
 
 
-class ProtocolBase(
-    metaclass=FidlMeta,
-    required_class_variables=[
-        ("Client", FidlMeta),
-        ("Server", FidlMeta),
-        ("EventHandler", FidlMeta),
-        ("MARKER", str),
-    ],
-):
-    ...
-
-
-def protocol_type(ir, root_ir) -> type:
-    """Constructs a Python type from a FIDL IR protocol declaration."""
-    name = fidl_ident_to_py_library_member(ir.name())
-    return type(
-        name,
-        (ProtocolBase,),
-        {
-            "__doc__": docstring(ir),
-            "__fidl_kind__": "protocol",
-            "Client": protocol_client_type(ir, root_ir),
-            "Server": protocol_server_type(ir, root_ir),
-            "EventHandler": protocol_event_handler_type(ir, root_ir),
-            "MARKER": fidl_ident_to_marker(ir.name()),
-        },
-    )
-
-
 def protocol_event_handler_type(ir: IR, root_ir) -> type:
     properties = {
         "__doc__": docstring(ir),
@@ -1042,6 +1005,17 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         (EventHandlerBase,),
         properties,
     )
+
+
+class ProtocolMarker(
+    str,
+    metaclass=FidlMeta,
+):
+    ...
+
+
+def protocol_marker(ir: IR, root_ir) -> ProtocolMarker:
+    return ProtocolMarker(normalize_identifier(ir.name().replace("/", ".")))
 
 
 def protocol_server_type(ir: IR, root_ir) -> type:
@@ -1356,7 +1330,24 @@ class FIDLLibraryModule(ModuleType):
     def _export_protocols(self) -> None:
         for decl in self.__ir__.protocol_declarations():
             if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
-                self._export_type(protocol_type(decl, self.__ir__))
+                self._export_type(
+                    protocol_client_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+                self._export_type(
+                    protocol_server_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+                self._export_type(
+                    protocol_event_handler_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+
+                protocol_name = fidl_ident_to_py_library_member(decl.name())
+                marker_name = f"{protocol_name}Marker"
+                marker = protocol_marker(decl, self.__ir__)
+                setattr(self, marker_name, marker)
+                self.__all__.append(marker_name)
 
     def _export_structs(self) -> None:
         for decl in self.__ir__.struct_declarations():
@@ -1411,28 +1402,25 @@ class FIDLLibraryModule(ModuleType):
         setattr(self, c.name, c.value)
         self.__all__.append(c.name)
 
-    def _export_type(self, t: type) -> None:
-        # TODO(https://fxbug.dev/346628306): Use a type more specific than Any if possible.
-        def encode_func(
-            obj: Any,
-        ) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
-            library = obj.__module__
-            library = library.removeprefix("fidl.")
-            library = library.replace("_", ".")
-            try:
-                type_name = f"{obj.__fidl_raw_type__}"
-            except AttributeError:
-                type_name = f"{library}/{type(obj).__name__}"
-            finally:
-                return encode_fidl_object(obj, library, type_name)
-
+    def _export_type(self, t: type, include_encode: bool = True) -> None:
         setattr(t, "__module__", self.fullname)
-        setattr(t, "encode", encode_func)
+
+        if include_encode:
+
+            def encode_func(
+                # TODO(https://fxbug.dev/346628306): Use a type more specific than Any if possible.
+                obj: Any,
+            ) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
+                library = obj.__module__
+                library = library.removeprefix("fidl.")
+                library = library.replace("_", ".")
+                try:
+                    type_name = f"{obj.__fidl_raw_type__}"
+                except AttributeError:
+                    type_name = f"{library}/{type(obj).__name__}"
+                finally:
+                    return encode_fidl_object(obj, library, type_name)
+
+            setattr(t, "encode", encode_func)
         setattr(self, t.__name__, t)
         self.__all__.append(t.__name__)
-
-        if issubclass(t, ProtocolBase):
-            for nested_class in [t.Client, t.Server, t.EventHandler]:
-                setattr(nested_class, "__module__", self.fullname)
-                setattr(self, nested_class.__name__, nested_class)
-                self.__all__.append(nested_class.__name__)

@@ -99,7 +99,7 @@ class NetstackFCTests(unittest.TestCase):
     def test_list_interfaces(self) -> None:
         """Test if list_interfaces works."""
         self.netstack_obj._state_proxy = mock.MagicMock(
-            spec=f_net_interfaces.State.Client
+            spec=f_net_interfaces.StateClient
         )
 
         def get_watcher(
@@ -143,7 +143,7 @@ class NetstackFCTests(unittest.TestCase):
         )
 
         self.netstack_obj._interfaces_proxy = mock.MagicMock(
-            spec=f_net_root.Interfaces.Client
+            spec=f_net_root.InterfacesClient
         )
 
         mac_result = f_net_root.InterfacesGetMacResult(
@@ -191,7 +191,7 @@ class NetstackFCTests(unittest.TestCase):
         )
 
 
-class TestWatcherImpl(f_net_interfaces.Watcher.Server):
+class TestWatcherImpl(f_net_interfaces.WatcherServer):
     """Iterator for netstack events."""
 
     def __init__(

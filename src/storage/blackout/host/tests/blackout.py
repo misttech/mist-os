@@ -116,9 +116,9 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             wait_time=5,
         )
         ch = self.dut.fuchsia_controller.connect_device_proxy(
-            FidlEndpoint(self.component_name, blackout.Controller.MARKER)
+            FidlEndpoint(self.component_name, blackout.ControllerMarker)
         )
-        self.blackout_proxy = blackout.Controller.Client(ch)
+        self.blackout_proxy = blackout.ControllerClient(ch)
 
     @test_case_revive.tag_test(
         tag_name="revive_test_case",

@@ -19,7 +19,7 @@ class WifiChipExistenceTest(base_test.WlanixBaseTestClass):
     def test_get_chip_ids(self) -> None:
         proxy, server = Channel.create()
         self.wlanix_proxy.get_wifi(wifi=server.take())
-        wifi_proxy = fidl_wlanix.Wifi.Client(proxy)
+        wifi_proxy = fidl_wlanix.WifiClient(proxy)
 
         response = asyncio.run(wifi_proxy.get_chip_ids()).unwrap()
         assert_is_not(

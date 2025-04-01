@@ -59,13 +59,13 @@ class RtcUisngFc(rtc.Rtc):
             self.__class__.MONIKER_NEW, CAPABILITY
         )
         try:
-            self._proxy: frtc.Device.Client = frtc.Device.Client(
+            self._proxy: frtc.Device.Client = frtc.DeviceClient(
                 self._controller.connect_device_proxy(ep_old)
             )
         except RuntimeError:
             # Try connecting through the other moniker.
             try:
-                self._proxy = frtc.Device.Client(
+                self._proxy = frtc.DeviceClient(
                     self._controller.connect_device_proxy(ep_new)
                 )
             except RuntimeError:

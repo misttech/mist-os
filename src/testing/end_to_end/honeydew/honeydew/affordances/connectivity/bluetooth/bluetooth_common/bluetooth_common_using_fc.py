@@ -151,14 +151,14 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             )
 
         assert self._access_controller_proxy is None
-        self._access_controller_proxy = f_btsys_controller.Access.Client(
+        self._access_controller_proxy = f_btsys_controller.AccessClient(
             self._fc_transport.connect_device_proxy(
                 _FCBluetoothProxies.BT_SYS_ACCESS
             )
         )
         assert self._host_watcher_controller_proxy is None
         self._host_watcher_controller_proxy = (
-            f_btsys_controller.HostWatcher.Client(
+            f_btsys_controller.HostWatcherClient(
                 self._fc_transport.connect_device_proxy(
                     _FCBluetoothProxies.BT_SYS_HOST_WATCHER
                 )
@@ -166,7 +166,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         )
 
         assert self._pairing_controller_proxy is None
-        self._pairing_controller_proxy = f_btsys_controller.Pairing.Client(
+        self._pairing_controller_proxy = f_btsys_controller.PairingClient(
             self._fc_transport.connect_device_proxy(
                 _FCBluetoothProxies.BT_SYS_PAIRING
             )

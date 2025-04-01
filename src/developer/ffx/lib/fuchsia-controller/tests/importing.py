@@ -110,9 +110,9 @@ class Importing(unittest.TestCase):
 
     def test_protocol_classes_exist(self) -> None:
         mod = importlib.import_module("fidl.fuchsia_controller_test")
-        self.assertEqual(mod.NoopClient, mod.Noop.Client)
-        self.assertEqual(mod.NoopServer, mod.Noop.Server)
-        self.assertEqual(mod.NoopEventHandler, mod.Noop.EventHandler)
+        self.assertEqual(mod.NoopClient, mod.NoopClient)
+        self.assertEqual(mod.NoopServer, mod.NoopServer)
+        self.assertEqual(mod.NoopEventHandler, mod.NoopEventHandler)
 
     def test_encode_protocol_return_value(self) -> None:
         """This test covers a problem area with naming protocol methods in IR.
