@@ -104,16 +104,6 @@ MATCHER_P(SyscallFailsWithErrno, expected_errno,
   }
 }
 
-MATCHER_P(FdIsLabeled, expected_label, std::string("fd is labeled with ") + expected_label) {
-  if (arg < 0) {
-    *result_listener << "invalid fd";
-    return false;
-  }
-  ::testing::Matcher<fit::result<int, std::string>> expected =
-      IsOkMatcherP<std::string>(expected_label);
-  return expected.MatchAndExplain(GetLabel(arg), result_listener);
-}
-
 namespace fit {
 
 /// Kludge to tell gTest how to stringify `fit::result<>` values.

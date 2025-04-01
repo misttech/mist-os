@@ -16,12 +16,12 @@ TEST(PolicyLoadTest, Pipes) {
   EXPECT_THAT(pipe(pipe_before_policy), SyscallSucceeds());
   LoadPolicy("minimal_policy.pp");
 
-  EXPECT_THAT(pipe_before_policy[0], FdIsLabeled("system_u:unconfined_r:unconfined_t:s0"));
+  EXPECT_THAT(GetLabel(pipe_before_policy[0]), "system_u:unconfined_r:unconfined_t:s0");
 
   WriteContents("/proc/thread-self/attr/current", "system_u:unconfined_r:unconfined_t:s0");
 
   int pipe_after_policy[2];
   EXPECT_THAT(pipe(pipe_after_policy), SyscallSucceeds());
 
-  EXPECT_THAT(pipe_after_policy[0], FdIsLabeled("system_u:unconfined_r:unconfined_t:s0"));
+  EXPECT_THAT(GetLabel(pipe_after_policy[0]), "system_u:unconfined_r:unconfined_t:s0");
 }
