@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WireInt32Wrapper> for Int32Wrapper {
     }
 }
 
-/// The wire type corersponding to [`Int32Wrapper`].
+/// The wire type corresponding to [`Int32Wrapper`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt32Wrapper {
@@ -202,7 +202,7 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddRequest> for SimpleProtocolAddRe
     }
 }
 
-/// The wire type corersponding to [`SimpleProtocolAddRequest`].
+/// The wire type corresponding to [`SimpleProtocolAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddRequest {
@@ -318,7 +318,7 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddR
     }
 }
 
-/// The wire type corersponding to [`SimpleProtocolAddResponse`].
+/// The wire type corresponding to [`SimpleProtocolAddResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddResponse {
@@ -862,7 +862,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableHandle> for StructWithNullableH
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableHandle`].
+/// The wire type corresponding to [`StructWithNullableHandle`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableHandle {
@@ -986,7 +986,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableProtocol`].
+/// The wire type corresponding to [`StructWithNullableProtocol`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableProtocol {
@@ -1111,7 +1111,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableRequest`].
+/// The wire type corresponding to [`StructWithNullableRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableRequest {
@@ -1214,7 +1214,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableString> for StructWithNullableS
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableString`].
+/// The wire type corresponding to [`StructWithNullableString`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableString {
@@ -1316,7 +1316,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableStruct> for StructWithNullableS
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableStruct`].
+/// The wire type corresponding to [`StructWithNullableStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableStruct {
@@ -1431,7 +1431,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUn
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableUnion`].
+/// The wire type corresponding to [`StructWithNullableUnion`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableUnion {
@@ -1531,7 +1531,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableVector> for StructWithNullableV
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableVector`].
+/// The wire type corresponding to [`StructWithNullableVector`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableVector {

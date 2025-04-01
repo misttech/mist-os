@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WireStructLargeArray> for StructLargeArray {
     }
 }
 
-/// The wire type corersponding to [`StructLargeArray`].
+/// The wire type corresponding to [`StructLargeArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructLargeArray {
@@ -191,7 +191,7 @@ impl ::fidl_next::TakeFrom<WireStructSmallArray> for StructSmallArray {
     }
 }
 
-/// The wire type corersponding to [`StructSmallArray`].
+/// The wire type corresponding to [`StructSmallArray`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructSmallArray {

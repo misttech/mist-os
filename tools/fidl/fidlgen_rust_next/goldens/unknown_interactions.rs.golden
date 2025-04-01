@@ -89,7 +89,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
@@ -624,7 +624,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -1858,7 +1858,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
@@ -2379,7 +2379,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
@@ -2897,7 +2897,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventFieldsR
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarProtocolStrictEventFieldsRequest`].
+/// The wire type corresponding to [`UnknownInteractionsAjarProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest {
@@ -3411,7 +3411,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventField
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest`].
+/// The wire type corresponding to [`UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
@@ -4996,7 +4996,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
@@ -5534,7 +5534,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -6734,7 +6734,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
@@ -7259,7 +7259,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
@@ -7781,7 +7781,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventField
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsClosedProtocolStrictEventFieldsRequest`].
+/// The wire type corresponding to [`UnknownInteractionsClosedProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest {
@@ -9110,7 +9110,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
@@ -9635,7 +9635,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
@@ -10162,7 +10162,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
@@ -10689,7 +10689,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
@@ -12441,7 +12441,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsResp
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse {
@@ -12950,7 +12950,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrR
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
@@ -13467,7 +13467,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsRe
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
@@ -13986,7 +13986,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsEr
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
@@ -14499,7 +14499,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventFieldsReque
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolStrictEventFieldsRequest`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolStrictEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolStrictEventFieldsRequest {
@@ -15001,7 +15001,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventFieldsReq
     }
 }
 
-/// The wire type corersponding to [`UnknownInteractionsProtocolFlexibleEventFieldsRequest`].
+/// The wire type corresponding to [`UnknownInteractionsProtocolFlexibleEventFieldsRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireUnknownInteractionsProtocolFlexibleEventFieldsRequest {

@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WireByteAndBytes> for ByteAndBytes {
     }
 }
 
-/// The wire type corersponding to [`ByteAndBytes`].
+/// The wire type corresponding to [`ByteAndBytes`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireByteAndBytes {

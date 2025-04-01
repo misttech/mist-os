@@ -109,7 +109,7 @@ impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
     }
 }
 
-/// The wire type corersponding to [`AllInstants`].
+/// The wire type corresponding to [`AllInstants`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireAllInstants {

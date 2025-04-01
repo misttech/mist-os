@@ -282,7 +282,7 @@ impl ::fidl_next::TakeFrom<WireExampleOfUseOfAliases> for ExampleOfUseOfAliases 
     }
 }
 
-/// The wire type corersponding to [`ExampleOfUseOfAliases`].
+/// The wire type corresponding to [`ExampleOfUseOfAliases`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleOfUseOfAliases {

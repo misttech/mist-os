@@ -90,7 +90,7 @@ impl ::fidl_next::TakeFrom<WireClientEndWrapper> for ClientEndWrapper {
     }
 }
 
-/// The wire type corersponding to [`ClientEndWrapper`].
+/// The wire type corresponding to [`ClientEndWrapper`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireClientEndWrapper {
@@ -472,7 +472,7 @@ impl ::fidl_next::TakeFrom<WireHandlesInProtocolSendHandlesRequest>
     }
 }
 
-/// The wire type corersponding to [`HandlesInProtocolSendHandlesRequest`].
+/// The wire type corresponding to [`HandlesInProtocolSendHandlesRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandlesInProtocolSendHandlesRequest {
@@ -749,7 +749,7 @@ impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
     }
 }
 
-/// The wire type corersponding to [`ServerEndWrapper`].
+/// The wire type corresponding to [`ServerEndWrapper`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireServerEndWrapper {

@@ -273,7 +273,7 @@ impl ::fidl_next::TakeFrom<WireOverrideTest> for OverrideTest {
     }
 }
 
-/// The wire type corersponding to [`OverrideTest`].
+/// The wire type corresponding to [`OverrideTest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireOverrideTest {
@@ -1201,7 +1201,7 @@ impl ::fidl_next::TakeFrom<WireTableData> for TableData {
     }
 }
 
-/// The wire type corersponding to [`TableData`].
+/// The wire type corresponding to [`TableData`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTableData {
@@ -1450,7 +1450,7 @@ impl ::fidl_next::TakeFrom<WireSomeProtocolSomeMethodRequest> for SomeProtocolSo
     }
 }
 
-/// The wire type corersponding to [`SomeProtocolSomeMethodRequest`].
+/// The wire type corresponding to [`SomeProtocolSomeMethodRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSomeProtocolSomeMethodRequest {
@@ -1568,7 +1568,7 @@ impl ::fidl_next::TakeFrom<WireSomeProtocolSomeMethodResponse> for SomeProtocolS
     }
 }
 
-/// The wire type corersponding to [`SomeProtocolSomeMethodResponse`].
+/// The wire type corresponding to [`SomeProtocolSomeMethodResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSomeProtocolSomeMethodResponse {

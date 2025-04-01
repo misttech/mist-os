@@ -193,7 +193,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildResponse> for ParentGetChildRespons
     }
 }
 
-/// The wire type corersponding to [`ParentGetChildResponse`].
+/// The wire type corresponding to [`ParentGetChildResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildResponse {
@@ -320,7 +320,7 @@ impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChild
     }
 }
 
-/// The wire type corersponding to [`ParentGetChildRequestResponse`].
+/// The wire type corresponding to [`ParentGetChildRequestResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildRequestResponse {
@@ -447,7 +447,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequest> for ParentTakeChildReques
     }
 }
 
-/// The wire type corersponding to [`ParentTakeChildRequest`].
+/// The wire type corresponding to [`ParentTakeChildRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequest {
@@ -574,7 +574,7 @@ impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChil
     }
 }
 
-/// The wire type corersponding to [`ParentTakeChildRequestRequest`].
+/// The wire type corresponding to [`ParentTakeChildRequestRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequestRequest {

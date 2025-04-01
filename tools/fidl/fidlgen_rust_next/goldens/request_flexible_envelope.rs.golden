@@ -534,7 +534,7 @@ impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleRequest>
     }
 }
 
-/// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleRequest`].
+/// The wire type corresponding to [`ProtocolRequestStrictResponseFlexibleRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestStrictResponseFlexibleRequest {
@@ -639,7 +639,7 @@ impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleResponse>
     }
 }
 
-/// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleResponse`].
+/// The wire type corresponding to [`ProtocolRequestStrictResponseFlexibleResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestStrictResponseFlexibleResponse {
@@ -744,7 +744,7 @@ impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictRequest>
     }
 }
 
-/// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictRequest`].
+/// The wire type corresponding to [`ProtocolRequestFlexibleResponseStrictRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestFlexibleResponseStrictRequest {
@@ -849,7 +849,7 @@ impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictResponse>
     }
 }
 
-/// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictResponse`].
+/// The wire type corresponding to [`ProtocolRequestFlexibleResponseStrictResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolRequestFlexibleResponseStrictResponse {

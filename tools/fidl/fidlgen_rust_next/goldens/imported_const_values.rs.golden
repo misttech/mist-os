@@ -79,7 +79,7 @@ impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
     }
 }
 
-/// The wire type corersponding to [`MyStruct`].
+/// The wire type corresponding to [`MyStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMyStruct {}

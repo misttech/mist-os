@@ -82,7 +82,7 @@ impl ::fidl_next::TakeFrom<WireBaz> for Baz {
     }
 }
 
-/// The wire type corersponding to [`Baz`].
+/// The wire type corresponding to [`Baz`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireBaz {

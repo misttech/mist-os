@@ -91,7 +91,7 @@ impl ::fidl_next::TakeFrom<WireLocalStructPayload> for LocalStructPayload {
     }
 }
 
-/// The wire type corersponding to [`LocalStructPayload`].
+/// The wire type corresponding to [`LocalStructPayload`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireLocalStructPayload {
@@ -218,7 +218,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolOneWayAnonRequest> for MainProtocolOn
     }
 }
 
-/// The wire type corersponding to [`MainProtocolOneWayAnonRequest`].
+/// The wire type corresponding to [`MainProtocolOneWayAnonRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolOneWayAnonRequest {
@@ -345,7 +345,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTw
     }
 }
 
-/// The wire type corersponding to [`MainProtocolTwoWayAnonRequest`].
+/// The wire type corresponding to [`MainProtocolTwoWayAnonRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonRequest {
@@ -472,7 +472,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonResponse> for MainProtocolT
     }
 }
 
-/// The wire type corersponding to [`MainProtocolTwoWayAnonResponse`].
+/// The wire type corresponding to [`MainProtocolTwoWayAnonResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonResponse {
@@ -601,7 +601,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorRequest>
     }
 }
 
-/// The wire type corersponding to [`MainProtocolTwoWayAnonWithErrorRequest`].
+/// The wire type corresponding to [`MainProtocolTwoWayAnonWithErrorRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonWithErrorRequest {
@@ -730,7 +730,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResponse>
     }
 }
 
-/// The wire type corersponding to [`MainProtocolTwoWayAnonWithErrorResponse`].
+/// The wire type corresponding to [`MainProtocolTwoWayAnonWithErrorResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolTwoWayAnonWithErrorResponse {
@@ -857,7 +857,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnon
     }
 }
 
-/// The wire type corersponding to [`MainProtocolOnAnonRequest`].
+/// The wire type corresponding to [`MainProtocolOnAnonRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMainProtocolOnAnonRequest {

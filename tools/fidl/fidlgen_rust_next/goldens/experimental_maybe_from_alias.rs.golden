@@ -405,7 +405,7 @@ impl ::fidl_next::TakeFrom<WireTesting> for Testing {
     }
 }
 
-/// The wire type corersponding to [`Testing`].
+/// The wire type corresponding to [`Testing`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireTesting {

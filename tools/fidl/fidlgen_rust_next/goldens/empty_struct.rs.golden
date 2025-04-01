@@ -69,7 +69,7 @@ impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
     }
 }
 
-/// The wire type corersponding to [`Empty`].
+/// The wire type corresponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmpty {}
@@ -175,7 +175,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRe
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendRequest`].
+/// The wire type corresponding to [`EmptyProtocolSendRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendRequest {
@@ -286,7 +286,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolRec
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolReceiveRequest`].
+/// The wire type corresponding to [`EmptyProtocolReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolReceiveRequest {
@@ -399,7 +399,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendAndReceiveRequest`].
+/// The wire type corresponding to [`EmptyProtocolSendAndReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveRequest {
@@ -512,7 +512,7 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendAndReceiveResponse`].
+/// The wire type corresponding to [`EmptyProtocolSendAndReceiveResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveResponse {

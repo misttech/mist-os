@@ -82,7 +82,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding4> for ShouldNeverAp
     }
 }
 
-/// The wire type corersponding to [`ShouldNeverAppearInAnyBinding4`].
+/// The wire type corresponding to [`ShouldNeverAppearInAnyBinding4`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding4 {
@@ -573,7 +573,7 @@ impl ::fidl_next::TakeFrom<WireAllowedDeniedResponse> for AllowedDeniedResponse 
     }
 }
 
-/// The wire type corersponding to [`AllowedDeniedResponse`].
+/// The wire type corresponding to [`AllowedDeniedResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireAllowedDeniedResponse {
@@ -947,7 +947,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding1> for ShouldNeverAp
     }
 }
 
-/// The wire type corersponding to [`ShouldNeverAppearInAnyBinding1`].
+/// The wire type corresponding to [`ShouldNeverAppearInAnyBinding1`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding1 {
@@ -1441,7 +1441,7 @@ impl ::fidl_next::TakeFrom<WireDeniedShouldNeverAppearInAnyBindingRequest>
     }
 }
 
-/// The wire type corersponding to [`DeniedShouldNeverAppearInAnyBindingRequest`].
+/// The wire type corresponding to [`DeniedShouldNeverAppearInAnyBindingRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireDeniedShouldNeverAppearInAnyBindingRequest {
@@ -1719,7 +1719,7 @@ impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding7> for ShouldNeverAp
     }
 }
 
-/// The wire type corersponding to [`ShouldNeverAppearInAnyBinding7`].
+/// The wire type corresponding to [`ShouldNeverAppearInAnyBinding7`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireShouldNeverAppearInAnyBinding7 {
@@ -2210,7 +2210,7 @@ impl ::fidl_next::TakeFrom<WireDeniedAnonymous> for DeniedAnonymous {
     }
 }
 
-/// The wire type corersponding to [`DeniedAnonymous`].
+/// The wire type corresponding to [`DeniedAnonymous`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireDeniedAnonymous {
@@ -2339,7 +2339,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyCppRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyCppRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyCppRequest {
@@ -2452,7 +2452,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyCppResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyCppResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyCppResponse {
@@ -2565,7 +2565,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyDartRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyDartRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyDartRequest {
@@ -2678,7 +2678,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyDartResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyDartResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyDartResponse {
@@ -2791,7 +2791,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyGoRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyGoRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyGoRequest {
@@ -2904,7 +2904,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyGoResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyGoResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyGoResponse {
@@ -3017,7 +3017,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyLibfuzzerRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyLibfuzzerRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyLibfuzzerRequest {
@@ -3130,7 +3130,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyLibfuzzerResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyLibfuzzerResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyLibfuzzerResponse {
@@ -3243,7 +3243,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyRustRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyRustRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyRustRequest {
@@ -3356,7 +3356,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenyRustResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenyRustResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyRustResponse {
@@ -3469,7 +3469,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerRequest>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenySyzkallerRequest`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenySyzkallerRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenySyzkallerRequest {
@@ -3582,7 +3582,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerResponse>
     }
 }
 
-/// The wire type corersponding to [`DenyEachBindingOnlyDenySyzkallerResponse`].
+/// The wire type corresponding to [`DenyEachBindingOnlyDenySyzkallerResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenySyzkallerResponse {
@@ -4439,7 +4439,7 @@ impl ::fidl_next::TakeFrom<WireMemberOnlyAppearsInImportingLibrary>
     }
 }
 
-/// The wire type corersponding to [`MemberOnlyAppearsInImportingLibrary`].
+/// The wire type corresponding to [`MemberOnlyAppearsInImportingLibrary`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMemberOnlyAppearsInImportingLibrary {
@@ -4568,7 +4568,7 @@ impl ::fidl_next::TakeFrom<WireOnlyAppearsInImportingLibrary> for OnlyAppearsInI
     }
 }
 
-/// The wire type corersponding to [`OnlyAppearsInImportingLibrary`].
+/// The wire type corresponding to [`OnlyAppearsInImportingLibrary`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireOnlyAppearsInImportingLibrary {
@@ -4858,7 +4858,7 @@ impl ::fidl_next::TakeFrom<WireOnlyGo> for OnlyGo {
     }
 }
 
-/// The wire type corersponding to [`OnlyGo`].
+/// The wire type corresponding to [`OnlyGo`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireOnlyGo {}

@@ -293,7 +293,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionS
     }
 }
 
-/// The wire type corersponding to [`SandwichUnionSize12Alignment4`].
+/// The wire type corresponding to [`SandwichUnionSize12Alignment4`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize12Alignment4 {
@@ -435,7 +435,7 @@ impl ::fidl_next::TakeFrom<WireStructSize16Alignment8> for StructSize16Alignment
     }
 }
 
-/// The wire type corersponding to [`StructSize16Alignment8`].
+/// The wire type corresponding to [`StructSize16Alignment8`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructSize16Alignment8 {
@@ -771,7 +771,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionS
     }
 }
 
-/// The wire type corersponding to [`SandwichUnionSize24Alignment8`].
+/// The wire type corresponding to [`SandwichUnionSize24Alignment8`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize24Alignment8 {
@@ -1115,7 +1115,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionS
     }
 }
 
-/// The wire type corersponding to [`SandwichUnionSize36Alignment4`].
+/// The wire type corresponding to [`SandwichUnionSize36Alignment4`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize36Alignment4 {
@@ -1477,7 +1477,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
     }
 }
 
-/// The wire type corersponding to [`SandwichUnionSize8Alignment4`].
+/// The wire type corresponding to [`SandwichUnionSize8Alignment4`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize8Alignment4 {

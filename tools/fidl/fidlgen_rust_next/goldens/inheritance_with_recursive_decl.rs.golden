@@ -94,7 +94,7 @@ impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
     }
 }
 
-/// The wire type corersponding to [`ParentFirstRequest`].
+/// The wire type corresponding to [`ParentFirstRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentFirstRequest {
@@ -372,7 +372,7 @@ impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
     }
 }
 
-/// The wire type corersponding to [`ChildSecondRequest`].
+/// The wire type corresponding to [`ChildSecondRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChildSecondRequest {

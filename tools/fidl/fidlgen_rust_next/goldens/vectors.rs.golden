@@ -84,7 +84,7 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
     }
 }
 
-/// The wire type corersponding to [`ExampleUseOfVectors`].
+/// The wire type corresponding to [`ExampleUseOfVectors`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfVectors {

@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WirePayload> for Payload {
     }
 }
 
-/// The wire type corersponding to [`Payload`].
+/// The wire type corresponding to [`Payload`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePayload {
@@ -191,7 +191,7 @@ impl ::fidl_next::TakeFrom<WireOneWaySendRequest> for OneWaySendRequest {
     }
 }
 
-/// The wire type corersponding to [`OneWaySendRequest`].
+/// The wire type corresponding to [`OneWaySendRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireOneWaySendRequest {

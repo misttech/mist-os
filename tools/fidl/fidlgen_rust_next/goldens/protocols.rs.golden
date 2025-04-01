@@ -197,7 +197,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodARequest> for ChannelProtoco
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolMethodARequest`].
+/// The wire type corresponding to [`ChannelProtocolMethodARequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodARequest {
@@ -324,7 +324,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolEventARequest> for ChannelProtocol
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolEventARequest`].
+/// The wire type corresponding to [`ChannelProtocolEventARequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolEventARequest {
@@ -451,7 +451,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBRequest> for ChannelProtoco
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolMethodBRequest`].
+/// The wire type corresponding to [`ChannelProtocolMethodBRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodBRequest {
@@ -567,7 +567,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBResponse> for ChannelProtoc
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolMethodBResponse`].
+/// The wire type corresponding to [`ChannelProtocolMethodBResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodBResponse {
@@ -684,7 +684,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolTakeHandleRequest>
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolTakeHandleRequest`].
+/// The wire type corresponding to [`ChannelProtocolTakeHandleRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolTakeHandleRequest {
@@ -803,7 +803,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMutateSocketRequest>
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolMutateSocketRequest`].
+/// The wire type corresponding to [`ChannelProtocolMutateSocketRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMutateSocketRequest {
@@ -922,7 +922,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMutateSocketResponse>
     }
 }
 
-/// The wire type corersponding to [`ChannelProtocolMutateSocketResponse`].
+/// The wire type corresponding to [`ChannelProtocolMutateSocketResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMutateSocketResponse {
@@ -1681,7 +1681,7 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolNoResponseMethodRequest>
     }
 }
 
-/// The wire type corersponding to [`HandleRightsProtocolNoResponseMethodRequest`].
+/// The wire type corresponding to [`HandleRightsProtocolNoResponseMethodRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolNoResponseMethodRequest {
@@ -1800,7 +1800,7 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolResponseMethodRequest>
     }
 }
 
-/// The wire type corersponding to [`HandleRightsProtocolResponseMethodRequest`].
+/// The wire type corresponding to [`HandleRightsProtocolResponseMethodRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolResponseMethodRequest {
@@ -1920,7 +1920,7 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolResponseMethodResponse>
     }
 }
 
-/// The wire type corersponding to [`HandleRightsProtocolResponseMethodResponse`].
+/// The wire type corresponding to [`HandleRightsProtocolResponseMethodResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolResponseMethodResponse {
@@ -2039,7 +2039,7 @@ impl ::fidl_next::TakeFrom<WireHandleRightsProtocolAnEventRequest>
     }
 }
 
-/// The wire type corersponding to [`HandleRightsProtocolAnEventRequest`].
+/// The wire type corresponding to [`HandleRightsProtocolAnEventRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandleRightsProtocolAnEventRequest {
@@ -2555,7 +2555,7 @@ impl ::fidl_next::TakeFrom<WireManyParametersFifteenRequest> for ManyParametersF
     }
 }
 
-/// The wire type corersponding to [`ManyParametersFifteenRequest`].
+/// The wire type corresponding to [`ManyParametersFifteenRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireManyParametersFifteenRequest {
@@ -3123,7 +3123,7 @@ impl ::fidl_next::TakeFrom<WireMethodWithUnionUnionMethodRequest>
     }
 }
 
-/// The wire type corersponding to [`MethodWithUnionUnionMethodRequest`].
+/// The wire type corresponding to [`MethodWithUnionUnionMethodRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMethodWithUnionUnionMethodRequest {
@@ -3238,7 +3238,7 @@ impl ::fidl_next::TakeFrom<WireMethodWithUnionUnionMethodResponse>
     }
 }
 
-/// The wire type corersponding to [`MethodWithUnionUnionMethodResponse`].
+/// The wire type corresponding to [`MethodWithUnionUnionMethodResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMethodWithUnionUnionMethodResponse {
@@ -3691,7 +3691,7 @@ impl ::fidl_next::TakeFrom<WireProtocolEnds> for ProtocolEnds {
     }
 }
 
-/// The wire type corersponding to [`ProtocolEnds`].
+/// The wire type corresponding to [`ProtocolEnds`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireProtocolEnds {
@@ -3838,7 +3838,7 @@ impl ::fidl_next::TakeFrom<WireSyscallProtocolMethodCRequest> for SyscallProtoco
     }
 }
 
-/// The wire type corersponding to [`SyscallProtocolMethodCRequest`].
+/// The wire type corresponding to [`SyscallProtocolMethodCRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSyscallProtocolMethodCRequest {
@@ -4101,7 +4101,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseNoRequestWithRespons
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseNoRequestWithResponseResponse`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseNoRequestWithResponseResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseNoRequestWithResponseResponse {
@@ -4213,7 +4213,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestNoRespons
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseWithRequestNoResponseRequest`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestNoResponseRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestNoResponseRequest {
@@ -4325,7 +4325,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestEmptyResp
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseWithRequestEmptyResponseRequest`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestEmptyResponseRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
@@ -4437,7 +4437,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestWithRespo
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseWithRequestWithResponseRequest`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestWithResponseRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseRequest {
@@ -4549,7 +4549,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseWithRequestWithRespo
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseWithRequestWithResponseResponse`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseWithRequestWithResponseResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseResponse {
@@ -4658,7 +4658,7 @@ impl ::fidl_next::TakeFrom<WireWithAndWithoutRequestResponseOnWithResponseReques
     }
 }
 
-/// The wire type corersponding to [`WithAndWithoutRequestResponseOnWithResponseRequest`].
+/// The wire type corresponding to [`WithAndWithoutRequestResponseOnWithResponseRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithAndWithoutRequestResponseOnWithResponseRequest {
@@ -5343,7 +5343,7 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxResponseAsStructResponse>
     }
 }
 
-/// The wire type corersponding to [`WithErrorSyntaxResponseAsStructResponse`].
+/// The wire type corresponding to [`WithErrorSyntaxResponseAsStructResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireWithErrorSyntaxResponseAsStructResponse {
@@ -5480,7 +5480,7 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxHandleInResultResponse>
     }
 }
 
-/// The wire type corersponding to [`WithErrorSyntaxHandleInResultResponse`].
+/// The wire type corresponding to [`WithErrorSyntaxHandleInResultResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithErrorSyntaxHandleInResultResponse {
@@ -5910,7 +5910,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsClientEndsRequest`].
+/// The wire type corresponding to [`WithProtocolEndsClientEndsRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsRequest {
@@ -6038,7 +6038,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsResponse>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsClientEndsResponse`].
+/// The wire type corresponding to [`WithProtocolEndsClientEndsResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsResponse {
@@ -6169,7 +6169,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsServerEndsRequest`].
+/// The wire type corresponding to [`WithProtocolEndsServerEndsRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsRequest {
@@ -6297,7 +6297,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsResponse>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsServerEndsResponse`].
+/// The wire type corresponding to [`WithProtocolEndsServerEndsResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsResponse {
@@ -6415,7 +6415,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsRequest>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsStructContainingEndsRequest`].
+/// The wire type corresponding to [`WithProtocolEndsStructContainingEndsRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsStructContainingEndsRequest {
@@ -6533,7 +6533,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsResponse>
     }
 }
 
-/// The wire type corersponding to [`WithProtocolEndsStructContainingEndsResponse`].
+/// The wire type corresponding to [`WithProtocolEndsStructContainingEndsResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsStructContainingEndsResponse {

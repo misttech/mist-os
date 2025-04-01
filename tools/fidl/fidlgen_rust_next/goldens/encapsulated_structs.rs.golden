@@ -76,7 +76,7 @@ impl ::fidl_next::TakeFrom<WireInt16Int8> for Int16Int8 {
     }
 }
 
-/// The wire type corersponding to [`Int16Int8`].
+/// The wire type corresponding to [`Int16Int8`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt16Int8 {
@@ -183,7 +183,7 @@ impl ::fidl_next::TakeFrom<WireArrayInt16Int8> for ArrayInt16Int8 {
     }
 }
 
-/// The wire type corersponding to [`ArrayInt16Int8`].
+/// The wire type corresponding to [`ArrayInt16Int8`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireArrayInt16Int8 {
@@ -290,7 +290,7 @@ impl ::fidl_next::TakeFrom<WireInt8Int32> for Int8Int32 {
     }
 }
 
-/// The wire type corersponding to [`Int8Int32`].
+/// The wire type corresponding to [`Int8Int32`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt8Int32 {
@@ -410,7 +410,7 @@ impl ::fidl_next::TakeFrom<WireNonInlineStructTestStruct> for NonInlineStructTes
     }
 }
 
-/// The wire type corersponding to [`NonInlineStructTestStruct`].
+/// The wire type corresponding to [`NonInlineStructTestStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireNonInlineStructTestStruct {
@@ -537,7 +537,7 @@ impl ::fidl_next::TakeFrom<WireStructPaddingTestStruct> for StructPaddingTestStr
     }
 }
 
-/// The wire type corersponding to [`StructPaddingTestStruct`].
+/// The wire type corresponding to [`StructPaddingTestStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructPaddingTestStruct {
@@ -658,7 +658,7 @@ impl ::fidl_next::TakeFrom<WireTopLevelStruct> for TopLevelStruct {
     }
 }
 
-/// The wire type corersponding to [`TopLevelStruct`].
+/// The wire type corresponding to [`TopLevelStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireTopLevelStruct {

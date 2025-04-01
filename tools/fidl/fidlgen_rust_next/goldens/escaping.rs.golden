@@ -76,7 +76,7 @@ impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
     }
 }
 
-/// The wire type corersponding to [`DocCommentWithQuotes`].
+/// The wire type corresponding to [`DocCommentWithQuotes`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDocCommentWithQuotes {}

@@ -122,7 +122,7 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
     }
 }
 
-/// The wire type corersponding to [`{{ name }}`].
+/// The wire type corresponding to [`{{ name }}`].
 #[derive(
     {% if is_static && !strct.is_resource %}
         Clone,

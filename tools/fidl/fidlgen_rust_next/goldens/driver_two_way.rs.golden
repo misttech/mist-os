@@ -91,7 +91,7 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddRequest> for TwoWayAddRequest {
     }
 }
 
-/// The wire type corersponding to [`TwoWayAddRequest`].
+/// The wire type corresponding to [`TwoWayAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddRequest {
@@ -207,7 +207,7 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
     }
 }
 
-/// The wire type corersponding to [`TwoWayAddResponse`].
+/// The wire type corresponding to [`TwoWayAddResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddResponse {

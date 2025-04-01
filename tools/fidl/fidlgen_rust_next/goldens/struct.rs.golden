@@ -78,7 +78,7 @@ impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
     }
 }
 
-/// The wire type corersponding to [`BasicStruct`].
+/// The wire type corresponding to [`BasicStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireBasicStruct {
@@ -211,7 +211,7 @@ impl ::fidl_next::TakeFrom<WireSimple> for Simple {
     }
 }
 
-/// The wire type corersponding to [`Simple`].
+/// The wire type corresponding to [`Simple`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimple {

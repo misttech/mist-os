@@ -76,7 +76,7 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding1ByteEnd`].
+/// The wire type corresponding to [`Padding1ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteEnd {
@@ -192,7 +192,7 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding1ByteMiddle`].
+/// The wire type corresponding to [`Padding1ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteMiddle {
@@ -315,7 +315,7 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAli
     }
 }
 
-/// The wire type corersponding to [`Padding2ByteAlignmentLength6`].
+/// The wire type corresponding to [`Padding2ByteAlignmentLength6`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteAlignmentLength6 {
@@ -440,7 +440,7 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding2ByteEnd`].
+/// The wire type corresponding to [`Padding2ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteEnd {
@@ -556,7 +556,7 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding2ByteMiddle`].
+/// The wire type corresponding to [`Padding2ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteMiddle {
@@ -672,7 +672,7 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding3ByteEnd`].
+/// The wire type corresponding to [`Padding3ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteEnd {
@@ -788,7 +788,7 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding3ByteMiddle`].
+/// The wire type corresponding to [`Padding3ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteMiddle {
@@ -918,7 +918,7 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAl
     }
 }
 
-/// The wire type corersponding to [`Padding4ByteAlignmentLength12`].
+/// The wire type corresponding to [`Padding4ByteAlignmentLength12`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteAlignmentLength12 {
@@ -1048,7 +1048,7 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding4ByteEnd`].
+/// The wire type corresponding to [`Padding4ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteEnd {
@@ -1164,7 +1164,7 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding4ByteMiddle`].
+/// The wire type corresponding to [`Padding4ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteMiddle {
@@ -1287,7 +1287,7 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding5ByteEnd`].
+/// The wire type corresponding to [`Padding5ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteEnd {
@@ -1415,7 +1415,7 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding5ByteMiddle`].
+/// The wire type corresponding to [`Padding5ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteMiddle {
@@ -1536,7 +1536,7 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding6ByteEnd`].
+/// The wire type corresponding to [`Padding6ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteEnd {
@@ -1652,7 +1652,7 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding6ByteMiddle`].
+/// The wire type corresponding to [`Padding6ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteMiddle {
@@ -1768,7 +1768,7 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
     }
 }
 
-/// The wire type corersponding to [`Padding7ByteEnd`].
+/// The wire type corresponding to [`Padding7ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteEnd {
@@ -1884,7 +1884,7 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
     }
 }
 
-/// The wire type corersponding to [`Padding7ByteMiddle`].
+/// The wire type corresponding to [`Padding7ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteMiddle {

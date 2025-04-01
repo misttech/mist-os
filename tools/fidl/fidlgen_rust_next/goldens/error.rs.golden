@@ -69,7 +69,7 @@ impl ::fidl_next::TakeFrom<WireExampleFooRequest> for ExampleFooRequest {
     }
 }
 
-/// The wire type corersponding to [`ExampleFooRequest`].
+/// The wire type corresponding to [`ExampleFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleFooRequest {
@@ -182,7 +182,7 @@ impl ::fidl_next::TakeFrom<WireExampleFooResponse> for ExampleFooResponse {
     }
 }
 
-/// The wire type corersponding to [`ExampleFooResponse`].
+/// The wire type corresponding to [`ExampleFooResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleFooResponse {

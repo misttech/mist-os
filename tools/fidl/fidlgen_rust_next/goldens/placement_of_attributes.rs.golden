@@ -277,7 +277,7 @@ impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocol
     }
 }
 
-/// The wire type corersponding to [`ExampleProtocolMethodRequest`].
+/// The wire type corresponding to [`ExampleProtocolMethodRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleProtocolMethodRequest {
@@ -539,7 +539,7 @@ impl ::fidl_next::TakeFrom<WireExampleStruct> for ExampleStruct {
     }
 }
 
-/// The wire type corersponding to [`ExampleStruct`].
+/// The wire type corresponding to [`ExampleStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleStruct {

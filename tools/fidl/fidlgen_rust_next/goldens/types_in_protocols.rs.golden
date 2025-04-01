@@ -148,7 +148,7 @@ impl ::fidl_next::TakeFrom<WireArrayBasic> for ArrayBasic {
     }
 }
 
-/// The wire type corersponding to [`ArrayBasic`].
+/// The wire type corresponding to [`ArrayBasic`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireArrayBasic {
@@ -494,7 +494,7 @@ impl ::fidl_next::TakeFrom<WireStruct> for Struct {
     }
 }
 
-/// The wire type corersponding to [`Struct`].
+/// The wire type corresponding to [`Struct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStruct {}
@@ -960,7 +960,7 @@ impl ::fidl_next::TakeFrom<WireArrayCompound> for ArrayCompound {
     }
 }
 
-/// The wire type corersponding to [`ArrayCompound`].
+/// The wire type corresponding to [`ArrayCompound`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireArrayCompound {
@@ -1119,7 +1119,7 @@ impl ::fidl_next::TakeFrom<WireArrayVectorNested> for ArrayVectorNested {
     }
 }
 
-/// The wire type corersponding to [`ArrayVectorNested`].
+/// The wire type corresponding to [`ArrayVectorNested`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireArrayVectorNested {
@@ -1319,7 +1319,7 @@ impl ::fidl_next::TakeFrom<WireBasic> for Basic {
     }
 }
 
-/// The wire type corersponding to [`Basic`].
+/// The wire type corresponding to [`Basic`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireBasic {
@@ -1532,7 +1532,7 @@ impl ::fidl_next::TakeFrom<WireCompound> for Compound {
     }
 }
 
-/// The wire type corersponding to [`Compound`].
+/// The wire type corresponding to [`Compound`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireCompound {
@@ -1747,7 +1747,7 @@ impl ::fidl_next::TakeFrom<WireVectorBasic> for VectorBasic {
     }
 }
 
-/// The wire type corersponding to [`VectorBasic`].
+/// The wire type corresponding to [`VectorBasic`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireVectorBasic {
@@ -1948,7 +1948,7 @@ impl ::fidl_next::TakeFrom<WireVectorCompound> for VectorCompound {
     }
 }
 
-/// The wire type corersponding to [`VectorCompound`].
+/// The wire type corresponding to [`VectorCompound`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireVectorCompound {
@@ -2107,7 +2107,7 @@ impl ::fidl_next::TakeFrom<WireVectorOptional> for VectorOptional {
     }
 }
 
-/// The wire type corersponding to [`VectorOptional`].
+/// The wire type corresponding to [`VectorOptional`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireVectorOptional {
@@ -2227,7 +2227,7 @@ impl ::fidl_next::TakeFrom<WireResourceStruct> for ResourceStruct {
     }
 }
 
-/// The wire type corersponding to [`ResourceStruct`].
+/// The wire type corresponding to [`ResourceStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireResourceStruct {}
@@ -2829,7 +2829,7 @@ impl ::fidl_next::TakeFrom<WireResource> for Resource {
     }
 }
 
-/// The wire type corersponding to [`Resource`].
+/// The wire type corresponding to [`Resource`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireResource {

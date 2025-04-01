@@ -69,7 +69,7 @@ impl ::fidl_next::TakeFrom<WireSerializableStruct> for SerializableStruct {
     }
 }
 
-/// The wire type corersponding to [`SerializableStruct`].
+/// The wire type corresponding to [`SerializableStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSerializableStruct {}

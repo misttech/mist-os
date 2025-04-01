@@ -71,7 +71,7 @@ impl ::fidl_next::TakeFrom<WireEmptyResourceStruct> for EmptyResourceStruct {
     }
 }
 
-/// The wire type corersponding to [`EmptyResourceStruct`].
+/// The wire type corresponding to [`EmptyResourceStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireEmptyResourceStruct {}
@@ -956,7 +956,7 @@ impl ::fidl_next::TakeFrom<WireHandlesInTypes> for HandlesInTypes {
     }
 }
 
-/// The wire type corersponding to [`HandlesInTypes`].
+/// The wire type corresponding to [`HandlesInTypes`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireHandlesInTypes {

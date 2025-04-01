@@ -72,7 +72,7 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailRequest>
     }
 }
 
-/// The wire type corersponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailRequest`].
+/// The wire type corresponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
@@ -188,7 +188,7 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
     }
 }
 
-/// The wire type corersponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailResponse`].
+/// The wire type corresponding to [`ExampleUseOfErrorSyntaxCallWhichMayFailResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {

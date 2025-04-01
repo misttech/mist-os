@@ -69,7 +69,7 @@ impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
     }
 }
 
-/// The wire type corersponding to [`Empty`].
+/// The wire type corresponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmpty {}
@@ -843,7 +843,7 @@ impl ::fidl_next::TakeFrom<WirePizza> for Pizza {
     }
 }
 
-/// The wire type corersponding to [`Pizza`].
+/// The wire type corresponding to [`Pizza`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WirePizza {
@@ -945,7 +945,7 @@ impl ::fidl_next::TakeFrom<WirePasta> for Pasta {
     }
 }
 
-/// The wire type corersponding to [`Pasta`].
+/// The wire type corresponding to [`Pasta`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WirePasta {
@@ -2971,7 +2971,7 @@ impl ::fidl_next::TakeFrom<WireNullableUnionStruct> for NullableUnionStruct {
     }
 }
 
-/// The wire type corersponding to [`NullableUnionStruct`].
+/// The wire type corresponding to [`NullableUnionStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireNullableUnionStruct {
@@ -4953,7 +4953,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUn
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableUnion`].
+/// The wire type corresponding to [`StructWithNullableUnion`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableUnion {
@@ -5064,7 +5064,7 @@ impl ::fidl_next::TakeFrom<WireTestProtocolStrictUnionHenceResponseMayBeStackAll
     }
 }
 
-/// The wire type corersponding to [`TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse`].
+/// The wire type corresponding to [`TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
@@ -5178,7 +5178,7 @@ impl ::fidl_next::TakeFrom<WireTestProtocolFlexibleUnionHenceResponseMustBeHeapA
     }
 }
 
-/// The wire type corersponding to [`TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse`].
+/// The wire type corresponding to [`TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
@@ -6018,7 +6018,7 @@ impl ::fidl_next::TakeFrom<WireUnionSandwich> for UnionSandwich {
     }
 }
 
-/// The wire type corersponding to [`UnionSandwich`].
+/// The wire type corresponding to [`UnionSandwich`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireUnionSandwich {
