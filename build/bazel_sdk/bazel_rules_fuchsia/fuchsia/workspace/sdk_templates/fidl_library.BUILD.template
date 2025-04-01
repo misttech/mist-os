@@ -59,6 +59,9 @@ fuchsia_fidl_hlcpp_library(
 alias(
     name = "{{name}}_hlcpp",
     actual = ":{{name}}_cc",
+    visibility = [
+        {{hlcpp_visibility}}
+    ],
 )
 
 # LEGACY: This target will soon be deprecated
