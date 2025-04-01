@@ -397,3 +397,21 @@ pub fn create_watcher_for_wake_events(watcher: zx::EventPair) {
         )
         .expect("Failed to register wake watcher");
 }
+
+mod test {
+    #[test]
+    fn test_counter_zero_initialization() {
+        let (_endpoint, endpoint) = zx::Channel::create();
+        let (_channel, counter) =
+            super::create_proxy_for_wake_events_counter_zero(endpoint, "test".into());
+        assert_eq!(counter.read(), Ok(0));
+    }
+
+    #[test]
+    fn test_counter_initialization() {
+        let (_endpoint, endpoint) = zx::Channel::create();
+        let (_channel, counter) =
+            super::create_proxy_for_wake_events_counter(endpoint, "test".into());
+        assert_eq!(counter.read(), Ok(1));
+    }
+}
