@@ -139,7 +139,7 @@ struct BootOptions {
   X86_OPTION_TYPES(OPTION_TYPE)
 #endif
 
-  OPTION_TYPE(uart::all::Driver);
+  OPTION_TYPE(uart::all::Config<>);
 
 #undef OPTION_TYPE
 

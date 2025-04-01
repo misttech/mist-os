@@ -24,7 +24,7 @@ namespace uart {
 namespace null {
 
 struct Driver {
-  struct config_type {};
+  using config_type = StubConfig;
 
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view kConfigName = "none";

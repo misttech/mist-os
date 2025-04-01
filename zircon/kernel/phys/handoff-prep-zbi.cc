@@ -66,14 +66,14 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
   // Appends the appropriate UART config, as encoded in the hand-off, which is
   // given as variant of lib/uart driver types, each with methods to indicate
   // the ZBI item type and payload.
-  auto append_uart_item = [this](const auto& uart) {
-    using uart_t = ktl::decay_t<decltype(uart)>;
-    if constexpr (!ktl::is_same_v<uart_t, uart::null::Driver>) {
-      SaveForMexec({.type = ZBI_TYPE_KERNEL_DRIVER, .extra = uart_t::kExtra},
-                   zbitl::AsBytes(uart.config()));
+  gBootOptions->serial.Visit([this]<typename T>(const T& config) {
+    using uart_type = typename T::uart_type;
+    if constexpr (!ktl::is_same_v<uart_type, uart::null::Driver>) {
+      SaveForMexec({.type = ZBI_TYPE_KERNEL_DRIVER, .extra = uart_type::kExtra},
+                   zbitl::AsBytes(*config));
     }
-  };
-  uart::internal::Visit(append_uart_item, gBootOptions->serial);
+  });
+
   EntropyHandoff entropy;
 
   zbitl::View view(zbi);
