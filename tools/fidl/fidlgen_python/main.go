@@ -19,7 +19,6 @@ type flagsDef struct {
 	jsonPath           *string
 	outputFilenamePath *string
 	includeDrivers     *bool
-	blackPath          *string
 }
 
 var (
@@ -27,8 +26,6 @@ var (
 		"the FIDL intermediate representation file")
 	outputFile = flag.String("output", "REQUIRED",
 		"the output file for the generated Python implementation")
-	blackPath = flag.String("black", "REQUIRED",
-		"path to black formatter")
 )
 
 func printUsage() {
@@ -57,17 +54,13 @@ func main() {
 		log.Fatal("Error: --output is required")
 	}
 	outputFile := *outputFile
-	if *blackPath == "REQUIRED" {
-		log.Fatal("Error: --black is required")
-	}
-	blackPath := *blackPath
 
 	root, err := fidlgen.ReadJSONIr(fidlIrJson)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	generator := codegen.NewGenerator(blackPath)
+	generator := codegen.NewGenerator()
 	err = generator.GenerateFidl(root, outputFile)
 	if err != nil {
 		log.Fatalf("Error running generator: %v", err)

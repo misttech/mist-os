@@ -780,262 +780,6 @@ void DenyEachBinding_OnlyDenyLibfuzzer_Result::EnsureStorageInitialized(::fidl_x
   }
 }
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-const fidl_type_t* DenyEachBindingOnlyDenyPythonRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-
-void DenyEachBindingOnlyDenyPythonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                  cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyPythonRequest>::value) {
-    memcpy(_encoder->template GetPtr<DenyEachBindingOnlyDenyPythonRequest>(_offset), this, sizeof(DenyEachBindingOnlyDenyPythonRequest));
-  } else {
-    ::fidl::Encode(_encoder, &a, _offset + 0);
-  }
-}
-
-void DenyEachBindingOnlyDenyPythonRequest::Decode(::fidl::Decoder* _decoder, DenyEachBindingOnlyDenyPythonRequest* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<DenyEachBindingOnlyDenyPythonRequest>::value) {
-    memcpy(_value, _decoder->template GetPtr<DenyEachBindingOnlyDenyPythonRequest>(_offset), sizeof(DenyEachBindingOnlyDenyPythonRequest));
-  } else {
-    ::fidl::Decode(_decoder, &_value->a, _offset + 0);
-  }
-}
-
-zx_status_t DenyEachBindingOnlyDenyPythonRequest::Clone(DenyEachBindingOnlyDenyPythonRequest* _result) const {
-  zx_status_t _status = ::fidl::Clone(a, &_result->a);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResponseTable;
-const fidl_type_t* DenyEachBinding_OnlyDenyPython_Response::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResponseTable;
-
-void DenyEachBinding_OnlyDenyPython_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyPython_Response>::value) {
-    memcpy(_encoder->template GetPtr<DenyEachBinding_OnlyDenyPython_Response>(_offset), this, sizeof(DenyEachBinding_OnlyDenyPython_Response));
-  } else {
-    ::fidl::Encode(_encoder, &b, _offset + 0);
-  }
-}
-
-void DenyEachBinding_OnlyDenyPython_Response::Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyPython_Response* _value, size_t _offset) {
-  if (::fidl::IsMemcpyCompatible<DenyEachBinding_OnlyDenyPython_Response>::value) {
-    memcpy(_value, _decoder->template GetPtr<DenyEachBinding_OnlyDenyPython_Response>(_offset), sizeof(DenyEachBinding_OnlyDenyPython_Response));
-  } else {
-    ::fidl::Decode(_decoder, &_value->b, _offset + 0);
-  }
-}
-
-zx_status_t DenyEachBinding_OnlyDenyPython_Response::Clone(DenyEachBinding_OnlyDenyPython_Response* _result) const {
-  zx_status_t _status = ::fidl::Clone(b, &_result->b);
-  if (_status != ZX_OK)
-    return _status;
-  return ZX_OK;
-}
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
-const fidl_type_t* DenyEachBinding_OnlyDenyPython_Result::FidlType = &test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
-
-DenyEachBinding_OnlyDenyPython_Result::DenyEachBinding_OnlyDenyPython_Result() {}
-
-DenyEachBinding_OnlyDenyPython_Result::~DenyEachBinding_OnlyDenyPython_Result() {
-  Destroy();
-}
-
-DenyEachBinding_OnlyDenyPython_Result::DenyEachBinding_OnlyDenyPython_Result(DenyEachBinding_OnlyDenyPython_Result&& other) : tag_(other.tag_) {
-  switch (tag_) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse:
-      new (&response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response();
-      response_ = std::move(other.response_);
-      break;
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr:
-      err_ = std::move(other.err_);
-      break;
-    case static_cast<fidl_xunion_tag_t>(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid):
-      break;
-  }
-}
-
-DenyEachBinding_OnlyDenyPython_Result& DenyEachBinding_OnlyDenyPython_Result::operator=(DenyEachBinding_OnlyDenyPython_Result&& other) {
-  if (this != &other) {
-    Destroy();
-    tag_ = other.tag_;
-    switch (tag_) {
-      case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse:
-        new (&response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response();
-        response_ = std::move(other.response_);
-        break;
-      case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr:
-        err_ = std::move(other.err_);
-        break;
-      case static_cast<fidl_xunion_tag_t>(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid):
-        break;
-    }
-  }
-  return *this;
-}
-
-DenyEachBinding_OnlyDenyPython_Result DenyEachBinding_OnlyDenyPython_Result::WithResponse(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response&& val) {
-  DenyEachBinding_OnlyDenyPython_Result result;
-  result.set_response(std::move(val));
-  return result;
-}
-DenyEachBinding_OnlyDenyPython_Result DenyEachBinding_OnlyDenyPython_Result::WithErr(uint32_t&& val) {
-  DenyEachBinding_OnlyDenyPython_Result result;
-  result.set_err(std::move(val));
-  return result;
-}
-
-void DenyEachBinding_OnlyDenyPython_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
-  const size_t length_before = encoder->CurrentLength();
-  const size_t handles_before = encoder->CurrentHandleCount();
-
-  switch (Which()) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse: {
-      if (::fidl::EncodingInlineSize<::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_union_t, envelope));
-
-        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
-        xunion->tag = tag_;
-        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
-        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
-        break;
-      }
-
-      ::fidl::Encode(
-          encoder,
-          &response_,
-          encoder->Alloc(::fidl::EncodingInlineSize<::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response, ::fidl::Encoder>(encoder)));
-
-      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
-      xunion->tag = tag_;
-      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
-      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
-      xunion->envelope.flags = 0;
-      break;
-    }
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr: {
-      if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_union_t, envelope));
-
-        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
-        xunion->tag = tag_;
-        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
-        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
-        break;
-      }
-
-      ::fidl::Encode(
-          encoder,
-          &err_,
-          encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
-
-      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
-      xunion->tag = tag_;
-      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
-      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
-      xunion->envelope.flags = 0;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-void DenyEachBinding_OnlyDenyPython_Result::Decode(::fidl::Decoder* _decoder, DenyEachBinding_OnlyDenyPython_Result* value, size_t offset) {
-  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
-
-  if (xunion->envelope.num_bytes == 0 &&
-      xunion->envelope.num_handles == 0 &&
-      xunion->envelope.flags == 0) {
-    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid));
-    return;
-  }
-
-  value->EnsureStorageInitialized(xunion->tag);
-
-  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
-
-  switch (value->tag_) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse: {
-      value->response_.~decltype(value->response_)();
-      new (&value->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response();
-      ::fidl::Decode(_decoder, &value->response_, value_offset);
-      break;
-    }
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr: {
-      ::fidl::Decode(_decoder, &value->err_, value_offset);
-      break;
-    }
-    default: {
-      break;
-    }
-  }
-}
-
-zx_status_t DenyEachBinding_OnlyDenyPython_Result::Clone(DenyEachBinding_OnlyDenyPython_Result* result) const {
-  result->Destroy();
-  result->tag_ = tag_;
-  switch (tag_) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid:
-      return ZX_OK;
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse:
-      new (&result->response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response();
-      return ::fidl::Clone(response_, &result->response_);
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr:
-      return ::fidl::Clone(err_, &result->err_);
-    default:
-      return ZX_OK;
-  }
-}
-
-DenyEachBinding_OnlyDenyPython_Result& DenyEachBinding_OnlyDenyPython_Result::set_response(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response value) {
-  EnsureStorageInitialized(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse);
-  response_ = std::move(value);
-  return *this;
-}
-
-DenyEachBinding_OnlyDenyPython_Result& DenyEachBinding_OnlyDenyPython_Result::set_err(uint32_t value) {
-  EnsureStorageInitialized(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr);
-  err_ = std::move(value);
-  return *this;
-}
-
-void DenyEachBinding_OnlyDenyPython_Result::Destroy() {
-  switch (tag_) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse:
-      response_.~decltype(response_)();
-      break;
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr:
-      break;
-
-    default:
-      break;
-  }
-  tag_ = static_cast<fidl_xunion_tag_t>(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid);
-}
-
-void DenyEachBinding_OnlyDenyPython_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
-  if (tag_ != tag) {
-    Destroy();
-    tag_ = tag;
-    switch (tag_) {
-      case static_cast<fidl_xunion_tag_t>(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::Invalid):
-        break;
-      case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kResponse:
-        new (&response_)::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Response();
-        break;
-      case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result::Tag::kErr:
-        new (&err_) uint32_t();
-        break;
-      default:
-        break;
-    }
-  }
-}
-
 extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 const fidl_type_t* DenyEachBindingOnlyDenyRustRequest::FidlType = &test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 
@@ -1825,10 +1569,6 @@ __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDe
 
 __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
 
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
-
 __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
 
 __LOCAL extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
@@ -1860,11 +1600,6 @@ const fidl_type_t* ::test::bindingsdenylist::DenyEachBinding_RequestDecoder::Get
       *out_needs_response = true;
       return &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable;
       ;
-    case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal:
-      *out_is_known = true;
-      *out_needs_response = true;
-      return &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-      ;
     case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyRust_Ordinal:
       *out_is_known = true;
       *out_needs_response = true;
@@ -1890,9 +1625,6 @@ const fidl_type_t* DenyEachBinding_ResponseDecoder::GetType(uint64_t ordinal) {
       ;
     case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal:
       return &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
-      ;
-    case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal:
-      return &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
       ;
     case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyRust_Ordinal:
       return &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
@@ -1993,27 +1725,6 @@ void DenyEachBinding_Proxy::OnlyDenyLibfuzzer(bool a, OnlyDenyLibfuzzerCallback 
 namespace {
 
 ::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
-DenyEachBinding_OnlyDenyPython_ResponseHandler(DenyEachBinding::OnlyDenyPythonCallback&& callback) {
-  ZX_DEBUG_ASSERT_MSG(callback,
-                      "Callback must not be empty for DenyEachBinding::OnlyDenyPython\n");
-  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
-      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
-        ::fidl::Decoder decoder(std::move(message));
-        callback_(::fidl::DecodeAs<::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result>(&decoder, 0 + sizeof(fidl_message_header_t)));
-        return ZX_OK;
-      },
-      &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable);
-}
-
-}  // namespace
-void DenyEachBinding_Proxy::OnlyDenyPython(bool a, OnlyDenyPythonCallback callback) {
-  ::fidl::MessageEncoder _encoder(::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal, ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_DynamicFlags);
-  const fidl_type_t* req_type = &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-  controller_->Send(req_type, ::test::bindingsdenylist::DenyEachBinding_RequestEncoder::OnlyDenyPython(&_encoder, &a), DenyEachBinding_OnlyDenyPython_ResponseHandler(std::move(callback)));
-}
-namespace {
-
-::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
 DenyEachBinding_OnlyDenyRust_ResponseHandler(DenyEachBinding::OnlyDenyRustCallback&& callback) {
   ZX_DEBUG_ASSERT_MSG(callback,
                       "Callback must not be empty for DenyEachBinding::OnlyDenyRust\n");
@@ -2107,21 +1818,6 @@ class DenyEachBinding_OnlyDenyLibfuzzer_Responder final {
   ::fidl::internal::PendingResponse response_;
 };
 
-class DenyEachBinding_OnlyDenyPython_Responder final {
- public:
-  DenyEachBinding_OnlyDenyPython_Responder(::fidl::internal::PendingResponse response)
-      : response_(std::move(response)) {}
-
-  void operator()(::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result DenyEachBinding_OnlyDenyPython_Result) {
-    ::fidl::MessageEncoder _encoder(::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal, ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_DynamicFlags);
-    const fidl_type_t* resp_type = &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
-    response_.Send(resp_type, ::test::bindingsdenylist::DenyEachBinding_ResponseEncoder::OnlyDenyPython(&_encoder, &DenyEachBinding_OnlyDenyPython_Result));
-  }
-
- private:
-  ::fidl::internal::PendingResponse response_;
-};
-
 class DenyEachBinding_OnlyDenyRust_Responder final {
  public:
   DenyEachBinding_OnlyDenyRust_Responder(::fidl::internal::PendingResponse response)
@@ -2203,11 +1899,6 @@ zx_status_t DenyEachBinding_Stub::Dispatch_(
       impl_->OnlyDenyLibfuzzer(::fidl::DecodeAs<bool>(&decoder, 0 + sizeof(fidl_message_header_t)), DenyEachBinding_OnlyDenyLibfuzzer_Responder(std::move(response)));
       break;
     }
-    case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal: {
-      ::fidl::Decoder decoder(std::move(message));
-      impl_->OnlyDenyPython(::fidl::DecodeAs<bool>(&decoder, 0 + sizeof(fidl_message_header_t)), DenyEachBinding_OnlyDenyPython_Responder(std::move(response)));
-      break;
-    }
     case ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyRust_Ordinal: {
       ::fidl::Decoder decoder(std::move(message));
       impl_->OnlyDenyRust(::fidl::DecodeAs<bool>(&decoder, 0 + sizeof(fidl_message_header_t)), DenyEachBinding_OnlyDenyRust_Responder(std::move(response)));
@@ -2271,20 +1962,6 @@ zx_status_t DenyEachBinding_SyncProxy::OnlyDenyLibfuzzer(bool a, ::test::binding
     return status_;
   ::fidl::Decoder decoder_(std::move(response_));
   *out_DenyEachBinding_OnlyDenyLibfuzzer_Result = ::fidl::DecodeAs<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
-  return ZX_OK;
-}
-
-zx_status_t DenyEachBinding_SyncProxy::OnlyDenyPython(bool a, ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result* out_DenyEachBinding_OnlyDenyPython_Result) {
-  ::fidl::MessageEncoder _encoder(::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_Ordinal, ::test::bindingsdenylist::internal::kDenyEachBinding_OnlyDenyPython_DynamicFlags);
-  ::fidl::IncomingMessageBuffer buffer_;
-  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
-  const fidl_type_t* req_type = &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBindingOnlyDenyPythonRequestTable;
-  const fidl_type_t* resp_type = &::test::bindingsdenylist::_internal::test_bindingsdenylist_DenyEachBinding_OnlyDenyPython_ResultTable;
-  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::bindingsdenylist::DenyEachBinding_RequestEncoder::OnlyDenyPython(&_encoder, &a), &response_);
-  if (status_ != ZX_OK)
-    return status_;
-  ::fidl::Decoder decoder_(std::move(response_));
-  *out_DenyEachBinding_OnlyDenyPython_Result = ::fidl::DecodeAs<::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result>(&decoder_, 0 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

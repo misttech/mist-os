@@ -11,13 +11,11 @@
 */}}
 {{ define "EnumDeclaration" -}}
 {{ .PythonName }} = enum.IntEnum("{{ .PythonName }}", {
-    {{- if .DocComments }}
     "__doc__": """
         {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty8 }}
-        {{- end -}}
+        {{ . }}
+        {{- end }}
         """,
-    {{- end }}
     "__fidl_kind__": "enum",
     "__fidl_type__": "{{ .PythonName }}",
     "__fidl_raw_type__": "{{ .Name }}",

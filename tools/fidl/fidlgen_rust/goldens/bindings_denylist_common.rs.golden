@@ -41,13 +41,6 @@ pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerRequest {}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DenyEachBindingOnlyDenyPythonRequest {
-    pub a: bool,
-}
-
-impl fidl::Persistable for DenyEachBindingOnlyDenyPythonRequest {}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
@@ -85,14 +78,6 @@ pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
 }
 
 impl fidl::Persistable for DenyEachBindingOnlyDenyLibfuzzerResponse {}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C)]
-pub struct DenyEachBindingOnlyDenyPythonResponse {
-    pub b: i32,
-}
-
-impl fidl::Persistable for DenyEachBindingOnlyDenyPythonResponse {}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -439,89 +424,6 @@ mod internal {
 
     impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for DenyEachBindingOnlyDenyLibfuzzerRequest
-    {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            Self { a: fidl::new_empty!(bool, D) }
-        }
-
-        #[inline]
-        unsafe fn decode(
-            &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            decoder.debug_check_bounds::<Self>(offset);
-            // Verify that padding bytes are zero.
-            fidl::decode!(bool, D, &mut self.a, decoder, offset + 0, _depth)?;
-            Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyPythonRequest {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
-    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyPythonRequest {
-        type Owned = Self;
-
-        #[inline(always)]
-        fn inline_align(_context: fidl::encoding::Context) -> usize {
-            1
-        }
-
-        #[inline(always)]
-        fn inline_size(_context: fidl::encoding::Context) -> usize {
-            1
-        }
-    }
-
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyPythonRequest, D>
-        for &DenyEachBindingOnlyDenyPythonRequest
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyPythonRequest>(offset);
-            // Delegate to tuple encoding.
-            fidl::encoding::Encode::<DenyEachBindingOnlyDenyPythonRequest, D>::encode(
-                (<bool as fidl::encoding::ValueTypeMarker>::borrow(&self.a),),
-                encoder,
-                offset,
-                _depth,
-            )
-        }
-    }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<bool, D>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyPythonRequest, D> for (T0,)
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
-            offset: usize,
-            depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyPythonRequest>(offset);
-            // Zero out padding regions. There's no need to apply masks
-            // because the unmasked parts will be overwritten by fields.
-            // Write the fields.
-            self.0.encode(encoder, offset + 0, depth)?;
-            Ok(())
-        }
-    }
-
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for DenyEachBindingOnlyDenyPythonRequest
     {
         #[inline(always)]
         fn new_empty() -> Self {
@@ -994,104 +896,6 @@ mod internal {
 
     impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
         for DenyEachBindingOnlyDenyLibfuzzerResponse
-    {
-        #[inline(always)]
-        fn new_empty() -> Self {
-            Self { b: fidl::new_empty!(i32, D) }
-        }
-
-        #[inline]
-        unsafe fn decode(
-            &mut self,
-            decoder: &mut fidl::encoding::Decoder<'_, D>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            decoder.debug_check_bounds::<Self>(offset);
-            let buf_ptr = unsafe { decoder.buf.as_ptr().add(offset) };
-            // Verify that padding bytes are zero.
-            // Copy from the buffer into the object.
-            unsafe {
-                std::ptr::copy_nonoverlapping(buf_ptr, self as *mut Self as *mut u8, 4);
-            }
-            Ok(())
-        }
-    }
-
-    impl fidl::encoding::ValueTypeMarker for DenyEachBindingOnlyDenyPythonResponse {
-        type Borrowed<'a> = &'a Self;
-        fn borrow(value: &<Self as fidl::encoding::TypeMarker>::Owned) -> Self::Borrowed<'_> {
-            value
-        }
-    }
-
-    unsafe impl fidl::encoding::TypeMarker for DenyEachBindingOnlyDenyPythonResponse {
-        type Owned = Self;
-
-        #[inline(always)]
-        fn inline_align(_context: fidl::encoding::Context) -> usize {
-            4
-        }
-
-        #[inline(always)]
-        fn inline_size(_context: fidl::encoding::Context) -> usize {
-            4
-        }
-        #[inline(always)]
-        fn encode_is_copy() -> bool {
-            true
-        }
-
-        #[inline(always)]
-        fn decode_is_copy() -> bool {
-            true
-        }
-    }
-
-    unsafe impl<D: fidl::encoding::ResourceDialect>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyPythonResponse, D>
-        for &DenyEachBindingOnlyDenyPythonResponse
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
-            offset: usize,
-            _depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyPythonResponse>(offset);
-            unsafe {
-                // Copy the object into the buffer.
-                let buf_ptr = encoder.buf.as_mut_ptr().add(offset);
-                (buf_ptr as *mut DenyEachBindingOnlyDenyPythonResponse)
-                    .write_unaligned((self as *const DenyEachBindingOnlyDenyPythonResponse).read());
-                // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
-                // done second because the memcpy will write garbage to these bytes.
-            }
-            Ok(())
-        }
-    }
-    unsafe impl<D: fidl::encoding::ResourceDialect, T0: fidl::encoding::Encode<i32, D>>
-        fidl::encoding::Encode<DenyEachBindingOnlyDenyPythonResponse, D> for (T0,)
-    {
-        #[inline]
-        unsafe fn encode(
-            self,
-            encoder: &mut fidl::encoding::Encoder<'_, D>,
-            offset: usize,
-            depth: fidl::encoding::Depth,
-        ) -> fidl::Result<()> {
-            encoder.debug_check_bounds::<DenyEachBindingOnlyDenyPythonResponse>(offset);
-            // Zero out padding regions. There's no need to apply masks
-            // because the unmasked parts will be overwritten by fields.
-            // Write the fields.
-            self.0.encode(encoder, offset + 0, depth)?;
-            Ok(())
-        }
-    }
-
-    impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D>
-        for DenyEachBindingOnlyDenyPythonResponse
     {
         #[inline(always)]
         fn new_empty() -> Self {

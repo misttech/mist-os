@@ -44,10 +44,6 @@ struct DenyEachBindingOnlyDenyLibfuzzerRequest;
 
 struct DenyEachBindingOnlyDenyLibfuzzerResponse;
 
-struct DenyEachBindingOnlyDenyPythonRequest;
-
-struct DenyEachBindingOnlyDenyPythonResponse;
-
 struct DenyEachBindingOnlyDenyRustRequest;
 
 struct DenyEachBindingOnlyDenyRustResponse;
@@ -67,8 +63,6 @@ class DenyEachBindingOnlyDenyDartResult;
 class DenyEachBindingOnlyDenyGoResult;
 
 class DenyEachBindingOnlyDenyLibfuzzerResult;
-
-class DenyEachBindingOnlyDenyPythonResult;
 
 class DenyEachBindingOnlyDenyRustResult;
 
@@ -95,14 +89,6 @@ struct DenyEachBindingOnlyDenyLibfuzzerRequest {
 };
 
 struct DenyEachBindingOnlyDenyLibfuzzerResponse {
-  int32_t b = {};
-};
-
-struct DenyEachBindingOnlyDenyPythonRequest {
-  bool a = {};
-};
-
-struct DenyEachBindingOnlyDenyPythonResponse {
   int32_t b = {};
 };
 
@@ -390,77 +376,6 @@ class DenyEachBindingOnlyDenyLibfuzzerResult {
 
   static void SizeAndOffsetAssertionHelper();
   ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult::Ordinal ordinal_;
-  FIDL_ALIGNDECL
-  ::fidl::UntypedEnvelope envelope_;
-};
-
-class DenyEachBindingOnlyDenyPythonResult {
- public:
-  using Response = test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse;
-
-  DenyEachBindingOnlyDenyPythonResult() : ordinal_(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::Invalid), envelope_{} {}
-
-  DenyEachBindingOnlyDenyPythonResult(const DenyEachBindingOnlyDenyPythonResult&) = default;
-  DenyEachBindingOnlyDenyPythonResult& operator=(const DenyEachBindingOnlyDenyPythonResult&) = default;
-  DenyEachBindingOnlyDenyPythonResult(DenyEachBindingOnlyDenyPythonResult&&) = default;
-  DenyEachBindingOnlyDenyPythonResult& operator=(DenyEachBindingOnlyDenyPythonResult&&) = default;
-
-  enum class Tag : fidl_xunion_tag_t {
-    kResponse = 1,  // 0x1
-    kErr = 2,       // 0x2
-  };
-
-  bool has_invalid_tag() const { return ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::Invalid; }
-
-  bool is_response() const { return ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kResponse; }
-
-  static DenyEachBindingOnlyDenyPythonResult WithResponse(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse val) {
-    DenyEachBindingOnlyDenyPythonResult result;
-    result.ordinal_ = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kResponse;
-    result.envelope_.As<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse>().set_data(std::move(val));
-    return result;
-  }
-
-  ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse& response() {
-    ZX_ASSERT(ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kResponse);
-    return envelope_.As<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse>().get_data();
-  }
-  const ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse& response() const {
-    ZX_ASSERT(ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kResponse);
-    return envelope_.As<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse>().get_data();
-  }
-
-  bool is_err() const { return ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kErr; }
-
-  static DenyEachBindingOnlyDenyPythonResult WithErr(uint32_t val) {
-    DenyEachBindingOnlyDenyPythonResult result;
-    result.ordinal_ = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kErr;
-    result.envelope_.As<uint32_t>().set_data(std::move(val));
-    return result;
-  }
-
-  uint32_t& err() {
-    ZX_ASSERT(ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  const uint32_t& err() const {
-    ZX_ASSERT(ordinal_ == ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal::kErr);
-    return envelope_.As<uint32_t>().get_data();
-  }
-  ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag Which() const {
-    ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag>(ordinal_);
-  }
-
- private:
-  enum class Ordinal : fidl_xunion_tag_t {
-    Invalid = 0,
-    kResponse = 1,  // 0x1
-    kErr = 2,       // 0x2
-  };
-
-  static void SizeAndOffsetAssertionHelper();
-  ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
@@ -876,98 +791,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
       internal::WireEncoder* encoder, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (kIsMemcpyCompatible) {
       memcpy(position.As<void>(), value, sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse));
-    } else {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->b, position + 0, recursion_depth);
-    }
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
-};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 0;
-  static constexpr uint32_t kPrimarySize = 1;
-  [[maybe_unused]]
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = false;
-};
-
-template <>
-struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest> : public std::true_type {};
-template <>
-struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest> : public std::true_type {};
-template <>
-struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest>);
-static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, a) == 0);
-static_assert(sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest) == TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest>::kPrimarySize);
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t kInlineSize = 1;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
-  static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
-
-  static void Encode(
-      internal::WireEncoder* encoder, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest));
-    } else {
-      internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->a, position + 0, recursion_depth);
-    }
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<bool, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-  }
-};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 0;
-  static constexpr uint32_t kPrimarySize = 4;
-  [[maybe_unused]]
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = false;
-};
-
-template <>
-struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse> : public std::true_type {};
-template <>
-struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse> : public std::true_type {};
-template <>
-struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse>);
-static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, b) == 0);
-static_assert(sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse) == TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse>::kPrimarySize);
-
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
-  static constexpr size_t kInlineSize = 4;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
-  static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
-  static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
-
-  static void Encode(
-      internal::WireEncoder* encoder, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse));
     } else {
       internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->b, position + 0, recursion_depth);
     }
@@ -1732,128 +1555,6 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
-
-template <>
-struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]]
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult> : public std::true_type {};
-template <>
-struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult> : public std::true_type {};
-template <>
-struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult>);
-
-template <typename Constraint, bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult, Constraint, IsRecursive> {
-  static constexpr size_t kInlineSize = 16;
-  static constexpr bool kIsMemcpyCompatible = false;
-
-  static void Encode(internal::WireEncoder* encoder, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
-
-    if (unlikely(u->tag == 0)) {
-      if constexpr (Constraint::is_optional) {
-        *position.As<fidl_union_t>() = {};
-        return;
-      }
-      encoder->SetError(kCodingErrorInvalidUnionTag);
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(encoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    *position.As<fidl_xunion_tag_t>() = u->tag;
-
-    size_t encode_inline_size;
-    switch (u->tag) {
-      case 1:  // ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kResponse
-        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      case 2:  // ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kErr
-        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        encode_inline_size = 0;
-        break;
-    }
-    ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
-    switch (u->tag) {
-      case 1:  // ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kResponse
-        encode_fn = ::fidl::internal::MakeEncodeFn<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      case 2:  // ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kErr
-        encode_fn = ::fidl::internal::MakeEncodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        encode_fn = nullptr;
-        break;
-    }
-    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-
-  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag tag = *position.As<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag>();
-    if (unlikely(static_cast<uint64_t>(tag) == 0)) {
-      if constexpr (!Constraint::is_optional) {
-        decoder->SetError(kCodingErrorInvalidUnionTag);
-        return;
-      }
-      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
-      if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
-        decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
-      }
-      return;
-    }
-
-    RecursionDepth<IsRecursive> inner_depth = recursion_depth.Add(decoder, 1);
-    if (!inner_depth.IsValid()) {
-      return;
-    }
-
-    size_t decode_inline_size;
-    switch (tag) {
-      case ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kResponse:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      case ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kErr:
-        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::kInlineSize;
-        break;
-      default:
-        decode_inline_size = 0;
-        break;
-    }
-    DecodeFn<IsRecursive> decode_fn;
-    switch (tag) {
-      case ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kResponse:
-        decode_fn = ::fidl::internal::MakeDecodeFn<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      case ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::Tag::kErr:
-        decode_fn = ::fidl::internal::MakeDecodeFn<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
-        break;
-      default:
-        decode_fn = nullptr;
-        break;
-    }
-    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
-  }
-};
-
-// Top-level union.
-template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-    : public ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 template <>
 struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult> {

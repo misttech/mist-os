@@ -6,22 +6,18 @@
 
 {{ define "UnionDeclaration" -}}
 class {{ .PythonName }}:
-    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{ . }}
     {{- end }}
     """
-    {{- end }}
     {{- range .PythonMembers }}
-    {{- if .DocComments }}
-    """
-    {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
-    {{- end }}
-    """
-    {{- end }}
     _{{ .PythonName }}: typing.Optional[{{ .PythonType.PythonName }}]
+    {{- range .DocComments }}
+    """
+    {{ . }}
+    """
+    {{- end }}
     {{- end }}
 
     __fidl_kind__ = "union"

@@ -43,10 +43,6 @@ class TestBase<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::Server
                                  OnlyDenyLibfuzzerCompleter::Sync& completer) {
     NotImplemented_("OnlyDenyLibfuzzer", completer);
   }
-  virtual void OnlyDenyPython(OnlyDenyPythonRequest& request,
-                              OnlyDenyPythonCompleter::Sync& completer) {
-    NotImplemented_("OnlyDenyPython", completer);
-  }
   virtual void OnlyDenyRust(OnlyDenyRustRequest& request,
                             OnlyDenyRustCompleter::Sync& completer) {
     NotImplemented_("OnlyDenyRust", completer);

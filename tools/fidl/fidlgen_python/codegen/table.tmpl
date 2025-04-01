@@ -7,22 +7,18 @@
 {{ define "TableDeclaration" -}}
 @dataclass
 class {{ .PythonName }}:
-    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{ . }}
     {{- end }}
     """
-    {{- end }}
     {{- range .PythonMembers }}
-    {{- if .DocComments }}
-    """
-    {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
-    {{- end }}
-    """
-    {{- end }}
     {{ .PythonName }}: {{ .PythonType.PythonName }} | None
+    {{- range .DocComments }}
+    """
+    {{ . }}
+    """
+    {{- end }}
     {{- end }}
 
     {{ if .PythonMembers -}}

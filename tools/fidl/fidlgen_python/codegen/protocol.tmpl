@@ -6,39 +6,33 @@
 
 {{ define "ProtocolDeclaration" -}}
 class {{ .PythonServerName }}(fidl._server.ServerBase):
-    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{ . }}
     {{- end }}
     """
-    {{- end }}
     __fidl_kind__ = "server"
     library = "{{ .Library }}"
     method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
 
 
 class {{ .PythonClientName }}(fidl._client.FidlClient):
-    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{ . }}
     {{- end }}
     """
-    {{- end }}
     __fidl_kind__ = "client"
     library = "{{ .Library }}"
     method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
 
 
 class {{ .PythonEventHandlerName }}(fidl._client.EventHandlerBase):
-    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{ . }}
     {{- end }}
     """
-    {{- end }}
     __fidl_kind__ = "event_handler"
     library = "{{ .Library }}"
     method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}

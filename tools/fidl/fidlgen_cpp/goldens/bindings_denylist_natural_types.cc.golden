@@ -37,16 +37,6 @@
       ::fidl::internal::NaturalClone(storage_.b)};
 }
 
-::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.a)};
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.b)};
-}
-
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::Storage_ test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -122,22 +112,6 @@ std::shared_ptr<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult::Storag
 }
 
 std::shared_ptr<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Storage_> test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    case 2:
-      return std::make_shared<Storage_>(
-          std::in_place_index<2>,
-          ::fidl::internal::NaturalClone(std::get<2>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
-
-std::shared_ptr<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult::Storage_> test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:

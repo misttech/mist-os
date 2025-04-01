@@ -60,11 +60,6 @@ class WireTestBase<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::Wi
       OnlyDenyLibfuzzerCompleter::Sync& completer) override {
     NotImplemented_("OnlyDenyLibfuzzer", completer);
   }
-  virtual void OnlyDenyPython(
-      ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest* request,
-      OnlyDenyPythonCompleter::Sync& completer) override {
-    NotImplemented_("OnlyDenyPython", completer);
-  }
   virtual void OnlyDenyRust(
       ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest* request,
       OnlyDenyRustCompleter::Sync& completer) override {

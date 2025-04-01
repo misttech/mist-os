@@ -11,13 +11,11 @@
 */}}
 {{ define "BitsDeclaration" -}}
 {{ .PythonName }} = enum.IntFlag("{{ .PythonName }}", {
-    {{- if .DocComments }}
     "__doc__": """
         {{- range .DocComments }}
-{{ . | escapeQuotes | trimSpace | indentNonEmpty8 }}
+        {{ . }}
         {{- end }}
         """,
-    {{- end }}
     "__fidl_kind__": "bits",
     "__fidl_type__": "{{ .PythonName }}",
     "__fidl_raw_type__": "{{ .Name }}",

@@ -30,13 +30,7 @@ import {{ . }}
 {{ range .PythonUnsupportedTypes }}
 class {{ .PythonName }}:
     def __init__(self, *args: list[typing.Any], _unsupported: fidl.Unsupported, **kwargs: dict[str, typing.Any]) -> None:
-        raise NotImplementedError(
-            """
-            {{ .Identifier }} not supported.
-{{ range .Message }}
-            {{ . | escapeQuotes | trimSpace }}
-            {{- end }}
-            """)
+        raise NotImplementedError("""{{ .Identifier }} not supported. {{ .Message }}""")
 {{ end }}
 
 

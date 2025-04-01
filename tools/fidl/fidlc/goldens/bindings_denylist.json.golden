@@ -73,19 +73,19 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
                 "line": 13,
                 "column": 20,
-                "length": 54
+                "length": 46
               }
             }
           ],
@@ -93,7 +93,7 @@
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
             "line": 13,
             "column": 1,
-            "length": 74
+            "length": 66
           }
         }
       ],
@@ -226,19 +226,19 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
                 "line": 18,
                 "column": 20,
-                "length": 59
+                "length": 51
               }
             }
           ],
@@ -246,7 +246,7 @@
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
             "line": 18,
             "column": 1,
-            "length": 79
+            "length": 71
           }
         }
       ],
@@ -282,7 +282,7 @@
       "name": "test.bindingsdenylist/Allowed",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 122,
+        "line": 112,
         "column": 17,
         "length": 7
       },
@@ -297,7 +297,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 124,
+            "line": 114,
             "column": 12,
             "length": 6
           },
@@ -312,27 +312,27 @@
                   "type": "string",
                   "value": {
                     "kind": "literal",
-                    "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                    "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                    "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                    "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                     "literal": {
                       "kind": "string",
-                      "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                      "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                      "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                      "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                     }
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 123,
+                    "line": 113,
                     "column": 24,
-                    "length": 65
+                    "length": 57
                   }
                 }
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 123,
+                "line": 113,
                 "column": 5,
-                "length": 85
+                "length": 77
               }
             }
           ],
@@ -387,7 +387,7 @@
       "name": "test.bindingsdenylist/ContainsAllowed",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 154,
+        "line": 144,
         "column": 17,
         "length": 15
       },
@@ -401,27 +401,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 153,
+                "line": 143,
                 "column": 20,
-                "length": 65
+                "length": 57
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 153,
+            "line": 143,
             "column": 1,
-            "length": 85
+            "length": 77
           }
         }
       ],
@@ -433,7 +433,7 @@
       "name": "test.bindingsdenylist/Denied",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 108,
+        "line": 98,
         "column": 17,
         "length": 6
       },
@@ -447,27 +447,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 107,
+                "line": 97,
                 "column": 20,
-                "length": 65
+                "length": 57
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 107,
+            "line": 97,
             "column": 1,
-            "length": 85
+            "length": 77
           }
         }
       ],
@@ -481,7 +481,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 109,
+            "line": 99,
             "column": 12,
             "length": 29
           },
@@ -511,7 +511,7 @@
       "name": "test.bindingsdenylist/DenyEachBinding",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 54,
+        "line": 51,
         "column": 17,
         "length": 15
       },
@@ -526,7 +526,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 56,
+            "line": 53,
             "column": 12,
             "length": 11
           },
@@ -551,7 +551,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 55,
+                    "line": 52,
                     "column": 24,
                     "length": 30
                   }
@@ -559,7 +559,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 55,
+                "line": 52,
                 "column": 5,
                 "length": 50
               }
@@ -631,7 +631,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 63,
+            "line": 60,
             "column": 12,
             "length": 12
           },
@@ -656,7 +656,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 62,
+                    "line": 59,
                     "column": 24,
                     "length": 6
                   }
@@ -664,7 +664,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 62,
+                "line": 59,
                 "column": 5,
                 "length": 26
               }
@@ -736,7 +736,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 70,
+            "line": 67,
             "column": 12,
             "length": 10
           },
@@ -761,7 +761,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 69,
+                    "line": 66,
                     "column": 24,
                     "length": 4
                   }
@@ -769,7 +769,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 69,
+                "line": 66,
                 "column": 5,
                 "length": 24
               }
@@ -841,7 +841,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 77,
+            "line": 74,
             "column": 12,
             "length": 17
           },
@@ -866,7 +866,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 76,
+                    "line": 73,
                     "column": 24,
                     "length": 11
                   }
@@ -874,7 +874,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 76,
+                "line": 73,
                 "column": 5,
                 "length": 31
               }
@@ -941,117 +941,12 @@
         },
         {
           "kind": "twoway",
-          "ordinal": 3010747198252652930,
-          "name": "OnlyDenyPython",
-          "strict": true,
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 84,
-            "column": 12,
-            "length": 14
-          },
-          "deprecated": false,
-          "has_request": true,
-          "maybe_attributes": [
-            {
-              "name": "bindings_denylist",
-              "arguments": [
-                {
-                  "name": "value",
-                  "type": "string",
-                  "value": {
-                    "kind": "literal",
-                    "value": "python",
-                    "expression": "\"python\"",
-                    "literal": {
-                      "kind": "string",
-                      "value": "python",
-                      "expression": "\"python\""
-                    }
-                  },
-                  "location": {
-                    "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 83,
-                    "column": 24,
-                    "length": 8
-                  }
-                }
-              ],
-              "location": {
-                "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 83,
-                "column": 5,
-                "length": 28
-              }
-            }
-          ],
-          "maybe_request_payload": {
-            "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBindingOnlyDenyPythonRequest",
-            "nullable": false,
-            "type_shape_v2": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "has_response": true,
-          "maybe_response_payload": {
-            "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Result",
-            "nullable": false,
-            "type_shape_v2": {
-              "inline_size": 16,
-              "alignment": 8,
-              "depth": 1,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "is_composed": false,
-          "has_error": true,
-          "maybe_response_success_type": {
-            "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Response",
-            "nullable": false,
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "maybe_response_err_type": {
-            "kind_v2": "primitive",
-            "subtype": "uint32",
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          }
-        },
-        {
-          "kind": "twoway",
           "ordinal": 3719805222870932662,
           "name": "OnlyDenyRust",
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 91,
+            "line": 81,
             "column": 12,
             "length": 12
           },
@@ -1076,7 +971,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 90,
+                    "line": 80,
                     "column": 24,
                     "length": 6
                   }
@@ -1084,7 +979,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 90,
+                "line": 80,
                 "column": 5,
                 "length": 26
               }
@@ -1156,7 +1051,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 98,
+            "line": 88,
             "column": 12,
             "length": 17
           },
@@ -1181,7 +1076,7 @@
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                    "line": 97,
+                    "line": 87,
                     "column": 24,
                     "length": 11
                   }
@@ -1189,7 +1084,7 @@
               ],
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 97,
+                "line": 87,
                 "column": 5,
                 "length": 31
               }
@@ -1260,7 +1155,7 @@
       "name": "test.bindingsdenylist/ImportsSameNameContext",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 165,
+        "line": 155,
         "column": 17,
         "length": 22
       },
@@ -1271,7 +1166,7 @@
           "name": "test.dependent/ContainsDenied",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 166,
+            "line": 156,
             "column": 13,
             "length": 29
           },
@@ -1281,7 +1176,7 @@
           "name": "test.dependent/ContainsAllowed",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 167,
+            "line": 157,
             "column": 13,
             "length": 30
           },
@@ -1311,19 +1206,19 @@
                   "type": "string",
                   "value": {
                     "kind": "literal",
-                    "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                    "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                    "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                    "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                     "literal": {
                       "kind": "string",
-                      "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                      "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                      "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                      "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                     }
                   },
                   "location": {
                     "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/dependent.test.fidl",
                     "line": 11,
                     "column": 24,
-                    "length": 65
+                    "length": 57
                   }
                 }
               ],
@@ -1331,7 +1226,7 @@
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/dependent.test.fidl",
                 "line": 11,
                 "column": 5,
-                "length": 85
+                "length": 77
               }
             }
           ],
@@ -1393,7 +1288,7 @@
       "name": "test.bindingsdenylist/OnlyCppAndDeps",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 47,
+        "line": 44,
         "column": 17,
         "length": 14
       },
@@ -1407,27 +1302,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "dart, go, libfuzzer, python, rust, syzkaller",
-                "expression": "\"dart, go, libfuzzer, python, rust, syzkaller\"",
+                "value": "dart, go, libfuzzer, rust, syzkaller",
+                "expression": "\"dart, go, libfuzzer, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "dart, go, libfuzzer, python, rust, syzkaller",
-                  "expression": "\"dart, go, libfuzzer, python, rust, syzkaller\""
+                  "value": "dart, go, libfuzzer, rust, syzkaller",
+                  "expression": "\"dart, go, libfuzzer, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 46,
+                "line": 43,
                 "column": 20,
-                "length": 46
+                "length": 38
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 46,
+            "line": 43,
             "column": 1,
-            "length": 66
+            "length": 58
           }
         }
       ],
@@ -1439,7 +1334,7 @@
       "name": "test.bindingsdenylist/OnlyLibfuzzerAndDeps",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 41,
+        "line": 38,
         "column": 17,
         "length": 20
       },
@@ -1453,27 +1348,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, rust, syzkaller",
+                "expression": "\"cpp, dart, go, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 40,
+                "line": 37,
                 "column": 20,
-                "length": 40
+                "length": 32
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 40,
+            "line": 37,
             "column": 1,
-            "length": 60
+            "length": 52
           }
         }
       ],
@@ -1487,7 +1382,7 @@
       "name": "test.bindingsdenylist/OnlyHlcpp",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 50,
+        "line": 47,
         "column": 9,
         "length": 9
       },
@@ -1501,27 +1396,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, dart, go, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 49,
+                "line": 46,
                 "column": 20,
-                "length": 58
+                "length": 50
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 49,
+            "line": 46,
             "column": 1,
-            "length": 78
+            "length": 70
           }
         }
       ],
@@ -1539,7 +1434,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 124,
+        "line": 114,
         "column": 25,
         "length": 282
       },
@@ -1563,7 +1458,7 @@
           "name": "should_never_appear_in_any_binding_4",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 125,
+            "line": 115,
             "column": 9,
             "length": 36
           },
@@ -1591,7 +1486,7 @@
           "name": "should_never_appear_in_any_binding_5",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 128,
+            "line": 118,
             "column": 9,
             "length": 36
           },
@@ -1619,7 +1514,7 @@
           "name": "should_never_appear_in_any_binding_6",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 131,
+            "line": 121,
             "column": 9,
             "length": 36
           },
@@ -1649,7 +1544,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 138,
+        "line": 128,
         "column": 6,
         "length": 15
       },
@@ -1663,27 +1558,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 137,
+                "line": 127,
                 "column": 20,
-                "length": 65
+                "length": 57
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 137,
+            "line": 127,
             "column": 1,
-            "length": 85
+            "length": 77
           }
         }
       ],
@@ -1706,7 +1601,7 @@
           "name": "should_never_appear_in_any_binding_7",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 139,
+            "line": 129,
             "column": 5,
             "length": 36
           },
@@ -1734,7 +1629,7 @@
           "name": "should_never_appear_in_any_binding_8",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 142,
+            "line": 132,
             "column": 5,
             "length": 36
           },
@@ -1762,7 +1657,7 @@
           "name": "should_never_appear_in_any_binding_9",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 145,
+            "line": 135,
             "column": 5,
             "length": 36
           },
@@ -1794,7 +1689,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 109,
+        "line": 99,
         "column": 42,
         "length": 282
       },
@@ -1818,7 +1713,7 @@
           "name": "should_never_appear_in_any_binding_1",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 110,
+            "line": 100,
             "column": 9,
             "length": 36
           },
@@ -1846,7 +1741,7 @@
           "name": "should_never_appear_in_any_binding_2",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 113,
+            "line": 103,
             "column": 9,
             "length": 36
           },
@@ -1874,7 +1769,7 @@
           "name": "should_never_appear_in_any_binding_3",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 116,
+            "line": 106,
             "column": 9,
             "length": 36
           },
@@ -1906,7 +1801,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 56,
+        "line": 53,
         "column": 24,
         "length": 30
       },
@@ -1929,7 +1824,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 57,
+            "line": 54,
             "column": 9,
             "length": 1
           },
@@ -1961,7 +1856,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 63,
+        "line": 60,
         "column": 25,
         "length": 30
       },
@@ -1984,7 +1879,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 64,
+            "line": 61,
             "column": 9,
             "length": 1
           },
@@ -2016,7 +1911,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 70,
+        "line": 67,
         "column": 23,
         "length": 30
       },
@@ -2039,7 +1934,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 71,
+            "line": 68,
             "column": 9,
             "length": 1
           },
@@ -2071,7 +1966,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 77,
+        "line": 74,
         "column": 30,
         "length": 30
       },
@@ -2094,62 +1989,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 78,
-            "column": 9,
-            "length": 1
-          },
-          "deprecated": false,
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "is_empty_success_struct": false,
-      "type_shape_v2": {
-        "inline_size": 1,
-        "alignment": 1,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": false,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.bindingsdenylist/DenyEachBindingOnlyDenyPythonRequest",
-      "naming_context": [
-        "DenyEachBinding",
-        "OnlyDenyPython",
-        "Request"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 84,
-        "column": 27,
-        "length": 30
-      },
-      "deprecated": false,
-      "members": [
-        {
-          "type": {
-            "kind_v2": "primitive",
-            "subtype": "bool",
-            "type_shape_v2": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "a",
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 85,
+            "line": 75,
             "column": 9,
             "length": 1
           },
@@ -2181,7 +2021,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 91,
+        "line": 81,
         "column": 25,
         "length": 30
       },
@@ -2204,7 +2044,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 92,
+            "line": 82,
             "column": 9,
             "length": 1
           },
@@ -2236,7 +2076,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 98,
+        "line": 88,
         "column": 30,
         "length": 30
       },
@@ -2259,7 +2099,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 99,
+            "line": 89,
             "column": 9,
             "length": 1
           },
@@ -2292,7 +2132,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 58,
+        "line": 55,
         "column": 12,
         "length": 31
       },
@@ -2315,7 +2155,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 59,
+            "line": 56,
             "column": 9,
             "length": 1
           },
@@ -2348,7 +2188,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 65,
+        "line": 62,
         "column": 12,
         "length": 31
       },
@@ -2371,7 +2211,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 66,
+            "line": 63,
             "column": 9,
             "length": 1
           },
@@ -2404,7 +2244,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 72,
+        "line": 69,
         "column": 12,
         "length": 31
       },
@@ -2427,7 +2267,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 73,
+            "line": 70,
             "column": 9,
             "length": 1
           },
@@ -2460,7 +2300,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 79,
+        "line": 76,
         "column": 12,
         "length": 31
       },
@@ -2483,63 +2323,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 80,
-            "column": 9,
-            "length": 1
-          },
-          "deprecated": false,
-          "field_shape_v2": {
-            "offset": 0,
-            "padding": 0
-          }
-        }
-      ],
-      "resource": false,
-      "is_empty_success_struct": false,
-      "type_shape_v2": {
-        "inline_size": 4,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": false,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Response",
-      "naming_context": [
-        "DenyEachBinding",
-        "OnlyDenyPython",
-        "Response",
-        "response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 86,
-        "column": 12,
-        "length": 31
-      },
-      "deprecated": false,
-      "members": [
-        {
-          "type": {
-            "kind_v2": "primitive",
-            "subtype": "int32",
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "name": "b",
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 87,
+            "line": 77,
             "column": 9,
             "length": 1
           },
@@ -2572,7 +2356,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 93,
+        "line": 83,
         "column": 12,
         "length": 31
       },
@@ -2595,7 +2379,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 94,
+            "line": 84,
             "column": 9,
             "length": 1
           },
@@ -2628,7 +2412,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 100,
+        "line": 90,
         "column": 12,
         "length": 31
       },
@@ -2651,7 +2435,7 @@
           "name": "b",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 101,
+            "line": 91,
             "column": 9,
             "length": 1
           },
@@ -2682,7 +2466,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 160,
+        "line": 150,
         "column": 46,
         "length": 30
       },
@@ -2705,7 +2489,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 161,
+            "line": 151,
             "column": 9,
             "length": 1
           },
@@ -2735,7 +2519,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 159,
+        "line": 149,
         "column": 6,
         "length": 29
       },
@@ -2759,7 +2543,7 @@
           "name": "member_only_appears_in_importing_library",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 160,
+            "line": 150,
             "column": 5,
             "length": 40
           },
@@ -2803,19 +2587,19 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                "expression": "\"cpp, dart, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\"",
+                "value": "cpp, dart, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                "expression": "\"cpp, dart, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, hlcpp, libfuzzer, llcpp, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, hlcpp, libfuzzer, llcpp, python, rust, syzkaller\""
+                  "value": "cpp, dart, hlcpp, libfuzzer, llcpp, rust, syzkaller",
+                  "expression": "\"cpp, dart, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
                 "line": 23,
                 "column": 20,
-                "length": 61
+                "length": 53
               }
             }
           ],
@@ -2823,7 +2607,7 @@
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
             "line": 23,
             "column": 1,
-            "length": 81
+            "length": 73
           }
         }
       ],
@@ -2850,7 +2634,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 110,
+        "line": 100,
         "column": 46,
         "length": 38
       },
@@ -2873,7 +2657,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 111,
+            "line": 101,
             "column": 13,
             "length": 1
           },
@@ -2907,7 +2691,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 125,
+        "line": 115,
         "column": 46,
         "length": 38
       },
@@ -2930,7 +2714,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 126,
+            "line": 116,
             "column": 13,
             "length": 1
           },
@@ -2961,7 +2745,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 139,
+        "line": 129,
         "column": 42,
         "length": 30
       },
@@ -2984,7 +2768,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 140,
+            "line": 130,
             "column": 9,
             "length": 1
           },
@@ -3068,71 +2852,13 @@
   ],
   "table_declarations": [
     {
-      "name": "test.bindingsdenylist/OnlyPython",
-      "naming_context": [
-        "OnlyPython"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 27,
-        "column": 6,
-        "length": 10
-      },
-      "deprecated": false,
-      "maybe_attributes": [
-        {
-          "name": "bindings_denylist",
-          "arguments": [
-            {
-              "name": "value",
-              "type": "string",
-              "value": {
-                "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\"",
-                "literal": {
-                  "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller\""
-                }
-              },
-              "location": {
-                "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 26,
-                "column": 20,
-                "length": 57
-              }
-            }
-          ],
-          "location": {
-            "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 26,
-            "column": 1,
-            "length": 77
-          }
-        }
-      ],
-      "members": [],
-      "strict": false,
-      "resource": false,
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": false,
-        "has_flexible_envelope": true
-      }
-    },
-    {
       "name": "test.bindingsdenylist/OnlyRust",
       "naming_context": [
         "OnlyRust"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 30,
+        "line": 27,
         "column": 6,
         "length": 8
       },
@@ -3146,27 +2872,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, syzkaller\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, syzkaller",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, python, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, python, syzkaller\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, llcpp, syzkaller",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, llcpp, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 29,
+                "line": 26,
                 "column": 20,
-                "length": 59
+                "length": 51
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 29,
+            "line": 26,
             "column": 1,
-            "length": 79
+            "length": 71
           }
         }
       ],
@@ -3193,7 +2919,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 113,
+        "line": 103,
         "column": 46,
         "length": 40
       },
@@ -3217,7 +2943,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 114,
+            "line": 104,
             "column": 16,
             "length": 1
           },
@@ -3247,7 +2973,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 128,
+        "line": 118,
         "column": 46,
         "length": 40
       },
@@ -3271,7 +2997,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 129,
+            "line": 119,
             "column": 16,
             "length": 1
           },
@@ -3298,7 +3024,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 142,
+        "line": 132,
         "column": 42,
         "length": 32
       },
@@ -3322,7 +3048,7 @@
           "name": "a",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 143,
+            "line": 133,
             "column": 12,
             "length": 1
           },
@@ -3352,7 +3078,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 124,
+        "line": 114,
         "column": 24,
         "length": 284
       },
@@ -3377,7 +3103,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 31,
+            "line": 27,
             "column": 1,
             "length": 8
           },
@@ -3401,7 +3127,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 32,
+            "line": 28,
             "column": 1,
             "length": 3
           },
@@ -3430,7 +3156,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 58,
+        "line": 55,
         "column": 11,
         "length": 33
       },
@@ -3508,7 +3234,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 65,
+        "line": 62,
         "column": 11,
         "length": 33
       },
@@ -3586,7 +3312,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 72,
+        "line": 69,
         "column": 11,
         "length": 33
       },
@@ -3664,7 +3390,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 79,
+        "line": 76,
         "column": 11,
         "length": 33
       },
@@ -3734,15 +3460,15 @@
       }
     },
     {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Result",
+      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
       "naming_context": [
         "DenyEachBinding",
-        "OnlyDenyPython",
+        "OnlyDenyRust",
         "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 86,
+        "line": 83,
         "column": 11,
         "length": 33
       },
@@ -3753,7 +3479,7 @@
           "name": "response",
           "type": {
             "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Response",
+            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 4,
@@ -3812,15 +3538,15 @@
       }
     },
     {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
+      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
       "naming_context": [
         "DenyEachBinding",
-        "OnlyDenyRust",
+        "OnlyDenySyzkaller",
         "Response"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 93,
+        "line": 90,
         "column": 11,
         "length": 33
       },
@@ -3831,7 +3557,7 @@
           "name": "response",
           "type": {
             "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
+            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 4,
@@ -3890,91 +3616,13 @@
       }
     },
     {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
-      "naming_context": [
-        "DenyEachBinding",
-        "OnlyDenySyzkaller",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 100,
-        "column": 11,
-        "length": 33
-      },
-      "deprecated": false,
-      "members": [
-        {
-          "ordinal": 1,
-          "name": "response",
-          "type": {
-            "kind_v2": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",
-            "nullable": false,
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 27,
-            "column": 1,
-            "length": 8
-          },
-          "deprecated": false
-        },
-        {
-          "ordinal": 2,
-          "name": "err",
-          "type": {
-            "kind_v2": "primitive",
-            "subtype": "uint32",
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 28,
-            "column": 1,
-            "length": 3
-          },
-          "deprecated": false
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "is_result": true,
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": false,
-        "has_flexible_envelope": false
-      }
-    },
-    {
       "name": "test.bindingsdenylist/OnlyLlcpp",
       "naming_context": [
         "OnlyLlcpp"
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 33,
+        "line": 30,
         "column": 6,
         "length": 9
       },
@@ -3988,27 +3636,27 @@
               "type": "string",
               "value": {
                 "kind": "literal",
-                "value": "cpp, dart, go, hlcpp, libfuzzer, python, rust, syzkaller",
-                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, python, rust, syzkaller\"",
+                "value": "cpp, dart, go, hlcpp, libfuzzer, rust, syzkaller",
+                "expression": "\"cpp, dart, go, hlcpp, libfuzzer, rust, syzkaller\"",
                 "literal": {
                   "kind": "string",
-                  "value": "cpp, dart, go, hlcpp, libfuzzer, python, rust, syzkaller",
-                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, python, rust, syzkaller\""
+                  "value": "cpp, dart, go, hlcpp, libfuzzer, rust, syzkaller",
+                  "expression": "\"cpp, dart, go, hlcpp, libfuzzer, rust, syzkaller\""
                 }
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-                "line": 32,
+                "line": 29,
                 "column": 20,
-                "length": 58
+                "length": 50
               }
             }
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 32,
+            "line": 29,
             "column": 1,
-            "length": 78
+            "length": 70
           }
         }
       ],
@@ -4031,7 +3679,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 34,
+            "line": 31,
             "column": 8,
             "length": 1
           },
@@ -4061,7 +3709,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 116,
+        "line": 106,
         "column": 46,
         "length": 49
       },
@@ -4085,7 +3733,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 117,
+            "line": 107,
             "column": 16,
             "length": 1
           },
@@ -4116,7 +3764,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 131,
+        "line": 121,
         "column": 46,
         "length": 49
       },
@@ -4140,7 +3788,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 132,
+            "line": 122,
             "column": 16,
             "length": 1
           },
@@ -4168,7 +3816,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 145,
+        "line": 135,
         "column": 42,
         "length": 41
       },
@@ -4192,7 +3840,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-            "line": 146,
+            "line": 136,
             "column": 12,
             "length": 1
           },
@@ -4245,9 +3893,6 @@
     "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result",
-    "test.bindingsdenylist/DenyEachBindingOnlyDenyPythonRequest",
-    "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Response",
-    "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Result",
     "test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequest",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
@@ -4264,7 +3909,6 @@
     "test.bindingsdenylist/OnlyHlcpp",
     "test.bindingsdenylist/OnlyLibfuzzerAndDeps",
     "test.bindingsdenylist/OnlyLlcpp",
-    "test.bindingsdenylist/OnlyPython",
     "test.bindingsdenylist/OnlyRust",
     "test.bindingsdenylist/OnlySyzkaller"
   ],
@@ -4287,14 +3931,12 @@
     "test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest": "struct",
     "test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequest": "struct",
     "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest": "struct",
-    "test.bindingsdenylist/DenyEachBindingOnlyDenyPythonRequest": "struct",
     "test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequest": "struct",
     "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response": "struct",
-    "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Response": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response": "struct",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response": "struct",
     "test.bindingsdenylist/MemberOnlyAppearsInImportingLibrary": "struct",
@@ -4303,7 +3945,6 @@
     "test.bindingsdenylist/ShouldNeverAppearInAnyBinding1": "struct",
     "test.bindingsdenylist/ShouldNeverAppearInAnyBinding4": "struct",
     "test.bindingsdenylist/ShouldNeverAppearInAnyBinding7": "struct",
-    "test.bindingsdenylist/OnlyPython": "table",
     "test.bindingsdenylist/OnlyRust": "table",
     "test.bindingsdenylist/ShouldNeverAppearInAnyBinding2": "table",
     "test.bindingsdenylist/ShouldNeverAppearInAnyBinding5": "table",
@@ -4313,7 +3954,6 @@
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result": "union",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result": "union",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result": "union",
-    "test.bindingsdenylist/DenyEachBinding_OnlyDenyPython_Result": "union",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result": "union",
     "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result": "union",
     "test.bindingsdenylist/OnlyLlcpp": "union",
