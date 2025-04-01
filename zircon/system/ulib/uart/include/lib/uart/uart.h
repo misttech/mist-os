@@ -16,6 +16,7 @@
 
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -78,6 +79,10 @@ class Config {
   template <typename OtherDriver>
   constexpr bool operator==(const Config<OtherDriver>& rhs) const {
     return false;
+  }
+
+  constexpr std::span<const std::byte> as_bytes() const {
+    return {reinterpret_cast<const std::byte*>(&config_), sizeof(config_)};
   }
 
  private:

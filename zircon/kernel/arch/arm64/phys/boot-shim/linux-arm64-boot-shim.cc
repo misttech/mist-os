@@ -100,10 +100,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
                uart_mmio->addr, uart_mmio->end());
       }
     }
-    // TODO(https://fxbug.dev/42084617): To be removed when driver state handed over switches do
-    // `uart::all::Config` as we work to remove `uart()` accessor.
-    shim.Get<boot_shim::UartItem<>>().Init(typename KernelDriver::uart_type(driver.config()));
   });
+  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().config());
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());
