@@ -2044,7 +2044,9 @@ class ScopedPageFreedList {
       cow_pages->FreePagesLocked(&list_);
     }
   }
+  list_node_t* List() { return &list_; }
 
+ private:
   list_node_t list_;
 };
 

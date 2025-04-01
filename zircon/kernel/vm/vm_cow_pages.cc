@@ -282,7 +282,7 @@ class BatchPQRemove {
             flph);
         Pmm::Node().FinishFreeLoanedPages(flph);
       } else {
-        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, &freed_list_.list_);
+        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_.List());
         freed_count_ += count_;
       }
       count_ = 0;
@@ -449,7 +449,7 @@ void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
         page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, ops.Flph(this));
   } else {
     pmm_page_queues()->Remove(page);
-    list_add_tail(&ops.FreeList(this).list_, &page->queue_node);
+    list_add_tail(ops.FreeList(this).List(), &page->queue_node);
   }
 }
 
@@ -7078,7 +7078,7 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
 }
 
 VmCowPages::DeferredOps::~DeferredOps() {
-  const bool list_empty = list_is_empty(&free_list_.list_);
+  const bool list_empty = list_is_empty(free_list_.List());
   // Avoid lock acquisition if we have no work to do.
   if (!list_empty || range_op_.has_value()) {
     if (locked_range_update_) {
