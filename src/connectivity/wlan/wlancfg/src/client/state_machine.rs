@@ -43,6 +43,18 @@ const PENDING_ROAM_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_
 
 type State = state_machine::State<ExitReason>;
 type ReqStream = stream::Fuse<mpsc::Receiver<ManualRequest>>;
+
+#[derive(Clone)]
+struct PendingRoam {
+    pub request: PolicyRoamRequest,
+    pub timestamp: fasync::MonotonicInstant,
+}
+impl From<PolicyRoamRequest> for PendingRoam {
+    fn from(request: PolicyRoamRequest) -> Self {
+        Self { request, timestamp: fasync::MonotonicInstant::now() }
+    }
+}
+
 pub trait ClientApi {
     fn connect(&mut self, selection: types::ConnectSelection) -> Result<(), anyhow::Error>;
     fn disconnect(
@@ -564,7 +576,7 @@ struct ConnectedOptions {
     roam_request_receiver: mpsc::Receiver<PolicyRoamRequest>,
     post_connect_metric_timer: Pin<Box<fasync::Timer>>,
     bss_connect_duration_metric_timer: Pin<Box<fasync::Timer>>,
-    pending_roam: Option<PolicyRoamRequest>,
+    pending_roam: Option<PendingRoam>,
     pending_roam_timer: Pin<Box<Fuse<fasync::Timer>>>,
 }
 impl ConnectedOptions {
@@ -811,7 +823,7 @@ async fn connected_state(
             }
             roam_request = options.roam_request_receiver.select_next_some() => {
                 if let Some(pending_roam) = &options.pending_roam {
-                    info!("Already pending a roam result for a requested roam to BSSID: {:?}", pending_roam.candidate.bss.bssid);
+                    info!("Already pending a roam result for a requested roam to BSSID: {:?}", pending_roam.request.candidate.bss.bssid);
                 } else {
                     let _ = common_options
                     .proxy
@@ -819,7 +831,7 @@ async fn connected_state(
                     .inspect_err(|e| {
                         error!("Error sending sme roam request: {}", e);
                     });
-                    options.pending_roam = Some(roam_request.clone());
+                    options.pending_roam = Some(roam_request.clone().into());
                     options.pending_roam_timer.set(fasync::Timer::new(PENDING_ROAM_TIMEOUT.after_now()).fuse());
                     common_options.telemetry_sender.send(TelemetryEvent::PolicyRoamAttempt {
                         request: roam_request,
@@ -943,27 +955,29 @@ async fn handle_roam_result(
     // Verify that the received roam result matches the pending roam request. If there is not a
     // pending roam request, or the pending request is for another BSS, the connection cannot
     // proceed.
-    match options.pending_roam.take() {
+    let pending_roam = match options.pending_roam.take() {
         None => {
             notify_on_roam_error_and_exit(common_options, options).await;
             return Err(format_err!(
                 "Roam result unexpectedly received without a pending roam request."
             ));
         }
-        Some(req) => {
-            if req.candidate.bss.bssid != result.bssid.into() {
+        Some(pending_roam) => {
+            if pending_roam.request.candidate.bss.bssid != result.bssid.into() {
                 notify_on_roam_error_and_exit(common_options, options).await;
                 return Err(format_err!(
                     "Roam result received for bssid {:?} while awaiting result for bssid {:?}.",
                     result.bssid,
-                    req.candidate.bss.bssid
+                    pending_roam.request.candidate.bss.bssid
                 ));
             }
+            pending_roam
         }
     };
     options.pending_roam_timer.set(Fuse::terminated());
 
     let roam_succeeded = result.status_code == fidl_ieee80211::StatusCode::Success;
+    let origin_channel = options.ap_state.tracked.channel;
     if roam_succeeded {
         // Record BSS disconnect to config manager. We do not report a disconnect to
         // telemetry, since we are still connected to the same ESS.
@@ -998,7 +1012,7 @@ async fn handle_roam_result(
         info!("Roam attempt failed, original association not maintained, disconnecting");
     }
 
-    notify_on_roam_result(common_options, options, result).await;
+    notify_on_roam_result(common_options, options, result, origin_channel, pending_roam).await;
     Ok(())
 }
 
@@ -1012,6 +1026,8 @@ async fn notify_on_roam_result(
     common_options: &mut CommonStateOptions,
     options: &mut ConnectedOptions,
     result: &fidl_sme::RoamResult,
+    origin_channel: types::WlanChan,
+    pending_roam: PendingRoam,
 ) {
     // Record connect result to config manager, regardless of status.
     common_options
@@ -1033,10 +1049,14 @@ async fn notify_on_roam_result(
         .await;
 
     // Log policy-initiated roam result to telemetry once state is up to date.
-    common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
+    common_options.telemetry_sender.send(TelemetryEvent::PolicyInitiatedRoamResult {
         iface_id: common_options.iface_id,
         result: result.clone(),
         ap_state: (*options.ap_state).clone(),
+        origin_channel,
+        request: pending_roam.request.clone(),
+        request_time: pending_roam.timestamp,
+        result_time: fasync::MonotonicInstant::now(),
     });
 
     // Publish state.
@@ -3265,7 +3285,7 @@ mod tests {
         );
         // Set the pending roam request, so we don't immediately exit when a result comes in.
         let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
-        options.pending_roam = Some(policy_request.clone());
+        options.pending_roam = Some(policy_request.clone().into());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3328,7 +3348,7 @@ mod tests {
 
         // Verify telemetry event for roam result
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
@@ -3375,7 +3395,7 @@ mod tests {
         );
         // Set the pending roam request, so we don't immediately exit when a result comes in.
         let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
-        options.pending_roam = Some(policy_request.clone());
+        options.pending_roam = Some(policy_request.clone().into());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3426,7 +3446,7 @@ mod tests {
 
         // Verify telemetry event for roam result
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
@@ -3478,7 +3498,7 @@ mod tests {
         );
         // Set the pending roam request, so we don't immediately exit when a result comes in.
         let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
-        options.pending_roam = Some(policy_request.clone());
+        options.pending_roam = Some(policy_request.clone().into());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3547,7 +3567,7 @@ mod tests {
 
         // Verify telemetry event for roam result
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+            assert_variant!(event, TelemetryEvent::PolicyInitiatedRoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
@@ -3603,7 +3623,7 @@ mod tests {
         );
         // Set the pending roam request for some BSSID.
         let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
-        options.pending_roam = Some(policy_request);
+        options.pending_roam = Some(policy_request.into());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3705,7 +3725,7 @@ mod tests {
         );
         // Set the pending roam request for some BSSID.
         let policy_request = generate_policy_roam_request([1, 1, 1, 1, 1, 1].into());
-        options.pending_roam = Some(policy_request);
+        options.pending_roam = Some(policy_request.into());
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();

@@ -4,6 +4,7 @@
 
 use crate::client::roaming::lib::RoamReason;
 use wlan_common::bss::Protection as BssProtection;
+use wlan_common::channel::Channel;
 use {fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics};
 
 pub fn convert_disconnect_source(
@@ -111,5 +112,46 @@ pub fn convert_roam_reason_dimension(
     match reason {
         RoamReason::RssiBelowThreshold => RssiBelowThreshold,
         RoamReason::SnrBelowThreshold => SnrBelowThreshold,
+    }
+}
+
+pub fn get_ghz_band_transition(
+    origin_channel: &Channel,
+    target_channel: &Channel,
+) -> metrics::ConnectivityWlanMetricDimensionGhzBandTransition {
+    let origin_is_2g = origin_channel.is_2ghz();
+    let origin_is_5g = origin_channel.is_5ghz();
+    let target_is_2g = target_channel.is_2ghz();
+    let target_is_5g = target_channel.is_5ghz();
+
+    match (origin_is_2g, origin_is_5g, target_is_2g, target_is_5g) {
+        (true, false, true, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From2gTo2g
+        }
+        (true, false, false, true) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From2gTo5g
+        }
+        (true, false, false, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From2gTo6g
+        }
+        (false, true, true, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From5gTo2g
+        }
+        (false, true, false, true) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From5gTo5g
+        }
+        (false, true, false, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From5gTo6g
+        }
+        (false, false, true, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From6gTo2g
+        }
+        (false, false, false, true) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From6gTo5g
+        }
+        (false, false, false, false) => {
+            metrics::ConnectivityWlanMetricDimensionGhzBandTransition::From6gTo6g
+        }
+        _ => panic!("Invalid channel band combination"),
     }
 }

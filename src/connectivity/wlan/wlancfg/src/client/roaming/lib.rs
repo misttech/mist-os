@@ -129,7 +129,7 @@ pub enum RoamTriggerDataOutcome {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RoamReason {
     RssiBelowThreshold,
     SnrBelowThreshold,

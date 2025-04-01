@@ -16,6 +16,9 @@ pub struct TimeSeriesStats {
     pub(crate) connect_attempt_count: TimeSeries<u32>,
     pub(crate) connect_successful_count: TimeSeries<u32>,
     pub(crate) disconnect_count: TimeSeries<u32>,
+    pub(crate) policy_roam_attempts_count: TimeSeries<u32>,
+    pub(crate) policy_roam_successful_count: TimeSeries<u32>,
+    pub(crate) policy_roam_disconnects_count: TimeSeries<u32>,
 
     // Packet counters stats, or stats calculated from packet counters
     pub(crate) rx_unicast_total_count: TimeSeries<u32>,
@@ -42,6 +45,9 @@ impl TimeSeriesStats {
             connected_duration_sec: TimeSeries::new(create_saturating_add_fn),
             connect_attempt_count: TimeSeries::new(create_saturating_add_fn),
             connect_successful_count: TimeSeries::new(create_saturating_add_fn),
+            policy_roam_attempts_count: TimeSeries::new(create_saturating_add_fn),
+            policy_roam_successful_count: TimeSeries::new(create_saturating_add_fn),
+            policy_roam_disconnects_count: TimeSeries::new(create_saturating_add_fn),
             disconnect_count: TimeSeries::new(create_saturating_add_fn),
             rx_unicast_total_count: TimeSeries::new(create_saturating_add_fn),
             rx_unicast_drop_count: TimeSeries::new(create_saturating_add_fn),
