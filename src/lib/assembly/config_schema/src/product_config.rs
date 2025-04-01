@@ -195,6 +195,7 @@ impl WalkPaths for ProductPackagesConfig {
     ) -> anyhow::Result<()> {
         walk_package_set(&mut self.base, found, dest.join("base"))?;
         walk_package_set(&mut self.cache, found, dest.join("cache"))?;
+        walk_package_set(&mut self.bootfs, found, dest.join("bootfs"))?;
         Ok(())
     }
 }
@@ -433,6 +434,11 @@ mod tests {
                     {
                         manifest: "path/to/cache/package_manifest.json"
                     }
+                ],
+                bootfs: [
+                    {
+                        manifest: "path/to/bootfs/package_manifest.json"
+                    }
                 ]
             }
         "#;
@@ -474,6 +480,17 @@ mod tests {
                 "0".to_string(),
                 ProductPackageDetails {
                     manifest: "path/to/cache/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
+        );
+        assert_eq!(
+            packages.bootfs,
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/bootfs/package_manifest.json".into(),
                     config_data: Vec::default()
                 }
             )]
