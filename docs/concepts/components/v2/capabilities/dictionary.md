@@ -510,4 +510,4 @@ The program just connects to each protocol in turn and tries to use it:
 [fidl-sandbox-receiver]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Receiver
 [glossary-dictionary]: /docs/glossary/README.md#dictionary
 [glossary-outgoing-directory]: /docs/glossary/README.md#outgoing-directory
-[src-service-fs]: /src/lib/fuchsia-component/src/server/mod.rs
+[src-service-fs]: /src/lib/fuchsia-component/server/src/lib.rs

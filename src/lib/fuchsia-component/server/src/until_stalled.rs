@@ -218,21 +218,21 @@ impl<ServiceObjTy: ServiceObjTrait> StallableServiceFs<ServiceObjTy> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Mutex;
-
+    use super::*;
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_component_client_test::{
         ProtocolAMarker, ProtocolARequest, ProtocolARequestStream,
     };
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
+    use fuchsia_component_directory::open_directory_async;
     use futures::future::BoxFuture;
     use futures::{pin_mut, select, TryStreamExt};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Mutex;
     use test_util::Counter;
     use zx::AsHandleRef;
-
-    use super::*;
 
     enum Requests {
         ServiceA(ProtocolARequestStream),
@@ -320,10 +320,7 @@ mod tests {
 
         let mut proxies = Vec::new();
         for _ in 0..NUM_FOO_REQUESTS {
-            proxies.push(
-                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
-                    .unwrap(),
-            );
+            proxies.push(connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap());
         }
 
         // Accept the connections.
@@ -387,8 +384,7 @@ mod tests {
         const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
 
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let proxy =
-            crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
+        let proxy = connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
 
         let foo = proxy.foo().fuse();
         pin_mut!(foo);
@@ -424,8 +420,7 @@ mod tests {
         TestExecutor::advance_to(initial + (IDLE_DURATION / 2)).await;
         assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
 
-        let proxy =
-            crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
+        let proxy = connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
         select! {
             result = proxy.foo().fuse() => assert_matches!(result, Ok(_)),
             _ = fs => unreachable!(),
@@ -459,9 +454,7 @@ mod tests {
             let request_interval = IDLE_DURATION / 2;
             current_time += request_interval;
             TestExecutor::advance_to(current_time).await;
-            let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
-                    .unwrap();
+            let proxy = connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
             assert_matches!(proxy.foo().await, Ok(_));
         }
         assert_eq!(mock_server.call_count.get(), NUM_FOO_REQUESTS);
@@ -471,9 +464,7 @@ mod tests {
             let request_interval = IDLE_DURATION * 2;
             current_time += request_interval;
             TestExecutor::advance_to(current_time).await;
-            let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
-                    .unwrap();
+            let proxy = connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
             let foo = proxy.foo();
             pin_mut!(foo);
             assert_matches!(TestExecutor::poll_until_stalled(&mut foo).await, Poll::Pending);
@@ -498,8 +489,7 @@ mod tests {
 
         {
             // We can open another connection that's not the main outgoing directory connection,
-            let svc = crate::directory::open_directory_async(&client_end, "svc", fio::R_STAR_DIR)
-                .unwrap();
+            let svc = open_directory_async(&client_end, "svc", fio::R_STAR_DIR).unwrap();
 
             TestExecutor::advance_to(initial + IDLE_DURATION).await;
             assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
@@ -575,9 +565,7 @@ mod tests {
         let mut deadline = initial;
         const NUM_REQUESTS: usize = 30;
         for delay_factor in 0..NUM_REQUESTS {
-            let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
-                    .unwrap();
+            let proxy = connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
             proxy.foo().await.unwrap();
             drop(proxy);
             deadline += MonotonicDuration::from_nanos(MIN_REQUEST_INTERVAL * (delay_factor as i64));

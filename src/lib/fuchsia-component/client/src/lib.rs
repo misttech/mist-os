@@ -4,6 +4,8 @@
 
 //! Tools for starting or connecting to existing Fuchsia applications and services.
 
+#![deny(missing_docs)]
+
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::{
     DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServiceMarker, ServiceProxy,
@@ -11,6 +13,7 @@ use fidl::endpoints::{
 use fidl_fuchsia_component::{RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::ChildRef;
 use fidl_fuchsia_io as fio;
+use fuchsia_component_directory::{open_directory_async, AsRefDirectory};
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::stream::FusedStream;
 use futures::{Stream, StreamExt};
@@ -20,8 +23,8 @@ use std::marker::PhantomData;
 use std::pin::pin;
 use std::task::Poll;
 
-use crate::directory::{open_directory_async, AsRefDirectory};
-use crate::SVC_DIR;
+/// Path to the service directory in an application's root namespace.
+pub const SVC_DIR: &'static str = "/svc";
 
 /// A protocol connection request that allows checking if the protocol exists.
 pub struct ProtocolConnector<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> {
@@ -562,27 +565,6 @@ pub fn realm() -> Result<RealmProxy, Error> {
     connect_to_protocol::<RealmMarker>()
 }
 
-#[allow(missing_docs)]
-#[cfg(test)]
-pub mod test_util {
-    use super::*;
-    use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
-    use vfs::ObjectRequest;
-
-    #[cfg(test)]
-    pub fn run_directory_server(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap();
-        ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
-            .handle(|request| dir.open3(scope, vfs::path::Path::dot(), flags, request));
-        dir_proxy
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
@@ -624,7 +606,7 @@ mod tests {
         let dir = pseudo_directory! {
             ProtocolBMarker::PROTOCOL_NAME => read_only("read_only"),
         };
-        let dir_proxy = test_util::run_directory_server(dir);
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let req = new_protocol_connector_in_dir::<ProtocolAMarker>(&dir_proxy);
         assert_matches::assert_matches!(
             req.exists().await.context("error probing invalid service"),
@@ -659,7 +641,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_service_instance_watcher_from_root() -> Result<(), Error> {
-        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let dir_proxy = vfs::directory::serve_read_only(make_service_instance_tree());
         let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
         let found_names: HashSet<_> = watcher
             .watch()
@@ -679,7 +661,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_service_instance_watcher_from_svc() -> Result<(), Error> {
-        let dir_proxy = test_util::run_directory_server(make_inner_service_instance_tree());
+        let dir_proxy = vfs::directory::serve_read_only(make_inner_service_instance_tree());
         let watcher = Service::open_from_dir(&dir_proxy, ServiceMarker)?;
         let found_names: HashSet<_> = watcher
             .watch()
@@ -699,7 +681,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_connect_to_all_services() -> Result<(), Error> {
-        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let dir_proxy = vfs::directory::serve_read_only(make_service_instance_tree());
         let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
         let _: Vec<_> = watcher.watch().await?.take(2).try_collect().await?;
 
@@ -708,7 +690,7 @@ mod tests {
 
     #[fasync::run_until_stalled(test)]
     async fn test_connect_to_any() -> Result<(), Error> {
-        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let dir_proxy = vfs::directory::serve_read_only(make_service_instance_tree());
         let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
         let found = watcher.watch_for_any().await?;
         assert!(["default", "another_instance"].contains(&found.instance_name()));

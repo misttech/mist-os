@@ -4,10 +4,13 @@
 
 //! Tools for providing Fuchsia services.
 
+#![deny(missing_docs)]
+
 use anyhow::Error;
 use fidl::endpoints::{
     DiscoverableProtocolMarker, Proxy as _, RequestStream, ServerEnd, ServiceMarker, ServiceRequest,
 };
+use fuchsia_component_client::connect_channel_to_protocol;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{FutureExt, Stream, StreamExt};
@@ -114,7 +117,7 @@ pub struct Proxy<P, O>(PhantomData<(P, fn() -> O)>);
 impl<P: DiscoverableProtocolMarker, O> Service for Proxy<P, O> {
     type Output = O;
     fn connect(&mut self, channel: zx::Channel) -> Option<O> {
-        if let Err(e) = crate::client::connect_channel_to_protocol::<P>(channel) {
+        if let Err(e) = connect_channel_to_protocol::<P>(channel) {
             eprintln!("failed to proxy request to {}: {:?}", P::PROTOCOL_NAME, e);
         }
         None

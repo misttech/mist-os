@@ -333,5 +333,5 @@ Now:
 [docs.capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
 [docs.component-manifests]: /docs/concepts/components/v2/component_manifests.md
 [glossary.namespace]: /docs/glossary/README.md#namespace
-[src.connect_to_protocol]: /src/lib/fuchsia-component/src/client.rs
+[src.connect_to_protocol]: /src/lib/fuchsia-component/client/src/lib.rs
 [src.scrutiny]: /src/developer/ffx/plugins/scrutiny/verify/README.md

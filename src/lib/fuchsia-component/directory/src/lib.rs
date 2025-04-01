@@ -1,11 +1,13 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Module for directory operations.
+//! Crate for directory operations.
 //
 // TODO(https://fxbug.dev/42083023): These operations can be merged into `fuchsia-fs` if Rust FIDL bindings
 // support making one-way calls on a client endpoint without turning it into a proxy.
+
+#![deny(missing_docs)]
 
 use anyhow::{Context, Error};
 use fidl::endpoints::ClientEnd;
@@ -139,7 +141,6 @@ pub fn open_file_async(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::test_util::run_directory_server;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use vfs::directory::immutable::simple;
@@ -151,7 +152,7 @@ mod tests {
         let dir = pseudo_directory! {
             "dir" => simple(),
         };
-        let dir = run_directory_server(dir);
+        let dir = vfs::directory::serve_read_only(dir);
         let dir = open_directory_async(&dir, "dir", fio::Rights::empty()).unwrap();
         fuchsia_fs::directory::close(dir).await.unwrap();
     }
@@ -161,7 +162,7 @@ mod tests {
         let dir = pseudo_directory! {
             "dir" => simple(),
         };
-        let dir = run_directory_server(dir);
+        let dir = vfs::directory::serve_read_only(dir);
         let dir = open_directory_async(&dir, "fake", fio::Rights::empty()).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(fuchsia_fs::directory::close(dir).await, Err(_));
@@ -172,7 +173,7 @@ mod tests {
         let dir = pseudo_directory! {
             "file" => read_only("read_only"),
         };
-        let dir = run_directory_server(dir);
+        let dir = vfs::directory::serve_read_only(dir);
         let file = open_file_async(&dir, "file", fio::Rights::READ_BYTES).unwrap();
         fuchsia_fs::file::close(file).await.unwrap();
     }
@@ -182,7 +183,7 @@ mod tests {
         let dir = pseudo_directory! {
             "file" => read_only("read_only"),
         };
-        let dir = run_directory_server(dir);
+        let dir = vfs::directory::serve_read_only(dir);
         let fake = open_file_async(&dir, "fake", fio::Rights::READ_BYTES).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(fuchsia_fs::file::close(fake).await, Err(_));
