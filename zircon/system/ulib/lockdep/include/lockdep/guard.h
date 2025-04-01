@@ -107,6 +107,10 @@ enum AdoptLockTag { AdoptLock };
 // Type tag to select the aliased lock Guard constructor.
 enum AliasedLockTag { AliasedLock };
 
+// Type tag to select the aliased lock and ordered Guard constructor for type
+// erased locks.
+enum AssertOrderedAliasedLockTag { AssertOrderedAliasedLock };
+
 // Base RAII type that automatically manages the duration of a lock acquisition.
 // TODO(eieio): Specializations handle exclusive and shared lock acquisitions.
 // These are largely identical except for the static lock analysis annotations.
@@ -117,8 +121,8 @@ class Guard;
 
 // Specialization of Guard that acquires the given lock in exclusive mode.
 template <typename LockType, typename Option>
-class __TA_SCOPED_CAPABILITY
-    Guard<LockType, Option, internal::EnableIfNotShared<LockType, Option>> {
+class __TA_SCOPED_CAPABILITY Guard<LockType, Option,
+                                   internal::EnableIfNotShared<LockType, Option>> {
   static_assert(!std::is_same<LockPolicy<LockType, Option>, AmbiguousOption>::value,
                 "The Option argument of Guard<LockType, Option> must always "
                 "be specified when the policy for LockType is defined using "
@@ -190,6 +194,21 @@ class __TA_SCOPED_CAPABILITY
       __TA_ACQUIRE(lock->capability()) __TA_ACQUIRE(alias) __TA_ACQUIRE(alias->capability())
       : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
     ZX_DEBUG_ASSERT(lock == alias);
+  }
+
+  // Acquires the given type erased lock and its alias. Only the first lock is
+  // actually acquired, the alias is verified to be the same lock by a runtime
+  // check and its capability is acquired to satisfy static analysis.
+  //
+  // The caller asserts the underlying lock type is nestable, which is verified
+  // by a runtime check in debug builds.
+  template <typename Lockable, typename... Args>
+  __WARN_UNUSED_CONSTRUCTOR Guard(AssertOrderedAliasedLockTag, Lockable* lock, Lockable* alias,
+                                  uintptr_t order, Args&&... state_args) __TA_ACQUIRE(lock)
+      __TA_ACQUIRE(lock->capability()) __TA_ACQUIRE(alias) __TA_ACQUIRE(alias->capability())
+      : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
+    ZX_DEBUG_ASSERT(lock == alias);
+    ZX_DEBUG_ASSERT(!kLockValidationEnabled || ValidatorLockClassState::IsNestable(lock->id()));
   }
 
   // Destructor that automatically releases the lock if not already released.

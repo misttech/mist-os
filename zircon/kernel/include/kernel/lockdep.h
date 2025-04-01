@@ -17,6 +17,7 @@
 using lockdep::AdoptLock;
 using lockdep::AliasedLock;
 using lockdep::AssertHeld;
+using lockdep::AssertOrderedAliasedLock;
 using lockdep::AssertOrderedLock;
 using lockdep::Guard;
 using lockdep::GuardMultiple;
