@@ -12128,6 +12128,20 @@ impl Default for xt_tproxy_target_info_v1 {
         }
     }
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct xt_mark_tginfo2 {
+    pub mark: __u32,
+    pub mask: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct xt_mark_mtinfo1 {
+    pub mark: __u32,
+    pub mask: __u32,
+    pub invert: __u8,
+    pub __bindgen_padding_0: [u8; 3usize],
+}
 pub const nf_ip_hook_priorities_NF_IP_PRI_FIRST: nf_ip_hook_priorities = -2147483648;
 pub const nf_ip_hook_priorities_NF_IP_PRI_RAW_BEFORE_DEFRAG: nf_ip_hook_priorities = -450;
 pub const nf_ip_hook_priorities_NF_IP_PRI_CONNTRACK_DEFRAG: nf_ip_hook_priorities = -400;
