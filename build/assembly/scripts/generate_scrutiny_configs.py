@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
+import dataclasses
 import os
 import re
 from typing import TextIO
@@ -16,7 +17,18 @@ _RUST_LIBSTD_RE = re.compile("lib\/libstd-[a-z0-9]+\.so")
 _RUST_LIBSTD_WILDCARD = "lib/libstd-*"
 
 
-def collect_aib_artifacts(aib: AssemblyInputBundle, aib_path: str) -> DepFile:
+@dataclasses.dataclass
+class CollectedArtifacts(object):
+    static_packages: set[str]
+    bootfs_packages: set[str]
+    bootfs_files: set[str]
+    kernel_cmdline: set[str]
+    deps: list[str]
+
+
+def collect_aib_artifacts(
+    aib: AssemblyInputBundle, aib_path: str
+) -> CollectedArtifacts:
     static_packages = set()
     bootfs_packages = set()
     for pkg in aib.packages:
@@ -56,7 +68,9 @@ def collect_aib_artifacts(aib: AssemblyInputBundle, aib_path: str) -> DepFile:
     cmdline.update(aib.kernel.args)
     cmdline.update(aib.boot_args)
 
-    return (static_packages, bootfs_packages, bootfs_files, cmdline, deps)
+    return CollectedArtifacts(
+        static_packages, bootfs_packages, bootfs_files, cmdline, deps
+    )
 
 
 class Golden:
@@ -162,23 +176,23 @@ def main() -> int:
         aib_path = os.path.dirname(file.name)
         aib = json_load(AssemblyInputBundle, file)
 
-        (sp, bp, bf, kc, d) = collect_aib_artifacts(aib, aib_path)
-        deps.extend(d)
-        static_packages.add_optional(sp)
-        bootfs_packages.add_optional(bp)
-        bootfs_files.add_optional(bf)
-        kernel_cmdline.add_optional(kc)
+        artifacts = collect_aib_artifacts(aib, aib_path)
+        deps.extend(artifacts.deps)
+        static_packages.add_optional(artifacts.static_packages)
+        bootfs_packages.add_optional(artifacts.bootfs_packages)
+        bootfs_files.add_optional(artifacts.bootfs_files)
+        kernel_cmdline.add_optional(artifacts.kernel_cmdline)
 
     for file in args.required_assembly_input_bundles:
         aib_path = os.path.dirname(file.name)
         aib = json_load(AssemblyInputBundle, file)
 
-        (sp, bp, bf, kc, d) = collect_aib_artifacts(aib, aib_path)
-        deps.extend(d)
-        static_packages.add_required(sp)
-        bootfs_packages.add_required(bp)
-        bootfs_files.add_required(bf)
-        kernel_cmdline.add_required(kc)
+        artifacts = collect_aib_artifacts(aib, aib_path)
+        deps.extend(artifacts.deps)
+        static_packages.add_required(artifacts.static_packages)
+        bootfs_packages.add_required(artifacts.bootfs_packages)
+        bootfs_files.add_required(artifacts.bootfs_files)
+        kernel_cmdline.add_required(artifacts.kernel_cmdline)
 
     # Merge in the optional input goldens.
     if args.static_packages_input:
