@@ -15,14 +15,17 @@
 /// Loads the policy |name|.
 void LoadPolicy(const std::string& name);
 
-/// Atomically writes |contents| to |file|, and fails the test otherwise.
-void WriteContents(const std::string& file, const std::string& contents, bool create = false);
+/// Writes `data` to the file at `path`, returning the `errno` if any part of that process fails.
+fit::result<int> WriteExistingFile(const std::string& path, std::string_view data);
 
-/// Reads |file|, or fail the test.
-std::string ReadFile(const std::string& file);
+/// Reads the contents of the file at `path`.
+fit::result<int, std::string> ReadFile(const std::string_view& path);
 
 /// Reads the specified security attribute (e.g. "current", "exec", etc) for the current task.
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name);
+
+/// Writes the specified security attribute (e.g. "current", "exec", etc) for the current task.
+fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view context);
 
 /// Returns the `in`put string with the trailing NUL character, if any, removed.
 /// Some SELinux surfaces (e.g. "/proc/<pid/attr/<attr>") include the terminating NUL in the
@@ -37,10 +40,12 @@ fit::result<int, std::string> GetLabel(int fd);
 /// rules to be set-up. For transitions from unconfined_t (the starting label for tests), giving
 /// them the `test_a` attribute from `test_policy.conf` is sufficient.
 template <typename T>
-::testing::AssertionResult RunAs(const std::string& label, T action) {
+::testing::AssertionResult RunSubprocessAs(std::string_view label, T action) {
   pid_t pid;
   if ((pid = fork()) == 0) {
-    WriteContents("/proc/thread-self/attr/current", label.c_str());
+    if (WriteTaskAttr("current", label).is_error()) {
+      _exit(1);
+    }
     action();
     _exit(testing::Test::HasFailure());
   }
@@ -54,7 +59,7 @@ template <typename T>
     }
     if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
       return ::testing::AssertionFailure()
-             << "forked process existed with status: " << WEXITSTATUS(wstatus) << " and signal "
+             << "forked process exited with status: " << WEXITSTATUS(wstatus) << " and signal "
              << WTERMSIG(wstatus);
     }
     return ::testing::AssertionSuccess();

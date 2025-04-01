@@ -52,7 +52,7 @@ TEST(IoctlTest, BasicIoctlAllowed) {
   ASSERT_TRUE(test_fd.is_ok());
 
   constexpr char kTestSecurityContext[] = "test_u:test_r:test_ioctl_figetbsz_allowed_t:s0";
-  ASSERT_TRUE(RunAs(kTestSecurityContext, [&] {
+  ASSERT_TRUE(RunSubprocessAs(kTestSecurityContext, [&] {
     auto result = GetBlockSize(test_fd.value().get());
     EXPECT_TRUE(result.is_ok());
   }));
@@ -67,7 +67,7 @@ TEST(IoctlTest, BasicIoctlDenied) {
   ASSERT_TRUE(test_fd.is_ok());
 
   constexpr char kTestSecurityContext[] = "test_u:test_r:test_ioctl_figetbsz_denied_t:s0";
-  ASSERT_TRUE(RunAs(kTestSecurityContext, [&] {
+  ASSERT_TRUE(RunSubprocessAs(kTestSecurityContext, [&] {
     auto result = GetBlockSize(test_fd.value().get());
     EXPECT_TRUE(result.is_error());
   }));

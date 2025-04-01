@@ -59,7 +59,7 @@ TEST(TimerslackNsTest, ReadWriteSelfNoPermRequired) {
   LoadPolicy("timerslack.pp");
   auto enforce = ScopedEnforcement::SetEnforcing();
 
-  ASSERT_TRUE(RunAs("test_u:test_r:timerslack_no_perms_t:s0", [&] {
+  ASSERT_TRUE(RunSubprocessAs("test_u:test_r:timerslack_no_perms_t:s0", [&] {
     std::string contents;
     ASSERT_TRUE(files::ReadFileToString("/proc/self/timerslack_ns", &contents));
     ASSERT_TRUE(files::WriteFile("/proc/self/timerslack_ns", "0"));
@@ -79,7 +79,7 @@ TEST_P(TimerslackNsTestWithParam, Read) {
   auto enforce = ScopedEnforcement::SetEnforcing();
   ScopedTargetProcess target_process("test_u:test_r:timerslack_target_t:s0");
 
-  ASSERT_TRUE(RunAs(std::string("test_u:test_r:") + GetParam().label + ":s0", [&] {
+  ASSERT_TRUE(RunSubprocessAs(std::string("test_u:test_r:") + GetParam().label + ":s0", [&] {
     std::string path =
         std::string("/proc/") + std::to_string(target_process.pid()) + "/timerslack_ns";
     std::string contents;
@@ -92,7 +92,7 @@ TEST_P(TimerslackNsTestWithParam, Write) {
   auto enforce = ScopedEnforcement::SetEnforcing();
   ScopedTargetProcess target_process("test_u:test_r:timerslack_target_t:s0");
 
-  ASSERT_TRUE(RunAs(std::string("test_u:test_r:") + GetParam().label + ":s0", [&] {
+  ASSERT_TRUE(RunSubprocessAs(std::string("test_u:test_r:") + GetParam().label + ":s0", [&] {
     std::string path =
         std::string("/proc/") + std::to_string(target_process.pid()) + "/timerslack_ns";
     ASSERT_EQ(files::WriteFile(path, "0"), GetParam().write_succeeds);

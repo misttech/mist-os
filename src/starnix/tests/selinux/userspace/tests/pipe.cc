@@ -18,7 +18,7 @@ TEST(PolicyLoadTest, Pipes) {
 
   EXPECT_THAT(GetLabel(pipe_before_policy[0]), "system_u:unconfined_r:unconfined_t:s0");
 
-  WriteContents("/proc/thread-self/attr/current", "system_u:unconfined_r:unconfined_t:s0");
+  ASSERT_EQ(WriteTaskAttr("current", "system_u:unconfined_r:unconfined_t:s0"), fit::ok());
 
   int pipe_after_policy[2];
   EXPECT_THAT(pipe(pipe_after_policy), SyscallSucceeds());

@@ -16,14 +16,21 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/files/file.h"
+#include "src/lib/files/file_descriptor.h"
 
-void WriteContents(const std::string& file, const std::string& contents, bool create) {
-  auto fd = fbl::unique_fd(open(file.c_str(), O_WRONLY | (create ? O_CREAT : 0), 0777));
-  ASSERT_THAT(fd.get(), SyscallSucceeds()) << "while opening file for writing: " << file;
+namespace {
+constexpr char kProcSelfAttrPath[] = "/proc/self/attr/";
+}
 
-  ssize_t written = write(fd.get(), contents.data(), contents.size());
-  ASSERT_THAT(written, SyscallSucceeds());
-  EXPECT_EQ(size_t(written), contents.size()) << "short write in " << file;
+fit::result<int> WriteExistingFile(const std::string& path, std::string_view data) {
+  auto fd = fbl::unique_fd(open(path.c_str(), O_WRONLY | O_TRUNC, 0777));
+  if (!fd.is_valid()) {
+    return fit::error(errno);
+  }
+  if (!fxl::WriteFileDescriptor(fd.get(), data.data(), data.size())) {
+    return fit::error(errno);
+  }
+  return fit::ok();
 }
 
 void LoadPolicy(const std::string& name) {
@@ -38,24 +45,17 @@ void LoadPolicy(const std::string& name) {
   auto unmap =
       fit::defer([address, fsize] { ASSERT_THAT(munmap(address, fsize), SyscallSucceeds()); });
 
-  WriteContents("/sys/fs/selinux/load", std::string(reinterpret_cast<char*>(address), fsize));
+  ASSERT_TRUE(WriteExistingFile("/sys/fs/selinux/load",
+                                std::string(reinterpret_cast<char*>(address), fsize))
+                  .is_ok());
 }
 
-std::string ReadFile(const std::string& name) {
-  auto fd = fbl::unique_fd(open(name.c_str(), O_RDONLY));
-  EXPECT_THAT(fd.get(), SyscallSucceeds()) << "while opening file for reading: " << name;
-  if (!fd) {
-    return "";
+fit::result<int, std::string> ReadFile(const std::string& path) {
+  std::string result;
+  if (files::ReadFileToString(path, &result)) {
+    return fit::ok(std::move(result));
   }
-
-  std::string contents;
-  char buf[4096];
-  ssize_t read_len;
-  while ((read_len = read(fd.get(), buf, sizeof(buf))) > 0) {
-    contents.append(buf, read_len);
-  }
-  EXPECT_THAT(read_len, SyscallSucceeds()) << "error reading " << name;
-  return contents;
+  return fit::error(errno);
 }
 
 std::string RemoveTrailingNul(std::string in) {
@@ -66,12 +66,21 @@ std::string RemoveTrailingNul(std::string in) {
 }
 
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name) {
-  constexpr char procattr_prefix[] = "/proc/self/attr/";
-  std::string attr_path(procattr_prefix);
+  std::string attr_path(kProcSelfAttrPath);
   attr_path.append(attr_name);
 
   auto attr = ReadFile(attr_path);
-  return fit::ok(RemoveTrailingNul(attr));
+  if (attr.is_error()) {
+    return attr;
+  }
+  return fit::ok(RemoveTrailingNul(attr.value()));
+}
+
+fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view context) {
+  std::string attr_path(kProcSelfAttrPath);
+  attr_path.append(attr_name);
+
+  return WriteExistingFile(attr_path, context);
 }
 
 fit::result<int, std::string> GetLabel(int fd) {

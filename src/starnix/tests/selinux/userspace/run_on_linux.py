@@ -179,7 +179,11 @@ def build_and_run_tests(
 
     print("Re-building tests...")
     subprocess.run(
-        ["fx", "build", "sestarnix_userspace_tests"],
+        [
+            "fx",
+            "build",
+            "//src/starnix/tests/selinux/userspace:sestarnix_userspace_tests",
+        ],
         check=True,
         cwd=fuchsia_dir,
     )
