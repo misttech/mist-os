@@ -45,7 +45,6 @@ per-file smoke-test=surajmalhotra@google.com
 per-file snapshot=frousseau@google.com
 per-file sniff.fx = file: /src/connectivity/network/OWNERS
 per-file sniff.py = file: /src/connectivity/network/OWNERS
-per-file symbol-index=dangyi@google.com,frousseau@google.com
 per-file system-status.fx=crjohns@google.com,miguelfrde@google.com
 per-file test-stats=crjohns@google.com
 per-file test-stats.py=crjohns@google.com
