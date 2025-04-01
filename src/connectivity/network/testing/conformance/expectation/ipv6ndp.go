@@ -385,7 +385,7 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	// its own locally.
 	{22, 1}:  Pass,
 	{22, 2}:  Fail,
-	{23, 1}:  Fail,
+	{23, 1}:  Pass,
 	{23, 2}:  Pass,
 	{23, 3}:  Pass,
 	{23, 4}:  Pass,
@@ -397,7 +397,7 @@ var ipv6ndpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{23, 11}: Pass,
 	{23, 12}: Pass,
 	{23, 13}: Pass,
-	{24, 1}:  Fail,
+	{24, 1}:  Pass,
 	{24, 2}:  Pass,
 	{24, 3}:  Pass,
 	{24, 4}:  Pass,

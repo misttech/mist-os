@@ -52,7 +52,7 @@ var icmpRouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{2, 3}:  Pass,
 	{2, 4}:  Pass,
 	{2, 5}:  Pass,
-	{3, 1}:  Fail,
+	{3, 1}:  Pass,
 	{3, 2}:  Fail,
 	{4, 1}:  Fail,
 	{4, 2}:  Pass,
