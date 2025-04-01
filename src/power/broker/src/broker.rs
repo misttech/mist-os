@@ -2417,7 +2417,7 @@ mod tests {
                     "0": {
                         "@time": AnyProperty,
                         add_element: {
-                            element_id: *broker.get_unsatisfiable_element_id() ,
+                            element_id: *broker.get_unsatisfiable_element_id(),
                             current_level: "unset",
                             required_level: "unset",
                         }

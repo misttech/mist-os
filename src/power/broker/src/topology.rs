@@ -53,15 +53,15 @@ impl std::cmp::Ord for IndexedPowerLevel {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
-pub struct ElementID(u64);
+pub struct ElementID(u32);
 
 impl ElementID {
-    pub fn new(id: u64) -> Self {
+    pub fn new(id: u32) -> Self {
         Self(id)
     }
 
     fn gen() -> Self {
-        Self(rand::random::<u64>())
+        Self(rand::random::<u32>())
     }
 }
 
@@ -72,7 +72,7 @@ impl fmt::Display for ElementID {
 }
 
 impl ops::Deref for ElementID {
-    type Target = u64;
+    type Target = u32;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
