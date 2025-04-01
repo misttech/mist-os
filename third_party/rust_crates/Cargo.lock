@@ -1545,7 +1545,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "iota",
- "itertools 0.10.1",
+ "itertools 0.14.0",
  "itoa 1.0.14",
  "json5format",
  "lazy_static",
@@ -2263,6 +2263,15 @@ name = "itertools"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69ddb889f9d0d08a67338271fa9b62996bc788c7796a5c18cf057420aaed5eaf"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]

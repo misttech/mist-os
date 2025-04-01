@@ -464,7 +464,7 @@ group("iota") {
 }
 
 group("itertools") {
-  public_deps = [ ":itertools-v0_10_1" ]
+  public_deps = [ ":itertools-v0_14_0" ]
 }
 
 group("itoa") {
@@ -8206,6 +8206,40 @@ rust_library("itertools-v0_10_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":itertools-v0_10_1.license" ]
+}
+
+license("itertools-v0_14_0.license") {
+  public_package_name = "itertools"
+  license_files = [
+    "//third_party/rust_crates/vendor/itertools-0.14.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/itertools-0.14.0/LICENSE-MIT",
+  ]
+}
+
+rust_library("itertools-v0_14_0") {
+  crate_name = "itertools"
+  crate_root = "//third_party/rust_crates/vendor/itertools-0.14.0/src/lib.rs"
+  output_name = "itertools-cbff12479395dd78"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":either-v1_14_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=cbff12479395dd78",
+    "-Cextra-filename=-cbff12479395dd78",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"use_alloc\"",
+    "--cfg=feature=\"use_std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":itertools-v0_14_0.license" ]
 }
 
 license("itertools-v0_8_0.license") {

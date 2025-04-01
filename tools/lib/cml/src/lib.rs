@@ -1698,7 +1698,7 @@ impl Document {
 
         let all_environments =
             my_environments.into_iter().merge_by(other_environments, |x, y| x.name <= y.name);
-        let groups = all_environments.group_by(|e| e.name.clone());
+        let groups = all_environments.chunk_by(|e| e.name.clone());
 
         let mut merged_environments = vec![];
         for (name, group) in groups.into_iter() {

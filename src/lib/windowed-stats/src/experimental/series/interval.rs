@@ -401,10 +401,10 @@ impl Display for SamplingProfile {
             self.granularity().into_quanta().into_nearest_unit_display(),
             self.duration().into_quanta().into_nearest_unit_display(),
         )?;
-        for interval in self.0.iter().with_position() {
-            match interval {
-                First(interval) | Middle(interval) => write!(formatter, "{} + ", interval),
-                Only(interval) | Last(interval) => write!(formatter, "{}", interval),
+        for (pos, interval) in self.0.iter().with_position() {
+            match pos {
+                First | Middle => write!(formatter, "{} + ", interval),
+                Only | Last => write!(formatter, "{}", interval),
             }?;
         }
         Ok(())

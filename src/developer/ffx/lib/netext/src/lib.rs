@@ -463,7 +463,7 @@ fn select_mcast_interfaces(
     iter.filter(is_local_multicast_addr)
         .filter(is_not_apple_touchbar)
         .sorted_by_key(|ifaddr| ifaddr.interface_name.to_string())
-        .group_by(|ifaddr| ifaddr.interface_name.to_string())
+        .chunk_by(|ifaddr| ifaddr.interface_name.to_string())
         .into_iter()
         .map(|(name, ifaddrs)| McastInterface {
             name: name,

@@ -134,7 +134,7 @@ humansize = "1.1.1"
 hyper = { version = "0.14.19", default-features = false, features = ["stream", "http1", "client", "server"] }
 indexmap = "1.9.2"
 iota = "0.2.3"
-itertools = "0.10"
+itertools = "0.14"
 itoa = "1.0"
 json5format = "0.2.6"
 lazy_static = "1.4"

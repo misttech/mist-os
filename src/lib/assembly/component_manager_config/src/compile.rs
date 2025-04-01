@@ -392,7 +392,7 @@ impl CapabilityAllowlistEntry {
                 )
             })
             .into_grouping_map()
-            .fold_first(|accumulated, _key, item| {
+            .reduce(|accumulated, _key, item| {
                 {
                     merge_option(accumulated, item, |mut l, mut r| {
                         l.append(&mut r);

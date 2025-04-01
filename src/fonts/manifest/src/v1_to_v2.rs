@@ -56,7 +56,7 @@ impl TryFrom<&FamilyV1> for v2::Family {
         let assets: Result<Vec<v2::Asset>, _> = old
             .fonts
             .iter()
-            .group_by(|font| &font.asset)
+            .chunk_by(|font| &font.asset)
             .into_iter()
             .map(|(asset_path, font_group)| group_fonts_into_assets(asset_path, font_group))
             .collect();

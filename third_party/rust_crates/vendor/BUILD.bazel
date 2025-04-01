@@ -1279,14 +1279,14 @@ alias(
 )
 
 alias(
-    name = "itertools-0.10.1",
-    actual = "//third_party/rust_crates/vendor/itertools-0.10.1:itertools",
+    name = "itertools-0.14.0",
+    actual = "//third_party/rust_crates/vendor/itertools-0.14.0:itertools",
     tags = ["manual"],
 )
 
 alias(
     name = "itertools",
-    actual = "//third_party/rust_crates/vendor/itertools-0.10.1:itertools",
+    actual = "//third_party/rust_crates/vendor/itertools-0.14.0:itertools",
     tags = ["manual"],
 )
 
