@@ -156,9 +156,9 @@ def main() -> int:
     )
 
     overrides_for_assembly.shell_commands = {}
-    for entry in overrides_from_gn.shell_commands:
-        overrides_for_assembly.shell_commands[entry.package] = [
-            f"bin/{name}" for name in entry.components
+    for shell_entry in overrides_from_gn.shell_commands:
+        overrides_for_assembly.shell_commands[shell_entry.package] = [
+            f"bin/{name}" for name in shell_entry.components
         ]
 
     if overrides_from_gn.packages:
