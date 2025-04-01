@@ -66,6 +66,8 @@ rust_library(
     edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
+        "--cfg=span_locations",
+        "--cfg=wrap_proc_macro",
     ],
     tags = [
         "cargo-bazel",

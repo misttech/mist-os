@@ -29,6 +29,7 @@ var bazelRuleToGNTemplate = map[string]string{
 	"package":            "package",
 	"rust_binary":        "rustc_binary",
 	"rust_library":       "rustc_library",
+	"rust_proc_macro":    "rustc_macro",
 	"sdk_host_tool":      "sdk_host_tool",
 }
 
