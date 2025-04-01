@@ -10,7 +10,6 @@ rustc_library("syslog-listener") {
   edition = "2021"
   source_root = "syslog-listener/src/lib.rs"
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",

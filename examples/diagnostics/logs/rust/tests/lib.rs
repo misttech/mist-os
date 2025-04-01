@@ -79,9 +79,7 @@ fn listen_to_logs(
     };
     let (send_logs, recv_logs) = mpsc::unbounded();
     let _old_listener = Task::spawn(async move {
-        run_log_listener_with_proxy(&log_proxy, send_logs, Some(&options), false, None)
-            .await
-            .unwrap();
+        run_log_listener_with_proxy(&log_proxy, send_logs, Some(&options)).await.unwrap();
     });
 
     let logs = recv_logs.filter(|m| {

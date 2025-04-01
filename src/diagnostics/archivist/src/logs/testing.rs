@@ -611,7 +611,7 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
     };
     let l = Listener { send_logs };
     fasync::Task::spawn(async move {
-        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await.unwrap();
+        run_log_listener_with_proxy(&log_proxy, l, Some(&options)).await.unwrap();
     })
     .detach();
     recv_logs

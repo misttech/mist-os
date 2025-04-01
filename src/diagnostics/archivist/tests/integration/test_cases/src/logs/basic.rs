@@ -31,8 +31,7 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     let (send_logs, recv_logs) = mpsc::unbounded();
     let l = Listener { send_logs };
     fasync::Task::spawn(async move {
-        let fut =
-            syslog_listener::run_log_listener_with_proxy(&proxy, l, Some(&options), false, None);
+        let fut = syslog_listener::run_log_listener_with_proxy(&proxy, l, Some(&options));
         if let Err(e) = fut.await {
             panic!("test fail {e:?}");
         }

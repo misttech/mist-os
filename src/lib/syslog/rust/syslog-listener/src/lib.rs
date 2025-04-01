@@ -7,7 +7,6 @@
 #![deny(missing_docs)]
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fidl_fuchsia_logger::{
     LogFilterOptions, LogListenerSafeRequest, LogListenerSafeRequestStream, LogMarker, LogMessage,
     LogProxy,
@@ -57,24 +56,9 @@ pub async fn run_log_listener_with_proxy<'a>(
     logger: &LogProxy,
     processor: impl LogProcessor + 'a,
     options: Option<&'a LogFilterOptions>,
-    dump_logs: bool,
-    selectors: Option<&'a [LogInterestSelector]>,
 ) -> Result<(), Error> {
     let (listener_ptr, listener_stream) = fidl::endpoints::create_request_stream();
-
-    if dump_logs {
-        logger.dump_logs_safe(listener_ptr, options).context("failed to register log dumper")?;
-    } else {
-        match selectors {
-            Some(s) => logger
-                .listen_safe_with_selectors(listener_ptr, options, s)
-                .context("failed to register listener with selectors")?,
-            None => {
-                logger.listen_safe(listener_ptr, options).context("failed to register listener")?
-            }
-        };
-    }
-
+    logger.listen_safe(listener_ptr, options).context("failed to register listener")?;
     log_listener(processor, listener_stream).await?;
     Ok(())
 }
@@ -84,11 +68,9 @@ pub async fn run_log_listener_with_proxy<'a>(
 pub async fn run_log_listener<'a>(
     processor: impl LogProcessor + 'a,
     options: Option<&'a LogFilterOptions>,
-    dump_logs: bool,
-    selectors: Option<&'a [LogInterestSelector]>,
 ) -> Result<(), Error> {
     let logger = connect_to_protocol::<LogMarker>()?;
-    run_log_listener_with_proxy(&logger, processor, options, dump_logs, selectors).await
+    run_log_listener_with_proxy(&logger, processor, options).await
 }
 
 impl LogProcessor for mpsc::UnboundedSender<LogMessage> {

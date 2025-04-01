@@ -38,7 +38,7 @@ async fn embedding_stop_api_for_log_listener() {
     let log_proxy = realm_proxy.connect_to_protocol::<LogMarker>().await.unwrap();
     let task = fasync::Task::spawn(async move {
         let l = Listener { send_logs };
-        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await
+        run_log_listener_with_proxy(&log_proxy, l, Some(&options)).await
     });
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
 
