@@ -563,11 +563,13 @@ impl Driver {
                     // This can fail if start fails.
                     let _ = shutdown_signaler.send(Arc::downgrade(&this));
                 }
-                let _ = driver_request.close_with_epitaph(zx::Status::OK);
+
                 // This should be the last strong reference to the driver. The destroy hook will run
                 // in its destructor.
                 Arc::try_unwrap(this)
                     .expect("Someone unexpected is holding onto a reference of driver");
+
+                let _ = driver_request.close_with_epitaph(zx::Status::OK);
             });
         };
     }
