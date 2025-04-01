@@ -501,7 +501,8 @@ pub fn export_buffer(
             if let Some(image_info) = image_info_opt {
                 ImageFile::new_file(current_task, image_info, memory)
             } else {
-                Anon::new_file(
+                // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+                Anon::new_private_file(
                     current_task,
                     Box::new(MemoryRegularFile::new(Arc::new(memory))),
                     OpenFlags::RDWR,
@@ -560,7 +561,8 @@ pub fn get_buffer_handle(
     } else {
         let memory =
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
-        let file = Anon::new_file(
+        // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let file = Anon::new_private_file(
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
@@ -599,7 +601,8 @@ pub fn query(
         let memory =
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) });
         let memory_size = memory.get_size();
-        let file = Anon::new_file_extended(
+        // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let file = Anon::new_private_file_extended(
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,

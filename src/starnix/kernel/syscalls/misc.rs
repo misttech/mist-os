@@ -639,8 +639,9 @@ pub fn sys_perf_event_open(
     let perf_event_file =
         PerfEventFile { _pid: pid, _cpu: cpu, _attr: perf_event_attrs, read_format_data };
     let file = Box::new(perf_event_file);
+    // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
     let file_handle =
-        Anon::new_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
+        Anon::new_private_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
     let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
 
     Ok(file_descriptor?.into())

@@ -52,7 +52,8 @@ impl ImageFile {
     ) -> FileHandle {
         let memory_size = memory.get_size();
 
-        let file = Anon::new_file_extended(
+        // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let file = Anon::new_private_file_extended(
             current_task,
             Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,
