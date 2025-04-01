@@ -4182,25 +4182,36 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
 
         // The initial segment should be retransmitted in smaller pieces, respecting the
         // reduced PMTU.
-        let (_eth, _ip, _tcp, frame) = frames.next().await.unwrap();
+        let retransmitted_segment = async {
+            loop {
+                let (_eth, _ip, _tcp, frame) = frames.next().await.unwrap();
+                let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                    .expect("valid ethernet frame");
 
-        let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
-            .expect("valid ethernet frame");
-        assert_eq!(eth.body().len(), usize::try_from(I::MINIMUM_LINK_MTU).unwrap());
-        let ip = I::Packet::parse(&mut eth.body(), ()).expect("valid IP packet");
-        let retransmitted_segment =
-            TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
-                .expect("valid TCP segment");
+                // It's possible the PMTU update wasn't processed by the netstack before the
+                // retransmission timer fired, in which case we'd see the original segment
+                // again.
+                if eth.body().len() != usize::try_from(I::MINIMUM_LINK_MTU).unwrap() {
+                    continue;
+                }
+
+                let ip = I::Packet::parse(&mut eth.body(), ()).expect("valid IP packet");
+                let tcp =
+                    TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                        .expect("valid TCP segment");
+                break tcp.body().to_vec();
+            }
+        }
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to observe segment with reduced MSS")
+        })
+        .await;
 
         let ip = I::Packet::parse(&mut too_large_frame.body(), ()).expect("valid IP packet");
         let too_large_segment =
             TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
                 .expect("valid TCP segment");
-
-        assert_eq!(
-            retransmitted_segment.body(),
-            &too_large_segment.body()[..retransmitted_segment.body().len()]
-        );
+        assert_eq!(retransmitted_segment, &too_large_segment.body()[..retransmitted_segment.len()]);
     };
 
     let client = async {
