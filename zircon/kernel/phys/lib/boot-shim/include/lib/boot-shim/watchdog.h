@@ -57,7 +57,18 @@ struct QualcomMsmWatchdog {
   static constexpr uint32_t kEnableOffset = 0x8;
   static constexpr uint32_t kBarkTimeOffset = 0x10;
   static constexpr uint32_t kBiteTimeOffset = 0x14;
-  static constexpr uint32_t kClockHz = 32765;
+
+  // Information extracted from a devicetree node.
+  struct DecodedNode {
+    // Base address of the watchdog banked registers, where to apply the offsets.
+    uint64_t addr;
+    // Size of the register bank.
+    uint64_t size;
+    // How often it should be pet in MS.
+    uint32_t pet_time_ms;
+    // If not pet, will issue system reset after this time in MS.
+    uint32_t bark_time_ms;
+  };
 
   // Returns true if decoder references a valid device node describing the watchdog device node and
   // `payload` is properly filled. Otherwise, returns false.
@@ -65,6 +76,39 @@ struct QualcomMsmWatchdog {
   static std::optional<zbi_dcfg_generic32_watchdog_t> MaybeCreate(
       const devicetree::PropertyDecoder& decoder,
       const DevicetreeBootShimMmioObserver* mmio_observer) {
+    std::optional<DecodedNode> decoded_node = DecodeNode(decoder);
+    if (!decoded_node) {
+      return std::nullopt;
+    }
+
+    (*mmio_observer)(DevicetreeMmioRange{.address = decoded_node->addr,
+                                         .size = static_cast<size_t>(decoded_node->size)});
+
+    return zbi_dcfg_generic32_watchdog_t{
+        .pet_action =
+            {
+                .addr = decoded_node->addr + kResetOffset,
+                .clr_mask = 0xffffffff,
+                .set_mask = 0x1,
+            },
+        .enable_action =
+            {
+                .addr = decoded_node->addr + kEnableOffset,
+                .clr_mask = 0xffffffff,
+                .set_mask = 0x1,
+            },
+        .disable_action =
+            {
+                .addr = decoded_node->addr + kEnableOffset,
+                .clr_mask = 0xffffffff,
+                .set_mask = 0x0,
+            },
+        .watchdog_period_nsec = zx::msec(decoded_node->pet_time_ms).to_nsecs(),
+        .flags = 0,
+    };
+  }
+
+  static std::optional<DecodedNode> DecodeNode(const devicetree::PropertyDecoder& decoder) {
     auto [reg_names_prop, reg_prop, pet_time_prop, bark_time_prop] =
         decoder.FindProperties("reg-names", "reg", "qcom,pet-time", "qcom,bark-time");
 
@@ -108,30 +152,11 @@ struct QualcomMsmWatchdog {
       return std::nullopt;
     }
 
-    (*mmio_observer)(
-        DevicetreeMmioRange{.address = *base_addr, .size = static_cast<size_t>(*base_size)});
-
-    return zbi_dcfg_generic32_watchdog_t{
-        .pet_action =
-            {
-                .addr = *base_addr + kResetOffset,
-                .clr_mask = 0xffffffff,
-                .set_mask = 0x1,
-            },
-        .enable_action =
-            {
-                .addr = *base_addr + kEnableOffset,
-                .clr_mask = 0xffffffff,
-                .set_mask = 0x1,
-            },
-        .disable_action =
-            {
-                .addr = *base_addr + kEnableOffset,
-                .clr_mask = 0xffffffff,
-                .set_mask = 0x0,
-            },
-        .watchdog_period_nsec = zx::msec(*pet_time).to_nsecs(),
-        .flags = 0,
+    return DecodedNode{
+        .addr = *base_addr,
+        .size = *base_size,
+        .pet_time_ms = *pet_time,
+        .bark_time_ms = *bark_time,
     };
   }
 };
