@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Implementation of Network Management File System (nmfs).
+//! Implementation of Network Monitor File System (fuchsia_network_monitor_fs).
 //!
-//! Nmfs is a Unix-compatible filesystem that receives properties
-//! of installed networks and communicates property updates to the
+//! fuchsia_network_monitor_fs is a Unix-compatible filesystem that receives
+//! properties of installed networks and communicates property updates to the
 //! Fuchsia Network Policy socket proxy.
 
 mod fs;

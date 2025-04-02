@@ -4,7 +4,7 @@
 
 //! This file contains an implementation for storing network information in a file system.
 //!
-//! Each file within `/sys/fs/nmfs` represents a network and its properties.
+//! Each file within `/sys/fs/fuchsia_network_monitor_fs` represents a network and its properties.
 
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::parse;
@@ -50,15 +50,69 @@ pub(crate) enum VersionedProperties {
     V1,
 }
 
-pub struct Nmfs;
-impl Nmfs {
-    pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, Nmfs, options)
-            .expect("nmfs constructed with valid options");
+pub struct FuchsiaNetworkMonitorFs;
+impl FuchsiaNetworkMonitorFs {
+    pub fn new_fs(
+        kernel: &Arc<Kernel>,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, FuchsiaNetworkMonitorFs, options)?;
 
         let node = FsNode::new_root(NetworkDirectoryNode::new());
         fs.set_root_node(node);
-        fs
+        Ok(fs)
+    }
+}
+
+const FUCHSIA_NETWORK_MONITOR_FS_NAME: &[u8; 26] = b"fuchsia_network_monitor_fs";
+const FUCHSIA_NETWORK_MONITOR_FS_MAGIC: u32 = u32::from_be_bytes(*b"nmfs");
+
+impl FileSystemOps for FuchsiaNetworkMonitorFs {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
+        Ok(default_statfs(FUCHSIA_NETWORK_MONITOR_FS_MAGIC))
+    }
+
+    fn name(&self) -> &'static FsStr {
+        FUCHSIA_NETWORK_MONITOR_FS_NAME.into()
+    }
+}
+
+pub fn fuchsia_network_monitor_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    struct FuchsiaNetworkMonitorFsHandle(FileSystemHandle);
+
+    let kernel = current_task.kernel();
+    Ok(kernel
+        .expando
+        .get_or_try_init(|| {
+            FuchsiaNetworkMonitorFs::new_fs(kernel, options)
+                .map(|fs| FuchsiaNetworkMonitorFsHandle(fs))
+        })?
+        .0
+        .clone())
+}
+
+// TODO(https://fxbug.dev/399181238): Remove Nmfs once the system has migrated to using
+// the updated `fuchsia_network_monitor_fs` name.
+pub struct Nmfs;
+impl Nmfs {
+    pub fn new_fs(
+        kernel: &Arc<Kernel>,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, Nmfs, options)?;
+
+        let node = FsNode::new_root(NetworkDirectoryNode::new());
+        fs.set_root_node(node);
+        Ok(fs)
     }
 }
 
@@ -88,7 +142,11 @@ pub fn nmfs(
     struct NmfsHandle(FileSystemHandle);
 
     let kernel = current_task.kernel();
-    Ok(kernel.expando.get_or_init(|| NmfsHandle(Nmfs::new_fs(kernel, options))).0.clone())
+    Ok(kernel
+        .expando
+        .get_or_try_init(|| Nmfs::new_fs(kernel, options).map(|fs| NmfsHandle(fs)))?
+        .0
+        .clone())
 }
 
 pub struct NetworkDirectoryNode;
