@@ -28,7 +28,6 @@ test("bin") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/zxtest",
   ]
 }

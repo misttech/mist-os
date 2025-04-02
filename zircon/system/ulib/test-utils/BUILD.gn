@@ -16,7 +16,6 @@ zx_library("test-utils") {
     "//sdk/lib/fdio",
     "//src/lib/debug:backtrace-request",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]

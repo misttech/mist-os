@@ -5,10 +5,7 @@
 source_set("stack") {
   testonly = true
   sources = [ "stack-test.cc" ]
-  deps = [
-    "//zircon/system/ulib/runtime",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps = [ "//zircon/system/ulib/zxtest" ]
 
   cflags = [ "-fstack-protector-all" ]
 

@@ -32,7 +32,6 @@
 #include <optional>
 #include <thread>
 
-#include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
