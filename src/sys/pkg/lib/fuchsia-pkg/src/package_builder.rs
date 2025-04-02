@@ -79,7 +79,7 @@ impl PackageBuilder {
             repository: None,
             subpackages: BTreeMap::default(),
             overwrite_files: false,
-            overwrite_subpackages: true,
+            overwrite_subpackages: false,
         }
     }
 
@@ -1146,6 +1146,19 @@ mod tests {
             MetaSubpackages::deserialize(Cursor::new(&far_file_data)).unwrap(),
             MetaSubpackages::from_iter([(pkg1_url, pkg1_hash), (pkg2_url, pkg2_hash)])
         );
+    }
+
+    #[test]
+    fn test_builder_rejects_subpackages_collisions() {
+        let url = "pkg".parse::<RelativePackageUrl>().unwrap();
+        let hash1 = Hash::from([0; fuchsia_hash::HASH_SIZE]);
+        let package_manifest_path1 = PathBuf::from("path1/package_manifest.json");
+        let hash2 = Hash::from([0; fuchsia_hash::HASH_SIZE]);
+        let package_manifest_path2 = PathBuf::from("path2/package_manifest.json");
+
+        let mut builder = PackageBuilder::new("some_pkg_name", FAKE_ABI_REVISION);
+        builder.add_subpackage(&url, hash1, package_manifest_path1).unwrap();
+        assert!(builder.add_subpackage(&url, hash2, package_manifest_path2).is_err());
     }
 
     #[test]
