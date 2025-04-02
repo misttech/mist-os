@@ -103,9 +103,6 @@ def _get_ignore_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="ignore arguments in rustdoc invocation"
     )
-    # ignored see //build/rbe/local-only.sh
-    parser.add_argument("--local-only", nargs="*", help="ignored")
-    parser.add_argument("--remote-only", nargs="*", help="ignored")
     # ignored from //build/rbe/remote_action.py
     parser.add_argument("--remote-disable", nargs="*", help="ignored")
     parser.add_argument("--remote-inputs", nargs="*", help="ignored")
@@ -175,6 +172,12 @@ def _main_arg_parser() -> ArgumentParser:
     return parser
 
 
+def _strip_cmd_prefixes(arg: str) -> str:
+    for prefix in ("--remote-only=", "--local-only="):
+        arg = arg.removeprefix(prefix)
+    return arg
+
+
 if __name__ == "__main__":
     parser = _main_arg_parser()
     args = parser.parse_args(argv[1:])
@@ -182,4 +185,9 @@ if __name__ == "__main__":
     (_ignored, rustdoc_invocation) = ignore_parser.parse_known_args(
         args.rustdoc_invocation
     )
+    # Strip prefixes to make sure flags from Rust configs are correctly applied
+    # to rustdoc invocations. See https://fxbug.dev/407713438 for details.
+    rustdoc_invocation = [
+        _strip_cmd_prefixes(arg) for arg in rustdoc_invocation
+    ]
     args.func(args, rustdoc_invocation)

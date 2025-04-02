@@ -68,10 +68,19 @@ if (is_host || is_fidl_toolchain) {
       visibility += [
         "${target}_compile_fidlc",
         "${target}_fdomain.actual",
+        "${target}_fdomain.aux.deps.deps",
+        "${target}_fdomain.aux.deps.transdeps",
+        "${target}_fdomain.rustdoc",
         "${target}_ir_root",
         "${target}_lint",
         "${target}_rust.actual",
+        "${target}_rust.aux.deps.deps",
+        "${target}_rust.aux.deps.transdeps",
+        "${target}_rust.rustdoc",
         "${target}_rust_common.actual",
+        "${target}_rust_common.aux.deps.deps",
+        "${target}_rust_common.aux.deps.transdeps",
+        "${target}_rust_common.rustdoc",
       ]
     }
 
