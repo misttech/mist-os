@@ -382,15 +382,16 @@ template("gvisor_test_package") {
     }
   }
 
-  _config_component = "${target_name}_config"
-  starnix_container_config_component(_config_component) {
+  _container_config_component = "${target_name}_config"
+  starnix_container_config_component(_container_config_component) {
     config = _container_config
   }
 
-  _config_shard_label = "${_config_component}_shard"
-  _config_shard = "${target_gen_dir}/${_config_shard_label}.cml"
-  starnix_container_config_offers(_config_shard_label) {
-    output = _config_shard
+  _container_config_shard_label = "${_container_config_component}_shard"
+  _container_config_shard =
+      "${target_gen_dir}/${_container_config_shard_label}.cml"
+  starnix_container_config_offers(_container_config_shard_label) {
+    output = _container_config_shard
     offer_from = "#config"
     offer_to = "#container"
   }
@@ -423,17 +424,17 @@ template("gvisor_test_package") {
         rebase_path(_container_shard, root_build_dir),
         rebase_path(_base_shard, root_build_dir),
         rebase_path(_storage_shard, root_build_dir),
-        rebase_path(_config_shard, root_build_dir),
+        rebase_path(_container_config_shard, root_build_dir),
       ]
       program = _program
       children = [
         {
           name = "config"
-          url = "#meta/${_config_component}.cm"
+          url = "#meta/${_container_config_component}.cm"
         },
       ]
     }
-    deps = [ ":${_config_shard_label }" ]
+    deps = [ ":${_container_config_shard_label }" ]
   }
 
   _component_label = target_name + "_component"
@@ -453,7 +454,7 @@ template("gvisor_test_package") {
   if (_is_benchmark) {
     fuchsia_test_package(target_name) {
       deps = [
-        ":${_config_component}",
+        ":${_container_config_component}",
         "//src/starnix/tests/gvisor:gvisor_runfiles",
       ]
       subpackages = starnix_test_subpackages + [ _container_package ]
@@ -463,7 +464,7 @@ template("gvisor_test_package") {
   } else {
     fuchsia_test_with_expectations_package(target_name) {
       deps = [
-        ":${_config_component}",
+        ":${_container_config_component}",
         "//src/starnix/tests/gvisor:gvisor_runfiles",
       ]
       subpackages = starnix_test_subpackages + [ _container_package ]
