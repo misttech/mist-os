@@ -18,7 +18,7 @@ use starnix_uapi::{
     nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC, nf_ip_hook_priorities_NF_IP_PRI_RAW,
     nf_nat_ipv4_multi_range_compat, nf_nat_range,
     xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
-    xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp,
+    xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_mark_tginfo2, xt_tcp,
     xt_tproxy_target_info_v1, xt_udp, IPPROTO_ICMP, IPPROTO_ICMPV6, IPPROTO_IP, IPPROTO_TCP,
     IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN, NF_IP_LOCAL_OUT,
     NF_IP_NUMHOOKS, NF_IP_POST_ROUTING, NF_IP_PRE_ROUTING, NF_QUEUE,
@@ -58,6 +58,7 @@ const TARGET_STANDARD: &str = "";
 const TARGET_ERROR: &str = "ERROR";
 const TARGET_REDIRECT: &str = "REDIRECT";
 const TARGET_TPROXY: &str = "TPROXY";
+const TARGET_MARK: &str = "MARK";
 
 #[derive(Debug, Error, PartialEq)]
 pub enum IpTableParseError {
@@ -460,6 +461,9 @@ pub enum Target {
 
     // Parsed from `xt_tproxy_target_info` for IPv4, and `xt_tproxy_target_info_v1` for IPv6.
     Tproxy(TproxyInfo),
+
+    // Parsed from `xt_mark_tginfo2`.
+    Mark { mask: u32, mark: u32 },
 }
 
 #[derive(Debug)]
@@ -533,12 +537,15 @@ pub struct IptReplaceParser {
 
     /// Keeps track of byte offsets of entries parsed so far. Used to check for errors.
     entry_offsets: HashSet<usize>,
+
+    /// Allows the mark target to be used.
+    allow_mark_target: bool,
 }
 
 impl IptReplaceParser {
     /// Initialize a new parser and tries to parse an `ipt_replace` struct from the buffer.
     /// The rest of the buffer is left unparsed.
-    fn new_ipv4(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
+    fn new_ipv4(bytes: Vec<u8>, allow_mark_target: bool) -> Result<Self, IpTableParseError> {
         let (ipt_replace, _) = ipt_replace::read_from_prefix(&bytes)
             .map_err(|_| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
         let replace_info = ReplaceInfo::try_from(ipt_replace)?;
@@ -556,12 +563,13 @@ impl IptReplaceParser {
             bytes,
             parse_pos: IPT_REPLACE_SIZE,
             entry_offsets: HashSet::new(),
+            allow_mark_target,
         })
     }
 
     /// Initialize a new parser and tries to parse an `ip6t_replace` struct from the buffer.
     /// The rest of the buffer is left unparsed.
-    fn new_ipv6(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
+    fn new_ipv6(bytes: Vec<u8>, allow_mark_target: bool) -> Result<Self, IpTableParseError> {
         let (ip6t_replace, _) = ip6t_replace::read_from_prefix(&bytes)
             .map_err(|_| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
         let replace_info = ReplaceInfo::try_from(ip6t_replace)?;
@@ -579,6 +587,7 @@ impl IptReplaceParser {
             bytes,
             parse_pos: IP6T_REPLACE_SIZE,
             entry_offsets: HashSet::new(),
+            allow_mark_target,
         })
     }
 
@@ -814,6 +823,10 @@ impl IptReplaceParser {
 
             (TARGET_TPROXY, 1) => self.view_as_tproxy_target(remaining_size)?,
 
+            (TARGET_MARK, 2) if self.allow_mark_target => {
+                self.view_as_mark_target(remaining_size)?
+            }
+
             (target_name, revision) => {
                 log_warn!(
                     "IpTables: ignored {target_name} target (revision={revision}) of size \
@@ -914,6 +927,19 @@ impl IptReplaceParser {
         let port = NonZeroU16::new(u16::from_be(tproxy_target.lport));
         Ok(Target::Tproxy(TproxyInfo { address, port }))
     }
+
+    fn view_as_mark_target(&self, remaining_size: usize) -> Result<Target, IpTableParseError> {
+        if remaining_size < size_of::<xt_mark_tginfo2>() {
+            return Err(IpTableParseError::TargetSizeMismatch {
+                size: remaining_size,
+                target_name: "mark",
+            });
+        }
+
+        let mark_target = self.view_next_bytes_as::<xt_mark_tginfo2>()?;
+
+        Ok(Target::Mark { mark: mark_target.mark, mask: mark_target.mask })
+    }
 }
 
 #[derive(Debug)]
@@ -934,12 +960,18 @@ pub struct IpTable {
 }
 
 impl IpTable {
-    pub fn from_ipt_replace(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        Self::from_parser(IptReplaceParser::new_ipv4(bytes)?)
+    pub fn from_ipt_replace(
+        bytes: Vec<u8>,
+        allow_mark_target: bool,
+    ) -> Result<Self, IpTableParseError> {
+        Self::from_parser(IptReplaceParser::new_ipv4(bytes, allow_mark_target)?)
     }
 
-    pub fn from_ip6t_replace(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        Self::from_parser(IptReplaceParser::new_ipv6(bytes)?)
+    pub fn from_ip6t_replace(
+        bytes: Vec<u8>,
+        allow_mark_target: bool,
+    ) -> Result<Self, IpTableParseError> {
+        Self::from_parser(IptReplaceParser::new_ipv6(bytes, allow_mark_target)?)
     }
 
     fn from_parser(mut parser: IptReplaceParser) -> Result<Self, IpTableParseError> {
@@ -1455,6 +1487,11 @@ impl Entry {
 
                 Ok(Some(fnet_filter_ext::Action::TransparentProxy(tproxy)))
             }
+
+            Target::Mark { mark, mask } => Ok(Some(fnet_filter_ext::Action::Mark {
+                domain: fnet::MarkDomain::Mark1,
+                action: fnet_filter_ext::MarkAction::SetMark { mark, clearing_mask: mask },
+            })),
         }
     }
 
@@ -1868,6 +1905,8 @@ mod tests {
     const NONZERO_PORT: NonZeroU16 = NonZeroU16::new(2345).unwrap();
     const NONZERO_PORT_RANGE: RangeInclusive<NonZeroU16> =
         RangeInclusive::new(NonZeroU16::new(2000).unwrap(), NonZeroU16::new(3000).unwrap());
+    const MARK: u32 = 1;
+    const MASK: u32 = 2;
 
     fn string_to_16_chars(string: &str) -> [c_char; 16] {
         let mut buffer = [0; 16];
@@ -2015,6 +2054,99 @@ mod tests {
                 name: chain_name.to_owned(),
             },
             routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        }
+    }
+
+    fn mangle_namespace_v4() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv4-mangle".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv4,
+        }
+    }
+
+    fn mangle_namespace_v6() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv6-mangle".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv6,
+        }
+    }
+
+    fn mangle_prerouting_routine(
+        namespace: &fnet_filter_ext::Namespace,
+    ) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_PREROUTING.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_MANGLE,
+                },
+            )),
+        }
+    }
+
+    fn mangle_input_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_INPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::LocalIngress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_MANGLE,
+                },
+            )),
+        }
+    }
+
+    fn mangle_forward_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_FORWARD.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Forwarding,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_MANGLE,
+                },
+            )),
+        }
+    }
+
+    fn mangle_output_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_OUTPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::LocalEgress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_MANGLE,
+                },
+            )),
+        }
+    }
+
+    fn mangle_postrouting_routine(
+        namespace: &fnet_filter_ext::Namespace,
+    ) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_POSTROUTING.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Egress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_MANGLE,
+                },
+            )),
         }
     }
 
@@ -2409,13 +2541,13 @@ mod tests {
     }
 
     #[test_case(
-        IpTable::from_ipt_replace(ipv4_table_with_ip_matchers()).unwrap(),
+        IpTable::from_ipt_replace(ipv4_table_with_ip_matchers(), true).unwrap(),
         filter_namespace_v4(),
         IPV4_SUBNET;
         "ipv4"
     )]
     #[test_case(
-        IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers()).unwrap(),
+        IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers(), true).unwrap(),
         filter_namespace_v6(),
         IPV6_SUBNET;
         "ipv6"
@@ -2646,7 +2778,7 @@ mod tests {
 
     #[fuchsia::test]
     fn parse_match_extensions_test() {
-        let table = IpTable::from_ipt_replace(table_with_match_extensions()).unwrap();
+        let table = IpTable::from_ipt_replace(table_with_match_extensions(), true).unwrap();
 
         let expected_namespace = filter_namespace_v4();
         assert_eq!(table.namespace, expected_namespace);
@@ -2866,12 +2998,12 @@ mod tests {
     }
 
     #[test_case(
-        IpTable::from_ipt_replace(ipv4_table_with_jump_target()).unwrap(),
+        IpTable::from_ipt_replace(ipv4_table_with_jump_target(), true).unwrap(),
         filter_namespace_v4();
         "ipv4"
     )]
     #[test_case(
-        IpTable::from_ip6t_replace(ipv6_table_with_jump_target()).unwrap(),
+        IpTable::from_ip6t_replace(ipv6_table_with_jump_target(), true).unwrap(),
         filter_namespace_v6();
         "ipv6"
     )]
@@ -3442,13 +3574,13 @@ mod tests {
     }
 
     #[test_case(
-        IpTable::from_ipt_replace(ipv4_table_with_redirect_and_tproxy()).unwrap(),
+        IpTable::from_ipt_replace(ipv4_table_with_redirect_and_tproxy(), true).unwrap(),
         nat_namespace_v4(),
         IPV4_ADDR;
         "ipv4"
     )]
     #[test_case(
-        IpTable::from_ip6t_replace(ipv6_table_with_redirect_and_tproxy()).unwrap(),
+        IpTable::from_ip6t_replace(ipv6_table_with_redirect_and_tproxy(), true).unwrap(),
         nat_namespace_v6(),
         IPV6_ADDR;
         "ipv6"
@@ -3599,6 +3731,221 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers::default(),
                 action: fnet_filter_ext::Action::Drop,
+            },
+        ];
+
+        for (rule, expected) in table.rules.iter().zip_eq(expected_rules.into_iter()) {
+            assert_eq!(rule, &expected);
+        }
+    }
+
+    fn ip_table_with_mark(
+        xt_entry: &[u8],
+        extend_with_standard_target: fn(&mut Vec<u8>, i32),
+        extend_with_error_target: fn(&mut Vec<u8>, &str),
+    ) -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Start of PREROUTING built-in chain.
+        let prerouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 1: policy of PREROUTING chain.
+        // Note: PREROUTING chain has no other rules.
+        let prerouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 2: The mark target.
+        entries_bytes.extend_from_slice(xt_entry);
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: u16::try_from(
+                    size_of::<xt_entry_target>() + size_of::<xt_mark_tginfo2>(),
+                )
+                .unwrap(),
+                name: string_to_29_chars(TARGET_MARK),
+                revision: 2,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(xt_mark_tginfo2 { mark: MARK, mask: MASK }.as_bytes());
+
+        // Entry 3: policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 5: policy of OUTPUT chain.
+        // Note: OUTPUT chain has no other rules.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of POSTROUTING built-in chain.
+        let postrouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 6: policy of POSTROUTING chain.
+        // Note: POSTROUTING chain has no other rules.
+        let postrouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 7: end of input.
+        extend_with_error_target(&mut entries_bytes, TARGET_ERROR);
+
+        assert_eq!(IPT_REPLACE_SIZE, IP6T_REPLACE_SIZE);
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("mangle"),
+            num_entries: 7,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::MANGLE.bits(),
+            hook_entry: [
+                prerouting_hook_entry,
+                input_hook_entry,
+                forward_hook_entry,
+                output_hook_entry,
+                postrouting_hook_entry,
+            ],
+            underflow: [
+                prerouting_underflow,
+                input_underflow,
+                forward_underflow,
+                output_underflow,
+                postrouting_underflow,
+            ],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    #[test_case(
+        IpTable::from_ipt_replace,
+        ipt_entry {
+            target_offset: u16::try_from(size_of::<ipt_entry>()).unwrap(),
+            next_offset: u16::try_from(
+                size_of::<ipt_entry>()
+                    + size_of::<xt_entry_target>()
+                    + size_of::<xt_mark_tginfo2>(),
+            )
+            .unwrap(),
+            ..Default::default()
+        }
+        .as_bytes(),
+        extend_with_standard_target_ipv4_entry,
+        extend_with_error_target_ipv4_entry,
+        mangle_namespace_v4(); "ipv4"
+    )]
+    #[test_case(
+        IpTable::from_ip6t_replace,
+        ip6t_entry {
+            target_offset: u16::try_from(size_of::<ip6t_entry>()).unwrap(),
+            next_offset: u16::try_from(
+                size_of::<ip6t_entry>()
+                    + size_of::<xt_entry_target>()
+                    + size_of::<xt_mark_tginfo2>(),
+            )
+            .unwrap(),
+            ..Default::default()
+        }
+        .as_bytes(),
+        extend_with_standard_target_ipv6_entry,
+        extend_with_error_target_ipv6_entry,
+        mangle_namespace_v6(); "ipv6"
+    )]
+    fn parse_mark_test(
+        parse_fn: fn(Vec<u8>, bool) -> Result<IpTable, IpTableParseError>,
+        xt_entry: &[u8],
+        extend_with_standard_target: fn(&mut Vec<u8>, i32),
+        extend_with_error_target: fn(&mut Vec<u8>, &str),
+        expected_namespace: fnet_filter_ext::Namespace,
+    ) {
+        let table = parse_fn(
+            ip_table_with_mark(xt_entry, extend_with_standard_target, extend_with_error_target),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(table.namespace, expected_namespace);
+
+        assert_eq!(
+            table.routines,
+            [
+                mangle_prerouting_routine(&expected_namespace),
+                mangle_input_routine(&expected_namespace),
+                mangle_forward_routine(&expected_namespace),
+                mangle_output_routine(&expected_namespace),
+                mangle_postrouting_routine(&expected_namespace),
+            ]
+        );
+
+        let expected_rules = [
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: mangle_prerouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: mangle_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Mark {
+                    domain: fnet::MarkDomain::Mark1,
+                    action: fnet_filter_ext::MarkAction::SetMark {
+                        clearing_mask: MASK,
+                        mark: MARK,
+                    },
+                },
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 1,
+                    routine: mangle_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: mangle_forward_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: mangle_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: mangle_postrouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
             },
         ];
 
@@ -3828,7 +4175,7 @@ mod tests {
         "chain with no policy"
     )]
     fn parse_table_error(bytes: Vec<u8>, expected_error: IpTableParseError) {
-        assert_eq!(IpTable::from_ipt_replace(bytes).unwrap_err(), expected_error);
+        assert_eq!(IpTable::from_ipt_replace(bytes, true).unwrap_err(), expected_error);
     }
 
     #[test_case(&[], Err(AsciiConversionError::NulByteNotFound { chars: vec![] }); "empty slice")]

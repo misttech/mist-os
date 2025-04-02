@@ -114,6 +114,9 @@ pub struct KernelFeatures {
 
     /// Implementation of mlock() to use for this kernel instance.
     pub mlock_pin_flavor: MlockPinFlavor,
+
+    /// Allows the netstack to mark packets/sockets.
+    pub netstack_mark: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -401,6 +404,8 @@ impl Kernel {
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
         let hrtimer_manager = HrTimerManager::new(&inspect_node);
 
+        let iptables = OrderedRwLock::new(IpTables::new(features.netstack_mark));
+
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
             features,
@@ -417,7 +422,7 @@ impl Kernel {
             remote_block_device_registry: Default::default(),
             bootloader_message_store: OnceLock::new(),
             binders: Default::default(),
-            iptables: OrderedRwLock::new(IpTables::new()),
+            iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),

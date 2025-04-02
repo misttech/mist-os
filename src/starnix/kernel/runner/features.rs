@@ -128,6 +128,7 @@ impl Features {
                         default_ns_mount_options,
                         mlock_always_onfault,
                         mlock_pin_flavor,
+                        netstack_mark,
                     },
                 selinux,
                 ashmem,
@@ -217,6 +218,7 @@ impl Features {
                     inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
                     inspect_node
                         .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
+                    inspect_node.record_bool("netstack_mark", *netstack_mark);
                 });
             }
         });
@@ -277,6 +279,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
                         }).collect::<Result<Vec<u16>, Error>>()?);
             },
             ("nanohub", _) => features.nanohub = true,
+            ("netstack_mark", _) => features.kernel.netstack_mark = true,
             ("network_manager", _) => features.network_manager = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
