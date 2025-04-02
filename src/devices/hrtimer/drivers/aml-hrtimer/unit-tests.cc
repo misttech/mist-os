@@ -211,13 +211,22 @@ class FakeSystemActivityGovernor
     completer.Reply({{std::move(elements)}});
   }
 
-  void TakeWakeLease(TakeWakeLeaseRequest& request,
-                     TakeWakeLeaseCompleter::Sync& completer) override {
+  zx::eventpair AcquireWakeLease() {
     zx::eventpair wake_lease_remote, wake_lease_local;
     zx::eventpair::create(0, &wake_lease_local, &wake_lease_remote);
     wake_leases_.push_back(std::move(wake_lease_local));
     lease_requested_ = true;
-    completer.Reply(std::move(wake_lease_remote));
+    return wake_lease_remote;
+  }
+
+  void AcquireWakeLease(AcquireWakeLeaseRequest& request,
+                        AcquireWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(AcquireWakeLease()));
+  }
+
+  void TakeWakeLease(TakeWakeLeaseRequest& request,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(AcquireWakeLease());
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {

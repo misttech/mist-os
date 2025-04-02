@@ -39,8 +39,7 @@ class FakeSystemActivityGovernor
 
   bool OnSuspendStarted() const { return on_suspend_started_; }
 
-  void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
-                     TakeWakeLeaseCompleter::Sync& completer) override {
+  LeaseToken AcquireWakeLease() {
     LeaseToken client_token, server_token;
     LeaseToken::create(/*options=*/0u, &client_token, &server_token);
 
@@ -70,7 +69,18 @@ class FakeSystemActivityGovernor
         wait_once_tasks_.push_back(std::move(wait));
       });
     }
-    completer.Reply(std::move(client_token));
+    return client_token;
+  }
+
+  // `fuchsia.power.system/ActivityGovernor`:
+  void AcquireWakeLease(AcquireWakeLeaseRequest& /* ignored */,
+                        AcquireWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(AcquireWakeLease()));
+  }
+
+  void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(AcquireWakeLease());
   }
 
   void RegisterListener(RegisterListenerRequest& request,

@@ -27,8 +27,17 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
   bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
 
  private:
+  // `fuchsia.power.system/ActivityGovernor`:
+  void AcquireWakeLease(AcquireWakeLeaseRequest& /* ignored */,
+                        AcquireWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(AcquireWakeLease()));
+  }
   void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
                      TakeWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(AcquireWakeLease());
+  }
+
+  LeaseToken AcquireWakeLease() {
     LeaseToken client_token, server_token;
     LeaseToken::create(/*options=*/0u, &client_token, &server_token);
 
@@ -46,7 +55,7 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
       active_wake_leases_.erase(it);
     });
 
-    completer.Reply(std::move(client_token));
+    return client_token;
   }
 
   async_dispatcher_t* dispatcher_;
