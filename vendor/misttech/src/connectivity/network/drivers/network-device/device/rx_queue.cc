@@ -5,12 +5,8 @@
 
 #include "rx_queue.h"
 
-// #include <lib/async/cpp/task.h>
-// #include <lib/fdf/cpp/env.h>
-#include <zircon/assert.h>
-
-// #include "log.h"
 #include <trace.h>
+#include <zircon/assert.h>
 
 #include "session.h"
 
@@ -73,7 +69,7 @@ zx::result<std::unique_ptr<RxQueue>> RxQueue::Create(DeviceInterface* parent) {
   KernelHandle<PortDispatcher> port;
   zx_rights_t rights;
   if (zx_status_t status = PortDispatcher::Create(0, &port, &rights); status != ZX_OK) {
-    TRACEF("failed to create rx watch port: %s\n", zx_status_get_string(status));
+    LTRACEF("failed to create rx watch port: %s\n", zx_status_get_string(status));
     return zx::error(status);
   }
   queue->rx_watch_port_ = port.release();
@@ -141,7 +137,7 @@ void RxQueue::TriggerRxWatch() {
   packet.status = ZX_OK;
   zx_status_t status = rx_watch_port_->QueueUser(packet);
   if (status != ZX_OK) {
-    TRACEF("TriggerRxWatch failed: %s\n", zx_status_get_string(status));
+    LTRACEF("TriggerRxWatch failed: %s\n", zx_status_get_string(status));
   }
 }
 
@@ -155,7 +151,7 @@ void RxQueue::TriggerSessionChanged() {
   packet.status = ZX_OK;
   zx_status_t status = rx_watch_port_->QueueUser(packet);
   if (status != ZX_OK) {
-    TRACEF("TriggerSessionChanged failed: %s\n", zx_status_get_string(status));
+    LTRACEF("TriggerSessionChanged failed: %s\n", zx_status_get_string(status));
   }
 }
 
@@ -181,7 +177,7 @@ void RxQueue::JoinThread() {
     packet.type = ZX_PKT_TYPE_USER;
     packet.key = kQuitWatchKey;
     if (zx_status_t status = rx_watch_port_->QueueUser(packet); status != ZX_OK) {
-      TRACEF("RxQueue::JoinThread failed to send quit key: %s", zx_status_get_string(status));
+      LTRACEF("RxQueue::JoinThread failed to send quit key: %s", zx_status_get_string(status));
     }
     // Mark the queue as not running anymore.
     running_ = false;
@@ -214,7 +210,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
   // Need to fetch more from the session.
   if (in_flight_->available() == 0) {
     // No more space to keep in flight buffers.
-    TRACEF("can't fit more in-flight buffers\n");
+    LTRACEF("can't fit more in-flight buffers\n");
     return std::make_tuple(nullptr, 0);
   }
 
@@ -223,7 +219,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
     case ZX_OK:
       break;
     default:
-      TRACEF("failed to load rx buffer descriptors: %s\n", zx_status_get_string(status));
+      LTRACEF("failed to load rx buffer descriptors: %s\n", zx_status_get_string(status));
       __FALLTHROUGH;
     case ZX_ERR_PEER_CLOSED:  // Primary FIFO closed.
     case ZX_ERR_SHOULD_WAIT:  // No Rx buffers available in FIFO.
@@ -291,8 +287,8 @@ void RxQueue::CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_lis
         // session, try and allocate buffers from it and copy things.
         // That's complicated enough and this is unexpected enough that the current decision is to
         // drop the frame on the floor.
-        TRACEF("dropping chained frame with %ld buffers spanning different sessions:  %s, %s\n",
-               rx_buffer.data_count, primary_session->name(), in_flight_buffer.session->name());
+        LTRACEF("dropping chained frame with %ld buffers spanning different sessions:  %s, %s\n",
+                rx_buffer.data_count, primary_session->name(), in_flight_buffer.session->name());
         drop_frame = true;
       }
       ZX_DEBUG_ASSERT(in_flight_buffer.session != nullptr);
@@ -301,7 +297,7 @@ void RxQueue::CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_lis
 
     if (!primary_session) {
       // Buffer contained no parts.
-      TRACEF("attempted to return an rx buffer with no parts\n");
+      LTRACEF("attempted to return an rx buffer with no parts\n");
       continue;
     }
 
@@ -322,10 +318,10 @@ void RxQueue::CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_lis
     }
 
     primary_session->AssertParentControlLockShared(*parent_);
-    // parent_->NotifyPortRxFrame(rx_buffer.meta.port, total_length);
+    parent_->NotifyPortRxFrame(rx_buffer.meta.port, total_length);
     const RxFrameInfo frame_info = {
         .meta = rx_buffer.meta,
-        //.port_id_salt = parent_->GetPortSalt(rx_buffer.meta.port),
+        .port_id_salt = parent_->GetPortSalt(rx_buffer.meta.port),
         .buffers = cpp20::span(session_parts.begin(), session_parts_iter),
         .total_length = total_length,
     };
@@ -341,9 +337,9 @@ void RxQueue::CompleteRxList(const cpp20::span<const rx_buffer_t>& rx_buffer_lis
     }
   }
   parent_->CommitAllSessions();
-  // if (device_buffer_count_ <= parent_->rx_notify_threshold()) {
-  //   TriggerRxWatch();
-  // }
+  if (device_buffer_count_ <= parent_->rx_notify_threshold()) {
+    TriggerRxWatch();
+  }
   // parent_->TryDelegateRxLease(rx_completed_frame_index_);
 }
 
@@ -356,26 +352,29 @@ int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
       bool fifo_readable = false;
       if (zx_status_t status = rx_watch_port_->Dequeue(Deadline::infinite(), &packet);
           status != ZX_OK) {
-        TRACEF("RxQueue::WatchThread port wait failed %s\n", zx_status_get_string(status));
+        LTRACEF("RxQueue::WatchThread port wait failed %s\n", zx_status_get_string(status));
         return status;
       }
-      // parent_->NotifyRxQueuePacket(packet.key);
+
+      parent_->NotifyRxQueuePacket(packet.key);
       switch (packet.key) {
         case kQuitWatchKey:
-          TRACEF("RxQueue::WatchThread got quit key\n");
+          LTRACEF("RxQueue::WatchThread got quit key\n");
           return ZX_OK;
         case kSessionSwitchKey:
           if (observed_fifo && waiting_on_fifo) {
-            if (zx_status_t status =
-                    rx_watch_port_->CancelQueued(observed_fifo.get(), kFifoWatchKey);
-                status != ZX_OK) {
-              TRACEF("RxQueue::WatchThread port cancel failed %s\n", zx_status_get_string(status));
+            bool had_observer = observed_fifo->CancelByKey(observed_fifo.get(),
+                                                           rx_watch_port_.get(), kFifoWatchKey);
+            bool packet_removed = rx_watch_port_->CancelQueued(observed_fifo.get(), kFifoWatchKey);
+            zx_status_t status = (had_observer || packet_removed) ? ZX_OK : ZX_ERR_NOT_FOUND;
+            if (status != ZX_OK) {
+              LTRACEF("RxQueue::WatchThread port cancel failed %s\n", zx_status_get_string(status));
               return status;
             }
             waiting_on_fifo = false;
           }
           observed_fifo = parent_->primary_rx_fifo();
-          TRACEF("RxQueue primary FIFO changed, valid=%d\n", static_cast<bool>(observed_fifo));
+          LTRACEF("RxQueue primary FIFO changed, valid=%d\n", static_cast<bool>(observed_fifo));
           break;
         case kFifoWatchKey:
           if ((packet.signal.observed & ZX_FIFO_PEER_CLOSED) || packet.status != ZX_OK) {
@@ -384,7 +383,7 @@ int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
             // `DeviceInterface` to signal us that a new primary session is available when that
             // happens.
             observed_fifo.reset();
-            TRACEF("RxQueue fifo closed or bad status %s\n", zx_status_get_string(packet.status));
+            LTRACEF("RxQueue fifo closed or bad status %s\n", zx_status_get_string(packet.status));
           } else {
             fifo_readable = true;
           }
@@ -443,16 +442,14 @@ int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
         if (!observed_fifo) {
           // This can happen if we get triggered to fetch more buffers, but the primary session is
           // already tearing down, it's fine to just proceed.
-          TRACEF("RxQueue::WatchThread Should wait but no FIFO is here\n");
+          LTRACEF("RxQueue::WatchThread Should wait but no FIFO is here\n");
         } else if (!waiting_on_fifo) {
-          HandleOwner fifo_hdl = Handle::Make(observed_fifo, ZX_DEFAULT_FIFO_RIGHTS);
-          zx_status_t status = rx_watch_port_->MakeObserver(0, fifo_hdl.get(), kFifoWatchKey,
+          zx_status_t status = rx_watch_port_->MakeObserver(0, observed_fifo, kFifoWatchKey,
                                                             ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED);
           if (status == ZX_OK) {
-            fifo_hdl.release();
             waiting_on_fifo = true;
           } else {
-            TRACEF("RxQueue::WatchThread wait_async failed: %s\n", zx_status_get_string(status));
+            LTRACEF("RxQueue::WatchThread wait_async failed: %s\n", zx_status_get_string(status));
             return status;
           }
         }
@@ -462,9 +459,9 @@ int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
 
   zx_status_t status = loop();
   if (status != ZX_OK) {
-    TRACEF("RxQueue::WatchThread finished loop with error: %s\n", zx_status_get_string(status));
+    LTRACEF("RxQueue::WatchThread finished loop with error: %s\n", zx_status_get_string(status));
   }
-  TRACEF("watch thread done\n");
+  LTRACEF("watch thread done\n");
   return 0;
 }
 

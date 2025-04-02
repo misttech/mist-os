@@ -13,9 +13,11 @@
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace network {
-// namespace netdev = fuchsia_hardware_network;
-// namespace netdriver = fuchsia_hardware_network_driver;
+#if __mist_os__
+constexpr uint16_t kMaxFifoDepth = (PAGE_SIZE / 2) / sizeof(uint16_t);
+#else
 constexpr uint16_t kMaxFifoDepth = PAGE_SIZE / sizeof(uint16_t);
+#endif
 
 namespace internal {
 template <typename T>

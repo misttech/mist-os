@@ -5,16 +5,17 @@
 
 #include "network_device_client.h"
 
-// #include <lib/async/default.h>
-// #include <lib/fidl/cpp/wire/wire_messaging.h>
-// #include <lib/fpromise/bridge.h>
-// #include <lib/fpromise/promise.h>
-// #include <lib/fpromise/result.h>
-// #include <lib/syslog/cpp/macros.h>
-
+#include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/zx/time.h>
 #include <trace.h>
 #include <zircon/status.h>
+#include <zircon/syscalls/port.h>
+
+#include <algorithm>
+
+#include <object/port_dispatcher.h>
+
+#include "vendor/misttech/src/connectivity/network/drivers/network-device/device/device_port.h"
 
 #define LOCAL_TRACE 0
 
@@ -26,23 +27,34 @@ namespace {
 // Set to the maximum number of `uint16`s that a zx FIFO can hold.
 constexpr uint64_t kMaxDepth = ZX_PAGE_SIZE / sizeof(uint16_t);
 
-// constexpr zx_signals_t kFifoWaitReads = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
-// constexpr zx_signals_t kFifoWaitWrites = ZX_FIFO_WRITABLE;
+constexpr zx_signals_t kFifoWaitReads = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
+constexpr zx_signals_t kFifoWaitWrites = ZX_FIFO_WRITABLE;
+
+static constexpr uint64_t kTxKey = 0;
+static constexpr uint64_t kRxKey = 1;
+static constexpr uint64_t kTxWritableKey = 2;
+static constexpr uint64_t kRxWritableKey = 3;
+
 }  // namespace
 
-zx::result<DeviceInfo> DeviceInfo::Create(const device_info_t& fidl) {
-  if (!(fidl.min_descriptor_length > 0 && fidl.descriptor_version > 0)) {
+zx::result<DeviceInfo> DeviceInfo::Create(const device_info_t& device_info) {
+  // TODO (Herrera) : Implment has_value() for device_info_t
+#if 0
+  if (!(fidl.has_min_descriptor_length() && fidl.has_descriptor_version() &&
+        fidl.has_base_info())) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+#endif
+  const device_base_info_t& base_info = device_info.base_info;
 
-  const device_base_info_t& base_info = fidl.base_info;
-
-  if (!(base_info.rx_depth > 0 && base_info.tx_depth > 0 && base_info.buffer_alignment > 0 &&
-        base_info.min_rx_buffer_length > 0 && base_info.min_tx_buffer_length > 0 &&
-        base_info.min_tx_buffer_head > 0 && base_info.min_tx_buffer_tail > 0 &&
-        base_info.max_buffer_parts > 0)) {
+#if 0
+   if (!(base_info.has_rx_depth() && base_info.has_tx_depth() && base_info.has_buffer_alignment() &&
+        base_info.has_min_rx_buffer_length() && base_info.has_min_tx_buffer_length() &&
+        base_info.has_min_tx_buffer_head() && base_info.has_min_tx_buffer_tail() &&
+        base_info.has_max_buffer_parts())) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+#endif
 
   uint32_t max_buffer_length = std::numeric_limits<uint32_t>::max();
   if (base_info.max_buffer_length > 0) {
@@ -53,8 +65,8 @@ zx::result<DeviceInfo> DeviceInfo::Create(const device_info_t& fidl) {
   }
 
   DeviceInfo info = {
-      .min_descriptor_length = fidl.min_descriptor_length,
-      .descriptor_version = fidl.descriptor_version,
+      .min_descriptor_length = device_info.min_descriptor_length,
+      .descriptor_version = device_info.descriptor_version,
       .rx_depth = base_info.rx_depth,
       .tx_depth = base_info.tx_depth,
       .buffer_alignment = base_info.buffer_alignment,
@@ -66,22 +78,21 @@ zx::result<DeviceInfo> DeviceInfo::Create(const device_info_t& fidl) {
       .max_buffer_parts = base_info.max_buffer_parts,
   };
 
-  /*if (base_info.rx_accel.size > 0) {
-    auto& rx_accel = base_info.rx_accel;
-    std::copy(rx_accel.begin(), rx_accel.end(), std::back_inserter(info.rx_accel));
+  if (base_info.rx_accel_count > 0) {
+    cpp20::span<const uint8_t> rx_accel_span(&base_info.rx_accel_list[0], base_info.rx_accel_count);
+    std::ranges::copy(rx_accel_span, util::back_inserter(info.rx_accel));
   }
-  if (base_info.tx_accel.size > 0) {
-    auto& tx_accel = base_info.tx_accel;
-    std::copy(tx_accel.begin(), tx_accel.end(), std::back_inserter(info.tx_accel));
-  }*/
+  if (base_info.tx_accel_count > 0) {
+    cpp20::span<const uint8_t> tx_accel_span(&base_info.tx_accel_list[0], base_info.tx_accel_count);
+    std::ranges::copy(tx_accel_span, util::back_inserter(info.tx_accel));
+  }
 
   return zx::ok(std::move(info));
 }
 
-#if 0
 zx::result<PortInfoAndMac> PortInfoAndMac::Create(
-    const port_info_t& fidl, const std::optional<fuchsia_net::wire::MacAddress>& unicast_address) {
-  if (!(fidl.id > 0 && fidl.base_info.port_class > 0)) {
+    const port_info_t& fidl, const std::optional<mac_address_t>& unicast_address) {
+  if (!(fidl.id.base > 0 && fidl.base_info.port_class > 0)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -92,21 +103,29 @@ zx::result<PortInfoAndMac> PortInfoAndMac::Create(
       .unicast_address = unicast_address,
   };
 
-  if (fidl_base_info.rx_types.size > 0) {
-    auto& rx_types = fidl_base_info.rx_types;
-    std::copy(rx_types.begin(), rx_types.end(), std::back_inserter(info.rx_types));
+  if (fidl_base_info.rx_types_count > 0) {
+    auto& rx_types = fidl_base_info.rx_types_list;
+    cpp20::span<const frame_type_t> rx_types_span(&rx_types[0], fidl_base_info.rx_types_count);
+    std::ranges::copy(rx_types_span, util::back_inserter(info.rx_types));
   }
-  if (fidl_base_info.tx_types.size > 0) {
-    auto& tx_types = fidl_base_info.tx_types;
-    std::copy(tx_types.begin(), tx_types.end(), std::back_inserter(info.tx_types));
+  if (fidl_base_info.tx_types_count > 0) {
+    auto& tx_types = fidl_base_info.tx_types_list;
+    cpp20::span<const frame_type_support_t> tx_types_span(&tx_types[0],
+                                                          fidl_base_info.tx_types_count);
+    std::ranges::copy(tx_types_span, util::back_inserter(info.tx_types));
   }
 
   return zx::ok(std::move(info));
 }
-#endif
+
 NetworkDeviceClient::NetworkDeviceClient(
     std::unique_ptr<network::internal::DeviceInterface> device_interface)
-    : device_(ktl::move(device_interface)) {}
+    : device_(ktl::move(device_interface)) {
+  KernelHandle<PortDispatcher> port;
+  zx_rights_t rights;
+  ZX_ASSERT(PortDispatcher::Create(0, &port, &rights) == ZX_OK);
+  port_ = port.release();
+}
 
 #if 0
 void NetworkDeviceClient::OnDeviceError(fidl::UnbindInfo info) {
@@ -148,7 +167,7 @@ SessionConfig NetworkDeviceClient::DefaultSessionConfig(const DeviceInfo& dev_in
       .tx_tail_length = dev_info.min_tx_buffer_tail,
       .rx_descriptor_count = dev_info.rx_depth,
       .tx_descriptor_count = dev_info.tx_depth,
-      //.options = netdev::wire::SessionFlags::kPrimary,
+      .options = SESSION_FLAGS_PRIMARY,
   };
 }
 
@@ -187,92 +206,24 @@ void NetworkDeviceClient::OpenSession(const std::string& name,
     return;
   }
 
+  auto& [session, fifos] = open_result.value();
+  session_ = session;
+  ZX_ASSERT(session_);
+
+  rx_fifo_ = ktl::move(fifos.first);
+  tx_fifo_ = ktl::move(fifos.second);
+
   if ((status = PrepareDescriptors()) != ZX_OK) {
     callback(status);
     return;
   }
 
+  thread_ =
+      Thread::Create("netdevice:client", &NetworkDeviceClient::Thread, this, DEFAULT_PRIORITY);
+  ZX_ASSERT_MSG(thread_, "Thread::Create failed.");
+  thread_->Resume();
+
   callback(ZX_OK);
-
-#if 0
-  fpromise::bridge<DeviceInfo, zx_status_t> bridge;
-  device_->GetInfo().ThenExactlyOnce(
-      [res = std::move(bridge.completer)](
-          fidl::WireUnownedResult<netdev::Device::GetInfo>& result) mutable {
-        if (!result.ok()) {
-          res.complete_error(result.status());
-          return;
-        }
-        zx::result info = DeviceInfo::Create(result->info);
-        if (info.is_error()) {
-          res.complete_error(info.status_value());
-        } else {
-          res.complete_ok(std::move(info.value()));
-        }
-      });
-
-  auto prepare_session = [this, cfg = std::move(config_factory)](
-                             DeviceInfo& info) -> fpromise::result<void, zx_status_t> {
-    session_config_ = cfg(info);
-    device_info_ = std::move(info);
-    zx_status_t status;
-    if ((status = PrepareSession()) != ZX_OK) {
-      return fpromise::error(status);
-    }
-    return fpromise::ok();
-  };
-  auto open_session = [this, name]() -> fpromise::promise<void, zx_status_t> {
-    fpromise::bridge<void, zx_status_t> bridge;
-    fidl::Arena alloc;
-    zx::result session_info = MakeSessionInfo(alloc);
-    if (session_info.is_error()) {
-      return fpromise::make_error_promise(session_info.error_value());
-    }
-    device_->OpenSession(fidl::StringView::FromExternal(name), session_info.value())
-        .Then([this, res = std::move(bridge.completer)](
-                  fidl::WireUnownedResult<netdev::Device::OpenSession>& result) mutable {
-          if (!result.ok()) {
-            res.complete_error(result.status());
-            return;
-          }
-
-          const auto* open_result = result.Unwrap();
-          if (open_result->is_error()) {
-            res.complete_error(open_result->error_value());
-          } else {
-            netdev::wire::DeviceOpenSessionResponse& response = *open_result->value();
-            session_.Bind(std::move(response.session), dispatcher_, this);
-            rx_fifo_ = std::move(response.fifos.rx);
-            tx_fifo_ = std::move(response.fifos.tx);
-            res.complete_ok();
-          }
-        });
-    return bridge.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED));
-  };
-  auto prepare_descriptors = [this]() -> fpromise::result<void, zx_status_t> {
-    zx_status_t status;
-    if ((status = PrepareDescriptors()) != ZX_OK) {
-      return fpromise::error(status);
-    } else {
-      return fpromise::ok();
-    }
-  };
-  auto fire_callback = [this,
-                        cb = std::move(callback)](fpromise::result<void, zx_status_t>& result) {
-    if (result.is_ok()) {
-      cb(ZX_OK);
-    } else {
-      session_running_ = false;
-      cb(result.error());
-    }
-  };
-  auto prom = bridge.consumer.promise()
-                  .and_then(std::move(prepare_session))
-                  .and_then(std::move(open_session))
-                  .and_then(std::move(prepare_descriptors))
-                  .then(std::move(fire_callback));
-  fpromise::schedule_for_consumer(executor_.get(), std::move(prom));
-#endif
 }
 
 zx_status_t SessionConfig::Validate() {
@@ -345,239 +296,127 @@ zx_status_t NetworkDeviceClient::PrepareSession() {
   return ZX_OK;
 }
 
-#if 0
-void NetworkDeviceClient::AttachPort(netdev::wire::PortId port_id,
-                                     std::vector<netdev::wire::FrameType> rx_frame_types,
+void NetworkDeviceClient::AttachPort(port_id_t port_id, fbl::Vector<frame_type_t> rx_frame_types,
                                      ErrorCallback callback) {
-  auto promise = [this, port_id, &rx_frame_types]() -> fpromise::promise<void, zx_status_t> {
-    if (!session_.is_valid()) {
-      return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
-    }
-    fpromise::bridge<void, zx_status_t> bridge;
-    session_
-        ->Attach(port_id, fidl::VectorView<netdev::wire::FrameType>::FromExternal(rx_frame_types))
-        .ThenExactlyOnce([completer = std::move(bridge.completer)](
-                             fidl::WireUnownedResult<netdev::Session::Attach>& result) mutable {
-          if (!result.ok()) {
-            completer.complete_error(result.status());
-            return;
-          }
-          if (result->is_error()) {
-            completer.complete_error(result->error_value());
-          } else {
-            completer.complete_ok();
-          }
-        });
-    return bridge.consumer.promise();
-  }();
-  ScheduleCallbackPromise(std::move(promise), std::move(callback));
+  auto result = session_->Attach(port_id, rx_frame_types);
+  callback(result);
 }
 
-void NetworkDeviceClient::DetachPort(netdev::wire::PortId port_id, ErrorCallback callback) {
-  auto promise = [this, &port_id]() -> fpromise::promise<void, zx_status_t> {
-    if (!session_.is_valid()) {
-      return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
-    }
-    fpromise::bridge<void, zx_status_t> bridge;
-    session_->Detach(port_id).ThenExactlyOnce(
-        [completer = std::move(bridge.completer)](
-            fidl::WireUnownedResult<netdev::Session::Detach>& result) mutable {
-          if (!result.ok()) {
-            completer.complete_error(result.status());
-            return;
-          }
-          if (result->is_error()) {
-            completer.complete_error(result->error_value());
-          } else {
-            completer.complete_ok();
-          }
-        });
-    return bridge.consumer.promise();
-  }();
-  ScheduleCallbackPromise(std::move(promise), std::move(callback));
+void NetworkDeviceClient::DetachPort(port_id_t port_id, ErrorCallback callback) {
+  auto result = session_->Detach(port_id);
+  callback(result);
 }
 
-void NetworkDeviceClient::GetPortInfoWithMac(netdev::wire::PortId port_id,
-                                             PortInfoWithMacCallback callback) {
+void NetworkDeviceClient::GetPortInfoWithMac(
+    port_id_t port_id, NetworkDeviceClient::PortInfoWithMacCallback callback) {
   struct State {
     PortInfoAndMac result;
-    fidl::WireClient<netdev::Port> port_client;
-    fidl::WireClient<netdev::MacAddressing> mac_client;
+    network::internal::DevicePort* port_client;
+    ddk::MacAddrProtocolClient mac_client;
   };
-  auto state = std::make_unique<State>();
+
+  fbl::AllocChecker ac;
+  auto state = fbl::make_unique_checked<State>(&ac);
+  if (!ac.check()) {
+    callback(zx::error(ZX_ERR_NO_MEMORY));
+    return;
+  }
 
   // Connect to the requested port.
-  zx::result port_endpoints = fidl::CreateEndpoints<netdev::Port>();
-  if (port_endpoints.is_error()) {
-    callback(zx::error(port_endpoints.error_value()));
+  device_->GetPort(port_id, &state->port_client);
+  if (!state->port_client) {
+    callback(zx::error(ZX_ERR_BAD_STATE));
     return;
   }
-  const fidl::OneWayStatus get_port_result =
-      device_->GetPort(port_id, std::move(port_endpoints->server));
-  if (!get_port_result.ok()) {
-    callback(zx::error(get_port_result.status()));
-    return;
-  }
-  state->port_client.Bind(std::move(port_endpoints->client), dispatcher_);
 
   // Connect to the port's MacAddressing interface.
-  zx::result mac_endpoints = fidl::CreateEndpoints<netdev::MacAddressing>();
-  if (mac_endpoints.is_error()) {
-    callback(zx::error(mac_endpoints.error_value()));
+  mac_addr_protocol_t* out_mac_ifc = nullptr;
+  state->port_client->GetMac(&out_mac_ifc);
+
+  if (!out_mac_ifc) {
+    callback(zx::error(ZX_ERR_BAD_STATE));
     return;
   }
-  const fidl::OneWayStatus get_mac_result =
-      state->port_client->GetMac(std::move(mac_endpoints->server));
-  if (!get_mac_result.ok()) {
-    callback(zx::error(get_mac_result.status()));
-    return;
-  }
-  state->mac_client.Bind(std::move(mac_endpoints->client), dispatcher_);
+  state->mac_client = ddk::MacAddrProtocolClient(out_mac_ifc);
 
-  // Get the port's information.
-  fpromise::bridge<void, zx_status_t> bridge;
-  state->port_client->GetInfo().ThenExactlyOnce(
-      [completer = std::move(bridge.completer),
-       state = state.get()](fidl::WireUnownedResult<netdev::Port::GetInfo>& result) mutable {
-        if (!result.ok()) {
-          completer.complete_error(result.status());
-          return;
-        }
-        zx::result<PortInfoAndMac> info =
-            PortInfoAndMac::Create(result.value().info, /*unicast_address=*/std::nullopt);
-        if (!info.is_ok()) {
-          completer.complete_error(info.error_value());
-          return;
-        }
-        state->result = std::move(info.value());
-        completer.complete_ok();
-      });
+  port_base_info_t info;
+  state->port_client->GetInfo(&info);
 
-  // Get the Mac address of the interface.
-  auto get_mac_address = [state = state.get()]() -> fpromise::promise<void, zx_status_t> {
-    fpromise::bridge<void, zx_status_t> bridge;
-    state->mac_client->GetUnicastAddress().ThenExactlyOnce(
-        [completer = std::move(bridge.completer),
-         state](fidl::WireUnownedResult<netdev::MacAddressing::GetUnicastAddress>& result) mutable {
-          if (!result.ok()) {
-            zx_status_t status = result.status();
-            if (status == ZX_ERR_NOT_SUPPORTED && result.is_peer_closed()) {
-              completer.complete_ok();
-            } else {
-              completer.complete_error(status);
-            }
-            return;
-          }
-
-          state->result.unicast_address = result->address;
-          completer.complete_ok();
-        });
-
-    return bridge.consumer.promise();
+  port_info_t pinfo = {
+      .id = port_id,
+      .base_info = info,
   };
 
-  // Fetch results, and call the user's callback.
-  auto fetch_details = bridge.consumer.promise()
-                           .and_then(std::move(get_mac_address))
-                           .then([callback = std::move(callback), state = state.get()](
-                                     fpromise::result<void, zx_status_t>& result) {
-                             if (!result.is_ok()) {
-                               callback(zx::error(result.error()));
-                               return;
-                             }
-                             callback(zx::success(std::move(state->result)));
-                           })
-                           // Keep `state` alive until the promise completes.
-                           .inspect([state = std::move(state)](const fpromise::result<>&) {});
-  fpromise::schedule_for_consumer(executor_.get(), std::move(fetch_details));
+  zx::result<PortInfoAndMac> port_info =
+      PortInfoAndMac::Create(pinfo, /*unicast_address=*/std::nullopt);
+
+  if (port_info.is_error()) {
+    callback(zx::error(port_info.error_value()));
+    return;
+  }
+
+  // Get the Mac address of the interface.
+  mac_address_t mac_address;
+  state->mac_client.GetAddress(&mac_address);
+  port_info.value().unicast_address = mac_address;
+
+  callback(zx::success(std::move(port_info.value())));
 }
 
 void NetworkDeviceClient::GetPorts(PortsCallback callback) {
   struct PortWatcherHelper {
-    using PortsAndCompleted = std::pair<std::vector<netdev::wire::PortId>, bool>;
-    using Promise = fpromise::promise<PortsAndCompleted, zx_status_t>;
-    static Promise Watch(fidl::WireClient<netdev::PortWatcher> watcher,
-                         std::vector<netdev::wire::PortId> found_ports) {
-      fpromise::bridge<PortsAndCompleted, zx_status_t> bridge;
-      watcher->Watch().ThenExactlyOnce(
-          [completer = std::move(bridge.completer), ports = std::move(found_ports)](
-              fidl::WireUnownedResult<netdev::PortWatcher::Watch>& result) mutable {
-            if (!result.ok()) {
-              completer.complete_error(result.status());
-              return;
-            }
-            const netdev::wire::DevicePortEvent& event = result->event;
-            switch (event.Which()) {
-              case netdev::wire::DevicePortEvent::Tag::kIdle:
-                completer.complete_ok(std::make_pair(std::move(ports), true));
-                break;
-              case netdev::wire::DevicePortEvent::Tag::kExisting:
-                ports.push_back(event.existing());
-                completer.complete_ok(std::make_pair(std::move(ports), false));
-                break;
-              case netdev::wire::DevicePortEvent::Tag::kRemoved:
-              case netdev::wire::DevicePortEvent::Tag::kAdded:
-                completer.complete_error(ZX_ERR_INTERNAL);
-                break;
-            }
-          });
-
-      return bridge.consumer.promise().and_then(
-          [watcher = std::move(watcher)](PortsAndCompleted& next) mutable -> Promise {
-            auto& [ports, complete] = next;
-            if (complete) {
-              // All done.
-              return fpromise::make_result_promise<PortsAndCompleted, zx_status_t>(
-                  fpromise::ok(std::move(next)));
-            }
-            return Watch(std::move(watcher), std::move(ports));
-          });
-    }
-  };
-  zx::result watcher_endpoints = fidl::CreateEndpoints<netdev::PortWatcher>();
-  if (watcher_endpoints.is_error()) {
-    callback(zx::error(watcher_endpoints.error_value()));
-    return;
-  }
-  const fidl::Status result = device_->GetPortWatcher(std::move(watcher_endpoints->server));
-  if (!result.ok()) {
-    callback(zx::error(result.status()));
-    return;
-  }
-  fidl::WireClient<netdev::PortWatcher> watcher;
-  watcher.Bind(std::move(watcher_endpoints->client), dispatcher_);
-
-  fpromise::bridge<std::vector<netdev::wire::PortId>, zx_status_t> bridge;
-  auto promise = PortWatcherHelper::Watch(std::move(watcher), {});
-
-  auto list_ports = promise.then(
-      [callback = std::move(callback)](
-          fpromise::result<PortWatcherHelper::PortsAndCompleted, zx_status_t>& result) {
-        if (!result.is_ok()) {
-          callback(zx::error(result.error()));
+    static zx::result<fbl::Vector<port_id_t>> Watch(network::internal::PortWatcher* watcher,
+                                                    fbl::Vector<port_id_t> found_ports) {
+      zx::result<bool> complete;
+      watcher->Watch([&complete, &ports = found_ports](
+                         zx::result<std::pair<uint8_t, device_port_event_t>> result) mutable {
+        if (result.is_error()) {
           return;
         }
-        auto& [ports, complete] = result.value();
-        FX_CHECK(complete);
-        callback(zx::success(std::move(ports)));
+        auto [type, event] = result.value();
+        switch (type) {
+          case EVENT_TYPE_IDLE:
+            complete = zx::ok(true);
+            break;
+          case EVENT_TYPE_EXISTING: {
+            fbl::AllocChecker ac;
+            ports.push_back(event.existing, &ac);
+            if (!ac.check()) {
+              return;
+            }
+            complete = zx::ok(false);
+            break;
+          }
+          case EVENT_TYPE_REMOVED:
+          case EVENT_TYPE_ADDED:
+            complete = zx::error(ZX_ERR_INTERNAL);
+            break;
+        }
       });
 
-  fpromise::schedule_for_consumer(executor_.get(), std::move(list_ports));
-}
+      if (complete.is_error()) {
+        return zx::error(complete.error_value());
+      }
+      if (complete.value()) {
+        return zx::ok(std::move(found_ports));
+      }
+      return Watch(watcher, std::move(found_ports));
+    }
+  };
 
-void NetworkDeviceClient::ScheduleCallbackPromise(fpromise::promise<void, zx_status_t> promise,
-                                                  ErrorCallback callback) {
-  fpromise::schedule_for_consumer(
-      executor_.get(),
-      promise.then([callback = std::move(callback)](fpromise::result<void, zx_status_t>& result) {
-        if (result.is_ok()) {
-          callback(ZX_OK);
-        } else {
-          callback(result.error());
-        }
-      }));
+  auto watcher = device_->GetPortWatcher();
+  if (!watcher) {
+    callback(zx::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  auto ports = PortWatcherHelper::Watch(watcher, {});
+  if (ports.is_error()) {
+    callback(zx::error(ports.error_value()));
+    return;
+  }
+  callback(zx::success(std::move(ports.value())));
 }
-#endif
 
 zx_status_t NetworkDeviceClient::KillSession() {
   if (!session_) {
@@ -597,40 +436,37 @@ zx_status_t NetworkDeviceClient::KillSession() {
   return ZX_OK;
 }
 
-#if 0
 zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>>
-NetworkDeviceClient::WatchStatus(netdev::wire::PortId port_id, StatusCallback callback,
-                                 uint32_t buffer) {
-  zx::result port_endpoints = fidl::CreateEndpoints<netdev::Port>();
-  if (port_endpoints.is_error()) {
-    return port_endpoints.take_error();
+NetworkDeviceClient::WatchStatus(port_id_t port_id, StatusCallback callback, uint32_t buffer) {
+  network::internal::DevicePort* port_client = nullptr;
+  device_->GetPort(port_id, &port_client);
+  if (!port_client) {
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  zx::result watcher_endpoints = fidl::CreateEndpoints<netdev::StatusWatcher>();
-  if (watcher_endpoints.is_error()) {
-    return watcher_endpoints.take_error();
+  auto status_watch = port_client->GetStatusWatcher(buffer);
+  if (!status_watch) {
+    return zx::error(ZX_ERR_BAD_STATE);
   }
-  {
-    fidl::Status result = device_->GetPort(port_id, std::move(port_endpoints->server));
-    if (!result.ok()) {
-      return zx::error(result.status());
-    }
+
+  fbl::AllocChecker ac;
+  auto handle = std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>(
+      new (&ac) NetworkDeviceClient::StatusWatchHandle(status_watch, std::move(callback)));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  fidl::Status result = fidl::WireCall(port_endpoints->client)
-                            ->GetStatusWatcher(std::move(watcher_endpoints->server), buffer);
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::unique_ptr<StatusWatchHandle>(new StatusWatchHandle(
-      std::move(watcher_endpoints->client), dispatcher_, std::move(callback))));
+
+  return zx::ok(std::move(handle));
 }
-#endif
 
 zx::result<session_info> NetworkDeviceClient::MakeSessionInfo() {
   uint64_t descriptor_length_words = session_config_.descriptor_length / sizeof(uint64_t);
   ZX_DEBUG_ASSERT_MSG(descriptor_length_words <= std::numeric_limits<uint8_t>::max(),
                       "session descriptor length %ld (%ld words) overflows uint8_t",
                       session_config_.descriptor_length, descriptor_length_words);
+
+  ZX_ASSERT(descriptors_vmo_);
+  ZX_ASSERT(data_vmo_);
 
   session_info session_info = {
       .descriptors_list = (uint8_t*)fbl::ExportToRawPtr<VmObjectDispatcher>(&descriptors_vmo_),
@@ -716,16 +552,28 @@ zx_status_t NetworkDeviceClient::PrepareDescriptors() {
       return ZX_ERR_NO_MEMORY;
     }
   }
+
   // rx_wait_.set_object(rx_fifo_.get());
   // rx_wait_.set_trigger(kFifoWaitReads);
+  rx_wait_.handle = Handle::Make(rx_fifo_.dispatcher(), ZX_DEFAULT_FIFO_RIGHTS);
   // ZX_ASSERT(rx_wait_.Begin(dispatcher_) == ZX_OK);
+  rx_wait_.pending = true;
+  ZX_ASSERT(port_->MakeObserver(0, rx_wait_.handle.get(), kRxKey, kFifoWaitReads) == ZX_OK);
+
   // tx_wait_.set_object(tx_fifo_.get());
   // tx_wait_.set_trigger(kFifoWaitReads);
-  // ZX_ASSERT(tx_wait_.Begin(dispatcher_) == ZX_OK);
+  tx_wait_.handle = Handle::Make(tx_fifo_.dispatcher(), ZX_DEFAULT_FIFO_RIGHTS);
+  // ZX_ASSERT(tx_wait_.Begin(dispatcher_) == ZX_OK)
+  tx_wait_.pending = true;
+  ZX_ASSERT(port_->MakeObserver(0, tx_wait_.handle.get(), kTxKey, kFifoWaitReads) == ZX_OK);
+
   // rx_writable_wait_.set_object(rx_fifo_.get());
   // rx_writable_wait_.set_trigger(kFifoWaitWrites);
+  rx_writable_wait_.handle = Handle::Make(rx_fifo_.dispatcher(), ZX_DEFAULT_FIFO_RIGHTS);
+
   // tx_writable_wait_.set_object(tx_fifo_.get());
   // tx_writable_wait_.set_trigger(kFifoWaitWrites);
+  tx_writable_wait_.handle = Handle::Make(tx_fifo_.dispatcher(), ZX_DEFAULT_FIFO_RIGHTS);
 
   FlushRx();
 
@@ -733,6 +581,8 @@ zx_status_t NetworkDeviceClient::PrepareDescriptors() {
 }
 
 void NetworkDeviceClient::FlushRx() {
+  LTRACE_ENTRY;
+
   size_t flush = std::min(rx_out_queue_.size(), static_cast<size_t>(device_info_.rx_depth));
   ZX_ASSERT(flush != 0);
 
@@ -742,20 +592,27 @@ void NetworkDeviceClient::FlushRx() {
   size_t actual;
   zx_status_t status = rx_fifo_.dispatcher()->Write(sizeof(uint16_t),
                                                     (uint8_t*)rx_out_queue_.data(), flush, &actual);
-  // bool sched_more;
+  bool sched_more;
   if (status == ZX_OK) {
     // rx_out_queue_.erase(rx_out_queue_.begin(), rx_out_queue_.begin() + flush);
-    // sched_more = !rx_out_queue_.is_empty();
+    for (uint16_t i = 0; i < flush; i++) {
+      rx_out_queue_.erase(0);
+    }
+    sched_more = !rx_out_queue_.is_empty();
   } else {
-    // sched_more = status == ZX_ERR_SHOULD_WAIT;
+    sched_more = status == ZX_ERR_SHOULD_WAIT;
   }
 
-  // if (sched_more && !rx_writable_wait_.is_pending()) {
-  //   ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  // }
+  if (sched_more && !rx_writable_wait_.is_pending()) {
+    rx_writable_wait_.pending = true;
+    ZX_ASSERT(port_->MakeObserver(0, rx_writable_wait_.handle.get(), kRxWritableKey,
+                                  kFifoWaitWrites) == ZX_OK);
+  }
 }
 
 void NetworkDeviceClient::FlushTx() {
+  LTRACE_ENTRY;
+
   size_t flush = std::min(tx_out_queue_.size(), static_cast<size_t>(device_info_.tx_depth));
   ZX_ASSERT(flush != 0);
 
@@ -765,27 +622,40 @@ void NetworkDeviceClient::FlushTx() {
   size_t actual;
   zx_status_t status = tx_fifo_.dispatcher()->Write(sizeof(uint16_t),
                                                     (uint8_t*)tx_out_queue_.data(), flush, &actual);
-  // bool sched_more;
+  bool sched_more;
   if (status == ZX_OK) {
     // tx_out_queue_.erase(tx_out_queue_.begin(), tx_out_queue_.begin() + flush);
-    // sched_more = !tx_out_queue_.is_empty();
+    for (uint16_t i = 0; i < flush; i++) {
+      tx_out_queue_.erase(0);
+    }
+    sched_more = !tx_out_queue_.is_empty();
   } else {
-    // sched_more = status == ZX_ERR_SHOULD_WAIT;
+    sched_more = status == ZX_ERR_SHOULD_WAIT;
   }
 
-  // if (sched_more && !tx_writable_wait_.is_pending()) {
-  //   ZX_ASSERT(tx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  // }
+  if (sched_more && !tx_writable_wait_.is_pending()) {
+    tx_writable_wait_.pending = true;
+    ZX_ASSERT(port_->MakeObserver(0, tx_writable_wait_.handle.get(), kTxWritableKey,
+                                  kFifoWaitWrites) == ZX_OK);
+  }
 }
 
-#if 0
 void NetworkDeviceClient::ErrorTeardown(zx_status_t err) {
+  LTRACEF("err: %s\n", zx_status_get_string(err));
   session_running_ = false;
   data_.Unmap();
   data_vmo_.reset();
   descriptors_.Unmap();
   descriptors_vmo_.reset();
   session_ = {};
+
+  bool zero_handles = port_->decrement_handle_count();
+  if (zero_handles) {
+    port_->on_zero_handles();
+  }
+  port_.reset();
+
+#if 0
   auto cancel_wait = [](async::WaitBase& wait, const char* name) {
     zx_status_t status = wait.Cancel();
     switch (status) {
@@ -796,65 +666,67 @@ void NetworkDeviceClient::ErrorTeardown(zx_status_t err) {
         FX_PLOGS(ERROR, status) << "failed to cancel" << name;
     }
   };
-  cancel_wait(tx_wait_, "tx_wait");
-  cancel_wait(rx_wait_, "rx_wait");
-  cancel_wait(tx_writable_wait_, "tx_writable_wait");
-  cancel_wait(rx_writable_wait_, "rx_writable_wait");
+  //cancel_wait(tx_wait_, "tx_wait");
+  //cancel_wait(rx_wait_, "rx_wait");
+  //cancel_wait(tx_writable_wait_, "tx_writable_wait");
+  //cancel_wait(rx_writable_wait_, "rx_writable_wait");
+#endif
 
   if (err_callback_) {
     err_callback_(err);
   }
 }
 
-void NetworkDeviceClient::TxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                   zx_status_t status, const zx_packet_signal_t* signal) {
+void NetworkDeviceClient::TxSignal(zx_status_t status, Handle* wait,
+                                   const zx_packet_signal_t* signal) {
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "tx wait failed: " << zx_status_get_string(status);
+    LTRACEF("tx wait failed: %s\n", zx_status_get_string(status));
     return;
   }
-  if (signal->observed & wait->trigger() & ZX_FIFO_PEER_CLOSED) {
-    FX_LOGS(WARNING) << "tx fifo was closed";
+  if (signal->observed & signal->trigger & ZX_FIFO_PEER_CLOSED) {
+    LTRACEF("tx fifo was closed\n");
     ErrorTeardown(ZX_ERR_PEER_CLOSED);
     return;
   }
-  if (signal->observed & wait->trigger() & ZX_FIFO_READABLE) {
+  if (signal->observed & signal->trigger & ZX_FIFO_READABLE) {
     FetchTx();
   }
-  if ((signal->observed & wait->trigger() & ZX_FIFO_WRITABLE) && !tx_out_queue_.empty()) {
+  if ((signal->observed & signal->trigger & ZX_FIFO_WRITABLE) && !tx_out_queue_.is_empty()) {
     FlushTx();
   }
 
-  if (wait != &tx_writable_wait_ || !tx_out_queue_.empty()) {
-    ZX_ASSERT(wait->Begin(dispatcher_) == ZX_OK);
+  if (wait != tx_writable_wait_.handle.get() || !tx_out_queue_.is_empty()) {
+    ZX_ASSERT(port_->MakeObserver(0, tx_wait_.handle.get(), kTxKey, kFifoWaitReads) == ZX_OK);
+    tx_wait_.pending = true;
   }
 }
 
-void NetworkDeviceClient::RxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                   zx_status_t status, const zx_packet_signal_t* signal) {
+void NetworkDeviceClient::RxSignal(zx_status_t status, Handle* wait,
+                                   const zx_packet_signal_t* signal) {
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "rx wait failed: " << zx_status_get_string(status);
+    LTRACEF("rx wait failed: %s\n", zx_status_get_string(status));
     return;
   }
 
-  if (signal->observed & wait->trigger() & ZX_FIFO_PEER_CLOSED) {
-    FX_LOGS(WARNING) << "rx fifo was closed";
+  if (signal->observed & signal->trigger & ZX_FIFO_PEER_CLOSED) {
+    LTRACEF("rx fifo was closed\n");
     ErrorTeardown(ZX_ERR_PEER_CLOSED);
     return;
   }
 
-  if (signal->observed & wait->trigger() & ZX_FIFO_READABLE) {
+  if (signal->observed & signal->trigger & ZX_FIFO_READABLE) {
     FetchRx();
   }
 
-  if ((signal->observed & wait->trigger() & ZX_FIFO_WRITABLE) && !rx_out_queue_.empty()) {
+  if ((signal->observed & signal->trigger & ZX_FIFO_WRITABLE) && !rx_out_queue_.is_empty()) {
     FlushRx();
   }
 
-  if (wait != &rx_writable_wait_ || !rx_out_queue_.empty()) {
-    ZX_ASSERT(wait->Begin(dispatcher_) == ZX_OK);
+  if (wait != rx_writable_wait_.handle.get() || !rx_out_queue_.is_empty()) {
+    ZX_ASSERT(port_->MakeObserver(0, rx_wait_.handle.get(), kRxKey, kFifoWaitReads) == ZX_OK);
+    rx_wait_.pending = true;
   }
 }
-#endif
 
 void NetworkDeviceClient::FetchRx() {
   uint16_t buff[kMaxDepth];
@@ -862,7 +734,7 @@ void NetworkDeviceClient::FetchRx() {
   zx_status_t status;
   if ((status = rx_fifo_.dispatcher()->Read(sizeof(uint16_t), (uint8_t*)buff, kMaxDepth, &read)) !=
       ZX_OK) {
-    TRACEF("Error reading from rx queue: %s\n", zx_status_get_string(status));
+    LTRACEF("Error reading from rx queue: %s\n", zx_status_get_string(status));
     return;
   }
   uint16_t* desc_idx = buff;
@@ -893,12 +765,14 @@ zx_status_t NetworkDeviceClient::Send(NetworkDeviceClient::Buffer* buffer) {
     tx_buffer.rx_ = true;
     buffer->rx_ = false;
   }
-  // if (!tx_writable_wait_.is_pending()) {
-  //   zx_status_t status = tx_writable_wait_.Begin(dispatcher_);
-  //   if (status != ZX_OK) {
-  //     return status;
-  //   }
-  // }
+  if (!tx_writable_wait_.is_pending()) {
+    zx_status_t status =
+        port_->MakeObserver(0, tx_writable_wait_.handle.get(), kTxWritableKey, kFifoWaitWrites);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
   fbl::AllocChecker ac;
   tx_out_queue_.push_back(buffer->descriptor_, &ac);
   ZX_ASSERT(ac.check());
@@ -929,9 +803,11 @@ void NetworkDeviceClient::ReturnRxDescriptor(uint16_t idx) {
   fbl::AllocChecker ac;
   rx_out_queue_.push_back(idx, &ac);
   ZX_ASSERT(ac.check());
-  // if (!rx_writable_wait_.is_pending()) {
-  //   ZX_ASSERT(rx_writable_wait_.Begin(dispatcher_) == ZX_OK);
-  // }
+
+  if (!rx_writable_wait_.is_pending()) {
+    ZX_ASSERT(port_->MakeObserver(0, rx_writable_wait_.handle.get(), kRxWritableKey,
+                                  kFifoWaitWrites) == ZX_OK);
+  }
 }
 
 void NetworkDeviceClient::FetchTx() {
@@ -940,7 +816,7 @@ void NetworkDeviceClient::FetchTx() {
   zx_status_t status;
   if ((status = tx_fifo_.dispatcher()->Read(sizeof(uint16_t), (uint8_t*)buff, kMaxDepth, &read)) !=
       ZX_OK) {
-    TRACEF("Error reading from tx queue: %s\n", zx_status_get_string(status));
+    LTRACEF("Error reading from tx queue: %s\n", zx_status_get_string(status));
     return;
   }
   uint16_t* desc_idx = buff;
@@ -950,6 +826,48 @@ void NetworkDeviceClient::FetchTx() {
     read--;
     desc_idx++;
   }
+}
+
+int NetworkDeviceClient::Thread(void* arg) {
+  NetworkDeviceClient* thiz = static_cast<NetworkDeviceClient*>(arg);
+  for (;;) {
+    zx_port_packet_t packet;
+    zx_status_t status = thiz->port_->Dequeue(Deadline::infinite(), &packet);
+    if (status != ZX_OK) {
+      LTRACEF("wait failed: %s\n", zx_status_get_string(status));
+      break;
+    }
+
+    if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE) {
+      switch (packet.key) {
+        case kTxKey: {
+          thiz->tx_wait_.pending = false;
+          thiz->TxSignal(ZX_OK, thiz->tx_wait_.handle.get(), &packet.signal);
+          break;
+        }
+        case kRxKey: {
+          thiz->rx_wait_.pending = false;
+          thiz->RxSignal(ZX_OK, thiz->rx_wait_.handle.get(), &packet.signal);
+          break;
+        }
+        case kTxWritableKey: {
+          thiz->tx_writable_wait_.pending = false;
+          thiz->TxSignal(ZX_OK, thiz->tx_writable_wait_.handle.get(), &packet.signal);
+          break;
+        }
+        case kRxWritableKey: {
+          thiz->rx_writable_wait_.pending = false;
+          thiz->RxSignal(ZX_OK, thiz->rx_writable_wait_.handle.get(), &packet.signal);
+          break;
+        }
+      }
+    }
+
+    if (!thiz->session_running_) {
+      break;
+    }
+  }
+  return 0;
 }
 
 NetworkDeviceClient::Buffer NetworkDeviceClient::AllocTx() {
@@ -1205,18 +1123,13 @@ size_t NetworkDeviceClient::BufferRegion::PadTo(size_t size) {
   return desc_->data_length;
 }
 
-#if 0
 void NetworkDeviceClient::StatusWatchHandle::Watch() {
-  watcher_->WatchStatus().Then(
-      [this](fidl::WireUnownedResult<netdev::StatusWatcher::WatchStatus>& result) {
-        if (!result.ok()) {
-          return;
-        }
-        callback_(result->port_status);
-        // Watch again, we only stop watching when StatusWatchHandle is destroyed.
-        Watch();
-      });
+  watcher_->WatchStatus([this](port_status_t status) {
+    callback_(zx::ok(status));
+    // Watch again, we only stop watching when StatusWatchHandle is destroyed.
+    // Watch();
+  });
 }
-#endif
+
 }  // namespace client
 }  // namespace network

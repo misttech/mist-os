@@ -23,15 +23,14 @@ namespace network::internal {
 
 struct tx_thread_wrapper_data {
   uint16_t capacity;
-  std::unique_ptr<tx_buffer_t[]> buffers;
+  std::unique_ptr<tx_buffer_t[]> tx_buffers;
   std::unique_ptr<BufferParts<buffer_region_t>[]> buffer_parts;
   TxQueue* queue;
 };
 
 int tx_thread_wrapper(void* arg) {
   struct tx_thread_wrapper_data* thread_data = (struct tx_thread_wrapper_data*)arg;
-  cpp20::span<tx_buffer_t> buffers(thread_data->buffers.get(), thread_data->capacity);
-  thread_data->queue->Thread(std::move(buffers));
+  thread_data->queue->Thread(cpp20::span(&thread_data->tx_buffers[0], thread_data->capacity));
   delete thread_data;
   return 0;
 }
@@ -147,10 +146,8 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   for (int i = 0; i < capacity; ++i) {
-    tx_buffers[i].data_list = new (&ac) buffer_region_t[capacity];
-    if (!ac.check()) {
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
+    tx_buffers[i].data_list = buffer_parts[i].data();
+    tx_buffers[i].data_count = 0;
   }
 
   KernelHandle<PortDispatcher> port;
@@ -202,7 +199,7 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
   }
 
   thread_data->capacity = capacity;
-  thread_data->buffers = std::move(tx_buffers);
+  thread_data->tx_buffers = std::move(tx_buffers);
   thread_data->buffer_parts = std::move(buffer_parts);
   thread_data->queue = queue.get();
 
@@ -262,8 +259,10 @@ zx_status_t TxQueue::UpdateFifoWatches() {
       if (!waiter.wait_installed) {
         continue;
       }
-      zx_status_t status =
-          port_->CancelQueued(session.tx_fifo().get(), it.key()) == true ? ZX_OK : ZX_ERR_NOT_FOUND;
+      auto fifo = session.tx_fifo();
+      bool had_observer = fifo->CancelByKey(fifo.get(), port_.get(), it.key());
+      bool packet_removed = port_->CancelQueued(fifo.get(), it.key());
+      zx_status_t status = (had_observer || packet_removed) ? ZX_OK : ZX_ERR_NOT_FOUND;
       switch (status) {
         case ZX_OK:
           waiter.wait_installed = false;
@@ -279,15 +278,13 @@ zx_status_t TxQueue::UpdateFifoWatches() {
       continue;
     }
 
-    HandleOwner fifo_hdl = Handle::Make(session.tx_fifo(), ZX_DEFAULT_FIFO_RIGHTS);
-    if (zx_status_t status = port_->MakeObserver(0, fifo_hdl.get(), it.key(),
+    if (zx_status_t status = port_->MakeObserver(0, session.tx_fifo(), it.key(),
                                                  ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE);
         status != ZX_OK) {
       TRACEF("failed to start FIFO wait for session %s: %s\n", session.name(),
              zx_status_get_string(status));
       return status;
     }
-    fifo_hdl.release();
 
     waiter.wait_installed = true;
   }
@@ -344,15 +341,13 @@ zx_status_t TxQueue::HandleFifoSignal(cpp20::span<tx_buffer_t> buffers, SessionK
     return ZX_OK;
   }
 
-  HandleOwner fifo_hdl = Handle::Make(fifo, ZX_DEFAULT_FIFO_RIGHTS);
   if (zx_status_t status =
-          port_->MakeObserver(0, fifo_hdl.get(), key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE);
+          port_->MakeObserver(0, fifo, key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE);
       status != ZX_OK) {
     TRACEF("failed to start FIFO wait for session %s: %s\n", session.name(),
            zx_status_get_string(status));
     return status;
   }
-  fifo_hdl.release();
 
   waiter.wait_installed = true;
 
@@ -417,7 +412,7 @@ void TxQueue::CompleteTxList(const cpp20::span<const tx_result_t>& tx_results) {
   }
   bool was_full = ReturnBuffers();
   parent_->NotifyTxReturned(was_full);
-  // parent_->NotifyTxComplete();
+  parent_->NotifyTxComplete();
 }
 
 TxQueue::SessionKey TxQueue::AddSession(Session* session) {

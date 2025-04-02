@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,21 +7,23 @@
 
 #include <zircon/status.h>
 
-#include "log.h"
+// #include "log.h"
 
 namespace network::internal {
 
 StatusWatcher::StatusWatcher(uint32_t max_queue) : max_queue_(max_queue) {
   if (max_queue_ == 0) {
     max_queue_ = 1;
-  } else if (max_queue_ > netdev::wire::kMaxStatusBuffer) {
-    max_queue_ = netdev::wire::kMaxStatusBuffer;
+  } else if (max_queue_ > MAX_STATUS_BUFFER) {
+    max_queue_ = MAX_STATUS_BUFFER;
   }
 }
 
-zx_status_t StatusWatcher::Bind(async_dispatcher_t* dispatcher,
-                                fidl::ServerEnd<netdev::StatusWatcher> channel,
+#if 0
+zx_status_t StatusWatcher::Bind(/*async_dispatcher_t* dispatcher,
+                                fidl::ServerEnd<netdev::StatusWatcher> channel,*/
                                 fit::callback<void(StatusWatcher*)> closed_callback) {
+#if 0
   fbl::AutoLock lock(&lock_);
   ZX_DEBUG_ASSERT(!binding_.has_value());
   binding_ =
@@ -39,11 +42,13 @@ zx_status_t StatusWatcher::Bind(async_dispatcher_t* dispatcher,
                            closed->closed_cb_(closed);
                          }
                        });
+#endif
   closed_cb_ = std::move(closed_callback);
   return ZX_OK;
 }
 
 void StatusWatcher::Unbind() {
+#if 0
   fbl::AutoLock lock(&lock_);
   if (pending_txn_.has_value()) {
     pending_txn_->Close(ZX_ERR_CANCELED);
@@ -54,18 +59,19 @@ void StatusWatcher::Unbind() {
     binding_->Unbind();
     binding_.reset();
   }
+#endif
 }
-
+#endif
 StatusWatcher::~StatusWatcher() {
-  ZX_ASSERT_MSG(!pending_txn_.has_value(),
-                "tried to destroy StatusWatcher with a pending transaction");
-  ZX_ASSERT_MSG(!binding_.has_value(), "tried to destroy StatusWatcher without unbinding");
+  // ZX_ASSERT_MSG(!pending_txn_.has_value(),
+  //              "tried to destroy StatusWatcher with a pending transaction");
+  // ZX_ASSERT_MSG(!binding_.has_value(), "tried to destroy StatusWatcher without unbinding");
 }
 
-void StatusWatcher::WatchStatus(WatchStatusCompleter::Sync& completer) {
+void StatusWatcher::WatchStatus(StatusCallback callback) {
   fbl::AutoLock lock(&lock_);
-  if (queue_.empty()) {
-    if (pending_txn_.has_value()) {
+  if (queue_.is_empty()) {
+    /*if (pending_txn_.has_value()) {
       if (last_observed_.has_value()) {
         // Complete the last pending transaction with the old value and retain the new completer as
         // an async transaction.
@@ -82,40 +88,52 @@ void StatusWatcher::WatchStatus(WatchStatusCompleter::Sync& completer) {
       }
     } else {
       pending_txn_ = completer.ToAsync();
+    }*/
+    port_status_t status;
+    if (last_observed_.has_value()) {
+      status = {.flags = last_observed_.value().flags, .mtu = last_observed_.value().mtu};
+    } else {
+      status = {.flags = 0, .mtu = 0};
     }
+    callback(status);
   } else {
-    last_observed_ = queue_.front();
-    queue_.pop();
-    WithWireStatus(
-        [&completer](netdev::wire::PortStatus wire_status) { completer.Reply(wire_status); },
-        last_observed_->flags, last_observed_->mtu);
+    port_status_t status;
+    last_observed_ = queue_.erase(0);
+    if (last_observed_.has_value()) {
+      status = {.flags = last_observed_.value().flags, .mtu = last_observed_.value().mtu};
+    } else {
+      status = {.flags = 0, .mtu = 0};
+    }
+    callback(status);
   }
 }
 
-void StatusWatcher::PushStatus(const fuchsia_hardware_network::wire::PortStatus& status) {
+void StatusWatcher::PushStatus(const port_status_t& status) {
   fbl::AutoLock lock(&lock_);
   std::optional<PortStatus> tail;
-  if (queue_.empty()) {
+  if (queue_.is_empty()) {
     tail = last_observed_;
   } else {
-    tail = queue_.back();
+    tail = queue_.data()[queue_.size() - 1];
   }
   if (tail.has_value() && tail.value() == status) {
     // ignore if no change is observed
     return;
   }
 
-  if (pending_txn_.has_value() && queue_.empty()) {
-    WithWireStatus(
+  if (/*pending_txn_.has_value() &&*/ queue_.is_empty()) {
+    /*WithWireStatus(
         [completer = std::move(std::exchange(pending_txn_, std::nullopt).value())](
             netdev::wire::PortStatus wire_status) mutable { completer.Reply(wire_status); },
-        status.flags(), status.mtu());
+        status.flags(), status.mtu());*/
     last_observed_ = PortStatus(status);
   } else {
-    queue_.emplace(status);
+    fbl::AllocChecker ac;
+    queue_.push_back(PortStatus(status), &ac);
+    ZX_ASSERT(ac.check());
     // limit the queue to max_queue_
     if (queue_.size() > max_queue_) {
-      queue_.pop();
+      queue_.erase(0);
     }
   }
 }

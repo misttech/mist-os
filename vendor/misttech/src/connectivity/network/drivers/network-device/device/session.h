@@ -14,18 +14,14 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_counted.h>
 
-#include "data_structs.h"
 #include "definitions.h"
 #include "device_interface.h"
-// #include "device_port.h"
-#include "public/locks.h"
 #include "rx_queue.h"
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
 
 namespace network::internal {
 
-#if 0
 // A device port attached to a session.
 //
 // This class provides safe access to device ports owned by a DeviceInterface.
@@ -46,7 +42,7 @@ class AttachedPort {
   }
 
   // Returns the Rx frame types we're subscribed to on this attached port.
-  cpp20::span<const netdev::wire::FrameType> frame_types() const {
+  cpp20::span<const frame_type_t> frame_types() const {
     return cpp20::span(frame_types_.begin(), frame_type_count_);
   }
 
@@ -56,7 +52,7 @@ class AttachedPort {
   }
 
   AttachedPort(DeviceInterface* parent, DevicePort* port,
-               cpp20::span<const netdev::wire::FrameType> frame_types)
+               cpp20::span<const frame_type_t> frame_types)
       : parent_(parent),
         port_(port),
         frame_types_([&frame_types]() {
@@ -73,10 +69,9 @@ class AttachedPort {
   DeviceInterface* parent_ = nullptr;
   // Attached port pointer, not owned;
   DevicePort* port_ = nullptr;
-  std::array<netdev::wire::FrameType, netdev::wire::kMaxFrameTypes> frame_types_{};
+  std::array<frame_type_t, MAX_FRAME_TYPES> frame_types_{};
   uint32_t frame_type_count_ = 0;
 };
-#endif
 
 // A client session with a network device interface.
 //
@@ -136,14 +131,13 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>> {
   }
 
   // FIDL interface implementation:
-  // void Attach(AttachRequestView request, AttachCompleter::Sync& _completer) override;
-  // void Detach(DetachRequestView request, DetachCompleter::Sync& _completer) override;
-  // void Close(CloseCompleter::Sync& _completer) override;
+  zx_status_t Attach(const port_id_t& port_id, cpp20::span<const frame_type_t> frame_types);
+  zx_status_t Detach(const port_id_t& port_id);
+  void Close();
   // void WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) override;
 
-  // zx_status_t AttachPort(const netdev::wire::PortId& port_id,
-  //                        cpp20::span<const netdev::wire::FrameType> frame_types);
-  // zx_status_t DetachPort(const netdev::wire::PortId& port_id);
+  zx_status_t AttachPort(const port_id_t& port_id, cpp20::span<const frame_type_t> frame_types);
+  zx_status_t DetachPort(const port_id_t& port_id);
 
   // Sets the return code for a tx descriptor.
   void MarkTxReturnResult(uint16_t descriptor, zx_status_t status);
@@ -247,8 +241,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>> {
   // to other ports.
   //
   // Returns zx::error otherwise.
-  // zx::result<bool> DetachPortLocked(uint8_t port_id, std::optional<uint8_t> salt)
-  //    __TA_REQUIRES(parent_->control_lock());
+  zx::result<bool> DetachPortLocked(uint8_t port_id, std::optional<uint8_t> salt)
+      __TA_REQUIRES(parent_->control_lock());
 
   buffer_descriptor_t* checked_descriptor(uint16_t index);
   const buffer_descriptor_t* checked_descriptor(uint16_t index) const;
@@ -289,8 +283,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>> {
 
   // AttachedPorts information. Parent device is responsible for detaching ports from sessions
   // before destroying them.
-  // std::array<std::optional<AttachedPort>, MAX_PORTS> attached_ports_
-  //    __TA_GUARDED(parent_->control_lock());
+  std::array<std::optional<AttachedPort>, MAX_PORTS> attached_ports_
+      __TA_GUARDED(parent_->control_lock());
   // Pointer to parent network device, not owned.
   DeviceInterface* const parent_;
   std::unique_ptr<uint16_t[]> rx_return_queue_ __TA_GUARDED(parent_->rx_lock());

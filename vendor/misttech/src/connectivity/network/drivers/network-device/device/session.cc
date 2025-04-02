@@ -6,7 +6,9 @@
 #include "session.h"
 
 #include <lib/fit/defer.h>
+#include <trace.h>
 
+#include <algorithm>
 #include <optional>
 
 #include <fbl/alloc_checker.h>
@@ -16,6 +18,8 @@
 #include "lib/stdcompat/span.h"
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
 #include "tx_queue.h"
+
+#define LOCAL_TRACE 0
 
 namespace network::internal {
 namespace {
@@ -77,13 +81,13 @@ Session::Create(const session_info_t& info, std::string_view name, DeviceInterfa
   fbl::AllocChecker ac;
   std::unique_ptr<Session> session(new (&ac) Session(info, name, parent));
   if (!ac.check()) {
-    TRACEF("failed to allocate session");
+    LTRACEF("failed to allocate session\n");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result result = session->Init();
   if (result.is_error()) {
-    TRACEF("failed to init session %s: %s", session->name(), result.status_string());
+    LTRACEF("failed to init session %s: %d\n", session->name(), result.error_value());
     return result.take_error();
   }
 
@@ -98,7 +102,7 @@ Session::Session(const session_info_t& info, std::string_view name, DeviceInterf
         *end = '\0';
         return t;
       }()),
-      vmo_descriptors_(),
+      vmo_descriptors_(fbl::ImportFromRawPtr((VmObjectDispatcher*)info.descriptors_list)),
       paused_(true),
       descriptor_count_(info.descriptor_count),
       descriptor_length_(info.descriptor_length * sizeof(uint64_t)),
@@ -106,20 +110,23 @@ Session::Session(const session_info_t& info, std::string_view name, DeviceInterf
       parent_(parent) {}
 
 Session::~Session() {
+  LTRACE_ENTRY_OBJ;
+
   // Ensure session has removed itself from the tx queue.
   ZX_ASSERT(!tx_ticket_.has_value());
   ZX_ASSERT(in_flight_rx_ == 0);
   ZX_ASSERT(in_flight_tx_ == 0);
   ZX_ASSERT(vmo_id_ == MAX_VMOS);
-  // for (size_t i = 0; i < attached_ports_.size(); i++) {
-  //   ZX_ASSERT_MSG(!attached_ports_[i].has_value(), "outstanding attached port %ld", i);
-  // }
+  for (size_t i = 0; i < attached_ports_.size(); i++) {
+    ZX_ASSERT_MSG(!attached_ports_[i].has_value(), "outstanding attached port %ld", i);
+  }
+
   //  attempts to send an epitaph, signaling that the buffers are reclaimed:
   // if (control_channel_.has_value()) {
   //   fidl_epitaph_write(control_channel_->channel().get(), ZX_ERR_CANCELED);
   // }
 
-  TRACEF("%s: Session destroyed", name());
+  LTRACEF("%s: Session destroyed\n", name());
 }
 
 zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>> Session::Init() {
@@ -129,7 +136,7 @@ zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>
           vmo_descriptors_, 0, descriptor_count_ * descriptor_length_,
           ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_REQUIRE_NON_RESIZABLE, nullptr);
       status != ZX_OK) {
-    TRACEF("%s: failed to map data VMO: %s", name(), zx_status_get_string(status));
+    LTRACEF("%s: failed to map data VMO: %s\n", name(), zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -142,13 +149,13 @@ zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>
   if (zx_status_t status = FifoDispatcher::Create(parent_->rx_fifo_depth(), sizeof(uint16_t), 0,
                                                   &rx, &fifo_rx_, &rights);
       status != ZX_OK) {
-    TRACEF("%s: failed to create rx FIFO", name());
+    LTRACEF("%s: failed to create rx FIFO\n", name());
     return zx::error(status);
   }
   if (zx_status_t status = FifoDispatcher::Create(parent_->tx_fifo_depth(), sizeof(uint16_t), 0,
                                                   &tx, &fifo_tx_, &rights);
       status != ZX_OK) {
-    TRACEF("%s: failed to create tx FIFO", name());
+    LTRACEF("%s: failed to create tx FIFO\n", name());
     return zx::error(status);
   }
 
@@ -159,14 +166,14 @@ zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>
       []() __TA_ASSERT(parent_->rx_lock()) {}();
       rx_return_queue_.reset(new (&ac) uint16_t[parent_->rx_fifo_depth()]);
       if (!ac.check()) {
-        TRACEF("%s: failed to create return queue", name());
+        LTRACEF("%s: failed to create return queue\n", name());
         ZX_ERR_NO_MEMORY;
       }
       rx_return_queue_count_ = 0;
 
       rx_avail_queue_.reset(new (&ac) uint16_t[parent_->rx_fifo_depth()]);
       if (!ac.check()) {
-        TRACEF("%s: failed to create return queue", name());
+        LTRACEF("%s: failed to create return queue\n", name());
         return ZX_ERR_NO_MEMORY;
       }
       rx_avail_queue_count_ = 0;
@@ -177,11 +184,11 @@ zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>
     }
   }
 
-  TRACEF(
-      "%s: starting session:"
-      " descriptor_count: %d,"
-      " descriptor_length: %ld,"
-      " flags: %08X",
+  LTRACEF(
+      "%s: starting session:\n"
+      " descriptor_count: %d,\n"
+      " descriptor_length: %ld,\n"
+      " flags: %08X\n",
       name(), descriptor_count_, descriptor_length_, static_cast<uint16_t>(flags_));
 
   return zx::ok(ktl::pair(std::move(rx), std::move(tx)));
@@ -283,15 +290,15 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
   }
   ZX_ASSERT(transaction.available() <= kMaxFifoDepth);
   uint16_t fetch_buffer[kMaxFifoDepth];
-  size_t read = 0;
-  /*if (zx_status_t status =
-          fifo_tx_.read(sizeof(uint16_t), fetch_buffer, transaction.available(), &read);
+  size_t read;
+  if (zx_status_t status = fifo_tx_.dispatcher()->Read(sizeof(uint16_t), (uint8_t*)fetch_buffer,
+                                                       transaction.available(), &read);
       status != ZX_OK) {
     if (status != ZX_ERR_SHOULD_WAIT) {
-      LOGF_TRACE("%s: tx fifo read failed %s", name(), zx_status_get_string(status));
+      LTRACEF("%s: tx fifo read failed %s\n", name(), zx_status_get_string(status));
     }
     return status;
-  }*/
+  }
 
   cpp20::span descriptors(fetch_buffer, read);
   // Let other sessions know of tx data.
@@ -305,28 +312,31 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
   for (uint16_t desc_idx : descriptors) {
     buffer_descriptor_t* const desc_ptr = checked_descriptor(desc_idx);
     if (!desc_ptr) {
-      TRACEF("%s: received out of bounds descriptor: %d", name(), desc_idx);
+      LTRACEF("%s: received out of bounds descriptor: %d\n", name(), desc_idx);
       return ZX_ERR_IO_INVALID;
     }
     buffer_descriptor_t& desc = *desc_ptr;
 
-    /*if (desc.port_id.base >= attached_ports_.size()) {
-      LOGF_ERROR("%s: received invalid tx port id: %d", name(), desc.port_id.base);
+    if (desc.port_id.base >= attached_ports_.size()) {
+      LTRACEF("%s: received invalid tx port id: %d\n", name(), desc.port_id.base);
       return ZX_ERR_IO_INVALID;
     }
+
     std::optional<AttachedPort>& slot = attached_ports_[desc.port_id.base];
+
     auto return_descriptor = [this, &desc, &desc_idx]() {
       // Tx on unattached port is a recoverable error; we must handle it gracefully because
       // detaching a port can race with regular tx.
       // This is not expected to be part of fast path operation, so it should be
       // fine to return one of these buffers at a time.
-      desc.return_flags = static_cast<uint32_t>(netdev::wire::TxReturnFlags::kTxRetError |
-                                                netdev::wire::TxReturnFlags::kTxRetNotAvailable);
+      desc.return_flags = static_cast<uint32_t>(TX_RETURN_FLAGS_TX_RET_ERROR |
+                                                TX_RETURN_FLAGS_TX_RET_NOT_AVAILABLE);
 
       // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO
       // here is a sufficient memory barrier for the other end to access the
       // data. That is currently true but not really guaranteed by the API.
-      zx_status_t status = fifo_tx_.write(sizeof(desc_idx), &desc_idx, 1, nullptr);
+      zx_status_t status =
+          fifo_tx_.dispatcher()->Write(sizeof(desc_idx), (uint8_t*)&desc_idx, 1, nullptr);
       switch (status) {
         case ZX_OK:
           return ZX_OK;
@@ -334,8 +344,8 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
           // Tx FIFO closing is an expected error.
           return ZX_ERR_PEER_CLOSED;
         default:
-          LOGF_ERROR("%s: failed to return buffer with bad port number %d: %s", name(),
-                     desc.port_id.base, zx_status_get_string(status));
+          LTRACEF("%s: failed to return buffer with bad port number %d: %s\n", name(),
+                  desc.port_id.base, zx_status_get_string(status));
           return ZX_ERR_IO_INVALID;
       }
     };
@@ -358,23 +368,23 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
     }
 
     if (!port.WithPort([frame_type = desc.frame_type](DevicePort& p) {
-          return p.IsValidTxFrameType(static_cast<netdev::wire::FrameType>(frame_type));
+          return p.IsValidTxFrameType(frame_type);
         })) {
       return ZX_ERR_IO_INVALID;
-    }*/
+    }
 
     tx_buffer_t* buffer = transaction.GetBuffer();
 
     // check header space:
     if (desc.head_length < req_header_length) {
-      TRACEF("%s: received buffer with insufficient head length: %d\n", name(), desc.head_length);
+      LTRACEF("%s: received buffer with insufficient head length: %d\n", name(), desc.head_length);
       return ZX_ERR_IO_INVALID;
     }
     auto skip_front = desc.head_length - req_header_length;
 
     // check tail space:
     if (desc.tail_length < req_tail_length) {
-      TRACEF("%s: received buffer with insufficient tail length: %d\n", name(), desc.tail_length);
+      LTRACEF("%s: received buffer with insufficient tail length: %d\n", name(), desc.tail_length);
       return ZX_ERR_IO_INVALID;
     }
 
@@ -383,8 +393,8 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
       case INFO_TYPE_NO_INFO:
         break;
       default:
-        TRACEF("%s: info type (%u) not recognized, discarding information\n", name(),
-               static_cast<uint32_t>(info_type));
+        LTRACEF("%s: info type (%u) not recognized, discarding information\n", name(),
+                static_cast<uint32_t>(info_type));
         info_type = INFO_TYPE_NO_INFO;
         break;
     }
@@ -392,7 +402,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
     buffer->data_count = 0;
 
     *buffer = {
-        //.data = buffer->data,
+        .data_list = buffer->data_list,
         .meta =
             {
                 .port = desc.port_id.base,
@@ -406,7 +416,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
     // chain_length is the number of buffers to follow, so it must be strictly less than the maximum
     // descriptor chain value.
     if (desc.chain_length >= MAX_DESCRIPTOR_CHAIN) {
-      TRACEF("%s: received invalid chain length: %d\n", name(), desc.chain_length);
+      LTRACEF("%s: received invalid chain length: %d\n", name(), desc.chain_length);
       return ZX_ERR_IO_INVALID;
     }
     auto expect_chain = desc.chain_length;
@@ -443,29 +453,30 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
       uint16_t didx = part_desc.nxt;
       part_iter = checked_descriptor(didx);
       if (part_iter == nullptr) {
-        TRACEF("%s: invalid chained descriptor index: %d\n", name(), didx);
+        LTRACEF("%s: invalid chained descriptor index: %d\n", name(), didx);
         return ZX_ERR_IO_INVALID;
       }
       buffer_descriptor_t& next_desc = *part_iter;
       if (next_desc.chain_length != expect_chain - 1) {
-        TRACEF("%s: invalid next chain length %d on descriptor %d\n", name(),
-               next_desc.chain_length, didx);
+        LTRACEF("%s: invalid next chain length %d on descriptor %d\n", name(),
+                next_desc.chain_length, didx);
         return ZX_ERR_IO_INVALID;
       }
       expect_chain--;
     }
 
     if (total_length < parent_->info().min_tx_buffer_length) {
-      TRACEF("%s: tx buffer length %d less than required minimum of %d\n", name(), total_length,
-             parent_->info().min_tx_buffer_length);
+      LTRACEF("%s: tx buffer length %d less than required minimum of %d\n", name(), total_length,
+              parent_->info().min_tx_buffer_length);
       return ZX_ERR_IO_INVALID;
     }
 
-    /*port.WithPort([&total_length](DevicePort& p) {
+    port.WithPort([&total_length](DevicePort& p) {
       DevicePort::Counters& counters = p.counters();
       counters.tx_frames.fetch_add(1);
       counters.tx_bytes.fetch_add(total_length);
-    });*/
+    });
+
     transaction.Push(desc_idx);
   }
   return transaction.overrun() ? ZX_ERR_IO_OVERRUN : ZX_OK;
@@ -507,9 +518,8 @@ cpp20::span<uint8_t> Session::data_at(uint64_t offset, uint64_t len) const {
   return mapped.subspan(offset, len);
 }
 
-#if 0
-zx_status_t Session::AttachPort(const netdev::wire::PortId& port_id,
-                                cpp20::span<const netdev::wire::FrameType> frame_types) {
+zx_status_t Session::AttachPort(const port_id_t& port_id,
+                                cpp20::span<const frame_type_t> frame_types) {
   size_t attached_count;
   parent_->control_lock().Acquire();
 
@@ -552,7 +562,7 @@ zx_status_t Session::AttachPort(const netdev::wire::PortId& port_id,
   return ZX_OK;
 }
 
-zx_status_t Session::DetachPort(const netdev::wire::PortId& port_id) {
+zx_status_t Session::DetachPort(const port_id_t& port_id) {
   parent_->control_lock().Acquire();
   auto result = DetachPortLocked(port_id.base, port_id.salt);
   if (result.is_error()) {
@@ -589,9 +599,8 @@ zx::result<bool> Session::DetachPortLocked(uint8_t port_id, std::optional<uint8_
   }
   attached_port.WithPort([](DevicePort& p) { p.SessionDetached(); });
   slot = std::nullopt;
-  return zx::ok(
-      std::all_of(attached_ports_.begin(), attached_ports_.end(),
-                  [](const std::optional<AttachedPort>& port) { return !port.has_value(); }));
+  return zx::ok(std::ranges::all_of(
+      attached_ports_, [](const std::optional<AttachedPort>& port) { return !port.has_value(); }));
 }
 
 bool Session::OnPortDestroyed(uint8_t port_id) {
@@ -607,27 +616,15 @@ bool Session::OnPortDestroyed(uint8_t port_id) {
   return should_stop;
 }
 
-void Session::Attach(AttachRequestView request, AttachCompleter::Sync& completer) {
-  zx_status_t status =
-      AttachPort(request->port, cpp20::span(request->rx_frames.data(), request->rx_frames.count()));
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
-  }
+zx_status_t Session::Attach(const port_id_t& port_id, cpp20::span<const frame_type_t> frame_types) {
+  return AttachPort(port_id, frame_types);
 }
 
-void Session::Detach(DetachRequestView request, DetachCompleter::Sync& completer) {
-  zx_status_t status = DetachPort(request->port);
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(status);
-  }
-}
+zx_status_t Session::Detach(const port_id_t& port_id) { return DetachPort(port_id); }
 
-void Session::Close(CloseCompleter::Sync& _completer) { Kill(); }
+void Session::Close() { Kill(); }
 
+#if 0
 void Session::WatchDelegatedRxLease(WatchDelegatedRxLeaseCompleter::Sync& completer) {
   fbl::AutoLock lock(&rx_lease_lock_);
   if (rx_lease_completer_.has_value()) {
@@ -680,21 +677,21 @@ void Session::ReturnTxDescriptors(const uint16_t* descriptors, size_t count) {
   // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
-  // zx_status_t status = fifo_tx_.write(sizeof(uint16_t), descriptors, count, &actual_count);
-  zx_status_t status = ZX_OK;
+  zx_status_t status =
+      fifo_tx_.dispatcher()->Write(sizeof(uint16_t), (uint8_t*)descriptors, count, &actual_count);
   // constexpr char kLogFormat[] = "%s: failed to return %ld tx descriptors: %s";
   switch (status) {
     case ZX_OK:
       if (actual_count != count) {
-        TRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count,
-               count);
+        LTRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count,
+                count);
       }
       break;
     case ZX_ERR_PEER_CLOSED:
-      TRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count, count);
+      LTRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count, count);
       break;
     default:
-      TRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count, count);
+      LTRACEF("%s: failed to return %ld/%ld tx descriptors\n", name(), count - actual_count, count);
       break;
   }
   // Always assume we were able to return the descriptors.
@@ -704,8 +701,8 @@ void Session::ReturnTxDescriptors(const uint16_t* descriptors, size_t count) {
 
 bool Session::LoadAvailableRxDescriptors(RxQueue::SessionTransaction& transact) {
   transact.AssertLock(*parent_);
-  TRACEF("%s: %s available:%ld transaction:%d\n", name(), __FUNCTION__, rx_avail_queue_count_,
-         transact.remaining());
+  LTRACEF("%s: %s available:%ld transaction:%d\n", name(), __FUNCTION__, rx_avail_queue_count_,
+          transact.remaining());
   if (rx_avail_queue_count_ == 0) {
     return false;
   }
@@ -763,19 +760,19 @@ void Session::Kill() {
 zx_status_t Session::FillRxSpace(uint16_t descriptor_index, rx_space_buffer_t* buff) {
   buffer_descriptor_t* desc_ptr = checked_descriptor(descriptor_index);
   if (!desc_ptr) {
-    TRACEF("%s: received out of bounds descriptor: %d\n", name(), descriptor_index);
+    LTRACEF("%s: received out of bounds descriptor: %d\n", name(), descriptor_index);
     return ZX_ERR_INVALID_ARGS;
   }
   buffer_descriptor_t& desc = *desc_ptr;
 
   // chain_length is the number of buffers to follow. Rx buffers are always single buffers.
   if (desc.chain_length != 0) {
-    TRACEF("%s: received invalid chain length for rx buffer: %d\n", name(), desc.chain_length);
+    LTRACEF("%s: received invalid chain length for rx buffer: %d\n", name(), desc.chain_length);
     return ZX_ERR_INVALID_ARGS;
   }
   if (desc.data_length < parent_->info().min_rx_buffer_length) {
-    TRACEF("netwok-device(%s): rx buffer length %d less than required minimum of %d\n", name(),
-           desc.data_length, parent_->info().min_rx_buffer_length);
+    LTRACEF("network-device(%s): rx buffer length %d less than required minimum of %d\n", name(),
+            desc.data_length, parent_->info().min_rx_buffer_length);
     return ZX_ERR_INVALID_ARGS;
   }
   *buff = {
@@ -816,7 +813,7 @@ bool Session::CompleteRx(const RxFrameInfo& frame_info) {
     }
   } else if (!IsValidFrameType(frame_info.meta.frame_type)) {
     // Help parent driver authors to debug common contract violation.
-    TRACEF("%s: rx frame has unspecified frame type, dropping frame\n", name());
+    LTRACEF("%s: rx frame has unspecified frame type, dropping frame\n", name());
   }
 
   return allow_reuse;
@@ -829,7 +826,7 @@ bool Session::CompleteRxWith(const Session& owner, const RxFrameInfo& frame_info
   if (!IsSubscribedToFrameType(frame_info.meta.port, frame_info.meta.frame_type) || IsPaused()) {
     if (!IsValidFrameType(frame_info.meta.frame_type)) {
       // Help parent driver authors to debug common contract violation.
-      TRACEF("%s: rx frame has unspecified frame type, dropping frame\n", name());
+      LTRACEF("%s: rx frame has unspecified frame type, dropping frame\n", name());
     }
     // Don't do anything if we're paused or not subscribed to this frame type.
     return false;
@@ -844,7 +841,7 @@ bool Session::CompleteRxWith(const Session& owner, const RxFrameInfo& frame_info
   while (remaining != 0) {
     if (parts_iter == parts_storage.end()) {
       // Chained too many parts, this session is not providing buffers large enough.
-      TRACEF(
+      LTRACEF(
           "%s: failed to allocate %d bytes with %ld buffer parts (%d bytes "
           "remaining); frame dropped\n",
           name(), frame_info.total_length, parts_storage.size(), remaining);
@@ -876,8 +873,8 @@ bool Session::CompleteRxWith(const Session& owner, const RxFrameInfo& frame_info
     session_buffer.descriptor = *(--rx_queue_pick);
     buffer_descriptor_t* desc_ptr = checked_descriptor(session_buffer.descriptor);
     if (!desc_ptr) {
-      TRACEF("%s: descriptor %d out of range %d\n", name(), session_buffer.descriptor,
-             descriptor_count_);
+      LTRACEF("%s: descriptor %d out of range %d\n", name(), session_buffer.descriptor,
+              descriptor_count_);
       Kill();
       return false;
     }
@@ -1006,8 +1003,8 @@ bool Session::ListenFromTx(const Session& owner, uint16_t owner_index) {
     case INFO_TYPE_NO_INFO:
       break;
     default:
-      TRACEF("%s: info type (%d) not recognized, discarding information\n", name(),
-             owner_desc.info_type);
+      LTRACEF("%s: info type (%d) not recognized, discarding information\n", name(),
+              owner_desc.info_type);
       info_type = INFO_TYPE_NO_INFO;
       break;
   }
@@ -1045,8 +1042,8 @@ zx_status_t Session::LoadRxInfo(const RxFrameInfo& info) {
     // from the offset on fulfilled buffer parts.
     uint32_t consumed_part_length = buffer.offset + buffer.length;
     if (consumed_part_length > available_len) {
-      TRACEF("%s: invalid returned buffer length: %d, descriptor fits %d\n", name(),
-             consumed_part_length, available_len);
+      LTRACEF("%s: invalid returned buffer length: %d, descriptor fits %d\n", name(),
+              consumed_part_length, available_len);
       return ZX_ERR_INVALID_ARGS;
     }
     // NB: Update only the fields that we need to update here instead of using literals; we're
@@ -1095,18 +1092,18 @@ void Session::CommitRx() {
   switch (status) {
     case ZX_OK:
       if (actual != rx_return_queue_count_) {
-        TRACEF("%s: failed to return %ld/%ld rx descriptors\n", name(),
-               rx_return_queue_count_ - actual, rx_return_queue_count_);
+        LTRACEF("%s: failed to return %ld/%ld rx descriptors\n", name(),
+                rx_return_queue_count_ - actual, rx_return_queue_count_);
       }
       break;
     case ZX_ERR_PEER_CLOSED:
-      TRACEF("%s: failed to return %ld rx descriptors: %s\n", name(), rx_return_queue_count_,
-             zx_status_get_string(status));
+      LTRACEF("%s: failed to return %ld rx descriptors: %s\n", name(), rx_return_queue_count_,
+              zx_status_get_string(status));
       break;
 
     default:
-      TRACEF("%s: failed to return %ld rx descriptors: %s\n", name(), rx_return_queue_count_,
-             zx_status_get_string(status));
+      LTRACEF("%s: failed to return %ld rx descriptors: %s\n", name(), rx_return_queue_count_,
+              zx_status_get_string(status));
       break;
   }
   // Always assume we were able to return the descriptors.
@@ -1114,17 +1111,16 @@ void Session::CommitRx() {
 }
 
 bool Session::IsSubscribedToFrameType(uint8_t port, frame_type_t frame_type) {
-  // if (port >= attached_ports_.size()) {
-  //   return false;
-  // }
-  // std::optional<AttachedPort>& slot = attached_ports_[port];
-  // if (!slot.has_value()) {
-  //   return false;
-  // }
-  // cpp20::span subscribed = slot.value().frame_types();
-  // return std::any_of(subscribed.begin(), subscribed.end(),
-  //                    [frame_type](const netdev::wire::FrameType& t) { return t == frame_type; });
-  return true;
+  if (port >= attached_ports_.size()) {
+    return false;
+  }
+  std::optional<AttachedPort>& slot = attached_ports_[port];
+  if (!slot.has_value()) {
+    return false;
+  }
+  cpp20::span subscribed = slot.value().frame_types();
+  return std::any_of(subscribed.begin(), subscribed.end(),
+                     [frame_type](const frame_type_t& t) { return t == frame_type; });
 }
 
 void Session::SetDataVmo(uint8_t vmo_id, DataVmoStore::StoredVmo* vmo) {

@@ -12,7 +12,7 @@ source_set("cpp") {
     "network_device_client.h",
   ]
 
-  #deps = [ "//sdk/lib/fit-promise" ]
+  deps = [ "//vendor/misttech/zircon/kernel/lib/mistos/util:headers" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_banjo_cpp",

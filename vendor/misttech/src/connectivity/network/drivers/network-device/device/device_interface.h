@@ -12,12 +12,9 @@
 
 #include "data_structs.h"
 #include "definitions.h"
-// #include "device_port.h"
-// #include "diagnostics_service.h"
-// #include "event_hook.h"
-// #include "port_watcher.h"
+#include "device_port.h"
+#include "port_watcher.h"
 #include "public/locks.h"
-// #include "public/network_device.h"
 #include <object/fifo_dispatcher.h>
 
 namespace network::testing {
@@ -73,10 +70,10 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // zx_status_t BindPort(uint8_t port_id, fidl::ServerEnd<netdev::Port> req) override;
 
   // NetworkDeviceIfc implementation.
-  void NetworkDeviceIfcPortStatusChanged(uint8_t id, const port_status_t* new_status) {}
+  void NetworkDeviceIfcPortStatusChanged(uint8_t id, const port_status_t* new_status);
   void NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port,
-                               network_device_ifc_add_port_callback callback, void* cookie) {}
-  void NetworkDeviceIfcRemovePort(uint8_t id) {}
+                               network_device_ifc_add_port_callback callback, void* cookie);
+  void NetworkDeviceIfcRemovePort(uint8_t id);
   void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
   void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);
   void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {}
@@ -87,7 +84,7 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // Returns the device-owned buffer count threshold at which we should trigger RxQueue work. If the
   // number of buffers on device is less than or equal to the threshold, we should attempt to fetch
   // more buffers.
-  // uint16_t rx_notify_threshold() const { return device_info_.rx_threshold().value_or(0); }
+  uint16_t rx_notify_threshold() const { return device_info_.rx_threshold; }
 
   TxQueue& tx_queue() { return *tx_queue_; }
 
@@ -141,11 +138,12 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
 
   // FIDL protocol implementation.
   device_info_t GetInfo();
-  zx::result<ktl::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>> OpenSession(
-      ktl::string_view name, struct session_info session_info);
-  // override; void GetPort(GetPortRequestView request, GetPortCompleter::Sync& _completer)
-  // override; void GetPortWatcher(GetPortWatcherRequestView request,
-  //                    GetPortWatcherCompleter::Sync& _completer) override;
+  zx::result<
+      std::tuple<Session*, std::pair<KernelHandle<FifoDispatcher>, KernelHandle<FifoDispatcher>>>>
+  OpenSession(ktl::string_view name, struct session_info session_info);
+  void GetPort(port_id_t port_id, DevicePort** out_port);
+  PortWatcher* GetPortWatcher();
+
   // void Clone(CloneRequestView request, CloneCompleter::Sync& _completer) override;
 
   // Returns the current port salt for the provided base port ID.
@@ -153,9 +151,9 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // If the port with |base_id| does not currently exist, returns the value of
   // the previously existing port with the same |base_id| or the initial salt
   // value.
-  // uint8_t GetPortSalt(uint8_t base_id) __TA_REQUIRES_SHARED(control_lock_) {
-  //  return ports_[base_id].salt;
-  //}
+  uint8_t GetPortSalt(uint8_t base_id) __TA_REQUIRES_SHARED(control_lock_) {
+    return ports_[base_id].salt;
+  }
 
   // Notifies of |frame_length| bytes received on port with |base_id|.
   void NotifyPortRxFrame(uint8_t base_id, uint64_t frame_length)
@@ -168,9 +166,9 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   //
   // NB: The validity of the returned AttachedPort is not really guaranteed by the type system, but
   // by the fact that DeviceInterface will detach all ports from sessions before continuing.
-  // zx::result<AttachedPort> AcquirePort(netdev::wire::PortId port_id,
-  //                                     cpp20::span<const netdev::wire::FrameType> rx_frame_types)
-  //    __TA_REQUIRES(control_lock_);
+  zx::result<AttachedPort> AcquirePort(port_id_t port_id,
+                                       cpp20::span<const frame_type_t> rx_frame_types)
+      __TA_REQUIRES(control_lock_);
 
   // Event observer hook for Rx queue packets.
   void NotifyRxQueuePacket(uint64_t key);
@@ -278,22 +276,22 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // Returns the value returned by the call to f.
   //
   // It is unsafe to use the provided DevicePort outside of the scope of the callback f.
-  // template <typename F>
-  // auto WithPort(uint8_t port_id, F f) __TA_REQUIRES_SHARED(control_lock_) {
-  //   if (port_id >= ports_.size()) {
-  //     const std::unique_ptr<DevicePort> null_port;
-  //     return f(null_port);
-  //   }
-  //   return f(ports_[port_id].port);
-  // }
-  // void OnPortTeardownComplete(DevicePort& port);
+  template <typename F>
+  auto WithPort(uint8_t port_id, F f) __TA_REQUIRES_SHARED(control_lock_) {
+    if (port_id >= ports_.size()) {
+      const std::unique_ptr<DevicePort> null_port;
+      return f(null_port);
+    }
+    return f(ports_[port_id].port);
+  }
+  void OnPortTeardownComplete(DevicePort& port);
 
   // Destroys all dead sessions that report they can be destroyed through `Session::CanDestroy`.
   void PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_);
   // Notifies all sessions that the transmit queue has available spots to take in transmit frames.
   void NotifyTxQueueAvailable() __TA_REQUIRES_SHARED(control_lock_);
 
-  // zx_status_t CanCreatePortWithId(uint8_t port_id) __TA_REQUIRES(control_lock_);
+  zx_status_t CanCreatePortWithId(uint8_t port_id) __TA_REQUIRES(control_lock_);
 
   device_impl_info_t device_info_;
   // DiagnosticsService diagnostics_;
@@ -301,20 +299,19 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // Only used to keep a network device shim alive during the device's lifetime.
   // std::unique_ptr<NetworkDeviceImplBinder> binder_;
   // std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceIfc>> ifc_binding_;
-  // fdf::WireSharedClient<netdriver::NetworkDeviceImpl> device_impl_;
   ddk::NetworkDeviceImplProtocolClient device_impl_;
-  // std::array<netdev::wire::RxAcceleration, netdev::wire::kMaxAccelFlags> accel_rx_;
-  // std::array<netdev::wire::TxAcceleration, netdev::wire::kMaxAccelFlags> accel_tx_;
+  std::array<rx_acceleration_t, MAX_ACCEL_FLAGS> accel_rx_;
+  std::array<tx_acceleration_t, MAX_ACCEL_FLAGS> accel_tx_;
 
   std::unique_ptr<Session> primary_session_ __TA_GUARDED(control_lock_);
   SessionList sessions_ __TA_GUARDED(control_lock_);
   uint32_t active_primary_sessions_ __TA_GUARDED(control_lock_) = 0;
 
-  // struct PortSlot {
-  //   std::unique_ptr<DevicePort> port;
-  //   uint8_t salt;
-  // };
-  // std::array<PortSlot, MAX_PORTS> ports_ __TA_GUARDED(control_lock_);
+  struct PortSlot {
+    std::unique_ptr<DevicePort> port;
+    uint8_t salt;
+  };
+  std::array<PortSlot, MAX_PORTS> ports_ __TA_GUARDED(control_lock_);
 
   SessionList dead_sessions_ __TA_GUARDED(control_lock_);
 
@@ -322,10 +319,10 @@ class DeviceInterface : public ddk::NetworkDeviceIfcProtocol<DeviceInterface> {
   // non-overlapping unique identifiers within a set of valid IDs.
   DataVmoStore vmo_store_ __TA_GUARDED(control_lock_);
   // BindingList bindings_ __TA_GUARDED(control_lock_);
-  // PortWatcher::List port_watchers_ __TA_GUARDED(control_lock_);
+  PortWatcher::List port_watchers_ __TA_GUARDED(control_lock_);
 
-  // TeardownState teardown_state_ __TA_GUARDED(control_lock_) = TeardownState::RUNNING;
-  // fit::callback<void()> teardown_callback_ __TA_GUARDED(control_lock_);
+  TeardownState teardown_state_ __TA_GUARDED(control_lock_) = TeardownState::RUNNING;
+  fit::callback<void()> teardown_callback_ __TA_GUARDED(control_lock_);
 
   PendingDeviceOperation pending_device_op_ = PendingDeviceOperation::NONE;
   std::atomic_bool has_listen_sessions_ = false;

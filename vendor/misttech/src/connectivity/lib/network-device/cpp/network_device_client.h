@@ -6,16 +6,10 @@
 #ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
 #define VENDOR_MISTTECH_SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_CPP_NETWORK_DEVICE_CLIENT_H_
 
-// #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fuchsia/hardware/network/c/banjo.h>
-// #include <lib/async/cpp/executor.h>
-// #include <lib/async/cpp/wait.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 
-// #include <queue>
-
-// #include <src/lib/fxl/macros.h>
 #include <fbl/macros.h>
 
 #include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
@@ -71,23 +65,20 @@ struct DeviceInfo {
   fbl::Vector<tx_acceleration_t> tx_accel;
 };
 
-#if 0
 // Port and Mac address information.
 //
 // Contains details about a single port derived from fuchsia.hardware.network/PortInfo
 // and from fuchsia.hardware.network/MacAddressing.
 struct PortInfoAndMac {
-  static zx::result<PortInfoAndMac> Create(
-      const netdev::wire::PortInfo& fidl,
-      const std::optional<fuchsia_net::wire::MacAddress>& unicast_address);
+  static zx::result<PortInfoAndMac> Create(const port_info_t& fidl,
+                                           const std::optional<mac_address_t>& unicast_address);
 
-  netdev::wire::PortId id;
-  fuchsia_hardware_network::wire::PortClass port_class;
-  std::vector<fuchsia_hardware_network::wire::FrameType> rx_types;
-  std::vector<fuchsia_hardware_network::wire::FrameTypeSupport> tx_types;
-  std::optional<fuchsia_net::wire::MacAddress> unicast_address;
+  port_id_t id;
+  port_class_t port_class;
+  fbl::Vector<frame_type_t> rx_types;
+  fbl::Vector<frame_type_support_t> tx_types;
+  std::optional<mac_address_t> unicast_address;
 };
-#endif
 
 namespace internal {
 
@@ -115,7 +106,7 @@ class SessionEventHandlerProxy : public fidl::WireAsyncEventHandler<netdev::Sess
 
 // A client for `fuchsia.hardware.network/Device`.
 class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDeviceClient>,
-                            public internal::SessionEventHandlerProxy<NetworkDeviceClient> */
+       public internal::SessionEventHandlerProxy<NetworkDeviceClient> */
 {
  public:
   class Buffer;
@@ -138,9 +129,9 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   using SessionConfigFactory = fit::function<SessionConfig(const DeviceInfo&)>;
   using RxCallback = fit::function<void(Buffer buffer)>;
   using ErrorCallback = fit::function<void(zx_status_t)>;
-  // using StatusCallback = fit::function<void(netdev::wire::PortStatus)>;
-  // using PortInfoWithMacCallback = fit::function<void(zx::result<PortInfoAndMac>)>;
-  // using PortsCallback = fit::function<void(zx::result<std::vector<netdev::wire::PortId>>)>;
+  using StatusCallback = fit::function<void(zx::result<port_status_t>)>;
+  using PortInfoWithMacCallback = fit::function<void(zx::result<PortInfoAndMac>)>;
+  using PortsCallback = fit::function<void(zx::result<fbl::Vector<port_id_t>>)>;
 
   // Opens a new session with `name` and invokes `callback` when done.
   //
@@ -160,22 +151,21 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   // Attaches a port to the current session.
   //
   // Calls callback with the operation's result.
-  // void AttachPort(netdev::wire::PortId port_id, std::vector<netdev::wire::FrameType>
-  // rx_frame_types,
-  //                ErrorCallback callback);
+  void AttachPort(port_id_t port_id, fbl::Vector<frame_type_t> rx_frame_types,
+                  ErrorCallback callback);
 
   // Detaches a port from the current session.
   //
   // Calls callback with the operation's result.
-  // void DetachPort(netdev::wire::PortId port_id, ErrorCallback callback);
+  void DetachPort(port_id_t port_id, ErrorCallback callback);
 
   // Gets information about the given port.
   //
   // Ports may be freely queried without being attached.
-  // void GetPortInfoWithMac(netdev::wire::PortId port_id, PortInfoWithMacCallback callback);
+  void GetPortInfoWithMac(port_id_t port_id, PortInfoWithMacCallback callback);
 
   // Gets all ports currently attached to the device.
-  // void GetPorts(PortsCallback callback);
+  void GetPorts(PortsCallback callback);
 
   // Kills the current session.
   //
@@ -198,8 +188,8 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   // `StatusWatchHandle` is in scope.
   // `buffer` is the number of changes buffered by the network device, according to the
   // `fuchsia.hardware.network.Device` protocol.
-  // zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>> WatchStatus(
-  //      netdev::wire::PortId port_id, StatusCallback callback, uint32_t buffer = 1);
+  zx::result<std::unique_ptr<NetworkDeviceClient::StatusWatchHandle>> WatchStatus(
+      port_id_t port_id, StatusCallback callback, uint32_t buffer = 1);
 
   const DeviceInfo& device_info() const { return device_info_; }
 
@@ -346,7 +336,6 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
     DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Buffer);
   };
 
-#if 0
   // An RAII object that triggers a callback on NetworkDevice status changes.
   class StatusWatchHandle {
    public:
@@ -356,18 +345,18 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
    protected:
     friend NetworkDeviceClient;
 
-    StatusWatchHandle(fidl::ClientEnd<netdev::StatusWatcher> watcher,
-                      async_dispatcher_t* dispatcher, StatusCallback callback)
-        : watcher_(std::move(watcher), dispatcher), callback_(std::move(callback)) {
+    StatusWatchHandle(network::internal::StatusWatcher* watcher, StatusCallback callback)
+        : watcher_(watcher), callback_(std::move(callback)) {
       Watch();
     }
 
    private:
     void Watch();
-    fidl::WireClient<netdev::StatusWatcher> watcher_;
+    network::internal::StatusWatcher* watcher_;
     StatusCallback callback_;
   };
 
+#if 0
   void OnDeviceError(fidl::UnbindInfo info);
   void OnSessionError(fidl::UnbindInfo info);
 #endif
@@ -386,13 +375,14 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   void FlushTx();
   void FetchRx();
   void FetchTx();
-#if 0
-  void TxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                const zx_packet_signal_t* signal);
-  void RxSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                const zx_packet_signal_t* signal);
+
+  void TxSignal(zx_status_t status, Handle* handle, const zx_packet_signal_t* signal);
+  void RxSignal(zx_status_t status, Handle* handle, const zx_packet_signal_t* signal);
+
+  static int Thread(void* arg);
 
   void ErrorTeardown(zx_status_t);
+#if 0
   void ScheduleCallbackPromise(fpromise::promise<void, zx_status_t> promise,
                                ErrorCallback callback);
 #endif
@@ -400,7 +390,6 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   bool session_running_ = false;
   RxCallback rx_callback_;
   ErrorCallback err_callback_;
-  // async_dispatcher_t* const dispatcher_;
   SessionConfig session_config_;
   uint16_t descriptor_count_;
   fbl::RefPtr<VmObjectDispatcher> data_vmo_;
@@ -409,24 +398,36 @@ class NetworkDeviceClient /*: public internal::DeviceEventHandlerProxy<NetworkDe
   fzl::VmoMapper descriptors_;
   KernelHandle<FifoDispatcher> rx_fifo_;
   KernelHandle<FifoDispatcher> tx_fifo_;
-  // const fidl::WireClient<netdev::Device> device_;
   std::unique_ptr<network::internal::DeviceInterface> device_;
-  // fidl::WireClient<netdev::Session> session_;
-  std::unique_ptr<network::internal::Session> session_;
+  network::internal::Session* session_;
 
   DeviceInfo device_info_;
   // rx descriptors ready to be sent back to the device.
   fbl::Vector<uint16_t> rx_out_queue_;
-  // tx descriptors available to be written.
+  // tx descriptors available to be written. (must work as std::queue)
   fbl::Vector<uint16_t> tx_avail_;
   // tx descriptors queued to be sent to device.
   fbl::Vector<uint16_t> tx_out_queue_;
 
-  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_wait_{this};
-  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_wait_{this};
-  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_writable_wait_{this};
-  // async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_writable_wait_{this};
+  struct WaitMethod {
+    HandleOwner handle;
+    bool pending = false;
+    bool is_pending() { return pending; }
+  };
 
+  WaitMethod tx_wait_;
+  WaitMethod rx_wait_;
+  WaitMethod tx_writable_wait_;
+  WaitMethod rx_writable_wait_;
+
+  //  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal> tx_wait_{this};
+  //  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::RxSignal> rx_wait_{this};
+  //  async::WaitMethod<NetworkDeviceClient, &NetworkDeviceClient::TxSignal>
+  //  tx_writable_wait_{this}; async::WaitMethod<NetworkDeviceClient,
+  //  &NetworkDeviceClient::RxSignal> rx_writable_wait_{this};
+
+  fbl::RefPtr<PortDispatcher> port_;
+  struct Thread* thread_ = nullptr;
   // const std::unique_ptr<async::Executor> executor_;
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(NetworkDeviceClient);

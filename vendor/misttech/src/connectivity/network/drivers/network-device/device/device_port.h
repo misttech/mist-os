@@ -1,24 +1,25 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
-#define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
+#ifndef VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
+#define VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
 
-#include <lib/async/dispatcher.h>
+// #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/optional.h>
 
 #include <fbl/mutex.h>
 
-#include "src/connectivity/network/drivers/network-device/mac/public/network_mac.h"
 #include "status_watcher.h"
+#include "vendor/misttech/src/connectivity/network/drivers/network-device/mac/public/network_mac.h"
 
 namespace network::internal {
 
 class DeviceInterface;
 
-class DevicePort : public fidl::WireServer<netdev::Port> {
+class DevicePort /*: public fidl::WireServer<netdev::Port>*/ {
  public:
   using TeardownCallback = fit::callback<void(DevicePort&)>;
   using OnCreated = fit::callback<void(zx::result<std::unique_ptr<DevicePort>>)>;
@@ -29,24 +30,23 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   // on an error the callback may be (but is not guaranteed to be) called inline from the Create
   // call. Because of this it's a good idea to avoid acquiring locks in the on_created callback when
   // an error is reported.
-  static void Create(
-      DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
-      fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port_client,
-      fdf_dispatcher_t* mac_dispatcher, TeardownCallback&& on_teardown, OnCreated&& on_created);
+  static void Create(DeviceInterface* parent, port_id_t id,
+                     ddk::NetworkPortProtocolClient port_client, TeardownCallback&& on_teardown,
+                     OnCreated&& on_created);
 
-  ~DevicePort() override;
+  ~DevicePort();
 
-  netdev::wire::PortId id() const { return id_; }
+  port_id_t id() const { return id_; }
 
   struct Counters {
-    std::atomic<uint64_t> rx_frames = 0;
-    std::atomic<uint64_t> rx_bytes = 0;
-    std::atomic<uint64_t> tx_frames = 0;
-    std::atomic<uint64_t> tx_bytes = 0;
+    ktl::atomic<uint64_t> rx_frames = 0;
+    ktl::atomic<uint64_t> rx_bytes = 0;
+    ktl::atomic<uint64_t> tx_frames = 0;
+    ktl::atomic<uint64_t> tx_bytes = 0;
   };
 
   // Notifies port of status changes notifications from the network device implementation.
-  void StatusChanged(const netdev::wire::PortStatus& new_status);
+  void StatusChanged(const port_status_t& new_status);
   // Starts port teardown process.
   //
   // Once port is torn down and ready to be deleted, the teardown callback passed on construction
@@ -65,28 +65,29 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   void SessionDetached();
 
   // Binds a new FIDL request to this port.
-  void Bind(fidl::ServerEnd<netdev::Port> req);
+  // void Bind(fidl::ServerEnd<netdev::Port> req);
+  // void Bind(ddk::NetworkPortProtocolClient* client) { *client = port_; }
 
   // Returns true if `frame_type` is a valid inbound frame type for subscription to on this port.
-  bool IsValidRxFrameType(netdev::wire::FrameType frame_type) const;
+  bool IsValidRxFrameType(frame_type_t frame_type) const;
   // Returns true if `frame_type` is a valid outbound frame type for this port.
-  bool IsValidTxFrameType(netdev::wire::FrameType frame_type) const;
+  bool IsValidTxFrameType(frame_type_t frame_type) const;
 
   // FIDL protocol implementation.
-  void GetInfo(GetInfoCompleter::Sync& completer) override;
-  void GetStatus(GetStatusCompleter::Sync& completer) override;
-  void GetStatusWatcher(GetStatusWatcherRequestView request,
-                        GetStatusWatcherCompleter::Sync& _completer) override;
-  void GetMac(GetMacRequestView request, GetMacCompleter::Sync& _completer) override;
-  void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
-  void Clone(CloneRequestView request, CloneCompleter::Sync& _completer) override;
-  void GetCounters(GetCountersCompleter::Sync& completer) override;
-  void GetDiagnostics(GetDiagnosticsRequestView request,
-                      GetDiagnosticsCompleter::Sync& _completer) override;
+  void GetInfo(port_base_info_t* info);
+  void GetStatus(port_status_t* status);
+  StatusWatcher* GetStatusWatcher(uint32_t buffer);
+  void GetMac(mac_addr_protocol_t** out_mac_ifc);
+  // void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
+  // void Clone(CloneRequestView request, CloneCompleter::Sync& _completer) override;
+  // void GetCounters(GetCountersCompleter::Sync& completer) override;
+  // void GetDiagnostics(GetDiagnosticsRequestView request,
+  //                    GetDiagnosticsCompleter::Sync& _completer) override;
 
   Counters& counters() { return counters_; }
 
  private:
+#if 0
   // Helper class to keep track of clients bound to DevicePort.
   class Binding : public fbl::DoublyLinkedListable<std::unique_ptr<Binding>> {
    public:
@@ -103,15 +104,14 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   };
 
   using BindingList = fbl::DoublyLinkedList<std::unique_ptr<Binding>>;
+#endif
 
-  DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
-             fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port,
+  DevicePort(DeviceInterface* parent, port_id_t id, ddk::NetworkPortProtocolClient port,
              TeardownCallback&& on_teardown);
 
-  void Init(fdf_dispatcher_t* mac_dispatcher, fit::callback<void(zx_status_t)>&& on_complete);
-  void GetMac(fit::callback<void(zx::result<::fdf::ClientEnd<netdriver::MacAddr>>)>&& on_complete);
-  void CreateMacInterface(::fdf::ClientEnd<netdriver::MacAddr>&& client_end,
-                          fdf_dispatcher_t* mac_dispatcher,
+  void Init(fit::callback<void(zx_status_t)>&& on_complete);
+  void GetMac(fit::callback<void(zx::result<ddk::MacAddrProtocolClient>)>&& on_complete);
+  void CreateMacInterface(ddk::MacAddrProtocolClient&& client_end,
                           fit::callback<void(zx_status_t)>&& on_complete);
   void GetInitialPortInfo(fit::callback<void(zx_status_t)>&& on_complete);
   void GetInitialStatus(fit::callback<void(zx_status_t)>&& on_complete);
@@ -129,17 +129,16 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   void NotifySessionCount(size_t new_count) __TA_REQUIRES(lock_);
 
   DeviceInterface* const parent_;  // Pointer to parent device. Not owned.
-  async_dispatcher_t* const dispatcher_;
-  const netdev::wire::PortId id_;
-  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort> port_;
+  const port_id_t id_;
+  ddk::NetworkPortProtocolClient port_;
   Counters counters_;
   std::unique_ptr<MacAddrDeviceInterface> mac_ __TA_GUARDED(lock_);
-  BindingList bindings_ __TA_GUARDED(lock_);
+  //   BindingList bindings_ __TA_GUARDED(lock_);
 
-  netdev::wire::PortClass port_class_;
-  netdev::PortStatus status_;
-  std::vector<netdev::wire::FrameType> supported_rx_;
-  std::vector<netdev::wire::FrameTypeSupport> supported_tx_;
+  port_class_t port_class_;
+  port_status_t status_;
+  fbl::Vector<frame_type_t> supported_rx_;
+  fbl::Vector<frame_type_support_t> supported_tx_;
 
   fbl::Mutex lock_;
   StatusWatcherList watchers_ __TA_GUARDED(lock_);
@@ -152,4 +151,4 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
 
 }  // namespace network::internal
 
-#endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
+#endif  // VENDOR_MISTTECH_SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_

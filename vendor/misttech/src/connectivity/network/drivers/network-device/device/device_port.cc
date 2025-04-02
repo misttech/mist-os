@@ -4,41 +4,44 @@
 
 #include "device_port.h"
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-#include <lib/async/cpp/task.h>
+#include <algorithm>
+
+// #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
+// #include <lib/async/cpp/task.h>
+
+#include <lib/mistos/util/back_insert_iterator.h>
+#include <trace.h>
 
 #include "device_interface.h"
-#include "log.h"
+
+#define LOCAL_TRACE 2
 
 namespace network::internal {
 
-void DevicePort::Create(
-    DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
-    fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port_client,
-    fdf_dispatcher_t* mac_dispatcher, TeardownCallback&& on_teardown, OnCreated&& on_created) {
+void DevicePort::Create(DeviceInterface* parent, port_id_t id, ddk::NetworkPortProtocolClient port,
+                        TeardownCallback&& on_teardown, OnCreated&& on_created) {
   if (parent == nullptr) {
-    LOGF_ERROR("null parent provided");
+    TRACEF("null parent provided\n");
     on_created(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<DevicePort> port(
-      new (&ac) DevicePort(parent, dispatcher, id, std::move(port_client), std::move(on_teardown)));
+  std::unique_ptr<DevicePort> device_port(new (&ac)
+                                              DevicePort(parent, id, port, std::move(on_teardown)));
   if (!ac.check()) {
-    LOGF_ERROR("Failed to allocate memory for port");
+    TRACEF("Failed to allocate memory for port\n");
     on_created(zx::error(ZX_ERR_NO_MEMORY));
     return;
   }
 
   // Keep a raw pointer for making the call below, the unique ptr will have been moved.
-  DevicePort* port_ptr = port.get();
-  port_ptr->Init(mac_dispatcher, [on_created = std::move(on_created),
-                                  port = std::move(port)](zx_status_t status) mutable {
+  DevicePort* port_ptr = device_port.get();
+  port_ptr->Init([&on_created, port = std::move(device_port)](zx_status_t status) mutable {
     if (status != ZX_OK) {
-      // Reset the port client to ensure that the DevicePort object doesn't try to do anything with
-      // it on destruction.
-      port->port_ = fdf::WireSharedClient<netdriver::NetworkPort>();
+      // Reset the port client to ensure that the DevicePort object doesn't try to do anything
+      // with it on destruction.
+      port->port_ = ddk::NetworkPortProtocolClient();
       on_created(zx::error(status));
       return;
     }
@@ -46,30 +49,27 @@ void DevicePort::Create(
   });
 }
 
-DevicePort::DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher,
-                       netdev::wire::PortId id,
-                       fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port,
+DevicePort::DevicePort(DeviceInterface* parent, port_id_t id, ddk::NetworkPortProtocolClient port,
                        TeardownCallback&& on_teardown)
-    : parent_(parent),
-      dispatcher_(dispatcher),
-      id_(id),
-      port_(std::move(port)),
-      on_teardown_(std::move(on_teardown)) {}
+    : parent_(parent), id_(id), port_(std::move(port)), on_teardown_(std::move(on_teardown)) {
+  if (parent_) {
+  }
+}
 
 DevicePort::~DevicePort() {
+#if 0
   fdf::Arena arena('NETD');
   if (port_.is_valid()) {
     fidl::OneWayStatus status = port_.buffer(arena)->Removed();
     if (!status.ok()) {
-      LOGF_ERROR("Failed to remove port: %s", status.FormatDescription().c_str());
+      TRACEF("Failed to remove port: %s\n", status.FormatDescription().c_str());
     }
   }
+#endif
 }
 
-void DevicePort::Init(fdf_dispatcher_t* mac_dispatcher,
-                      fit::callback<void(zx_status_t)>&& on_complete) {
-  GetMac([this, mac_dispatcher, on_complete = std::move(on_complete)](
-             zx::result<::fdf::ClientEnd<netdriver::MacAddr>> result) mutable {
+void DevicePort::Init(fit::callback<void(zx_status_t)>&& on_complete) {
+  GetMac([this, &on_complete](zx::result<ddk::MacAddrProtocolClient> result) mutable {
     if (result.is_error()) {
       on_complete(result.status_value());
       return;
@@ -77,54 +77,47 @@ void DevicePort::Init(fdf_dispatcher_t* mac_dispatcher,
 
     // Pre-create the callback here because it needs to be shared between two separate paths below
     // and the on_complete callback can only be captured in one place.
-    fit::callback<void(zx_status_t)> get_port_info = [this, on_complete = std::move(on_complete)](
-                                                         zx_status_t status) mutable {
+    fit::callback<void(zx_status_t)> get_port_info = [this,
+                                                      &on_complete](zx_status_t status) mutable {
       if (status != ZX_OK) {
         on_complete(status);
         return;
       }
-      GetInitialPortInfo([this, on_complete = std::move(on_complete)](zx_status_t status) mutable {
+      GetInitialPortInfo([this, &on_complete](zx_status_t status) mutable {
         if (status != ZX_OK) {
           on_complete(status);
           return;
         }
-        GetInitialStatus([on_complete = std::move(on_complete)](zx_status_t status) mutable {
-          on_complete(status);
-        });
+        GetInitialStatus([&on_complete](zx_status_t status) mutable { on_complete(status); });
       });
     };
 
     if (result.value().is_valid()) {
-      CreateMacInterface(std::move(result.value()), mac_dispatcher, get_port_info.share());
+      CreateMacInterface(std::move(result.value()), std::move(get_port_info));
       return;
     }
     get_port_info(ZX_OK);
   });
 }
 
-void DevicePort::GetMac(
-    fit::callback<void(zx::result<::fdf::ClientEnd<netdriver::MacAddr>>)>&& on_complete) {
-  fdf::Arena arena('PORT');
-  port_.buffer(arena)->GetMac().Then(
-      [on_complete = std::move(on_complete)](
-          fdf::WireUnownedResult<netdriver::NetworkPort::GetMac>& result) mutable {
-        if (!result.ok()) {
-          LOGF_ERROR("Failed to get Mac interface: %s", result.FormatDescription().c_str());
-          on_complete(zx::error(result.status()));
-          return;
-        }
-        on_complete(zx::ok(std::move(result->mac_ifc)));
-      });
+void DevicePort::GetMac(fit::callback<void(zx::result<ddk::MacAddrProtocolClient>)>&& on_complete) {
+  mac_addr_protocol_t* proto = nullptr;
+  port_.GetMac(&proto);
+  if (proto == nullptr || proto->ctx == nullptr || proto->ops == nullptr) {
+    // Mac protocol not implemented, return empty client end.
+    LTRACEF("mac protocol not implemented\n");
+    on_complete(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+  ddk::MacAddrProtocolClient mac_addr(proto);
+  on_complete(zx::ok(std::move(mac_addr)));
 }
 
-void DevicePort::CreateMacInterface(::fdf::ClientEnd<netdriver::MacAddr>&& client_end,
-                                    fdf_dispatcher_t* mac_dispatcher,
+void DevicePort::CreateMacInterface(ddk::MacAddrProtocolClient&& mac_client,
                                     fit::callback<void(zx_status_t)>&& on_complete) {
-  fdf::WireSharedClient mac_client(std::move(client_end), mac_dispatcher);
   MacAddrDeviceInterface::Create(
       std::move(mac_client),
-      [this, on_complete = std::move(on_complete)](
-          zx::result<std::unique_ptr<MacAddrDeviceInterface>> result) mutable {
+      [this, &on_complete](zx::result<std::unique_ptr<MacAddrDeviceInterface>> result) mutable {
         if (result.is_error()) {
           on_complete(result.status_value());
           return;
@@ -136,111 +129,83 @@ void DevicePort::CreateMacInterface(::fdf::ClientEnd<netdriver::MacAddr>&& clien
 }
 
 void DevicePort::GetInitialPortInfo(fit::callback<void(zx_status_t)>&& on_complete) {
-  fdf::Arena arena('PORT');
-  port_.buffer(arena)->GetInfo().Then(
-      [this, on_complete = std::move(on_complete)](
-          ::fdf::WireUnownedResult<netdriver::NetworkPort::GetInfo>& result) mutable {
-        if (!result.ok()) {
-          LOGF_ERROR("Failed to get initial port info: %s", result.FormatDescription().c_str());
-          on_complete(result.status());
-          return;
-        }
+  port_base_info_t info;
+  port_.GetInfo(&info);
 
-        if (!result->info.has_port_class()) {
-          LOGF_ERROR("missing port class");
-          on_complete(ZX_ERR_INVALID_ARGS);
-          return;
-        }
+  if (info.port_class == 0) {
+    TRACEF("missing port class\n");
+    on_complete(ZX_ERR_INVALID_ARGS);
+    return;
+  }
 
-        if (result->info.rx_types().count() > netdev::wire::kMaxFrameTypes) {
-          LOGF_ERROR("too many port rx types: %ld > %d", result->info.rx_types().count(),
-                     netdev::wire::kMaxFrameTypes);
-          on_complete(ZX_ERR_INVALID_ARGS);
-          return;
-        }
+  if (info.rx_types_count > MAX_FRAME_TYPES) {
+    TRACEF("too many port rx types: %ld > %d", info.rx_types_count, MAX_FRAME_TYPES);
+    on_complete(ZX_ERR_INVALID_ARGS);
+    return;
+  }
 
-        if (result->info.tx_types().count() > netdev::wire::kMaxFrameTypes) {
-          LOGF_ERROR("too many port tx types: %ld > %d", result->info.tx_types().count(),
-                     netdev::wire::kMaxFrameTypes);
-          on_complete(ZX_ERR_INVALID_ARGS);
-          return;
-        }
+  if (info.tx_types_count > MAX_FRAME_TYPES) {
+    TRACEF("too many port tx types: %ld > %d", info.tx_types_count, MAX_FRAME_TYPES);
+    on_complete(ZX_ERR_INVALID_ARGS);
+    return;
+  }
 
-        port_class_ = result->info.port_class();
+  port_class_ = info.port_class;
 
-        ZX_ASSERT(supported_rx_.empty());
-        if (result->info.has_rx_types()) {
-          std::copy(result->info.rx_types().begin(), result->info.rx_types().end(),
-                    std::back_inserter(supported_rx_));
-        }
-        ZX_ASSERT(supported_tx_.empty());
-        if (result->info.has_tx_types()) {
-          std::copy(result->info.tx_types().begin(), result->info.tx_types().end(),
-                    std::back_inserter(supported_tx_));
-        }
-        on_complete(ZX_OK);
-      });
+  ZX_ASSERT(supported_rx_.is_empty());
+  if (info.rx_types_count > 0) {
+    std::copy(info.rx_types_list, info.rx_types_list + info.rx_types_count,
+              util::back_inserter(supported_rx_));
+  }
+  ZX_ASSERT(supported_tx_.is_empty());
+  if (info.tx_types_count > 0) {
+    std::copy(info.tx_types_list, info.tx_types_list + info.tx_types_count,
+              util::back_inserter(supported_tx_));
+  }
+  on_complete(ZX_OK);
 }
 
 void DevicePort::GetInitialStatus(fit::callback<void(zx_status_t)>&& on_complete) {
-  fdf::Arena arena('PORT');
-  port_.buffer(arena)->GetStatus().Then(
-      [this, on_complete = std::move(on_complete)](
-          ::fdf::WireUnownedResult<netdriver::NetworkPort::GetStatus>& result) mutable {
-        if (!result.ok()) {
-          LOGF_ERROR("Failed to get initial port status: %s", result.FormatDescription().c_str());
-          on_complete(result.status());
-          return;
-        }
-        status_ = fidl::ToNatural(result->status);
-        on_complete(ZX_OK);
-      });
+  port_status_t status;
+  port_.GetStatus(&status);
+  status_ = status;
+  on_complete(ZX_OK);
 }
 
-void DevicePort::StatusChanged(const netdev::wire::PortStatus& new_status) {
+void DevicePort::StatusChanged(const port_status_t& new_status) {
   fbl::AutoLock lock(&lock_);
-  status_ = fidl::ToNatural(new_status);
   for (auto& w : watchers_) {
     w.PushStatus(new_status);
   }
 }
 
-void DevicePort::GetStatusWatcher(GetStatusWatcherRequestView request,
-                                  GetStatusWatcherCompleter::Sync& _completer) {
+StatusWatcher* DevicePort::GetStatusWatcher(uint32_t buffer) {
   fbl::AutoLock lock(&lock_);
   if (teardown_started_) {
     // Don't install new watchers after teardown has started.
-    return;
+    return nullptr;
   }
-
   fbl::AllocChecker ac;
-  auto n_watcher = fbl::make_unique_checked<StatusWatcher>(&ac, request->buffer);
+  auto n_watcher = fbl::make_unique_checked<StatusWatcher>(&ac, buffer);
   if (!ac.check()) {
-    return;
+    return nullptr;
   }
 
-  zx_status_t status =
-      n_watcher->Bind(dispatcher_, std::move(request->watcher), [this](StatusWatcher* watcher) {
-        fbl::AutoLock lock(&lock_);
-        watchers_.erase(*watcher);
-        MaybeFinishTeardown();
-      });
+  port_status_t status;
+  port_.GetStatus(&status);
+  n_watcher->PushStatus(status);
 
-  if (status != ZX_OK) {
-    LOGF_ERROR("failed to bind watcher: %s", zx_status_get_string(status));
-    return;
-  }
-
-  fdf::Arena arena('NETD');
-  n_watcher->PushStatus(fidl::ToWire(arena, status_));
+  auto watcher_ptr = n_watcher.get();
   watchers_.push_back(std::move(n_watcher));
+  return watcher_ptr;
 }
 
 bool DevicePort::MaybeFinishTeardown() {
-  if (teardown_started_ && on_teardown_ && watchers_.is_empty() && !mac_ && bindings_.is_empty()) {
-    // Always finish teardown on dispatcher to evade deadlock opportunity on DeviceInterface ports
-    // lock.
-    async::PostTask(dispatcher_, [this, call = std::move(on_teardown_)]() mutable { call(*this); });
+  if (teardown_started_ && on_teardown_ && watchers_.is_empty() && !mac_) {
+    //  Always finish teardown on dispatcher to evade deadlock opportunity on DeviceInterface ports
+    //  lock.
+    //  async::PostTask(dispatcher_, [this, call = std::move(on_teardown_)]() mutable { call(*this);
+    //  });
     return true;
   }
   return false;
@@ -256,6 +221,7 @@ void DevicePort::Teardown() {
   if (MaybeFinishTeardown()) {
     return;
   }
+#if 0
   for (auto& watcher : watchers_) {
     watcher.Unbind();
   }
@@ -273,8 +239,10 @@ void DevicePort::Teardown() {
       });
     });
   }
+#endif
 }
 
+#if 0
 void DevicePort::GetMac(GetMacRequestView request, GetMacCompleter::Sync& _completer) {
   fidl::ServerEnd req = std::move(request->mac);
 
@@ -291,6 +259,7 @@ void DevicePort::GetMac(GetMacRequestView request, GetMacCompleter::Sync& _compl
     LOGF_ERROR("failed to bind to MacAddr on port %d: %s", id_.base, zx_status_get_string(status));
   }
 }
+#endif
 
 void DevicePort::SessionAttached() {
   fbl::AutoLock lock(&lock_);
@@ -313,29 +282,30 @@ void DevicePort::NotifySessionCount(size_t new_count) {
   if (new_count <= 1) {
     // Always post notifications for later on dispatcher so the port implementation can safely call
     // back into the core device with no risk of deadlocks.
-    async::PostTask(dispatcher_, [this, active = new_count != 0]() {
+    /*async::PostTask(dispatcher_, [this, active = new_count != 0]() {
       fdf::Arena arena('NETD');
       fidl::OneWayStatus result = port_.buffer(arena)->SetActive(active);
       if (!result.ok()) {
         LOGF_ERROR("SetActive failed with error: %s", result.FormatDescription().c_str());
       }
     });
+    */
   }
 }
 
-bool DevicePort::IsValidRxFrameType(netdev::wire::FrameType frame_type) const {
+bool DevicePort::IsValidRxFrameType(frame_type_t frame_type) const {
   cpp20::span rx_types(supported_rx_.begin(), supported_rx_.end());
-  return std::any_of(rx_types.begin(), rx_types.end(),
-                     [frame_type](const netdev::wire::FrameType& t) { return t == frame_type; });
+  return std::ranges::any_of(rx_types,
+                             [frame_type](const frame_type_t& t) { return t == frame_type; });
 }
 
-bool DevicePort::IsValidTxFrameType(netdev::wire::FrameType frame_type) const {
+bool DevicePort::IsValidTxFrameType(frame_type_t frame_type) const {
   cpp20::span tx_types(supported_tx_.begin(), supported_tx_.end());
-  return std::any_of(
-      tx_types.begin(), tx_types.end(),
-      [frame_type](const netdev::wire::FrameTypeSupport& t) { return t.type == frame_type; });
+  return std::ranges::any_of(
+      tx_types, [frame_type](const frame_type_support_t& t) { return t.type == frame_type; });
 }
 
+#if 0
 void DevicePort::Bind(fidl::ServerEnd<netdev::Port> req) {
   fbl::AllocChecker ac;
   std::unique_ptr<Binding> binding(new (&ac) Binding);
@@ -355,72 +325,50 @@ void DevicePort::Bind(fidl::ServerEnd<netdev::Port> req) {
   binding->Bind(fidl::BindServer(dispatcher_, std::move(req), this,
                                  [binding_ptr](DevicePort* port, fidl::UnbindInfo /*unused*/,
                                                fidl::ServerEnd<netdev::Port> /*unused*/) {
-                                   // Always complete unbind later to avoid deadlock in case bind
-                                   // fails synchronously.
-                                   async::PostTask(port->dispatcher_, [port, binding_ptr]() {
-                                     fbl::AutoLock lock(&port->lock_);
-                                     port->bindings_.erase(*binding_ptr);
-                                     port->MaybeFinishTeardown();
-                                   });
-                                 }));
-
-  bindings_.push_front(std::move(binding));
-}
-
-void DevicePort::GetInfo(GetInfoCompleter::Sync& completer) {
-  fidl::Arena arena;
-
-  netdev::wire::PortBaseInfo port_base_info = netdev::wire::PortBaseInfo::Builder(arena)
-                                                  .port_class(port_class_)
-                                                  .tx_types(supported_tx_)
-                                                  .rx_types(supported_rx_)
-                                                  .Build();
-
-  netdev::wire::PortInfo port_info =
-      netdev::wire::PortInfo::Builder(arena).id(id_).base_info(port_base_info).Build();
-  completer.Reply(port_info);
-}
-
-void DevicePort::GetStatus(GetStatusCompleter::Sync& completer) {
-  fdf::Arena arena('NETD');
-  port_.buffer(arena)->GetStatus().Then(
-      [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_hardware_network_driver::NetworkPort::GetStatus>&
-              result) mutable {
-        if (!result.ok()) {
-          LOGF_ERROR("GetStatus() failed: %s", result.FormatDescription().c_str());
-          completer.Close(result.status());
-          return;
-        }
-        completer.Reply(result->status);
+      // Always complete unbind later to avoid deadlock in case bind
+      // fails synchronously.
+      async::PostTask(port->dispatcher_, [port, binding_ptr]() {
+        fbl::AutoLock lock(&port->lock_);
+        port->bindings_.erase(*binding_ptr);
+        port->MaybeFinishTeardown();
       });
-}
+    }));
 
+    bindings_.push_front(std::move(binding));
+  }
+#endif
+
+void DevicePort::GetInfo(port_base_info_t* info) { port_.GetInfo(info); }
+void DevicePort::GetStatus(port_status_t* status) { port_.GetStatus(status); }
+void DevicePort::GetMac(mac_addr_protocol_t** out_mac_ifc) { port_.GetMac(out_mac_ifc); }
+
+#if 0
 void DevicePort::GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) {
   if (zx_status_t status = parent_->Bind(std::move(request->device)); status != ZX_OK) {
     LOGF_ERROR("bind failed %s", zx_status_get_string(status));
   }
 }
 
-void DevicePort::Clone(CloneRequestView request, CloneCompleter::Sync& _completer) {
-  Bind(std::move(request->port));
-}
+  void DevicePort::Clone(CloneRequestView request, CloneCompleter::Sync & _completer) {
+    Bind(std::move(request->port));
+  }
 
-void DevicePort::GetCounters(GetCountersCompleter::Sync& completer) {
-  fidl::Arena arena;
+  void DevicePort::GetCounters(GetCountersCompleter::Sync & completer) {
+    fidl::Arena arena;
 
-  netdev::wire::PortGetCountersResponse rsp = netdev::wire::PortGetCountersResponse::Builder(arena)
-                                                  .tx_frames(counters_.tx_frames)
-                                                  .tx_bytes(counters_.tx_bytes)
-                                                  .rx_frames(counters_.rx_frames)
-                                                  .rx_bytes(counters_.rx_bytes)
-                                                  .Build();
-  completer.Reply(rsp);
-}
+    netdev::wire::PortGetCountersResponse rsp =
+        netdev::wire::PortGetCountersResponse::Builder(arena)
+            .tx_frames(counters_.tx_frames)
+            .tx_bytes(counters_.tx_bytes)
+            .rx_frames(counters_.rx_frames)
+            .rx_bytes(counters_.rx_bytes)
+            .Build();
+    completer.Reply(rsp);
+  }
 
-void DevicePort::GetDiagnostics(GetDiagnosticsRequestView request,
-                                GetDiagnosticsCompleter::Sync& _completer) {
-  parent_->diagnostics().Bind(std::move(request->diagnostics));
-}
-
+  void DevicePort::GetDiagnostics(GetDiagnosticsRequestView request,
+                                  GetDiagnosticsCompleter::Sync & _completer) {
+    parent_->diagnostics().Bind(std::move(request->diagnostics));
+  }
+#endif
 }  // namespace network::internal

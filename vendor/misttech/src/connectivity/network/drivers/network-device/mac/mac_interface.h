@@ -5,12 +5,11 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
-#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/wire/server.h>
+// #include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
+// #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
+// #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 
+#include <algorithm>
 #include <unordered_set>
 
 #include <fbl/auto_lock.h>
@@ -24,10 +23,10 @@
 
 namespace network {
 
-using MacAddress = fuchsia_net::wire::MacAddress;
+using MacAddress = mac_address_t;
 
-namespace netdev = fuchsia_hardware_network;
-namespace netdriver = fuchsia_hardware_network_driver;
+// namespace netdev = fuchsia_hardware_network;
+// namespace netdriver = fuchsia_hardware_network_driver;
 
 namespace internal {
 
@@ -37,17 +36,16 @@ class MacClientInstance;
 // fuchsia.hardware.network.MacAddressing (FIDL).
 class MacInterface : public ::network::MacAddrDeviceInterface {
  public:
-  static void Create(fdf::WireSharedClient<netdriver::MacAddr>&& parent, OnCreated&& on_created);
+  static void Create(ddk::MacAddrProtocolClient parent, OnCreated&& on_created);
 
-  ~MacInterface() override;
+  ~MacInterface();
 
   // MacAddrDevice implementation:
-  zx_status_t Bind(async_dispatcher_t* dispatcher,
-                   fidl::ServerEnd<netdev::MacAddressing> req) override;
+  zx_status_t Bind(
+      /*async_dispatcher_t* dispatcher, fidl::ServerEnd<netdev::MacAddressing> req*/) override;
   void Teardown(fit::callback<void()> callback) override;
 
-  std::optional<netdev::wire::MacFilterMode> ConvertMode(
-      const netdev::wire::MacFilterMode& mode) const;
+  std::optional<mac_filter_mode_t> ConvertMode(const mac_filter_mode_t& mode) const;
 
  private:
   friend MacClientInstance;
@@ -63,12 +61,12 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
   void GetFeatures(fit::callback<void(zx_status_t)>&& on_complete);
   void SetDefaultMode(fit::callback<void(zx_status_t)>&& on_complete);
 
-  explicit MacInterface(fdf::WireSharedClient<netdriver::MacAddr>&& parent);
+  explicit MacInterface(ddk::MacAddrProtocolClient parent);
 
-  fdf::WireSharedClient<netdriver::MacAddr> impl_;
+  ddk::MacAddrProtocolClient impl_;
 
-  netdriver::Features features_;
-  netdev::wire::MacFilterMode default_mode_;
+  features_t features_;
+  mac_filter_mode_t default_mode_;
   fbl::Mutex lock_;
   fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> clients_ __TA_GUARDED(lock_);
   fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> dead_clients_ __TA_GUARDED(lock_);
@@ -83,8 +81,7 @@ class ClientState {
   struct Addr {
     MacAddress address;
     bool operator==(const Addr& a) const {
-      return std::equal(address.octets.begin(), address.octets.end(), a.address.octets.begin(),
-                        a.address.octets.end());
+      return std::ranges::equal(address.octets, a.address.octets);
     }
   };
   // Helper class to hash a Mac Address to store it in an unordered_set.
@@ -93,7 +90,7 @@ class ClientState {
     size_t operator()(const Addr& a) const {
       size_t hash = 0;
       size_t shift = 0;
-      static_assert(decltype(a.address.octets)::size() <= sizeof(hash));
+      static_assert(sizeof(a.address.octets) <= sizeof(hash));
       for (uint8_t octet : a.address.octets) {
         hash |= static_cast<size_t>(octet) << shift;
         shift += 8;
@@ -102,10 +99,9 @@ class ClientState {
     }
   };
 
-  explicit ClientState(fuchsia_hardware_network::wire::MacFilterMode filter_mode)
-      : filter_mode(filter_mode) {}
+  explicit ClientState(mac_filter_mode_t filter_mode) : filter_mode(filter_mode) {}
 
-  fuchsia_hardware_network::wire::MacFilterMode filter_mode;
+  mac_filter_mode_t filter_mode;
   std::unordered_set<Addr, MacHasher> addresses;
 };
 
@@ -113,23 +109,23 @@ class ClientState {
 //
 // `MacClientInstance` keeps the state associated with the client and is responsible for fulfilling
 // FIDL requests.
-class MacClientInstance : public fidl::WireServer<netdev::MacAddressing>,
-                          public fbl::DoublyLinkedListable<std::unique_ptr<MacClientInstance>> {
+class MacClientInstance :  // public fidl::WireServer<netdev::MacAddressing>,
+                           public fbl::DoublyLinkedListable<std::unique_ptr<MacClientInstance>> {
  public:
-  explicit MacClientInstance(MacInterface* parent, netdev::wire::MacFilterMode default_mode);
+  explicit MacClientInstance(MacInterface* parent, mac_filter_mode_t default_mode);
 
-  void GetUnicastAddress(GetUnicastAddressCompleter::Sync& _completer) override;
-  void SetMode(SetModeRequestView request, SetModeCompleter::Sync& _completer) override;
-  void AddMulticastAddress(AddMulticastAddressRequestView request,
-                           AddMulticastAddressCompleter::Sync& _completer) override;
-  void RemoveMulticastAddress(RemoveMulticastAddressRequestView request,
-                              RemoveMulticastAddressCompleter::Sync& _completer) override;
+  // void GetUnicastAddress(GetUnicastAddressCompleter::Sync& _completer) override;
+  // void SetMode(SetModeRequestView request, SetModeCompleter::Sync& _completer) override;
+  // void AddMulticastAddress(AddMulticastAddressRequestView request,
+  //                          AddMulticastAddressCompleter::Sync& _completer) override;
+  // void RemoveMulticastAddress(RemoveMulticastAddressRequestView request,
+  //                             RemoveMulticastAddressCompleter::Sync& _completer) override;
   // Binds the client instance to serve FIDL requests from the provided request channel.
   // All requests will be operated on the provided dispatcher.
-  zx_status_t Bind(async_dispatcher_t* dispatcher, fidl::ServerEnd<netdev::MacAddressing> req);
+  // zx_status_t Bind(async_dispatcher_t* dispatcher, fidl::ServerEnd<netdev::MacAddressing> req);
   // Unbinds the client instance.
   // Once unbound it'll call `CloseClient` on its parent asynchronously.
-  void Unbind();
+  // void Unbind();
 
   // Accesses the client state.
   // Client state must only be accessed under the parent's MacInterface lock.
@@ -139,7 +135,7 @@ class MacClientInstance : public fidl::WireServer<netdev::MacAddressing>,
   // Pointer to parent MacInterface, not owned.
   MacInterface* const parent_;
   ClientState state_ __TA_GUARDED(parent_->lock_);
-  std::optional<fidl::ServerBindingRef<netdev::MacAddressing>> binding_;
+  // std::optional<fidl::ServerBindingRef<netdev::MacAddressing>> binding_;
 };
 
 }  // namespace internal
