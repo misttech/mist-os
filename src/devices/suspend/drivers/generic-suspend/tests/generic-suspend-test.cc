@@ -7,10 +7,10 @@
 #include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
-#include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
 #include "lib/zx/handle.h"
 #include "lib/zx/resource.h"
@@ -60,7 +60,7 @@ class GenericSuspendTest : public GenericSuspend {
 class TestEnvironmentWrapper : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    pdev_.SetConfig(fake_pdev::FakePDevFidl::Config{});
+    pdev_.SetConfig(fdf_fake::FakePDev::Config{});
 
     auto pdev_result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
@@ -75,7 +75,7 @@ class TestEnvironmentWrapper : public fdf_testing::Environment {
   }
 
  private:
-  fake_pdev::FakePDevFidl pdev_;
+  fdf_fake::FakePDev pdev_;
   compat::DeviceServer compat_server_;
 };
 
