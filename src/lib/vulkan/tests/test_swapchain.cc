@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+#include "fake_flatland.h"  // nogncheck
+#endif
+
 #include <dlfcn.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
-#include <lib/fidl/cpp/binding.h>
 #include <lib/zx/channel.h>
 
 #include <chrono>
@@ -19,20 +19,9 @@
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
-#include "sdk/lib/ui/scenic/cpp/view_creation_tokens.h"
-#include "src/lib/fsl/handles/object_info.h"
-
 namespace {
 
 constexpr uint32_t kVendorIDIntel = 0x8086;
-uint64_t ZirconIdFromHandle(uint32_t handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status != ZX_OK)
-    return 0;
-  return info.koid;
-}
 
 VkPhysicalDeviceType GetVkPhysicalDeviceType(VkPhysicalDevice device) {
   VkPhysicalDeviceProperties properties;
@@ -45,219 +34,6 @@ uint32_t GetVkPhysicalDeviceVendorID(VkPhysicalDevice device) {
   vkGetPhysicalDeviceProperties(device, &properties);
   return properties.vendorID;
 }
-
-// FakeFlatland runs async loop on its own thread to allow the test
-// to use blocking Vulkan calls while present callbacks are processed.
-class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBase,
-                     public fuchsia::ui::composition::testing::Flatland_TestBase,
-                     public fuchsia::ui::composition::testing::ParentViewportWatcher_TestBase {
- public:
-  FakeFlatland(fidl::InterfaceRequest<fuchsia::ui::composition::Allocator> allocator_request,
-               fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> flatland_request,
-               bool should_present)
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        allocator_binding_(this, std::move(allocator_request), loop_.dispatcher()),
-        flatland_binding_(this, std::move(flatland_request), loop_.dispatcher()),
-        should_present_(should_present) {
-    loop_.StartThread();
-  }
-
-  ~FakeFlatland() { loop_.Shutdown(); }
-
-  void NotImplemented_(const std::string& name) override {
-    fprintf(stderr, "NotImplemented: %s\n", name.c_str());
-  }
-
-  // |fuchsia::ui::composition::testing::Allocator|
-  void RegisterBufferCollection(fuchsia::ui::composition::RegisterBufferCollectionArgs args,
-                                RegisterBufferCollectionCallback callback) override {
-    EXPECT_EQ(fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT, args.usage());
-    auto [_, import_token_koid] = fsl::GetKoids(args.export_token().value.get());
-    registered_koids.insert(import_token_koid);
-
-    fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator;
-    zx_status_t status = fdio_service_connect(
-        "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator.NewRequest().TakeChannel().release());
-    EXPECT_EQ(status, ZX_OK);
-    sysmem_allocator->SetDebugClientInfo(
-        std::move(fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest{}
-                      .set_name(fsl::GetCurrentProcessName())
-                      .set_id(fsl::GetCurrentProcessKoid())));
-
-    // Exactly one of these must be set.
-    EXPECT_TRUE(!!args.has_buffer_collection_token2() ^ !!args.has_buffer_collection_token());
-    fuchsia::sysmem2::BufferCollectionTokenHandle token;
-    if (args.has_buffer_collection_token2()) {
-      token = std::move(*args.mutable_buffer_collection_token2());
-    } else {
-      token = fuchsia::sysmem2::BufferCollectionTokenHandle(
-          args.mutable_buffer_collection_token()->TakeChannel());
-    }
-
-    fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
-    status = sysmem_allocator->BindSharedCollection(
-        std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
-                      .set_token(std::move(token))
-                      .set_buffer_collection_request(buffer_collection.NewRequest())));
-    EXPECT_EQ(status, ZX_OK);
-
-    status = buffer_collection->SetConstraints(
-        fuchsia::sysmem2::BufferCollectionSetConstraintsRequest{});
-    EXPECT_EQ(status, ZX_OK);
-
-    status = buffer_collection->Release();
-    EXPECT_EQ(status, ZX_OK);
-
-    callback(fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result::WithResponse({}));
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void SetDebugName(std::string debug_name) override {
-    // Do nothing.
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void CreateView(fuchsia::ui::views::ViewCreationToken token,
-                  fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                      parent_viewport_watcher) override {
-    // Do nothing.
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void CreateView2(fuchsia::ui::views::ViewCreationToken token,
-                   fuchsia::ui::views::ViewIdentityOnCreation view_identity,
-                   fuchsia::ui::composition::ViewBoundProtocols view_protocols,
-                   fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                       parent_viewport_watcher) override {
-    // Do nothing.
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void CreateImage(fuchsia::ui::composition::ContentId image_id,
-                   fuchsia::ui::composition::BufferCollectionImportToken import_token,
-                   uint32_t vmo_index,
-                   fuchsia::ui::composition::ImageProperties properties) override {
-    auto [import_token_koid, _] = fsl::GetKoids(import_token.value.get());
-    EXPECT_TRUE(registered_koids.find(import_token_koid) != registered_koids.end());
-
-    EXPECT_TRUE(registered_images.find(image_id.value) == registered_images.end());
-    registered_images.insert(image_id.value);
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void ReleaseImage(fuchsia::ui::composition::ContentId image_id) override {
-    EXPECT_TRUE(registered_images.find(image_id.value) != registered_images.end());
-    registered_images.erase(image_id.value);
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void CreateTransform(fuchsia::ui::composition::TransformId transform_id) override {
-    EXPECT_EQ(kRootTransform.value, transform_id.value);
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void SetRootTransform(fuchsia::ui::composition::TransformId transform_id) override {
-    EXPECT_EQ(kRootTransform.value, transform_id.value);
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void SetImageDestinationSize(fuchsia::ui::composition::ContentId image_id,
-                               fuchsia::math::SizeU size) override {
-    EXPECT_TRUE(registered_images.find(image_id.value) != registered_images.end());
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void SetContent(fuchsia::ui::composition::TransformId transform_id,
-                  fuchsia::ui::composition::ContentId content_id) override {
-    EXPECT_EQ(kRootTransform.value, transform_id.value);
-    EXPECT_TRUE(registered_images.find(content_id.value) != registered_images.end());
-    image_on_root_transform_ = content_id.value;
-  }
-
-  // |fuchsia::ui::composition::testing::Flatland|
-  void Present(fuchsia::ui::composition::PresentArgs args) override {
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    acquire_fences_.insert(ZirconIdFromHandle(args.acquire_fences()[0].get()));
-
-    zx_signals_t pending;
-    zx_status_t status = args.acquire_fences()[0].wait_one(
-        ZX_EVENT_SIGNALED, zx::deadline_after(zx::sec(10)), &pending);
-
-    if (status == ZX_OK) {
-      if (should_present_) {
-        if (!args.release_fences().empty()) {
-          args.release_fences()[0].signal(0, ZX_EVENT_SIGNALED);
-        }
-        // Run OnNextFrameBegin callback.
-        fuchsia::ui::composition::OnNextFrameBeginValues values;
-        values.set_additional_present_credits(1);
-        flatland_binding_.events().OnNextFrameBegin(std::move(values));
-
-        // Run OnFramePresented callback.
-        fuchsia::scenic::scheduling::FramePresentedInfo frame_presented_info;
-        fuchsia::scenic::scheduling::PresentReceivedInfo received_info;
-        frame_presented_info.presentation_infos.emplace_back(std::move(received_info));
-        flatland_binding_.events().OnFramePresented(std::move(frame_presented_info));
-      }
-    }
-    presented_.push_back({image_on_root_transform_, status});
-  }
-
-  uint32_t presented_count() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return static_cast<uint32_t>(presented_.size());
-  }
-
-  uint32_t acquire_fences_count() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return static_cast<uint32_t>(acquire_fences_.size());
-  }
-
-  struct Presented {
-    uint64_t image_id;
-    zx_status_t acquire_wait_status;
-  };
-
- private:
-  async::Loop loop_;
-  fidl::Binding<fuchsia::ui::composition::Allocator> allocator_binding_;
-  fidl::Binding<fuchsia::ui::composition::Flatland> flatland_binding_;
-
-  const fuchsia::ui::composition::TransformId kRootTransform = {1};
-  std::set<zx_koid_t> registered_koids;
-  std::set<uint64_t> registered_images;
-  uint64_t image_on_root_transform_ = 0;
-  bool should_present_;
-  std::mutex mutex_;
-  std::vector<Presented> presented_;
-  std::set<uint64_t> acquire_fences_;
-};
-
-void GetFakeFlatlandInjectedToLib(std::unique_ptr<FakeFlatland>* flatland, bool should_present) {
-  zx::channel local_allocator_endpoint, remote_allocator_endpoint;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &local_allocator_endpoint, &remote_allocator_endpoint));
-  zx::channel local_flatland_endpoint, remote_flatland_endpoint;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &local_flatland_endpoint, &remote_flatland_endpoint));
-
-  // Inject it to vulkan swapchain lib.
-  void* libvulkan = dlopen("VkLayer_image_pipe_swapchain.so", RTLD_NOW | RTLD_LOCAL);
-  ASSERT_NE(libvulkan, nullptr);
-  typedef bool (*imagepipe_initialize_service_channel_fn)(zx::channel, zx::channel);
-  auto fn = reinterpret_cast<imagepipe_initialize_service_channel_fn>(
-      dlsym(libvulkan, "imagepipe_initialize_service_channel"));
-  ASSERT_NE(fn, nullptr);
-  ASSERT_TRUE(fn(std::move(remote_allocator_endpoint), std::move(remote_flatland_endpoint)));
-
-  *flatland =
-      std::make_unique<FakeFlatland>(fidl::InterfaceRequest<fuchsia::ui::composition::Allocator>(
-                                         std::move(local_allocator_endpoint)),
-                                     fidl::InterfaceRequest<fuchsia::ui::composition::Flatland>(
-                                         std::move(local_flatland_endpoint)),
-                                     should_present);
-}
-
-}  // namespace
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL
 debug_utils_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -461,7 +237,35 @@ class TestSwapchain {
       vkDestroyInstance(vk_instance_, nullptr);
   }
 
-  void ValidateSurfaceForDevice(VkSurfaceKHR surface) {
+  void InitFakeFlatlandIfRequired(bool should_present) {
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+    GetFakeFlatlandInjectedToLib(&fake_flatland_, should_present);
+#endif
+  }
+
+  VkSurfaceKHR CreateSurface() {
+#if defined(USE_IMAGEPIPE_DISPLAY)
+    zx_handle_t imagePipeHandle = ZX_HANDLE_INVALID;
+#else
+    auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
+    zx_handle_t imagePipeHandle = view_token.value.release();
+#endif
+
+    VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
+        .pNext = nullptr,
+        .imagePipeHandle = imagePipeHandle,
+    };
+
+    VkSurfaceKHR surface = 0;
+
+    EXPECT_EQ(VK_SUCCESS,
+              vkCreateImagePipeSurfaceFUCHSIA(vk_instance_, &create_info, nullptr, &surface));
+
+    return surface;
+  }
+
+  void ValidateSurfaceForDevice(VkSurfaceKHR surface, VkExtent2D* current_extent_out) {
     VkSurfaceProtectedCapabilitiesKHR surface_protected_caps = {
         .sType = VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR,
         .pNext = nullptr,
@@ -485,6 +289,8 @@ class TestSwapchain {
     EXPECT_EQ(VK_SUCCESS, get_surface_support_khr_(vk_physical_device_, /*queue_family_index*/ 0,
                                                    surface, &surface_supported));
     EXPECT_TRUE(surface_supported);
+
+    *current_extent_out = surface_caps2.surfaceCapabilities.currentExtent;
   }
 
   std::vector<VkImage> GetSwapchainImages(VkSwapchainKHR swapchain) {
@@ -499,7 +305,14 @@ class TestSwapchain {
 
   VkResult CreateSwapchainHelper(VkSurfaceKHR surface, VkFormat format, VkImageUsageFlags usage,
                                  VkSwapchainKHR* swapchain_out) {
-    ValidateSurfaceForDevice(surface);
+    VkExtent2D current_extent = {};
+    ValidateSurfaceForDevice(surface, &current_extent);
+    // TODO(https://fxbug.dev/407570787) - the flatland backed swapchain should query layout info.
+    if (current_extent.width == 0xFFFFFFFF || current_extent.height == 0xFFFFFFFF) {
+      current_extent.width = 100;
+      current_extent.height = 100;
+    }
+
     VkSwapchainCreateInfoKHR create_info = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = nullptr,
@@ -509,7 +322,7 @@ class TestSwapchain {
         .minImageCount = kSwapchainImageCount,
         .imageFormat = format,
         .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent = {100, 100},
+        .imageExtent = current_extent,
         .imageArrayLayers = 1,
         .imageUsage = usage,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -558,17 +371,9 @@ class TestSwapchain {
   void CreateSwapchain(int num_swapchains, VkFormat format, VkImageUsageFlags usage) {
     ASSERT_TRUE(init_);
 
-    GetFakeFlatlandInjectedToLib(&fake_flatland_, /*should_present=*/true);
+    InitFakeFlatlandIfRequired(/*should_present=*/true);
 
-    auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-    VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-        .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-        .pNext = nullptr,
-        .imagePipeHandle = view_token.value.release(),
-    };
-    VkSurfaceKHR surface;
-    EXPECT_EQ(VK_SUCCESS,
-              vkCreateImagePipeSurfaceFUCHSIA(vk_instance_, &create_info, nullptr, &surface));
+    VkSurfaceKHR surface = CreateSurface();
 
     for (int i = 0; i < num_swapchains; ++i) {
       VkSwapchainKHR swapchain;
@@ -650,7 +455,9 @@ class TestSwapchain {
   PFN_vkAcquireNextImageKHR acquire_next_image_khr_;
   PFN_vkQueuePresentKHR queue_present_khr_;
   PFN_vkGetDeviceQueue2 get_device_queue2_;
+#if !defined(USE_IMAGEPIPE_DISPLAY)
   std::unique_ptr<FakeFlatland> fake_flatland_;
+#endif
 
   const bool protected_memory_ = false;
   bool init_ = false;
@@ -683,6 +490,7 @@ debug_utils_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   EXPECT_TRUE(swapchain->allows_validation_errors_);
   return VK_FALSE;
 }
+
 using UseProtectedMemory = bool;
 using ValidationBeforeLayer = bool;
 
@@ -695,17 +503,30 @@ static std::string NameFromParam(const testing::TestParamInfo<ParamType>& info) 
          (validation_before ? "ValidationBefore" : "ValidationAfter");
 }
 
-class SwapchainTest : public ::testing::TestWithParam<ParamType> {
+}  // namespace
+
+#if defined(USE_IMAGEPIPE_DISPLAY)
+#define TEST_CLASS_NAME DisplaySwapchainTest
+#else
+#define TEST_CLASS_NAME SwapchainTest
+#endif
+
+class TEST_CLASS_NAME : public ::testing::TestWithParam<ParamType> {
  protected:
   void SetUp() override {
     std::vector<const char*> instance_layers;
     if (validation_before_layer()) {
       instance_layers.push_back("VK_LAYER_KHRONOS_validation");
     }
+
+#if defined(USE_IMAGEPIPE_DISPLAY)
+    instance_layers.push_back("VK_LAYER_FUCHSIA_imagepipe_swapchain_fb");
+#else
     instance_layers.push_back("VK_LAYER_FUCHSIA_imagepipe_swapchain");
     if (!validation_before_layer()) {
       instance_layers.push_back("VK_LAYER_KHRONOS_validation");
     }
+#endif
 
     auto test = std::make_unique<TestSwapchain>(instance_layers, use_protected_memory());
     if (use_protected_memory() && !test->protected_memory_is_supported_) {
@@ -739,19 +560,19 @@ class SwapchainTest : public ::testing::TestWithParam<ParamType> {
   std::vector<VkSemaphore> single_use_semaphores_;
 };
 
-TEST_P(SwapchainTest, Surface) { test_->Surface(false); }
+TEST_P(TEST_CLASS_NAME, Surface) { test_->Surface(false); }
 
-TEST_P(SwapchainTest, SurfaceDynamicSymbol) { test_->Surface(true); }
+TEST_P(TEST_CLASS_NAME, SurfaceDynamicSymbol) { test_->Surface(true); }
 
-TEST_P(SwapchainTest, Create) {
+TEST_P(TEST_CLASS_NAME, Create) {
   test_->CreateSwapchain(1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 }
 
-TEST_P(SwapchainTest, CreateTwice) {
+TEST_P(TEST_CLASS_NAME, CreateTwice) {
   test_->CreateSwapchain(2, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 }
 
-TEST_P(SwapchainTest, CreateForStorage) {
+TEST_P(TEST_CLASS_NAME, CreateForStorage) {
   // TODO(60853): STORAGE usage is currently not supported by FEMU Vulkan ICD.
   if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
     GTEST_SKIP();
@@ -765,7 +586,7 @@ TEST_P(SwapchainTest, CreateForStorage) {
   test_->CreateSwapchain(1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
 }
 
-TEST_P(SwapchainTest, CreateForRgbaStorage) {
+TEST_P(TEST_CLASS_NAME, CreateForRgbaStorage) {
   // TODO(60853): STORAGE usage is currently not supported by FEMU Vulkan ICD.
   if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
     GTEST_SKIP();
@@ -773,23 +594,14 @@ TEST_P(SwapchainTest, CreateForRgbaStorage) {
   test_->CreateSwapchain(1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT);
 }
 
-TEST_P(SwapchainTest, CreateForSrgb) {
+TEST_P(TEST_CLASS_NAME, CreateForSrgb) {
   test_->CreateSwapchain(1, VK_FORMAT_B8G8R8A8_SRGB, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 }
 
-TEST_P(SwapchainTest, AcquireFence) {
-  GetFakeFlatlandInjectedToLib(&test_->fake_flatland_, /*should_present=*/true);
+TEST_P(TEST_CLASS_NAME, AcquireFence) {
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/true);
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-      .pNext = nullptr,
-      .imagePipeHandle = view_token.value.release(),
-  };
-
-  VkSurfaceKHR surface;
-  EXPECT_EQ(VK_SUCCESS,
-            vkCreateImagePipeSurfaceFUCHSIA(test_->vk_instance_, &create_info, nullptr, &surface));
+  VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
   EXPECT_EQ(VK_SUCCESS,
@@ -814,26 +626,12 @@ TEST_P(SwapchainTest, AcquireFence) {
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 }
 
-INSTANTIATE_TEST_SUITE_P(SwapchainTestSuite, SwapchainTest,
-                         ::testing::Combine(::testing::Bool(), ::testing::Bool()), NameFromParam);
-
-class SwapchainFidlTest : public SwapchainTest {};
-
-TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
+TEST_P(TEST_CLASS_NAME, PresentAndAcquireNoSemaphore) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<FakeFlatland> flatland;
-  GetFakeFlatlandInjectedToLib(&flatland, /*should_present=*/true);
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/true);
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-      .pNext = nullptr,
-      .imagePipeHandle = view_token.value.release(),
-  };
-  VkSurfaceKHR surface;
-  EXPECT_EQ(VK_SUCCESS,
-            vkCreateImagePipeSurfaceFUCHSIA(test_->vk_instance_, &create_info, nullptr, &surface));
+  VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
   ASSERT_EQ(VK_SUCCESS,
@@ -867,9 +665,14 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
             test_->acquire_next_image_khr_(test_->vk_device_, swapchain, 0, VK_NULL_HANDLE,
                                            VK_NULL_HANDLE, &image_index));
 
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+  // Death doesn't work with FB because the 2nd test process hangs while initializing the fake
+  // display
   ASSERT_DEATH(test_->acquire_next_image_khr_(test_->vk_device_, swapchain, UINT64_MAX,
                                               VK_NULL_HANDLE, VK_NULL_HANDLE, &image_index),
                ".*Currently all images are pending.*");
+#endif
+
   test_->allows_validation_errors_ = false;
 
   uint32_t present_index;  // Initialized below.
@@ -916,11 +719,13 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
   test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 
-  EXPECT_EQ(flatland->presented_count(), kFrameCount);
-  EXPECT_EQ(flatland->acquire_fences_count(), kFrameCount);
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+  EXPECT_EQ(test_->fake_flatland_->presented_count(), kFrameCount);
+  EXPECT_EQ(test_->fake_flatland_->acquire_fences_count(), kFrameCount);
+#endif
 }
 
-TEST_P(SwapchainFidlTest, ForceQuit) {
+TEST_P(TEST_CLASS_NAME, ForceQuit) {
   // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
   // a host crash on emulators with SwiftShader. Thus, we disable it on
   // emulators.
@@ -928,18 +733,9 @@ TEST_P(SwapchainFidlTest, ForceQuit) {
     GTEST_SKIP();
   }
 
-  std::unique_ptr<FakeFlatland> flatland;
-  GetFakeFlatlandInjectedToLib(&flatland, /*should_present=*/true);
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/true);
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-      .pNext = nullptr,
-      .imagePipeHandle = view_token.value.release(),
-  };
-  VkSurfaceKHR surface;
-  EXPECT_EQ(VK_SUCCESS,
-            vkCreateImagePipeSurfaceFUCHSIA(test_->vk_instance_, &create_info, nullptr, &surface));
+  VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
   ASSERT_EQ(VK_SUCCESS,
@@ -980,13 +776,17 @@ TEST_P(SwapchainFidlTest, ForceQuit) {
   };
 
   ASSERT_EQ(VK_SUCCESS, test_->queue_present_khr_(queue, &present_info));
-  flatland.reset();
+
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+  test_->fake_flatland_.reset();
+#endif
 
   test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 }
 
-TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+TEST_P(TEST_CLASS_NAME, DeviceLostAvoidSemaphoreHang) {
   // TODO(58325): The emulator will block of a command queue with a pending fence is submitted. So
   // this test, which depends on a delayed GPU execution, will deadlock.
   if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
@@ -995,18 +795,9 @@ TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<FakeFlatland> flatland;
-  GetFakeFlatlandInjectedToLib(&flatland, /*should_present=*/false);
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/false);
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-      .pNext = nullptr,
-      .imagePipeHandle = view_token.value.release(),
-  };
-  VkSurfaceKHR surface;
-  EXPECT_EQ(VK_SUCCESS,
-            vkCreateImagePipeSurfaceFUCHSIA(test_->vk_instance_, &create_info, nullptr, &surface));
+  VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
   ASSERT_EQ(VK_SUCCESS,
@@ -1071,6 +862,8 @@ TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
                     .pWaitDstStageMask = &wait_flag};
   ASSERT_EQ(VK_SUCCESS, vkQueueSubmit(queue, 1, &info, VK_NULL_HANDLE));
 
+  auto flatland = std::move(test_->fake_flatland_);
+
   auto future = std::async(std::launch::async, [flatland = std::move(flatland)]() mutable {
     // Wait enough time for the DeviceWaitIdle to start waiting on the semaphore, but not enough
     // time to get a lost device.
@@ -1101,8 +894,9 @@ TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
   test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 }
+#endif
 
-TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
+TEST_P(TEST_CLASS_NAME, AcquireZeroTimeout) {
   // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
   // a host crash on emulators with SwiftShader. Thus, we disable it on
   // emulators.
@@ -1112,19 +906,9 @@ TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  std::unique_ptr<FakeFlatland> flatland;
-  GetFakeFlatlandInjectedToLib(&flatland, /*should_present=*/false);
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/false);
 
-  auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-  VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
-      .pNext = nullptr,
-      .imagePipeHandle = view_token.value.release(),
-  };
-
-  VkSurfaceKHR surface;
-  EXPECT_EQ(VK_SUCCESS,
-            vkCreateImagePipeSurfaceFUCHSIA(test_->vk_instance_, &create_info, nullptr, &surface));
+  VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
   ASSERT_EQ(VK_SUCCESS,
@@ -1183,13 +967,15 @@ TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
     test_->allows_validation_errors_ = false;
   }
 
+#if !defined(USE_IMAGEPIPE_DISPLAY)
   // Close the remote end because we've configured it to not-present, and the swapchain
   // teardown hangs otherwise.
-  flatland.reset();
+  test_->fake_flatland_.reset();
+#endif
 
   test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
   vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
 }
 
-INSTANTIATE_TEST_SUITE_P(SwapchainFidlTestSuite, SwapchainFidlTest,
+INSTANTIATE_TEST_SUITE_P(HermeticSwapchain, TEST_CLASS_NAME,
                          ::testing::Combine(::testing::Bool(), ::testing::Bool()), NameFromParam);
