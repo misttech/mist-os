@@ -31,6 +31,12 @@ void ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult::Size
   static_assert(offsetof(DenyEachBindingOnlyDenyLibfuzzerResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
+void ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(DenyEachBindingOnlyDenyPythonResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(DenyEachBindingOnlyDenyPythonResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(DenyEachBindingOnlyDenyPythonResult, envelope_) == offsetof(fidl_union_t, envelope));
+}
+
 void ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(DenyEachBindingOnlyDenyRustResult) == sizeof(fidl_union_t));
   static_assert(offsetof(DenyEachBindingOnlyDenyRustResult, ordinal_) == offsetof(fidl_union_t, tag));

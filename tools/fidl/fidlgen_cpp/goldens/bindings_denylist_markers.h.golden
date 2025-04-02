@@ -83,6 +83,22 @@ class DenyEachBinding final {
 
     static constexpr uint64_t kOrdinal = 2184115815603862302;
   };
+  class OnlyDenyPython final {
+    OnlyDenyPython() = delete;
+
+   public:
+    using Protocol = ::test_bindingsdenylist::DenyEachBinding;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = true;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = true;
+    static constexpr bool kHasFrameworkError = false;
+
+    static constexpr uint64_t kOrdinal = 3010747198252652930;
+  };
   class OnlyDenyRust final {
     OnlyDenyRust() = delete;
 

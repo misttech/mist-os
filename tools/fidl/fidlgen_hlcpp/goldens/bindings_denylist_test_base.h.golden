@@ -35,6 +35,9 @@ class DenyEachBinding_TestBase : public ::test::bindingsdenylist::DenyEachBindin
   void OnlyDenyLibfuzzer(bool a, OnlyDenyLibfuzzerCallback callback) override {
     NotImplemented_("OnlyDenyLibfuzzer");
   }
+  void OnlyDenyPython(bool a, OnlyDenyPythonCallback callback) override {
+    NotImplemented_("OnlyDenyPython");
+  }
   void OnlyDenyRust(bool a, OnlyDenyRustCallback callback) override {
     NotImplemented_("OnlyDenyRust");
   }

@@ -103,7 +103,7 @@ type UnsupportedMessage string
 type PythonUnsupported struct {
 	Identifier fidlgen.EncodedCompoundIdentifier
 	PythonName string
-	Message    UnsupportedMessage
+	Message    []string
 }
 
 type PythonProtocol struct {
@@ -306,7 +306,11 @@ func (c *compiler) compileLiteral(val fidlgen.Literal) *string {
 			log.Fatalf("Unknown bool value: %v", val)
 		}
 	case fidlgen.StringLiteral:
-		r = fmt.Sprintf("\"%s\"", val.Value)
+		r = strings.ReplaceAll(val.Value, "\\", "\\\\")
+		r = strings.ReplaceAll(r, "\"", "\\\"")
+		r = strings.ReplaceAll(r, "'", "\\'")
+		r = strings.ReplaceAll(r, "\x00", "\\x00")
+		r = fmt.Sprintf("\"\"\"%s\"\"\"", r)
 	default:
 		log.Fatalf("Unknown literal kind: %v", val)
 	}
@@ -456,7 +460,10 @@ func (c *compiler) compileStruct(val fidlgen.Struct) (PythonStruct, *PythonUnsup
 	for _, v := range val.Members {
 		member, message := c.compileStructMember(v)
 		if message != nil {
-			unsupported_message = fmt.Sprintf("%s\n    - %s", unsupported_message, *message)
+			if unsupported_message != "" {
+				unsupported_message += "\n"
+			}
+			unsupported_message = fmt.Sprintf("%s- %s", unsupported_message, *message)
 			continue
 		}
 		python_struct.PythonMembers = append(python_struct.PythonMembers, member)
@@ -465,7 +472,7 @@ func (c *compiler) compileStruct(val fidlgen.Struct) (PythonStruct, *PythonUnsup
 		unsupported := PythonUnsupported{
 			Identifier: val.Name,
 			PythonName: name,
-			Message:    UnsupportedMessage("\n" + unsupported_message),
+			Message:    strings.Split(unsupported_message, "\n"),
 		}
 		return PythonStruct{}, &unsupported
 	}

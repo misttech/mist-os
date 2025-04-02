@@ -6,6 +6,8 @@ package codegen
 
 import (
 	"embed"
+	"fmt"
+	"strings"
 	"text/template"
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
@@ -19,14 +21,39 @@ type Generator struct {
 	*fidlgen.Generator
 }
 
-func NewGenerator() *Generator {
-	// TODO(https://fxbug.dev/394423190): Integrate with a formatter. Unfortunately, shac
-	// is not compatible with fidlgen.NewFormatter because shac does not format files
-	// from stdin.
-	formatter := fidlgen.NewFormatter("")
+func EscapeQuotes(s string) string {
+	// Replace backslashes first to avoid double-escaping
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	s = strings.ReplaceAll(s, "'", "\\'")
+	s = strings.ReplaceAll(s, "\x00", "\\x00")
+	return s
+}
+
+func IndentNonEmpty4(s string) string {
+	if s == "" {
+		return ""
+	}
+	return fmt.Sprintf("    %s", s)
+}
+
+func IndentNonEmpty8(s string) string {
+	if s == "" {
+		return ""
+	}
+	return fmt.Sprintf("        %s", s)
+}
+
+func NewGenerator(blackPath string) *Generator {
+	formatter := fidlgen.NewFormatter(blackPath, "--quiet", "-")
 
 	return &Generator{
-		Generator: fidlgen.NewGenerator("PythonTemplates", templates, formatter, template.FuncMap{})}
+		Generator: fidlgen.NewGenerator("PythonTemplates", templates, formatter, template.FuncMap{
+			"escapeQuotes":    EscapeQuotes,
+			"trimSpace":       strings.TrimSpace,
+			"indentNonEmpty4": IndentNonEmpty4,
+			"indentNonEmpty8": IndentNonEmpty8,
+		})}
 }
 
 func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string) error {

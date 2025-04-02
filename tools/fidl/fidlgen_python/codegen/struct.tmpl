@@ -6,20 +6,24 @@
 {{define "StructDeclaration" -}}
 @dataclass
 class {{ .PythonName }}:
+    {{- if .DocComments }}
     """
     {{- range .DocComments }}
-    {{ . }}
+{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
     {{- end }}
     """
+    {{- end }}
     # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
     # of needing to support creation of a "default object" before decoding.
     {{- range .PythonMembers }}
-    {{ .PythonName }}: {{ .PythonType.PythonName }} | None
+    {{- if .DocComments }}
+    """
     {{- range .DocComments }}
+{{ . | escapeQuotes | trimSpace | indentNonEmpty4 }}
+    {{- end }}
     """
-    {{ . }}
-    """
-    {{- end -}}
+    {{- end }}
+    {{ .PythonName }}: {{ .PythonType.PythonName }} | None
     {{- end }}
 
     __fidl_kind__ = "struct"

@@ -72,7 +72,12 @@ template("fidl_python") {
       tool = "//tools/fidl/fidlgen_python"
       mnemonic = "FIDLGEN"
 
-      inputs = [ fidl_ir_json ]
+      inputs = [
+        fidl_ir_json,
+        "//prebuilt/third_party/black/linux-x64/black",
+        "//.gitignore",
+        "//pyproject.toml",
+      ]
 
       output = "$fidl_gen_dir/__init__.py"
       outputs = [ output ]
@@ -82,6 +87,9 @@ template("fidl_python") {
         rebase_path(fidl_ir_json, root_build_dir),
         "--output",
         rebase_path(output, root_build_dir),
+        "--black",
+        rebase_path("//prebuilt/third_party/black/linux-x64/black",
+                    root_build_dir),
       ]
 
       deps = [ fidl_ir_target ]
