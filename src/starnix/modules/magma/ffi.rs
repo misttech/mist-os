@@ -166,11 +166,12 @@ pub fn device_import(
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
 ) -> Result<MagmaDevice, Errno> {
-    let entries =
-        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+    let entries = std::fs::read_dir("/svc/fuchsia.gpu.magma.Service")
+        .map_err(|_| errno!(EINVAL))?
+        .filter_map(|x| x.ok());
 
-    let mut magma_devices =
-        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendors).ok());
+    let mut magma_devices = entries
+        .filter_map(|entry| attempt_open_path(entry.path().join("device"), supported_vendors).ok());
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
 
     if magma_devices.next().is_some() {
@@ -186,11 +187,13 @@ pub fn device_import(
 }
 
 fn get_magma_vendor_id(supported_vendor_list: &Vec<u16>) -> Result<u64, Errno> {
-    let entries =
-        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+    let entries = std::fs::read_dir("/svc/fuchsia.gpu.magma.Service")
+        .map_err(|_| errno!(EINVAL))?
+        .filter_map(|x| x.ok());
 
-    let mut magma_devices =
-        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendor_list).ok());
+    let mut magma_devices = entries.filter_map(|entry| {
+        attempt_open_path(entry.path().join("device"), supported_vendor_list).ok()
+    });
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
     let mut result_out = 0;
     let mut result_buffer_out = 0;
