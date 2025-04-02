@@ -61,7 +61,7 @@ creation time. Otherwise, it will default to 0.
 During clock update operations, any attempt to set the clock's value to
 something less than the backstop time will fail with **ZX_ERR_INVALID_ARGS**. A
 clock that has not been initially set will always report the backstop time
-configured for the clock. Backtop times may never be less than the default
+configured for the clock. Backstop times may never be less than the default
 value of zero.
 
 ### Implied properties

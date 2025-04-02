@@ -17,11 +17,16 @@ Zircon actively manages the following resources:
 
 ## Kernel objects for applications
 
+### General
+
++ [Clock](/docs/reference/kernel_objects/clock.md)
+
 ### IPC
 
 + [Channel](/docs/reference/kernel_objects/channel.md)
 + [Socket](/docs/reference/kernel_objects/socket.md)
 + [FIFO](/docs/reference/kernel_objects/fifo.md)
++ [Stream](/docs/reference/kernel_objects/stream.md)
 
 ### Tasks
 
@@ -39,12 +44,12 @@ Zircon actively manages the following resources:
 + [Event](/docs/reference/kernel_objects/event.md)
 + [Event Pair](/docs/reference/kernel_objects/eventpair.md)
 + [Futex](/docs/reference/kernel_objects/futex.md)
++ [Counter](/docs/reference/kernel_objects/counter.md)
 
 ### Memory and address space
 
 + [Virtual Memory Object](/docs/reference/kernel_objects/vm_object.md)
 + [Virtual Memory Address Region](/docs/reference/kernel_objects/vm_address_region.md)
-+ [bus_transaction_initiator](/docs/reference/kernel_objects/bus_transaction_initiator.md)
 + [Pager](/docs/reference/kernel_objects/pager.md)
 
 ### Waiting
@@ -58,6 +63,8 @@ Zircon actively manages the following resources:
 + [Message Signaled Interrupts](/docs/reference/kernel_objects/msi.md)
 + [Resource](/docs/reference/kernel_objects/resource.md)
 + [Debuglog](/docs/reference/kernel_objects/debuglog.md)
++ [Bus Transaction Initiator](/docs/reference/kernel_objects/bus_transaction_initiator.md)
++ [Pinned Memory Token](/docs/reference/kernel_objects/pinned_memory_token.md)
 
 ## Kernel object lifetime
 
