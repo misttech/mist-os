@@ -27,15 +27,11 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t request) {
 
 __EXPORT
 zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t request) {
-  // TODO(https://fxbug.dev/376575307): Migrate this to fdio_open3_at once we've ensured no more
-  // callers of this function are using privileged operations on directory connections.
-  //
-  // Some existing callers use this function to open a directory and then perform operations on it,
-  // which is not possible in io2 since we want to enforce rights on these operations.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  return fdio_open3_at(dir, path, uint64_t{fuchsia_io::wire::Flags::kProtocolService}, request);
+#else
   return fdio_open_at(dir, path, 0, request);
-#pragma clang diagnostic pop
+#endif
 }
 
 __EXPORT

@@ -99,7 +99,7 @@ TEST_F(ServerTest, ConnectsToOtherMember) {
   auto svc_local = component::OpenDirectoryAt(local_root_, "svc");
   ASSERT_OK(svc_local.status_value());
 
-  // Connect to the `EchoService` at the 'default' instance.
+  // Connect to the `EchoService` at the 'other' instance.
   zx::result<EchoService::ServiceClient> open_result =
       component::OpenServiceAt<EchoService>(*svc_local, "other");
   ASSERT_TRUE(open_result.is_ok());
@@ -128,16 +128,14 @@ TEST_F(ServerTest, ListsMembers) {
   std::thread t([&] {
     auto defer_quit_loop = fit::defer([&] { loop().Quit(); });
 
-    // Open the 'default' instance of the test service.
-    zx::channel client, server;
-    ASSERT_OK(zx::channel::create(0, &client, &server));
-    ASSERT_OK(fdio_service_connect_at(local_root_.channel().get(),
-                                      "/svc/fidl.service.test.EchoService/default",
-                                      server.release()));
-    fbl::unique_fd instance_fd;
-    ASSERT_OK(fdio_fd_create(client.release(), instance_fd.reset_and_get_address()));
+    // Open the 'default' instance of the test service and enumerate its contents.
+    auto default_instance =
+        component::OpenDirectoryAt(local_root_, "/svc/fidl.service.test.EchoService/default");
+    ASSERT_OK(default_instance.status_value());
 
-    // fdopendir takes ownership of `instance_fd`.
+    fbl::unique_fd instance_fd;
+    ASSERT_OK(fdio_fd_create(default_instance->TakeChannel().release(),
+                             instance_fd.reset_and_get_address()));
     DIR* dir = fdopendir(instance_fd.release());
     ASSERT_NE(dir, nullptr);
     auto defer_closedir = fit::defer([dir] { closedir(dir); });

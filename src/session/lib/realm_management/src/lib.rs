@@ -242,7 +242,7 @@ mod tests {
         }
 
         let directory_request_handler = |directory_request| match directory_request {
-            fio::DirectoryRequest::DeprecatedOpen { path: fake_capability_path, .. } => {
+            fio::DirectoryRequest::Open { path: fake_capability_path, .. } => {
                 CALL_COUNT.inc();
                 assert_eq!(fake_capability_path, "fake_capability_path");
             }
