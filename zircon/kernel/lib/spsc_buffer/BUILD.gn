@@ -1,0 +1,15 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/library_headers.gni")
+
+library_headers("headers") {
+  headers = [ "lib/spsc_buffer/spsc_buffer.h" ]
+  public_deps = [ "//zircon/kernel/lib/ktl" ]
+}
+
+source_set("spsc_buffer") {
+  public_deps = [ ":headers" ]
+  deps = [ "//zircon/kernel/lib/ktl" ]
+}
