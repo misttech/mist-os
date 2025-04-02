@@ -7,7 +7,7 @@ Tests of various (mostly hardcoded) properties returned from a WifiChip.
 
 import asyncio
 
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from antlion import base_test
 from mobly import test_runner
 from mobly.asserts import assert_equal

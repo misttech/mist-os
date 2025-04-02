@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-import fidl.fuchsia_wlan_device_service as fidl_wlan_device_service
+import fidl_fuchsia_wlan_device_service as fidl_wlan_device_service
 from antlion import base_test
 from antlion.controllers import fuchsia_device
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod

@@ -8,7 +8,7 @@ Testing utilities for antlion tests of wlanix.
 import asyncio
 from typing import Any
 
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from antlion import controllers
 from antlion.controllers import fuchsia_device
 from antlion.controllers.access_point import AccessPoint
@@ -19,7 +19,7 @@ from antlion.test_utils.wifi import wifi_test_utils as wutils
 from fuchsia_controller_py import Channel
 from honeydew.typing.custom_types import FidlEndpoint
 from mobly import base_test, signals
-from mobly.asserts import abort_class_if, assert_equal, assert_is_not
+from mobly.asserts import abort_class_if, assert_equal
 from mobly.records import TestResultRecord
 
 
@@ -68,11 +68,9 @@ class WifiChipBaseTestClass(WlanixBaseTestClass):
         wifi_proxy = fidl_wlanix.WifiClient(proxy)
 
         response = asyncio.run(wifi_proxy.get_chip_ids()).unwrap()
-        assert_is_not(
-            response.chip_ids,
-            None,
-            "Wifi.GetChipIds() response is missing a chip_ids value",
-        )
+        assert (
+            response.chip_ids is not None
+        ), "Wifi.GetChipIds() response is missing a chip_ids value"
         assert_equal(
             len(response.chip_ids),
             1,
@@ -91,6 +89,9 @@ class WifiChipBaseTestClass(WlanixBaseTestClass):
             response = asyncio.run(
                 self.wifi_chip_proxy.get_sta_iface_names()
             ).unwrap()
+            assert (
+                response.iface_names is not None
+            ), "WifiChip.GetStaIfaceNames() response is missing an iface_names value"
             assert_equal(
                 len(response.iface_names),
                 0,
@@ -109,11 +110,14 @@ class IfaceBaseTestClass(WifiChipBaseTestClass):
     def setup_class(self) -> None:
         super().setup_class()
 
-        response = asyncio.run(
+        get_sta_iface_names_response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()
         ).unwrap()
+        assert (
+            get_sta_iface_names_response.iface_names is not None
+        ), "WifiChip.GetStaIfaceNames() response is missing an iface_names value"
         assert_equal(
-            len(response.iface_names),
+            len(get_sta_iface_names_response.iface_names),
             0,
             "WifiChip should have returned an empty list of iface names",
         )
@@ -123,11 +127,14 @@ class IfaceBaseTestClass(WifiChipBaseTestClass):
             self.wifi_chip_proxy.create_sta_iface(iface=server.take())
         ).unwrap()
         self.wifi_sta_iface_proxy = fidl_wlanix.WifiStaIfaceClient(proxy)
-        self.iface_name = (
-            asyncio.run(self.wifi_sta_iface_proxy.get_name())
-            .unwrap()
-            .iface_name
-        )
+
+        get_name_response = asyncio.run(
+            self.wifi_sta_iface_proxy.get_name()
+        ).unwrap()
+        assert (
+            get_name_response.iface_name is not None
+        ), "WifiStaIface.GetName() response is missing an iface_name value"
+        self.iface_name = get_name_response.iface_name
 
         proxy, server = Channel.create()
         self.wlanix_proxy.get_supplicant(supplicant=server.take())
@@ -150,11 +157,14 @@ class IfaceBaseTestClass(WifiChipBaseTestClass):
                 )
             ).unwrap()
 
-            response = (
+            get_sta_iface_names_response = (
                 await self.wifi_chip_proxy.get_sta_iface_names()
             ).unwrap()
+            assert (
+                get_sta_iface_names_response.iface_names is not None
+            ), "WifiChip.GetStaIfaceNames() response is missing an iface_names value"
             assert_equal(
-                len(response.iface_names),
+                len(get_sta_iface_names_response.iface_names),
                 0,
                 "WifiChip should no longer contain the iface just removed",
             )

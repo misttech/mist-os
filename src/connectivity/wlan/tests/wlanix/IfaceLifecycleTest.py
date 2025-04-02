@@ -7,7 +7,7 @@ Battery of tests of the lifecycle of ifaces managed by wlanix.
 
 import asyncio
 
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from fuchsia_controller_py import Channel
 from mobly import base_test, test_runner
 from mobly.asserts import assert_equal
