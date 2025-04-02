@@ -42,6 +42,15 @@ TEST(Create, NotSupported) {
   zxio_storage_t storage;
   ASSERT_OK(zxio_create(event.release(), &storage));
   zxio_t* io = &storage.io;
+
+  zx_handle_t borrow = ZX_HANDLE_INVALID;
+  ASSERT_OK(zxio_borrow(io, &borrow));
+  EXPECT_NE(borrow, ZX_HANDLE_INVALID);
+
+  zx::handle clone;
+  ASSERT_OK(zxio_clone(io, clone.reset_and_get_address()));
+  EXPECT_TRUE(clone.is_valid());
+
   zx::handle handle;
   ASSERT_OK(zxio_release(io, handle.reset_and_get_address()));
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));

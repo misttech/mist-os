@@ -35,7 +35,6 @@ constexpr zxio_ops_t zxio_handle_holder_ops = []() {
     zxio_get_handle_holder(io).~zxio_handle_holder();
     return ZX_OK;
   };
-
   ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
     const zx_handle_t handle = zxio_get_handle_holder(io).handle.release();
     if (handle == ZX_HANDLE_INVALID) {
@@ -43,6 +42,16 @@ constexpr zxio_ops_t zxio_handle_holder_ops = []() {
     }
     *out_handle = handle;
     return ZX_OK;
+  };
+  ops.borrow = [](zxio_t* io, zx_handle_t* out_handle) {
+    *out_handle = zxio_get_handle_holder(io).handle.get();
+    return ZX_OK;
+  };
+  ops.clone = [](zxio_t* io, zx_handle_t* out_handle) {
+    zx::handle handle;
+    zx_status_t status = zxio_get_handle_holder(io).handle.duplicate(ZX_RIGHT_SAME_RIGHTS, &handle);
+    *out_handle = handle.release();
+    return status;
   };
   return ops;
 }();
