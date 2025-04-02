@@ -9,6 +9,7 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/memalloc/range.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbitl/view.h>
 
@@ -28,6 +29,19 @@ struct DevicetreeBoot {
 
   // Possible nvram range provided by the bootloader.
   ktl::optional<zbi_nvram_t> nvram;
+};
+
+// Generic Watchdog MMIO abstraction implementation for phys environment.
+struct WatchdogMmioHelper {
+  static uint32_t Read(uint64_t addr) {
+    auto* ptr = reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr);
+    return MmioRead32(ptr);
+  }
+
+  static void Write(uint64_t addr, uint32_t value) {
+    auto* ptr = reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr);
+    MmioWrite32(value, ptr);
+  }
 };
 
 // Instance populated by InitMemory().
