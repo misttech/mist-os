@@ -146,6 +146,7 @@ void ReplaceRuntimeClock() {
 }  // namespace
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   // Parse the flags.
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   fxl::SetLogSettingsFromCommandLine(command_line, {"cobalt", "fidl_service"});
@@ -277,8 +278,6 @@ int main(int argc, const char** argv) {
   if (test_dont_backfill_empty_reports) {
     FX_LOGS(WARNING) << "Not backfilling empty reports. This should only be enabled in tests.";
   }
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
