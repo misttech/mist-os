@@ -639,7 +639,7 @@ void KTrace::InitHook(unsigned) {
   // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
   fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
     fxt::WriteStringRecord(
-        &GetInternalState(), interned_string.id(), interned_string.string(),
+        &GetInstance(), interned_string.id(), interned_string.string(),
         strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
   });
 
