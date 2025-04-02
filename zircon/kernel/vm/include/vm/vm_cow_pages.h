@@ -2060,6 +2060,7 @@ class ScopedPageFreedList {
 //
 // The destruction order will then allow |deferred| to perform its actions after |guard| is
 // destructed and the lock is dropped.
+// This class it not thread safe.
 class VmCowPages::DeferredOps {
  public:
   // Construct a DeferredOps for the given VmCowPages. Must be constructed, and deconstructed,
