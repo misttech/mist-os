@@ -27,7 +27,7 @@
 #include <ktl/move.h>
 
 // Fwd decl of tests to allow friendship.
-namespace ktrace_tests {
+namespace ktrace_internal_tests {
 class TestKTraceState;
 }
 
@@ -202,7 +202,7 @@ class KTraceState {
   }
 
  private:
-  friend class ktrace_tests::TestKTraceState;
+  friend class ktrace_internal_tests::TestKTraceState;
 
   [[nodiscard]] zx_status_t RewindLocked() TA_REQ(lock_);
 

@@ -16,7 +16,7 @@
 
 #include <ktl/enforce.h>
 
-namespace ktrace_tests {
+namespace ktrace_internal_tests {
 
 // A test version of KTraceState which overrides the ReportStaticNames and
 // ReportThreadProcessNames behaviors for testing purposes.
@@ -818,17 +818,17 @@ class TestKTraceState : public ::internal::KTraceState {
   size_t validation_buffer_size_{0};
 };
 
-}  // namespace ktrace_tests
+}  // namespace ktrace_internal_tests
 
-UNITTEST_START_TESTCASE(ktrace_tests)
-UNITTEST("init/start", ktrace_tests::TestKTraceState::InitStartTest)
-UNITTEST("write record", ktrace_tests::TestKTraceState::WriteRecordsTest)
-UNITTEST("saturation", ktrace_tests::TestKTraceState::SaturationTest)
-UNITTEST("rewind", ktrace_tests::TestKTraceState::RewindTest)
-UNITTEST("state check", ktrace_tests::TestKTraceState::StateCheckTest)
-UNITTEST("circular", ktrace_tests::TestKTraceState::CircularWriteTest)
-UNITTEST("fxt compat writer", ktrace_tests::TestKTraceState::FxtCompatWriterTest)
-UNITTEST("disable writes", ktrace_tests::TestKTraceState::DisableWritesTest)
+UNITTEST_START_TESTCASE(ktrace_internal_tests)
+UNITTEST("init/start", ktrace_internal_tests::TestKTraceState::InitStartTest)
+UNITTEST("write record", ktrace_internal_tests::TestKTraceState::WriteRecordsTest)
+UNITTEST("saturation", ktrace_internal_tests::TestKTraceState::SaturationTest)
+UNITTEST("rewind", ktrace_internal_tests::TestKTraceState::RewindTest)
+UNITTEST("state check", ktrace_internal_tests::TestKTraceState::StateCheckTest)
+UNITTEST("circular", ktrace_internal_tests::TestKTraceState::CircularWriteTest)
+UNITTEST("fxt compat writer", ktrace_internal_tests::TestKTraceState::FxtCompatWriterTest)
+UNITTEST("disable writes", ktrace_internal_tests::TestKTraceState::DisableWritesTest)
 UNITTEST("disable writes during pending commit",
-         ktrace_tests::TestKTraceState::DisableWritesDuringPendingCommitTest)
-UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")
+         ktrace_internal_tests::TestKTraceState::DisableWritesDuringPendingCommitTest)
+UNITTEST_END_TESTCASE(ktrace_internal_tests, "ktrace-internal", "KTrace tests")
