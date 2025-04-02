@@ -79,6 +79,6 @@ rust_library(
         "//third_party/rust_crates/vendor/fnv-1.0.7:fnv",
         "//third_party/rust_crates/vendor/quick-error-1.2.2:quick_error",
         "//third_party/rust_crates/vendor/tempfile-3.2.0:tempfile",
-        "//third_party/rust_crates/vendor/wait-timeout-0.2.0:wait_timeout",
+        "//third_party/rust_crates/vendor/wait-timeout-0.2.1:wait_timeout",
     ],
 )

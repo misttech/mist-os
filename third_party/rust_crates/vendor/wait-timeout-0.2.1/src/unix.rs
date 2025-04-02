@@ -19,17 +19,17 @@
 
 use std::cmp;
 use std::collections::HashMap;
-use std::io::{self, Write, Read};
-use std::os::unix::net::UnixStream;
+use std::io::{self, Read, Write};
 use std::mem;
+use std::os::unix::net::UnixStream;
 use std::os::unix::prelude::*;
 use std::process::{Child, ExitStatus};
-use std::sync::{Once, ONCE_INIT, Mutex};
+use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
 use libc::{self, c_int};
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 static mut STATE: *mut State = 0 as *mut _;
 
 struct State {
@@ -41,23 +41,9 @@ struct State {
 
 type StateMap = HashMap<*mut Child, (UnixStream, Option<ExitStatus>)>;
 
-pub fn wait_timeout(child: &mut Child, dur: Duration)
-                    -> io::Result<Option<ExitStatus>> {
+pub fn wait_timeout(child: &mut Child, dur: Duration) -> io::Result<Option<ExitStatus>> {
     INIT.call_once(State::init);
-    unsafe {
-        (*STATE).wait_timeout(child, dur)
-    }
-}
-
-// Do $value as type_of($target)
-macro_rules! _as {
-    ($value:expr, $target:expr) => (
-        {
-            let mut x = $target;
-            x = $value as _;
-            x
-        }
-    )
+    unsafe { (*STATE).wait_timeout(child, dur) }
 }
 
 impl State {
@@ -70,7 +56,7 @@ impl State {
             read.set_nonblocking(true).unwrap();
             write.set_nonblocking(true).unwrap();
 
-            let mut state = Box::new(State {
+            let state = Box::new(State {
                 prev: mem::zeroed(),
                 write: write,
                 read: read,
@@ -80,25 +66,15 @@ impl State {
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = sigchld_handler as usize;
+            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
 
-            // FIXME: remove this workaround when the PR to libc get merged and released
-            //
-            // This is a workaround for the type mismatch in the definition of SA_*
-            // constants for android. See https://github.com/rust-lang/libc/pull/511
-            //
-            let sa_flags = new.sa_flags;
-            new.sa_flags = _as!(libc::SA_NOCLDSTOP, sa_flags) |
-                           _as!(libc::SA_RESTART, sa_flags) |
-                           _as!(libc::SA_SIGINFO, sa_flags);
+            STATE = Box::into_raw(state);
 
-            assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
-
-            STATE = mem::transmute(state);
+            assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut (*STATE).prev), 0);
         }
     }
 
-    fn wait_timeout(&self, child: &mut Child, dur: Duration)
-                       -> io::Result<Option<ExitStatus>> {
+    fn wait_timeout(&self, child: &mut Child, dur: Duration) -> io::Result<Option<ExitStatus>> {
         // First up, prep our notification pipe which will tell us when our
         // child has been reaped (other threads may signal this pipe).
         let (read, write) = UnixStream::pair()?;
@@ -116,7 +92,7 @@ impl State {
         // to happen.
         let mut map = self.map.lock().unwrap();
         if let Some(status) = child.try_wait()? {
-            return Ok(Some(status))
+            return Ok(Some(status));
         }
         assert!(map.insert(child, (write, None)).is_none());
         drop(map);
@@ -134,7 +110,6 @@ impl State {
             }
         }
         let remove = Remove { state: self, child };
-
 
         // Alright, we're guaranteed that we'll eventually get a SIGCHLD due
         // to our `try_wait` failing, and we're also guaranteed that we'll
@@ -161,25 +136,23 @@ impl State {
         loop {
             let elapsed = start.elapsed();
             if elapsed >= dur {
-                break
+                break;
             }
             let timeout = dur - elapsed;
-            let timeout = timeout.as_secs().checked_mul(1_000)
-                .and_then(|amt| {
-                    amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000)
-                })
+            let timeout = timeout
+                .as_secs()
+                .checked_mul(1_000)
+                .and_then(|amt| amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000))
                 .unwrap_or(u64::max_value());
             let timeout = cmp::min(<c_int>::max_value() as u64, timeout) as c_int;
-            let r = unsafe {
-                libc::poll(fds.as_mut_ptr(), 2, timeout)
-            };
+            let r = unsafe { libc::poll(fds.as_mut_ptr(), 2, timeout) };
             let timeout = match r {
                 0 => true,
                 n if n > 0 => false,
                 n => {
                     let err = io::Error::last_os_error();
                     if err.kind() == io::ErrorKind::Interrupted {
-                        continue
+                        continue;
                     } else {
                         panic!("error in select = {}: {}", n, err)
                     }
@@ -209,7 +182,7 @@ impl State {
             }
 
             if drain(&read) || timeout {
-                break
+                break;
             }
         }
 
@@ -223,7 +196,7 @@ impl State {
         for (&k, &mut (ref write, ref mut status)) in map {
             // Already reaped, nothing to do here
             if status.is_some() {
-                continue
+                continue;
             }
 
             *status = unsafe { (*k).try_wait().unwrap() };
@@ -243,7 +216,7 @@ fn drain(mut file: &UnixStream) -> bool {
             Ok(..) => ret = true, // data read, but keep draining
             Err(e) => {
                 if e.kind() == io::ErrorKind::WouldBlock {
-                    return ret
+                    return ret;
                 } else {
                     panic!("bad read: {}", e)
                 }
@@ -275,11 +248,9 @@ fn notify(mut file: &UnixStream) {
 // which will wake up the other end at some point, so we just allow this
 // signal to be coalesced with the pending signals on the pipe.
 #[allow(unused_assignments)]
-extern fn sigchld_handler(signum: c_int,
-                          info: *mut libc::siginfo_t,
-                          ptr: *mut libc::c_void) {
-    type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
-    type FnHandler = extern fn(c_int);
+extern "C" fn sigchld_handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc::c_void) {
+    type FnSigaction = extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
+    type FnHandler = extern "C" fn(c_int);
 
     unsafe {
         let state = &*STATE;
@@ -287,14 +258,9 @@ extern fn sigchld_handler(signum: c_int,
 
         let fnptr = state.prev.sa_sigaction;
         if fnptr == 0 {
-            return
+            return;
         }
-        // FIXME: remove this workaround when the PR to libc get merged and released
-        //
-        // This is a workaround for the type mismatch in the definition of SA_*
-        // constants for android. See https://github.com/rust-lang/libc/pull/511
-        //
-        if state.prev.sa_flags & _as!(libc::SA_SIGINFO, state.prev.sa_flags) == 0 {
+        if state.prev.sa_flags & libc::SA_SIGINFO == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
             action(signum)
         } else {

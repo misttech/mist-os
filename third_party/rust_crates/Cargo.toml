@@ -345,7 +345,7 @@ tinyjson = "2.5.0"
 # supports target-specific feature resolution
 tokio = { version = "=1.38.1", default-features = false }
 tokio-stream = "0.1.14"
-wait-timeout = "0.2.0"
+wait-timeout = "0.2.1"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 # keep-sorted end
 

@@ -527,7 +527,7 @@ _NORMAL_DEPENDENCIES = {
             "tinyjson": Label("//third_party/rust_crates/vendor/tinyjson-2.5.0:tinyjson"),
             "tokio": Label("//third_party/rust_crates/vendor/tokio-1.38.1:tokio"),
             "tokio-stream": Label("//third_party/rust_crates/vendor/tokio-stream-0.1.14:tokio_stream"),
-            "wait-timeout": Label("//third_party/rust_crates/vendor/wait-timeout-0.2.0:wait_timeout"),
+            "wait-timeout": Label("//third_party/rust_crates/vendor/wait-timeout-0.2.1:wait_timeout"),
             "zip": Label("//third_party/rust_crates/vendor/zip-0.5.5:zip"),
         },
         "cfg(target_os = \"fuchsia\")": {

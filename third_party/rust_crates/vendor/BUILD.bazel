@@ -3211,14 +3211,14 @@ alias(
 )
 
 alias(
-    name = "wait-timeout-0.2.0",
-    actual = "//third_party/rust_crates/vendor/wait-timeout-0.2.0:wait_timeout",
+    name = "wait-timeout-0.2.1",
+    actual = "//third_party/rust_crates/vendor/wait-timeout-0.2.1:wait_timeout",
     tags = ["manual"],
 )
 
 alias(
     name = "wait-timeout",
-    actual = "//third_party/rust_crates/vendor/wait-timeout-0.2.0:wait_timeout",
+    actual = "//third_party/rust_crates/vendor/wait-timeout-0.2.1:wait_timeout",
     tags = ["manual"],
 )
 

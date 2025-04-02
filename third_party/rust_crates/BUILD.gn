@@ -1232,7 +1232,7 @@ group("vte") {
 
 if (!(current_os == "fuchsia")) {
   group("wait-timeout") {
-    public_deps = [ ":wait-timeout-v0_2_0" ]
+    public_deps = [ ":wait-timeout-v0_2_1" ]
   }
 }
 
@@ -14256,7 +14256,7 @@ rust_library("rusty-fork-v0_3_0") {
   deps += [ ":fnv-v1_0_7" ]
   deps += [ ":quick-error-v1_2_2" ]
   deps += [ ":tempfile-v3_2_0" ]
-  deps += [ ":wait-timeout-v0_2_0" ]
+  deps += [ ":wait-timeout-v0_2_1" ]
 
   rustenv = []
 
@@ -18925,18 +18925,18 @@ rust_library("vte-v0_15_0") {
   applicable_licenses = [ ":vte-v0_15_0.license" ]
 }
 
-license("wait-timeout-v0_2_0.license") {
+license("wait-timeout-v0_2_1.license") {
   public_package_name = "wait_timeout"
   license_files = [
-    "//third_party/rust_crates/vendor/wait-timeout-0.2.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wait-timeout-0.2.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/wait-timeout-0.2.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/wait-timeout-0.2.1/LICENSE-MIT",
   ]
 }
 
-rust_library("wait-timeout-v0_2_0") {
+rust_library("wait-timeout-v0_2_1") {
   crate_name = "wait_timeout"
-  crate_root = "//third_party/rust_crates/vendor/wait-timeout-0.2.0/src/lib.rs"
-  output_name = "wait_timeout-369c6a5702285b53"
+  crate_root = "//third_party/rust_crates/vendor/wait-timeout-0.2.1/src/lib.rs"
+  output_name = "wait_timeout-893c459239f83683"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18949,13 +18949,13 @@ rust_library("wait-timeout-v0_2_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=369c6a5702285b53",
-    "-Cextra-filename=-369c6a5702285b53",
+    "-Cmetadata=893c459239f83683",
+    "-Cextra-filename=-893c459239f83683",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":wait-timeout-v0_2_0.license" ]
+  applicable_licenses = [ ":wait-timeout-v0_2_1.license" ]
 }
 
 license("waker-fn-v1_1_0.license") {
