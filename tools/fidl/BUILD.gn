@@ -15,6 +15,7 @@ group("fidl") {
     "fidlgen_go:host",
     "fidlgen_hlcpp:host",
     "fidlgen_libfuzzer:host",
+    "fidlgen_python:host",
     "fidlgen_rust:host",
     "fidlgen_rust_next:host",
     "fidlgen_syzkaller:host",
