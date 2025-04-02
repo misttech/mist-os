@@ -778,6 +778,20 @@ macro_rules! release_after {
     }};
 }
 
+/// Macro that ensure the iterator of releasables are released with the given context after
+/// the body returns.
+#[macro_export]
+macro_rules! release_iter_after {
+    ($releasable_iter:ident, $context:expr, $(|| -> $output_type:ty)? $body:block ) => {{
+        #[allow(clippy::redundant_closure_call)]
+        let result = { (|| $(-> $output_type)? { $body })() };
+        for item in $releasable_iter.into_iter() {
+            item.release($context);
+        }
+        result
+    }};
+}
+
 pub mod internal {
     pub async fn async_try<E>(block: impl std::future::Future<Output = E>) -> E {
         block.await
@@ -796,7 +810,7 @@ macro_rules! async_release_after {
     }};
 }
 
-pub use {release_after, release_on_error};
+pub use {release_after, release_iter_after, release_on_error};
 
 #[cfg(test)]
 mod test {

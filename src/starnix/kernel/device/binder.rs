@@ -35,14 +35,14 @@ use starnix_logging::{
     trace_instant_flow_end, track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex, MutexGuard,
-    ResourceAccessorAddFile, RwLock, Unlocked,
+    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex,
+    MutexGuard, ResourceAccessorAddFile, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::convert::IntoFidl as _;
 use starnix_types::ownership::{
-    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, Share, TempRef,
-    WeakRef,
+    release_after, release_iter_after, release_on_error, DropGuard, OwnedRef, Releasable,
+    ReleaseGuard, Share, TempRef, WeakRef,
 };
 use starnix_types::user_buffer::UserBuffer;
 use starnix_types::vfs::default_statfs;
@@ -72,12 +72,14 @@ use starnix_uapi::{
     binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE,
     binder_driver_return_protocol_BR_DEAD_BINDER, binder_driver_return_protocol_BR_DEAD_REPLY,
     binder_driver_return_protocol_BR_DECREFS, binder_driver_return_protocol_BR_ERROR,
-    binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_INCREFS,
-    binder_driver_return_protocol_BR_RELEASE, binder_driver_return_protocol_BR_REPLY,
-    binder_driver_return_protocol_BR_SPAWN_LOOPER, binder_driver_return_protocol_BR_TRANSACTION,
+    binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_FROZEN_REPLY,
+    binder_driver_return_protocol_BR_INCREFS, binder_driver_return_protocol_BR_RELEASE,
+    binder_driver_return_protocol_BR_REPLY, binder_driver_return_protocol_BR_SPAWN_LOOPER,
+    binder_driver_return_protocol_BR_TRANSACTION,
     binder_driver_return_protocol_BR_TRANSACTION_COMPLETE,
+    binder_driver_return_protocol_BR_TRANSACTION_PENDING_FROZEN,
     binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
-    binder_object_header, binder_transaction_data,
+    binder_freeze_info, binder_frozen_status_info, binder_object_header, binder_transaction_data,
     binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
     binder_uintptr_t, binder_version, binder_write_read, errno, errno_from_code, error,
     flat_binder_object, pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi, BINDERFS_SUPER_MAGIC,
@@ -409,6 +411,37 @@ struct BinderProcessState {
     /// interrupted either just before or while waiting must abort the operation and return a EINTR
     /// error.
     interrupted: bool,
+    /// Status of the binder freeze.
+    freeze_status: FreezeStatus,
+}
+
+impl BinderProcessState {
+    fn freeze(&mut self) {
+        self.freeze_status.frozen = true;
+        self.freeze_status.has_async_recv = false;
+        self.freeze_status.has_sync_recv = false;
+    }
+
+    fn thaw(&mut self) {
+        self.freeze_status.frozen = false;
+        self.freeze_status.has_async_recv = false;
+        self.freeze_status.has_sync_recv = false;
+    }
+
+    fn has_pending_transactions(&self) -> bool {
+        !self.active_transactions.is_empty()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+struct FreezeStatus {
+    frozen: bool,
+    /// Indicates whether the process has received any sync calls since last
+    /// freeze (cleared at freeze/unfreeze)
+    has_sync_recv: bool,
+    /// Indicates whether the process has received any async calls since last
+    /// freeze (cleared at freeze/unfreeze)
+    has_async_recv: bool,
 }
 
 #[derive(Default, Debug)]
@@ -1833,6 +1866,10 @@ impl BinderThreadState {
             }
         }
     }
+
+    pub fn has_pending_transactions(&self) -> bool {
+        !self.transactions.is_empty()
+    }
 }
 
 impl Releasable for BinderThreadState {
@@ -1967,6 +2004,11 @@ enum Command {
     },
     /// Notifies a binder process that a binder object has died.
     DeadBinder(binder_uintptr_t),
+    /// Notifies the initiator of a sync transaction that the recipient is frozen.
+    FrozenReply,
+    /// Notifies the initiator of an async transaction that the recipient is frozen and transaction
+    /// is queued.
+    PendingFrozen,
     /// Notifies a binder process that the death notification has been cleared.
     ClearDeathNotificationDone(binder_uintptr_t),
     /// Notified the binder process that it should spawn a new looper.
@@ -1993,6 +2035,8 @@ impl Command {
             Command::DeadBinder(_) => c"DeadBinder",
             Command::ClearDeathNotificationDone(_) => c"ClearDeathNotificationDone",
             Command::SpawnLooper => c"SpawnLooper",
+            Command::FrozenReply => c"FrozenReply",
+            Command::PendingFrozen => c"PendingFrozen",
         })
     }
 
@@ -2018,6 +2062,8 @@ impl Command {
             Self::FailedReply => binder_driver_return_protocol_BR_FAILED_REPLY,
             Self::DeadReply { .. } => binder_driver_return_protocol_BR_DEAD_REPLY,
             Self::DeadBinder(..) => binder_driver_return_protocol_BR_DEAD_BINDER,
+            Self::FrozenReply => binder_driver_return_protocol_BR_FROZEN_REPLY,
+            Self::PendingFrozen => binder_driver_return_protocol_BR_TRANSACTION_PENDING_FROZEN,
             Self::ClearDeathNotificationDone(..) => {
                 binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE
             }
@@ -2114,6 +2160,8 @@ impl Command {
             Self::TransactionComplete
             | Self::OnewayTransactionComplete
             | Self::FailedReply
+            | Self::FrozenReply
+            | Self::PendingFrozen
             | Self::DeadReply { .. }
             | Self::SpawnLooper => {
                 if buffer.length < std::mem::size_of::<binder_driver_return_protocol>() {
@@ -3180,6 +3228,15 @@ impl BinderDriver {
         self.procs.read().get(&identifier).map(OwnedRef::share).ok_or_else(|| errno!(ENOENT))
     }
 
+    /// Finds all binder processes that associate with the given `pid`.
+    fn find_processes_by_pid(&self, pid: pid_t) -> Vec<OwnedRef<BinderProcess>> {
+        self.procs
+            .read()
+            .iter()
+            .filter_map(|(_k, v)| if v.pid == pid { Some(OwnedRef::share(v)) } else { None })
+            .collect::<Vec<_>>()
+    }
+
     /// Creates and register the binder process state to represent a local process with `pid`.
     fn create_local_process(&self, pid: pid_t) -> u64 {
         self.create_process(pid, None)
@@ -3417,8 +3474,100 @@ impl BinderDriver {
                     error!(EOPNOTSUPP)
                 }
                 uapi::BINDER_FREEZE => {
-                    track_stub!(TODO("https://fxbug.dev/322874189"), "binder BINDER_FREEZE");
-                    error!(EOPNOTSUPP)
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
+
+                    let user_ref = UserRef::<binder_freeze_info>::new(user_arg);
+                    let binder_freeze_info { pid, enable, timeout_ms } =
+                        binder_proc.get_resource_accessor(current_task).read_object(user_ref)?;
+                    let freezing = match enable {
+                        0 => false,
+                        1 => true,
+                        _ => return error!(EINVAL),
+                    };
+
+                    let target_binder_procs = self.find_processes_by_pid(pid as pid_t);
+                    if target_binder_procs.is_empty() {
+                        return error!(EINVAL);
+                    }
+
+                    release_iter_after!(target_binder_procs, current_task.kernel(), {
+                        let locks =
+                            target_binder_procs.iter().map(|p| &p.state).collect::<Vec<_>>();
+                        let mut target_binder_procs_locked = ordered_lock_vec(&locks);
+                        if !freezing {
+                            target_binder_procs_locked.iter_mut().for_each(|bp| bp.thaw());
+                            return Ok(SUCCESS);
+                        }
+
+                        // Clone threads in the proc to lock them all until freeze is done.
+                        let threads = target_binder_procs_locked
+                            .iter()
+                            .map(|p| p.thread_pool.0.values().map(|t| OwnedRef::share(t)))
+                            .flatten()
+                            .collect::<Vec<_>>();
+                        release_iter_after!(threads, current_task.kernel(), {
+                            let threads_locks =
+                                threads.iter().map(|t| &t.state).collect::<Vec<_>>();
+                            let threads_locked = ordered_lock_vec(&threads_locks);
+
+                            // Avoid freezing the target procs if there is any pending transaction
+                            if target_binder_procs_locked
+                                .iter()
+                                .any(|binder_process| binder_process.has_pending_transactions())
+                                || threads_locked
+                                    .iter()
+                                    .any(|binder_thread| binder_thread.has_pending_transactions())
+                            {
+                                if timeout_ms > 0 {
+                                    track_stub!(
+                                        TODO("https://fxbug.dev/391657004"),
+                                        "BINDER_FREEZE timeout"
+                                    );
+                                }
+                                return error!(EAGAIN);
+                            }
+
+                            target_binder_procs_locked.iter_mut().for_each(|bp| bp.freeze());
+                            Ok(SUCCESS)
+                        })
+                    })
+                }
+                uapi::BINDER_GET_FROZEN_INFO => {
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
+
+                    let user_ref = UserRef::<binder_frozen_status_info>::new(user_arg);
+                    let resource_accessor = binder_proc.get_resource_accessor(current_task);
+                    let binder_frozen_status_info { pid, .. } =
+                        resource_accessor.read_object(user_ref)?;
+                    let target_binder_procs = self.find_processes_by_pid(pid as pid_t);
+                    if target_binder_procs.is_empty() {
+                        return error!(EINVAL);
+                    }
+                    let mut has_sync_recv = false;
+                    let mut has_async_recv = false;
+                    release_iter_after!(target_binder_procs, current_task.kernel(), {
+                        target_binder_procs.iter().for_each(|binder_proc| {
+                            let binder_proc_state = binder_proc.lock();
+                            has_sync_recv |= binder_proc_state.freeze_status.has_sync_recv;
+                            has_async_recv |= binder_proc_state.freeze_status.has_async_recv;
+                        });
+                    });
+                    resource_accessor.write_object(
+                        user_ref,
+                        &binder_frozen_status_info {
+                            pid,
+                            // TODO(https://fxbug.dev/391657004): After timeout is supported, use
+                            // the second right bit as the indicator whether it has any pending
+                            // transactions.
+                            sync_recv: has_sync_recv as u32,
+                            async_recv: has_async_recv as u32,
+                        },
+                    )?;
+                    Ok(SUCCESS)
                 }
                 _ => {
                     track_stub!(
@@ -3586,6 +3735,20 @@ impl BinderDriver {
         release_after!(actions, (), {
             release_after!(guard, &mut actions, {
                 let target_proc = target_proc.ok_or(TransactionError::Dead)?;
+                let oneway = data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0;
+                // Track freeze status if the target proc is frozen
+                let is_target_frozen = {
+                    let mut state = target_proc.lock();
+                    if state.freeze_status.frozen {
+                        state.freeze_status.has_sync_recv |= !oneway;
+                        state.freeze_status.has_async_recv |= oneway;
+                    }
+                    state.freeze_status.frozen
+                };
+                // If the target proc is frozen in the sync transaction, reply with the Frozen error
+                if is_target_frozen && !oneway {
+                    return Err(TransactionError::Frozen);
+                }
                 let weak_task = current_task.get_task(target_proc.pid);
                 let target_task = weak_task.upgrade().ok_or(TransactionError::Dead)?;
                 let security_context: Option<FsString> =
@@ -3636,85 +3799,88 @@ impl BinderDriver {
                     transaction_state.push_guard(guard);
                 }
 
-                let (target_thread, command) =
-                    if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
-                        profile_duration!("TransactionOneWay");
-                        // The caller is not expecting a reply.
-                        binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
-
-                        // Register the transaction buffer.
-                        target_proc.lock().active_transactions.insert(
-                            buffers.data.address,
-                            ActiveTransaction {
-                                request_type: RequestType::Oneway { object: object.clone() },
-                                state: transaction_state.into_state(),
-                            }
-                            .into(),
-                        );
-
-                        // Oneway transactions are enqueued on the binder object and processed one at a time.
-                        // This guarantees that oneway transactions are processed in the order they are
-                        // submitted, and one at a time.
-                        let mut object_state = object.lock();
-                        if object_state.handling_oneway_transaction {
-                            // Currently, a oneway transaction is being handled. Queue this one so that it is
-                            // scheduled when the buffer from the in-progress transaction is freed.
-                            object_state.oneway_transactions.push_back(transaction);
-                            return Ok(());
-                        }
-
-                        // No oneway transactions are being handled, which means that no buffer will be
-                        // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
-                        // the transaction regularly, but mark the object as handling a oneway transaction.
-                        object_state.handling_oneway_transaction = true;
-
-                        (None, Command::OnewayTransaction(transaction))
+                let (target_thread, command) = if oneway {
+                    profile_duration!("TransactionOneWay");
+                    // The caller is not expecting a reply.
+                    binder_thread.lock().enqueue_command(if is_target_frozen {
+                        Command::PendingFrozen
                     } else {
-                        profile_duration!("TransactionTwoWay");
-                        let target_thread = match match binder_thread.lock().transactions.last() {
-                            Some(TransactionRole::Receiver(rx, _)) => rx.upgrade(),
-                            _ => None,
-                        } {
-                            Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
-                            _ => None,
-                        };
+                        Command::OnewayTransactionComplete
+                    });
 
-                        // Make the sender thread part of the transaction so it doesn't get scheduled to handle
-                        // any other transactions.
-                        binder_thread.lock().transactions.push(TransactionRole::Sender);
-
-                        // Register the transaction buffer.
-                        target_proc.lock().active_transactions.insert(
-                            buffers.data.address,
-                            ActiveTransaction {
-                                request_type: RequestType::RequestResponse,
-                                state: transaction_state.into_state(),
-                            }
-                            .into(),
-                        );
-
-                        // The object flags have 2 ways to declare a scheduler policy for the
-                        // transaction.
-                        // 1. It might contains a specific minimal policy to use.
-                        // 2. It might declare that the transaction supports priority inheritance.
-                        // The results must always be the best policy according to these rules.
-                        let mut scheduler_policy = object.flags.get_scheduler_policy();
-                        if object.flags.contains(BinderObjectFlags::INHERIT_RT) {
-                            let current_policy = current_task.read().scheduler_policy;
-                            scheduler_policy = scheduler_policy
-                                .map(|p| if p > current_policy { p } else { current_policy })
-                                .or(Some(current_policy));
+                    // Register the transaction buffer.
+                    target_proc.lock().active_transactions.insert(
+                        buffers.data.address,
+                        ActiveTransaction {
+                            request_type: RequestType::Oneway { object: object.clone() },
+                            state: transaction_state.into_state(),
                         }
+                        .into(),
+                    );
 
-                        (
-                            target_thread,
-                            Command::Transaction {
-                                sender: WeakBinderPeer::new(binder_proc, binder_thread),
-                                data: transaction,
-                                scheduler_policy,
-                            },
-                        )
+                    // Oneway transactions are enqueued on the binder object and processed one at a time.
+                    // This guarantees that oneway transactions are processed in the order they are
+                    // submitted, and one at a time.
+                    let mut object_state = object.lock();
+                    if object_state.handling_oneway_transaction {
+                        // Currently, a oneway transaction is being handled. Queue this one so that it is
+                        // scheduled when the buffer from the in-progress transaction is freed.
+                        object_state.oneway_transactions.push_back(transaction);
+                        return Ok(());
+                    }
+
+                    // No oneway transactions are being handled, which means that no buffer will be
+                    // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
+                    // the transaction regularly, but mark the object as handling a oneway transaction.
+                    object_state.handling_oneway_transaction = true;
+
+                    (None, Command::OnewayTransaction(transaction))
+                } else {
+                    profile_duration!("TransactionTwoWay");
+                    let target_thread = match match binder_thread.lock().transactions.last() {
+                        Some(TransactionRole::Receiver(rx, _)) => rx.upgrade(),
+                        _ => None,
+                    } {
+                        Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
+                        _ => None,
                     };
+
+                    // Make the sender thread part of the transaction so it doesn't get scheduled to handle
+                    // any other transactions.
+                    binder_thread.lock().transactions.push(TransactionRole::Sender);
+
+                    // Register the transaction buffer.
+                    target_proc.lock().active_transactions.insert(
+                        buffers.data.address,
+                        ActiveTransaction {
+                            request_type: RequestType::RequestResponse,
+                            state: transaction_state.into_state(),
+                        }
+                        .into(),
+                    );
+
+                    // The object flags have 2 ways to declare a scheduler policy for the
+                    // transaction.
+                    // 1. It might contains a specific minimal policy to use.
+                    // 2. It might declare that the transaction supports priority inheritance.
+                    // The results must always be the best policy according to these rules.
+                    let mut scheduler_policy = object.flags.get_scheduler_policy();
+                    if object.flags.contains(BinderObjectFlags::INHERIT_RT) {
+                        let current_policy = current_task.read().scheduler_policy;
+                        scheduler_policy = scheduler_policy
+                            .map(|p| if p > current_policy { p } else { current_policy })
+                            .or(Some(current_policy));
+                    }
+
+                    (
+                        target_thread,
+                        Command::Transaction {
+                            sender: WeakBinderPeer::new(binder_proc, binder_thread),
+                            data: transaction,
+                            scheduler_policy,
+                        },
+                    )
+                };
 
                 // Schedule the transaction on the target_thread if it is specified, otherwise use the
                 // process' command queue.
@@ -3892,6 +4058,8 @@ impl BinderDriver {
                     | Command::FailedReply
                     | Command::DeadReply { .. }
                     | Command::DeadBinder(..)
+                    | Command::FrozenReply
+                    | Command::PendingFrozen
                     | Command::ClearDeathNotificationDone(..)
                     | Command::SpawnLooper => {}
                 }
@@ -4561,6 +4729,8 @@ enum TransactionError {
     /// The transaction payload was correctly formed, but either the recipient, or a handle embedded
     /// in the transaction, is dead. Send a [`Command::DeadReply`] command to the issuing thread.
     Dead,
+    /// The binder thread is frozen. Send a [`Command::FrozenReply`] command to the issuing thread.
+    Frozen,
 }
 
 impl TransactionError {
@@ -4581,6 +4751,7 @@ impl TransactionError {
             }
             TransactionError::Failure => Command::FailedReply,
             TransactionError::Dead => Command::DeadReply { pop_transaction: false },
+            TransactionError::Frozen => Command::FrozenReply,
         });
         Ok(())
     }
@@ -8441,5 +8612,161 @@ pub mod tests {
             let fds = process_accessor_thread.join().expect("join").expect("fds");
             assert_eq!(fds.len(), 1);
         });
+    }
+
+    #[fuchsia::test]
+    async fn no_reply_when_transaction_before_process_frozen() {
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+
+            // Make the receiver thread look eligible for transactions.
+            // Pretend the client thread is waiting for commands, so that it can be scheduled
+            // commands.
+            let fake_waiter = Waiter::new();
+            {
+                let mut thread_state = receiver.thread.lock();
+                thread_state.registration = RegistrationState::Main;
+                thread_state.command_queue.waiters.wait_async(&fake_waiter);
+            }
+
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
+
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
+
+            // Check that the receiving process has a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some((Command::Transaction { .. }, _))
+            );
+
+            // Freeze the receiver process.
+            receiver.proc.lock().freeze();
+
+            // Check that there is a frozen reply command for the sending thread.
+            assert!(sender.thread.lock().command_queue.commands.is_empty());
+            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+        })
+    }
+
+    #[fuchsia::test]
+    async fn frozen_reply_when_process_frozen() {
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+            // Freeze the receiver process.
+            let freeze_info_address = map_object_anywhere(
+                locked,
+                &current_task,
+                &binder_freeze_info { pid: receiver.proc.pid as u32, enable: 1, timeout_ms: 1000 },
+            );
+            device
+                .ioctl(
+                    locked,
+                    current_task,
+                    &receiver.proc,
+                    uapi::BINDER_FREEZE,
+                    freeze_info_address.into(),
+                )
+                .expect("BINDER_FREEZE ioctl");
+
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+
+            // Submit the transaction.
+            assert_matches!(
+                device.handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                ),
+                Err(TransactionError::Frozen)
+            );
+
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
+            assert!(sender.thread.lock().transactions.is_empty());
+
+            // Check the frozen info
+            let frozen_status_info_address = map_object_anywhere(
+                locked,
+                &current_task,
+                &binder_frozen_status_info {
+                    pid: receiver.proc.pid as u32,
+                    sync_recv: 0,
+                    async_recv: 0,
+                },
+            );
+            device
+                .ioctl(
+                    locked,
+                    current_task,
+                    &receiver.proc,
+                    uapi::BINDER_GET_FROZEN_INFO,
+                    frozen_status_info_address.into(),
+                )
+                .expect("BINDER_GET_FROZEN_INFO ioctl");
+            let read_frozen_status_info = receiver
+                .proc
+                .get_resource_accessor(current_task)
+                .read_object(UserRef::<binder_frozen_status_info>::new(frozen_status_info_address))
+                .expect("read returned binder frozen status");
+            assert_eq!(read_frozen_status_info.sync_recv, 1);
+            assert_eq!(read_frozen_status_info.async_recv, 0)
+        })
     }
 }
