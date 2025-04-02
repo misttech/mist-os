@@ -7112,8 +7112,13 @@ void VmCowPages::DeferredOps::AddRange(VmCowPages* self, VmCowRange range, Range
   DEBUG_ASSERT(self == self_);
   if (range_op_.has_value()) {
     if (range_op_->op != op) {
-      DEBUG_ASSERT(range_op_->op == RangeChangeOp::UnmapZeroPage && op == RangeChangeOp::Unmap);
-      range_op_->op = op;
+      // Permit an UnmapZeroPage to to be upgraded to an Unmap. If already an Unmap, then ignore any
+      // UnmapZeroPage.
+      if (range_op_->op == RangeChangeOp::UnmapZeroPage && op == RangeChangeOp::Unmap) {
+        range_op_->op = op;
+      } else {
+        DEBUG_ASSERT(range_op_->op == RangeChangeOp::Unmap && op == RangeChangeOp::UnmapZeroPage);
+      }
     }
     range_op_->range = range_op_->range.Cover(range);
   } else {
