@@ -52,12 +52,16 @@ zx_status_t UsbFunction::AddDevice(const std::string& name) {
       fuchsia_hardware_usb_function::UsbFunctionService::Name,
       ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
   };
-  status = DdkAdd(ddk::DeviceAddArgs(name.c_str())
-                      .set_str_props(props)
-                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_MAC_ADDRESS)
-                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
-                      .set_fidl_service_offers(offers)
-                      .set_outgoing_dir(endpoints->client.TakeChannel()));
+  status = DdkAdd(
+      ddk::DeviceAddArgs(name.c_str())
+          .set_str_props(props)
+          // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
+          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_MAC_ADDRESS)
+          // TODO(b/407987472): Don't forward DEVICE_METADATA_SERIAL_NUMBER once no longer
+          // retrieved.
+          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
+          .set_fidl_service_offers(offers)
+          .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_dev_bind_functions add_device failed %s", zx_status_get_string(status));
     return status;
@@ -283,17 +287,27 @@ zx_status_t UsbFunction::Control(const usb_setup_t* setup, const void* write_buf
 zx::result<> UsbFunction::Init() {
   if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent_);
       result.is_error()) {
-    zxlogf(ERROR, "Failed to forward mac address: %s", result.status_string());
+    zxlogf(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     return result.take_error();
   }
-
   if (zx_status_t status = mac_address_metadata_server_.Serve(
           outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
       status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve mac address: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to serve mac address metadata: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
+  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent_);
+      result.is_error()) {
+    zxlogf(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx_status_t status = serial_number_metadata_server_.Serve(
+          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve serial number metadata: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
   return zx::ok();
 }
 

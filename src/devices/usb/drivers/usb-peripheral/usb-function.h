@@ -126,6 +126,7 @@ class UsbFunction : public UsbFunctionType,
   component::OutgoingDirectory outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_usb_function::UsbFunction> bindings_;
   ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata> mac_address_metadata_server_;
+  ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata> serial_number_metadata_server_;
 };
 
 }  // namespace usb_peripheral
