@@ -342,6 +342,7 @@ typedef struct zxio_node_attr {
     bool casefold;
     bool wrapping_key_id;
     bool selinux_context;
+    bool pending_access_time_update;
   } has;
 } zxio_node_attributes_t;
 
