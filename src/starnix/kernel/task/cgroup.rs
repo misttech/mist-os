@@ -10,7 +10,7 @@
 use starnix_core::signals::{send_freeze_signal, SignalInfo};
 use starnix_core::task::{Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
-use starnix_logging::{log_warn, track_stub};
+use starnix_logging::{log_warn, trace_duration, track_stub, CATEGORY_STARNIX};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::errors::Errno;
@@ -649,6 +649,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn kill(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupKill");
         let state = self.state.lock();
         state.propagate_kill();
     }
@@ -675,6 +676,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn freeze(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupFreeze");
         let mut state = self.state.lock();
         let inherited_freezer_state = state.inherited_freezer_state;
         state.propagate_freeze(inherited_freezer_state);
@@ -682,6 +684,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn thaw(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupThaw");
         let mut state = self.state.lock();
         state.self_freezer_state = FreezerState::Thawed;
         let inherited_freezer_state = state.inherited_freezer_state;
