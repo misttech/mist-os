@@ -8535,7 +8535,7 @@ mod test {
         let seg = seg.expect("expected segment");
         assert_eq!(seg.header.ack, Some(ISS_2 + 1));
         let expect = if sack_permitted {
-            SackBlocks::from_iter([SackBlock(seg_start, seg_start + mss)])
+            SackBlocks::from_iter([SackBlock::try_new(seg_start, seg_start + mss).unwrap()])
         } else {
             SackBlocks::default()
         };

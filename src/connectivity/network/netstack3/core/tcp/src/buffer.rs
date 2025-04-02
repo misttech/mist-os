@@ -216,9 +216,10 @@ impl Assembler {
             heap.sort_by(|a, b| b.meta.cmp(&a.meta))
         }
 
-        SackBlocks::from_iter(
-            heap.into_iter().map(|block| SackBlock(block.range.start, block.range.end)),
-        )
+        SackBlocks::from_iter(heap.into_iter().map(|block| {
+            // Assembler is guaranteed to be in order, unwrap is safe.
+            SackBlock::try_new(block.range.start, block.range.end).unwrap()
+        }))
     }
 }
 
@@ -845,8 +846,8 @@ mod test {
         }
         assembler
             .sack_blocks()
-            .iter()
-            .map(|SackBlock(start, end)| Range { start: start.into(), end: end.into() })
+            .try_iter()
+            .map(|r| r.expect("invalid block").into_range_u32())
             .collect()
     }
 
