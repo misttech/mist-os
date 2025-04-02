@@ -79,12 +79,23 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
   } else {
     wake_lease_last_attempted_acquisition_timestamp_.Set(zx::clock::get_monotonic().get());
     // If not holding a lease, take one.
-    auto result_lease = sag_client_->TakeWakeLease(fidl::StringView::FromExternal(lease_name_));
+    auto result_lease = sag_client_->AcquireWakeLease(fidl::StringView::FromExternal(lease_name_));
     if (!result_lease.ok()) {
       if (log_) {
         fdf::warn(
-            "Failed to take wake lease, system may incorrectly enter suspend: {}. Will not attempt again.",
+            "Failed to call AcquireWakeLease(), system may incorrectly enter "
+            "suspend: {}. Will not attempt again.",
             result_lease.error());
+      }
+      ResetSagClient();
+      return false;
+    }
+    if (result_lease->is_error()) {
+      if (log_) {
+        fdf::warn(
+            "System activity governor failed to acquire wake lease, "
+            "system may incorrectly enter suspend: {}. Will not attempt again.",
+            static_cast<uint32_t>(result_lease->error_value()));
       }
       ResetSagClient();
       return false;
@@ -97,7 +108,7 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
     // acquisition the object might avoid future, unnecessary acquisitions.
     system_suspended_ = false;
 
-    lease_ = std::move(result_lease->token);
+    lease_ = std::move(result_lease->value()->token);
     if (log_) {
       fdf::info("Created a wake lease due to recent wake event.");
     }
