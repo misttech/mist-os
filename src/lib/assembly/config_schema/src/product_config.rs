@@ -341,6 +341,12 @@ impl JsonSchema for TeeClientConfigData {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
+pub enum TrustedAppType {
+    GlobalPlatform,
+    BinderRPC,
+}
+
 /// Configuration for how to run a trusted application in Fuchsia.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 pub struct TrustedApp {
@@ -348,6 +354,8 @@ pub struct TrustedApp {
     pub component_url: String,
     /// The GUID that identifies this trusted app for clients.
     pub guid: String,
+    /// Type of trusted application.
+    pub ta_type: TrustedAppType,
 }
 
 /// Product configuration options for the session:

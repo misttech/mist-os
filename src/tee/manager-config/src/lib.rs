@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[serde(rename_all = "camelCase", tag = "type")]
 enum Config {
     GlobalPlatform(GlobalPlatformConfig),
-    BinderRpc(BinderRpcConfig),
+    BinderRpc,
 }
 
 // Configuration values specific to GlobalPlatform TAs.
@@ -25,20 +25,6 @@ struct GlobalPlatformConfig {
     /// The trusted app should continue running even in low power states and suspension.
     // TODO: Support instanceKeepAlive functionality.
     instance_keep_alive: bool,
-}
-
-// Configuration values specific to Binder RPC TAs.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-struct BinderRpcConfig {
-    startup_behavior: StartupBehavior,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-enum StartupBehavior {
-    Lazy,
-    Eager,
 }
 
 /// Configuration for how to run a trusted application in Fuchsia.
@@ -64,6 +50,14 @@ impl TAConfig {
             }),
             capabilities: vec![],
         }
+    }
+
+    pub fn global_platform(url: String) -> Self {
+        Self::new(url)
+    }
+
+    pub fn binder_rpc(url: String) -> Self {
+        Self { url, config: Config::BinderRpc, capabilities: vec![] }
     }
 
     pub fn parse_config(path: &PathBuf) -> Result<Self> {

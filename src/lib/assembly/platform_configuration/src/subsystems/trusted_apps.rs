@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{Context, Result};
 use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
+use assembly_config_schema::product_config::TrustedAppType::{BinderRPC, GlobalPlatform};
 use assembly_constants::{BootfsPackageDestination, PackageSetDestination};
 use assembly_images_config::FilesystemImageMode;
 use fuchsia_tee_manager_config::TAConfig;
@@ -45,7 +46,10 @@ impl DefineSubsystemConfiguration<(&Vec<ProductTrustedApp>, FilesystemImageMode)
             } else {
                 c.component_url.clone()
             };
-            let ta_config = TAConfig::new(url);
+            let ta_config = match c.ta_type {
+                GlobalPlatform => TAConfig::global_platform(url),
+                BinderRPC => TAConfig::binder_rpc(url),
+            };
             let ta_config = serde_json::to_string(&ta_config)
                 .with_context(|| format!("Failed to serialize the ta config: {}", c.guid))?;
             dir.entry_from_contents(&format!("{}.json", c.guid), &ta_config)?;
@@ -75,10 +79,12 @@ mod tests {
             ProductTrustedApp {
                 component_url: "fuchsia-pkg://fuchsia.com/pkg1#resource1.txt".into(),
                 guid: "abcdef".into(),
+                ta_type: GlobalPlatform,
             },
             ProductTrustedApp {
                 component_url: "fuchsia-pkg://fuchsia.com/pkg2#resource2.txt".into(),
                 guid: "123456".into(),
+                ta_type: BinderRPC,
             },
         ];
         let image_mode = FilesystemImageMode::NoImage;
@@ -97,8 +103,8 @@ mod tests {
         let entries: Vec<FileOrContents> =
             directory.entries.iter().map(|(_, e)| e.clone()).collect();
         let expected_configs = [
-            TAConfig::new("fuchsia-boot:///pkg2#resource2.txt".into()),
-            TAConfig::new("fuchsia-boot:///pkg1#resource1.txt".into()),
+            TAConfig::binder_rpc("fuchsia-boot:///pkg2#resource2.txt".into()),
+            TAConfig::global_platform("fuchsia-boot:///pkg1#resource1.txt".into()),
         ];
         let expected_configs: Vec<FileOrContents> = expected_configs
             .iter()

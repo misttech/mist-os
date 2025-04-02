@@ -147,6 +147,7 @@ fuchsia_product_configuration(
                 {
                     "component_url": "fuchsia-pkg://fuchsia.com/ta-noop#meta/ta-runtime.cm",
                     "guid": "185d0391-bb47-495a-ba57-d6c6b808bfae",
+                    "ta_type": "GlobalPlatform",
                 },
             ],
         },
