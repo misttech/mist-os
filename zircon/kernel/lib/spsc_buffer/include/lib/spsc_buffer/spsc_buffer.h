@@ -14,6 +14,13 @@
 #include <ktl/move.h>
 #include <ktl/span.h>
 
+// The CopyOutFunction concept sets up a concept that the Spsc::Read function uses to copy data
+// out of the ring buffer.
+template <typename F>
+concept CopyOutFunction = requires(F func, uint32_t offset, ktl::span<ktl::byte> src) {
+  { func(offset, src) } -> std::same_as<zx_status_t>;
+};
+
 // SpscBuffer implements a transactional, single-producer, single-consumer ring buffer.
 //
 // The caller is responsible for ensuring that there is only one reader and one writer; no internal
@@ -38,7 +45,7 @@ class SpscBuffer {
   void Init(ktl::span<ktl::byte> buffer) {
     // Assert that the provided buffer meets our requirements for the storage buffer.
     // See the comments around storage_ for more information about these requirements.
-    DEBUG_ASSERT(buffer.size() <= (1u << 31));
+    DEBUG_ASSERT(buffer.size() <= kMaxStorageSize);
     DEBUG_ASSERT((buffer.size() & (buffer.size() - 1)) == 0);
     storage_ = buffer;
   }
@@ -49,14 +56,183 @@ class SpscBuffer {
     uint32_t write;
   };
 
-  zx_status_t Reserve(uint32_t size) {
-    // TODO(https://fxbug.dev/404539312): Implement reservations.
-    return ZX_ERR_NOT_SUPPORTED;
+  // A Reservation is a wrapper around a slot of memory in the ring buffer. It has a predetermined
+  // size that is determined by the size passed into the Reserve method below. Any attempt to write
+  // more than this amount of data into the slot is a programming error and will cause an assertion
+  // failure. This class provides a formal way for writers to serialize data in place in the ring
+  // buffer, thus eliminating the need for a temporary serialization buffer.
+  class Reservation {
+   public:
+    ~Reservation() {
+      // Ensure that commit has been called.
+      DEBUG_ASSERT(committed_);
+    }
+
+    // Reservations cannot be copied.
+    Reservation(const Reservation&) = delete;
+    Reservation& operator=(const Reservation&) = delete;
+    // Reservations cannot be move-assigned, as several members are const.
+    Reservation& operator=(Reservation&& other) = delete;
+    // Reservations can be move-constructed.
+    Reservation(Reservation&& other)
+        : spsc_(other.spsc_),
+          initial_ring_pointers_(other.initial_ring_pointers_),
+          region1_(other.region1_),
+          region2_(other.region2_),
+          write_offset_(other.write_offset_),
+          committed_(other.committed_) {
+      // Writes and Commits are not allowed when `committed_` is set to true, so this effectively
+      // makes `other` a no-op and means we don't have to zero out the other fields.
+      other.committed_ = true;
+    }
+
+    // Writes the given data into this reservation.
+    void Write(ktl::span<ktl::byte> data) {
+      // Writing to an already committed reservation is not allowed.
+      DEBUG_ASSERT(!committed_);
+
+      size_t bytes_to_copy = data.size();
+      size_t region1_copy_amount = 0;
+
+      // Check where the write_offset_ is. If it's less than the size of region 1, copy as much
+      // data as we can into region 1.
+      if (write_offset_ < region1_.size()) {
+        const size_t space_left_in_region1 = region1_.size() - write_offset_;
+        region1_copy_amount = ktl::min(bytes_to_copy, space_left_in_region1);
+        ktl::copy(data.begin(), data.begin() + region1_copy_amount,
+                  region1_.subspan(write_offset_, region1_copy_amount).begin());
+        write_offset_ += region1_copy_amount;
+        bytes_to_copy -= region1_copy_amount;
+      }
+
+      // Check if we've written all of the data we need to. If we have, return early.
+      if (bytes_to_copy == 0) {
+        return;
+      }
+
+      // Now, if there's still data to copy, copy it into region 2. There should always be enough
+      // space in region2 to do this, unless the `Reserve` call that created this reservation did
+      // not reserve enough space. If this is the case, assert since writing beyond the bounds of
+      // a reservation is a programming error.
+      DEBUG_ASSERT(write_offset_ >= region1_.size());
+      const uint64_t region2_offset = write_offset_ - region1_.size();
+      ASSERT(region2_.size() >= region2_offset);
+      ASSERT((region2_.size() - region2_offset) >= bytes_to_copy);
+      ktl::copy(data.begin() + region1_copy_amount, data.end(),
+                region2_.subspan(region2_offset, bytes_to_copy).begin());
+      write_offset_ += bytes_to_copy;
+    }
+
+    // Advances the write pointer of the associated spsc buffer. This makes the written data visible
+    // to the reader, and thus can only be called once all Writes have been completed.
+    void Commit() {
+      // Calling Commit twice on the same reservation is not allowed.
+      DEBUG_ASSERT(!committed_);
+      // Writers must fill up their reservation before calling commit. This is necessary to prevent
+      // Readers from exfiltrating stale data from the section that was not written to.
+      DEBUG_ASSERT(write_offset_ == (region1_.size() + region2_.size()));
+      spsc_->AdvanceWritePointer(initial_ring_pointers_,
+                                 static_cast<uint32_t>(region1_.size() + region2_.size()));
+      committed_ = true;
+    }
+
+   private:
+    friend class SpscBuffer;
+    // Reservations should only be constructed by SpscBuffer. Hence, the constructor is made
+    // private, and the class is marked a friend of the SpscBuffer.
+    Reservation(SpscBuffer* spsc, SpscBuffer::RingPointers initial_ring_pointers,
+                ktl::span<ktl::byte> r1, ktl::span<ktl::byte> r2)
+        : spsc_(spsc), initial_ring_pointers_(initial_ring_pointers), region1_(r1), region2_(r2) {
+      // Reservations with a zero byte region1, or whose total size is greater than the max storage
+      // buffer size, are not allowed.
+      DEBUG_ASSERT(r1.size() > 0);
+      DEBUG_ASSERT((r1.size() + r2.size()) <= kMaxStorageSize);
+    }
+
+    SpscBuffer* const spsc_ = nullptr;
+    const SpscBuffer::RingPointers initial_ring_pointers_;
+    const ktl::span<ktl::byte> region1_;
+    const ktl::span<ktl::byte> region2_;
+
+    uint64_t write_offset_ = 0;
+    bool committed_ = false;
+  };
+
+  // Reserves a block of the given size in the buffer.
+  //
+  // Any data written into this block will not be visible to readers until Commit is called on the
+  // Reservation.
+  zx::result<Reservation> Reserve(uint32_t size) {
+    // Check that we have enough space for this record.
+    if (size > storage_.size()) {
+      return zx::error(ZX_ERR_NO_SPACE);
+    }
+    const RingPointers initial_state = LoadPointers();
+    const uint32_t available_space = AvailableSpace(initial_state);
+    if (available_space < size) {
+      return zx::error(ZX_ERR_NO_SPACE);
+    }
+
+    // Construct the reservation object.
+    const uint32_t write_offset = PointerToOffset(initial_state.write);
+    const uint32_t ring_break_distance = static_cast<uint32_t>(storage_.size()) - write_offset;
+    const uint32_t bytes_before_break = ktl::min(size, ring_break_distance);
+    const ktl::span<ktl::byte> region1 = storage_.subspan(write_offset, bytes_before_break);
+    const ktl::span<ktl::byte> region2 = bytes_before_break < size
+                                             ? storage_.subspan(0, size - bytes_before_break)
+                                             : ktl::span<ktl::byte>{};
+    return zx::ok(Reservation(this, initial_state, region1, region2));
   }
 
-  zx_status_t Read(void* dst, uint32_t offset, uint32_t len) {
-    // TODO(https://fxbug.dev/404539312): Implement reads.
-    return ZX_ERR_NOT_SUPPORTED;
+  // Copies len bytes out of the buffer and into dst.
+  //
+  // Takes a CopyOutFunction as the first argument, which has the following signature:
+  // zx_status_t copy_fn(uint32_t offset, ktl::span<ktl::byte> src);
+  // where offset is the offset into the destination buffer at which we data should be written, and
+  // src is the source buffer. This copy function may be invoked multiple times during the course
+  // of this function.
+  //
+  // Returns the number of bytes read into dst on success. If copy_fn returns an error, that error
+  // will be returned to the caller of Read.
+  //
+  // Importantly, even if an error is returned, 'copy_fn' might have already processed a partial
+  // amount of data (between 0 and 'len' bytes). However, these partially processed bytes are
+  // considered *not read* by this 'Read' function. Consequently, the internal read pointer of the
+  // ring buffer will *not* be advanced for these unread bytes, meaning that these same bytes will
+  // remain available for reading in subsequent calls to 'Read'.
+  template <CopyOutFunction CopyFunc>
+  zx::result<uint32_t> Read(CopyFunc copy_fn, uint32_t len) {
+    const RingPointers initial_state = LoadPointers();
+
+    const uint32_t available_data = AvailableData(initial_state);
+    if (available_data == 0) {
+      return zx::ok(0);
+    }
+    const uint32_t amount_to_copy = ktl::min(available_data, len);
+
+    // Copy the data before the ring break.
+    const uint32_t read_offset = PointerToOffset(initial_state.read);
+    const uint32_t ring_break_distance = static_cast<uint32_t>(storage_.size()) - read_offset;
+    const uint32_t bytes_before_break = ktl::min(amount_to_copy, ring_break_distance);
+    zx_status_t status = copy_fn(0, storage_.subspan(read_offset, bytes_before_break));
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    // If there's more data left to be copied after the ring break, copy it now.
+    if (bytes_before_break < amount_to_copy) {
+      const uint32_t bytes_after_break = amount_to_copy - bytes_before_break;
+      status = copy_fn(bytes_before_break, storage_.subspan(0, bytes_after_break));
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+    }
+
+    // It is critically important that the advancement of the read pointer occurs _after_ the copy
+    // has completed. Otherwise, the Write method may see the updated read pointer before the copy
+    // completes.
+    AdvanceReadPointer(initial_state, amount_to_copy);
+    return zx::ok(amount_to_copy);
   }
 
  private:
@@ -169,6 +345,7 @@ class SpscBuffer {
   // * Have a size smaller than 2^32 bytes because the read and write pointer must fit into 32
   //   bits. Taken in conjunction with the previous requirement, this means that the buffer must
   //   have a size less than or equal to 2^31 bytes.
+  constexpr static uint32_t kMaxStorageSize = 1u << 31;
   ktl::span<ktl::byte> storage_;
 };
 

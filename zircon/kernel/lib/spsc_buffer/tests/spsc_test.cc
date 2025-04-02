@@ -330,6 +330,174 @@ class SpscBufferTests {
 
     END_TEST;
   }
+
+  // Test that reads and writes from the same thread work correctly.
+  static bool TestReadWriteSingleThreaded() {
+    BEGIN_TEST;
+
+    // Start by setting up a:
+    // * Storage buffer, which will be the backing storage for the ring buffer.
+    // * Src buffer, which will be filled with random data that will be written to the ring buffer.
+    // * Dst buffer, which will be used to read data out of the ring buffer.
+    constexpr size_t kStorageSize = 256;
+    ktl::array<ktl::byte, kStorageSize> storage;
+    ktl::array<ktl::byte, kStorageSize> src;
+    srand(4);
+    for (ktl::byte& byte : src) {
+      byte = static_cast<ktl::byte>(rand());
+    }
+    ktl::array<ktl::byte, kStorageSize> dst;
+
+    // Initialize a SpscBuffer to run tests with.
+    SpscBuffer spsc;
+    spsc.Init(ktl::span<ktl::byte>(storage.data(), kStorageSize));
+
+    // Set up the lambda that the read method will use to copy data into the destination buffer.
+    auto copy_out_fn = [&dst](uint32_t offset, ktl::span<ktl::byte> src) {
+      // The given offset and source buffer should be able to fit inside the destination.
+      ASSERT((offset + src.size()) <= dst.size());
+      memcpy(dst.data() + offset, src.data(), src.size());
+      return ZX_OK;
+    };
+
+    // Set up a copy out function that returns an error.
+    auto copy_out_err_fn = [](uint32_t offset, ktl::span<ktl::byte> src) {
+      return ZX_ERR_BAD_STATE;
+    };
+
+    // Set up our test cases.
+    struct TestCase {
+      uint32_t write_size;
+      uint32_t read_size;
+      uint32_t expected_read_size;
+      zx_status_t expected_reserve_status;
+      zx_status_t expected_read_status;
+      SpscBuffer::RingPointers initial_pointers;
+      bool use_copy_out_err_fn;
+    };
+    constexpr ktl::array kTestCases = ktl::to_array<TestCase>({
+        // Test the case with no wrapping and we read everything we wrote.
+        {
+            .write_size = kStorageSize / 2,
+            .read_size = kStorageSize / 2,
+            .expected_read_size = kStorageSize / 2,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = 0, .write = 0},
+            .use_copy_out_err_fn = false,
+        },
+        // Test the case with no wrapping and we perform a partial read of what we wrote.
+        {
+            .write_size = kStorageSize / 2,
+            .read_size = kStorageSize / 4,
+            .expected_read_size = kStorageSize / 4,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = 0, .write = 0},
+            .use_copy_out_err_fn = false,
+        },
+        // Test the case where we fill the buffer and read the whole thing back out.
+        {
+            .write_size = kStorageSize,
+            .read_size = kStorageSize,
+            .expected_read_size = kStorageSize,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = 0, .write = 0},
+            .use_copy_out_err_fn = false,
+        },
+        // Test the case where we attempt to read more data than we wrote.
+        {
+            .write_size = kStorageSize / 4,
+            .read_size = kStorageSize / 2,
+            .expected_read_size = kStorageSize / 4,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = 0, .write = 0},
+            .use_copy_out_err_fn = false,
+        },
+        // Test the case where a read and write both wrap around the end of the ring buffer.
+        {
+            .write_size = kStorageSize,
+            .read_size = kStorageSize,
+            .expected_read_size = kStorageSize,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = kStorageSize / 2, .write = kStorageSize / 2},
+            .use_copy_out_err_fn = false,
+        },
+        // Test the case where the read and write pointers wrap around the max uint32_t value.
+        {
+            .write_size = kStorageSize,
+            .read_size = kStorageSize,
+            .expected_read_size = kStorageSize,
+            .expected_reserve_status = ZX_OK,
+            .expected_read_status = ZX_OK,
+            .initial_pointers = {.read = 0xFFFFFFFA, .write = 0xFFFFFFFA},
+            .use_copy_out_err_fn = false,
+        },
+        // Test that writing more data than we have space for returns ZX_ERR_NO_SPACE.
+        {
+            .write_size = 64,
+            .expected_reserve_status = ZX_ERR_NO_SPACE,
+            .initial_pointers = {.read = 0, .write = kStorageSize - 48},
+        },
+        // Test that the copy out function returning an error does not read any data.
+        {
+            .write_size = kStorageSize,
+            .read_size = kStorageSize / 2,
+            .expected_read_status = ZX_ERR_BAD_STATE,
+            .initial_pointers = {.read = 0, .write = 0},
+            .use_copy_out_err_fn = true,
+        },
+    });
+
+    for (const TestCase& tc : kTestCases) {
+      // Zero out the spsc buffer storage and destination buffer to remove any stale data from
+      // previous test cases.
+      memset(dst.data(), 0, kStorageSize);
+      memset(storage.data(), 0, kStorageSize);
+
+      // Set the initial value of the starting pointers.
+      const uint64_t starting_pointers = SpscBuffer::CombinePointers(tc.initial_pointers);
+      spsc.combined_pointers_.store(starting_pointers, ktl::memory_order_release);
+
+      // Reserve a slot of the requested size in the ring buffer and validate that we get the
+      // expected return code.
+      zx::result<SpscBuffer::Reservation> reservation = spsc.Reserve(tc.write_size);
+      ASSERT_EQ(tc.expected_reserve_status, reservation.status_value());
+      if (tc.expected_reserve_status != ZX_OK) {
+        continue;
+      }
+
+      // Perform the write and commit.
+      reservation->Write(ktl::span<ktl::byte>(src.data(), tc.write_size));
+      reservation->Commit();
+
+      // Perform the read using the desired copy out function and validate that we get the expected
+      // return code.
+      const zx::result<size_t> read_result = [&]() {
+        if (tc.use_copy_out_err_fn) {
+          return spsc.Read(copy_out_err_fn, tc.read_size);
+        }
+        return spsc.Read(copy_out_fn, tc.read_size);
+      }();
+      ASSERT_EQ(tc.expected_read_status, read_result.status_value());
+      if (tc.expected_read_status != ZX_OK) {
+        // If the read failed, then the read pointer should not have advanced, and there should be
+        // just as much data after the read call as there was before, so assert that here.
+        ASSERT_EQ(spsc.AvailableData(spsc.LoadPointers()), tc.write_size);
+        continue;
+      }
+
+      // Verify that we read out the correct data.
+      ASSERT_EQ(tc.expected_read_size, read_result.value());
+      ASSERT_BYTES_EQ(reinterpret_cast<uint8_t*>(src.data()),
+                      reinterpret_cast<uint8_t*>(dst.data()), tc.expected_read_size);
+    }
+
+    END_TEST;
+  }
 };
 
 UNITTEST_START_TESTCASE(spsc_buffer_tests)
@@ -339,5 +507,6 @@ UNITTEST("available_space", SpscBufferTests::TestAvailableSpace)
 UNITTEST("available_data", SpscBufferTests::TestAvailableData)
 UNITTEST("advance_read_pointer", SpscBufferTests::TestAdvanceReadPointer)
 UNITTEST("advance_write_pointer", SpscBufferTests::TestAdvanceWritePointer)
+UNITTEST("read_write_single_threaded", SpscBufferTests::TestReadWriteSingleThreaded)
 UNITTEST_END_TESTCASE(spsc_buffer_tests, "spsc_buffer",
                       "Test the single-producer, single-consumer ring buffer implementation.")
