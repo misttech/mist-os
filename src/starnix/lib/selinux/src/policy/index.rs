@@ -11,7 +11,7 @@ use super::symbols::{
 };
 use super::{ClassId, ParsedPolicy, RoleId, TypeId};
 
-use crate::{ClassPermission as _, NullessByteStr};
+use crate::{ClassPermission as _, FileClass, FsNodeClass, NullessByteStr};
 use std::collections::HashMap;
 
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
@@ -138,12 +138,19 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         class: &crate::FsNodeClass,
     ) -> SecurityContext {
         let object_class = crate::ObjectClass::from(class.clone());
+        let default_role = match class {
+            // Sockets and pipes use the source role as default role, as observed in SELinux.
+            FsNodeClass::Socket(_) => source.role(),
+            FsNodeClass::File(file) if *file == FileClass::Fifo => source.role(),
+            // The SELinux notebook states the role component defaults to the object_r role for
+            // files.
+            FsNodeClass::File(_) => self.cached_object_r_role,
+        };
         self.new_security_context(
             source,
             target,
             &object_class,
-            // The SELinux notebook states the role component defaults to the object_r role.
-            self.cached_object_r_role,
+            default_role,
             // The SELinux notebook states the type component defaults to the type of the parent
             // directory.
             target.type_(),

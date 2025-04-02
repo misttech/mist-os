@@ -89,7 +89,17 @@ fit::result<int, std::string> GetLabel(int fd) {
   if (result < 0) {
     return fit::error(errno);
   }
-  // Use `c_str()` to strip off the trailing NUL if present.
+  // Use `RemoveTrailingNul` to strip off the trailing NUL if present.
+  return fit::ok(RemoveTrailingNul(std::string(buf, result)));
+}
+
+fit::result<int, std::string> GetLabel(const std::string& path) {
+  char buf[256];
+  ssize_t result = getxattr(path.c_str(), "security.selinux", buf, sizeof(buf));
+  if (result < 0) {
+    return fit::error(errno);
+  }
+  // Use `RemoveTrailingNul` to strip off the trailing NUL if present.
   return fit::ok(RemoveTrailingNul(std::string(buf, result)));
 }
 

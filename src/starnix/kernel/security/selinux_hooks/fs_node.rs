@@ -346,31 +346,24 @@ fn compute_new_fs_node_sid(
             // filesystems, this should be the kernel sid. However, for parent-less nodes (e.g.
             // pipes in pipefs) this should be the task sid.
             let current_task_sid = current_task.security_state.lock().current_sid;
-            if fs_use_type == FsUseType::Task {
-                // TODO: https://fxbug.dev/377912777 - verify that this is how fs_use_task is
-                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
-                Ok(Some((current_task_sid, label)))
+            let target_sid = if fs_use_type == FsUseType::Task {
+                current_task_sid
             } else {
                 // If we have a parent, use its sid. Otherwise, compute the sid of root nodes from
                 // the sid of the filesystem.
-                let parent_sid = if let Some(parent) = parent {
+                if let Some(parent) = parent {
                     fs_node_effective_sid_and_class(parent).sid
                 } else {
                     label.sid
-                };
-                let permission_check = security_server.as_permission_check();
-                let sid = permission_check
-                    .compute_new_fs_node_sid(
-                        current_task_sid,
-                        parent_sid,
-                        new_node_class,
-                        name.into(),
-                    )
-                    // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
-                    // for compute_new_fs_node_sid to have failed?
-                    .map_err(|_| errno!(EPERM))?;
-                Ok(Some((sid, label)))
-            }
+                }
+            };
+            let permission_check = security_server.as_permission_check();
+            let sid = permission_check
+                .compute_new_fs_node_sid(current_task_sid, target_sid, new_node_class, name.into())
+                // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
+                // for compute_new_fs_node_sid to have failed?
+                .map_err(|_| errno!(EPERM))?;
+            Ok(Some((sid, label)))
         }
     }
 }

@@ -106,6 +106,7 @@ test_names = [
   "pipe",
   "procattr",
   "selinuxfs",
+  "socket",
   "timerslack",
 
   # keep-sorted end
@@ -119,6 +120,8 @@ resource("policies") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_transition_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/timerslack.pp",
   ]
   outputs = "data/policies/{{source_file_part}}"
