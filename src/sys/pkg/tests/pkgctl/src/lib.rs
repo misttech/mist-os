@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 use vfs::directory::entry_container::Directory;
-use vfs::ToObjectRequest;
+use vfs::ToObjectRequest as _;
 use zx::Status;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_space as fidl_space, fuchsia_async as fasync};
 

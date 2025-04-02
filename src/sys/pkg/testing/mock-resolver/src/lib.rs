@@ -59,18 +59,6 @@ impl TestPackage {
     }
 }
 
-// Should roughly be kept in sync with the heuristic under Open in pkgfs/package_directory.go
-fn should_redirect_request_to_merkle_file(path: &str, flags: fio::OpenFlags) -> bool {
-    let file_flag = flags.intersects(fio::OpenFlags::NOT_DIRECTORY);
-    let dir_flag = flags.intersects(fio::OpenFlags::DIRECTORY);
-    let path_flag = flags.intersects(fio::OpenFlags::NODE_REFERENCE);
-
-    let open_as_file = file_flag;
-    let open_as_directory = dir_flag || path_flag;
-
-    path == "meta" && (open_as_file || !open_as_directory)
-}
-
 /// Handles a stream of requests for a package directory,
 /// redirecting file-mode Open requests for /meta to an internal file.
 pub async fn handle_package_directory_stream(
@@ -84,23 +72,6 @@ pub async fn handle_package_directory_stream(
 
         while let Some(req) = stream.next().await {
             match req.unwrap() {
-                fio::DirectoryRequest::DeprecatedOpen { flags, mode, path, object, control_handle: _ } => {
-                    // If the client is trying to read the meta directory _as a file_, redirect them
-                    // to the file which actually holds the merkle for the purposes of these tests.
-                    // Otherwise, redirect to the real package contents.
-
-                    if path == "." {
-                        panic!(
-                            "Client would escape mock resolver directory redirects by opening '.', which might break further requests to /meta as a file"
-                        )
-                    }
-
-                    if should_redirect_request_to_merkle_file(&path, flags) {
-                        backing_dir_proxy.deprecated_open(flags, mode, &path, object).unwrap();
-                    } else {
-                        package_contents_dir_proxy.deprecated_open(flags, mode, &path, object).unwrap();
-                    }
-                }
                 fio::DirectoryRequest::Open { path, flags, options, object, control_handle: _ } => {
                     // If the client is trying to read the meta directory as a file, redirect them
                     // to the file which actually holds the merkle for the purposes of these tests.

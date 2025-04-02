@@ -159,7 +159,7 @@ impl NonMetaStorage for blobfs::Client {
         scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), NonMetaStorageError> {
-        self.open_blob_for_read(blob, flags, scope, server_end).map_err(|e| {
+        self.deprecated_open_blob_for_read(blob, flags, scope, server_end).map_err(|e| {
             NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e))
         })
     }
@@ -171,7 +171,7 @@ impl NonMetaStorage for blobfs::Client {
         scope: ExecutionScope,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        self.open3_blob_for_read(blob, flags, scope, object_request)
+        self.open_blob_for_read(blob, flags, scope, object_request)
     }
 
     async fn get_blob_vmo(

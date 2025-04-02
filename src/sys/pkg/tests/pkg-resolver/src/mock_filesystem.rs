@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl::endpoints::RequestStream;
 use fuchsia_sync::Mutex;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
@@ -28,18 +28,6 @@ fn handle_directory_request_stream(
 
 async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenCounter) {
     match req {
-        fio::DirectoryRequest::DeprecatedOpen {
-            flags,
-            mode: _mode,
-            path,
-            object,
-            control_handle: _control_handle,
-        } => {
-            if path == "." {
-                reopen_self_deprecated(object, flags, Arc::clone(&open_counts));
-            }
-            *open_counts.lock().entry(path).or_insert(0) += 1;
-        }
         fio::DirectoryRequest::Open {
             path,
             flags,
@@ -56,24 +44,6 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
             });
         }
         request => panic!("Unhandled fuchsia.io/Directory request: {request:?}"),
-    }
-}
-
-fn reopen_self_deprecated(
-    node: ServerEnd<fio::NodeMarker>,
-    flags: fio::OpenFlags,
-    open_counts: OpenCounter,
-) {
-    let stream = node.into_stream().cast_stream();
-    describe_dir(flags, &stream);
-    fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
-}
-
-pub fn describe_dir(flags: fio::OpenFlags, stream: &fio::DirectoryRequestStream) {
-    let ch = stream.control_handle();
-    if flags.intersects(fio::OpenFlags::DESCRIBE) {
-        let ni = fio::NodeInfoDeprecated::Directory(fio::DirectoryObject);
-        ch.send_on_open_(Status::OK.into_raw(), Some(ni)).expect("send_on_open");
     }
 }
 

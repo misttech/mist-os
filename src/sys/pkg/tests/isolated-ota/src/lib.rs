@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
 use blobfs_ramdisk::BlobfsRamdisk;
-use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
+use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fuchsia_paver::{Asset, Configuration};
 use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs};
 use fuchsia_component_test::{
@@ -28,7 +28,11 @@ use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use vfs::directory::entry_container::Directory;
 use vfs::file::vmo::read_only;
+use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+const OUT_DIR_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 struct TestResult {
     blobfs: Option<BlobfsRamdisk>,
@@ -114,14 +118,14 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                         .take()
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    directories_out_dir.open(
-                        scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
-                    );
+                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
+                        directories_out_dir.open3(
+                            scope.clone(),
+                            vfs::Path::dot(),
+                            OUT_DIR_FLAGS,
+                            request,
+                        )
+                    });
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -236,14 +240,9 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                         "blob" => blobfs_vfs,
                     };
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    out_dir.open(
-                        scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
-                    );
+                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
+                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
+                    });
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -510,61 +509,6 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
             fio::DirectoryRequest::Clone { request, control_handle: _ } => {
                 launch_cloned_blobfs(ServerEnd::new(request.into_channel()))
             }
-            fio::DirectoryRequest::Close { responder } => {
-                responder.send(Err(zx::Status::IO.into_raw()))?
-            }
-            fio::DirectoryRequest::Sync { responder } => {
-                responder.send(Err(zx::Status::IO.into_raw()))?
-            }
-            fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
-            }
-            fio::DirectoryRequest::GetAttr { responder } => responder.send(
-                zx::Status::IO.into_raw(),
-                &fio::NodeAttributes {
-                    mode: 0,
-                    id: 0,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 0,
-                    creation_time: 0,
-                    modification_time: 0,
-                },
-            )?,
-            fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
-                responder.send(zx::Status::IO.into_raw())?
-            }
-            fio::DirectoryRequest::GetAttributes { query: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
-            }
-            fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?
-            }
-            fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
-                responder.send(zx::Status::IO.into_raw(), fio::OpenFlags::empty())?
-            }
-            fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
-                responder.send(zx::Status::IO.into_raw())?
-            }
-            fio::DirectoryRequest::GetFlags { responder } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            fio::DirectoryRequest::SetFlags { flags: _, responder } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            fio::DirectoryRequest::DeprecatedOpen {
-                flags: _,
-                mode: _,
-                path,
-                object,
-                control_handle: _,
-            } => {
-                if &path == "." {
-                    launch_cloned_blobfs(object);
-                } else {
-                    object.close_with_epitaph(zx::Status::IO)?;
-                }
-            }
             fio::DirectoryRequest::Open { path, flags, options, object, control_handle: _ } => {
                 vfs::ObjectRequest::new(flags, &options, object).handle(|request| {
                     if path == "." {
@@ -574,27 +518,6 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
                         Err(zx::Status::IO)
                     }
                 });
-            }
-            fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
-                responder.send(Err(zx::Status::IO.into_raw()))?
-            }
-            fio::DirectoryRequest::ReadDirents { max_bytes: _, responder } => {
-                responder.send(zx::Status::IO.into_raw(), &[])?
-            }
-            fio::DirectoryRequest::Rewind { responder } => {
-                responder.send(zx::Status::IO.into_raw())?
-            }
-            fio::DirectoryRequest::GetToken { responder } => {
-                responder.send(zx::Status::IO.into_raw(), None)?
-            }
-            fio::DirectoryRequest::Watch { mask: _, options: _, watcher: _, responder } => {
-                responder.send(zx::Status::IO.into_raw())?
-            }
-            fio::DirectoryRequest::Query { responder } => {
-                responder.send(fio::DirectoryMarker::PROTOCOL_NAME.as_bytes())?;
-            }
-            fio::DirectoryRequest::QueryFilesystem { responder } => {
-                responder.send(zx::Status::IO.into_raw(), None)?
             }
             _ => {
                 // To avoid making these tests to fragile, we only handle the fuchsia.io/Directory

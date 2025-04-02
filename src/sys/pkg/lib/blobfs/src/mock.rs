@@ -29,19 +29,6 @@ impl Mock {
     /// Panics on error or assertion violation (unexpected requests or a mismatched open call)
     pub async fn expect_open_blob(&mut self, merkle: Hash) -> Blob {
         match self.stream.next().await {
-            Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
-                flags,
-                mode: _,
-                path,
-                object,
-                control_handle: _,
-            })) => {
-                assert_eq!(path, merkle.to_string());
-                FlagSet::OPEN_FOR_READ.verify(flags);
-
-                let stream = object.into_stream().cast_stream();
-                Blob { stream }
-            }
             Some(Ok(fio::DirectoryRequest::Open {
                 path,
                 flags,
@@ -70,19 +57,6 @@ impl Mock {
     /// Panics on error or assertion violation (unexpected requests or a mismatched open call)
     pub async fn expect_create_blob(&mut self, merkle: Hash) -> Blob {
         match self.stream.next().await {
-            Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
-                flags,
-                mode: _,
-                path,
-                object,
-                control_handle: _,
-            })) => {
-                FlagSet::OPEN_FOR_WRITE.verify(flags);
-                assert_eq!(path, delivery_blob::delivery_blob_path(merkle));
-
-                let stream = object.into_stream().cast_stream();
-                Blob { stream }
-            }
             Some(Ok(fio::DirectoryRequest::Open {
                 path,
                 flags,
@@ -187,27 +161,6 @@ impl Mock {
 
         while !(readable.is_empty() && missing.is_empty()) {
             match self.stream.next().await {
-                Some(Ok(fio::DirectoryRequest::DeprecatedOpen {
-                    flags,
-                    mode: _,
-                    path,
-                    object,
-                    control_handle: _,
-                })) => {
-                    FlagSet::OPEN_FOR_READ.verify(flags);
-                    let path: Hash = path.parse().unwrap();
-
-                    let stream = object.into_stream().cast_stream();
-                    let blob = Blob { stream };
-
-                    if readable.remove(&path) {
-                        blob.succeed_open_with_blob_readable().await;
-                    } else if missing.remove(&path) {
-                        blob.fail_open_with_not_found();
-                    } else {
-                        panic!("Unexpected blob existance check for {path}");
-                    }
-                }
                 Some(Ok(fio::DirectoryRequest::Open {
                     path,
                     flags,
@@ -570,40 +523,5 @@ impl Blob {
 
             self.expect_done().await;
         }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-struct FlagSet {
-    required: fio::OpenFlags,
-    anti_required: fio::OpenFlags,
-}
-
-impl FlagSet {
-    const OPEN_FOR_READ: FlagSet = FlagSet::new()
-        .require_present(fio::OpenFlags::RIGHT_READABLE)
-        .require_absent(fio::OpenFlags::CREATE)
-        .require_absent(fio::OpenFlags::RIGHT_WRITABLE);
-
-    const OPEN_FOR_WRITE: FlagSet = FlagSet::new()
-        .require_present(fio::OpenFlags::CREATE)
-        .require_present(fio::OpenFlags::RIGHT_WRITABLE);
-
-    const fn new() -> Self {
-        Self { required: fio::OpenFlags::empty(), anti_required: fio::OpenFlags::empty() }
-    }
-    const fn require_present(self, flags: fio::OpenFlags) -> Self {
-        let Self { required, anti_required } = self;
-        let required = required.union(flags);
-        Self { required, anti_required }
-    }
-    const fn require_absent(self, flags: fio::OpenFlags) -> Self {
-        let Self { required, anti_required } = self;
-        let anti_required = anti_required.union(flags);
-        Self { required, anti_required }
-    }
-    fn verify(self, flags: fio::OpenFlags) {
-        assert_eq!(flags & self.required, self.required);
-        assert_eq!(flags & self.anti_required, fio::OpenFlags::empty());
     }
 }

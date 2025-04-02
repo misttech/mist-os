@@ -28,15 +28,6 @@ use {
 trait OpenRequestHandler: Sized {
     fn handle_open_request(
         &self,
-        flags: fio::OpenFlags,
-        path: String,
-        object: ServerEnd<fio::NodeMarker>,
-        control_handle: fio::DirectoryControlHandle,
-        parent: Arc<DirectoryStreamHandler<Self>>,
-    );
-
-    fn handle_open3_request(
-        &self,
         _path: String,
         _flags: fio::Flags,
         _object_request: ObjectRequestRef<'_>,
@@ -64,19 +55,6 @@ where
         async move {
             while let Some(req) = stream.next().await {
                 match req.unwrap() {
-                    fio::DirectoryRequest::DeprecatedOpen {
-                        flags,
-                        mode: _,
-                        path,
-                        object,
-                        control_handle,
-                    } => self.open_handler.handle_open_request(
-                        flags,
-                        path,
-                        object,
-                        control_handle,
-                        Arc::clone(&self),
-                    ),
                     fio::DirectoryRequest::Open {
                         path,
                         flags,
@@ -85,7 +63,7 @@ where
                         control_handle,
                     } => {
                         ObjectRequest::new(flags, &options, object).handle(|request| {
-                            self.open_handler.handle_open3_request(
+                            self.open_handler.handle_open_request(
                                 path,
                                 flags,
                                 request,
@@ -132,35 +110,6 @@ impl OpenFailOrTempFs {
 
 impl OpenRequestHandler for OpenFailOrTempFs {
     fn handle_open_request(
-        &self,
-        flags: fio::OpenFlags,
-        path: String,
-        object: ServerEnd<fio::NodeMarker>,
-        _control_handle: fio::DirectoryControlHandle,
-        parent: Arc<DirectoryStreamHandler<Self>>,
-    ) {
-        if self.should_fail() {
-            if path == "." {
-                let stream = object.into_stream().cast_stream();
-                mock_filesystem::describe_dir(flags, &stream);
-                fasync::Task::spawn(parent.handle_stream(stream)).detach();
-            } else {
-                self.fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            }
-        } else {
-            let (tempdir_proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            fdio::open(
-                self.tempdir.path().to_str().unwrap(),
-                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
-                server_end.into_channel(),
-            )
-            .unwrap();
-            tempdir_proxy.deprecated_open(flags, fio::ModeType::empty(), &path, object).unwrap();
-        }
-    }
-
-    fn handle_open3_request(
         &self,
         path: String,
         flags: fio::Flags,
@@ -255,65 +204,6 @@ impl WriteFailOrTempFs {
 
 impl OpenRequestHandler for WriteFailOrTempFs {
     fn handle_open_request(
-        &self,
-        flags: fio::OpenFlags,
-        path: String,
-        object: ServerEnd<fio::NodeMarker>,
-        _control_handle: fio::DirectoryControlHandle,
-        parent: Arc<DirectoryStreamHandler<Self>>,
-    ) {
-        if path == "." && self.should_fail() {
-            let stream = object.into_stream().cast_stream();
-            mock_filesystem::describe_dir(flags, &stream);
-            fasync::Task::spawn(parent.handle_stream(stream)).detach();
-            return;
-        }
-
-        if !self.files_to_fail_writes.contains(&path) {
-            // We don't want to intercept file operations, so just open the file normally.
-            self.tempdir_proxy
-                .deprecated_open(flags, fio::ModeType::empty(), &path, object)
-                .unwrap();
-            return;
-        }
-
-        // This file matched our configured set of paths to intercept operations for, so open a
-        // backing file and send all file operations which the client thinks it's sending
-        // to the backing file instead to our FailingWriteFileStreamHandler.
-
-        let (file_requests, file_control_handle) =
-            ServerEnd::<fio::FileMarker>::new(object.into_channel())
-                .into_stream_and_control_handle();
-
-        // Create a proxy to the actual file we'll open to proxy to.
-        let (backing_node_proxy, backing_node_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>();
-
-        self.tempdir_proxy
-            .deprecated_open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
-            .expect("open file requested by pkg-resolver");
-
-        // All the things pkg-resolver attempts to open in these tests are files,
-        // not directories, so cast the NodeProxy to a FileProxy. If the pkg-resolver assumption
-        // changes, this code will have to support both.
-        let backing_file_proxy = fio::FileProxy::new(backing_node_proxy.into_channel().unwrap());
-        let send_onopen = flags.intersects(fio::OpenFlags::DESCRIBE);
-
-        let file_handler = Arc::new(FailingWriteFileStreamHandler::new(
-            backing_file_proxy,
-            String::from(path),
-            Arc::clone(&self.should_fail),
-            Arc::clone(&self.fail_count),
-        ));
-        fasync::Task::spawn(file_handler.handle_stream(
-            file_requests,
-            file_control_handle,
-            send_onopen,
-        ))
-        .detach();
-    }
-
-    fn handle_open3_request(
         &self,
         path: String,
         flags: fio::Flags,
@@ -506,99 +396,6 @@ impl RenameFailOrTempFs {
 impl OpenRequestHandler for RenameFailOrTempFs {
     fn handle_open_request(
         &self,
-        flags: fio::OpenFlags,
-        path: String,
-        object: ServerEnd<fio::NodeMarker>,
-        _control_handle: fio::DirectoryControlHandle,
-        parent: Arc<DirectoryStreamHandler<Self>>,
-    ) {
-        // Set up proxy to tmpdir and delegate to it on success.
-        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        fdio::open(
-            self.tempdir.path().to_str().unwrap(),
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
-            server_end.into_channel(),
-        )
-        .unwrap();
-        if !self.should_fail() || path != "." {
-            tempdir_proxy.deprecated_open(flags, fio::ModeType::empty(), &path, object).unwrap();
-            return;
-        }
-
-        // Prepare to handle the directory requests. We must call describe_dir, which sends an
-        // OnOpen if OPEN_FLAG_DESCRIBE is set. Otherwise, the code will hang when reading from
-        // the stream.
-        let mut stream = object.into_stream().cast_stream();
-        mock_filesystem::describe_dir(flags, &stream);
-        let fail_count = Arc::clone(&self.fail_count);
-        let files_to_fail_renames = Clone::clone(&self.files_to_fail_renames);
-
-        // Handle the directory requests.
-        fasync::Task::spawn(async move {
-            while let Some(req) = stream.next().await {
-                match req.unwrap() {
-                    fio::DirectoryRequest::GetAttr { responder } => {
-                        let (status, attrs) = tempdir_proxy.get_attr().await.unwrap();
-                        responder.send(status, &attrs).unwrap();
-                    }
-                    fio::DirectoryRequest::Close { responder } => {
-                        let result = tempdir_proxy.close().await.unwrap();
-                        responder.send(result).unwrap();
-                    }
-                    fio::DirectoryRequest::GetToken { responder } => {
-                        let (status, handle) = tempdir_proxy.get_token().await.unwrap();
-                        responder.send(status, handle).unwrap();
-                    }
-                    fio::DirectoryRequest::Rename { src, dst, responder, .. } => {
-                        if !files_to_fail_renames.contains(&src) {
-                            panic!("unsupported rename from {} to {}", src, dst);
-                        }
-                        fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
-                    }
-                    fio::DirectoryRequest::DeprecatedOpen {
-                        flags,
-                        mode: _,
-                        path,
-                        object,
-                        control_handle,
-                    } => {
-                        parent.open_handler.handle_open_request(
-                            flags,
-                            path,
-                            object,
-                            control_handle,
-                            Arc::clone(&parent.clone()),
-                        );
-                    }
-                    fio::DirectoryRequest::Open {
-                        path,
-                        flags,
-                        options,
-                        object,
-                        control_handle,
-                    } => {
-                        ObjectRequest::new(flags, &options, object).handle(|request| {
-                            parent.open_handler.handle_open3_request(
-                                path,
-                                flags,
-                                request,
-                                control_handle,
-                                Arc::clone(&parent.clone()),
-                            )
-                        });
-                    }
-                    other => {
-                        panic!("unhandled request type for path {:?}: {:?}", path, other);
-                    }
-                }
-            }
-        })
-        .detach();
-    }
-
-    fn handle_open3_request(
-        &self,
         path: String,
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
@@ -656,21 +453,6 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
                     }
-                    fio::DirectoryRequest::DeprecatedOpen {
-                        flags,
-                        mode: _,
-                        path,
-                        object,
-                        control_handle,
-                    } => {
-                        parent.open_handler.handle_open_request(
-                            flags,
-                            path,
-                            object,
-                            control_handle,
-                            Arc::clone(&parent.clone()),
-                        );
-                    }
                     fio::DirectoryRequest::Open {
                         path,
                         flags,
@@ -679,7 +461,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         control_handle,
                     } => {
                         ObjectRequest::new(flags, &options, object).handle(|request| {
-                            parent.open_handler.handle_open3_request(
+                            parent.open_handler.handle_open_request(
                                 path,
                                 flags,
                                 request,
