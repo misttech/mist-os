@@ -15,8 +15,6 @@
 // hw breakpoints registers. They will work independent whether the address in question is
 // read-only or not.
 
-// ARMv8 assures at least 2 hardware breakpoints.
-#define ARM64_MIN_HW_BREAKPOINTS 2
 #define ARM64_MAX_HW_BREAKPOINTS 16
 
 // Access macros:
@@ -127,8 +125,6 @@
 // Watchpoints permits to stop a thread when it read/writes to a particular address in memory.
 // This will work even if the address is read-only memory (for a read, of course).
 
-// ARMv8 assures at least 2 watchpoints.
-#define ARM64_MIN_HW_WATCHPOINTS 2
 #define ARM64_MAX_HW_WATCHPOINTS 16
 
 // DBGWCR<n>: Watchpoint Control Register.
