@@ -116,27 +116,42 @@ type PythonProtocol struct {
 	PythonClientName       string
 	PythonServerName       string
 	PythonEventHandlerName string
+	PythonMethods          []PythonMethod
 }
 
-type PythonRequest struct {
+type PythonMethod struct {
+	fidlgen.Method
+	HasFrameworkError            bool
+	PythonName                   string
+	PythonRequestPayload         *PythonPayload
+	PythonRequestIdent           fidlgen.EncodedCompoundIdentifier
+	PythonResponsePayload        *PythonPayload
+	PythonResponseSuccessPayload *PythonPayload
+	PythonResponseIdentifier     fidlgen.EncodedCompoundIdentifier
+	EmptyResponse                bool
+}
+
+type PythonPayload struct {
+	fidlgen.Type
 	DeclType         fidlgen.DeclType
 	PythonType       PythonType
 	PythonParameters []PythonParameter
 }
 
 type PythonParameter struct {
-	PythonType    PythonType
-	PythonName    string
-	PythonDefault *string
+	PythonType        PythonType
+	PythonName        string
+	PythonNoneDefault bool
 }
 
 type PythonRoot struct {
 	fidlgen.Root
 	PythonModuleName       string
-	PythonTables           []PythonTable
-	PythonStructs          []PythonStruct
-	ExternalPythonStructs  []PythonStruct
-	PythonUnions           []PythonUnion
+	EmptySuccessStructs    map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	PythonTables           map[fidlgen.EncodedCompoundIdentifier]PythonTable
+	PythonStructs          map[fidlgen.EncodedCompoundIdentifier]PythonStruct
+	ExternalPythonStructs  map[fidlgen.EncodedCompoundIdentifier]PythonStruct
+	PythonUnions           map[fidlgen.EncodedCompoundIdentifier]PythonUnion
 	PythonAliases          []PythonAlias
 	PythonConsts           []PythonConst
 	PythonBits             []PythonBits
@@ -147,10 +162,10 @@ type PythonRoot struct {
 }
 
 type compiler struct {
-	decls               fidlgen.DeclInfoMap
-	library             fidlgen.EncodedLibraryIdentifier
-	externalModules     map[string]struct{}
-	EmptySuccessStructs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	decls           fidlgen.DeclInfoMap
+	library         fidlgen.EncodedLibraryIdentifier
+	externalModules map[string]struct{}
+	PythonRoot      PythonRoot
 }
 
 func (c *compiler) lookupDeclInfo(val fidlgen.EncodedCompoundIdentifier) *fidlgen.DeclInfo {
@@ -206,7 +221,7 @@ func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
 }
 
 func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) *PythonType {
-	if _, ok := c.EmptySuccessStructs[val.Identifier]; ok {
+	if _, ok := c.PythonRoot.EmptySuccessStructs[val.Identifier]; ok {
 		return &PythonType{
 			Type:       val,
 			PythonName: "None",
@@ -214,6 +229,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	}
 
 	name := ""
+
 	if val.Nullable {
 		name = "typing.Optional["
 	}
@@ -710,8 +726,58 @@ func (c *compiler) compileUnion(val fidlgen.Union) PythonUnion {
 	return python_union
 }
 
-func (c *compiler) compileRequest(m fidlgen.Method) *PythonRequest {
-	return nil
+func (c *compiler) compilePayload(payload fidlgen.Type) *PythonPayload {
+	r := PythonPayload{
+		Type:             payload,
+		DeclType:         c.decls[payload.Identifier].Type,
+		PythonType:       *c.compileType(payload, nil),
+		PythonParameters: []PythonParameter{},
+	}
+
+	switch r.DeclType {
+	case fidlgen.StructDeclType:
+		if s, ok := c.PythonRoot.PythonStructs[payload.Identifier]; ok {
+			for _, field := range s.PythonMembers {
+				r.PythonParameters = append(r.PythonParameters, PythonParameter{
+					PythonType:        field.PythonType,
+					PythonName:        field.PythonName,
+					PythonNoneDefault: false,
+				})
+			}
+		} else if s, ok := c.PythonRoot.ExternalPythonStructs[payload.Identifier]; ok {
+			for _, field := range s.PythonMembers {
+				r.PythonParameters = append(r.PythonParameters, PythonParameter{
+					PythonType:        field.PythonType,
+					PythonName:        field.PythonName,
+					PythonNoneDefault: false,
+				})
+			}
+		}
+	case fidlgen.UnionDeclType:
+		if u, ok := c.PythonRoot.PythonUnions[payload.Identifier]; ok {
+			for _, field := range u.PythonMembers {
+				r.PythonParameters = append(r.PythonParameters, PythonParameter{
+					PythonType:        field.PythonType,
+					PythonName:        field.PythonName,
+					PythonNoneDefault: true,
+				})
+			}
+		}
+	case fidlgen.TableDeclType:
+		if t, ok := c.PythonRoot.PythonTables[payload.Identifier]; ok {
+			for _, field := range t.PythonMembers {
+				r.PythonParameters = append(r.PythonParameters, PythonParameter{
+					PythonType:        field.PythonType,
+					PythonName:        field.PythonName,
+					PythonNoneDefault: true,
+				})
+			}
+		}
+	default:
+		log.Fatalf("Unable to compile payload: %v", payload)
+	}
+
+	return &r
 }
 
 func (c *compiler) compileProtocol(val fidlgen.Protocol) PythonProtocol {
@@ -734,88 +800,125 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) PythonProtocol {
 		r.Marker = fmt.Sprintf("(nondiscoverable) %s", val.Name)
 	}
 
+	for _, v := range val.Methods {
+		m := PythonMethod{
+			Method:            v,
+			HasFrameworkError: v.HasFrameworkError(),
+			PythonName:        changeIfReserved(compileSnakeIdentifier(v.Name)),
+		}
+		if v.RequestPayload == nil {
+			m.PythonRequestPayload = nil
+		} else {
+			m.PythonRequestPayload = c.compilePayload(*v.RequestPayload)
+			m.PythonRequestIdent = m.PythonRequestPayload.PythonType.Identifier
+		}
+		if v.ResponsePayload == nil {
+			m.PythonResponsePayload = nil
+		} else {
+			m.PythonResponsePayload = c.compilePayload(*v.ResponsePayload)
+			m.PythonResponseIdentifier = m.PythonResponsePayload.PythonType.Identifier
+		}
+
+		if v.HasError || m.HasFrameworkError {
+			m.PythonResponseSuccessPayload = c.compilePayload(*v.ValueType)
+		}
+
+		if m.HasResponse &&
+			(m.PythonResponsePayload == nil ||
+				(m.PythonResponseSuccessPayload != nil &&
+					m.PythonResponseSuccessPayload.PythonType.PythonName == "None")) {
+			m.EmptyResponse = true
+		} else {
+			m.EmptyResponse = false
+		}
+
+		r.PythonMethods = append(r.PythonMethods, m)
+	}
+
 	return r
 }
 
 func Compile(root fidlgen.Root) PythonRoot {
 	root = root.ForBindings("python")
 	root = root.ForTransports([]string{"Channel"})
-	python_root := PythonRoot{
-		Root:             root,
-		PythonModuleName: ToPythonModuleName(root.Name),
-		PythonStructs:    []PythonStruct{},
-		PythonBits:       []PythonBits{},
-	}
 	c := compiler{
-		decls:               root.DeclInfo(),
-		library:             root.Name,
-		externalModules:     map[string]struct{}{},
-		EmptySuccessStructs: map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+		decls:           root.DeclInfo(),
+		library:         root.Name,
+		externalModules: map[string]struct{}{},
+		PythonRoot: PythonRoot{
+			Root:                  root,
+			PythonModuleName:      ToPythonModuleName(root.Name),
+			EmptySuccessStructs:   map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+			PythonStructs:         map[fidlgen.EncodedCompoundIdentifier]PythonStruct{},
+			ExternalPythonStructs: map[fidlgen.EncodedCompoundIdentifier]PythonStruct{},
+			PythonUnions:          map[fidlgen.EncodedCompoundIdentifier]PythonUnion{},
+			PythonTables:          map[fidlgen.EncodedCompoundIdentifier]PythonTable{},
+		},
 	}
 
 	// Collect all empty success structs so that all calls to compileType() will return None as
 	// their type.
 	for _, v := range root.Structs {
 		if v.IsEmptySuccessStruct {
-			c.EmptySuccessStructs[v.Name] = v
+			c.PythonRoot.EmptySuccessStructs[v.Name] = v
 		}
 	}
 	// The only known uses of ExternalStructs are from fuchsia.unknown which provides some empty
 	// success structs. Otherwise, it seems safe to ignore types in ExternalStructs.
 	for _, v := range root.ExternalStructs {
 		if v.IsEmptySuccessStruct {
-			c.EmptySuccessStructs[v.Name] = v
+			c.PythonRoot.EmptySuccessStructs[v.Name] = v
 		}
 		python_struct, python_unsupported := c.compileStruct(v)
 		if python_unsupported != nil {
-			python_root.PythonUnsupportedTypes = append(python_root.PythonUnsupportedTypes, *python_unsupported)
+			c.PythonRoot.PythonUnsupportedTypes = append(c.PythonRoot.PythonUnsupportedTypes, *python_unsupported)
 		} else {
-			python_root.ExternalPythonStructs = append(python_root.ExternalPythonStructs, python_struct)
+			c.PythonRoot.ExternalPythonStructs[v.Name] = python_struct
 		}
 	}
 
 	for _, v := range root.Tables {
-		python_root.PythonTables = append(python_root.PythonTables, c.compileTable(v))
+		c.PythonRoot.PythonTables[v.Name] = c.compileTable(v)
 	}
 
 	for _, v := range root.Structs {
 		if v.IsEmptySuccessStruct {
-			c.EmptySuccessStructs[v.Name] = v
+			c.PythonRoot.EmptySuccessStructs[v.Name] = v
 		}
 		python_struct, python_unsupported := c.compileStruct(v)
 		if python_unsupported != nil {
-			python_root.PythonUnsupportedTypes = append(python_root.PythonUnsupportedTypes, *python_unsupported)
+			c.PythonRoot.PythonUnsupportedTypes = append(c.PythonRoot.PythonUnsupportedTypes, *python_unsupported)
 		} else {
-			python_root.PythonStructs = append(python_root.PythonStructs, python_struct)
+			c.PythonRoot.PythonStructs[v.Name] = python_struct
 		}
 	}
 
 	for _, v := range root.Aliases {
-		python_root.PythonAliases = append(python_root.PythonAliases, c.compileAlias(v))
+		c.PythonRoot.PythonAliases = append(c.PythonRoot.PythonAliases, c.compileAlias(v))
 	}
 
 	// TODO(https://fxbug.dev/396552135): Extend the test suite to cover the different variations
 	// of bits declarations.
 	for _, v := range root.Bits {
-		python_root.PythonBits = append(python_root.PythonBits, c.compileBits(v))
+		c.PythonRoot.PythonBits = append(c.PythonRoot.PythonBits, c.compileBits(v))
 	}
 
 	for _, v := range root.Consts {
-		python_root.PythonConsts = append(python_root.PythonConsts, c.compileConst(v))
+		c.PythonRoot.PythonConsts = append(c.PythonRoot.PythonConsts, c.compileConst(v))
 	}
 
 	for _, v := range root.Enums {
-		python_root.PythonEnums = append(python_root.PythonEnums, c.compileEnum(v))
+		c.PythonRoot.PythonEnums = append(c.PythonRoot.PythonEnums, c.compileEnum(v))
 	}
 
 	for _, v := range root.Unions {
 		// TODO(https://fxbug.dev/394421154): If v is a result, then its creation should
 		// be deferred to when the corresponding protocol method is compiled.
-		python_root.PythonUnions = append(python_root.PythonUnions, c.compileUnion(v))
+		c.PythonRoot.PythonUnions[v.Name] = c.compileUnion(v)
 	}
 
 	for _, v := range root.Protocols {
-		python_root.PythonProtocols = append(python_root.PythonProtocols, c.compileProtocol(v))
+		c.PythonRoot.PythonProtocols = append(c.PythonRoot.PythonProtocols, c.compileProtocol(v))
 	}
 
 	// Sort the external modules to make sure the generated file is
@@ -827,8 +930,8 @@ func Compile(root fidlgen.Root) PythonRoot {
 	sort.Strings(externalModules)
 
 	for _, k := range externalModules {
-		python_root.PythonExternalModules = append(python_root.PythonExternalModules, k)
+		c.PythonRoot.PythonExternalModules = append(c.PythonRoot.PythonExternalModules, k)
 	}
 
-	return python_root
+	return c.PythonRoot
 }

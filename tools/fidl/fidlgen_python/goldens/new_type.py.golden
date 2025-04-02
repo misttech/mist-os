@@ -140,6 +140,7 @@ class Union:
     __fidl_kind__ = "union"
     __fidl_type__ = "Union"
     __fidl_raw_type__ = "test.newtype/Union"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -230,22 +231,90 @@ Bits = enum.IntFlag(
 Alias = Struct
 
 
-class CalculatorServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class CalculatorServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.newtype"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        7893336915889044876: MethodInfo(
+            name="add",
+            request_ident="test.newtype/CalculatorAddRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.newtype/CalculatorAddResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_add: typing.TypeAlias = CalculatorAddResponse
+
+    @abstractmethod
+    def add(
+        self,
+        request: CalculatorAddRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_add]
+        | _MethodResponse_add
+    ):
+        ...
 
 
 class CalculatorClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.newtype"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def add(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, CalculatorAddResponse]:
+        msg = CalculatorAddRequest(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            7893336915889044876,
+            "test.newtype",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.newtype/CalculatorAddResponse"
+            ),
+        )
 
 
-class CalculatorEventHandler(fidl._client.EventHandlerBase):
+class CalculatorEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.newtype"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 CalculatorMarker = fidl._library.ProtocolMarker(

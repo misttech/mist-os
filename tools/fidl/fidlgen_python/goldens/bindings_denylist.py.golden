@@ -549,6 +549,7 @@ class DenyEachBindingOnlyDenyCppResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -658,6 +659,7 @@ class DenyEachBindingOnlyDenyDartResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -767,6 +769,7 @@ class DenyEachBindingOnlyDenyGoResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -876,6 +879,7 @@ class DenyEachBindingOnlyDenyLibfuzzerResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -987,6 +991,7 @@ class DenyEachBindingOnlyDenyRustResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1096,6 +1101,7 @@ class DenyEachBindingOnlyDenySyzkallerResult:
     __fidl_raw_type__ = (
         "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1202,22 +1208,50 @@ class DenyEachBindingOnlyDenySyzkallerResult:
 ALL_BINDINGS: int = 0
 
 
-class AllowedServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class AllowedServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class AllowedClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class AllowedEventHandler(fidl._client.EventHandlerBase):
+class AllowedEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 AllowedMarker = fidl._library.ProtocolMarker(
@@ -1225,22 +1259,307 @@ AllowedMarker = fidl._library.ProtocolMarker(
 )
 
 
-class DenyEachBindingServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class DenyEachBindingServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        2957648440141224850: MethodInfo(
+            name="only_deny_cpp",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenyCppRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result",
+        ),
+        8446571910689294295: MethodInfo(
+            name="only_deny_dart",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result",
+        ),
+        7311125300308839833: MethodInfo(
+            name="only_deny_go",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result",
+        ),
+        2184115815603862302: MethodInfo(
+            name="only_deny_libfuzzer",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result",
+        ),
+        3719805222870932662: MethodInfo(
+            name="only_deny_rust",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
+        ),
+        2319043834522757514: MethodInfo(
+            name="only_deny_syzkaller",
+            request_ident="test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_only_deny_cpp: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenyCppResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_cpp(
+        self,
+        request: DenyEachBindingOnlyDenyCppRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_cpp]
+        | _MethodResponse_only_deny_cpp
+    ):
+        ...
+
+    _MethodResponse_only_deny_dart: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenyDartResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_dart(
+        self,
+        request: DenyEachBindingOnlyDenyDartRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_dart]
+        | _MethodResponse_only_deny_dart
+    ):
+        ...
+
+    _MethodResponse_only_deny_go: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenyGoResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_go(
+        self,
+        request: DenyEachBindingOnlyDenyGoRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_go]
+        | _MethodResponse_only_deny_go
+    ):
+        ...
+
+    _MethodResponse_only_deny_libfuzzer: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenyLibfuzzerResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_libfuzzer(
+        self,
+        request: DenyEachBindingOnlyDenyLibfuzzerRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_only_deny_libfuzzer
+        ]
+        | _MethodResponse_only_deny_libfuzzer
+    ):
+        ...
+
+    _MethodResponse_only_deny_rust: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenyRustResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_rust(
+        self,
+        request: DenyEachBindingOnlyDenyRustRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_only_deny_rust]
+        | _MethodResponse_only_deny_rust
+    ):
+        ...
+
+    _MethodResponse_only_deny_syzkaller: typing.TypeAlias = typing.Union[
+        DomainError,
+        DenyEachBindingOnlyDenySyzkallerResponse,
+    ]
+
+    @abstractmethod
+    def only_deny_syzkaller(
+        self,
+        request: DenyEachBindingOnlyDenySyzkallerRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_only_deny_syzkaller
+        ]
+        | _MethodResponse_only_deny_syzkaller
+    ):
+        ...
 
 
 class DenyEachBindingClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def only_deny_cpp(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenyCppResult
+    ]:
+        msg = DenyEachBindingOnlyDenyCppRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2957648440141224850,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Result"
+            ),
+        )
+
+    def only_deny_dart(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenyDartResult
+    ]:
+        msg = DenyEachBindingOnlyDenyDartRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            8446571910689294295,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Result"
+            ),
+        )
+
+    def only_deny_go(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenyGoResult
+    ]:
+        msg = DenyEachBindingOnlyDenyGoRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            7311125300308839833,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Result"
+            ),
+        )
+
+    def only_deny_libfuzzer(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenyLibfuzzerResult
+    ]:
+        msg = DenyEachBindingOnlyDenyLibfuzzerRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2184115815603862302,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Result"
+            ),
+        )
+
+    def only_deny_rust(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenyRustResult
+    ]:
+        msg = DenyEachBindingOnlyDenyRustRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            3719805222870932662,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result"
+            ),
+        )
+
+    def only_deny_syzkaller(
+        self,
+        *,
+        a: bool,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, DenyEachBindingOnlyDenySyzkallerResult
+    ]:
+        msg = DenyEachBindingOnlyDenySyzkallerRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2319043834522757514,
+            "test.bindingsdenylist",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result"
+            ),
+        )
 
 
-class DenyEachBindingEventHandler(fidl._client.EventHandlerBase):
+class DenyEachBindingEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 DenyEachBindingMarker = fidl._library.ProtocolMarker(
@@ -1248,22 +1567,117 @@ DenyEachBindingMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ImportsSameNameContextServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ImportsSameNameContextServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        475191379775102607: MethodInfo(
+            name="unattributed",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2914965219653596920: MethodInfo(
+            name="always_appears_in_importing_library",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_unattributed: typing.TypeAlias = None
+
+    @abstractmethod
+    def unattributed(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_unattributed]
+        | _MethodResponse_unattributed
+    ):
+        ...
+
+    _MethodResponse_always_appears_in_importing_library: typing.TypeAlias = None
+
+    @abstractmethod
+    def always_appears_in_importing_library(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_always_appears_in_importing_library,
+        ]
+        | _MethodResponse_always_appears_in_importing_library
+    ):
+        ...
 
 
 class ImportsSameNameContextClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def unattributed(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            475191379775102607,
+            "test.bindingsdenylist",
+            msg,
+        )
+
+    def always_appears_in_importing_library(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            2914965219653596920,
+            "test.bindingsdenylist",
+            msg,
+        )
 
 
-class ImportsSameNameContextEventHandler(fidl._client.EventHandlerBase):
+class ImportsSameNameContextEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.bindingsdenylist"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ImportsSameNameContextMarker = fidl._library.ProtocolMarker(

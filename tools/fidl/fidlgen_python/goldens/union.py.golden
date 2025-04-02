@@ -277,6 +277,7 @@ class EmptyFlexibleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyFlexibleUnion"
     __fidl_raw_type__ = "test.union/EmptyFlexibleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -315,6 +316,7 @@ class ExplicitFlexibleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExplicitFlexibleUnion"
     __fidl_raw_type__ = "test.union/ExplicitFlexibleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -395,6 +397,7 @@ class ExplicitFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExplicitFoo"
     __fidl_raw_type__ = "test.union/ExplicitFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -473,6 +476,7 @@ class ExplicitPizzaOrPasta:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExplicitPizzaOrPasta"
     __fidl_raw_type__ = "test.union/ExplicitPizzaOrPasta"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -553,6 +557,7 @@ class ExplicitStrictFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExplicitStrictFoo"
     __fidl_raw_type__ = "test.union/ExplicitStrictFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -633,6 +638,7 @@ class ExplicitUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExplicitUnion"
     __fidl_raw_type__ = "test.union/ExplicitUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -714,6 +720,7 @@ class FieldCollision:
     __fidl_kind__ = "union"
     __fidl_type__ = "FieldCollision"
     __fidl_raw_type__ = "test.union/FieldCollision"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -781,6 +788,7 @@ class FlexibleFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "FlexibleFoo"
     __fidl_raw_type__ = "test.union/FlexibleFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -859,6 +867,7 @@ class FlexiblePizzaOrPasta:
     __fidl_kind__ = "union"
     __fidl_type__ = "FlexiblePizzaOrPasta"
     __fidl_raw_type__ = "test.union/FlexiblePizzaOrPasta"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -940,6 +949,7 @@ class FlexibleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "FlexibleUnion"
     __fidl_raw_type__ = "test.union/FlexibleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1045,6 +1055,7 @@ class NewerSimpleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "NewerSimpleUnion"
     __fidl_raw_type__ = "test.union/NewerSimpleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1138,6 +1149,7 @@ class OlderSimpleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "OlderSimpleUnion"
     __fidl_raw_type__ = "test.union/OlderSimpleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1218,6 +1230,7 @@ class PizzaOrPasta:
     __fidl_kind__ = "union"
     __fidl_type__ = "PizzaOrPasta"
     __fidl_raw_type__ = "test.union/PizzaOrPasta"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1296,6 +1309,7 @@ class ReverseOrdinalUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "ReverseOrdinalUnion"
     __fidl_raw_type__ = "test.union/ReverseOrdinalUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1375,6 +1389,7 @@ class StrictBoundedUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictBoundedUnion"
     __fidl_raw_type__ = "test.union/StrictBoundedUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1442,6 +1457,7 @@ class StrictFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictFoo"
     __fidl_raw_type__ = "test.union/StrictFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1520,6 +1536,7 @@ class StrictPizzaOrPasta:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictPizzaOrPasta"
     __fidl_raw_type__ = "test.union/StrictPizzaOrPasta"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1601,6 +1618,7 @@ class StrictSimpleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictSimpleUnion"
     __fidl_raw_type__ = "test.union/StrictSimpleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1695,6 +1713,7 @@ class StrictUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictUnion"
     __fidl_raw_type__ = "test.union/StrictUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1798,6 +1817,7 @@ class Union:
     __fidl_kind__ = "union"
     __fidl_type__ = "Union"
     __fidl_raw_type__ = "test.union/Union"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1899,6 +1919,7 @@ class UnionContainingEmptyStruct:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionContainingEmptyStruct"
     __fidl_raw_type__ = "test.union/UnionContainingEmptyStruct"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1965,6 +1986,7 @@ class UnionWithAttributes:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionWithAttributes"
     __fidl_raw_type__ = "test.union/UnionWithAttributes"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2025,22 +2047,135 @@ class UnionWithAttributes:
         return cls(_empty=())
 
 
-class TestProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class TestProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.union"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        6628358876445129155: MethodInfo(
+            name="strict_union_hence_response_may_be_stack_allocated",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse",
+        ),
+        7588545459451501794: MethodInfo(
+            name="flexible_union_hence_response_must_be_heap_allocated",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_strict_union_hence_response_may_be_stack_allocated: typing.TypeAlias = (
+        TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
+    )
+
+    @abstractmethod
+    def strict_union_hence_response_may_be_stack_allocated(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_strict_union_hence_response_may_be_stack_allocated,
+        ]
+        | _MethodResponse_strict_union_hence_response_may_be_stack_allocated
+    ):
+        ...
+
+    _MethodResponse_flexible_union_hence_response_must_be_heap_allocated: typing.TypeAlias = (
+        TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
+    )
+
+    @abstractmethod
+    def flexible_union_hence_response_must_be_heap_allocated(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_flexible_union_hence_response_must_be_heap_allocated,
+        ]
+        | _MethodResponse_flexible_union_hence_response_must_be_heap_allocated
+    ):
+        ...
 
 
 class TestProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.union"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def strict_union_hence_response_may_be_stack_allocated(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6628358876445129155,
+            "test.union",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse"
+            ),
+        )
+
+    def flexible_union_hence_response_must_be_heap_allocated(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            7588545459451501794,
+            "test.union",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse"
+            ),
+        )
 
 
-class TestProtocolEventHandler(fidl._client.EventHandlerBase):
+class TestProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.union"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 TestProtocolMarker = fidl._library.ProtocolMarker(

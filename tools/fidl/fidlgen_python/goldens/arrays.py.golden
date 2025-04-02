@@ -150,6 +150,7 @@ class UnionLargeArray:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionLargeArray"
     __fidl_raw_type__ = "test.arrays/UnionLargeArray"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -216,6 +217,7 @@ class UnionSmallArray:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionSmallArray"
     __fidl_raw_type__ = "test.arrays/UnionSmallArray"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):

@@ -152,22 +152,50 @@ class ParentTakeChildRequestRequest:
         )
 
 
-class ChildServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ChildServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class ChildClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class ChildEventHandler(fidl._client.EventHandlerBase):
+class ChildEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ChildMarker = fidl._library.ProtocolMarker(
@@ -175,22 +203,195 @@ ChildMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ParentServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ParentServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        881818649151440699: MethodInfo(
+            name="get_child",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolrequest/ParentGetChildResponse",
+        ),
+        1096855814967598201: MethodInfo(
+            name="get_child_request",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolrequest/ParentGetChildRequestResponse",
+        ),
+        4470101341872267920: MethodInfo(
+            name="take_child",
+            request_ident="test.protocolrequest/ParentTakeChildRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2333981071306416007: MethodInfo(
+            name="take_child_request",
+            request_ident="test.protocolrequest/ParentTakeChildRequestRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_get_child: typing.TypeAlias = ParentGetChildResponse
+
+    @abstractmethod
+    def get_child(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_child]
+        | _MethodResponse_get_child
+    ):
+        ...
+
+    _MethodResponse_get_child_request: typing.TypeAlias = (
+        ParentGetChildRequestResponse
+    )
+
+    @abstractmethod
+    def get_child_request(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_get_child_request
+        ]
+        | _MethodResponse_get_child_request
+    ):
+        ...
+
+    _MethodResponse_take_child: typing.TypeAlias = None
+
+    @abstractmethod
+    def take_child(
+        self,
+        request: ParentTakeChildRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_take_child]
+        | _MethodResponse_take_child
+    ):
+        ...
+
+    _MethodResponse_take_child_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def take_child_request(
+        self,
+        request: ParentTakeChildRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_take_child_request
+        ]
+        | _MethodResponse_take_child_request
+    ):
+        ...
 
 
 class ParentClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def get_child(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, ParentGetChildResponse]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            881818649151440699,
+            "test.protocolrequest",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolrequest/ParentGetChildResponse"
+            ),
+        )
+
+    def get_child_request(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ParentGetChildRequestResponse
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            1096855814967598201,
+            "test.protocolrequest",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolrequest/ParentGetChildRequestResponse"
+            ),
+        )
+
+    def take_child(
+        self,
+        *,
+        c: int,
+    ) -> None:
+        msg = ParentTakeChildRequest(
+            c,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            4470101341872267920,
+            "test.protocolrequest",
+            msg,
+        )
+
+    def take_child_request(
+        self,
+        *,
+        r: int,
+    ) -> None:
+        msg = ParentTakeChildRequestRequest(
+            r,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            2333981071306416007,
+            "test.protocolrequest",
+            msg,
+        )
 
 
-class ParentEventHandler(fidl._client.EventHandlerBase):
+class ParentEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocolrequest"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ParentMarker = fidl._library.ProtocolMarker(

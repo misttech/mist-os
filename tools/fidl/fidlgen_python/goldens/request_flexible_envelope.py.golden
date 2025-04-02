@@ -159,6 +159,7 @@ class FlexibleFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "FlexibleFoo"
     __fidl_raw_type__ = "test.requestflexibleenvelope/FlexibleFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -241,6 +242,7 @@ class StrictFoo:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictFoo"
     __fidl_raw_type__ = "test.requestflexibleenvelope/StrictFoo"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -316,22 +318,141 @@ class StrictFoo:
         return cls(_empty=())
 
 
-class ProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.requestflexibleenvelope"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        700529454616207123: MethodInfo(
+            name="request_strict_response_flexible",
+            request_ident="test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse",
+        ),
+        5191655763393883319: MethodInfo(
+            name="request_flexible_response_strict",
+            request_ident="test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_request_strict_response_flexible: typing.TypeAlias = (
+        ProtocolRequestStrictResponseFlexibleResponse
+    )
+
+    @abstractmethod
+    def request_strict_response_flexible(
+        self,
+        request: ProtocolRequestStrictResponseFlexibleRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_request_strict_response_flexible,
+        ]
+        | _MethodResponse_request_strict_response_flexible
+    ):
+        ...
+
+    _MethodResponse_request_flexible_response_strict: typing.TypeAlias = (
+        ProtocolRequestFlexibleResponseStrictResponse
+    )
+
+    @abstractmethod
+    def request_flexible_response_strict(
+        self,
+        request: ProtocolRequestFlexibleResponseStrictRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_request_flexible_response_strict,
+        ]
+        | _MethodResponse_request_flexible_response_strict
+    ):
+        ...
 
 
 class ProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.requestflexibleenvelope"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def request_strict_response_flexible(
+        self,
+        *,
+        s: StrictFoo,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolRequestStrictResponseFlexibleResponse
+    ]:
+        msg = ProtocolRequestStrictResponseFlexibleRequest(
+            s,
+        )
+        return self._send_two_way_fidl_request(
+            700529454616207123,
+            "test.requestflexibleenvelope",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse"
+            ),
+        )
+
+    def request_flexible_response_strict(
+        self,
+        *,
+        s: FlexibleFoo,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolRequestFlexibleResponseStrictResponse
+    ]:
+        msg = ProtocolRequestFlexibleResponseStrictRequest(
+            s,
+        )
+        return self._send_two_way_fidl_request(
+            5191655763393883319,
+            "test.requestflexibleenvelope",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse"
+            ),
+        )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase):
+class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.requestflexibleenvelope"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ProtocolMarker = fidl._library.ProtocolMarker(

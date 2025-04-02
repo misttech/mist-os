@@ -283,6 +283,7 @@ class MainProtocolTwoWayAnonWithErrorResult:
     __fidl_raw_type__ = (
         "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -396,6 +397,7 @@ class MainProtocolTwoWayImportWithErrorResult:
     __fidl_raw_type__ = (
         "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -509,6 +511,7 @@ class MainProtocolTwoWayLocalWithErrorResult:
     __fidl_raw_type__ = (
         "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -609,22 +612,660 @@ class MainProtocolTwoWayLocalWithErrorResult:
         return cls(_empty=())
 
 
-class MainProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class MainProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocolpayloads"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        2602591870026304272: MethodInfo(
+            name="one_way_composed",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2542459230546612144: MethodInfo(
+            name="two_way_composed",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolpayloads.imported/ImportStructPayload",
+        ),
+        7681984876526769495: MethodInfo(
+            name="two_way_composed_with_error",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result",
+        ),
+        7755175439334311701: MethodInfo(
+            name="one_way_local",
+            request_ident="test.protocolpayloads/LocalStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8374292137648566031: MethodInfo(
+            name="two_way_local",
+            request_ident="test.protocolpayloads/LocalStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolpayloads/LocalStructPayload",
+        ),
+        2898559119954589948: MethodInfo(
+            name="two_way_local_with_error",
+            request_ident="test.protocolpayloads/LocalStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result",
+        ),
+        3344777159365288972: MethodInfo(
+            name="one_way_import",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2374708679656510579: MethodInfo(
+            name="two_way_import",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolpayloads.imported/ImportStructPayload",
+        ),
+        4286143084949642173: MethodInfo(
+            name="two_way_import_with_error",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result",
+        ),
+        811587311021806764: MethodInfo(
+            name="one_way_anon",
+            request_ident="test.protocolpayloads/MainProtocolOneWayAnonRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        629880979996923737: MethodInfo(
+            name="two_way_anon",
+            request_ident="test.protocolpayloads/MainProtocolTwoWayAnonRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocolpayloads/MainProtocolTwoWayAnonResponse",
+        ),
+        6368863385719175734: MethodInfo(
+            name="two_way_anon_with_error",
+            request_ident="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_one_way_composed: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_composed(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_composed
+        ]
+        | _MethodResponse_one_way_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_composed: typing.TypeAlias = (
+        fidl_test_protocolpayloads_imported.ImportStructPayload
+    )
+
+    @abstractmethod
+    def two_way_composed(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_composed
+        ]
+        | _MethodResponse_two_way_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_composed_with_error: typing.TypeAlias = (
+        typing.Union[
+            DomainError,
+            fidl_test_protocolpayloads_imported.ImportStructPayload,
+        ]
+    )
+
+    @abstractmethod
+    def two_way_composed_with_error(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_composed_with_error
+        ]
+        | _MethodResponse_two_way_composed_with_error
+    ):
+        ...
+
+    def on_composed(
+        self,
+        *,
+        a: int,
+    ) -> None:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        self._send_event(1872339328378152762, "test.protocolpayloads", msg)
+
+    _MethodResponse_one_way_local: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_local(
+        self,
+        request: LocalStructPayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_local]
+        | _MethodResponse_one_way_local
+    ):
+        ...
+
+    _MethodResponse_two_way_local: typing.TypeAlias = LocalStructPayload
+
+    @abstractmethod
+    def two_way_local(
+        self,
+        request: LocalStructPayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_local]
+        | _MethodResponse_two_way_local
+    ):
+        ...
+
+    _MethodResponse_two_way_local_with_error: typing.TypeAlias = typing.Union[
+        DomainError,
+        LocalStructPayload,
+    ]
+
+    @abstractmethod
+    def two_way_local_with_error(
+        self,
+        request: LocalStructPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_local_with_error
+        ]
+        | _MethodResponse_two_way_local_with_error
+    ):
+        ...
+
+    def on_local(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = LocalStructPayload(
+            a,
+            b,
+        )
+        self._send_event(5135782819583756313, "test.protocolpayloads", msg)
+
+    _MethodResponse_one_way_import: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_import(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_import]
+        | _MethodResponse_one_way_import
+    ):
+        ...
+
+    _MethodResponse_two_way_import: typing.TypeAlias = (
+        fidl_test_protocolpayloads_imported.ImportStructPayload
+    )
+
+    @abstractmethod
+    def two_way_import(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_import]
+        | _MethodResponse_two_way_import
+    ):
+        ...
+
+    _MethodResponse_two_way_import_with_error: typing.TypeAlias = typing.Union[
+        DomainError,
+        fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ]
+
+    @abstractmethod
+    def two_way_import_with_error(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_import_with_error
+        ]
+        | _MethodResponse_two_way_import_with_error
+    ):
+        ...
+
+    def on_import(
+        self,
+        *,
+        a: int,
+    ) -> None:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        self._send_event(1996489653379631369, "test.protocolpayloads", msg)
+
+    _MethodResponse_one_way_anon: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_anon(
+        self,
+        request: MainProtocolOneWayAnonRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_anon]
+        | _MethodResponse_one_way_anon
+    ):
+        ...
+
+    _MethodResponse_two_way_anon: typing.TypeAlias = (
+        MainProtocolTwoWayAnonResponse
+    )
+
+    @abstractmethod
+    def two_way_anon(
+        self,
+        request: MainProtocolTwoWayAnonRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_anon]
+        | _MethodResponse_two_way_anon
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_with_error: typing.TypeAlias = typing.Union[
+        DomainError,
+        MainProtocolTwoWayAnonWithErrorResponse,
+    ]
+
+    @abstractmethod
+    def two_way_anon_with_error(
+        self,
+        request: MainProtocolTwoWayAnonWithErrorRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_anon_with_error
+        ]
+        | _MethodResponse_two_way_anon_with_error
+    ):
+        ...
+
+    def on_anon(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = MainProtocolOnAnonRequest(
+            a,
+            b,
+        )
+        self._send_event(4815229650203439104, "test.protocolpayloads", msg)
 
 
 class MainProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocolpayloads"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def one_way_composed(
+        self,
+        *,
+        a: int,
+    ) -> None:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            2602591870026304272,
+            "test.protocolpayloads",
+            msg,
+        )
+
+    def two_way_composed(
+        self,
+        *,
+        a: int,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ]:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2542459230546612144,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads.imported/ImportStructPayload"
+            ),
+        )
+
+    def two_way_composed_with_error(
+        self,
+        *,
+        a: int,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        fidl_test_protocolpayloads_imported.ComposedProtocolTwoWayComposedWithErrorResult,
+    ]:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            7681984876526769495,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads.imported/ComposedProtocol_TwoWayComposedWithError_Result"
+            ),
+        )
+
+    def one_way_local(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = LocalStructPayload(
+            a,
+            b,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7755175439334311701,
+            "test.protocolpayloads",
+            msg,
+        )
+
+    def two_way_local(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, LocalStructPayload]:
+        msg = LocalStructPayload(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            8374292137648566031,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads/LocalStructPayload"
+            ),
+        )
+
+    def two_way_local_with_error(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayLocalWithErrorResult
+    ]:
+        msg = LocalStructPayload(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            2898559119954589948,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads/MainProtocol_TwoWayLocalWithError_Result"
+            ),
+        )
+
+    def one_way_import(
+        self,
+        *,
+        a: int,
+    ) -> None:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            3344777159365288972,
+            "test.protocolpayloads",
+            msg,
+        )
+
+    def two_way_import(
+        self,
+        *,
+        a: int,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ]:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2374708679656510579,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads.imported/ImportStructPayload"
+            ),
+        )
+
+    def two_way_import_with_error(
+        self,
+        *,
+        a: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayImportWithErrorResult
+    ]:
+        msg = fidl_test_protocolpayloads_imported.ImportStructPayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            4286143084949642173,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result"
+            ),
+        )
+
+    def one_way_anon(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = MainProtocolOneWayAnonRequest(
+            a,
+            b,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            811587311021806764,
+            "test.protocolpayloads",
+            msg,
+        )
+
+    def two_way_anon(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayAnonResponse
+    ]:
+        msg = MainProtocolTwoWayAnonRequest(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            629880979996923737,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads/MainProtocolTwoWayAnonResponse"
+            ),
+        )
+
+    def two_way_anon_with_error(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayAnonWithErrorResult
+    ]:
+        msg = MainProtocolTwoWayAnonWithErrorRequest(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            6368863385719175734,
+            "test.protocolpayloads",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Result"
+            ),
+        )
 
 
-class MainProtocolEventHandler(fidl._client.EventHandlerBase):
+class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocolpayloads"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        1872339328378152762: MethodInfo(
+            name="on_composed",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5135782819583756313: MethodInfo(
+            name="on_local",
+            request_ident="test.protocolpayloads/LocalStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        1996489653379631369: MethodInfo(
+            name="on_import",
+            request_ident="test.protocolpayloads.imported/ImportStructPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        4815229650203439104: MethodInfo(
+            name="on_anon",
+            request_ident="test.protocolpayloads/MainProtocolOnAnonRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_composed(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_local(
+        self,
+        request: LocalStructPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_import(
+        self,
+        request: fidl_test_protocolpayloads_imported.ImportStructPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_anon(
+        self,
+        request: MainProtocolOnAnonRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 MainProtocolMarker = fidl._library.ProtocolMarker(

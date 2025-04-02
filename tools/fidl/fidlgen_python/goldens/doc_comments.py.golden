@@ -119,6 +119,7 @@ class FlexibleUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "FlexibleUnion"
     __fidl_raw_type__ = "test.doccomments/FlexibleUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -196,6 +197,7 @@ class StrictUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "StrictUnion"
     __fidl_raw_type__ = "test.doccomments/StrictUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -336,7 +338,12 @@ MyStrictBits = enum.IntFlag(
 C: int = 4
 
 
-class InterfaceServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class InterfaceServer(fidl._server.ServerBase, ABC):
     """
     interface comment #1
 
@@ -345,7 +352,41 @@ class InterfaceServer(fidl._server.ServerBase):
 
     __fidl_kind__ = "server"
     library = "test.doccomments"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5017051197196532121: MethodInfo(
+            name="method",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_method: typing.TypeAlias = None
+
+    @abstractmethod
+    def method(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method]
+        | _MethodResponse_method
+    ):
+        ...
+
+    def on_event(
+        self,
+    ) -> None:
+        msg = None
+        self._send_event(28780186509098736, "test.doccomments", msg)
 
 
 class InterfaceClient(fidl._client.FidlClient):
@@ -357,10 +398,29 @@ class InterfaceClient(fidl._client.FidlClient):
 
     __fidl_kind__ = "client"
     library = "test.doccomments"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def method(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            5017051197196532121,
+            "test.doccomments",
+            msg,
+        )
 
 
-class InterfaceEventHandler(fidl._client.EventHandlerBase):
+class InterfaceEventHandler(fidl._client.EventHandlerBase, ABC):
     """
     interface comment #1
 
@@ -369,7 +429,30 @@ class InterfaceEventHandler(fidl._client.EventHandlerBase):
 
     __fidl_kind__ = "event_handler"
     library = "test.doccomments"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        28780186509098736: MethodInfo(
+            name="on_event",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_event(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 InterfaceMarker = fidl._library.ProtocolMarker(

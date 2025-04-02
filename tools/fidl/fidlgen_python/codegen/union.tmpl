@@ -27,6 +27,7 @@ class {{ .PythonName }}:
     __fidl_kind__ = "union"
     __fidl_type__ = "{{ .PythonName }}"
     __fidl_raw_type__ = "{{ .Name }}"
+    _is_result = {{ if .IsResult }}True{{ else }}False{{ end }}
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):

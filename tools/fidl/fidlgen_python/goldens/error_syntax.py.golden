@@ -99,6 +99,7 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult:
     __fidl_raw_type__ = (
         "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -203,22 +204,141 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult:
         return cls(_empty=())
 
 
-class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ExampleUseOfErrorSyntaxServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.errorsyntax"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        3565108794310607393: MethodInfo(
+            name="composed_call_which_may_fail",
+            request_ident="test.errorsyntax.parent/ParentUsesErrorSyntaxComposedCallWhichMayFailRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result",
+        ),
+        3757408930698888354: MethodInfo(
+            name="call_which_may_fail",
+            request_ident="test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_composed_call_which_may_fail: typing.TypeAlias = typing.Union[
+        DomainError,
+        fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailResponse,
+    ]
+
+    @abstractmethod
+    def composed_call_which_may_fail(
+        self,
+        request: fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_composed_call_which_may_fail
+        ]
+        | _MethodResponse_composed_call_which_may_fail
+    ):
+        ...
+
+    _MethodResponse_call_which_may_fail: typing.TypeAlias = typing.Union[
+        DomainError,
+        ExampleUseOfErrorSyntaxCallWhichMayFailResponse,
+    ]
+
+    @abstractmethod
+    def call_which_may_fail(
+        self,
+        request: ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_which_may_fail
+        ]
+        | _MethodResponse_call_which_may_fail
+    ):
+        ...
 
 
 class ExampleUseOfErrorSyntaxClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.errorsyntax"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def composed_call_which_may_fail(
+        self,
+        *,
+        s: str,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
+    ]:
+        msg = fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailRequest(
+            s,
+        )
+        return self._send_two_way_fidl_request(
+            3565108794310607393,
+            "test.errorsyntax",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.errorsyntax.parent/ParentUsesErrorSyntax_ComposedCallWhichMayFail_Result"
+            ),
+        )
+
+    def call_which_may_fail(
+        self,
+        *,
+        s: str,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ExampleUseOfErrorSyntaxCallWhichMayFailResult
+    ]:
+        msg = ExampleUseOfErrorSyntaxCallWhichMayFailRequest(
+            s,
+        )
+        return self._send_two_way_fidl_request(
+            3757408930698888354,
+            "test.errorsyntax",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result"
+            ),
+        )
 
 
-class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase):
+class ExampleUseOfErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.errorsyntax"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ExampleUseOfErrorSyntaxMarker = fidl._library.ProtocolMarker(

@@ -39,6 +39,7 @@ from ._fidl_common import (
     MethodInfo,
     camel_case_to_snake_case,
     internal_kind_to_type,
+    normalize_identifier,
 )
 from ._server import ServerBase
 
@@ -1140,19 +1141,6 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
             )
 
         return server_lambda
-
-
-def normalize_identifier(identifier: str) -> str:
-    """Takes an identifier and attempts to normalize it.
-
-    For the average identifier this shouldn't do anything. This only applies to result types
-    that have underscores in their names.
-
-    Returns: The normalized identifier string (sans-underscores).
-    """
-    if identifier.endswith("_Result") or identifier.endswith("_Response"):
-        return identifier.replace("_", "")
-    return identifier
 
 
 def event_method(

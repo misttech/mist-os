@@ -115,22 +115,50 @@ U64 = int
 Vector = typing.Optional[typing.Sequence[int]]
 
 
-class MyProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class MyProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.experimentalmaybefromalias"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class MyProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.experimentalmaybefromalias"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class MyProtocolEventHandler(fidl._client.EventHandlerBase):
+class MyProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.experimentalmaybefromalias"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 MyProtocolMarker = fidl._library.ProtocolMarker(

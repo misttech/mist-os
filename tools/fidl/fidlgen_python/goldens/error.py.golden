@@ -87,6 +87,7 @@ class ExampleFooResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ExampleFooResult"
     __fidl_raw_type__ = "test.error/Example_foo_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -185,22 +186,91 @@ class ExampleFooResult:
         return cls(_empty=())
 
 
-class ExampleServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ExampleServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.error"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        1107623248440401476: MethodInfo(
+            name="foo",
+            request_ident="test.error/ExampleFooRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.error/Example_foo_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_foo: typing.TypeAlias = typing.Union[
+        DomainError,
+        ExampleFooResponse,
+    ]
+
+    @abstractmethod
+    def foo(
+        self,
+        request: ExampleFooRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_foo]
+        | _MethodResponse_foo
+    ):
+        ...
 
 
 class ExampleClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.error"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def foo(
+        self,
+        *,
+        s: str,
+    ) -> typing.Coroutine[typing.Any, typing.Any, ExampleFooResult]:
+        msg = ExampleFooRequest(
+            s,
+        )
+        return self._send_two_way_fidl_request(
+            1107623248440401476,
+            "test.error",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.error/Example_foo_Result"
+            ),
+        )
 
 
-class ExampleEventHandler(fidl._client.EventHandlerBase):
+class ExampleEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.error"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ExampleMarker = fidl._library.ProtocolMarker(

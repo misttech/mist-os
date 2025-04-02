@@ -1241,6 +1241,7 @@ class AjarTargetEventReport:
     __fidl_kind__ = "union"
     __fidl_type__ = "AjarTargetEventReport"
     __fidl_raw_type__ = "fidl.clientsuite/AjarTargetEventReport"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1324,6 +1325,7 @@ class ClosedTargetEventReport:
     __fidl_kind__ = "union"
     __fidl_type__ = "ClosedTargetEventReport"
     __fidl_raw_type__ = "fidl.clientsuite/ClosedTargetEventReport"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1447,6 +1449,7 @@ class ClosedTargetTwoWayStructPayloadErrResult:
     __fidl_raw_type__ = (
         "fidl.clientsuite/ClosedTarget_TwoWayStructPayloadErr_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1554,6 +1557,7 @@ class EmptyResultClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultClassification"
     __fidl_raw_type__ = "fidl.clientsuite/EmptyResultClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1637,6 +1641,7 @@ class EmptyResultWithErrorClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultWithErrorClassification"
     __fidl_raw_type__ = "fidl.clientsuite/EmptyResultWithErrorClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1732,6 +1737,7 @@ class NonEmptyResultClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultClassification"
     __fidl_raw_type__ = "fidl.clientsuite/NonEmptyResultClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1815,6 +1821,7 @@ class NonEmptyResultWithErrorClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultWithErrorClassification"
     __fidl_raw_type__ = "fidl.clientsuite/NonEmptyResultWithErrorClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1912,6 +1919,7 @@ class OpenTargetEventReport:
     __fidl_kind__ = "union"
     __fidl_type__ = "OpenTargetEventReport"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTargetEventReport"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2019,6 +2027,7 @@ class OpenTargetFlexibleTwoWayErrResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "OpenTargetFlexibleTwoWayErrResult"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2141,6 +2150,7 @@ class OpenTargetFlexibleTwoWayFieldsErrResult:
     __fidl_raw_type__ = (
         "fidl.clientsuite/OpenTarget_FlexibleTwoWayFieldsErr_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2263,6 +2273,7 @@ class OpenTargetFlexibleTwoWayFieldsResult:
     __fidl_raw_type__ = (
         "fidl.clientsuite/OpenTarget_FlexibleTwoWayFields_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2370,6 +2381,7 @@ class OpenTargetFlexibleTwoWayResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "OpenTargetFlexibleTwoWayResult"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2476,6 +2488,7 @@ class OpenTargetStrictTwoWayErrResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "OpenTargetStrictTwoWayErrResult"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2584,6 +2597,7 @@ class OpenTargetStrictTwoWayFieldsErrResult:
     __fidl_raw_type__ = (
         "fidl.clientsuite/OpenTarget_StrictTwoWayFieldsErr_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2691,6 +2705,7 @@ class TableResultClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "TableResultClassification"
     __fidl_raw_type__ = "fidl.clientsuite/TableResultClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2772,6 +2787,7 @@ class UnionPayload:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionPayload"
     __fidl_raw_type__ = "fidl.clientsuite/UnionPayload"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -2839,6 +2855,7 @@ class UnionResultClassification:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionResultClassification"
     __fidl_raw_type__ = "fidl.clientsuite/UnionResultClassification"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -3029,22 +3046,50 @@ Test = enum.IntEnum(
 CLIENT_SUITE_VERSION: int = 1
 
 
-class AjarTargetServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class AjarTargetServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class AjarTargetClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class AjarTargetEventHandler(fidl._client.EventHandlerBase):
+class AjarTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 AjarTargetMarker = fidl._library.ProtocolMarker(
@@ -3052,22 +3097,89 @@ AjarTargetMarker = fidl._library.ProtocolMarker(
 )
 
 
-class AjarTargetEventReporterServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class AjarTargetEventReporterServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5150872472050569784: MethodInfo(
+            name="report_event",
+            request_ident="fidl.clientsuite/AjarTargetEventReport",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_report_event: typing.TypeAlias = None
+
+    @abstractmethod
+    def report_event(
+        self,
+        request: AjarTargetEventReport,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
+        | _MethodResponse_report_event
+    ):
+        ...
 
 
 class AjarTargetEventReporterClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def report_event(
+        self,
+        *,
+        fidl_error: int | None = None,
+        unknown_event: UnknownEvent | None = None,
+    ) -> None:
+        msg = AjarTargetEventReport(
+            fidl_error,
+            unknown_event,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            5150872472050569784,
+            "fidl.clientsuite",
+            msg,
+        )
 
 
-class AjarTargetEventReporterEventHandler(fidl._client.EventHandlerBase):
+class AjarTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 AjarTargetEventReporterMarker = fidl._library.ProtocolMarker(
@@ -3075,22 +3187,578 @@ AjarTargetEventReporterMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ClosedTargetServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ClosedTargetServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        8823160117673072416: MethodInfo(
+            name="two_way_no_payload",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        4197391242806919613: MethodInfo(
+            name="two_way_struct_payload",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyPayload",
+        ),
+        6034278263774013116: MethodInfo(
+            name="two_way_table_payload",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/TablePayload",
+        ),
+        2303581613023334284: MethodInfo(
+            name="two_way_union_payload",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/UnionPayload",
+        ),
+        7112457167486827531: MethodInfo(
+            name="two_way_struct_payload_err",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="fidl.clientsuite/ClosedTarget_TwoWayStructPayloadErr_Result",
+        ),
+        5762209808438257078: MethodInfo(
+            name="two_way_struct_request",
+            request_ident="fidl.clientsuite/NonEmptyPayload",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        4411466441619884495: MethodInfo(
+            name="two_way_table_request",
+            request_ident="fidl.clientsuite/TablePayload",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        8852700443574767223: MethodInfo(
+            name="two_way_union_request",
+            request_ident="fidl.clientsuite/UnionPayload",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        880285710761691653: MethodInfo(
+            name="one_way_no_request",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2745184144532233426: MethodInfo(
+            name="one_way_struct_request",
+            request_ident="fidl.clientsuite/NonEmptyPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1894745725882679327: MethodInfo(
+            name="one_way_table_request",
+            request_ident="fidl.clientsuite/TablePayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1453322211393998309: MethodInfo(
+            name="one_way_union_request",
+            request_ident="fidl.clientsuite/UnionPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_two_way_no_payload: typing.TypeAlias = None
+
+    @abstractmethod
+    def two_way_no_payload(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_no_payload
+        ]
+        | _MethodResponse_two_way_no_payload
+    ):
+        ...
+
+    _MethodResponse_two_way_struct_payload: typing.TypeAlias = NonEmptyPayload
+
+    @abstractmethod
+    def two_way_struct_payload(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_struct_payload
+        ]
+        | _MethodResponse_two_way_struct_payload
+    ):
+        ...
+
+    _MethodResponse_two_way_table_payload: typing.TypeAlias = TablePayload
+
+    @abstractmethod
+    def two_way_table_payload(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_table_payload
+        ]
+        | _MethodResponse_two_way_table_payload
+    ):
+        ...
+
+    _MethodResponse_two_way_union_payload: typing.TypeAlias = UnionPayload
+
+    @abstractmethod
+    def two_way_union_payload(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_union_payload
+        ]
+        | _MethodResponse_two_way_union_payload
+    ):
+        ...
+
+    _MethodResponse_two_way_struct_payload_err: typing.TypeAlias = typing.Union[
+        DomainError,
+        NonEmptyPayload,
+    ]
+
+    @abstractmethod
+    def two_way_struct_payload_err(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_struct_payload_err
+        ]
+        | _MethodResponse_two_way_struct_payload_err
+    ):
+        ...
+
+    _MethodResponse_two_way_struct_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def two_way_struct_request(
+        self,
+        request: NonEmptyPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_struct_request
+        ]
+        | _MethodResponse_two_way_struct_request
+    ):
+        ...
+
+    _MethodResponse_two_way_table_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def two_way_table_request(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_table_request
+        ]
+        | _MethodResponse_two_way_table_request
+    ):
+        ...
+
+    _MethodResponse_two_way_union_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def two_way_union_request(
+        self,
+        request: UnionPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_union_request
+        ]
+        | _MethodResponse_two_way_union_request
+    ):
+        ...
+
+    _MethodResponse_one_way_no_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_no_request(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_no_request
+        ]
+        | _MethodResponse_one_way_no_request
+    ):
+        ...
+
+    _MethodResponse_one_way_struct_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_struct_request(
+        self,
+        request: NonEmptyPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_struct_request
+        ]
+        | _MethodResponse_one_way_struct_request
+    ):
+        ...
+
+    _MethodResponse_one_way_table_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_table_request(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_table_request
+        ]
+        | _MethodResponse_one_way_table_request
+    ):
+        ...
+
+    _MethodResponse_one_way_union_request: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_union_request(
+        self,
+        request: UnionPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_union_request
+        ]
+        | _MethodResponse_one_way_union_request
+    ):
+        ...
+
+    def on_event_no_payload(
+        self,
+    ) -> None:
+        msg = None
+        self._send_event(5685716274827179686, "fidl.clientsuite", msg)
+
+    def on_event_struct_payload(
+        self,
+        *,
+        some_field: int,
+    ) -> None:
+        msg = NonEmptyPayload(
+            some_field,
+        )
+        self._send_event(5253669518495638118, "fidl.clientsuite", msg)
+
+    def on_event_table_payload(
+        self,
+        *,
+        some_field: int | None = None,
+    ) -> None:
+        msg = TablePayload(
+            some_field,
+        )
+        self._send_event(8251567748156745542, "fidl.clientsuite", msg)
+
+    def on_event_union_payload(
+        self,
+        *,
+        some_variant: int | None = None,
+    ) -> None:
+        msg = UnionPayload(
+            some_variant,
+        )
+        self._send_event(7621842152112557728, "fidl.clientsuite", msg)
 
 
 class ClosedTargetClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def two_way_no_payload(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            8823160117673072416,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def two_way_struct_payload(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, NonEmptyPayload]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            4197391242806919613,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyPayload"
+            ),
+        )
+
+    def two_way_table_payload(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, TablePayload]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6034278263774013116,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/TablePayload"
+            ),
+        )
+
+    def two_way_union_payload(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, UnionPayload]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            2303581613023334284,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/UnionPayload"
+            ),
+        )
+
+    def two_way_struct_payload_err(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ClosedTargetTwoWayStructPayloadErrResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            7112457167486827531,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/ClosedTarget_TwoWayStructPayloadErr_Result"
+            ),
+        )
+
+    def two_way_struct_request(
+        self,
+        *,
+        some_field: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = NonEmptyPayload(
+            some_field,
+        )
+        return self._send_two_way_fidl_request(
+            5762209808438257078,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def two_way_table_request(
+        self,
+        *,
+        some_field: int | None = None,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = TablePayload(
+            some_field,
+        )
+        return self._send_two_way_fidl_request(
+            4411466441619884495,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def two_way_union_request(
+        self,
+        *,
+        some_variant: int | None = None,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = UnionPayload(
+            some_variant,
+        )
+        return self._send_two_way_fidl_request(
+            8852700443574767223,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def one_way_no_request(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            880285710761691653,
+            "fidl.clientsuite",
+            msg,
+        )
+
+    def one_way_struct_request(
+        self,
+        *,
+        some_field: int,
+    ) -> None:
+        msg = NonEmptyPayload(
+            some_field,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            2745184144532233426,
+            "fidl.clientsuite",
+            msg,
+        )
+
+    def one_way_table_request(
+        self,
+        *,
+        some_field: int | None = None,
+    ) -> None:
+        msg = TablePayload(
+            some_field,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1894745725882679327,
+            "fidl.clientsuite",
+            msg,
+        )
+
+    def one_way_union_request(
+        self,
+        *,
+        some_variant: int | None = None,
+    ) -> None:
+        msg = UnionPayload(
+            some_variant,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1453322211393998309,
+            "fidl.clientsuite",
+            msg,
+        )
 
 
-class ClosedTargetEventHandler(fidl._client.EventHandlerBase):
+class ClosedTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5685716274827179686: MethodInfo(
+            name="on_event_no_payload",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5253669518495638118: MethodInfo(
+            name="on_event_struct_payload",
+            request_ident="fidl.clientsuite/NonEmptyPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        8251567748156745542: MethodInfo(
+            name="on_event_table_payload",
+            request_ident="fidl.clientsuite/TablePayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        7621842152112557728: MethodInfo(
+            name="on_event_union_payload",
+            request_ident="fidl.clientsuite/UnionPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_event_no_payload(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_event_struct_payload(
+        self,
+        request: NonEmptyPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_event_table_payload(
+        self,
+        request: TablePayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_event_union_payload(
+        self,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 ClosedTargetMarker = fidl._library.ProtocolMarker(
@@ -3098,22 +3766,95 @@ ClosedTargetMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ClosedTargetEventReporterServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ClosedTargetEventReporterServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        7172279718796493934: MethodInfo(
+            name="report_event",
+            request_ident="fidl.clientsuite/ClosedTargetEventReport",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_report_event: typing.TypeAlias = None
+
+    @abstractmethod
+    def report_event(
+        self,
+        request: ClosedTargetEventReport,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
+        | _MethodResponse_report_event
+    ):
+        ...
 
 
 class ClosedTargetEventReporterClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def report_event(
+        self,
+        *,
+        fidl_error: int | None = None,
+        on_event_no_payload: Empty | None = None,
+        on_event_struct_payload: NonEmptyPayload | None = None,
+        on_event_table_payload: TablePayload | None = None,
+        on_event_union_payload: UnionPayload | None = None,
+    ) -> None:
+        msg = ClosedTargetEventReport(
+            fidl_error,
+            on_event_no_payload,
+            on_event_struct_payload,
+            on_event_table_payload,
+            on_event_union_payload,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7172279718796493934,
+            "fidl.clientsuite",
+            msg,
+        )
 
 
-class ClosedTargetEventReporterEventHandler(fidl._client.EventHandlerBase):
+class ClosedTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ClosedTargetEventReporterMarker = fidl._library.ProtocolMarker(
@@ -3121,22 +3862,458 @@ ClosedTargetEventReporterMarker = fidl._library.ProtocolMarker(
 )
 
 
-class OpenTargetServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class OpenTargetServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        7904024199254697828: MethodInfo(
+            name="strict_one_way",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1119507890521778684: MethodInfo(
+            name="flexible_one_way",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        995098632483095874: MethodInfo(
+            name="strict_two_way",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        8775166568163566307: MethodInfo(
+            name="strict_two_way_fields",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyPayload",
+        ),
+        6063427118545698440: MethodInfo(
+            name="strict_two_way_err",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_StrictTwoWayErr_Result",
+        ),
+        9059738677182539537: MethodInfo(
+            name="strict_two_way_fields_err",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_StrictTwoWayFieldsErr_Result",
+        ),
+        7373850992214410631: MethodInfo(
+            name="flexible_two_way",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_FlexibleTwoWay_Result",
+        ),
+        4087393006943873764: MethodInfo(
+            name="flexible_two_way_fields",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_FlexibleTwoWayFields_Result",
+        ),
+        7932048879253591162: MethodInfo(
+            name="flexible_two_way_err",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Result",
+        ),
+        1029425766479692362: MethodInfo(
+            name="flexible_two_way_fields_err",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="fidl.clientsuite/OpenTarget_FlexibleTwoWayFieldsErr_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_strict_one_way: typing.TypeAlias = None
+
+    @abstractmethod
+    def strict_one_way(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
+        | _MethodResponse_strict_one_way
+    ):
+        ...
+
+    _MethodResponse_flexible_one_way: typing.TypeAlias = None
+
+    @abstractmethod
+    def flexible_one_way(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_flexible_one_way
+        ]
+        | _MethodResponse_flexible_one_way
+    ):
+        ...
+
+    _MethodResponse_strict_two_way: typing.TypeAlias = None
+
+    @abstractmethod
+    def strict_two_way(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_two_way]
+        | _MethodResponse_strict_two_way
+    ):
+        ...
+
+    _MethodResponse_strict_two_way_fields: typing.TypeAlias = NonEmptyPayload
+
+    @abstractmethod
+    def strict_two_way_fields(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields
+        ]
+        | _MethodResponse_strict_two_way_fields
+    ):
+        ...
+
+    _MethodResponse_strict_two_way_err: typing.TypeAlias = typing.Union[
+        DomainError,
+        None,
+    ]
+
+    @abstractmethod
+    def strict_two_way_err(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_strict_two_way_err
+        ]
+        | _MethodResponse_strict_two_way_err
+    ):
+        ...
+
+    _MethodResponse_strict_two_way_fields_err: typing.TypeAlias = typing.Union[
+        DomainError,
+        NonEmptyPayload,
+    ]
+
+    @abstractmethod
+    def strict_two_way_fields_err(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields_err
+        ]
+        | _MethodResponse_strict_two_way_fields_err
+    ):
+        ...
+
+    _MethodResponse_flexible_two_way: typing.TypeAlias = typing.Union[
+        FrameworkError,
+        None,
+    ]
+
+    @abstractmethod
+    def flexible_two_way(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_flexible_two_way
+        ]
+        | _MethodResponse_flexible_two_way
+    ):
+        ...
+
+    _MethodResponse_flexible_two_way_fields: typing.TypeAlias = typing.Union[
+        FrameworkError,
+        NonEmptyPayload,
+    ]
+
+    @abstractmethod
+    def flexible_two_way_fields(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields
+        ]
+        | _MethodResponse_flexible_two_way_fields
+    ):
+        ...
+
+    _MethodResponse_flexible_two_way_err: typing.TypeAlias = typing.Union[
+        FrameworkError,
+        DomainError,
+        None,
+    ]
+
+    @abstractmethod
+    def flexible_two_way_err(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_flexible_two_way_err
+        ]
+        | _MethodResponse_flexible_two_way_err
+    ):
+        ...
+
+    _MethodResponse_flexible_two_way_fields_err: typing.TypeAlias = (
+        typing.Union[
+            FrameworkError,
+            DomainError,
+            NonEmptyPayload,
+        ]
+    )
+
+    @abstractmethod
+    def flexible_two_way_fields_err(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields_err
+        ]
+        | _MethodResponse_flexible_two_way_fields_err
+    ):
+        ...
+
+    def strict_event(
+        self,
+    ) -> None:
+        msg = None
+        self._send_event(3110049402570307488, "fidl.clientsuite", msg)
+
+    def flexible_event(
+        self,
+    ) -> None:
+        msg = None
+        self._send_event(5824395118547404952, "fidl.clientsuite", msg)
 
 
 class OpenTargetClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def strict_one_way(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            7904024199254697828,
+            "fidl.clientsuite",
+            msg,
+        )
+
+    def flexible_one_way(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            1119507890521778684,
+            "fidl.clientsuite",
+            msg,
+        )
+
+    def strict_two_way(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            995098632483095874,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def strict_two_way_fields(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, NonEmptyPayload]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            8775166568163566307,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyPayload"
+            ),
+        )
+
+    def strict_two_way_err(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetStrictTwoWayErrResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6063427118545698440,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Result"
+            ),
+        )
+
+    def strict_two_way_fields_err(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetStrictTwoWayFieldsErrResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            9059738677182539537,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_StrictTwoWayFieldsErr_Result"
+            ),
+        )
+
+    def flexible_two_way(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetFlexibleTwoWayResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            7373850992214410631,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Result"
+            ),
+        )
+
+    def flexible_two_way_fields(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetFlexibleTwoWayFieldsResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            4087393006943873764,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_FlexibleTwoWayFields_Result"
+            ),
+        )
+
+    def flexible_two_way_err(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetFlexibleTwoWayErrResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            7932048879253591162,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Result"
+            ),
+        )
+
+    def flexible_two_way_fields_err(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, OpenTargetFlexibleTwoWayFieldsErrResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            1029425766479692362,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/OpenTarget_FlexibleTwoWayFieldsErr_Result"
+            ),
+        )
 
 
-class OpenTargetEventHandler(fidl._client.EventHandlerBase):
+class OpenTargetEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        3110049402570307488: MethodInfo(
+            name="strict_event",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5824395118547404952: MethodInfo(
+            name="flexible_event",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def strict_event(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def flexible_event(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 OpenTargetMarker = fidl._library.ProtocolMarker(
@@ -3144,22 +4321,93 @@ OpenTargetMarker = fidl._library.ProtocolMarker(
 )
 
 
-class OpenTargetEventReporterServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class OpenTargetEventReporterServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        8118645339567199818: MethodInfo(
+            name="report_event",
+            request_ident="fidl.clientsuite/OpenTargetEventReport",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_report_event: typing.TypeAlias = None
+
+    @abstractmethod
+    def report_event(
+        self,
+        request: OpenTargetEventReport,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
+        | _MethodResponse_report_event
+    ):
+        ...
 
 
 class OpenTargetEventReporterClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def report_event(
+        self,
+        *,
+        fidl_error: int | None = None,
+        unknown_event: UnknownEvent | None = None,
+        strict_event: Empty | None = None,
+        flexible_event: Empty | None = None,
+    ) -> None:
+        msg = OpenTargetEventReport(
+            fidl_error,
+            unknown_event,
+            strict_event,
+            flexible_event,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            8118645339567199818,
+            "fidl.clientsuite",
+            msg,
+        )
 
 
-class OpenTargetEventReporterEventHandler(fidl._client.EventHandlerBase):
+class OpenTargetEventReporterEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 OpenTargetEventReporterMarker = fidl._library.ProtocolMarker(
@@ -3167,22 +4415,1237 @@ OpenTargetEventReporterMarker = fidl._library.ProtocolMarker(
 )
 
 
-class RunnerServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class RunnerServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        6151094865554034132: MethodInfo(
+            name="get_version",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/RunnerGetVersionResponse",
+        ),
+        8456568861872716880: MethodInfo(
+            name="is_test_enabled",
+            request_ident="fidl.clientsuite/RunnerIsTestEnabledRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/RunnerIsTestEnabledResponse",
+        ),
+        6518872820703682864: MethodInfo(
+            name="check_alive",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        8553849771382515254: MethodInfo(
+            name="get_bindings_properties",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/BindingsProperties",
+        ),
+        6029318298044407969: MethodInfo(
+            name="call_two_way_no_payload",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayNoPayloadRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        2659811426878208326: MethodInfo(
+            name="call_two_way_struct_payload",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayStructPayloadRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultClassification",
+        ),
+        517424185216448362: MethodInfo(
+            name="call_two_way_table_payload",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayTablePayloadRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/TableResultClassification",
+        ),
+        9064011510580525152: MethodInfo(
+            name="call_two_way_union_payload",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayUnionPayloadRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/UnionResultClassification",
+        ),
+        3100628808697771749: MethodInfo(
+            name="call_two_way_struct_payload_err",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayStructPayloadErrRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultWithErrorClassification",
+        ),
+        8935324979276061509: MethodInfo(
+            name="call_two_way_struct_request",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayStructRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        7212342332333000126: MethodInfo(
+            name="call_two_way_table_request",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayTableRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        5469041625659498910: MethodInfo(
+            name="call_two_way_union_request",
+            request_ident="fidl.clientsuite/RunnerCallTwoWayUnionRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        2645564239868906505: MethodInfo(
+            name="call_one_way_no_request",
+            request_ident="fidl.clientsuite/RunnerCallOneWayNoRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        3830919545774453792: MethodInfo(
+            name="call_one_way_struct_request",
+            request_ident="fidl.clientsuite/RunnerCallOneWayStructRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        8304956294418347759: MethodInfo(
+            name="call_one_way_table_request",
+            request_ident="fidl.clientsuite/RunnerCallOneWayTableRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        702155129378639542: MethodInfo(
+            name="call_one_way_union_request",
+            request_ident="fidl.clientsuite/RunnerCallOneWayUnionRequestRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        5682710877569041515: MethodInfo(
+            name="call_strict_one_way",
+            request_ident="fidl.clientsuite/RunnerCallStrictOneWayRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        8238193170653898775: MethodInfo(
+            name="call_flexible_one_way",
+            request_ident="fidl.clientsuite/RunnerCallFlexibleOneWayRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        2281631162221649191: MethodInfo(
+            name="call_strict_two_way",
+            request_ident="fidl.clientsuite/RunnerCallStrictTwoWayRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        8027963207886237987: MethodInfo(
+            name="call_strict_two_way_fields",
+            request_ident="fidl.clientsuite/RunnerCallStrictTwoWayFieldsRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultClassification",
+        ),
+        5897108006990753562: MethodInfo(
+            name="call_strict_two_way_err",
+            request_ident="fidl.clientsuite/RunnerCallStrictTwoWayErrRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultWithErrorClassification",
+        ),
+        8044305163731028997: MethodInfo(
+            name="call_strict_two_way_fields_err",
+            request_ident="fidl.clientsuite/RunnerCallStrictTwoWayFieldsErrRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultWithErrorClassification",
+        ),
+        293287060805479753: MethodInfo(
+            name="call_flexible_two_way",
+            request_ident="fidl.clientsuite/RunnerCallFlexibleTwoWayRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultClassification",
+        ),
+        3677636279746006765: MethodInfo(
+            name="call_flexible_two_way_fields",
+            request_ident="fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultClassification",
+        ),
+        6763272537909111383: MethodInfo(
+            name="call_flexible_two_way_err",
+            request_ident="fidl.clientsuite/RunnerCallFlexibleTwoWayErrRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/EmptyResultWithErrorClassification",
+        ),
+        8854931429453661326: MethodInfo(
+            name="call_flexible_two_way_fields_err",
+            request_ident="fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsErrRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="fidl.clientsuite/NonEmptyResultWithErrorClassification",
+        ),
+        5249652665483729643: MethodInfo(
+            name="receive_closed_events",
+            request_ident="fidl.clientsuite/RunnerReceiveClosedEventsRequest",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        889006526008657827: MethodInfo(
+            name="receive_ajar_events",
+            request_ident="fidl.clientsuite/RunnerReceiveAjarEventsRequest",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        8765983170380094431: MethodInfo(
+            name="receive_open_events",
+            request_ident="fidl.clientsuite/RunnerReceiveOpenEventsRequest",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_get_version: typing.TypeAlias = RunnerGetVersionResponse
+
+    @abstractmethod
+    def get_version(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_version]
+        | _MethodResponse_get_version
+    ):
+        ...
+
+    _MethodResponse_is_test_enabled: typing.TypeAlias = (
+        RunnerIsTestEnabledResponse
+    )
+
+    @abstractmethod
+    def is_test_enabled(
+        self,
+        request: RunnerIsTestEnabledRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_is_test_enabled
+        ]
+        | _MethodResponse_is_test_enabled
+    ):
+        ...
+
+    _MethodResponse_check_alive: typing.TypeAlias = None
+
+    @abstractmethod
+    def check_alive(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_check_alive]
+        | _MethodResponse_check_alive
+    ):
+        ...
+
+    _MethodResponse_get_bindings_properties: typing.TypeAlias = (
+        BindingsProperties
+    )
+
+    @abstractmethod
+    def get_bindings_properties(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_get_bindings_properties
+        ]
+        | _MethodResponse_get_bindings_properties
+    ):
+        ...
+
+    _MethodResponse_call_two_way_no_payload: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_no_payload(
+        self,
+        request: RunnerCallTwoWayNoPayloadRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_no_payload
+        ]
+        | _MethodResponse_call_two_way_no_payload
+    ):
+        ...
+
+    _MethodResponse_call_two_way_struct_payload: typing.TypeAlias = (
+        NonEmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_struct_payload(
+        self,
+        request: RunnerCallTwoWayStructPayloadRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_struct_payload
+        ]
+        | _MethodResponse_call_two_way_struct_payload
+    ):
+        ...
+
+    _MethodResponse_call_two_way_table_payload: typing.TypeAlias = (
+        TableResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_table_payload(
+        self,
+        request: RunnerCallTwoWayTablePayloadRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_table_payload
+        ]
+        | _MethodResponse_call_two_way_table_payload
+    ):
+        ...
+
+    _MethodResponse_call_two_way_union_payload: typing.TypeAlias = (
+        UnionResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_union_payload(
+        self,
+        request: RunnerCallTwoWayUnionPayloadRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_union_payload
+        ]
+        | _MethodResponse_call_two_way_union_payload
+    ):
+        ...
+
+    _MethodResponse_call_two_way_struct_payload_err: typing.TypeAlias = (
+        NonEmptyResultWithErrorClassification
+    )
+
+    @abstractmethod
+    def call_two_way_struct_payload_err(
+        self,
+        request: RunnerCallTwoWayStructPayloadErrRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_call_two_way_struct_payload_err,
+        ]
+        | _MethodResponse_call_two_way_struct_payload_err
+    ):
+        ...
+
+    _MethodResponse_call_two_way_struct_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_struct_request(
+        self,
+        request: RunnerCallTwoWayStructRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_struct_request
+        ]
+        | _MethodResponse_call_two_way_struct_request
+    ):
+        ...
+
+    _MethodResponse_call_two_way_table_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_table_request(
+        self,
+        request: RunnerCallTwoWayTableRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_table_request
+        ]
+        | _MethodResponse_call_two_way_table_request
+    ):
+        ...
+
+    _MethodResponse_call_two_way_union_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_two_way_union_request(
+        self,
+        request: RunnerCallTwoWayUnionRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_two_way_union_request
+        ]
+        | _MethodResponse_call_two_way_union_request
+    ):
+        ...
+
+    _MethodResponse_call_one_way_no_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_one_way_no_request(
+        self,
+        request: RunnerCallOneWayNoRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_one_way_no_request
+        ]
+        | _MethodResponse_call_one_way_no_request
+    ):
+        ...
+
+    _MethodResponse_call_one_way_struct_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_one_way_struct_request(
+        self,
+        request: RunnerCallOneWayStructRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_one_way_struct_request
+        ]
+        | _MethodResponse_call_one_way_struct_request
+    ):
+        ...
+
+    _MethodResponse_call_one_way_table_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_one_way_table_request(
+        self,
+        request: RunnerCallOneWayTableRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_one_way_table_request
+        ]
+        | _MethodResponse_call_one_way_table_request
+    ):
+        ...
+
+    _MethodResponse_call_one_way_union_request: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_one_way_union_request(
+        self,
+        request: RunnerCallOneWayUnionRequestRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_one_way_union_request
+        ]
+        | _MethodResponse_call_one_way_union_request
+    ):
+        ...
+
+    _MethodResponse_call_strict_one_way: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_strict_one_way(
+        self,
+        request: RunnerCallStrictOneWayRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_strict_one_way
+        ]
+        | _MethodResponse_call_strict_one_way
+    ):
+        ...
+
+    _MethodResponse_call_flexible_one_way: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_flexible_one_way(
+        self,
+        request: RunnerCallFlexibleOneWayRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_flexible_one_way
+        ]
+        | _MethodResponse_call_flexible_one_way
+    ):
+        ...
+
+    _MethodResponse_call_strict_two_way: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_strict_two_way(
+        self,
+        request: RunnerCallStrictTwoWayRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_strict_two_way
+        ]
+        | _MethodResponse_call_strict_two_way
+    ):
+        ...
+
+    _MethodResponse_call_strict_two_way_fields: typing.TypeAlias = (
+        NonEmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_strict_two_way_fields(
+        self,
+        request: RunnerCallStrictTwoWayFieldsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_strict_two_way_fields
+        ]
+        | _MethodResponse_call_strict_two_way_fields
+    ):
+        ...
+
+    _MethodResponse_call_strict_two_way_err: typing.TypeAlias = (
+        EmptyResultWithErrorClassification
+    )
+
+    @abstractmethod
+    def call_strict_two_way_err(
+        self,
+        request: RunnerCallStrictTwoWayErrRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_strict_two_way_err
+        ]
+        | _MethodResponse_call_strict_two_way_err
+    ):
+        ...
+
+    _MethodResponse_call_strict_two_way_fields_err: typing.TypeAlias = (
+        NonEmptyResultWithErrorClassification
+    )
+
+    @abstractmethod
+    def call_strict_two_way_fields_err(
+        self,
+        request: RunnerCallStrictTwoWayFieldsErrRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_call_strict_two_way_fields_err,
+        ]
+        | _MethodResponse_call_strict_two_way_fields_err
+    ):
+        ...
+
+    _MethodResponse_call_flexible_two_way: typing.TypeAlias = (
+        EmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_flexible_two_way(
+        self,
+        request: RunnerCallFlexibleTwoWayRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way
+        ]
+        | _MethodResponse_call_flexible_two_way
+    ):
+        ...
+
+    _MethodResponse_call_flexible_two_way_fields: typing.TypeAlias = (
+        NonEmptyResultClassification
+    )
+
+    @abstractmethod
+    def call_flexible_two_way_fields(
+        self,
+        request: RunnerCallFlexibleTwoWayFieldsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way_fields
+        ]
+        | _MethodResponse_call_flexible_two_way_fields
+    ):
+        ...
+
+    _MethodResponse_call_flexible_two_way_err: typing.TypeAlias = (
+        EmptyResultWithErrorClassification
+    )
+
+    @abstractmethod
+    def call_flexible_two_way_err(
+        self,
+        request: RunnerCallFlexibleTwoWayErrRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way_err
+        ]
+        | _MethodResponse_call_flexible_two_way_err
+    ):
+        ...
+
+    _MethodResponse_call_flexible_two_way_fields_err: typing.TypeAlias = (
+        NonEmptyResultWithErrorClassification
+    )
+
+    @abstractmethod
+    def call_flexible_two_way_fields_err(
+        self,
+        request: RunnerCallFlexibleTwoWayFieldsErrRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_call_flexible_two_way_fields_err,
+        ]
+        | _MethodResponse_call_flexible_two_way_fields_err
+    ):
+        ...
+
+    _MethodResponse_receive_closed_events: typing.TypeAlias = None
+
+    @abstractmethod
+    def receive_closed_events(
+        self,
+        request: RunnerReceiveClosedEventsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_receive_closed_events
+        ]
+        | _MethodResponse_receive_closed_events
+    ):
+        ...
+
+    _MethodResponse_receive_ajar_events: typing.TypeAlias = None
+
+    @abstractmethod
+    def receive_ajar_events(
+        self,
+        request: RunnerReceiveAjarEventsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_receive_ajar_events
+        ]
+        | _MethodResponse_receive_ajar_events
+    ):
+        ...
+
+    _MethodResponse_receive_open_events: typing.TypeAlias = None
+
+    @abstractmethod
+    def receive_open_events(
+        self,
+        request: RunnerReceiveOpenEventsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_receive_open_events
+        ]
+        | _MethodResponse_receive_open_events
+    ):
+        ...
 
 
 class RunnerClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def get_version(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, RunnerGetVersionResponse]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6151094865554034132,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/RunnerGetVersionResponse"
+            ),
+        )
+
+    def is_test_enabled(
+        self,
+        *,
+        test: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, RunnerIsTestEnabledResponse]:
+        msg = RunnerIsTestEnabledRequest(
+            test,
+        )
+        return self._send_two_way_fidl_request(
+            8456568861872716880,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/RunnerIsTestEnabledResponse"
+            ),
+        )
+
+    def check_alive(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6518872820703682864,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def get_bindings_properties(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, BindingsProperties]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            8553849771382515254,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/BindingsProperties"
+            ),
+        )
+
+    def call_two_way_no_payload(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallTwoWayNoPayloadRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            6029318298044407969,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_two_way_struct_payload(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, NonEmptyResultClassification]:
+        msg = RunnerCallTwoWayStructPayloadRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            2659811426878208326,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultClassification"
+            ),
+        )
+
+    def call_two_way_table_payload(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, TableResultClassification]:
+        msg = RunnerCallTwoWayTablePayloadRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            517424185216448362,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/TableResultClassification"
+            ),
+        )
+
+    def call_two_way_union_payload(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, UnionResultClassification]:
+        msg = RunnerCallTwoWayUnionPayloadRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            9064011510580525152,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/UnionResultClassification"
+            ),
+        )
+
+    def call_two_way_struct_payload_err(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, NonEmptyResultWithErrorClassification
+    ]:
+        msg = RunnerCallTwoWayStructPayloadErrRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            3100628808697771749,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultWithErrorClassification"
+            ),
+        )
+
+    def call_two_way_struct_request(
+        self,
+        *,
+        target: int,
+        request: NonEmptyPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallTwoWayStructRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            8935324979276061509,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_two_way_table_request(
+        self,
+        *,
+        target: int,
+        request: TablePayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallTwoWayTableRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            7212342332333000126,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_two_way_union_request(
+        self,
+        *,
+        target: int,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallTwoWayUnionRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            5469041625659498910,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_one_way_no_request(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallOneWayNoRequestRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            2645564239868906505,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_one_way_struct_request(
+        self,
+        *,
+        target: int,
+        request: NonEmptyPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallOneWayStructRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            3830919545774453792,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_one_way_table_request(
+        self,
+        *,
+        target: int,
+        request: TablePayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallOneWayTableRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            8304956294418347759,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_one_way_union_request(
+        self,
+        *,
+        target: int,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallOneWayUnionRequestRequest(
+            target,
+            request,
+        )
+        return self._send_two_way_fidl_request(
+            702155129378639542,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_strict_one_way(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallStrictOneWayRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            5682710877569041515,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_flexible_one_way(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallFlexibleOneWayRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            8238193170653898775,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_strict_two_way(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallStrictTwoWayRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            2281631162221649191,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_strict_two_way_fields(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, NonEmptyResultClassification]:
+        msg = RunnerCallStrictTwoWayFieldsRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            8027963207886237987,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultClassification"
+            ),
+        )
+
+    def call_strict_two_way_err(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, EmptyResultWithErrorClassification
+    ]:
+        msg = RunnerCallStrictTwoWayErrRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            5897108006990753562,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultWithErrorClassification"
+            ),
+        )
+
+    def call_strict_two_way_fields_err(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, NonEmptyResultWithErrorClassification
+    ]:
+        msg = RunnerCallStrictTwoWayFieldsErrRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            8044305163731028997,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultWithErrorClassification"
+            ),
+        )
+
+    def call_flexible_two_way(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, EmptyResultClassification]:
+        msg = RunnerCallFlexibleTwoWayRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            293287060805479753,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultClassification"
+            ),
+        )
+
+    def call_flexible_two_way_fields(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, NonEmptyResultClassification]:
+        msg = RunnerCallFlexibleTwoWayFieldsRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            3677636279746006765,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultClassification"
+            ),
+        )
+
+    def call_flexible_two_way_err(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, EmptyResultWithErrorClassification
+    ]:
+        msg = RunnerCallFlexibleTwoWayErrRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            6763272537909111383,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/EmptyResultWithErrorClassification"
+            ),
+        )
+
+    def call_flexible_two_way_fields_err(
+        self,
+        *,
+        target: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, NonEmptyResultWithErrorClassification
+    ]:
+        msg = RunnerCallFlexibleTwoWayFieldsErrRequest(
+            target,
+        )
+        return self._send_two_way_fidl_request(
+            8854931429453661326,
+            "fidl.clientsuite",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "fidl.clientsuite/NonEmptyResultWithErrorClassification"
+            ),
+        )
+
+    def receive_closed_events(
+        self,
+        *,
+        target: int,
+        reporter: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = RunnerReceiveClosedEventsRequest(
+            target,
+            reporter,
+        )
+        return self._send_two_way_fidl_request(
+            5249652665483729643,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def receive_ajar_events(
+        self,
+        *,
+        target: int,
+        reporter: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = RunnerReceiveAjarEventsRequest(
+            target,
+            reporter,
+        )
+        return self._send_two_way_fidl_request(
+            889006526008657827,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
+
+    def receive_open_events(
+        self,
+        *,
+        target: int,
+        reporter: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = RunnerReceiveOpenEventsRequest(
+            target,
+            reporter,
+        )
+        return self._send_two_way_fidl_request(
+            8765983170380094431,
+            "fidl.clientsuite",
+            msg,
+            "",
+        )
 
 
-class RunnerEventHandler(fidl._client.EventHandlerBase):
+class RunnerEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "fidl.clientsuite"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 RunnerMarker = fidl._library.ProtocolMarker("fidl.clientsuite.Runner")

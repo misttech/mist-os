@@ -232,6 +232,7 @@ class Expression:
     __fidl_kind__ = "union"
     __fidl_type__ = "Expression"
     __fidl_raw_type__ = "test.anonymous/Expression"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -325,6 +326,7 @@ class SomeProtocolSomeMethodResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "SomeProtocolSomeMethodResult"
     __fidl_raw_type__ = "test.anonymous/SomeProtocol_SomeMethod_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -431,6 +433,7 @@ class UnionMember:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionMember"
     __fidl_raw_type__ = "test.anonymous/UnionMember"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -549,22 +552,93 @@ Flags = enum.IntFlag(
 )
 
 
-class SomeProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class SomeProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.anonymous"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        2515914517457749720: MethodInfo(
+            name="some_method",
+            request_ident="test.anonymous/SomeProtocolSomeMethodRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.anonymous/SomeProtocol_SomeMethod_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_some_method: typing.TypeAlias = typing.Union[
+        DomainError,
+        SomeProtocolSomeMethodResponse,
+    ]
+
+    @abstractmethod
+    def some_method(
+        self,
+        request: SomeProtocolSomeMethodRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_some_method]
+        | _MethodResponse_some_method
+    ):
+        ...
 
 
 class SomeProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.anonymous"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def some_method(
+        self,
+        *,
+        union_member: UnionMember,
+        table_member: TableMember,
+    ) -> typing.Coroutine[typing.Any, typing.Any, SomeProtocolSomeMethodResult]:
+        msg = SomeProtocolSomeMethodRequest(
+            union_member,
+            table_member,
+        )
+        return self._send_two_way_fidl_request(
+            2515914517457749720,
+            "test.anonymous",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.anonymous/SomeProtocol_SomeMethod_Result"
+            ),
+        )
 
 
-class SomeProtocolEventHandler(fidl._client.EventHandlerBase):
+class SomeProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.anonymous"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 SomeProtocolMarker = fidl._library.ProtocolMarker(

@@ -589,6 +589,7 @@ class ProtocolErrorArrayBasicResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ProtocolErrorArrayBasicResult"
     __fidl_raw_type__ = "test.typesinprotocols/Protocol_ErrorArrayBasic_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -698,6 +699,7 @@ class ProtocolErrorArrayCompoundResult:
     __fidl_raw_type__ = (
         "test.typesinprotocols/Protocol_ErrorArrayCompound_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -807,6 +809,7 @@ class ProtocolErrorArrayVectorNestedResult:
     __fidl_raw_type__ = (
         "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -914,6 +917,7 @@ class ProtocolErrorBasicResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ProtocolErrorBasicResult"
     __fidl_raw_type__ = "test.typesinprotocols/Protocol_ErrorBasic_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1021,6 +1025,7 @@ class ProtocolErrorCompoundResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ProtocolErrorCompoundResult"
     __fidl_raw_type__ = "test.typesinprotocols/Protocol_ErrorCompound_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1128,6 +1133,7 @@ class ProtocolErrorResourceResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ProtocolErrorResourceResult"
     __fidl_raw_type__ = "test.typesinprotocols/Protocol_ErrorResource_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1235,6 +1241,7 @@ class ProtocolErrorVectorBasicResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ProtocolErrorVectorBasicResult"
     __fidl_raw_type__ = "test.typesinprotocols/Protocol_ErrorVectorBasic_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1344,6 +1351,7 @@ class ProtocolErrorVectorCompoundResult:
     __fidl_raw_type__ = (
         "test.typesinprotocols/Protocol_ErrorVectorCompound_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1453,6 +1461,7 @@ class ProtocolErrorVectorOptionalResult:
     __fidl_raw_type__ = (
         "test.typesinprotocols/Protocol_ErrorVectorOptional_Result"
     )
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1559,6 +1568,7 @@ class ResourceUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "ResourceUnion"
     __fidl_raw_type__ = "test.typesinprotocols/ResourceUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1625,6 +1635,7 @@ class Union:
     __fidl_kind__ = "union"
     __fidl_type__ = "Union"
     __fidl_raw_type__ = "test.typesinprotocols/Union"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1712,22 +1723,1811 @@ Bits = enum.IntFlag(
 )
 
 
-class ProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.typesinprotocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        8948968077914418681: MethodInfo(
+            name="one_way_basic",
+            request_ident="test.typesinprotocols/Basic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2331618702752598159: MethodInfo(
+            name="two_way_basic",
+            request_ident="test.typesinprotocols/Basic",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/Basic",
+        ),
+        5016634351643393939: MethodInfo(
+            name="error_basic",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorBasic_Result",
+        ),
+        3153289648860022476: MethodInfo(
+            name="one_way_compound",
+            request_ident="test.typesinprotocols/Compound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8787219719097524529: MethodInfo(
+            name="two_way_compound",
+            request_ident="test.typesinprotocols/Compound",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/Compound",
+        ),
+        2990809657626249085: MethodInfo(
+            name="error_compound",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorCompound_Result",
+        ),
+        7125516817014311449: MethodInfo(
+            name="one_way_array_basic",
+            request_ident="test.typesinprotocols/ArrayBasic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        5309034178175279380: MethodInfo(
+            name="two_way_array_basic",
+            request_ident="test.typesinprotocols/ArrayBasic",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/ArrayBasic",
+        ),
+        1084731895342694265: MethodInfo(
+            name="error_array_basic",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorArrayBasic_Result",
+        ),
+        5064659223443251357: MethodInfo(
+            name="one_way_array_compound",
+            request_ident="test.typesinprotocols/ArrayCompound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        849744466051983995: MethodInfo(
+            name="two_way_array_compound",
+            request_ident="test.typesinprotocols/ArrayCompound",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/ArrayCompound",
+        ),
+        5919277476782807556: MethodInfo(
+            name="error_array_compound",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorArrayCompound_Result",
+        ),
+        5733220720079947351: MethodInfo(
+            name="one_way_vector_basic",
+            request_ident="test.typesinprotocols/VectorBasic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8674156353091415668: MethodInfo(
+            name="two_way_vector_basic",
+            request_ident="test.typesinprotocols/VectorBasic",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/VectorBasic",
+        ),
+        875941614196965234: MethodInfo(
+            name="error_vector_basic",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorVectorBasic_Result",
+        ),
+        1853985797298830992: MethodInfo(
+            name="one_way_vector_compound",
+            request_ident="test.typesinprotocols/VectorCompound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        3968024057912959924: MethodInfo(
+            name="two_way_vector_compound",
+            request_ident="test.typesinprotocols/VectorCompound",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/VectorCompound",
+        ),
+        8506780203315865989: MethodInfo(
+            name="error_vector_compound",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorVectorCompound_Result",
+        ),
+        1530215841195476271: MethodInfo(
+            name="one_way_vector_optional",
+            request_ident="test.typesinprotocols/VectorOptional",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1030024737742222323: MethodInfo(
+            name="two_way_vector_optional",
+            request_ident="test.typesinprotocols/VectorOptional",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/VectorOptional",
+        ),
+        6406191217027936606: MethodInfo(
+            name="error_vector_optional",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorVectorOptional_Result",
+        ),
+        5912603762133524183: MethodInfo(
+            name="one_way_array_vector_nested",
+            request_ident="test.typesinprotocols/ArrayVectorNested",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        5351275678438791132: MethodInfo(
+            name="two_way_array_vector_nested",
+            request_ident="test.typesinprotocols/ArrayVectorNested",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/ArrayVectorNested",
+        ),
+        9085604921605802151: MethodInfo(
+            name="error_array_vector_nested",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result",
+        ),
+        6553996787849601058: MethodInfo(
+            name="one_way_resource",
+            request_ident="test.typesinprotocols/Resource",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1802709005492464987: MethodInfo(
+            name="two_way_resource",
+            request_ident="test.typesinprotocols/Resource",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.typesinprotocols/Resource",
+        ),
+        6568609240497354166: MethodInfo(
+            name="error_resource",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.typesinprotocols/Protocol_ErrorResource_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_one_way_basic: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_basic(
+        self,
+        request: Basic,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_basic]
+        | _MethodResponse_one_way_basic
+    ):
+        ...
+
+    _MethodResponse_two_way_basic: typing.TypeAlias = Basic
+
+    @abstractmethod
+    def two_way_basic(
+        self,
+        request: Basic,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_basic]
+        | _MethodResponse_two_way_basic
+    ):
+        ...
+
+    _MethodResponse_error_basic: typing.TypeAlias = typing.Union[
+        DomainError,
+        Basic,
+    ]
+
+    @abstractmethod
+    def error_basic(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_basic]
+        | _MethodResponse_error_basic
+    ):
+        ...
+
+    def event_basic(
+        self,
+        *,
+        uint8: int,
+        uint16: int,
+        uint32: int,
+        uint64: int,
+        int8: int,
+        int16: int,
+        int32: int,
+        int64: int,
+        float32: float,
+        float64: float,
+        string: str,
+        opt_string: typing.Optional[str],
+    ) -> None:
+        msg = Basic(
+            uint8,
+            uint16,
+            uint32,
+            uint64,
+            int8,
+            int16,
+            int32,
+            int64,
+            float32,
+            float64,
+            string,
+            opt_string,
+        )
+        self._send_event(5892309624949902400, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_compound: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_compound(
+        self,
+        request: Compound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_compound
+        ]
+        | _MethodResponse_one_way_compound
+    ):
+        ...
+
+    _MethodResponse_two_way_compound: typing.TypeAlias = Compound
+
+    @abstractmethod
+    def two_way_compound(
+        self,
+        request: Compound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_compound
+        ]
+        | _MethodResponse_two_way_compound
+    ):
+        ...
+
+    _MethodResponse_error_compound: typing.TypeAlias = typing.Union[
+        DomainError,
+        Compound,
+    ]
+
+    @abstractmethod
+    def error_compound(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_compound]
+        | _MethodResponse_error_compound
+    ):
+        ...
+
+    def event_compound(
+        self,
+        *,
+        bits: int,
+        enum: int,
+        struct: Struct,
+        table: Table,
+        union: Union,
+        opt_struct: typing.Optional[Struct],
+        opt_union: typing.Optional[Union],
+    ) -> None:
+        msg = Compound(
+            bits,
+            enum,
+            struct,
+            table,
+            union,
+            opt_struct,
+            opt_union,
+        )
+        self._send_event(7024581948727571669, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_array_basic: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_array_basic(
+        self,
+        request: ArrayBasic,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_array_basic
+        ]
+        | _MethodResponse_one_way_array_basic
+    ):
+        ...
+
+    _MethodResponse_two_way_array_basic: typing.TypeAlias = ArrayBasic
+
+    @abstractmethod
+    def two_way_array_basic(
+        self,
+        request: ArrayBasic,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_array_basic
+        ]
+        | _MethodResponse_two_way_array_basic
+    ):
+        ...
+
+    _MethodResponse_error_array_basic: typing.TypeAlias = typing.Union[
+        DomainError,
+        ArrayBasic,
+    ]
+
+    @abstractmethod
+    def error_array_basic(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_array_basic
+        ]
+        | _MethodResponse_error_array_basic
+    ):
+        ...
+
+    def event_array_basic(
+        self,
+        *,
+        array_uint8: typing.Sequence[int],
+        array_uint16: typing.Sequence[int],
+        array_uint32: typing.Sequence[int],
+        array_uint64: typing.Sequence[int],
+        array_int8: typing.Sequence[int],
+        array_int16: typing.Sequence[int],
+        array_int32: typing.Sequence[int],
+        array_int64: typing.Sequence[int],
+        array_float32: typing.Sequence[float],
+        array_float64: typing.Sequence[float],
+        array_string: typing.Sequence[str],
+        array_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> None:
+        msg = ArrayBasic(
+            array_uint8,
+            array_uint16,
+            array_uint32,
+            array_uint64,
+            array_int8,
+            array_int16,
+            array_int32,
+            array_int64,
+            array_float32,
+            array_float64,
+            array_string,
+            array_opt_string,
+        )
+        self._send_event(5888282827283820590, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_array_compound: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_array_compound(
+        self,
+        request: ArrayCompound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_array_compound
+        ]
+        | _MethodResponse_one_way_array_compound
+    ):
+        ...
+
+    _MethodResponse_two_way_array_compound: typing.TypeAlias = ArrayCompound
+
+    @abstractmethod
+    def two_way_array_compound(
+        self,
+        request: ArrayCompound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_array_compound
+        ]
+        | _MethodResponse_two_way_array_compound
+    ):
+        ...
+
+    _MethodResponse_error_array_compound: typing.TypeAlias = typing.Union[
+        DomainError,
+        ArrayCompound,
+    ]
+
+    @abstractmethod
+    def error_array_compound(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_array_compound
+        ]
+        | _MethodResponse_error_array_compound
+    ):
+        ...
+
+    def event_array_compound(
+        self,
+        *,
+        array_bits: typing.Sequence[int],
+        array_enum: typing.Sequence[int],
+        array_struct: typing.Sequence[Struct],
+        array_table: typing.Sequence[Table],
+        array_union: typing.Sequence[Union],
+        array_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        array_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> None:
+        msg = ArrayCompound(
+            array_bits,
+            array_enum,
+            array_struct,
+            array_table,
+            array_union,
+            array_opt_struct,
+            array_opt_union,
+        )
+        self._send_event(2189769767733851157, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_vector_basic: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_vector_basic(
+        self,
+        request: VectorBasic,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_vector_basic
+        ]
+        | _MethodResponse_one_way_vector_basic
+    ):
+        ...
+
+    _MethodResponse_two_way_vector_basic: typing.TypeAlias = VectorBasic
+
+    @abstractmethod
+    def two_way_vector_basic(
+        self,
+        request: VectorBasic,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_vector_basic
+        ]
+        | _MethodResponse_two_way_vector_basic
+    ):
+        ...
+
+    _MethodResponse_error_vector_basic: typing.TypeAlias = typing.Union[
+        DomainError,
+        VectorBasic,
+    ]
+
+    @abstractmethod
+    def error_vector_basic(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_vector_basic
+        ]
+        | _MethodResponse_error_vector_basic
+    ):
+        ...
+
+    def event_vector_basic(
+        self,
+        *,
+        vector_uint8: typing.Sequence[int],
+        vector_uint16: typing.Sequence[int],
+        vector_uint32: typing.Sequence[int],
+        vector_uint64: typing.Sequence[int],
+        vector_int8: typing.Sequence[int],
+        vector_int16: typing.Sequence[int],
+        vector_int32: typing.Sequence[int],
+        vector_int64: typing.Sequence[int],
+        vector_float32: typing.Sequence[float],
+        vector_float64: typing.Sequence[float],
+        vector_string: typing.Sequence[str],
+        vector_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> None:
+        msg = VectorBasic(
+            vector_uint8,
+            vector_uint16,
+            vector_uint32,
+            vector_uint64,
+            vector_int8,
+            vector_int16,
+            vector_int32,
+            vector_int64,
+            vector_float32,
+            vector_float64,
+            vector_string,
+            vector_opt_string,
+        )
+        self._send_event(4583890770109526006, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_vector_compound: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_vector_compound(
+        self,
+        request: VectorCompound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_vector_compound
+        ]
+        | _MethodResponse_one_way_vector_compound
+    ):
+        ...
+
+    _MethodResponse_two_way_vector_compound: typing.TypeAlias = VectorCompound
+
+    @abstractmethod
+    def two_way_vector_compound(
+        self,
+        request: VectorCompound,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_vector_compound
+        ]
+        | _MethodResponse_two_way_vector_compound
+    ):
+        ...
+
+    _MethodResponse_error_vector_compound: typing.TypeAlias = typing.Union[
+        DomainError,
+        VectorCompound,
+    ]
+
+    @abstractmethod
+    def error_vector_compound(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_vector_compound
+        ]
+        | _MethodResponse_error_vector_compound
+    ):
+        ...
+
+    def event_vector_compound(
+        self,
+        *,
+        vector_bits: typing.Sequence[int],
+        vector_enum: typing.Sequence[int],
+        vector_struct: typing.Sequence[Struct],
+        vector_table: typing.Sequence[Table],
+        vector_union: typing.Sequence[Union],
+        vector_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        vector_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> None:
+        msg = VectorCompound(
+            vector_bits,
+            vector_enum,
+            vector_struct,
+            vector_table,
+            vector_union,
+            vector_opt_struct,
+            vector_opt_union,
+        )
+        self._send_event(6026375226599919603, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_vector_optional: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_vector_optional(
+        self,
+        request: VectorOptional,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_vector_optional
+        ]
+        | _MethodResponse_one_way_vector_optional
+    ):
+        ...
+
+    _MethodResponse_two_way_vector_optional: typing.TypeAlias = VectorOptional
+
+    @abstractmethod
+    def two_way_vector_optional(
+        self,
+        request: VectorOptional,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_vector_optional
+        ]
+        | _MethodResponse_two_way_vector_optional
+    ):
+        ...
+
+    _MethodResponse_error_vector_optional: typing.TypeAlias = typing.Union[
+        DomainError,
+        VectorOptional,
+    ]
+
+    @abstractmethod
+    def error_vector_optional(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_vector_optional
+        ]
+        | _MethodResponse_error_vector_optional
+    ):
+        ...
+
+    def event_vector_optional(
+        self,
+        *,
+        opt_vector_uint8: typing.Optional[typing.Sequence[int]],
+        opt_vector_string: typing.Optional[typing.Sequence[str]],
+        opt_vector_struct: typing.Optional[typing.Sequence[Struct]],
+        opt_vector_opt_struct: typing.Optional[
+            typing.Sequence[typing.Optional[Struct]]
+        ],
+    ) -> None:
+        msg = VectorOptional(
+            opt_vector_uint8,
+            opt_vector_string,
+            opt_vector_struct,
+            opt_vector_opt_struct,
+        )
+        self._send_event(1684763340073130077, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_array_vector_nested: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_array_vector_nested(
+        self,
+        request: ArrayVectorNested,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_array_vector_nested
+        ]
+        | _MethodResponse_one_way_array_vector_nested
+    ):
+        ...
+
+    _MethodResponse_two_way_array_vector_nested: typing.TypeAlias = (
+        ArrayVectorNested
+    )
+
+    @abstractmethod
+    def two_way_array_vector_nested(
+        self,
+        request: ArrayVectorNested,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_array_vector_nested
+        ]
+        | _MethodResponse_two_way_array_vector_nested
+    ):
+        ...
+
+    _MethodResponse_error_array_vector_nested: typing.TypeAlias = typing.Union[
+        DomainError,
+        ArrayVectorNested,
+    ]
+
+    @abstractmethod
+    def error_array_vector_nested(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_array_vector_nested
+        ]
+        | _MethodResponse_error_array_vector_nested
+    ):
+        ...
+
+    def event_array_vector_nested(
+        self,
+        *,
+        array_array_uint8: typing.Sequence[typing.Sequence[int]],
+        array_vector_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_array_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_vector_uint8: typing.Sequence[typing.Sequence[int]],
+    ) -> None:
+        msg = ArrayVectorNested(
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        )
+        self._send_event(1228201560727880574, "test.typesinprotocols", msg)
+
+    _MethodResponse_one_way_resource: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_resource(
+        self,
+        request: Resource,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_resource
+        ]
+        | _MethodResponse_one_way_resource
+    ):
+        ...
+
+    _MethodResponse_two_way_resource: typing.TypeAlias = Resource
+
+    @abstractmethod
+    def two_way_resource(
+        self,
+        request: Resource,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_resource
+        ]
+        | _MethodResponse_two_way_resource
+    ):
+        ...
+
+    _MethodResponse_error_resource: typing.TypeAlias = typing.Union[
+        DomainError,
+        Resource,
+    ]
+
+    @abstractmethod
+    def error_resource(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_resource]
+        | _MethodResponse_error_resource
+    ):
+        ...
+
+    def event_resource(
+        self,
+        *,
+        handle: int,
+        vmo: int,
+        client_end: int,
+        server_end: int,
+        struct: ResourceStruct,
+        table: ResourceTable,
+        union: ResourceUnion,
+        opt_handle: typing.Optional[int],
+        opt_vmo: typing.Optional[int],
+        opt_client_end: typing.Optional[int],
+        opt_server_end: typing.Optional[int],
+        opt_struct: typing.Optional[ResourceStruct],
+        opt_union: typing.Optional[ResourceUnion],
+        array_handle: typing.Sequence[int],
+        array_vmo: typing.Sequence[int],
+        array_client_end: typing.Sequence[int],
+        array_server_end: typing.Sequence[int],
+        array_struct: typing.Sequence[ResourceStruct],
+        array_table: typing.Sequence[ResourceTable],
+        array_union: typing.Sequence[ResourceUnion],
+        vector_handle: typing.Sequence[int],
+        vector_vmo: typing.Sequence[int],
+        vector_client_end: typing.Sequence[int],
+        vector_server_end: typing.Sequence[int],
+        vector_struct: typing.Sequence[ResourceStruct],
+        vector_table: typing.Sequence[ResourceTable],
+        vector_union: typing.Sequence[ResourceUnion],
+    ) -> None:
+        msg = Resource(
+            handle,
+            vmo,
+            client_end,
+            server_end,
+            struct,
+            table,
+            union,
+            opt_handle,
+            opt_vmo,
+            opt_client_end,
+            opt_server_end,
+            opt_struct,
+            opt_union,
+            array_handle,
+            array_vmo,
+            array_client_end,
+            array_server_end,
+            array_struct,
+            array_table,
+            array_union,
+            vector_handle,
+            vector_vmo,
+            vector_client_end,
+            vector_server_end,
+            vector_struct,
+            vector_table,
+            vector_union,
+        )
+        self._send_event(5745997765922613643, "test.typesinprotocols", msg)
 
 
 class ProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.typesinprotocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def one_way_basic(
+        self,
+        *,
+        uint8: int,
+        uint16: int,
+        uint32: int,
+        uint64: int,
+        int8: int,
+        int16: int,
+        int32: int,
+        int64: int,
+        float32: float,
+        float64: float,
+        string: str,
+        opt_string: typing.Optional[str],
+    ) -> None:
+        msg = Basic(
+            uint8,
+            uint16,
+            uint32,
+            uint64,
+            int8,
+            int16,
+            int32,
+            int64,
+            float32,
+            float64,
+            string,
+            opt_string,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            8948968077914418681,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_basic(
+        self,
+        *,
+        uint8: int,
+        uint16: int,
+        uint32: int,
+        uint64: int,
+        int8: int,
+        int16: int,
+        int32: int,
+        int64: int,
+        float32: float,
+        float64: float,
+        string: str,
+        opt_string: typing.Optional[str],
+    ) -> typing.Coroutine[typing.Any, typing.Any, Basic]:
+        msg = Basic(
+            uint8,
+            uint16,
+            uint32,
+            uint64,
+            int8,
+            int16,
+            int32,
+            int64,
+            float32,
+            float64,
+            string,
+            opt_string,
+        )
+        return self._send_two_way_fidl_request(
+            2331618702752598159,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Basic"
+            ),
+        )
+
+    def error_basic(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, ProtocolErrorBasicResult]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            5016634351643393939,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorBasic_Result"
+            ),
+        )
+
+    def one_way_compound(
+        self,
+        *,
+        bits: int,
+        enum: int,
+        struct: Struct,
+        table: Table,
+        union: Union,
+        opt_struct: typing.Optional[Struct],
+        opt_union: typing.Optional[Union],
+    ) -> None:
+        msg = Compound(
+            bits,
+            enum,
+            struct,
+            table,
+            union,
+            opt_struct,
+            opt_union,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            3153289648860022476,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_compound(
+        self,
+        *,
+        bits: int,
+        enum: int,
+        struct: Struct,
+        table: Table,
+        union: Union,
+        opt_struct: typing.Optional[Struct],
+        opt_union: typing.Optional[Union],
+    ) -> typing.Coroutine[typing.Any, typing.Any, Compound]:
+        msg = Compound(
+            bits,
+            enum,
+            struct,
+            table,
+            union,
+            opt_struct,
+            opt_union,
+        )
+        return self._send_two_way_fidl_request(
+            8787219719097524529,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Compound"
+            ),
+        )
+
+    def error_compound(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, ProtocolErrorCompoundResult]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            2990809657626249085,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorCompound_Result"
+            ),
+        )
+
+    def one_way_array_basic(
+        self,
+        *,
+        array_uint8: typing.Sequence[int],
+        array_uint16: typing.Sequence[int],
+        array_uint32: typing.Sequence[int],
+        array_uint64: typing.Sequence[int],
+        array_int8: typing.Sequence[int],
+        array_int16: typing.Sequence[int],
+        array_int32: typing.Sequence[int],
+        array_int64: typing.Sequence[int],
+        array_float32: typing.Sequence[float],
+        array_float64: typing.Sequence[float],
+        array_string: typing.Sequence[str],
+        array_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> None:
+        msg = ArrayBasic(
+            array_uint8,
+            array_uint16,
+            array_uint32,
+            array_uint64,
+            array_int8,
+            array_int16,
+            array_int32,
+            array_int64,
+            array_float32,
+            array_float64,
+            array_string,
+            array_opt_string,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7125516817014311449,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_array_basic(
+        self,
+        *,
+        array_uint8: typing.Sequence[int],
+        array_uint16: typing.Sequence[int],
+        array_uint32: typing.Sequence[int],
+        array_uint64: typing.Sequence[int],
+        array_int8: typing.Sequence[int],
+        array_int16: typing.Sequence[int],
+        array_int32: typing.Sequence[int],
+        array_int64: typing.Sequence[int],
+        array_float32: typing.Sequence[float],
+        array_float64: typing.Sequence[float],
+        array_string: typing.Sequence[str],
+        array_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> typing.Coroutine[typing.Any, typing.Any, ArrayBasic]:
+        msg = ArrayBasic(
+            array_uint8,
+            array_uint16,
+            array_uint32,
+            array_uint64,
+            array_int8,
+            array_int16,
+            array_int32,
+            array_int64,
+            array_float32,
+            array_float64,
+            array_string,
+            array_opt_string,
+        )
+        return self._send_two_way_fidl_request(
+            5309034178175279380,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/ArrayBasic"
+            ),
+        )
+
+    def error_array_basic(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorArrayBasicResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            1084731895342694265,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorArrayBasic_Result"
+            ),
+        )
+
+    def one_way_array_compound(
+        self,
+        *,
+        array_bits: typing.Sequence[int],
+        array_enum: typing.Sequence[int],
+        array_struct: typing.Sequence[Struct],
+        array_table: typing.Sequence[Table],
+        array_union: typing.Sequence[Union],
+        array_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        array_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> None:
+        msg = ArrayCompound(
+            array_bits,
+            array_enum,
+            array_struct,
+            array_table,
+            array_union,
+            array_opt_struct,
+            array_opt_union,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            5064659223443251357,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_array_compound(
+        self,
+        *,
+        array_bits: typing.Sequence[int],
+        array_enum: typing.Sequence[int],
+        array_struct: typing.Sequence[Struct],
+        array_table: typing.Sequence[Table],
+        array_union: typing.Sequence[Union],
+        array_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        array_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> typing.Coroutine[typing.Any, typing.Any, ArrayCompound]:
+        msg = ArrayCompound(
+            array_bits,
+            array_enum,
+            array_struct,
+            array_table,
+            array_union,
+            array_opt_struct,
+            array_opt_union,
+        )
+        return self._send_two_way_fidl_request(
+            849744466051983995,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/ArrayCompound"
+            ),
+        )
+
+    def error_array_compound(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorArrayCompoundResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            5919277476782807556,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorArrayCompound_Result"
+            ),
+        )
+
+    def one_way_vector_basic(
+        self,
+        *,
+        vector_uint8: typing.Sequence[int],
+        vector_uint16: typing.Sequence[int],
+        vector_uint32: typing.Sequence[int],
+        vector_uint64: typing.Sequence[int],
+        vector_int8: typing.Sequence[int],
+        vector_int16: typing.Sequence[int],
+        vector_int32: typing.Sequence[int],
+        vector_int64: typing.Sequence[int],
+        vector_float32: typing.Sequence[float],
+        vector_float64: typing.Sequence[float],
+        vector_string: typing.Sequence[str],
+        vector_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> None:
+        msg = VectorBasic(
+            vector_uint8,
+            vector_uint16,
+            vector_uint32,
+            vector_uint64,
+            vector_int8,
+            vector_int16,
+            vector_int32,
+            vector_int64,
+            vector_float32,
+            vector_float64,
+            vector_string,
+            vector_opt_string,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            5733220720079947351,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_vector_basic(
+        self,
+        *,
+        vector_uint8: typing.Sequence[int],
+        vector_uint16: typing.Sequence[int],
+        vector_uint32: typing.Sequence[int],
+        vector_uint64: typing.Sequence[int],
+        vector_int8: typing.Sequence[int],
+        vector_int16: typing.Sequence[int],
+        vector_int32: typing.Sequence[int],
+        vector_int64: typing.Sequence[int],
+        vector_float32: typing.Sequence[float],
+        vector_float64: typing.Sequence[float],
+        vector_string: typing.Sequence[str],
+        vector_opt_string: typing.Sequence[typing.Optional[str]],
+    ) -> typing.Coroutine[typing.Any, typing.Any, VectorBasic]:
+        msg = VectorBasic(
+            vector_uint8,
+            vector_uint16,
+            vector_uint32,
+            vector_uint64,
+            vector_int8,
+            vector_int16,
+            vector_int32,
+            vector_int64,
+            vector_float32,
+            vector_float64,
+            vector_string,
+            vector_opt_string,
+        )
+        return self._send_two_way_fidl_request(
+            8674156353091415668,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/VectorBasic"
+            ),
+        )
+
+    def error_vector_basic(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorVectorBasicResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            875941614196965234,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorVectorBasic_Result"
+            ),
+        )
+
+    def one_way_vector_compound(
+        self,
+        *,
+        vector_bits: typing.Sequence[int],
+        vector_enum: typing.Sequence[int],
+        vector_struct: typing.Sequence[Struct],
+        vector_table: typing.Sequence[Table],
+        vector_union: typing.Sequence[Union],
+        vector_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        vector_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> None:
+        msg = VectorCompound(
+            vector_bits,
+            vector_enum,
+            vector_struct,
+            vector_table,
+            vector_union,
+            vector_opt_struct,
+            vector_opt_union,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1853985797298830992,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_vector_compound(
+        self,
+        *,
+        vector_bits: typing.Sequence[int],
+        vector_enum: typing.Sequence[int],
+        vector_struct: typing.Sequence[Struct],
+        vector_table: typing.Sequence[Table],
+        vector_union: typing.Sequence[Union],
+        vector_opt_struct: typing.Sequence[typing.Optional[Struct]],
+        vector_opt_union: typing.Sequence[typing.Optional[Union]],
+    ) -> typing.Coroutine[typing.Any, typing.Any, VectorCompound]:
+        msg = VectorCompound(
+            vector_bits,
+            vector_enum,
+            vector_struct,
+            vector_table,
+            vector_union,
+            vector_opt_struct,
+            vector_opt_union,
+        )
+        return self._send_two_way_fidl_request(
+            3968024057912959924,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/VectorCompound"
+            ),
+        )
+
+    def error_vector_compound(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorVectorCompoundResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            8506780203315865989,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorVectorCompound_Result"
+            ),
+        )
+
+    def one_way_vector_optional(
+        self,
+        *,
+        opt_vector_uint8: typing.Optional[typing.Sequence[int]],
+        opt_vector_string: typing.Optional[typing.Sequence[str]],
+        opt_vector_struct: typing.Optional[typing.Sequence[Struct]],
+        opt_vector_opt_struct: typing.Optional[
+            typing.Sequence[typing.Optional[Struct]]
+        ],
+    ) -> None:
+        msg = VectorOptional(
+            opt_vector_uint8,
+            opt_vector_string,
+            opt_vector_struct,
+            opt_vector_opt_struct,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1530215841195476271,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_vector_optional(
+        self,
+        *,
+        opt_vector_uint8: typing.Optional[typing.Sequence[int]],
+        opt_vector_string: typing.Optional[typing.Sequence[str]],
+        opt_vector_struct: typing.Optional[typing.Sequence[Struct]],
+        opt_vector_opt_struct: typing.Optional[
+            typing.Sequence[typing.Optional[Struct]]
+        ],
+    ) -> typing.Coroutine[typing.Any, typing.Any, VectorOptional]:
+        msg = VectorOptional(
+            opt_vector_uint8,
+            opt_vector_string,
+            opt_vector_struct,
+            opt_vector_opt_struct,
+        )
+        return self._send_two_way_fidl_request(
+            1030024737742222323,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/VectorOptional"
+            ),
+        )
+
+    def error_vector_optional(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorVectorOptionalResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6406191217027936606,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorVectorOptional_Result"
+            ),
+        )
+
+    def one_way_array_vector_nested(
+        self,
+        *,
+        array_array_uint8: typing.Sequence[typing.Sequence[int]],
+        array_vector_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_array_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_vector_uint8: typing.Sequence[typing.Sequence[int]],
+    ) -> None:
+        msg = ArrayVectorNested(
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            5912603762133524183,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_array_vector_nested(
+        self,
+        *,
+        array_array_uint8: typing.Sequence[typing.Sequence[int]],
+        array_vector_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_array_uint8: typing.Sequence[typing.Sequence[int]],
+        vector_vector_uint8: typing.Sequence[typing.Sequence[int]],
+    ) -> typing.Coroutine[typing.Any, typing.Any, ArrayVectorNested]:
+        msg = ArrayVectorNested(
+            array_array_uint8,
+            array_vector_uint8,
+            vector_array_uint8,
+            vector_vector_uint8,
+        )
+        return self._send_two_way_fidl_request(
+            5351275678438791132,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/ArrayVectorNested"
+            ),
+        )
+
+    def error_array_vector_nested(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ProtocolErrorArrayVectorNestedResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            9085604921605802151,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result"
+            ),
+        )
+
+    def one_way_resource(
+        self,
+        *,
+        handle: int,
+        vmo: int,
+        client_end: int,
+        server_end: int,
+        struct: ResourceStruct,
+        table: ResourceTable,
+        union: ResourceUnion,
+        opt_handle: typing.Optional[int],
+        opt_vmo: typing.Optional[int],
+        opt_client_end: typing.Optional[int],
+        opt_server_end: typing.Optional[int],
+        opt_struct: typing.Optional[ResourceStruct],
+        opt_union: typing.Optional[ResourceUnion],
+        array_handle: typing.Sequence[int],
+        array_vmo: typing.Sequence[int],
+        array_client_end: typing.Sequence[int],
+        array_server_end: typing.Sequence[int],
+        array_struct: typing.Sequence[ResourceStruct],
+        array_table: typing.Sequence[ResourceTable],
+        array_union: typing.Sequence[ResourceUnion],
+        vector_handle: typing.Sequence[int],
+        vector_vmo: typing.Sequence[int],
+        vector_client_end: typing.Sequence[int],
+        vector_server_end: typing.Sequence[int],
+        vector_struct: typing.Sequence[ResourceStruct],
+        vector_table: typing.Sequence[ResourceTable],
+        vector_union: typing.Sequence[ResourceUnion],
+    ) -> None:
+        msg = Resource(
+            handle,
+            vmo,
+            client_end,
+            server_end,
+            struct,
+            table,
+            union,
+            opt_handle,
+            opt_vmo,
+            opt_client_end,
+            opt_server_end,
+            opt_struct,
+            opt_union,
+            array_handle,
+            array_vmo,
+            array_client_end,
+            array_server_end,
+            array_struct,
+            array_table,
+            array_union,
+            vector_handle,
+            vector_vmo,
+            vector_client_end,
+            vector_server_end,
+            vector_struct,
+            vector_table,
+            vector_union,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            6553996787849601058,
+            "test.typesinprotocols",
+            msg,
+        )
+
+    def two_way_resource(
+        self,
+        *,
+        handle: int,
+        vmo: int,
+        client_end: int,
+        server_end: int,
+        struct: ResourceStruct,
+        table: ResourceTable,
+        union: ResourceUnion,
+        opt_handle: typing.Optional[int],
+        opt_vmo: typing.Optional[int],
+        opt_client_end: typing.Optional[int],
+        opt_server_end: typing.Optional[int],
+        opt_struct: typing.Optional[ResourceStruct],
+        opt_union: typing.Optional[ResourceUnion],
+        array_handle: typing.Sequence[int],
+        array_vmo: typing.Sequence[int],
+        array_client_end: typing.Sequence[int],
+        array_server_end: typing.Sequence[int],
+        array_struct: typing.Sequence[ResourceStruct],
+        array_table: typing.Sequence[ResourceTable],
+        array_union: typing.Sequence[ResourceUnion],
+        vector_handle: typing.Sequence[int],
+        vector_vmo: typing.Sequence[int],
+        vector_client_end: typing.Sequence[int],
+        vector_server_end: typing.Sequence[int],
+        vector_struct: typing.Sequence[ResourceStruct],
+        vector_table: typing.Sequence[ResourceTable],
+        vector_union: typing.Sequence[ResourceUnion],
+    ) -> typing.Coroutine[typing.Any, typing.Any, Resource]:
+        msg = Resource(
+            handle,
+            vmo,
+            client_end,
+            server_end,
+            struct,
+            table,
+            union,
+            opt_handle,
+            opt_vmo,
+            opt_client_end,
+            opt_server_end,
+            opt_struct,
+            opt_union,
+            array_handle,
+            array_vmo,
+            array_client_end,
+            array_server_end,
+            array_struct,
+            array_table,
+            array_union,
+            vector_handle,
+            vector_vmo,
+            vector_client_end,
+            vector_server_end,
+            vector_struct,
+            vector_table,
+            vector_union,
+        )
+        return self._send_two_way_fidl_request(
+            1802709005492464987,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Resource"
+            ),
+        )
+
+    def error_resource(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, ProtocolErrorResourceResult]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6568609240497354166,
+            "test.typesinprotocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.typesinprotocols/Protocol_ErrorResource_Result"
+            ),
+        )
 
 
-class ProtocolEventHandler(fidl._client.EventHandlerBase):
+class ProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.typesinprotocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5892309624949902400: MethodInfo(
+            name="event_basic",
+            request_ident="test.typesinprotocols/Basic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        7024581948727571669: MethodInfo(
+            name="event_compound",
+            request_ident="test.typesinprotocols/Compound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5888282827283820590: MethodInfo(
+            name="event_array_basic",
+            request_ident="test.typesinprotocols/ArrayBasic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        2189769767733851157: MethodInfo(
+            name="event_array_compound",
+            request_ident="test.typesinprotocols/ArrayCompound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        4583890770109526006: MethodInfo(
+            name="event_vector_basic",
+            request_ident="test.typesinprotocols/VectorBasic",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        6026375226599919603: MethodInfo(
+            name="event_vector_compound",
+            request_ident="test.typesinprotocols/VectorCompound",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        1684763340073130077: MethodInfo(
+            name="event_vector_optional",
+            request_ident="test.typesinprotocols/VectorOptional",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        1228201560727880574: MethodInfo(
+            name="event_array_vector_nested",
+            request_ident="test.typesinprotocols/ArrayVectorNested",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5745997765922613643: MethodInfo(
+            name="event_resource",
+            request_ident="test.typesinprotocols/Resource",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def event_basic(
+        self,
+        request: Basic,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_compound(
+        self,
+        request: Compound,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_array_basic(
+        self,
+        request: ArrayBasic,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_array_compound(
+        self,
+        request: ArrayCompound,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_vector_basic(
+        self,
+        request: VectorBasic,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_vector_compound(
+        self,
+        request: VectorCompound,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_vector_optional(
+        self,
+        request: VectorOptional,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_array_vector_nested(
+        self,
+        request: ArrayVectorNested,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def event_resource(
+        self,
+        request: Resource,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 ProtocolMarker = fidl._library.ProtocolMarker(

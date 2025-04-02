@@ -1130,6 +1130,7 @@ class TheUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "TheUnion"
     __fidl_raw_type__ = "test.protocols/TheUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1197,6 +1198,7 @@ class WithErrorSyntaxErrorAsEnumResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "WithErrorSyntaxErrorAsEnumResult"
     __fidl_raw_type__ = "test.protocols/WithErrorSyntax_ErrorAsEnum_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1303,6 +1305,7 @@ class WithErrorSyntaxErrorAsPrimitiveResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "WithErrorSyntaxErrorAsPrimitiveResult"
     __fidl_raw_type__ = "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1409,6 +1412,7 @@ class WithErrorSyntaxHandleInResultResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "WithErrorSyntaxHandleInResultResult"
     __fidl_raw_type__ = "test.protocols/WithErrorSyntax_HandleInResult_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1516,6 +1520,7 @@ class WithErrorSyntaxResponseAsStructResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "WithErrorSyntaxResponseAsStructResult"
     __fidl_raw_type__ = "test.protocols/WithErrorSyntax_ResponseAsStruct_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1633,22 +1638,52 @@ ErrorEnum = enum.IntEnum(
 )
 
 
-class AnotherDiscoverableProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class AnotherDiscoverableProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class AnotherDiscoverableProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class AnotherDiscoverableProtocolEventHandler(fidl._client.EventHandlerBase):
+class AnotherDiscoverableProtocolEventHandler(
+    fidl._client.EventHandlerBase, ABC
+):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 AnotherDiscoverableProtocolMarker = fidl._library.ProtocolMarker(
@@ -1656,22 +1691,234 @@ AnotherDiscoverableProtocolMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ChannelProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ChannelProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        3155008840945527714: MethodInfo(
+            name="method_a",
+            request_ident="test.protocols/ChannelProtocolMethodARequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8903004957800778182: MethodInfo(
+            name="method_b",
+            request_ident="test.protocols/ChannelProtocolMethodBRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/ChannelProtocolMethodBResponse",
+        ),
+        591935489944717925: MethodInfo(
+            name="take_handle",
+            request_ident="test.protocols/ChannelProtocolTakeHandleRequest",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        7411742788430590287: MethodInfo(
+            name="mutate_socket",
+            request_ident="test.protocols/ChannelProtocolMutateSocketRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/ChannelProtocolMutateSocketResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_method_a: typing.TypeAlias = None
+
+    @abstractmethod
+    def method_a(
+        self,
+        request: ChannelProtocolMethodARequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method_a]
+        | _MethodResponse_method_a
+    ):
+        ...
+
+    def event_a(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = ChannelProtocolEventARequest(
+            a,
+            b,
+        )
+        self._send_event(2220452875311597006, "test.protocols", msg)
+
+    _MethodResponse_method_b: typing.TypeAlias = ChannelProtocolMethodBResponse
+
+    @abstractmethod
+    def method_b(
+        self,
+        request: ChannelProtocolMethodBRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method_b]
+        | _MethodResponse_method_b
+    ):
+        ...
+
+    _MethodResponse_take_handle: typing.TypeAlias = None
+
+    @abstractmethod
+    def take_handle(
+        self,
+        request: ChannelProtocolTakeHandleRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_take_handle]
+        | _MethodResponse_take_handle
+    ):
+        ...
+
+    _MethodResponse_mutate_socket: typing.TypeAlias = (
+        ChannelProtocolMutateSocketResponse
+    )
+
+    @abstractmethod
+    def mutate_socket(
+        self,
+        request: ChannelProtocolMutateSocketRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_mutate_socket]
+        | _MethodResponse_mutate_socket
+    ):
+        ...
 
 
 class ChannelProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def method_a(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> None:
+        msg = ChannelProtocolMethodARequest(
+            a,
+            b,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            3155008840945527714,
+            "test.protocols",
+            msg,
+        )
+
+    def method_b(
+        self,
+        *,
+        a: int,
+        b: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ChannelProtocolMethodBResponse
+    ]:
+        msg = ChannelProtocolMethodBRequest(
+            a,
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            8903004957800778182,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/ChannelProtocolMethodBResponse"
+            ),
+        )
+
+    def take_handle(
+        self,
+        *,
+        h: int,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = ChannelProtocolTakeHandleRequest(
+            h,
+        )
+        return self._send_two_way_fidl_request(
+            591935489944717925,
+            "test.protocols",
+            msg,
+            "",
+        )
+
+    def mutate_socket(
+        self,
+        *,
+        a: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ChannelProtocolMutateSocketResponse
+    ]:
+        msg = ChannelProtocolMutateSocketRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            7411742788430590287,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/ChannelProtocolMutateSocketResponse"
+            ),
+        )
 
 
-class ChannelProtocolEventHandler(fidl._client.EventHandlerBase):
+class ChannelProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        2220452875311597006: MethodInfo(
+            name="event_a",
+            request_ident="test.protocols/ChannelProtocolEventARequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def event_a(
+        self,
+        request: ChannelProtocolEventARequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 ChannelProtocolMarker = fidl._library.ProtocolMarker(
@@ -1679,22 +1926,82 @@ ChannelProtocolMarker = fidl._library.ProtocolMarker(
 )
 
 
-class DiscoverableProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class DiscoverableProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        3455873048082739435: MethodInfo(
+            name="method",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_method: typing.TypeAlias = None
+
+    @abstractmethod
+    def method(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_method]
+        | _MethodResponse_method
+    ):
+        ...
 
 
 class DiscoverableProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def method(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            3455873048082739435,
+            "test.protocols",
+            msg,
+        )
 
 
-class DiscoverableProtocolEventHandler(fidl._client.EventHandlerBase):
+class DiscoverableProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 DiscoverableProtocolMarker = fidl._library.ProtocolMarker(
@@ -1702,22 +2009,158 @@ DiscoverableProtocolMarker = fidl._library.ProtocolMarker(
 )
 
 
-class HandleRightsProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class HandleRightsProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        1155044649514904573: MethodInfo(
+            name="no_response_method",
+            request_ident="test.protocols/HandleRightsProtocolNoResponseMethodRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        5956276128041940295: MethodInfo(
+            name="response_method",
+            request_ident="test.protocols/HandleRightsProtocolResponseMethodRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/HandleRightsProtocolResponseMethodResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_no_response_method: typing.TypeAlias = None
+
+    @abstractmethod
+    def no_response_method(
+        self,
+        request: HandleRightsProtocolNoResponseMethodRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_no_response_method
+        ]
+        | _MethodResponse_no_response_method
+    ):
+        ...
+
+    _MethodResponse_response_method: typing.TypeAlias = (
+        HandleRightsProtocolResponseMethodResponse
+    )
+
+    @abstractmethod
+    def response_method(
+        self,
+        request: HandleRightsProtocolResponseMethodRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_response_method
+        ]
+        | _MethodResponse_response_method
+    ):
+        ...
+
+    def an_event(
+        self,
+        *,
+        h: int,
+    ) -> None:
+        msg = HandleRightsProtocolAnEventRequest(
+            h,
+        )
+        self._send_event(476727631355490611, "test.protocols", msg)
 
 
 class HandleRightsProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def no_response_method(
+        self,
+        *,
+        h: int,
+    ) -> None:
+        msg = HandleRightsProtocolNoResponseMethodRequest(
+            h,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1155044649514904573,
+            "test.protocols",
+            msg,
+        )
+
+    def response_method(
+        self,
+        *,
+        h: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, HandleRightsProtocolResponseMethodResponse
+    ]:
+        msg = HandleRightsProtocolResponseMethodRequest(
+            h,
+        )
+        return self._send_two_way_fidl_request(
+            5956276128041940295,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/HandleRightsProtocolResponseMethodResponse"
+            ),
+        )
 
 
-class HandleRightsProtocolEventHandler(fidl._client.EventHandlerBase):
+class HandleRightsProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        476727631355490611: MethodInfo(
+            name="an_event",
+            request_ident="test.protocols/HandleRightsProtocolAnEventRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def an_event(
+        self,
+        request: HandleRightsProtocolAnEventRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 HandleRightsProtocolMarker = fidl._library.ProtocolMarker(
@@ -1725,22 +2168,115 @@ HandleRightsProtocolMarker = fidl._library.ProtocolMarker(
 )
 
 
-class ManyParametersServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ManyParametersServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        6423043252952467815: MethodInfo(
+            name="fifteen",
+            request_ident="test.protocols/ManyParametersFifteenRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_fifteen: typing.TypeAlias = None
+
+    @abstractmethod
+    def fifteen(
+        self,
+        request: ManyParametersFifteenRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_fifteen]
+        | _MethodResponse_fifteen
+    ):
+        ...
 
 
 class ManyParametersClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def fifteen(
+        self,
+        *,
+        p1: bool,
+        p2: bool,
+        p3: bool,
+        p4: bool,
+        p5: bool,
+        p6: bool,
+        p7: bool,
+        p8: bool,
+        p9: bool,
+        p10: bool,
+        p11: bool,
+        p12: bool,
+        p13: bool,
+        p14: bool,
+        p15: bool,
+    ) -> None:
+        msg = ManyParametersFifteenRequest(
+            p1,
+            p2,
+            p3,
+            p4,
+            p5,
+            p6,
+            p7,
+            p8,
+            p9,
+            p10,
+            p11,
+            p12,
+            p13,
+            p14,
+            p15,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            6423043252952467815,
+            "test.protocols",
+            msg,
+        )
 
 
-class ManyParametersEventHandler(fidl._client.EventHandlerBase):
+class ManyParametersEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 ManyParametersMarker = fidl._library.ProtocolMarker(
@@ -1748,22 +2284,92 @@ ManyParametersMarker = fidl._library.ProtocolMarker(
 )
 
 
-class MethodWithUnionServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class MethodWithUnionServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        4124874338266649112: MethodInfo(
+            name="union_method",
+            request_ident="test.protocols/MethodWithUnionUnionMethodRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/MethodWithUnionUnionMethodResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_union_method: typing.TypeAlias = (
+        MethodWithUnionUnionMethodResponse
+    )
+
+    @abstractmethod
+    def union_method(
+        self,
+        request: MethodWithUnionUnionMethodRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_union_method]
+        | _MethodResponse_union_method
+    ):
+        ...
 
 
 class MethodWithUnionClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def union_method(
+        self,
+        *,
+        u: TheUnion,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MethodWithUnionUnionMethodResponse
+    ]:
+        msg = MethodWithUnionUnionMethodRequest(
+            u,
+        )
+        return self._send_two_way_fidl_request(
+            4124874338266649112,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/MethodWithUnionUnionMethodResponse"
+            ),
+        )
 
 
-class MethodWithUnionEventHandler(fidl._client.EventHandlerBase):
+class MethodWithUnionEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 MethodWithUnionMarker = fidl._library.ProtocolMarker(
@@ -1771,22 +2377,50 @@ MethodWithUnionMarker = fidl._library.ProtocolMarker(
 )
 
 
-class PlatformServerServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class PlatformServerServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 class PlatformServerClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
-class PlatformServerEventHandler(fidl._client.EventHandlerBase):
+class PlatformServerEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 PlatformServerMarker = fidl._library.ProtocolMarker(
@@ -1794,22 +2428,324 @@ PlatformServerMarker = fidl._library.ProtocolMarker(
 )
 
 
-class WithAndWithoutRequestResponseServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class WithAndWithoutRequestResponseServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5413654872775949227: MethodInfo(
+            name="no_request_no_response",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        1631193469798418024: MethodInfo(
+            name="no_request_empty_response",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        9037369643591427517: MethodInfo(
+            name="no_request_with_response",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse",
+        ),
+        7326057319832554103: MethodInfo(
+            name="with_request_no_response",
+            request_ident="test.protocols/WithAndWithoutRequestResponseWithRequestNoResponseRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2877322062572412767: MethodInfo(
+            name="with_request_empty_response",
+            request_ident="test.protocols/WithAndWithoutRequestResponseWithRequestEmptyResponseRequest",
+            requires_response=True,
+            empty_response=True,
+            has_result=False,
+            response_identifier="",
+        ),
+        6417226585456833969: MethodInfo(
+            name="with_request_with_response",
+            request_ident="test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_no_request_no_response: typing.TypeAlias = None
+
+    @abstractmethod
+    def no_request_no_response(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_no_request_no_response
+        ]
+        | _MethodResponse_no_request_no_response
+    ):
+        ...
+
+    _MethodResponse_no_request_empty_response: typing.TypeAlias = None
+
+    @abstractmethod
+    def no_request_empty_response(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_no_request_empty_response
+        ]
+        | _MethodResponse_no_request_empty_response
+    ):
+        ...
+
+    _MethodResponse_no_request_with_response: typing.TypeAlias = (
+        WithAndWithoutRequestResponseNoRequestWithResponseResponse
+    )
+
+    @abstractmethod
+    def no_request_with_response(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_no_request_with_response
+        ]
+        | _MethodResponse_no_request_with_response
+    ):
+        ...
+
+    _MethodResponse_with_request_no_response: typing.TypeAlias = None
+
+    @abstractmethod
+    def with_request_no_response(
+        self,
+        request: WithAndWithoutRequestResponseWithRequestNoResponseRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_with_request_no_response
+        ]
+        | _MethodResponse_with_request_no_response
+    ):
+        ...
+
+    _MethodResponse_with_request_empty_response: typing.TypeAlias = None
+
+    @abstractmethod
+    def with_request_empty_response(
+        self,
+        request: WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_with_request_empty_response
+        ]
+        | _MethodResponse_with_request_empty_response
+    ):
+        ...
+
+    _MethodResponse_with_request_with_response: typing.TypeAlias = (
+        WithAndWithoutRequestResponseWithRequestWithResponseResponse
+    )
+
+    @abstractmethod
+    def with_request_with_response(
+        self,
+        request: WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_with_request_with_response
+        ]
+        | _MethodResponse_with_request_with_response
+    ):
+        ...
+
+    def on_empty_response(
+        self,
+    ) -> None:
+        msg = None
+        self._send_event(5397663296507358806, "test.protocols", msg)
+
+    def on_with_response(
+        self,
+        *,
+        ret: str,
+    ) -> None:
+        msg = WithAndWithoutRequestResponseOnWithResponseRequest(
+            ret,
+        )
+        self._send_event(5811598563493228968, "test.protocols", msg)
 
 
 class WithAndWithoutRequestResponseClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def no_request_no_response(
+        self,
+    ) -> None:
+        msg = None
+
+        self._send_one_way_fidl_request(
+            0,
+            5413654872775949227,
+            "test.protocols",
+            msg,
+        )
+
+    def no_request_empty_response(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            1631193469798418024,
+            "test.protocols",
+            msg,
+            "",
+        )
+
+    def no_request_with_response(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            9037369643591427517,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse"
+            ),
+        )
+
+    def with_request_no_response(
+        self,
+        *,
+        arg: str,
+    ) -> None:
+        msg = WithAndWithoutRequestResponseWithRequestNoResponseRequest(
+            arg,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7326057319832554103,
+            "test.protocols",
+            msg,
+        )
+
+    def with_request_empty_response(
+        self,
+        *,
+        arg: str,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None]:
+        msg = WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(
+            arg,
+        )
+        return self._send_two_way_fidl_request(
+            2877322062572412767,
+            "test.protocols",
+            msg,
+            "",
+        )
+
+    def with_request_with_response(
+        self,
+        *,
+        arg: str,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+    ]:
+        msg = WithAndWithoutRequestResponseWithRequestWithResponseRequest(
+            arg,
+        )
+        return self._send_two_way_fidl_request(
+            6417226585456833969,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse"
+            ),
+        )
 
 
-class WithAndWithoutRequestResponseEventHandler(fidl._client.EventHandlerBase):
+class WithAndWithoutRequestResponseEventHandler(
+    fidl._client.EventHandlerBase, ABC
+):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5397663296507358806: MethodInfo(
+            name="on_empty_response",
+            request_ident="",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        5811598563493228968: MethodInfo(
+            name="on_with_response",
+            request_ident="test.protocols/WithAndWithoutRequestResponseOnWithResponseRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_empty_response(
+        self,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_with_response(
+        self,
+        request: WithAndWithoutRequestResponseOnWithResponseRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 WithAndWithoutRequestResponseMarker = fidl._library.ProtocolMarker(
@@ -1817,22 +2753,205 @@ WithAndWithoutRequestResponseMarker = fidl._library.ProtocolMarker(
 )
 
 
-class WithErrorSyntaxServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class WithErrorSyntaxServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        268248568430741139: MethodInfo(
+            name="response_as_struct",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocols/WithErrorSyntax_ResponseAsStruct_Result",
+        ),
+        6930994461233198567: MethodInfo(
+            name="error_as_primitive",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=True,
+            response_identifier="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result",
+        ),
+        5491891352371277635: MethodInfo(
+            name="error_as_enum",
+            request_ident="",
+            requires_response=True,
+            empty_response=True,
+            has_result=True,
+            response_identifier="test.protocols/WithErrorSyntax_ErrorAsEnum_Result",
+        ),
+        1371676333068455103: MethodInfo(
+            name="handle_in_result",
+            request_ident="",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocols/WithErrorSyntax_HandleInResult_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_response_as_struct: typing.TypeAlias = typing.Union[
+        DomainError,
+        WithErrorSyntaxResponseAsStructResponse,
+    ]
+
+    @abstractmethod
+    def response_as_struct(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_response_as_struct
+        ]
+        | _MethodResponse_response_as_struct
+    ):
+        ...
+
+    _MethodResponse_error_as_primitive: typing.TypeAlias = typing.Union[
+        DomainError,
+        None,
+    ]
+
+    @abstractmethod
+    def error_as_primitive(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_error_as_primitive
+        ]
+        | _MethodResponse_error_as_primitive
+    ):
+        ...
+
+    _MethodResponse_error_as_enum: typing.TypeAlias = typing.Union[
+        DomainError,
+        None,
+    ]
+
+    @abstractmethod
+    def error_as_enum(
+        self,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_as_enum]
+        | _MethodResponse_error_as_enum
+    ):
+        ...
+
+    _MethodResponse_handle_in_result: typing.TypeAlias = typing.Union[
+        DomainError,
+        WithErrorSyntaxHandleInResultResponse,
+    ]
+
+    @abstractmethod
+    def handle_in_result(
+        self,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_handle_in_result
+        ]
+        | _MethodResponse_handle_in_result
+    ):
+        ...
 
 
 class WithErrorSyntaxClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def response_as_struct(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithErrorSyntaxResponseAsStructResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            268248568430741139,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithErrorSyntax_ResponseAsStruct_Result"
+            ),
+        )
+
+    def error_as_primitive(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithErrorSyntaxErrorAsPrimitiveResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            6930994461233198567,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result"
+            ),
+        )
+
+    def error_as_enum(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithErrorSyntaxErrorAsEnumResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            5491891352371277635,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithErrorSyntax_ErrorAsEnum_Result"
+            ),
+        )
+
+    def handle_in_result(
+        self,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithErrorSyntaxHandleInResultResult
+    ]:
+        msg = None
+        return self._send_two_way_fidl_request(
+            1371676333068455103,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithErrorSyntax_HandleInResult_Result"
+            ),
+        )
 
 
-class WithErrorSyntaxEventHandler(fidl._client.EventHandlerBase):
+class WithErrorSyntaxEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 WithErrorSyntaxMarker = fidl._library.ProtocolMarker(
@@ -1840,22 +2959,176 @@ WithErrorSyntaxMarker = fidl._library.ProtocolMarker(
 )
 
 
-class WithProtocolEndsServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class WithProtocolEndsServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5870448041025163330: MethodInfo(
+            name="client_ends",
+            request_ident="test.protocols/WithProtocolEndsClientEndsRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/WithProtocolEndsClientEndsResponse",
+        ),
+        8115535094437022259: MethodInfo(
+            name="server_ends",
+            request_ident="test.protocols/WithProtocolEndsServerEndsRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/WithProtocolEndsServerEndsResponse",
+        ),
+        4076866772260025813: MethodInfo(
+            name="struct_containing_ends",
+            request_ident="test.protocols/WithProtocolEndsStructContainingEndsRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocols/WithProtocolEndsStructContainingEndsResponse",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_client_ends: typing.TypeAlias = (
+        WithProtocolEndsClientEndsResponse
+    )
+
+    @abstractmethod
+    def client_ends(
+        self,
+        request: WithProtocolEndsClientEndsRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_client_ends]
+        | _MethodResponse_client_ends
+    ):
+        ...
+
+    _MethodResponse_server_ends: typing.TypeAlias = (
+        WithProtocolEndsServerEndsResponse
+    )
+
+    @abstractmethod
+    def server_ends(
+        self,
+        request: WithProtocolEndsServerEndsRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_server_ends]
+        | _MethodResponse_server_ends
+    ):
+        ...
+
+    _MethodResponse_struct_containing_ends: typing.TypeAlias = (
+        WithProtocolEndsStructContainingEndsResponse
+    )
+
+    @abstractmethod
+    def struct_containing_ends(
+        self,
+        request: WithProtocolEndsStructContainingEndsRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_struct_containing_ends
+        ]
+        | _MethodResponse_struct_containing_ends
+    ):
+        ...
 
 
 class WithProtocolEndsClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def client_ends(
+        self,
+        *,
+        in_: int,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithProtocolEndsClientEndsResponse
+    ]:
+        msg = WithProtocolEndsClientEndsRequest(
+            in_,
+        )
+        return self._send_two_way_fidl_request(
+            5870448041025163330,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithProtocolEndsClientEndsResponse"
+            ),
+        )
+
+    def server_ends(
+        self,
+        *,
+        in_: typing.Optional[int],
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithProtocolEndsServerEndsResponse
+    ]:
+        msg = WithProtocolEndsServerEndsRequest(
+            in_,
+        )
+        return self._send_two_way_fidl_request(
+            8115535094437022259,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithProtocolEndsServerEndsResponse"
+            ),
+        )
+
+    def struct_containing_ends(
+        self,
+        *,
+        in_: ProtocolEnds,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, WithProtocolEndsStructContainingEndsResponse
+    ]:
+        msg = WithProtocolEndsStructContainingEndsRequest(
+            in_,
+        )
+        return self._send_two_way_fidl_request(
+            4076866772260025813,
+            "test.protocols",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocols/WithProtocolEndsStructContainingEndsResponse"
+            ),
+        )
 
 
-class WithProtocolEndsEventHandler(fidl._client.EventHandlerBase):
+class WithProtocolEndsEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocols"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
 
 
 WithProtocolEndsMarker = fidl._library.ProtocolMarker(

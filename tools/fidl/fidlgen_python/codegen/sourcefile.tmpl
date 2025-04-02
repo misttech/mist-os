@@ -77,7 +77,7 @@ class {{ .PythonName }}:
 {{ end -}}
 {{- range .PythonAliases -}}
 {{.PythonName }} = {{ .PythonAliasedName }}
-{{ end -}}
+{{ end }}
 
 {{ range .PythonProtocols }}
 {{- template "ProtocolDeclaration" . -}}

@@ -129,7 +129,7 @@ class ServerBase(
                 f"{self} method {info.name} received a "
                 + "response but is one-way method"
             )
-        if res is None and info.requires_response:
+        if res is None and info.requires_response and not info.empty_response:
             raise ServerError(
                 f"{self} method {info.name} returned "
                 + "None when a response was expected"
@@ -145,9 +145,14 @@ class ServerBase(
                     fidl_type=info.response_identifier, framework_err=res
                 )
             else:
-                res = GenericResult(
-                    fidl_type=info.response_identifier, response=res
-                )
+                if res is None:
+                    res = GenericResult(
+                        fidl_type=info.response_identifier, response=object()
+                    )
+                else:
+                    res = GenericResult(
+                        fidl_type=info.response_identifier, response=res
+                    )
         if res is not None:
             encoded_fidl_message = encode_fidl_message(
                 ordinal=ordinal,

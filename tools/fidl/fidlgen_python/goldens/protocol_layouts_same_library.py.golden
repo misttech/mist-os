@@ -268,6 +268,7 @@ class ComposedProtocolOnAnonComposedRequest:
     __fidl_raw_type__ = (
         "test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedRequest"
     )
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -336,6 +337,7 @@ class ComposedProtocolTwoWayAnonComposedRequest:
     __fidl_kind__ = "union"
     __fidl_type__ = "ComposedProtocolTwoWayAnonComposedRequest"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedRequest"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -404,6 +406,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResponse:
     __fidl_kind__ = "union"
     __fidl_type__ = "ComposedProtocolTwoWayAnonComposedWithErrorResponse"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Response"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -475,6 +478,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ComposedProtocolTwoWayAnonComposedWithErrorResult"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -586,6 +590,7 @@ class ComposedProtocolTwoWayNamedComposedWithErrorResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "ComposedProtocolTwoWayNamedComposedWithErrorResult"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -694,6 +699,7 @@ class MainProtocolOnAnonRequest:
     __fidl_raw_type__ = (
         "test.protocollayoutssamelibrary/MainProtocolOnAnonRequest"
     )
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -764,6 +770,7 @@ class MainProtocolTwoWayAnonRequest:
     __fidl_raw_type__ = (
         "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonRequest"
     )
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -832,6 +839,7 @@ class MainProtocolTwoWayAnonWithErrorResponse:
     __fidl_kind__ = "union"
     __fidl_type__ = "MainProtocolTwoWayAnonWithErrorResponse"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Response"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -901,6 +909,7 @@ class MainProtocolTwoWayAnonWithErrorResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "MainProtocolTwoWayAnonWithErrorResult"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1010,6 +1019,7 @@ class MainProtocolTwoWayLocalWithErrorResult:
     __fidl_kind__ = "union"
     __fidl_type__ = "MainProtocolTwoWayLocalWithErrorResult"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result"
+    _is_result = True
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1116,6 +1126,7 @@ class UnionPayload:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionPayload"
     __fidl_raw_type__ = "test.protocollayoutssamelibrary/UnionPayload"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -1178,22 +1189,364 @@ class UnionPayload:
         return cls(_empty=())
 
 
-class ComposedProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class ComposedProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        7960710870216447007: MethodInfo(
+            name="one_way_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolOneWayAnonComposedRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8107448265006659060: MethodInfo(
+            name="two_way_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse",
+        ),
+        5751989932125743144: MethodInfo(
+            name="two_way_anon_composed_with_error",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
+        ),
+        1159174053475281336: MethodInfo(
+            name="one_way_named_composed",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        5022872388073111636: MethodInfo(
+            name="two_way_named_composed",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/TablePayload",
+        ),
+        4973436213756973807: MethodInfo(
+            name="two_way_named_composed_with_error",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_one_way_anon_composed: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_anon_composed(
+        self,
+        request: ComposedProtocolOneWayAnonComposedRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_anon_composed
+        ]
+        | _MethodResponse_one_way_anon_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_composed: typing.TypeAlias = (
+        ComposedProtocolTwoWayAnonComposedResponse
+    )
+
+    @abstractmethod
+    def two_way_anon_composed(
+        self,
+        request: ComposedProtocolTwoWayAnonComposedRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_anon_composed
+        ]
+        | _MethodResponse_two_way_anon_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_composed_with_error: typing.TypeAlias = (
+        typing.Union[
+            DomainError,
+            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+        ]
+    )
+
+    @abstractmethod
+    def two_way_anon_composed_with_error(
+        self,
+        request: ComposedProtocolTwoWayAnonComposedWithErrorRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_two_way_anon_composed_with_error,
+        ]
+        | _MethodResponse_two_way_anon_composed_with_error
+    ):
+        ...
+
+    def on_anon_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = ComposedProtocolOnAnonComposedRequest(
+            b,
+        )
+        self._send_event(
+            5307191872315199016, "test.protocollayoutssamelibrary", msg
+        )
+
+    _MethodResponse_one_way_named_composed: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_named_composed(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_named_composed
+        ]
+        | _MethodResponse_one_way_named_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_named_composed: typing.TypeAlias = TablePayload
+
+    @abstractmethod
+    def two_way_named_composed(
+        self,
+        request: UnionPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_named_composed
+        ]
+        | _MethodResponse_two_way_named_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_named_composed_with_error: typing.TypeAlias = (
+        typing.Union[
+            DomainError,
+            UnionPayload,
+        ]
+    )
+
+    @abstractmethod
+    def two_way_named_composed_with_error(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_two_way_named_composed_with_error,
+        ]
+        | _MethodResponse_two_way_named_composed_with_error
+    ):
+        ...
+
+    def on_named_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = UnionPayload(
+            b,
+        )
+        self._send_event(
+            1712755118419701115, "test.protocollayoutssamelibrary", msg
+        )
 
 
 class ComposedProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def one_way_anon_composed(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = ComposedProtocolOneWayAnonComposedRequest(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7960710870216447007,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_anon_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ComposedProtocolTwoWayAnonComposedResponse
+    ]:
+        msg = ComposedProtocolTwoWayAnonComposedRequest(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            8107448265006659060,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse"
+            ),
+        )
+
+    def two_way_anon_composed_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+    ]:
+        msg = ComposedProtocolTwoWayAnonComposedWithErrorRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            5751989932125743144,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result"
+            ),
+        )
+
+    def one_way_named_composed(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = TablePayload(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1159174053475281336,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_named_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[typing.Any, typing.Any, TablePayload]:
+        msg = UnionPayload(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            5022872388073111636,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/TablePayload"
+            ),
+        )
+
+    def two_way_named_composed_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+    ]:
+        msg = TablePayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            4973436213756973807,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result"
+            ),
+        )
 
 
-class ComposedProtocolEventHandler(fidl._client.EventHandlerBase):
+class ComposedProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5307191872315199016: MethodInfo(
+            name="on_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        1712755118419701115: MethodInfo(
+            name="on_named_composed",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_anon_composed(
+        self,
+        request: ComposedProtocolOnAnonComposedRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_named_composed(
+        self,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 ComposedProtocolMarker = fidl._library.ProtocolMarker(
@@ -1201,22 +1554,656 @@ ComposedProtocolMarker = fidl._library.ProtocolMarker(
 )
 
 
-class MainProtocolServer(fidl._server.ServerBase):
+import fidl._construct
+from fidl._fidl_common import DomainError, MethodInfo, FrameworkError
+from abc import abstractmethod, ABC
+
+
+class MainProtocolServer(fidl._server.ServerBase, ABC):
     __fidl_kind__ = "server"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        7960710870216447007: MethodInfo(
+            name="one_way_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolOneWayAnonComposedRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        8107448265006659060: MethodInfo(
+            name="two_way_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse",
+        ),
+        5751989932125743144: MethodInfo(
+            name="two_way_anon_composed_with_error",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedWithErrorRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result",
+        ),
+        1159174053475281336: MethodInfo(
+            name="one_way_named_composed",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        5022872388073111636: MethodInfo(
+            name="two_way_named_composed",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/TablePayload",
+        ),
+        4973436213756973807: MethodInfo(
+            name="two_way_named_composed_with_error",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result",
+        ),
+        4131125523789731521: MethodInfo(
+            name="one_way_local",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        2781407403924167255: MethodInfo(
+            name="two_way_local",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/TablePayload",
+        ),
+        5367158046384127463: MethodInfo(
+            name="two_way_local_with_error",
+            request_ident="test.protocollayoutssamelibrary/TablePayload",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result",
+        ),
+        8596232895075765804: MethodInfo(
+            name="one_way_anon",
+            request_ident="test.protocollayoutssamelibrary/MainProtocolOneWayAnonRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier="",
+        ),
+        4600336371166510638: MethodInfo(
+            name="two_way_anon",
+            request_ident="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=False,
+            response_identifier="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonResponse",
+        ),
+        2104032160763523653: MethodInfo(
+            name="two_way_anon_with_error",
+            request_ident="test.protocollayoutssamelibrary/MainProtocolTwoWayAnonWithErrorRequest",
+            requires_response=True,
+            empty_response=False,
+            has_result=True,
+            response_identifier="test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result",
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    _MethodResponse_one_way_anon_composed: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_anon_composed(
+        self,
+        request: ComposedProtocolOneWayAnonComposedRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_anon_composed
+        ]
+        | _MethodResponse_one_way_anon_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_composed: typing.TypeAlias = (
+        ComposedProtocolTwoWayAnonComposedResponse
+    )
+
+    @abstractmethod
+    def two_way_anon_composed(
+        self,
+        request: ComposedProtocolTwoWayAnonComposedRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_anon_composed
+        ]
+        | _MethodResponse_two_way_anon_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_composed_with_error: typing.TypeAlias = (
+        typing.Union[
+            DomainError,
+            ComposedProtocolTwoWayAnonComposedWithErrorResponse,
+        ]
+    )
+
+    @abstractmethod
+    def two_way_anon_composed_with_error(
+        self,
+        request: ComposedProtocolTwoWayAnonComposedWithErrorRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_two_way_anon_composed_with_error,
+        ]
+        | _MethodResponse_two_way_anon_composed_with_error
+    ):
+        ...
+
+    def on_anon_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = ComposedProtocolOnAnonComposedRequest(
+            b,
+        )
+        self._send_event(
+            5307191872315199016, "test.protocollayoutssamelibrary", msg
+        )
+
+    _MethodResponse_one_way_named_composed: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_named_composed(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_one_way_named_composed
+        ]
+        | _MethodResponse_one_way_named_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_named_composed: typing.TypeAlias = TablePayload
+
+    @abstractmethod
+    def two_way_named_composed(
+        self,
+        request: UnionPayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_named_composed
+        ]
+        | _MethodResponse_two_way_named_composed
+    ):
+        ...
+
+    _MethodResponse_two_way_named_composed_with_error: typing.TypeAlias = (
+        typing.Union[
+            DomainError,
+            UnionPayload,
+        ]
+    )
+
+    @abstractmethod
+    def two_way_named_composed_with_error(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any,
+            typing.Any,
+            _MethodResponse_two_way_named_composed_with_error,
+        ]
+        | _MethodResponse_two_way_named_composed_with_error
+    ):
+        ...
+
+    def on_named_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = UnionPayload(
+            b,
+        )
+        self._send_event(
+            1712755118419701115, "test.protocollayoutssamelibrary", msg
+        )
+
+    _MethodResponse_one_way_local: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_local(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_local]
+        | _MethodResponse_one_way_local
+    ):
+        ...
+
+    _MethodResponse_two_way_local: typing.TypeAlias = TablePayload
+
+    @abstractmethod
+    def two_way_local(
+        self,
+        request: UnionPayload,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_local]
+        | _MethodResponse_two_way_local
+    ):
+        ...
+
+    _MethodResponse_two_way_local_with_error: typing.TypeAlias = typing.Union[
+        DomainError,
+        UnionPayload,
+    ]
+
+    @abstractmethod
+    def two_way_local_with_error(
+        self,
+        request: TablePayload,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_local_with_error
+        ]
+        | _MethodResponse_two_way_local_with_error
+    ):
+        ...
+
+    def on_local(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = UnionPayload(
+            b,
+        )
+        self._send_event(
+            8208103053879750285, "test.protocollayoutssamelibrary", msg
+        )
+
+    _MethodResponse_one_way_anon: typing.TypeAlias = None
+
+    @abstractmethod
+    def one_way_anon(
+        self,
+        request: MainProtocolOneWayAnonRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_anon]
+        | _MethodResponse_one_way_anon
+    ):
+        ...
+
+    _MethodResponse_two_way_anon: typing.TypeAlias = (
+        MainProtocolTwoWayAnonResponse
+    )
+
+    @abstractmethod
+    def two_way_anon(
+        self,
+        request: MainProtocolTwoWayAnonRequest,
+    ) -> (
+        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_anon]
+        | _MethodResponse_two_way_anon
+    ):
+        ...
+
+    _MethodResponse_two_way_anon_with_error: typing.TypeAlias = typing.Union[
+        DomainError,
+        MainProtocolTwoWayAnonWithErrorResponse,
+    ]
+
+    @abstractmethod
+    def two_way_anon_with_error(
+        self,
+        request: MainProtocolTwoWayAnonWithErrorRequest,
+    ) -> (
+        typing.Coroutine[
+            typing.Any, typing.Any, _MethodResponse_two_way_anon_with_error
+        ]
+        | _MethodResponse_two_way_anon_with_error
+    ):
+        ...
+
+    def on_anon(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> None:
+        msg = MainProtocolOnAnonRequest(
+            b,
+        )
+        self._send_event(
+            977183060572945300, "test.protocollayoutssamelibrary", msg
+        )
 
 
 class MainProtocolClient(fidl._client.FidlClient):
     __fidl_kind__ = "client"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    def one_way_anon_composed(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = ComposedProtocolOneWayAnonComposedRequest(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            7960710870216447007,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_anon_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, ComposedProtocolTwoWayAnonComposedResponse
+    ]:
+        msg = ComposedProtocolTwoWayAnonComposedRequest(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            8107448265006659060,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocolTwoWayAnonComposedResponse"
+            ),
+        )
+
+    def two_way_anon_composed_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+    ]:
+        msg = ComposedProtocolTwoWayAnonComposedWithErrorRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            5751989932125743144,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayAnonComposedWithError_Result"
+            ),
+        )
+
+    def one_way_named_composed(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = TablePayload(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            1159174053475281336,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_named_composed(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[typing.Any, typing.Any, TablePayload]:
+        msg = UnionPayload(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            5022872388073111636,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/TablePayload"
+            ),
+        )
+
+    def two_way_named_composed_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any,
+        typing.Any,
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+    ]:
+        msg = TablePayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            4973436213756973807,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/ComposedProtocol_TwoWayNamedComposedWithError_Result"
+            ),
+        )
+
+    def one_way_local(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = TablePayload(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            4131125523789731521,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_local(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[typing.Any, typing.Any, TablePayload]:
+        msg = UnionPayload(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            2781407403924167255,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/TablePayload"
+            ),
+        )
+
+    def two_way_local_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayLocalWithErrorResult
+    ]:
+        msg = TablePayload(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            5367158046384127463,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/MainProtocol_TwoWayLocalWithError_Result"
+            ),
+        )
+
+    def one_way_anon(
+        self,
+        *,
+        a: int | None = None,
+    ) -> None:
+        msg = MainProtocolOneWayAnonRequest(
+            a,
+        )
+
+        self._send_one_way_fidl_request(
+            0,
+            8596232895075765804,
+            "test.protocollayoutssamelibrary",
+            msg,
+        )
+
+    def two_way_anon(
+        self,
+        *,
+        b: bool | None = None,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayAnonResponse
+    ]:
+        msg = MainProtocolTwoWayAnonRequest(
+            b,
+        )
+        return self._send_two_way_fidl_request(
+            4600336371166510638,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/MainProtocolTwoWayAnonResponse"
+            ),
+        )
+
+    def two_way_anon_with_error(
+        self,
+        *,
+        a: int | None = None,
+    ) -> typing.Coroutine[
+        typing.Any, typing.Any, MainProtocolTwoWayAnonWithErrorResult
+    ]:
+        msg = MainProtocolTwoWayAnonWithErrorRequest(
+            a,
+        )
+        return self._send_two_way_fidl_request(
+            2104032160763523653,
+            "test.protocollayoutssamelibrary",
+            msg,
+            fidl._fidl_common.normalize_identifier(
+                "test.protocollayoutssamelibrary/MainProtocol_TwoWayAnonWithError_Result"
+            ),
+        )
 
 
-class MainProtocolEventHandler(fidl._client.EventHandlerBase):
+class MainProtocolEventHandler(fidl._client.EventHandlerBase, ABC):
     __fidl_kind__ = "event_handler"
     library = "test.protocollayoutssamelibrary"
-    method_map: typing.Dict[int, typing.Callable[..., typing.Any]] = {}
+    method_map: typing.Dict[int, MethodInfo] = {
+        5307191872315199016: MethodInfo(
+            name="on_anon_composed",
+            request_ident="test.protocollayoutssamelibrary/ComposedProtocolOnAnonComposedRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        1712755118419701115: MethodInfo(
+            name="on_named_composed",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        8208103053879750285: MethodInfo(
+            name="on_local",
+            request_ident="test.protocollayoutssamelibrary/UnionPayload",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+        977183060572945300: MethodInfo(
+            name="on_anon",
+            request_ident="test.protocollayoutssamelibrary/MainProtocolOnAnonRequest",
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        ),
+    }
+
+    @staticmethod
+    def construct_response_object(
+        response_ident: str, response_obj: typing.Any
+    ) -> typing.Any:
+        return fidl._construct.construct_response_object(
+            response_ident, response_obj
+        )
+
+    @abstractmethod
+    def on_anon_composed(
+        self,
+        request: ComposedProtocolOnAnonComposedRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_named_composed(
+        self,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_local(
+        self,
+        request: UnionPayload,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
+
+    @abstractmethod
+    def on_anon(
+        self,
+        request: MainProtocolOnAnonRequest,
+    ) -> typing.Coroutine[typing.Any, typing.Any, None] | None:
+        ...
 
 
 MainProtocolMarker = fidl._library.ProtocolMarker(

@@ -149,6 +149,7 @@ class EmptyResourceUnion:
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResourceUnion"
     __fidl_raw_type__ = "test.handlesintypes/EmptyResourceUnion"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -188,6 +189,7 @@ class UnionWithHandle:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionWithHandle"
     __fidl_raw_type__ = "test.handlesintypes/UnionWithHandle"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):

@@ -210,6 +210,7 @@ class UnionSize12Alignment4:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionSize12Alignment4"
     __fidl_raw_type__ = "test.unionsandwich/UnionSize12Alignment4"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -278,6 +279,7 @@ class UnionSize24Alignment8:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionSize24Alignment8"
     __fidl_raw_type__ = "test.unionsandwich/UnionSize24Alignment8"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -346,6 +348,7 @@ class UnionSize36Alignment4:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionSize36Alignment4"
     __fidl_raw_type__ = "test.unionsandwich/UnionSize36Alignment4"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
@@ -414,6 +417,7 @@ class UnionSize8Alignment4:
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionSize8Alignment4"
     __fidl_raw_type__ = "test.unionsandwich/UnionSize8Alignment4"
+    _is_result = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):

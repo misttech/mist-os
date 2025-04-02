@@ -29,10 +29,31 @@ group("fidlgen_python_protocol_compile_test") {
 python_host_test("fidlgen_python_construct_test") {
   main_source = "test_construct.py"
   libraries = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_python",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
+  ]
+}
+
+python_host_test("fidlgen_python_client_test") {
+  main_source = "test_client.py"
+  libraries = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
-    "//sdk/fidl/fuchsia.net:fuchsia.net_python",
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+  ]
+}
+
+python_host_test("fidlgen_python_server_and_event_handler_test") {
+  main_source = "test_server_and_event_handler.py"
+  libraries = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_python",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_python",
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_python",
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
   ]
 }
@@ -44,4 +65,9 @@ python_host_test("fidlgen_python_union_test") {
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_python",
     "fidl:test.python.protocol_python",
   ]
+}
+
+python_host_test("fidlgen_python_reserved_names_test") {
+  main_source = "test_reserved_names.py"
+  libraries = [ "fidl:test.python.reserved_python" ]
 }

@@ -75,7 +75,7 @@ class MethodInfo:
     requires_response: bool
     empty_response: bool
     has_result: bool
-    response_identifier: str
+    response_identifier: str | None
 
 
 class StopServer(Exception):
@@ -153,3 +153,16 @@ def parse_epitaph_value(msg: FidlMessage):
 
 def camel_case_to_snake_case(s: str):
     return re.sub(r"(?<!^)(?=[A-Z])", "_", s).lower()
+
+
+def normalize_identifier(identifier: str) -> str:
+    """Takes an identifier and attempts to normalize it.
+
+    For the average identifier this shouldn't do anything. This only applies to result types
+    that have underscores in their names.
+
+    Returns: The normalized identifier string (sans-underscores).
+    """
+    if identifier.endswith("_Result") or identifier.endswith("_Response"):
+        return identifier.replace("_", "")
+    return identifier
