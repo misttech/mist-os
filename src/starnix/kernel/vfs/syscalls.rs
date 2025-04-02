@@ -3535,7 +3535,8 @@ mod arch32 {
     pub use super::{
         sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
         sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
-        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_eventfd2 as sys_arch32_eventfd2,
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_epoll_pwait as sys_arch32_epoll_pwait,
+        sys_epoll_pwait2 as sys_arch32_epoll_pwait2, sys_eventfd2 as sys_arch32_eventfd2,
         sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
         sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
         sys_fstatfs as sys_arch32_fstatfs, sys_ftruncate as sys_arch32_ftruncate,
