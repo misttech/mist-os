@@ -69,13 +69,11 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     CompleteStart(pdev_client_end.take_error());
     return;
   }
-
   fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev);
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming());
       result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set mac address metadata from platform device: %s",
-            result.status_string());
+    FDF_LOG(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     CompleteStart(result.take_error());
     return;
   }
