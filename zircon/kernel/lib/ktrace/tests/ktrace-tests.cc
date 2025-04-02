@@ -683,20 +683,6 @@ class TestKTraceState : public ::internal::KTraceState {
     disable_diags_printfs_ = true;
   }
 
-  // TODO(johngro): The default KTraceState implementation never cleans up its
-  // buffer allocation, as it assumes that it is being used as a global
-  // singleton, and that the kernel will never "exit". Test instances of
-  // KTraceState *must* clean themselves up, however.  Should we push this
-  // behavior down one level into the default KTraceState implementation's
-  // destructor, even though it (currently) does not ever have any reason to
-  // destruct?
-  ~TestKTraceState() {
-    if (buffer_ != nullptr) {
-      VmAspace* aspace = VmAspace::kernel_aspace();
-      aspace->FreeRegion(reinterpret_cast<vaddr_t>(buffer_));
-    }
-  }
-
   // We interpose ourselves in the Init path so that we can allocate the side
   // buffer we will use for validation.
   [[nodiscard]] bool Init(uint32_t target_bufsize, uint32_t initial_groups) {

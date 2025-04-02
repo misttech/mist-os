@@ -72,7 +72,7 @@ class KTraceState {
   enum class StartMode { Saturate, Circular };
 
   constexpr KTraceState() = default;
-  virtual ~KTraceState();
+  ~KTraceState();
 
   // Initialize the KTraceState instance, may only be called once.  Any methods
   // called on a KTraceState instance after construction, but before Init,
