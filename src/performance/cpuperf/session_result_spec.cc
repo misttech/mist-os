@@ -134,10 +134,10 @@ bool WriteSessionResultSpec(const std::string& output_file_path, const SessionRe
   }
 
   writer.Key(kNumIterationsKey);
-  writer.Uint(spec.num_iterations);
+  writer.Uint(static_cast<unsigned int>(spec.num_iterations));
 
   writer.Key(kNumTracesKey);
-  writer.Uint(spec.num_traces);
+  writer.Uint(static_cast<unsigned int>(spec.num_traces));
 
   writer.Key(kOutputPathPrefixKey);
   writer.String(spec.output_path_prefix.c_str());

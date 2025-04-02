@@ -418,7 +418,7 @@ void RecordCommand::OnSpawnedAppExit(async_dispatcher_t* dispatcher, async::Wait
     out() << "Application exited with return code " << proc_info.return_code << '\n';
     if (!options_.decouple) {
       if (options_.return_child_result) {
-        TerminateTrace(proc_info.return_code);
+        TerminateTrace(static_cast<int32_t>(proc_info.return_code));
       } else {
         TerminateTrace(EXIT_SUCCESS);
       }
@@ -461,8 +461,8 @@ void RecordCommand::StartTimer() {
           weak->TerminateTrace(EXIT_SUCCESS);
       },
       options_.duration);
-  out() << "Starting trace; will stop in " << options_.duration.to_nsecs() / 1000000000.0
-        << " seconds...\n";
+  out() << "Starting trace; will stop in "
+        << static_cast<double>(options_.duration.to_nsecs()) / 1000000000.0 << " seconds...\n";
 }
 
 }  // namespace tracing

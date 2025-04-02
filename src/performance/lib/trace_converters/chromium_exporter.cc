@@ -180,7 +180,7 @@ void ChromiumExporter::ExportRecord(const trace::Record& record) {
     case trace::RecordType::kInitialization:
       // Compute scale factor for ticks to microseconds.
       // Microseconds is the unit for the "ts" field.
-      tick_scale_ = 1'000'000.0 / record.GetInitialization().ticks_per_second;
+      tick_scale_ = 1'000'000.0 / static_cast<double>(record.GetInitialization().ticks_per_second);
       break;
     case trace::RecordType::kEvent:
       ExportEvent(record.GetEvent());
@@ -235,7 +235,7 @@ void ChromiumExporter::ExportEvent(const trace::Record::Event& event) {
   writer_.Key("name");
   writer_.String(CleanString(event.name));
   writer_.Key("ts");
-  writer_.Double(event.timestamp * tick_scale_);
+  writer_.Double(static_cast<double>(event.timestamp) * tick_scale_);
   writer_.Key("pid");
   writer_.Uint64(event.process_thread.process_koid());
   writer_.Key("tid");
@@ -279,7 +279,9 @@ void ChromiumExporter::ExportEvent(const trace::Record::Event& event) {
       writer_.Key("ph");
       writer_.String("X");
       writer_.Key("dur");
-      writer_.Double((event.data.GetDurationComplete().end_time - event.timestamp) * tick_scale_);
+      writer_.Double(
+          static_cast<double>(event.data.GetDurationComplete().end_time - event.timestamp) *
+          tick_scale_);
       break;
     case trace::EventType::kAsyncBegin:
       writer_.Key("ph");
@@ -379,9 +381,9 @@ void ChromiumExporter::ExportLastBranchBlob(const perfmon::LastBranchRecordBlob&
   writer_.Key("cpu");
   writer_.Uint(lbr.cpu);
   writer_.Key("aspace");
-  writer_.Uint(lbr.aspace);
+  writer_.Uint(static_cast<unsigned int>(lbr.aspace));
   writer_.Key("event_time");
-  writer_.Uint(lbr.event_time);
+  writer_.Uint(static_cast<unsigned int>(lbr.event_time));
   writer_.Key("branches");
   writer_.StartArray();
   for (unsigned i = 0; i < lbr.num_branches; ++i) {
@@ -405,7 +407,7 @@ void ChromiumExporter::ExportLog(const trace::Record::Log& log) {
   writer_.Key("ph");
   writer_.String("i");
   writer_.Key("ts");
-  writer_.Double(log.timestamp * tick_scale_);
+  writer_.Double(static_cast<double>(log.timestamp) * tick_scale_);
   writer_.Key("pid");
   writer_.Uint64(log.process_thread.process_koid());
   writer_.Key("tid");
@@ -627,7 +629,7 @@ void ChromiumExporter::ExportFidlBlob(const trace::LargeRecordData::BlobEvent& b
   writer_.Key("name");
   writer_.String(CleanString(blob.name));
   writer_.Key("ts");
-  writer_.Double(blob.timestamp * tick_scale_);
+  writer_.Double(static_cast<double>(blob.timestamp) * tick_scale_);
   writer_.Key("pid");
   writer_.Uint64(blob.process_thread.process_koid());
   writer_.Key("tid");

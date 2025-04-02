@@ -65,7 +65,7 @@ bool Importer::Import(perfmon::Reader& reader, const perfmon::Config& perfmon_co
 
   auto start = zx::clock::get_monotonic();
 
-  uint32_t record_count = ImportRecords(reader, perfmon_config);
+  uint32_t record_count = static_cast<uint32_t>(ImportRecords(reader, perfmon_config));
 
   FX_LOGS(INFO) << "Import of " << record_count << " cpu perf records took "
                 << (zx::clock::get_monotonic() - start).to_usecs() << " us";
@@ -243,9 +243,9 @@ void Importer::EmitSampleRecord(trace_cpu_number_t cpu, const perfmon::EventDeta
   // TODO(dje): Perhaps the rate calculation should be done in the report
   // generator, but it's done this way so that catapult reports in chrome
   // are usable. Maybe add a new phase type to the catapult format?
-  rate_per_second = static_cast<double>(value) / interval_ticks;
+  rate_per_second = static_cast<double>(value) / static_cast<double>(interval_ticks);
   if (ticks_per_second != 0) {
-    rate_per_second *= ticks_per_second;
+    rate_per_second *= static_cast<double>(ticks_per_second);
   }
 
   trace_arg_t args[3];
@@ -301,14 +301,14 @@ void Importer::EmitLastBranchRecordBlob(trace_cpu_number_t cpu, const perfmon::S
                                         trace_ticks_t time) {
   // Use the cpu's name as the blob's name.
   auto cpu_name_ref{GetCpuNameRef(cpu)};
-  uint16_t num_branches = record.last_branch->num_branches;
+  uint16_t num_branches = static_cast<uint16_t>(record.last_branch->num_branches);
   size_t size = perfmon::LastBranchRecordBlobSize(num_branches);
   void* ptr = trace_context_begin_write_blob_record(context_, TRACE_BLOB_TYPE_LAST_BRANCH,
                                                     &cpu_name_ref, size);
   if (ptr) {
     auto rec = reinterpret_cast<perfmon::LastBranchRecordBlob*>(ptr);
-    rec->cpu = cpu;
-    rec->num_branches = record.last_branch->num_branches;
+    rec->cpu = static_cast<uint16_t>(cpu);
+    rec->num_branches = static_cast<uint16_t>(record.last_branch->num_branches);
     rec->reserved = 0;
     rec->event_time = time;
     rec->aspace = record.last_branch->aspace;
