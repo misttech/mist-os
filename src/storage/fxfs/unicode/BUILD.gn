@@ -24,11 +24,11 @@ rustc_library("unicode") {
   visibility = [ "//src/storage/fxfs/*" ]
 }
 
-# We compile do it this this file into it's own crate to avoid gen/ path imports from rust.
+# We compile this file into its own crate to avoid gen/ path imports from rust.
 rustc_library("unicode_gen") {
   edition = "2021"
-  source_root = "${root_gen_dir}/unicode_gen.rs"
-  sources = [ "${root_gen_dir}/unicode_gen.rs" ]
+  source_root = "${target_gen_dir}/unicode_gen.rs"
+  sources = [ "${target_gen_dir}/unicode_gen.rs" ]
   deps = [ ":types" ]
   non_rust_deps = [ ":generate_unicode_gen" ]
 }
@@ -36,8 +36,8 @@ rustc_library("unicode_gen") {
 # This rule is for executing unicode_gen_builder.
 compiled_action("generate_unicode_gen") {
   tool = ":unicode_gen_builder"
-  output_path = "${root_gen_dir}/unicode_gen.rs"
-  outputs = [ output_path ]
+  outputs =
+      [ get_label_info(":unicode_gen", "target_gen_dir") + "/unicode_gen.rs" ]
   inputs = [ "//prebuilt/third_party/ucd/UCD.zip" ]
   args = [ rebase_path("//prebuilt/third_party/ucd/UCD.zip", root_build_dir) ] +
          rebase_path(outputs, root_build_dir)
