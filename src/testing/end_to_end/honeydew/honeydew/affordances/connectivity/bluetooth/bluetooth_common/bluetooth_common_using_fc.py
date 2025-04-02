@@ -226,7 +226,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         )
         assert self._pairing_controller_proxy is not None
         self._pairing_controller_proxy.set_pairing_delegate(
-            input=_FC_DELEGATES[input_mode],
+            input_=_FC_DELEGATES[input_mode],
             output=_FC_DELEGATES[output_mode],
             delegate=tx.take(),
         )

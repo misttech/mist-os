@@ -174,7 +174,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         )
         assert self.bluetooth_common_fc_obj._pairing_delegate_server is not None
         self.bluetooth_common_fc_obj._pairing_controller_proxy.set_pairing_delegate.assert_called_with(
-            input=1, output=1, delegate=mock.ANY
+            input_=1, output=1, delegate=mock.ANY
         )
 
     @parameterized.expand(
