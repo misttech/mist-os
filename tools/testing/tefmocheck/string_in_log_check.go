@@ -349,11 +349,21 @@ func StringInLogsChecks() []FailureModeCheck {
 		// RBE-CAS service.
 		&stringInLogCheck{
 			String:       "cas: failed to call UploadIfMissing",
+			InfraFailure: true,
 			Type:         swarmingOutputType,
 			OnlyOnStates: []string{"BOT_DIED"},
 		},
 		&stringInLogCheck{
+			// Error for CAS upload failures.
 			String:       "cas: failed to create cas client",
+			InfraFailure: true,
+			Type:         swarmingOutputType,
+			OnlyOnStates: []string{"BOT_DIED"},
+		},
+		&stringInLogCheck{
+			// Error for CAS download failures.
+			String:       "failed to create casclient",
+			InfraFailure: true,
 			Type:         swarmingOutputType,
 			OnlyOnStates: []string{"BOT_DIED"},
 		},
