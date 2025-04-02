@@ -3907,23 +3907,6 @@ template("rust_library") {
   }
   _rlib_path = "${_searchdir_path}/lib${invoker.output_name}.rlib"
 
-  _define_aux_deps = include_rustdoc
-  if (defined(invoker.define_aux_deps)) {
-    _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
-  }
-  if (_define_aux_deps) {
-    _rust_auxiliary_name = "${target_name}.aux"
-    rust_aux_deps(_rust_auxiliary_name) {
-      forward_variables_from(invoker,
-                             [
-                               "deps",
-                               "data_deps",
-                               "public_deps",
-                               "testonly",
-                             ])
-    }
-  }
-
   _rust_library_internal_wrapper(target_name) {
     forward_variables_from(invoker,
                            "*",
@@ -3953,13 +3936,6 @@ template("rust_library") {
 
     _rlib_path = rebase_path(_rlib_path, root_build_dir)
     _searchdir_path = rebase_path(_searchdir_path, root_build_dir)
-
-    if (_define_aux_deps) {
-      if (!defined(public_deps)) {
-        public_deps = []
-      }
-      public_deps += [ ":${_rust_auxiliary_name}" ]
-    }
 
     metadata = {
       if (defined(invoker.metadata)) {
@@ -4009,24 +3985,6 @@ template("rust_proc_macro") {
     }
     _rlib_path = "$_searchdir_path/lib${invoker.output_name}.$_output_extension"
 
-    _define_aux_deps = include_rustdoc
-    if (defined(invoker.define_aux_deps)) {
-      _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
-    }
-    if (_define_aux_deps) {
-      # Reuse the name (without .actual) defined in rustc_artifact.gni
-      _rust_auxiliary_name = "${target_name}.aux"
-      rust_aux_deps(_rust_auxiliary_name) {
-        forward_variables_from(invoker,
-                               [
-                                 "deps",
-                                 "data_deps",
-                                 "public_deps",
-                                 "testonly",
-                               ])
-      }
-    }
-
     _rust_proc_macro_internal_wrapper(target_name) {
       forward_variables_from(invoker,
                              "*",
@@ -4054,11 +4012,6 @@ template("rust_proc_macro") {
 
       if (!defined(public_deps)) {
         public_deps = []
-      }
-      if (_define_aux_deps) {
-        public_deps += [ ":${_rust_auxiliary_name}" ]
-      } else {
-        not_needed(invoker, [ "_rust_auxiliary_name" ])
       }
       metadata = {
         if (defined(invoker.metadata)) {
