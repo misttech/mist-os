@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Error};
 use diagnostics_data::ExtendedMoniker;
 use glob::glob;
 use log::{info, warn};
@@ -130,94 +129,58 @@ pub(crate) struct TagEntry {
     pub data: String,
 }
 
-// All the names in the previous-boot directory.
+/// Read persisted data from the previous boot.
 // TODO(https://fxbug.dev/42150693): If this gets big, use Lazy Inspect.
-pub(crate) fn remembered_data() -> Result<Vec<ServiceEntry>, Error> {
-    // Counter for number of tags successfully retrieved. If no persisted tags were
-    // retrieved, this method returns an error.
-    let mut tags_retrieved = 0;
-
-    let mut service_entries = Vec::new();
-    // Create an iterator over all subdirectories of /cache/previous
-    // which contains persisted data from the last boot.
-    for service_path in glob(&format!("{}/*", PREVIOUS_PATH))
-        .map_err(|e| format_err!("Failed to read previous-path glob pattern: {:?}", e))?
-    {
-        match service_path {
-            Err(e) => {
-                // If our glob pattern was valid, but we encountered glob errors while iterating, just warn
-                // since there may still be some persisted metrics.
-                warn!(
-                    "Encountered GlobError; contents could not be read to determine if glob pattern was matched: {:?}",
-                    e
-                )
-            }
+pub(crate) fn remembered_data() -> impl Iterator<Item = ServiceEntry> {
+    // Iterate over all subdirectories of /cache/previous which contains
+    // persisted data from the last boot.
+    glob(&format!("{PREVIOUS_PATH}/*"))
+        .expect("Failed to read previous-path glob pattern")
+        .filter_map(|p| match p {
             Ok(path) => {
-                if let Some(name) = path.file_name() {
-                    let service_name = name.to_string_lossy().to_string();
-                    let mut tag_entries = Vec::new();
-                    for tag_path in
-                        glob(&format!("{}/{}/*", PREVIOUS_PATH, service_name)).map_err(|e| {
-                            format_err!(
-                                "Failed to read previous service persistence pattern: {:?}",
-                                e
-                            )
-                        })?
-                    {
-                        match tag_path {
-                            Ok(path) => {
-                                if let Some(tag_name) = path.file_name() {
-                                    let tag_name = tag_name.to_string_lossy().to_string();
-                                    match fs::read(path.clone()) {
-                                        Ok(text) => {
-                                            // TODO(cphoenix): We want to encode failures at retrieving persisted
-                                            // metrics in the inspect hierarchy so clients know why their data is
-                                            // missing.
-                                            match std::str::from_utf8(&text) {
-                                                Ok(contents) => {
-                                                    tags_retrieved += 1;
-
-                                                    tag_entries.push(TagEntry {
-                                                        name: tag_name,
-                                                        data: contents.to_owned(),
-                                                    });
-                                                }
-                                                Err(e) => {
-                                                    warn!(
-                                                        "Failed to parse persisted bytes at path: {:?} into text: {:?}",
-                                                        path, e
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            warn!(
-                                            "Failed to retrieve text persisted at path: {:?}: {:?}",
-                                            path, e
-                                        );
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                // If our glob pattern was valid, but we encountered glob errors while iterating, just warn
-                                // since there may still be some persisted metrics.
-                                warn!(
-                                        "Encountered GlobError; contents could not be read to determine if glob pattern was matched: {:?}",
-                                        e
-                                    )
-                            }
-                        }
-                    }
-                    service_entries.push(ServiceEntry { name: service_name, data: tag_entries });
-                }
+                path.file_name().map(|p| p.to_string_lossy().to_string())
             }
-        };
-    }
+            Err(e) => {
+                warn!("Encountered GlobError; contents could not be read to determine if glob pattern was matched: {e:?}");
+                None
+            }
+        })
+        .map(|service_name| {
+            let entries: Vec<TagEntry> = glob(&format!("{PREVIOUS_PATH}/{service_name}/*"))
+                .expect("Failed to read previous service persistence pattern")
+                .filter_map(|p| match p {
+                    Ok(path) => path
+                        .file_name()
+                        .map(|tag| (path.clone(), tag.to_string_lossy().to_string())),
+                    Err(ref e) => {
+                        warn!("Failed to retrieve text persisted at path {p:?}: {e:?}");
+                        None
+                    }
+                })
+                .filter_map(|(path, tag)| match fs::read(&path) {
+                    // TODO(cphoenix): We want to encode failures at retrieving persisted
+                    // metrics in the inspect hierarchy so clients know why their data is
+                    // missing.
+                    Ok(text) => match std::str::from_utf8(&text) {
+                        Ok(contents) => Some(TagEntry { name: tag, data: contents.to_owned() }),
+                        Err(e) => {
+                            warn!("Failed to parse persisted bytes at path: {path:?} into text: {e:?}");
+                            None
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Failed to retrieve text persisted at path: {path:?}: {e:?}");
+                        None
+                    }
+                })
+                .collect();
 
-    if tags_retrieved == 0 {
-        info!("No persisted data was successfully retrieved.");
-    }
+            if entries.is_empty() {
+                info!("No data available to persist for {service_name:?}.");
+            } else {
+                info!("{} data entries available to persist for {service_name:?}.", entries.len());
+            }
 
-    Ok(service_entries)
+            ServiceEntry { name: service_name, data: entries }
+        })
 }
