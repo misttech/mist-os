@@ -8,6 +8,7 @@ use assembly_manifest::Image;
 use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
 use url::Url;
@@ -170,13 +171,20 @@ impl PartitionImageMapper {
                     }
                 }
                 Image::Dtbo(path) => {
-                    // The software delivery system does not support dtbos in slot R.
-                    if slot == Slot::R {
-                        bail!("devicetree_overlay cannot be mapped to slot R");
-                    }
                     let image_type = ImageType::Dtbo;
                     log::debug!("Adding image type: {} from path {}", image_type, path.clone());
-                    slot_entry.insert(image_type, path.clone());
+
+                    // If multiple assemblies are adding the DTBO to the same partition, ensure
+                    // that the contents of the image are equal.
+                    if let Some(existing) = slot_entry.insert(image_type, path.clone()) {
+                        let existing_digest = try_digest(&existing)
+                            .with_context(|| format!("Hashing existing dtbo: {}", &existing))?;
+                        let new_digest = try_digest(path)
+                            .with_context(|| format!("Hashing new dtbo: {}", path))?;
+                        if existing_digest != new_digest {
+                            bail!("Two different dtbo images were mapped to the same partition\nprevious: {}\nnew: {}", &existing, &path);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -258,6 +266,14 @@ impl PartitionImageMapper {
 
         write_json_file(&report_path, &report).context("Writing gerrit size report")
     }
+}
+
+/// Return the sha256 digest of `path`.
+fn try_digest(path: &Utf8PathBuf) -> Result<Vec<u8>> {
+    let mut hasher = Sha256::new();
+    let mut file = std::fs::File::open(path)?;
+    std::io::copy(&mut file, &mut hasher).with_context(|| format!("Hashing file: {}", path))?;
+    Ok(hasher.finalize().to_vec())
 }
 
 #[cfg(test)]
@@ -691,17 +707,32 @@ mod tests {
     }
 
     #[test]
-    fn test_dbto_in_r_is_error() {
+    fn test_multiple_dtbos_must_be_equal() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_dir_path = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let dtbo_one = temp_dir_path.join("dtbo");
+        let dtbo_two = temp_dir_path.join("dtbo");
+        let dtbo_three = temp_dir_path.join("dtbo_other");
+        std::fs::write(&dtbo_one, "dtbo_same").unwrap();
+        std::fs::write(&dtbo_two, "dtbo_same").unwrap();
+        std::fs::write(&dtbo_three, "dtbo_diff").unwrap();
+
         let partitions = PartitionsConfig {
-            partitions: vec![Partition::Dtbo { name: "dtbo_r".into(), slot: Slot::R, size: None }],
+            partitions: vec![Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None }],
             ..Default::default()
         };
-        let images_r = AssemblyManifest {
-            images: vec![Image::Dtbo("path/to/r/dtbo".into())],
+        let images_one =
+            AssemblyManifest { images: vec![Image::Dtbo(dtbo_one)], board_name: "my_board".into() };
+        let images_two =
+            AssemblyManifest { images: vec![Image::Dtbo(dtbo_two)], board_name: "my_board".into() };
+        let images_three = AssemblyManifest {
+            images: vec![Image::Dtbo(dtbo_three)],
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
-        assert!(mapper.map_images_to_slot(&images_r.images, Slot::R).is_err());
+        assert!(mapper.map_images_to_slot(&images_one.images, Slot::A).is_ok());
+        assert!(mapper.map_images_to_slot(&images_two.images, Slot::A).is_ok());
+        assert!(mapper.map_images_to_slot(&images_three.images, Slot::A).is_err());
     }
 
     #[test]
