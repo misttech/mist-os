@@ -118,12 +118,20 @@ unsafe impl PropertyQuery for NameProperty {
 /// This is primarily used for working with borrowed values of `HandleBased` types.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Unowned<'a, T> {
+pub struct Unowned<'a, T: Into<Handle>> {
     inner: ManuallyDrop<T>,
     marker: PhantomData<&'a T>,
 }
 
-impl<'a, T> ::std::ops::Deref for Unowned<'a, T> {
+impl<T: Into<Handle>> Drop for Unowned<'_, T> {
+    fn drop(&mut self) {
+        // SAFETY: This is safe because we don't use this ManuallyDrop again.
+        let handle: Handle = unsafe { ManuallyDrop::take(&mut self.inner).into() };
+        mem::forget(handle);
+    }
+}
+
+impl<'a, T: Into<Handle>> ::std::ops::Deref for Unowned<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -138,6 +146,25 @@ impl<T: HandleBased> Clone for Unowned<'_, T> {
 }
 
 pub type HandleRef<'a> = Unowned<'a, Handle>;
+
+impl<'a, T: Into<Handle>> Unowned<'a, T> {
+    /// Returns a new object that borrows the underyling handle.  This will work for any type that
+    /// implements `From<U>` where `U` is handle-like i.e. it implements `AsHandleRef` and
+    /// `From<Handle>`.
+    pub fn new<U: AsHandleRef + From<Handle>>(inner: &'a U) -> Self
+    where
+        T: From<U>,
+    {
+        // SAFETY: This is safe because we are converting from &U to U to allow us to create T, and
+        // then when we drop, we convert T into a handle that we forget.
+        Unowned {
+            inner: ManuallyDrop::new(T::from(U::from(unsafe {
+                Handle::from_raw(inner.as_handle_ref().raw_handle())
+            }))),
+            marker: PhantomData,
+        }
+    }
+}
 
 impl<'a, T: HandleBased> Unowned<'a, T> {
     /// Create a `HandleRef` from a raw handle. Use this method when you are given a raw handle but

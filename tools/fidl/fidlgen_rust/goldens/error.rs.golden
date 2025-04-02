@@ -91,6 +91,20 @@ impl ExampleSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<ExampleSynchronousProxy> for zx::Handle {
+    fn from(value: ExampleSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ExampleSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExampleProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
