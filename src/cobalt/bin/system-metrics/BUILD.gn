@@ -51,9 +51,6 @@ source_set("system_metrics_daemon_lib") {
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 executable("system-metrics") {
