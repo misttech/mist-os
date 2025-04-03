@@ -446,8 +446,8 @@ class VmCowPages final : public VmHierarchyBase,
   // ZX_ERR_SHOULD_WAIT is returned the caller should wait on |page_request|. |alloc_list| will hold
   // any pages that were allocated but not used in case of delayed PMM allocations, so that it can
   // be reused across multiple successive calls whilst ensuring forward progress.
-  zx_status_t DirtyPagesLocked(VmCowRange range, list_node_t* alloc_list,
-                               AnonymousPageRequest* page_request) TA_REQ(lock());
+  zx_status_t DirtyPages(VmCowRange range, list_node_t* alloc_list,
+                         AnonymousPageRequest* page_request);
 
   using DirtyRangeEnumerateFunction = VmObject::DirtyRangeEnumerateFunction;
   // See VmObject::EnumerateDirtyRanges

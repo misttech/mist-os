@@ -1898,7 +1898,6 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 }
 
 zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
-  zx_status_t status;
   // It is possible to encounter delayed PMM allocations, which requires waiting on the
   // page_request.
   __UNINITIALIZED AnonymousPageRequest page_request;
@@ -1908,13 +1907,12 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<VmoLockType> guard{lock()};
-  // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
+  // Initialize a list of allocated pages that DirtyPages will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
-  // to DirtyPagesLocked. Instead of having to allocate and free pages in case DirtyPagesLocked
+  // to DirtyPages. Instead of having to allocate and free pages in case DirtyPages
   // cannot successfully dirty the entire range atomically, we can just hold on to the allocated
   // pages and use them for the next call. This ensures that we are making forward progress with
-  // each successive call to DirtyPagesLocked.
+  // each successive call to DirtyPages.
   list_node alloc_list;
   list_initialize(&alloc_list);
   auto alloc_list_cleanup = fit::defer([&alloc_list, this]() -> void {
@@ -1922,19 +1920,20 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
       cow_pages_->FreePages(&alloc_list);
     }
   });
-  do {
-    status = cow_pages_locked()->DirtyPagesLocked(*cow_range, &alloc_list, &page_request);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t wait_status;
-      guard.CallUnlocked([&page_request, &wait_status]() { wait_status = page_request.Wait(); });
-      if (wait_status != ZX_OK) {
-        return wait_status;
-      }
-      // If the wait was successful, loop around and try the call again, which will re-validate any
-      // state that might have changed when the lock was dropped.
+  while (true) {
+    zx_status_t status = cow_pages_->DirtyPages(*cow_range, &alloc_list, &page_request);
+    if (status == ZX_OK) {
+      return ZX_OK;
     }
-  } while (status == ZX_ERR_SHOULD_WAIT);
-  return status;
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      status = page_request.Wait();
+    }
+    if (status != ZX_OK) {
+      return status;
+    }
+    // If the wait was successful, loop around and try the call again, which will re-validate any
+    // state that might have changed when the lock was dropped.
+  }
 }
 
 zx_status_t VmObjectPaged::EnumerateDirtyRanges(uint64_t offset, uint64_t len,

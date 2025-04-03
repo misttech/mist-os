@@ -5170,8 +5170,8 @@ zx_status_t VmCowPages::FailPageRequestsLocked(VmCowRange range, zx_status_t err
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::DirtyPagesLocked(VmCowRange range, list_node_t* alloc_list,
-                                         AnonymousPageRequest* page_request) {
+zx_status_t VmCowPages::DirtyPages(VmCowRange range, list_node_t* alloc_list,
+                                   AnonymousPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(range.is_page_aligned());
@@ -5185,6 +5185,9 @@ zx_status_t VmCowPages::DirtyPagesLocked(VmCowRange range, list_node_t* alloc_li
 
   const uint64_t start_offset = range.offset;
   const uint64_t end_offset = range.end();
+
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   if (start_offset > size_locked()) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -5400,7 +5403,6 @@ zx_status_t VmCowPages::DirtyPagesLocked(VmCowRange range, list_node_t* alloc_li
     // Install newly allocated pages in place of the zero page markers and interval sentinels. Start
     // with clean zero pages even for the intervals, so that the dirty transition logic below can
     // uniformly transition them to dirty along with pager supplied pages.
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
     status = page_list_.ForEveryPageInRange(
         [this, &alloc_list, &deferred](const VmPageOrMarker* p, uint64_t off) {
           if (p->IsMarker() || p->IsIntervalSlot()) {
@@ -5410,8 +5412,8 @@ zx_status_t VmCowPages::DirtyPagesLocked(VmCowRange range, list_node_t* alloc_li
             // AddNewPageLocked will also zero the page and update any mappings.
             //
             // TODO(rashaeqbal): Depending on how often we end up forking zero markers, we might
-            // want to pass do_range_udpate = false, and defer updates until later, so we can
-            // perform a single batch update.
+            // want to pass a nullptr here instead of &deferred and perform a single batch update
+            // later.
             zx_status_t status =
                 AddNewPageLocked(off, list_remove_head_type(alloc_list, vm_page, queue_node),
                                  CanOverwriteContent::Zero, nullptr, true, &deferred);
