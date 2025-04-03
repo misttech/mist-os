@@ -1,10 +1,8 @@
-
 # Preferred reviewers.
 lijiaming@google.com
-dschuyler@google.com
+
 
 # Reviewers of last resort
 etryzelaar@google.com
 chaselatta@google.com
-wilkinsonclay@google.com
-
+include /src/developer/ffx/OWNERS
