@@ -273,14 +273,12 @@ class BatchPQRemove {
   void Flush() {
     if (count_ > 0) {
       if (is_loaned_) {
-        FreeLoanedPagesHolder flph;
         Pmm::Node().BeginFreeLoanedArray(
             pages_, count_,
             [](vm_page_t** pages, size_t count, list_node_t* free_list) {
               pmm_page_queues()->RemoveArrayIntoList(pages, count, free_list);
             },
-            flph);
-        Pmm::Node().FinishFreeLoanedPages(flph);
+            freed_list_.Flph());
       } else {
         pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_.List());
         freed_count_ += count_;
