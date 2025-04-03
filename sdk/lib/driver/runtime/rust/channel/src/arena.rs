@@ -452,7 +452,13 @@ impl<'a, T> ArenaBox<'a, [T]> {
 }
 
 impl<'a, T: ?Sized> ArenaBox<'a, T> {
-    pub(crate) unsafe fn new(obj: NonNull<T>) -> ArenaBox<'a, T> {
+    /// Creates a new [`ArenaBox`] from the given non-null pointer to an object of type `T`.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the object pointed to came from an [`Arena`]
+    /// and that the lifetime of this box is less than the lifetime of that [`Arena`].
+    pub unsafe fn new(obj: NonNull<T>) -> ArenaBox<'a, T> {
         Self(obj, PhantomData)
     }
 

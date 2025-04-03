@@ -7,5 +7,6 @@
 
 pub mod arena;
 pub mod channel;
+pub mod futures;
 pub mod message;
 pub mod test_utils;

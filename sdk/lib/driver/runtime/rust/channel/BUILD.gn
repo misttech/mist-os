@@ -29,6 +29,7 @@ rustc_library("channel") {
   sources = [
     "src/arena.rs",
     "src/channel.rs",
+    "src/futures.rs",
     "src/lib.rs",
     "src/message.rs",
     "src/test_utils.rs",

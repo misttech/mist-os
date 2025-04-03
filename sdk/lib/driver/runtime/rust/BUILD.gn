@@ -31,5 +31,6 @@ group("tests") {
     "core:tests",
     "env:tests",
     "fdf_sys:tests",
+    "fidl:tests",
   ]
 }

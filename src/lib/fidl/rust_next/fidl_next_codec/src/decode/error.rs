@@ -117,9 +117,13 @@ pub enum DecodeError {
     #[error("cannot decode driver handles with this decoder")]
     DriverHandlesUnsupported,
 
-    /// The decoder ran out of driver handles before decoding finished.
-    #[error("consumed all driver handles before decoding finished")]
-    InsufficientDriverHandles,
+    /// The next available handle was a zircon handle but expected a driver handle
+    #[error("expected next handle to be a driver handle")]
+    ExpectedDriverHandle,
+
+    /// The next available handle was a driver handle but expected a zircon handle
+    #[error("expected next handle to be a zircon handle")]
+    ExpectedZirconHandle,
 
     /// Decoding finished without consuming all of the bytes
     #[error(
