@@ -60,31 +60,36 @@ use starnix_uapi::{
     binder_buffer_object, binder_driver_command_protocol,
     binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
     binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION,
+    binder_driver_command_protocol_BC_CLEAR_FREEZE_NOTIFICATION,
     binder_driver_command_protocol_BC_DEAD_BINDER_DONE, binder_driver_command_protocol_BC_DECREFS,
-    binder_driver_command_protocol_BC_ENTER_LOOPER, binder_driver_command_protocol_BC_FREE_BUFFER,
-    binder_driver_command_protocol_BC_INCREFS, binder_driver_command_protocol_BC_INCREFS_DONE,
+    binder_driver_command_protocol_BC_ENTER_LOOPER,
+    binder_driver_command_protocol_BC_FREEZE_NOTIFICATION_DONE,
+    binder_driver_command_protocol_BC_FREE_BUFFER, binder_driver_command_protocol_BC_INCREFS,
+    binder_driver_command_protocol_BC_INCREFS_DONE,
     binder_driver_command_protocol_BC_REGISTER_LOOPER, binder_driver_command_protocol_BC_RELEASE,
     binder_driver_command_protocol_BC_REPLY, binder_driver_command_protocol_BC_REPLY_SG,
     binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION,
+    binder_driver_command_protocol_BC_REQUEST_FREEZE_NOTIFICATION,
     binder_driver_command_protocol_BC_TRANSACTION,
     binder_driver_command_protocol_BC_TRANSACTION_SG, binder_driver_return_protocol,
     binder_driver_return_protocol_BR_ACQUIRE,
     binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE,
+    binder_driver_return_protocol_BR_CLEAR_FREEZE_NOTIFICATION_DONE,
     binder_driver_return_protocol_BR_DEAD_BINDER, binder_driver_return_protocol_BR_DEAD_REPLY,
     binder_driver_return_protocol_BR_DECREFS, binder_driver_return_protocol_BR_ERROR,
-    binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_FROZEN_REPLY,
-    binder_driver_return_protocol_BR_INCREFS, binder_driver_return_protocol_BR_RELEASE,
-    binder_driver_return_protocol_BR_REPLY, binder_driver_return_protocol_BR_SPAWN_LOOPER,
-    binder_driver_return_protocol_BR_TRANSACTION,
+    binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_FROZEN_BINDER,
+    binder_driver_return_protocol_BR_FROZEN_REPLY, binder_driver_return_protocol_BR_INCREFS,
+    binder_driver_return_protocol_BR_RELEASE, binder_driver_return_protocol_BR_REPLY,
+    binder_driver_return_protocol_BR_SPAWN_LOOPER, binder_driver_return_protocol_BR_TRANSACTION,
     binder_driver_return_protocol_BR_TRANSACTION_COMPLETE,
     binder_driver_return_protocol_BR_TRANSACTION_PENDING_FROZEN,
     binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
-    binder_freeze_info, binder_frozen_status_info, binder_object_header, binder_transaction_data,
-    binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-    binder_uintptr_t, binder_version, binder_write_read, errno, errno_from_code, error,
-    flat_binder_object, pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi, BINDERFS_SUPER_MAGIC,
-    BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER,
-    BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+    binder_freeze_info, binder_frozen_state_info, binder_frozen_status_info, binder_object_header,
+    binder_transaction_data, binder_transaction_data__bindgen_ty_2__bindgen_ty_1,
+    binder_transaction_data_sg, binder_uintptr_t, binder_version, binder_write_read, errno,
+    errno_from_code, error, flat_binder_object, pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi,
+    BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
+    BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ffi::CStr;
@@ -404,6 +409,8 @@ struct BinderProcessState {
     active_transactions: BTreeMap<UserAddress, ReleaseGuard<ActiveTransaction>>,
     /// The list of processes that should be notified if this process dies.
     death_subscribers: Vec<(WeakRef<BinderProcess>, binder_uintptr_t)>,
+    /// The list of processes that should be notified if this process is frozen.
+    freeze_subscribers: Vec<(WeakRef<BinderProcess>, binder_uintptr_t)>,
     /// Whether the binder connection for this process is closed. Once closed, any blocking
     /// operation will be aborted and return an EBADF error.
     closed: bool,
@@ -420,12 +427,34 @@ impl BinderProcessState {
         self.freeze_status.frozen = true;
         self.freeze_status.has_async_recv = false;
         self.freeze_status.has_sync_recv = false;
+        self.freeze_subscribers.retain(|(proc, cookie)| {
+            let Some(proc) = proc.upgrade() else {
+                return false; // remove if the process is already dead
+            };
+            proc.enqueue_command(Command::FrozenBinder(binder_frozen_state_info {
+                cookie: *cookie,
+                is_frozen: 1,
+                reserved: 0,
+            }));
+            true
+        });
     }
 
     fn thaw(&mut self) {
         self.freeze_status.frozen = false;
         self.freeze_status.has_async_recv = false;
         self.freeze_status.has_sync_recv = false;
+        self.freeze_subscribers.retain(|(proc, cookie)| {
+            let Some(proc) = proc.upgrade() else {
+                return false; // remove if the process is already dead
+            };
+            proc.enqueue_command(Command::FrozenBinder(binder_frozen_state_info {
+                cookie: *cookie,
+                is_frozen: 0,
+                reserved: 0,
+            }));
+            true
+        });
     }
 
     fn has_pending_transactions(&self) -> bool {
@@ -936,6 +965,80 @@ impl BinderProcess {
             }
         }
         self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
+        Ok(())
+    }
+
+    /// Subscribe a process to the freeze of the owner of `handle`.
+    fn handle_request_freeze_notification(
+        &self,
+        handle: Handle,
+        cookie: binder_uintptr_t,
+    ) -> Result<(), Errno> {
+        let proxy = match handle {
+            Handle::ContextManager => {
+                track_stub!(
+                    TODO("https://fxbug.dev/402188420"),
+                    "binder freeze notification for service manager"
+                );
+                let info = binder_frozen_state_info { cookie, ..Default::default() };
+                self.enqueue_command(Command::FrozenBinder(info));
+                return Ok(());
+            }
+            Handle::Object { index } => {
+                let (proxy, guard) =
+                    self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?;
+
+                // The object must have strong reference when used to find its owner process,
+                // but there is no need to keep it alive afterwards.
+                let mut actions = RefCountActions::default();
+                guard.release(&mut actions);
+                actions.release(());
+
+                proxy
+            }
+        };
+        let owner = proxy.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
+        let mut owner = owner.lock();
+        let info = binder_frozen_state_info {
+            cookie,
+            is_frozen: if owner.freeze_status.frozen { 1 } else { 0 },
+            reserved: 0,
+        };
+        self.enqueue_command(Command::FrozenBinder(info));
+        owner.freeze_subscribers.push((self.weak_self.clone(), cookie));
+        Ok(())
+    }
+
+    /// Remove a previously subscribed freeze notification.
+    fn handle_clear_freeze_notification(
+        &self,
+        handle: Handle,
+        cookie: binder_uintptr_t,
+    ) -> Result<(), Errno> {
+        let owner = match handle {
+            Handle::ContextManager => {
+                track_stub!(
+                    TODO("https://fxbug.dev/402191387"),
+                    "binder clear freeze notification for service manager"
+                );
+                self.enqueue_command(Command::ClearFreezeNotificationDone(cookie));
+                return Ok(());
+            }
+            Handle::Object { index } => {
+                self.lock().handles.get_owner(index).ok_or_else(|| errno!(ENOENT))?
+            }
+        };
+        let owner = owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
+        let mut owner = owner.lock();
+        if let Some((idx, _)) = owner
+            .freeze_subscribers
+            .iter()
+            .enumerate()
+            .find(|(_idx, (proc, c))| proc.as_ptr() == self && *c == cookie)
+        {
+            owner.freeze_subscribers.swap_remove(idx);
+        }
+        self.enqueue_command(Command::ClearFreezeNotificationDone(cookie));
         Ok(())
     }
 
@@ -2013,6 +2116,10 @@ enum Command {
     ClearDeathNotificationDone(binder_uintptr_t),
     /// Notified the binder process that it should spawn a new looper.
     SpawnLooper,
+    /// Notifies a binder process whether it is transitioned into a frozen state.
+    FrozenBinder(binder_frozen_state_info),
+    /// Notifies a binder process that the freeze notification has been cleared.
+    ClearFreezeNotificationDone(binder_uintptr_t),
 }
 
 impl Command {
@@ -2037,6 +2144,8 @@ impl Command {
             Command::SpawnLooper => c"SpawnLooper",
             Command::FrozenReply => c"FrozenReply",
             Command::PendingFrozen => c"PendingFrozen",
+            Command::FrozenBinder(_) => c"FrozenBinder",
+            Command::ClearFreezeNotificationDone(_) => c"ClearFreezeNotificationDone",
         })
     }
 
@@ -2068,6 +2177,10 @@ impl Command {
                 binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE
             }
             Self::SpawnLooper => binder_driver_return_protocol_BR_SPAWN_LOOPER,
+            Self::FrozenBinder(..) => binder_driver_return_protocol_BR_FROZEN_BINDER,
+            Self::ClearFreezeNotificationDone(..) => {
+                binder_driver_return_protocol_BR_CLEAR_FREEZE_NOTIFICATION_DONE
+            }
         }
     }
 
@@ -2170,19 +2283,36 @@ impl Command {
                 resource_accessor
                     .write_object(UserRef::new(buffer.address), &self.driver_return_code())
             }
-            Self::DeadBinder(cookie) | Self::ClearDeathNotificationDone(cookie) => {
+            Self::DeadBinder(cookie)
+            | Self::ClearDeathNotificationDone(cookie)
+            | Self::ClearFreezeNotificationDone(cookie) => {
                 #[repr(C, packed)]
                 #[derive(IntoBytes, Immutable)]
-                struct DeadBinderData {
+                struct CookieData {
                     command: binder_driver_return_protocol,
                     cookie: binder_uintptr_t,
                 }
-                if buffer.length < std::mem::size_of::<DeadBinderData>() {
+                if buffer.length < std::mem::size_of::<CookieData>() {
                     return error!(ENOMEM);
                 }
                 resource_accessor.write_object(
                     UserRef::new(buffer.address),
-                    &DeadBinderData { command: self.driver_return_code(), cookie: *cookie },
+                    &CookieData { command: self.driver_return_code(), cookie: *cookie },
+                )
+            }
+            Self::FrozenBinder(state) => {
+                #[repr(C, packed)]
+                #[derive(IntoBytes, Immutable)]
+                struct FreezeBinderData {
+                    command: binder_driver_return_protocol,
+                    state: binder_frozen_state_info,
+                }
+                if buffer.length < std::mem::size_of::<FreezeBinderData>() {
+                    return error!(ENOMEM);
+                }
+                resource_accessor.write_object(
+                    UserRef::new(buffer.address),
+                    &FreezeBinderData { command: self.driver_return_code(), state: *state },
                 )
             }
         }
@@ -3687,6 +3817,23 @@ impl BinderDriver {
                 self.handle_reply(locked, current_task, binder_proc, binder_thread, data)
                     .or_else(|err| err.dispatch(binder_thread))
             }
+            binder_driver_command_protocol_BC_REQUEST_FREEZE_NOTIFICATION => {
+                profile_duration!("RequestFreezeNotif");
+                let handle = cursor.read_object::<u32>()?.into();
+                let cookie = cursor.read_object::<binder_uintptr_t>()?;
+                binder_proc.handle_request_freeze_notification(handle, cookie)
+            }
+            binder_driver_command_protocol_BC_FREEZE_NOTIFICATION_DONE => {
+                profile_duration!("FreezeBinderDone");
+                let _cookie = cursor.read_object::<binder_uintptr_t>()?;
+                Ok(())
+            }
+            binder_driver_command_protocol_BC_CLEAR_FREEZE_NOTIFICATION => {
+                profile_duration!("ClearFreezeNotifi");
+                let handle = cursor.read_object::<u32>()?.into();
+                let cookie = cursor.read_object::<binder_uintptr_t>()?;
+                binder_proc.handle_clear_freeze_notification(handle, cookie)
+            }
             _ => {
                 log_error!("binder received unknown RW command: {:#08x}", command);
                 error!(EINVAL)
@@ -4061,7 +4208,9 @@ impl BinderDriver {
                     | Command::FrozenReply
                     | Command::PendingFrozen
                     | Command::ClearDeathNotificationDone(..)
-                    | Command::SpawnLooper => {}
+                    | Command::SpawnLooper
+                    | Command::FrozenBinder(..)
+                    | Command::ClearFreezeNotificationDone(..) => {}
                 }
 
                 return Ok(bytes_written);
@@ -8828,5 +8977,122 @@ pub mod tests {
             assert_eq!(read_frozen_status_info.sync_recv, 1);
             assert_eq!(read_frozen_status_info.async_recv, 0)
         })
+    }
+
+    #[fuchsia::test]
+    async fn freeze_notification_fires_when_process_frozen() {
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+
+            // Register an object with the owner.
+            let guard = owner.proc.lock().find_or_register_object(
+                &owner.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
+
+            // Insert a handle to the object in the client. This also retains a strong reference.
+            let handle = client
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+            const FREEZE_NOTIFICATION_COOKIE: binder_uintptr_t = 0xAAAAAAAA;
+
+            // Register a death notification handler.
+            client
+                .proc
+                .handle_request_freeze_notification(handle, FREEZE_NOTIFICATION_COOKIE)
+                .expect("request freeze notification");
+
+            // The client process should acknowledge the request.
+            assert_matches!(
+                client.proc.command_queue.lock().commands.pop_front(),
+                Some((Command::FrozenBinder(binder_frozen_state_info { is_frozen: 0, .. }), _))
+            );
+
+            owner.proc.lock().freeze();
+
+            // The client process should have a notification waiting.
+            assert_matches!(
+                client.proc.command_queue.lock().commands.front(),
+                Some((Command::FrozenBinder(binder_frozen_state_info { is_frozen: 1, .. }), _))
+            );
+        });
+    }
+
+    #[fuchsia::test]
+    async fn freeze_notification_is_cleared_before_process_frozen() {
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
+
+            // Register an object with the owner.
+            let guard = owner.proc.lock().find_or_register_object(
+                &owner.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
+
+            // Insert a handle to the object in the receiver. This also retains a strong reference.
+            let handle = client
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+            const FREEZE_NOTIFICATION_COOKIE: binder_uintptr_t = 0xAAAAAAAA;
+
+            // Register a freeze notification handler.
+            client
+                .proc
+                .handle_request_freeze_notification(handle, FREEZE_NOTIFICATION_COOKIE)
+                .expect("request freeze notification");
+
+            // Now clear the freeze notification handler.
+            client
+                .proc
+                .handle_clear_freeze_notification(handle, FREEZE_NOTIFICATION_COOKIE)
+                .expect("clear freeze notification");
+
+            // Check that the client received two acknowledgements.
+            {
+                let mut queue = client.proc.command_queue.lock();
+                assert_eq!(queue.commands.len(), 2);
+                assert!(matches!(
+                    queue.commands.pop_front(),
+                    Some((Command::FrozenBinder(binder_frozen_state_info { is_frozen: 0, .. }), _))
+                ));
+                assert!(matches!(
+                    queue.commands.pop_front(),
+                    Some((Command::ClearFreezeNotificationDone(FREEZE_NOTIFICATION_COOKIE), _))
+                ));
+            }
+
+            // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
+            let fake_waiter = Waiter::new();
+            {
+                let mut state = client.thread.lock();
+                state.registration = RegistrationState::Main;
+                state.command_queue.waiters.wait_async(&fake_waiter);
+            }
+
+            owner.proc.lock().freeze();
+
+            // The client thread should have no notification.
+            assert!(client.thread.lock().command_queue.is_empty());
+            // The client process should have no notification.
+            assert!(client.proc.command_queue.lock().commands.is_empty());
+        });
     }
 }
