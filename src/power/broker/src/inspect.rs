@@ -261,10 +261,10 @@ impl TopologyInspect {
                         let shadow_ref = shadow.lock().unwrap();
                         let root = inspector.root();
                         root.record_uint("event_capacity", max_events as u64);
-                        let duration = shadow_ref.history_duration().into_nanos();
-                        root.record_int("history_duration_ns", duration);
+                        let duration = shadow_ref.history_duration().into_seconds();
+                        root.record_int("history_duration_seconds", duration);
                         if shadow_ref.at_capacity() {
-                            root.record_int("at_capacity_history_duration_ns", duration);
+                            root.record_int("at_capacity_history_duration_seconds", duration);
                         }
                     }
                     Ok(inspector)
