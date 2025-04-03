@@ -1985,7 +1985,7 @@ group("vnames_config.metadata") {
   metadata = {
     vnames_config = [
       {
-        path = "//infra/vnames.json"
+        path = "//build/kythe/vnames.json"
       },
     ]
   }

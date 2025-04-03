@@ -200,6 +200,8 @@ tables_generator_tests_*.txt
 /vendor/
 /build/secondary/third_party/ffmpeg
 /build/secondary/third_party/protobuf
+# Checkouts for some release operations include the infra recipes repository.
+/infra/recipes/
 
 # rust-analyzer
 /rust-project.json
