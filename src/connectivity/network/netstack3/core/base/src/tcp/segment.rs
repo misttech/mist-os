@@ -103,6 +103,13 @@ impl Options {
         }
     }
 
+    fn as_segment(&self) -> Option<&SegmentOptions> {
+        match self {
+            Self::Handshake(_) => None,
+            Self::Segment(s) => Some(s),
+        }
+    }
+
     fn as_segment_mut(&mut self) -> Option<&mut SegmentOptions> {
         match self {
             Self::Handshake(_) => None,
@@ -181,6 +188,14 @@ impl Options {
     pub fn sack_permitted(&self) -> bool {
         self.as_handshake().is_some_and(|o| o.sack_permitted)
     }
+
+    /// Returns the segment's selective ack blocks.
+    ///
+    /// Returns a reference to empty blocks if this is not [`Options::Segment`].
+    pub fn sack_blocks(&self) -> &SackBlocks {
+        const EMPTY_REF: &'static SackBlocks = &SackBlocks::EMPTY;
+        self.as_segment().map(|s| &s.sack_blocks).unwrap_or(EMPTY_REF)
+    }
 }
 
 /// Segment options only set on handshake.
@@ -228,6 +243,9 @@ const MAX_SACK_BLOCKS: usize = 4;
 pub struct SackBlocks(ArrayVec<TcpSackBlock, MAX_SACK_BLOCKS>);
 
 impl SackBlocks {
+    /// A constant empty instance of SACK blocks.
+    pub const EMPTY: Self = SackBlocks(ArrayVec::new_const());
+
     /// The maximum number of selective ack blocks that can be in a TCP segment.
     ///
     /// See [RFC 2018 section 3].
@@ -271,22 +289,25 @@ impl SackBlocks {
         Self(blocks.iter().take(Self::MAX_BLOCKS).copied().collect())
     }
 
-    /// Creates a new [`SackBlocks`] option from an iterator of [`SackBlock`].
-    ///
-    /// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
-    pub fn from_iter(iter: impl IntoIterator<Item = SackBlock>) -> Self {
-        Self(
-            iter.into_iter()
-                .take(Self::MAX_BLOCKS)
-                .map(|block| TcpSackBlock::from(block))
-                .collect(),
-        )
+    /// Returns `true` if there are no blocks present.
+    pub fn is_empty(&self) -> bool {
+        let Self(inner) = self;
+        inner.is_empty()
     }
 
     /// Drops all blocks.
     pub fn clear(&mut self) {
         let Self(inner) = self;
         inner.clear()
+    }
+}
+
+/// Creates a new [`SackBlocks`] option from an iterator of [`SackBlock`].
+///
+/// Ignores any blocks past [`SackBlocks::MAX_BLOCKS`].
+impl FromIterator<SackBlock> for SackBlocks {
+    fn from_iter<T: IntoIterator<Item = SackBlock>>(iter: T) -> Self {
+        Self(iter.into_iter().take(Self::MAX_BLOCKS).map(|b| b.into()).collect())
     }
 }
 

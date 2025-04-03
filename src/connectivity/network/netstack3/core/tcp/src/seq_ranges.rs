@@ -153,6 +153,20 @@ impl<M> SeqRanges<M> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &SeqRange<M>> + '_ {
         self.blocks.iter()
     }
+
+    /// Provides an iterator that allows modifying the metadata for each stored
+    /// range.
+    pub(crate) fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut SeqRange<M>> + '_ {
+        self.blocks.iter_mut()
+    }
+
+    /// Trims the ranges discarding any values at or before `value`.
+    pub(crate) fn discard_starting_at_or_before(&mut self, value: SeqNum) {
+        let Self { blocks } = self;
+        let first_after = Self::find_first_after(blocks, value);
+        // All the blocks starting at or before `value` can be discarded.
+        let _drain = blocks.drain(0..first_after);
+    }
 }
 
 impl<M: Clone> FromIterator<SeqRange<M>> for SeqRanges<M> {
@@ -216,6 +230,11 @@ mod range {
             len as u32
         }
 
+        pub(crate) fn cap_right(self, seq: SeqNum) -> Option<Self> {
+            let Self { range: Range { start, end }, meta } = self;
+            seq.after(start).then(|| Self { range: Range { start, end: end.earliest(seq) }, meta })
+        }
+
         pub(crate) fn to_sack_block(&self) -> SackBlock {
             let Self { range: Range { start, end }, meta: _ } = self;
             // SAFETY: SackBlock requires that end is after start, which is the
@@ -249,18 +268,30 @@ pub(crate) use range::SeqRange;
 mod test {
     use super::*;
 
-    use alloc::format;
+    use alloc::vec::Vec;
+    use alloc::{format, vec};
 
     use netstack3_base::{SackBlock, WindowSize};
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
     use proptest::{prop_assert, prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
+    use test_case::test_case;
 
     impl SeqRanges<()> {
         fn insert_u32(&mut self, range: Range<u32>) -> bool {
             let Range { start, end } = range;
             self.insert(SeqNum::new(start)..SeqNum::new(end), ())
+        }
+    }
+
+    impl FromIterator<Range<u32>> for SeqRanges<()> {
+        fn from_iter<T: IntoIterator<Item = Range<u32>>>(iter: T) -> Self {
+            let mut ranges = SeqRanges::default();
+            for range in iter {
+                let _: bool = ranges.insert_u32(range);
+            }
+            ranges
         }
     }
 
@@ -314,6 +345,7 @@ mod test {
                 SackBlock::try_new(start, end).ok()
             );
         }
+
     }
 
     fn insertions() -> impl Strategy<Value = Range<SeqNum>> {
@@ -347,5 +379,23 @@ mod test {
 
         assert!(sr.insert_u32(7..22));
         assert!(!sr.insert_u32(0..35));
+    }
+
+    #[test_case(&[], 0 => Vec::<Range<u32>>::new(); "empty")]
+    #[test_case(&[10..20], 0 => vec![10..20]; "before 1")]
+    #[test_case(&[10..20, 30..40], 0 => vec![10..20, 30..40]; "before 2")]
+    #[test_case(&[10..20], 10 =>  Vec::<Range<u32>>::new(); "same 1")]
+    #[test_case(&[10..20, 30..40], 10 => vec![30..40]; "same 2")]
+    #[test_case(&[10..20], 20 =>  Vec::<Range<u32>>::new(); "after 1")]
+    #[test_case(&[10..20, 30..40], 20 => vec![30..40]; "after 2")]
+    #[test_case(&[10..20, 30..40], 30 =>  Vec::<Range<u32>>::new(); "after 3")]
+    #[test_case(&[10..20, 30..40], 15 =>  vec![30..40]; "mid 1")]
+    #[test_case(&[10..20, 30..40], 35 =>  Vec::<Range<u32>>::new(); "mid 2")]
+    fn discard_starting_at_or_before(ranges: &[Range<u32>], discard: u32) -> Vec<Range<u32>> {
+        let mut sr = ranges.into_iter().cloned().collect::<SeqRanges<()>>();
+        sr.discard_starting_at_or_before(SeqNum::new(discard));
+        sr.iter()
+            .map(|seq_range| u32::from(seq_range.start())..u32::from(seq_range.end()))
+            .collect()
     }
 }

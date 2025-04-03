@@ -1585,6 +1585,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         seg_seq: SeqNum,
         seg_ack: SeqNum,
         seg_wnd: UnscaledWindowSize,
+        seg_sack_blocks: &SackBlocks,
         pure_ack: bool,
         rcv: R,
         now: I,
@@ -1649,134 +1650,141 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //   If the ACK acks something not yet sent (SEG.ACK >
             //   SND.NXT) then send an ACK, drop the segment, and
             //   return.
-            (Some(rcv.make_ack(*snd_max)), DataAcked::No)
+            return (Some(rcv.make_ack(*snd_max)), DataAcked::No);
+        }
+
+        // TODO(https://fxbug.dev/42078221): Remove SACK_PERMITTED guard when
+        // SACK-based loss recovery is complete.
+        if SACK_PERMITTED {
+            // TODO(https://fxbug.dev/42078221): Use duplicate ack information
+            // from scoreboard to enter SACK-based loss recovery.
+            let _is_dup_ack_by_sack =
+                congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
+        }
+
+        let (trace, data_acked) = if seg_ack.after(*snd_una) {
+            // The unwrap is safe because the result must be positive.
+            let acked = u32::try_from(seg_ack - *snd_una)
+                .ok_checked::<TryFromIntError>()
+                .and_then(NonZeroU32::new)
+                .unwrap_or_else(|| {
+                    panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
+                });
+            let BufferLimits { len, capacity: _ } = buffer.limits();
+            let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
+            // Remove the acked bytes from the send buffer. The following
+            // operation should not panic because we are in this branch
+            // means seg_ack is before snd.max, thus seg_ack - snd.una
+            // cannot exceed the buffer length.
+            buffer.mark_read(
+                NonZeroUsize::try_from(acked)
+                    .unwrap_or_else(|TryFromIntError { .. }| {
+                        // we've checked that acked must be smaller than the outstanding
+                        // bytes we have in the buffer; plus in Rust, any allocation can
+                        // only have a size up to isize::MAX bytes.
+                        panic!(
+                            "acked({:?}) must be smaller than isize::MAX({:?})",
+                            acked,
+                            isize::MAX
+                        )
+                    })
+                    .get()
+                    - usize::from(fin_acked),
+            );
+            *snd_una = seg_ack;
+            // If the incoming segment acks something that has been sent
+            // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
+            // bump `snd.nxt` as well.
+            if seg_ack.after(*snd_nxt) {
+                *snd_nxt = seg_ack;
+            }
+            // If the incoming segment acks the sequence number that we used
+            // for RTT estimate, feed the sample to the estimator.
+            if let Some(rtt) = rtt_sampler.on_ack(now, seg_ack) {
+                rtt_estimator.sample(rtt);
+            }
+
+            // It is possible, however unlikely, that we get here without an
+            // RTT estimation - in case the first data segment that we send
+            // out gets retransmitted. In that case, simply don't update
+            // congestion control which at worst causes slow start to take
+            // one extra step.
+            if let Some(rtt) = rtt_estimator.srtt() {
+                congestion_control.on_ack(acked, now, rtt);
+            }
+
+            // At least one byte of data was ACKed by the peer.
+            (true, DataAcked::Yes)
         } else {
-            let (trace, data_acked) = if seg_ack.after(*snd_una) {
-                // The unwrap is safe because the result must be positive.
-                let acked = u32::try_from(seg_ack - *snd_una)
-                    .ok_checked::<TryFromIntError>()
-                    .and_then(NonZeroU32::new)
-                    .unwrap_or_else(|| {
-                        panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
-                    });
-                let BufferLimits { len, capacity: _ } = buffer.limits();
-                let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
-                // Remove the acked bytes from the send buffer. The following
-                // operation should not panic because we are in this branch
-                // means seg_ack is before snd.max, thus seg_ack - snd.una
-                // cannot exceed the buffer length.
-                buffer.mark_read(
-                    NonZeroUsize::try_from(acked)
-                        .unwrap_or_else(|TryFromIntError { .. }| {
-                            // we've checked that acked must be smaller than the outstanding
-                            // bytes we have in the buffer; plus in Rust, any allocation can
-                            // only have a size up to isize::MAX bytes.
-                            panic!(
-                                "acked({:?}) must be smaller than isize::MAX({:?})",
-                                acked,
-                                isize::MAX
-                            )
-                        })
-                        .get()
-                        - usize::from(fin_acked),
-                );
-                *snd_una = seg_ack;
-                // If the incoming segment acks something that has been sent
-                // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
-                // bump `snd.nxt` as well.
-                if seg_ack.after(*snd_nxt) {
-                    *snd_nxt = seg_ack;
-                }
-                // If the incoming segment acks the sequence number that we used
-                // for RTT estimate, feed the sample to the estimator.
-                if let Some(rtt) = rtt_sampler.on_ack(now, seg_ack) {
-                    rtt_estimator.sample(rtt);
-                }
-
-                // It is possible, however unlikely, that we get here without an
-                // RTT estimation - in case the first data segment that we send
-                // out gets retransmitted. In that case, simply don't update
-                // congestion control which at worst causes slow start to take
-                // one extra step.
-                if let Some(rtt) = rtt_estimator.srtt() {
-                    congestion_control.on_ack(acked, now, rtt);
-                }
-
-                // At least one byte of data was ACKed by the peer.
-                (true, DataAcked::Yes)
-            } else {
-                // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
-                //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
-                //   "duplicate" in the following algorithms when (a) the receiver of
-                //   the ACK has outstanding data, (b) the incoming acknowledgment
-                //   carries no data, (c) the SYN and FIN bits are both off, (d) the
-                //   acknowledgment number is equal to the greatest acknowledgment
-                //   received on the given connection (TCP.UNA from [RFC793]) and (e)
-                //   the advertised window in the incoming acknowledgment equals the
-                //   advertised window in the last incoming acknowledgment.
-                let is_dup_ack = {
-                    snd_nxt.after(*snd_una) // (a)
+            // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
+            //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
+            //   "duplicate" in the following algorithms when (a) the receiver of
+            //   the ACK has outstanding data, (b) the incoming acknowledgment
+            //   carries no data, (c) the SYN and FIN bits are both off, (d) the
+            //   acknowledgment number is equal to the greatest acknowledgment
+            //   received on the given connection (TCP.UNA from [RFC793]) and (e)
+            //   the advertised window in the incoming acknowledgment equals the
+            //   advertised window in the last incoming acknowledgment.
+            let is_dup_ack = {
+                snd_nxt.after(*snd_una) // (a)
                 && pure_ack // (b) & (c)
                 && seg_ack == *snd_una // (d)
                 && seg_wnd == *snd_wnd // (e)
-                };
-                if is_dup_ack {
-                    let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
-                    if fast_recovery_initiated {
-                        counters.increment(|c| &c.fast_recovery);
-                    }
-                }
-                // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
-                //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
-                //   ignored.
-                (is_dup_ack, DataAcked::No)
             };
-
-            // Per RFC 9293
-            // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
-            //   If SND.UNA =< SEG.ACK =< SND.NXT, the send window should be
-            //   updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ and
-            //   SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND, set
-            //   SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
-            if !snd_una.after(seg_ack)
-                && (snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)))
-            {
-                *snd_wnd = seg_wnd;
-                *snd_wl1 = seg_seq;
-                *snd_wl2 = seg_ack;
-                *wnd_max = seg_wnd.max(*wnd_max);
-                if seg_wnd != WindowSize::ZERO
-                    && matches!(timer, Some(SendTimer::ZeroWindowProbe(_)))
-                {
-                    *timer = None;
-                    // We need to ensure that we're reset when exiting ZWP as if
-                    // we're going to retransmit. The actual retransmit handling
-                    // will be performed by poll_send.
-                    *snd_nxt = *snd_una;
+            if is_dup_ack {
+                let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
+                if fast_recovery_initiated {
+                    counters.increment(|c| &c.fast_recovery);
                 }
             }
+            // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
+            //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
+            //   ignored.
+            (is_dup_ack, DataAcked::No)
+        };
 
-            // Only generate traces for interesting things.
-            if trace {
-                trace_instant!(c"tcp::Send::process_ack",
-                    "id" => id.trace_id(),
-                    "seg_ack" => u32::from(seg_ack),
-                    "snd_nxt" => u32::from(*snd_nxt),
-                    "snd_wnd" => u32::from(*snd_wnd),
-                    "rtt_ms" => u32::try_from(
-                        // If we don't have an RTT sample yet use zero to
-                        // signal.
-                        rtt_estimator.srtt().unwrap_or(Duration::ZERO).as_millis()
-                    ).unwrap_or(u32::MAX),
-                    "cwnd" => u32::from(congestion_control.cwnd()),
-                    "ssthresh" => congestion_control.slow_start_threshold(),
-                    "fast_recovery" => congestion_control.in_fast_recovery(),
-                    "acked" => data_acked == DataAcked::Yes,
-                );
+        // Per RFC 9293
+        // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
+        //   If SND.UNA =< SEG.ACK =< SND.NXT, the send window should be
+        //   updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ and
+        //   SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND, set
+        //   SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
+        if !snd_una.after(seg_ack)
+            && (snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)))
+        {
+            *snd_wnd = seg_wnd;
+            *snd_wl1 = seg_seq;
+            *snd_wl2 = seg_ack;
+            *wnd_max = seg_wnd.max(*wnd_max);
+            if seg_wnd != WindowSize::ZERO && matches!(timer, Some(SendTimer::ZeroWindowProbe(_))) {
+                *timer = None;
+                // We need to ensure that we're reset when exiting ZWP as if
+                // we're going to retransmit. The actual retransmit handling
+                // will be performed by poll_send.
+                *snd_nxt = *snd_una;
             }
-
-            (None, data_acked)
         }
+
+        // Only generate traces for interesting things.
+        if trace {
+            trace_instant!(c"tcp::Send::process_ack",
+                "id" => id.trace_id(),
+                "seg_ack" => u32::from(seg_ack),
+                "snd_nxt" => u32::from(*snd_nxt),
+                "snd_wnd" => u32::from(*snd_wnd),
+                "rtt_ms" => u32::try_from(
+                    // If we don't have an RTT sample yet use zero to
+                    // signal.
+                    rtt_estimator.srtt().unwrap_or(Duration::ZERO).as_millis()
+                ).unwrap_or(u32::MAX),
+                "cwnd" => u32::from(congestion_control.cwnd()),
+                "ssthresh" => congestion_control.slow_start_threshold(),
+                "fast_recovery" => congestion_control.in_fast_recovery(),
+                "acked" => data_acked == DataAcked::Yes,
+            );
+        }
+
+        (None, data_acked)
     }
 
     fn update_mss(&mut self, mss: Mss, seq: SeqNum) -> ShouldRetransmit {
@@ -2398,7 +2406,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             let needs_ack = !pure_ack;
             let Segment {
                 header:
-                    SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options: _ },
+                    SegmentHeader {
+                        seq: seg_seq,
+                        ack: seg_ack,
+                        wnd: seg_wnd,
+                        control,
+                        options: seg_options,
+                    },
                 data,
             } = match incoming.overlap(rcv.nxt(), rcv.wnd()) {
                 Some(incoming) => incoming,
@@ -2561,6 +2575,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             rcv.get_mut(),
                             now,
@@ -2578,6 +2593,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -2597,6 +2613,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -2624,6 +2641,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             rcv.get_mut(),
                             now,
@@ -2664,6 +2682,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             seg_seq,
                             seg_ack,
                             seg_wnd,
+                            seg_options.sack_blocks(),
                             pure_ack,
                             &*closed_rcv,
                             now,
@@ -4081,7 +4100,7 @@ mod test {
                 rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
+                wnd_scale: WindowScale::default(),
             }.into(),
             closed_rcv: RecvParams {
                 ack: ISS_1 + 2,
@@ -4165,7 +4184,7 @@ mod test {
                 rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
+                wnd_scale: WindowScale::default(),
             }.into(),
             closed_rcv: RecvParams {
                 ack: ISS_2 + 2,
@@ -4192,7 +4211,7 @@ mod test {
                 rtt_sampler: RttSampler::default(),
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
-                    wnd_scale: WindowScale::default(),
+                wnd_scale: WindowScale::default(),
             }.into(),
             closed_rcv: RecvParams {
                 ack: ISS_2 + 3,
@@ -7681,6 +7700,7 @@ mod test {
                 ISS_2 + 1,
                 ISS_1 + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
+                &SackBlocks::EMPTY,
                 true,
                 &RecvParams {
                     ack: ISS_2 + 1,
@@ -7754,6 +7774,7 @@ mod test {
                     ISS_2 + 1,
                     ISS_1 + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(3),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
                         ack: ISS_2 + 1,
@@ -7774,6 +7795,7 @@ mod test {
                     ISS_2 + 1,
                     ISS_1 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(0),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
                         ack: ISS_2 + 1,
@@ -7795,6 +7817,7 @@ mod test {
                     ISS_2 + 1,
                     ISS_1 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(3),
+                    &SackBlocks::EMPTY,
                     true,
                     &RecvParams {
                         ack: ISS_2 + 1,
@@ -7924,6 +7947,7 @@ mod test {
                 ISS_2 + 1,
                 ISS_1 + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
+                &SackBlocks::EMPTY,
                 true,
                 &RecvParams {
                     ack: ISS_2 + 1,

@@ -16,7 +16,9 @@ use core::cmp::Ordering;
 use core::num::{NonZeroU32, NonZeroU8};
 use core::time::Duration;
 
-use netstack3_base::{Instant, Mss, SeqNum, WindowSize};
+use netstack3_base::{Instant, Mss, SackBlocks, SeqNum, WindowSize};
+
+use crate::internal::sack_scoreboard::SackScoreboard;
 
 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
 ///   The fast retransmit algorithm uses the arrival of 3 duplicate ACKs (...)
@@ -62,15 +64,17 @@ impl CongestionControlParams {
     }
 }
 
-/// Congestion control with four intertwined algorithms.
+/// Congestion control with five intertwined algorithms.
 ///
 /// - Slow start
 /// - Congestion avoidance from a loss-based algorithm
 /// - Fast retransmit
 /// - Fast recovery: https://datatracker.ietf.org/doc/html/rfc5681#section-3
+/// - SACK recovery: https://datatracker.ietf.org/doc/html/rfc6675
 #[derive(Debug)]
 pub(crate) struct CongestionControl<I> {
     params: CongestionControlParams,
+    sack_scoreboard: SackScoreboard,
     algorithm: LossBasedAlgorithm<I>,
     /// The connection is in fast recovery when this field is a [`Some`].
     fast_recovery: Option<FastRecovery>,
@@ -124,9 +128,27 @@ impl<I: Instant> LossBasedAlgorithm<I> {
 }
 
 impl<I: Instant> CongestionControl<I> {
+    /// Preprocesses an ACK that may contain selective ack blocks.
+    ///
+    /// Returns true if this should be considered a duplicate ACK according to
+    /// the rules in [RFC 6675 section 2].
+    ///
+    /// [RFC 6675 section 2]: https://datatracker.ietf.org/doc/html/rfc6675#section-2
+    pub(super) fn preprocess_ack(
+        &mut self,
+        seg_ack: SeqNum,
+        snd_nxt: SeqNum,
+        seg_sack_blocks: &SackBlocks,
+    ) -> bool {
+        let Self { params, algorithm: _, fast_recovery: _, sack_scoreboard } = self;
+        // TODO(https://fxbug.dev/42078221): Take HighRxt from loss recovery.
+        let high_rxt = None;
+        sack_scoreboard.process_ack(seg_ack, snd_nxt, high_rxt, seg_sack_blocks, params.mss)
+    }
+
     /// Called when there are previously unacknowledged bytes being acked.
     pub(super) fn on_ack(&mut self, bytes_acked: NonZeroU32, now: I, rtt: Duration) {
-        let Self { params, algorithm, fast_recovery } = self;
+        let Self { params, algorithm, fast_recovery, sack_scoreboard: _ } = self;
         // Exit fast recovery since there is an ACK that acknowledges new data.
         if let Some(fast_recovery) = fast_recovery.take() {
             if fast_recovery.dup_acks.get() >= DUP_ACK_THRESHOLD {
@@ -140,7 +162,7 @@ impl<I: Instant> CongestionControl<I> {
     ///
     /// Returns `true` if fast recovery was initiated as a result of this ACK.
     pub(super) fn on_dup_ack(&mut self, seg_ack: SeqNum) -> bool {
-        let Self { params, algorithm, fast_recovery } = self;
+        let Self { params, algorithm, fast_recovery, sack_scoreboard: _ } = self;
         match fast_recovery {
             None => {
                 *fast_recovery = Some(FastRecovery::new());
@@ -155,7 +177,7 @@ impl<I: Instant> CongestionControl<I> {
 
     /// Called upon a retransmission timeout.
     pub(super) fn on_retransmission_timeout(&mut self) {
-        let Self { params, algorithm, fast_recovery } = self;
+        let Self { params, algorithm, fast_recovery, sack_scoreboard: _ } = self;
         *fast_recovery = None;
         algorithm.on_retransmission_timeout(params);
     }
@@ -169,7 +191,7 @@ impl<I: Instant> CongestionControl<I> {
     /// that this still conforms to the RFC because we don't change the cwnd of
     /// our algorithm, the algorithm is not aware of this "inflation".
     pub(super) fn cwnd(&self) -> WindowSize {
-        let Self { params, algorithm: _, fast_recovery } = self;
+        let Self { params, algorithm: _, fast_recovery, sack_scoreboard: _ } = self;
         let cwnd = params.rounded_cwnd();
         if let Some(fast_recovery) = fast_recovery {
             // Per RFC 3042 (https://www.rfc-editor.org/rfc/rfc3042#section-2):
@@ -210,6 +232,7 @@ impl<I: Instant> CongestionControl<I> {
             params: CongestionControlParams::with_mss(mss),
             algorithm: LossBasedAlgorithm::Cubic(Default::default()),
             fast_recovery: None,
+            sack_scoreboard: SackScoreboard::default(),
         }
     }
 
