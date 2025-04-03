@@ -50,8 +50,14 @@ struct symbolizer_location_t {
 };
 
 typedef void (*location_callback)(const symbolizer_location_t* location, void* context);
-void symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer, uint64_t address,
-                                location_callback output, void* output_context);
+enum class ResolveAddressStatus : uint8_t {
+  Ok,
+  SymbolFileUnavailable,
+  NoOverlappingModule,
+};
+ResolveAddressStatus symbolizer_resolve_address(symbolizer::SymbolizerImpl* symbolizer,
+                                                uint64_t address, location_callback output,
+                                                void* output_context);
 }
 
 #endif /* SRC_DEVELOPER_FFX_LIB_SYMBOLIZE_SYS_WRAPPER_H_ */

@@ -62,6 +62,15 @@ class SymbolizerImpl : public Symbolizer,
     kInconsistentBaseAddress,
   };
 
+  enum class BacktraceStatus : uint8_t {
+    // No problems were encountered.
+    kOk,
+    // The corresponding symbol file is not available.
+    kSymbolFileUnavailable,
+    // The requested address is not covered by any mapping.
+    kNoOverlappingModule,
+  };
+
   // Provides location information as a callback, along with its offset within a frame.
   using LocationOutputFn = fit::function<void(size_t, const zxdb::Location&, const ModuleInfo&)>;
 
@@ -69,7 +78,7 @@ class SymbolizerImpl : public Symbolizer,
   // outputs.
   MMapStatus MMap(uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
                   uint64_t module_offset);
-  void Backtrace(uint64_t address, AddressType type, LocationOutputFn output);
+  BacktraceStatus Backtrace(uint64_t address, AddressType type, LocationOutputFn output);
 
   // |Symbolizer| implementation.
   void Reset(bool symbolizing_dart, ResetType type) override;

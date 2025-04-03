@@ -24,6 +24,7 @@ if (is_host) {
       source_root,
     ]
     deps = [
+      "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/e2e_emu",
       "//src/developer/ffx/lib/symbolize",
       "//src/lib/diagnostics/log/rust_cpp_bridge",
@@ -41,6 +42,11 @@ if (is_host) {
     deps = [ ":ffx_symbolize_lib_e2e_test" ]
   }
 } else if (is_fuchsia) {
+  # A helper library that defines a memory area not covered by any symbol.
+  shared_library("no_symbol_area") {
+    sources = [ "no_symbol_area.c" ]
+  }
+
   rustc_binary("print_fn_ptr_bin") {
     edition = "2021"
     source_root = "print_fn_ptr.rs"
@@ -49,6 +55,7 @@ if (is_host) {
       source_root,
     ]
     deps = [
+      ":no_symbol_area",
       "//sdk/rust/zx",
       "//src/lib/process_builder",
       "//third_party/rust_crates:libc",

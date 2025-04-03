@@ -10,6 +10,8 @@ pub struct SymbolizationTestOutputs {
     pub fn_one_addr: u64,
     pub fn_two_addr: u64,
     pub fn_sys_inc_addr: u64,
+    pub heap_addr: u64,
+    pub no_symbol_addr: u64,
     pub fn_one_source_line: u32,
     pub fn_two_source_line: u32,
     pub modules: Vec<Module>,
