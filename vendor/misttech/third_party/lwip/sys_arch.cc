@@ -4,8 +4,6 @@
 
 #include "arch/sys_arch.h"
 
-#include <trace.h>
-
 #include <fbl/canary.h>
 #include <kernel/mutex.h>
 #include <kernel/semaphore.h>
@@ -17,8 +15,6 @@
 #include "lwip/opt.h"
 #include "lwip/sys.h"
 #include "lwip/tcpip.h"
-
-#define LOCAL_TRACE 0
 
 struct sys_sem {
  public:
@@ -39,13 +35,13 @@ struct sys_mutex {
   DECLARE_MUTEX(sys_mutex) mutex;
 };
 
-#define SYS_MBOX_SIZE 16
+#define SYS_MBOX_SIZE 128
 
 struct sys_mbox {
   fbl::Canary<fbl::magic("MBOX")> magic;
 
-  Semaphore empty;
-  Semaphore full;
+  Semaphore empty = Semaphore(SYS_MBOX_SIZE);
+  Semaphore full = Semaphore(0);
   DECLARE_MUTEX(sys_mbox) lock;
 
   int head;
@@ -154,7 +150,6 @@ void sys_arch_unprotect(sys_prot_t pval) TA_REL(ArchLock::Get()) {
 /* Mailbox */
 
 err_t sys_mbox_new(struct sys_mbox **mb, int size) {
-  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_UNUSED_ARG(size);
 
@@ -187,7 +182,6 @@ int sys_mbox_valid(struct sys_mbox **mb) {
 }
 
 void sys_mbox_post(struct sys_mbox **mb, void *msg) {
-  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
@@ -201,18 +195,17 @@ void sys_mbox_post(struct sys_mbox **mb, void *msg) {
     mbox->head = (mbox->head + 1) % SYS_MBOX_SIZE;
   }
   mbox->full.Post();
-  LTRACE_EXIT;
 }
 
 err_t sys_mbox_trypost(struct sys_mbox **mb, void *msg) {
-  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
 
   zx_status_t res = mbox->empty.Wait(Deadline::after_mono(ZX_USEC(1)));
   if (res == ZX_ERR_TIMED_OUT) {
-    return ERR_MEM;
+    SYS_STATS_INC(mbox.err);
+    return ERR_TIMEOUT;
   }
 
   {
@@ -226,7 +219,6 @@ err_t sys_mbox_trypost(struct sys_mbox **mb, void *msg) {
 }
 
 u32_t sys_arch_mbox_tryfetch(struct sys_mbox **mb, void **msg) {
-  LTRACE_ENTRY;
   struct sys_mbox *mbox;
   LWIP_ASSERT("invalid mbox", (mb != nullptr) && (*mb != nullptr) && (*mb)->magic.Valid());
   mbox = *mb;
@@ -236,9 +228,9 @@ u32_t sys_arch_mbox_tryfetch(struct sys_mbox **mb, void **msg) {
     return SYS_MBOX_EMPTY;
   }
 
-  if (mbox->head == mbox->tail) {
-    return SYS_MBOX_EMPTY;
-  }
+  // if (mbox->head == mbox->tail) {
+  //  return SYS_MBOX_EMPTY;
+  // }
 
   {
     Guard<Mutex> guard{&mbox->lock};
@@ -304,7 +296,6 @@ void sys_sem_signal(struct sys_sem **s) {
 }
 
 u32_t sys_arch_sem_wait(struct sys_sem **s, u32_t timeout) {
-  LTRACE_ENTRY;
   struct sys_sem *sem;
   LWIP_ASSERT("invalid sem", (s != nullptr) && (*s != nullptr));
   sem = *s;
