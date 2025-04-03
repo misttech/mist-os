@@ -62,6 +62,7 @@ use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::util::respond_to_completer;
+use crate::FeatureFlags;
 
 /// A handler for interface events.
 pub trait InterfacesHandler: Send + Sync + 'static {
@@ -507,6 +508,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) async fn handle_interface_watcher_event(
         &mut self,
         event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
+        feature_flags: &FeatureFlags,
     ) -> Result<(), InterfaceEventHandlerError> {
         let update = match self.interface_properties.update(event) {
             Ok(update) => update,
@@ -574,7 +576,10 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 // TODO(https://fxbug.dev/397475289): Rather than constructing a stub NDUSEROPT
                 // message from a fake RDNSS record, consume real data on this from the netstack
                 // once it is exposed.
-                if *has_default_ipv6_route && previously_did_not_have_default_ipv6_route {
+                if *has_default_ipv6_route
+                    && previously_did_not_have_default_ipv6_route
+                    && !feature_flags.use_ndp_watcher_instead_of_nduseropt_stub
+                {
                     let message = build_stub_nduseropt_message(
                         u32::try_from(id.get()).expect("should fit in u32"),
                     );
@@ -1516,8 +1521,11 @@ pub(crate) mod testutil {
     use futures::TryStreamExt as _;
     use net_declare::{fidl_subnet, net_addr_subnet};
 
+    use crate::client::AsyncWorkItem;
     use crate::eventloop::{EventLoopComponent, IncludedWorkers, Optional, Required};
     use crate::messaging::testutil::FakeSender;
+    use crate::protocol_family::route::NetlinkRouteNotifiedGroup;
+    use crate::FeatureFlags;
 
     pub(crate) const LO_INTERFACE_ID: u64 = 1;
     pub(crate) const LO_NAME: &str = "lo";
@@ -1627,6 +1635,7 @@ pub(crate) mod testutil {
         type RoutesV6Worker = Optional;
         type RuleV4Worker = Optional;
         type RuleV6Worker = Optional;
+        type NduseroptWorker = Optional;
     }
 
     pub(crate) struct Setup<E, W> {
@@ -1636,6 +1645,7 @@ pub(crate) mod testutil {
             mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RouteNetlinkMessage>>>,
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
         pub interfaces_handler_sink: FakeInterfacesHandlerSink,
+        pub _async_work_sink: mpsc::UnboundedSender<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
     }
 
     pub(crate) fn setup_with_route_clients(
@@ -1650,11 +1660,13 @@ pub(crate) mod testutil {
             fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>();
         let (interfaces_state_proxy, interfaces_state) =
             fidl::endpoints::create_proxy::<fnet_interfaces::StateMarker>();
+        let (async_work_sink, async_work_receiver) = mpsc::unbounded();
         let event_loop_inputs = crate::eventloop::EventLoopInputs::<_, _, OnlyInterfaces> {
             route_clients: EventLoopComponent::Present(route_clients),
             interfaces_handler: EventLoopComponent::Present(interfaces_handler),
             interfaces_proxy: EventLoopComponent::Present(interfaces_proxy),
             interfaces_state_proxy: EventLoopComponent::Present(interfaces_state_proxy),
+            async_work_receiver,
 
             v4_routes_state: EventLoopComponent::Absent(Optional),
             v6_routes_state: EventLoopComponent::Absent(Optional),
@@ -1664,8 +1676,10 @@ pub(crate) mod testutil {
             v6_route_table_provider: EventLoopComponent::Absent(Optional),
             v4_rule_table: EventLoopComponent::Absent(Optional),
             v6_rule_table: EventLoopComponent::Absent(Optional),
+            ndp_option_watcher_provider: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
+            feature_flags: FeatureFlags::test(),
         };
 
         let interfaces_request_stream = interfaces.into_stream();
@@ -1690,6 +1704,7 @@ pub(crate) mod testutil {
                         routes_v6: EventLoopComponent::Absent(Optional),
                         rules_v4: EventLoopComponent::Absent(Optional),
                         rules_v6: EventLoopComponent::Absent(Optional),
+                        nduseropt: EventLoopComponent::Absent(Optional),
                     })
                     .await?;
                 event_loop.run().await
@@ -1698,6 +1713,7 @@ pub(crate) mod testutil {
             request_sink,
             interfaces_request_stream,
             interfaces_handler_sink,
+            _async_work_sink: async_work_sink,
         }
     }
 
@@ -1973,6 +1989,7 @@ mod tests {
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
+            _async_work_sink: _,
         } = setup();
         let interfaces = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let watcher_fut =
@@ -1994,6 +2011,7 @@ mod tests {
             request_sink: _,
             interfaces_request_stream: _,
             interfaces_handler_sink: _,
+            _async_work_sink: _,
         } = setup();
         let interfaces =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(1, "lo", LOOPBACK)];
@@ -2023,6 +2041,7 @@ mod tests {
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
+            _async_work_sink: _,
         } = setup();
         let interfaces_existing = vec![get_fake_interface(1, "lo", LOOPBACK)];
         let interfaces_new = vec![get_fake_interface(1, "lo", LOOPBACK)];
@@ -2052,6 +2071,7 @@ mod tests {
             request_sink: _,
             interfaces_request_stream,
             interfaces_handler_sink: _,
+            _async_work_sink: _,
         } = setup();
         let interfaces_existing =
             vec![get_fake_interface(1, "lo", LOOPBACK), get_fake_interface(2, "eth001", ETHERNET)];
@@ -2159,44 +2179,55 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_deliver_updates() {
-        let (mut link_sink, link_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
-        );
-        let (mut addr4_sink, addr4_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_2,
-            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
-        );
-        let (mut addr6_sink, addr6_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_3,
-            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
-        );
-        let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_4,
-            &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
-        );
-        let (mut all_sink, all_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_5,
-            &[
-                ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
-                ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
-                ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
-                ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
-            ],
-        );
+        let scope = fasync::Scope::new();
+        let (mut link_sink, link_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut addr4_sink, addr4_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_2,
+                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut addr6_sink, addr6_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_3,
+                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut other_sink, other_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_4,
+                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut all_sink, all_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_5,
+                &[
+                    ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
+                    ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
+                    ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
+                ],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
         let Setup {
             event_loop_fut,
             mut watcher_stream,
             request_sink: _,
             interfaces_request_stream,
             mut interfaces_handler_sink,
+            _async_work_sink: _,
         } = setup_with_route_clients({
             let route_clients = ClientTable::default();
             route_clients.add_client(link_client);
             route_clients.add_client(addr4_client);
             route_clients.add_client(addr6_client);
-            route_clients.add_client(all_client);
             route_clients.add_client(other_client);
+            route_clients.add_client(all_client);
             route_clients
         });
         let event_loop_fut = event_loop_fut.fuse();
@@ -2273,8 +2304,8 @@ mod tests {
         assert_eq!(&link_sink.take_messages()[..], &[]);
         assert_eq!(&addr4_sink.take_messages()[..], &[]);
         assert_eq!(&addr6_sink.take_messages()[..], &[]);
-        assert_eq!(&all_sink.take_messages()[..], &[]);
         assert_eq!(&other_sink.take_messages()[..], &[]);
+        assert_eq!(&all_sink.take_messages()[..], &[]);
 
         // Note that we provide the stream by value so that it is dropped/closed
         // after this round of updates is sent to the event loop. We wait for
@@ -2467,10 +2498,6 @@ mod tests {
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
             ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
-        let nduseropt = SentMessage::multicast(
-            build_stub_nduseropt_message(WLAN_INTERFACE_ID.try_into().unwrap()),
-            ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
-        );
         assert_eq!(
             &addr6_sink.take_messages()[..],
             &[wlan_v6_addr.clone(), lo_v6_addr.clone(), eth_v6_addr.clone(), ppp_v6_addr.clone(),],
@@ -2491,10 +2518,10 @@ mod tests {
                 eth_link,
                 ppp_v4_addr,
                 ppp_v6_addr,
-                nduseropt,
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);
+        scope.join().await;
     }
 
     const LO_MAC: Option<fnet::MacAddress> = None;
@@ -2590,99 +2617,109 @@ mod tests {
         root_handler: F,
         initial_state: InitialState,
     ) -> TestRequestResult {
-        let InitialState { eth_interface_online } = initial_state;
+        let scope = fasync::Scope::new();
+        let result = {
+            let InitialState { eth_interface_online } = initial_state;
 
-        let (mut expected_sink, expected_client) = crate::client::testutil::new_fake_client::<
-            NetlinkRoute,
-        >(
-            crate::client::testutil::CLIENT_ID_1, &[]
-        );
-        let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_2,
-            &[],
-        );
-        let Setup {
-            event_loop_fut,
-            mut watcher_stream,
-            request_sink,
-            interfaces_request_stream,
-            interfaces_handler_sink: _,
-        } = setup_with_route_clients({
-            let route_clients = ClientTable::default();
-            route_clients.add_client(expected_client.clone());
-            route_clients.add_client(other_client);
-            route_clients
-        });
-        let event_loop_fut = event_loop_fut.fuse();
-        let mut event_loop_fut = pin!(event_loop_fut);
+            let (mut expected_sink, expected_client, async_work_drain_task) =
+                crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                    crate::client::testutil::CLIENT_ID_1,
+                    &[],
+                );
+            let _join_handle = scope.spawn(async_work_drain_task);
+            let (mut other_sink, other_client, async_work_drain_task) =
+                crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                    crate::client::testutil::CLIENT_ID_2,
+                    &[],
+                );
+            let _join_handle = scope.spawn(async_work_drain_task);
+            let Setup {
+                event_loop_fut,
+                mut watcher_stream,
+                request_sink,
+                interfaces_request_stream,
+                interfaces_handler_sink: _,
+                _async_work_sink: _,
+            } = setup_with_route_clients({
+                let route_clients = ClientTable::default();
+                route_clients.add_client(expected_client.clone());
+                route_clients.add_client(other_client);
+                route_clients
+            });
+            let event_loop_fut = event_loop_fut.fuse();
+            let mut event_loop_fut = pin!(event_loop_fut);
 
-        let watcher_stream_fut = respond_to_watcher(
-            watcher_stream.by_ref(),
-            [
-                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                    id: Some(LO_INTERFACE_ID),
-                    name: Some(LO_NAME.to_string()),
-                    port_class: Some(LOOPBACK.into()),
-                    online: Some(true),
-                    addresses: Some(vec![test_addr(TEST_V6_ADDR), test_addr(TEST_V4_ADDR)]),
-                    has_default_ipv4_route: Some(false),
-                    has_default_ipv6_route: Some(false),
-                    ..Default::default()
+            let watcher_stream_fut = respond_to_watcher(
+                watcher_stream.by_ref(),
+                [
+                    fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                        id: Some(LO_INTERFACE_ID),
+                        name: Some(LO_NAME.to_string()),
+                        port_class: Some(LOOPBACK.into()),
+                        online: Some(true),
+                        addresses: Some(vec![test_addr(TEST_V6_ADDR), test_addr(TEST_V4_ADDR)]),
+                        has_default_ipv4_route: Some(false),
+                        has_default_ipv6_route: Some(false),
+                        ..Default::default()
+                    }),
+                    fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
+                        id: Some(ETH_INTERFACE_ID),
+                        name: Some(ETH_NAME.to_string()),
+                        port_class: Some(ETHERNET.into()),
+                        online: Some(eth_interface_online),
+                        addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
+                        has_default_ipv4_route: Some(false),
+                        has_default_ipv6_route: Some(false),
+                        ..Default::default()
+                    }),
+                    fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
+                ],
+            );
+            futures::select_biased! {
+                err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
+                () = watcher_stream_fut.fuse() => {},
+            }
+            assert_eq!(&expected_sink.take_messages()[..], &[]);
+            assert_eq!(&other_sink.take_messages()[..], &[]);
+
+            let expected_client = &expected_client;
+            let fut = futures::stream::iter(args).fold(
+                (Vec::new(), request_sink),
+                |(mut results, mut request_sink), args| async move {
+                    let (completer, waiter) = oneshot::channel();
+                    request_sink
+                        .send(crate::eventloop::UnifiedRequest::InterfacesRequest(Request {
+                            args,
+                            sequence_number: TEST_SEQUENCE_NUMBER,
+                            client: expected_client.clone(),
+                            completer,
+                        }))
+                        .await
+                        .unwrap();
+                    results.push(waiter.await.unwrap());
+                    (results, request_sink)
+                },
+            );
+            // Handle root API requests then feed the returned
+            // `fuchsia.net.interfaces/Event`s to the watcher.
+            let watcher_fut = root_handler(interfaces_request_stream).map(Ok).forward(
+                futures::sink::unfold(watcher_stream.by_ref(), |st, event| async {
+                    respond_to_watcher(st.by_ref(), [event]).await;
+                    Ok::<_, std::convert::Infallible>(st)
                 }),
-                fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
-                    id: Some(ETH_INTERFACE_ID),
-                    name: Some(ETH_NAME.to_string()),
-                    port_class: Some(ETHERNET.into()),
-                    online: Some(eth_interface_online),
-                    addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
-                    has_default_ipv4_route: Some(false),
-                    has_default_ipv6_route: Some(false),
-                    ..Default::default()
-                }),
-                fnet_interfaces::Event::Idle(fnet_interfaces::Empty),
-            ],
-        );
-        futures::select_biased! {
-            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
-            () = watcher_stream_fut.fuse() => {},
-        }
-        assert_eq!(&expected_sink.take_messages()[..], &[]);
-        assert_eq!(&other_sink.take_messages()[..], &[]);
+            );
+            let waiter_results = futures::select_biased! {
+                res = futures::future::join(watcher_fut, event_loop_fut) => {
+                    unreachable!("eventloop/watcher should not return: {res:?}")
+                },
+                (results, _request_sink) = fut.fuse() => results
+            };
+            assert_eq!(&other_sink.take_messages()[..], &[]);
 
-        let expected_client = &expected_client;
-        let fut = futures::stream::iter(args).fold(
-            (Vec::new(), request_sink),
-            |(mut results, mut request_sink), args| async move {
-                let (completer, waiter) = oneshot::channel();
-                request_sink
-                    .send(crate::eventloop::UnifiedRequest::InterfacesRequest(Request {
-                        args,
-                        sequence_number: TEST_SEQUENCE_NUMBER,
-                        client: expected_client.clone(),
-                        completer,
-                    }))
-                    .await
-                    .unwrap();
-                results.push(waiter.await.unwrap());
-                (results, request_sink)
-            },
-        );
-        // Handle root API requests then feed the returned
-        // `fuchsia.net.interfaces/Event`s to the watcher.
-        let watcher_fut = root_handler(interfaces_request_stream).map(Ok).forward(
-            futures::sink::unfold(watcher_stream.by_ref(), |st, event| async {
-                respond_to_watcher(st.by_ref(), [event]).await;
-                Ok::<_, std::convert::Infallible>(st)
-            }),
-        );
-        let waiter_results = futures::select_biased! {
-            res = futures::future::join(watcher_fut, event_loop_fut) => {
-                unreachable!("eventloop/watcher should not return: {res:?}")
-            },
-            (results, _request_sink) = fut.fuse() => results
+            TestRequestResult { messages: expected_sink.take_messages(), waiter_results }
         };
-        assert_eq!(&other_sink.take_messages()[..], &[]);
-        TestRequestResult { messages: expected_sink.take_messages(), waiter_results }
+        scope.join().await;
+        result
     }
 
     #[test_case(

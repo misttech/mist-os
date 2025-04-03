@@ -15,11 +15,13 @@ use futures::{FutureExt as _, StreamExt as _};
 use ip_test_macro::ip_test;
 use linux_uapi::{
     rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
-    rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
+    rtnetlink_groups_RTNLGRP_IPV6_ROUTE, rtnetlink_groups_RTNLGRP_ND_USEROPT,
 };
+use net_declare::{fidl_mac, net_ip_v6};
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netemul::{RealmUdpSocket as _, TestRealm};
 use netlink::multicast_groups::ModernGroup;
+use netlink::FeatureFlags;
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload, NetlinkSerializable};
 use netlink_packet_route::route::{
     RouteAttribute, RouteFlags, RouteHeader, RouteMessage, RouteProtocol, RouteScope, RouteType,
@@ -30,6 +32,7 @@ use netstack_testing_common::realms::{Netstack3, TestSandboxExt};
 use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
+use packet_formats::icmp::ndp as packet_formats_ndp;
 use test_case::test_matrix;
 
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
@@ -37,9 +40,9 @@ use fidl_fuchsia_net_routes_ext::rules::FidlRuleIpExt;
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_ndp as fnet_ndp,
+    fidl_fuchsia_net_root as fnet_root, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 fn connect_to_netlink_protocols_in_realm(
@@ -81,6 +84,10 @@ fn connect_to_netlink_protocols_in_realm(
         <Ipv6 as fnet_routes_ext::rules::FidlRuleAdminIpExt>::RuleTableMarker,
     >()
     .expect("connect to fuchsia.net.routes.admin");
+    let ndp_option_watcher_provider = realm
+        .connect_to_protocol::<fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker>()
+        .expect("connect to fuchsia.net.ndp");
+
     netlink::NetlinkWorkerDiscoverableProtocols {
         root_interfaces,
         interfaces_state,
@@ -92,6 +99,7 @@ fn connect_to_netlink_protocols_in_realm(
         v6_route_table_provider,
         v4_rule_table,
         v6_rule_table,
+        ndp_option_watcher_provider,
     }
 }
 
@@ -367,6 +375,7 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
             NoopInterfacesHandler,
             protocols,
             on_initialized,
+            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -400,7 +409,14 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
         .await;
 
     let mut client = add_route_client(&netlink);
-    client.client.add_membership(route_group::<I>()).expect("should add membership successfully");
+    assert!(
+        client
+            .client
+            .add_membership(route_group::<I>())
+            .expect("should add membership successfully")
+            .is_noop(),
+        "should not produce blocking work"
+    );
 
     for &(test_subnet, ref peer) in &test_peers {
         add_route_and_await_installed::<I>(
@@ -578,6 +594,7 @@ async fn successfully_installs_rule_referencing_main_table<
             NoopInterfacesHandler,
             protocols,
             on_initialized,
+            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -699,6 +716,7 @@ async fn route_table_kept_alive_by_rules<I: Ip + FidlRuleIpExt + FidlRouteIpExt>
             NoopInterfacesHandler,
             protocols,
             on_initialized,
+            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
@@ -920,12 +938,20 @@ async fn route_table_is_cleaned_up_after_rules_and_routes_deleted<
             NoopInterfacesHandler,
             protocols,
             on_initialized,
+            FeatureFlags::test(),
         );
     let _join_handle = fasync::Task::spawn(worker_fut);
     initialized.await.expect("should not be dropped");
 
     let mut client = add_route_client(&netlink);
-    client.client.add_membership(route_group::<I>()).expect("should add membership successfully");
+    assert!(
+        client
+            .client
+            .add_membership(route_group::<I>())
+            .expect("should add membership successfully")
+            .is_noop(),
+        "should not produce blocking work"
+    );
 
     fn destination<I: Ip>() -> std::net::IpAddr {
         match I::VERSION {
@@ -1272,4 +1298,98 @@ async fn route_table_is_cleaned_up_after_rules_and_routes_deleted<
         })
         .await;
     let _ = client;
+}
+
+const MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:00:01:02:03:04");
+const SOURCE_ADDR: net_types::ip::Ipv6Addr = net_ip_v6!("fe80::1");
+
+fn rdnss_option_builder() -> packet_formats_ndp::options::NdpOptionBuilder<'static> {
+    const ADDRESSES: [net_types::ip::Ipv6Addr; 2] =
+        [net_ip_v6!("2001:db8::1"), net_ip_v6!("2001:db8::2")];
+    let option = packet_formats::icmp::ndp::options::RecursiveDnsServer::new(u32::MAX, &ADDRESSES);
+    let builder = packet_formats::icmp::ndp::options::NdpOptionBuilder::RecursiveDnsServer(option);
+    builder
+}
+
+#[fuchsia::test]
+async fn join_leave_nduseropt_multicast_group() {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let main_realm = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("main-netstack"))
+        .expect("create realm");
+
+    let protocols = connect_to_netlink_protocols_in_realm(&main_realm);
+    let (on_initialized, initialized) = oneshot::channel();
+    let (netlink, worker_fut) =
+        netlink::Netlink::<SenderReceiverProvider>::new_from_protocol_connections(
+            NoopInterfacesHandler,
+            protocols,
+            on_initialized,
+            FeatureFlags::test(),
+        );
+    let _join_handle = fasync::Task::spawn(worker_fut);
+    initialized.await.expect("should not be dropped");
+
+    let mut client = add_route_client(&netlink);
+    let waiter = client
+        .client
+        .add_membership(ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT))
+        .expect("should succeed");
+    fasync::unblock(|| waiter.assert_blocking_and_wait_until_complete()).await;
+
+    let network = sandbox.create_network("network").await.expect("failed to create network");
+
+    let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
+    let _iface = main_realm
+        .join_network_with(
+            &network,
+            "iface",
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(MAC)),
+            Default::default(),
+        )
+        .await
+        .expect("failed to join network");
+
+    let builder = rdnss_option_builder();
+    let len = packet::records::RecordBuilder::serialized_len(&builder);
+    let mut want_body = vec![0u8; len];
+    packet::records::RecordBuilder::serialize_into(&builder, &mut want_body);
+
+    netstack_testing_common::ndp::send_ra_with_router_lifetime(
+        &fake_ep,
+        u16::MAX,
+        &[builder],
+        SOURCE_ADDR,
+    )
+    .await
+    .expect("should succeed");
+
+    let message = client.receiver.next().await.expect("should receive message");
+    let SentNetlinkMessage { message, group } = message;
+    assert_eq!(
+        group.expect("should be specified"),
+        ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT)
+    );
+    let message =
+        assert_matches!(message.payload, NetlinkPayload::InnerMessage(message) => message);
+    let message = assert_matches!(
+        message,
+        RouteNetlinkMessage::NewNeighbourDiscoveryUserOption(message) => message
+    );
+
+    assert_eq!(message.option_body, want_body);
+    let attr = assert_matches!(&message.attributes[..], [attr] => attr.clone());
+    let addr_bytes = assert_matches!(attr,
+        netlink_packet_route::neighbour_discovery_user_option::Nla::SourceLinkLocalAddress(
+            addr_bytes,
+        ) => addr_bytes);
+    let addr = net_types::ip::Ipv6Addr::from_bytes(
+        addr_bytes.try_into().expect("should be valid IPv6 bytes"),
+    );
+    assert_eq!(addr, SOURCE_ADDR);
+
+    client
+        .client
+        .del_membership(ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT))
+        .expect("del group should succeed");
 }

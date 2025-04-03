@@ -4,9 +4,11 @@
 
 //! A module for managing individual clients (aka sockets) of Netlink.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::num::NonZeroU32;
+use std::ops::DerefMut as _;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -17,7 +19,7 @@ use netlink_packet_core::NetlinkMessage;
 use crate::logging::{log_debug, log_warn};
 use crate::messaging::Sender;
 use crate::multicast_groups::{
-    InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
+    self, InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
     MulticastGroupMemberships,
 };
 use crate::protocol_family::ProtocolFamily;
@@ -30,10 +32,55 @@ pub(crate) struct ClientId(u64);
 struct InnerClient<F: ProtocolFamily> {
     /// The unique ID for this client.
     id: ClientId,
-    /// The client's current multicast group memberships.
-    group_memberships: Mutex<MulticastGroupMemberships<F>>,
+    /// State relating to the client's multicast group memberships.
+    group_memberships: Mutex<MulticastGroupState<F>>,
     /// The client's assigned port number.
     port_number: Mutex<Option<NonZeroU32>>,
+}
+
+impl<F: ProtocolFamily> Drop for InnerClient<F> {
+    fn drop(&mut self) {
+        let mut group_memberships_lock_guard = self.group_memberships.lock().unwrap();
+        let memberships = std::mem::replace(
+            &mut group_memberships_lock_guard.deref_mut().memberships,
+            MulticastGroupMemberships::new(),
+        );
+        let mut groups = None;
+
+        for group in memberships.iter_groups() {
+            if let Some(group) = F::should_notify_on_group_membership_change(group) {
+                push_one_or_many(&mut groups, group);
+            }
+        }
+        if let Some(groups) = groups {
+            group_memberships_lock_guard
+                .async_work_sink
+                .unbounded_send(AsyncWorkItem::OnLeaveMulticastGroup(groups))
+                .unwrap_or_else(
+                    |_: futures::channel::mpsc::TrySendError<
+                        AsyncWorkItem<<F as ProtocolFamily>::NotifiedMulticastGroup>,
+                    >| log_warn!("async work receiver was dropped"),
+                );
+        }
+    }
+}
+
+struct MulticastGroupState<F: ProtocolFamily> {
+    /// The client's current multicast group memberships.
+    memberships: MulticastGroupMemberships<F>,
+    /// Channel for sending async work to the worker thread.
+    async_work_sink:
+        futures::channel::mpsc::UnboundedSender<AsyncWorkItem<F::NotifiedMulticastGroup>>,
+}
+
+impl<F: ProtocolFamily> MulticastGroupState<F> {
+    fn new(
+        async_work_sink: futures::channel::mpsc::UnboundedSender<
+            AsyncWorkItem<F::NotifiedMulticastGroup>,
+        >,
+    ) -> Self {
+        Self { memberships: MulticastGroupMemberships::new(), async_work_sink }
+    }
 }
 
 impl<F: ProtocolFamily> Display for InnerClient<F> {
@@ -70,7 +117,7 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> Display for InternalClient<F
 impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> InternalClient<F, S> {
     /// Returns true if this client is a member of the provided group.
     pub(crate) fn member_of_group(&self, group: ModernGroup) -> bool {
-        self.inner.group_memberships.lock().unwrap().member_of_group(group)
+        self.inner.group_memberships.lock().unwrap().memberships.member_of_group(group)
     }
 
     /// Sends the given unicast message to the external half of this client.
@@ -95,6 +142,87 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> InternalClient<F, S> {
     }
 }
 
+#[derive(Debug)]
+pub(crate) enum OneOrMany<T> {
+    One(T),
+    Many(HashSet<T>),
+}
+
+impl<T> IntoIterator for OneOrMany<T> {
+    type Item = T;
+
+    type IntoIter = itertools::Either<std::iter::Once<T>, std::collections::hash_set::IntoIter<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            OneOrMany::One(one) => itertools::Either::Left(std::iter::once(one)),
+            OneOrMany::Many(hash_set) => itertools::Either::Right(hash_set.into_iter()),
+        }
+    }
+}
+
+fn push_one_or_many<T: Hash + PartialEq + Eq + Copy>(
+    mut one_or_many: &mut Option<OneOrMany<T>>,
+    item: T,
+) {
+    match &mut one_or_many {
+        None => {
+            *one_or_many = Some(OneOrMany::One(item));
+        }
+        Some(OneOrMany::One(existing)) => {
+            if *existing == item {
+                return;
+            }
+            *one_or_many = Some(OneOrMany::Many(HashSet::from_iter([*existing, item])));
+        }
+        Some(OneOrMany::Many(set)) => {
+            let _: bool = set.insert(item);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum AsyncWorkItem<T> {
+    OnJoinMulticastGroup(T, oneshot_sync::Sender<()>),
+    // No synchronization is actually needed on this, it's just a cleanup signal.
+    OnLeaveMulticastGroup(OneOrMany<T>),
+    OnSetMulticastGroups {
+        joined: Option<OneOrMany<T>>,
+        left: Option<OneOrMany<T>>,
+        complete: Option<oneshot_sync::Sender<()>>,
+    },
+}
+
+/// Blocks until asynchronous work is completed.
+#[derive(Debug)]
+pub enum AsyncWorkCompletionWaiter {
+    /// Blocks until a signal is observed on the receiver.
+    Blocking(oneshot_sync::Receiver<()>),
+    Noop,
+}
+
+impl AsyncWorkCompletionWaiter {
+    /// Blocks until asynchronous work is completed.
+    pub fn wait_until_complete(self) {
+        match self {
+            Self::Blocking(receiver) => receiver.receive().expect("signaler should not be dropped"),
+            Self::Noop => (),
+        }
+    }
+
+    /// Returns true if [`Self::wait_until_complete`] will not produce any
+    /// blocking work.
+    pub fn is_noop(&self) -> bool {
+        matches!(self, AsyncWorkCompletionWaiter::Noop)
+    }
+
+    /// Asserts that blocking work is required, and blocks until asynchronous work is completed.
+    pub fn assert_blocking_and_wait_until_complete(self) {
+        assert_matches!(&self, Self::Blocking(_));
+        self.wait_until_complete()
+    }
+}
+
 /// The external half of a Netlink client, with the internal half being provided
 /// by ['InternalClient'].
 pub(crate) struct ExternalClient<F: ProtocolFamily> {
@@ -115,43 +243,104 @@ impl<F: ProtocolFamily> ExternalClient<F> {
     }
 
     /// Adds the given multicast group membership.
-    pub(crate) fn add_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
-        let res = self.inner.group_memberships.lock().unwrap().add_membership(group);
-        match res {
-            Ok(()) => log_debug!("{} joined multicast group: {:?}", self, group),
-            Err(InvalidModernGroupError) => {
-                log_warn!("{} failed to join invalid multicast group: {:?}", self, group)
-            }
-        };
-        res
+    pub(crate) fn add_membership(
+        &self,
+        group: ModernGroup,
+    ) -> Result<AsyncWorkCompletionWaiter, InvalidModernGroupError> {
+        let mut group_memberships_lock_guard = self.inner.group_memberships.lock().unwrap();
+        let newly_added =
+            group_memberships_lock_guard.memberships.add_membership(group).inspect_err(|err| {
+                log_warn!("{self} failed to join invalid multicast group {group:?}: {err:?}")
+            })?;
+        log_debug!("{self} joined multicast group (newly_added = {newly_added:?}): {group:?}");
+        if !newly_added {
+            return Ok(AsyncWorkCompletionWaiter::Noop);
+        }
+        if let Some(group) = F::should_notify_on_group_membership_change(group) {
+            let (sender, receiver) = oneshot_sync::channel();
+
+            // NB: it's important that this is done under lock to avoid
+            // reordering of setup and teardown events on the channel.
+            group_memberships_lock_guard
+                .async_work_sink
+                .unbounded_send(AsyncWorkItem::OnJoinMulticastGroup(group, sender))
+                .expect("netlink worker should not have dropped async work receiver");
+            Ok(AsyncWorkCompletionWaiter::Blocking(receiver))
+        } else {
+            Ok(AsyncWorkCompletionWaiter::Noop)
+        }
     }
 
     /// Deletes the given multicast group membership.
     pub(crate) fn del_membership(&self, group: ModernGroup) -> Result<(), InvalidModernGroupError> {
-        let res = self.inner.group_memberships.lock().unwrap().del_membership(group);
-        match res {
-            Ok(()) => log_debug!("{} left multicast group: {:?}", self, group),
-            Err(InvalidModernGroupError) => {
-                log_warn!("{} failed to leave invalid multicast group: {:?}", self, group)
-            }
-        };
-        res
+        let mut group_memberships_lock_guard = self.inner.group_memberships.lock().unwrap();
+        let was_present =
+            group_memberships_lock_guard.memberships.del_membership(group).inspect_err(|e| {
+                log_warn!("{self} failed to leave invalid multicast group {group:?}: {e:?}");
+            })?;
+        log_debug!("{self} left multicast group (was_present = {was_present:?}): {group:?}",);
+        if !was_present {
+            return Ok(());
+        }
+        if let Some(group) = F::should_notify_on_group_membership_change(group) {
+            // NB: it's important that this is done under lock to avoid
+            // reordering of setup and teardown events on the channel.
+            group_memberships_lock_guard
+                .async_work_sink
+                .unbounded_send(AsyncWorkItem::OnLeaveMulticastGroup(OneOrMany::One(group)))
+                .expect("netlink worker should not have dropped async work receiver");
+        }
+        Ok(())
     }
 
     /// Sets the legacy multicast group memberships.
     pub(crate) fn set_legacy_memberships(
         &self,
         legacy_memberships: LegacyGroups,
-    ) -> Result<(), InvalidLegacyGroupsError> {
-        let res =
-            self.inner.group_memberships.lock().unwrap().set_legacy_memberships(legacy_memberships);
-        match res {
-            Ok(()) => log_debug!("{} updated multicast groups: {:?}", self, legacy_memberships),
-            Err(InvalidLegacyGroupsError) => {
-                log_warn!("{} failed to update multicast groups: {:?}", self, legacy_memberships)
+    ) -> Result<AsyncWorkCompletionWaiter, InvalidLegacyGroupsError> {
+        let mut group_memberships_lock_guard = self.inner.group_memberships.lock().unwrap();
+        let mutations = group_memberships_lock_guard
+            .memberships
+            .set_legacy_memberships(legacy_memberships)
+            .inspect_err(|e| {
+                log_warn!("{self} failed to update multicast groups {legacy_memberships:?}: {e:?}")
+            })?;
+        log_debug!("{self} updated multicast groups: {legacy_memberships:?}");
+        let mut joined = None;
+        let mut left = None;
+        for mutation in mutations {
+            match mutation {
+                multicast_groups::Mutation::None => {}
+                multicast_groups::Mutation::Add(group) => {
+                    if let Some(group) = F::should_notify_on_group_membership_change(group) {
+                        push_one_or_many(&mut joined, group);
+                    }
+                }
+                multicast_groups::Mutation::Del(group) => {
+                    if let Some(group) = F::should_notify_on_group_membership_change(group) {
+                        push_one_or_many(&mut left, group);
+                    }
+                }
             }
+        }
+
+        let waiter = if joined.is_some() || left.is_some() {
+            let (sender, receiver) = oneshot_sync::channel();
+
+            group_memberships_lock_guard
+                .async_work_sink
+                .unbounded_send(AsyncWorkItem::OnSetMulticastGroups {
+                    joined,
+                    left,
+                    complete: Some(sender),
+                })
+                .expect("netlink worker should not have dropped async work receiver");
+            AsyncWorkCompletionWaiter::Blocking(receiver)
+        } else {
+            AsyncWorkCompletionWaiter::Noop
         };
-        res
+
+        Ok(waiter)
     }
 }
 
@@ -159,13 +348,16 @@ impl<F: ProtocolFamily> ExternalClient<F> {
 pub(crate) fn new_client_pair<F: ProtocolFamily, S: Sender<F::InnerMessage>>(
     id: ClientId,
     sender: S,
+    async_work_sink: futures::channel::mpsc::UnboundedSender<
+        AsyncWorkItem<F::NotifiedMulticastGroup>,
+    >,
 ) -> (ExternalClient<F>, InternalClient<F, S>) {
     let inner = Arc::new(InnerClient {
         id,
-        group_memberships: Mutex::new(MulticastGroupMemberships::new()),
+        group_memberships: Mutex::new(MulticastGroupState::new(async_work_sink)),
         port_number: Mutex::default(),
     });
-    (ExternalClient { inner: inner.clone() }, InternalClient { inner, sender: sender })
+    (ExternalClient { inner: inner.clone() }, InternalClient { inner, sender })
 }
 
 /// A generator of [`ClientId`].
@@ -242,6 +434,9 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
+
+    use futures::{Future, StreamExt as _};
+
     use crate::messaging::testutil::{FakeSender, FakeSenderSink};
 
     pub(crate) const CLIENT_ID_1: ClientId = ClientId(1);
@@ -254,13 +449,26 @@ pub(crate) mod testutil {
     pub(crate) fn new_fake_client<F: ProtocolFamily>(
         id: ClientId,
         group_memberships: &[ModernGroup],
-    ) -> (FakeSenderSink<F::InnerMessage>, InternalClient<F, FakeSender<F::InnerMessage>>) {
+    ) -> (
+        FakeSenderSink<F::InnerMessage>,
+        InternalClient<F, FakeSender<F::InnerMessage>>,
+        impl Future<Output = ()>,
+    ) {
         let (sender, sender_sink) = crate::messaging::testutil::fake_sender_with_sink();
-        let (external_client, internal_client) = new_client_pair(id, sender);
+        let (async_work_sink, mut async_work_receiver) = futures::channel::mpsc::unbounded();
+
+        let (external_client, internal_client) = new_client_pair(id, sender, async_work_sink);
         for group in group_memberships {
-            external_client.add_membership(*group).expect("add group membership");
+            let waiter = external_client.add_membership(*group).expect("add group membership");
+            assert!(waiter.is_noop(), "should not use this helper for incurring blocking work");
         }
-        (sender_sink, internal_client)
+
+        let async_work_drain_task = async move {
+            let work = async_work_receiver.next().await;
+            assert_matches!(work, None, "should not receive any async work: {work:?}");
+        };
+
+        (sender_sink, internal_client, async_work_drain_task)
     }
 }
 
@@ -271,11 +479,14 @@ mod tests {
     use std::collections::HashSet;
 
     use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
     use test_case::test_case;
 
     use crate::messaging::testutil::{fake_sender_with_sink, SentMessage};
     use crate::protocol_family::testutil::{
         new_fake_netlink_message, FakeProtocolFamily, MODERN_GROUP1, MODERN_GROUP2,
+        MODERN_GROUP_NEEDS_BLOCKING,
     };
 
     impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
@@ -287,23 +498,38 @@ mod tests {
         }
     }
 
+    fn closed_async_work_sink<T: Copy + Clone + Debug + 'static>(
+    ) -> futures::channel::mpsc::UnboundedSender<AsyncWorkItem<T>> {
+        let (sender, _) = futures::channel::mpsc::unbounded();
+        sender.close_channel();
+        sender
+    }
+
     // Verify that multicast group membership changes applied to the external
     // client are observed on the internal client.
-    #[test]
-    fn test_group_memberships() {
+    #[fuchsia::test]
+    async fn test_group_memberships() {
         let (sender, _sink) = fake_sender_with_sink();
-        let (external_client, internal_client) =
-            new_client_pair::<FakeProtocolFamily, _>(testutil::CLIENT_ID_1, sender);
+        let (async_work_sink, mut async_work_receiver) = futures::channel::mpsc::unbounded();
+        let (external_client, internal_client) = new_client_pair::<FakeProtocolFamily, _>(
+            testutil::CLIENT_ID_1,
+            sender,
+            async_work_sink,
+        );
 
         assert!(!internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));
 
         // Add one membership and verify the other is unaffected.
-        external_client.add_membership(MODERN_GROUP1).expect("failed to add membership");
+        let waiter =
+            external_client.add_membership(MODERN_GROUP1).expect("failed to add membership");
+        assert!(waiter.is_noop(), "should not need to block on async work");
         assert!(internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));
         // Add the second membership.
-        external_client.add_membership(MODERN_GROUP2).expect("failed to add membership");
+        let waiter =
+            external_client.add_membership(MODERN_GROUP2).expect("failed to add membership");
+        assert!(waiter.is_noop(), "should not need to block on async work");
         assert!(internal_client.member_of_group(MODERN_GROUP1));
         assert!(internal_client.member_of_group(MODERN_GROUP2));
         // Delete the first membership and verify the other is unaffected.
@@ -314,24 +540,68 @@ mod tests {
         external_client.del_membership(MODERN_GROUP2).expect("failed to del membership");
         assert!(!internal_client.member_of_group(MODERN_GROUP1));
         assert!(!internal_client.member_of_group(MODERN_GROUP2));
+
+        let waiter = external_client
+            .add_membership(MODERN_GROUP_NEEDS_BLOCKING)
+            .expect("add should succeed");
+        let work = async_work_receiver.next().await.expect("should yield work");
+        match work {
+            AsyncWorkItem::OnJoinMulticastGroup((), sender) => {
+                sender.send(());
+            }
+            AsyncWorkItem::OnLeaveMulticastGroup(_) => panic!("should be join not leave"),
+            AsyncWorkItem::OnSetMulticastGroups { .. } => panic!("should be join not set"),
+        }
+        waiter.assert_blocking_and_wait_until_complete();
+
+        assert!(
+            external_client
+                .add_membership(MODERN_GROUP_NEEDS_BLOCKING)
+                .expect("add should succeed")
+                .is_noop(),
+            "should be no-op"
+        );
+
+        external_client.del_membership(MODERN_GROUP_NEEDS_BLOCKING).expect("add should succeed");
+        let work = async_work_receiver.next().await.expect("should yield work");
+        match work {
+            AsyncWorkItem::OnJoinMulticastGroup(..) => panic!("should be leave"),
+            AsyncWorkItem::OnLeaveMulticastGroup(groups) => {
+                assert_matches!(groups, OneOrMany::One(()));
+            }
+            AsyncWorkItem::OnSetMulticastGroups { .. } => panic!("should be leave"),
+        }
+
+        drop(async_work_receiver);
+
+        // Deleting the membership again shouldn't panic even though the async
+        // work receiver has been dropped, as we're already not in the group (so
+        // no additional work needs to be done).
+        external_client.del_membership(MODERN_GROUP_NEEDS_BLOCKING).expect("add should succeed");
     }
 
-    #[test]
-    fn test_send_message_to_group() {
+    #[fuchsia::test]
+    async fn test_send_message_to_group() {
         let clients = ClientTable::default();
-        let (mut sink_group1, client_group1) = testutil::new_fake_client::<FakeProtocolFamily>(
-            testutil::CLIENT_ID_1,
-            &[MODERN_GROUP1],
-        );
-        let (mut sink_group2, client_group2) = testutil::new_fake_client::<FakeProtocolFamily>(
-            testutil::CLIENT_ID_2,
-            &[MODERN_GROUP2],
-        );
-        let (mut sink_both_groups, client_both_groups) =
+        let scope = fasync::Scope::new();
+        let (mut sink_group1, client_group1, async_work_drain_task) =
+            testutil::new_fake_client::<FakeProtocolFamily>(
+                testutil::CLIENT_ID_1,
+                &[MODERN_GROUP1],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut sink_group2, client_group2, async_work_drain_task) =
+            testutil::new_fake_client::<FakeProtocolFamily>(
+                testutil::CLIENT_ID_2,
+                &[MODERN_GROUP2],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut sink_both_groups, client_both_groups, async_work_drain_task) =
             testutil::new_fake_client::<FakeProtocolFamily>(
                 testutil::CLIENT_ID_3,
                 &[MODERN_GROUP1, MODERN_GROUP2],
             );
+        let _join_handle = scope.spawn(async_work_drain_task);
         clients.add_client(client_group1);
         clients.add_client(client_group2);
         clients.add_client(client_both_groups);
@@ -361,6 +631,8 @@ mod tests {
             &sink_both_groups.take_messages()[..],
             &[SentMessage::multicast(new_fake_netlink_message(), MODERN_GROUP2)]
         );
+        drop(clients);
+        scope.join().await;
     }
 
     #[test]
@@ -379,8 +651,11 @@ mod tests {
     #[test_case(1; "pid_1")]
     fn test_set_port_number(port_number: u32) {
         let (sender, mut sink) = fake_sender_with_sink();
-        let (external_client, mut internal_client) =
-            new_client_pair::<FakeProtocolFamily, _>(testutil::CLIENT_ID_1, sender);
+        let (external_client, mut internal_client) = new_client_pair::<FakeProtocolFamily, _>(
+            testutil::CLIENT_ID_1,
+            sender,
+            closed_async_work_sink(),
+        );
 
         if let Some(port_number) = NonZeroU32::new(port_number) {
             external_client.set_port_number(port_number)

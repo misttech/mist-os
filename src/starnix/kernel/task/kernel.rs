@@ -677,8 +677,10 @@ impl Kernel {
         self: &'a Arc<Self>,
     ) -> &'a Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
-            let (network_netlink, network_netlink_async_worker) =
-                Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
+            let (network_netlink, network_netlink_async_worker) = Netlink::new(
+                InterfacesHandlerImpl(Arc::downgrade(self)),
+                netlink::FeatureFlags::prod(),
+            );
             self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");

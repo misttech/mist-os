@@ -134,6 +134,13 @@ pub(crate) struct MulticastGroupMemberships<F: MulticastCapableNetlinkFamily> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InvalidModernGroupError;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum Mutation {
+    None,
+    Add(ModernGroup),
+    Del(ModernGroup),
+}
+
 /// Error returned when attempting to join invalid [`LegacyGroups`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InvalidLegacyGroupsError;
@@ -150,46 +157,48 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
     }
 
     /// Adds the given multicast group membership.
+    ///
+    /// Returns `true` if the membership was newly added.
     pub(crate) fn add_membership(
         &mut self,
         group: ModernGroup,
-    ) -> Result<(), InvalidModernGroupError> {
+    ) -> Result<bool, InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
             return Err(InvalidModernGroupError);
         }
-        let _was_absent: bool = memberships.insert(group.into());
-        return Ok(());
+        let was_absent = memberships.insert(group.into());
+        return Ok(was_absent);
     }
 
     /// Deletes the given multicast group membership.
+    ///
+    /// Returns `true` if the membership was newly removed.
     pub(crate) fn del_membership(
         &mut self,
         group: ModernGroup,
-    ) -> Result<(), InvalidModernGroupError> {
+    ) -> Result<bool, InvalidModernGroupError> {
         let MulticastGroupMemberships { family: _, memberships } = self;
         if !F::is_valid_group(&group) {
             return Err(InvalidModernGroupError);
         }
-        let _was_present: bool = memberships.remove(group.into());
-        return Ok(());
+        let was_present = memberships.remove(group.into());
+        return Ok(was_present);
     }
 
     /// Sets the legacy multicast group memberships.
     ///
     /// Legacy memberships are translated into their modern equivalent before
     /// being written.
+    ///
+    /// Returns the mutations applied.
     pub(crate) fn set_legacy_memberships(
         &mut self,
         LegacyGroups(requested_groups): LegacyGroups,
-    ) -> Result<(), InvalidLegacyGroupsError> {
+    ) -> Result<Vec<Mutation>, InvalidLegacyGroupsError> {
+        crate::logging::log_debug!("set_legacy_memberships");
         let MulticastGroupMemberships { family: _, memberships } = self;
-        #[derive(Clone, Copy)]
-        enum Mutation {
-            None,
-            Add(ModernGroup),
-            Del(ModernGroup),
-        }
+
         let mut mutations = [Mutation::None; U32_BITS_USIZE];
         // Validate and record all the mutations that will need to be applied.
         for i in 0..U32_BITS_USIZE {
@@ -213,19 +222,36 @@ impl<F: MulticastCapableNetlinkFamily> MulticastGroupMemberships<F> {
                 (None, false) => Mutation::None,
             };
         }
+
+        let mut return_mutations = Vec::new();
         // Apply all of the mutations.
         for mutation in mutations {
             match mutation {
                 Mutation::None => {}
                 Mutation::Add(group) => {
-                    let _was_absent: bool = memberships.insert(group.into());
+                    crate::logging::log_debug!("mutation: add {group:?}");
+                    let was_absent = memberships.insert(group.into());
+                    if was_absent {
+                        return_mutations.push(Mutation::Add(group));
+                    }
                 }
                 Mutation::Del(group) => {
-                    let _was_present: bool = memberships.remove(group.into());
+                    crate::logging::log_debug!("mutation: del {group:?}");
+                    let was_present = memberships.remove(group.into());
+                    if was_present {
+                        return_mutations.push(Mutation::Del(group));
+                    }
                 }
             }
         }
-        Ok(())
+        Ok(return_mutations)
+    }
+
+    pub(crate) fn iter_groups(&self) -> impl Iterator<Item = ModernGroup> + '_ {
+        self.memberships.into_iter().map(|n: usize| {
+            let n = u32::try_from(n).expect("all ModernGroups fit in u32");
+            ModernGroup(n)
+        })
     }
 }
 
@@ -257,24 +283,30 @@ mod tests {
         assert!(!memberships.member_of_group(MODERN_GROUP3));
 
         // Add one membership, and verify the others are unaffected.
-        memberships.add_membership(MODERN_GROUP1).expect("failed to add");
+        let changed = memberships.add_membership(MODERN_GROUP1).expect("failed to add");
+        assert!(changed, "should have changed group memberships");
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
         assert!(!memberships.member_of_group(MODERN_GROUP3));
         // Add a second & third membership.
-        memberships.add_membership(MODERN_GROUP2).expect("failed to add");
-        memberships.add_membership(MODERN_GROUP3).expect("failed to add");
+        let changed = memberships.add_membership(MODERN_GROUP2).expect("failed to add");
+        assert!(changed, "should have changed group memberships");
+        let changed = memberships.add_membership(MODERN_GROUP3).expect("failed to add");
+        assert!(changed, "should have changed group memberships");
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
         assert!(memberships.member_of_group(MODERN_GROUP3));
         // Remove one membership, and verify the others are unaffected.
-        memberships.del_membership(MODERN_GROUP1).expect("failed to del");
+        let changed = memberships.del_membership(MODERN_GROUP1).expect("failed to del");
+        assert!(changed, "should have changed group memberships");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
         assert!(memberships.member_of_group(MODERN_GROUP3));
         // Remove the second & third membership.
-        memberships.del_membership(MODERN_GROUP2).expect("failed to del");
-        memberships.del_membership(MODERN_GROUP3).expect("failed to del");
+        let changed = memberships.del_membership(MODERN_GROUP2).expect("failed to del");
+        assert!(changed, "should have changed group memberships");
+        let changed = memberships.del_membership(MODERN_GROUP3).expect("failed to del");
+        assert!(changed, "should have changed group memberships");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
         assert!(!memberships.member_of_group(MODERN_GROUP3));
@@ -298,28 +330,38 @@ mod tests {
         assert!(!memberships.member_of_group(MODERN_GROUP3));
 
         // Add one membership and verify the others are unaffected.
-        memberships
+        let mutations = memberships
             .set_legacy_memberships(LegacyGroups(LEGACY_GROUP1))
             .expect("failed to set legacy groups");
+        let expected_mutations = [Mutation::Add(MODERN_GROUP1)];
+        assert_eq!(mutations, expected_mutations);
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
         assert!(!memberships.member_of_group(MODERN_GROUP3));
         // Add a second & third membership.
-        memberships
+        let mutations = memberships
             .set_legacy_memberships(LegacyGroups(LEGACY_GROUP1 | LEGACY_GROUP2 | LEGACY_GROUP3))
             .expect("failed to set legacy groups");
+        let expected_mutations = [Mutation::Add(MODERN_GROUP2), Mutation::Add(MODERN_GROUP3)];
+        assert_eq!(mutations, expected_mutations);
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
         assert!(memberships.member_of_group(MODERN_GROUP3));
         // Remove one membership and verify the others are unaffected.
-        memberships
+        let mutations = memberships
             .set_legacy_memberships(LegacyGroups(LEGACY_GROUP2 | LEGACY_GROUP3))
             .expect("failed to set legacy_groups");
+        let expected_mutations = [Mutation::Del(MODERN_GROUP1)];
+        assert_eq!(mutations, expected_mutations);
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
         assert!(memberships.member_of_group(MODERN_GROUP3));
         // Remove the second & third membership.
-        memberships.set_legacy_memberships(LegacyGroups(0)).expect("failed to set legacy groups");
+        let mutations = memberships
+            .set_legacy_memberships(LegacyGroups(0))
+            .expect("failed to set legacy groups");
+        let expected_mutations = [Mutation::Del(MODERN_GROUP2), Mutation::Del(MODERN_GROUP3)];
+        assert_eq!(mutations, expected_mutations);
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
         assert!(!memberships.member_of_group(MODERN_GROUP3));
@@ -338,29 +380,31 @@ mod tests {
         assert!(!memberships.member_of_group(MODERN_GROUP2));
 
         // Add memberships by their legacy group and drop by their modern group.
-        memberships
+        let _: Vec<Mutation> = memberships
             .set_legacy_memberships(LegacyGroups(LEGACY_GROUP1 | LEGACY_GROUP2))
             .expect("failed to set legacy groups");
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
-        memberships.del_membership(MODERN_GROUP1).expect("failed to del");
+        let _: bool = memberships.del_membership(MODERN_GROUP1).expect("failed to del");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
-        memberships.del_membership(MODERN_GROUP2).expect("failed to del");
+        let _: bool = memberships.del_membership(MODERN_GROUP2).expect("failed to del");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
 
         // Add memberships by their modern group and drop by their legacy group.
-        memberships.add_membership(MODERN_GROUP1).expect("failed to add");
-        memberships.add_membership(MODERN_GROUP2).expect("failed to add");
+        let _: bool = memberships.add_membership(MODERN_GROUP1).expect("failed to add");
+        let _: bool = memberships.add_membership(MODERN_GROUP2).expect("failed to add");
         assert!(memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
-        memberships
+        let _: Vec<Mutation> = memberships
             .set_legacy_memberships(LegacyGroups(LEGACY_GROUP2))
             .expect("failed to set legacy groups");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(memberships.member_of_group(MODERN_GROUP2));
-        memberships.set_legacy_memberships(LegacyGroups(0)).expect("failed to set legacy groups");
+        let _: Vec<Mutation> = memberships
+            .set_legacy_memberships(LegacyGroups(0))
+            .expect("failed to set legacy groups");
         assert!(!memberships.member_of_group(MODERN_GROUP1));
         assert!(!memberships.member_of_group(MODERN_GROUP2));
     }

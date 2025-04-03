@@ -953,10 +953,15 @@ impl SocketOps for RouteNetlinkSocket {
         if let Some(pid) = pid {
             client.set_pid(pid);
         }
-        match client.set_legacy_memberships(LegacyGroups(multicast_groups)) {
-            Err(InvalidLegacyGroupsError {}) => error!(EPERM),
-            Ok(()) => Ok(()),
-        }
+        // This "blocks" in order to synchronize with the internal
+        // state of the rtnetlink worker, but we're not blocking on
+        // the completion of any i/o or any expensive computation,
+        // so there's no need to support interrupts here.
+        client
+            .set_legacy_memberships(LegacyGroups(multicast_groups))
+            .map_err(|InvalidLegacyGroupsError {}| errno!(EPERM))?
+            .wait_until_complete();
+        Ok(())
     }
 
     fn read(
@@ -1092,16 +1097,23 @@ impl SocketOps for RouteNetlinkSocket {
             (SOL_NETLINK, NETLINK_ADD_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
                 let group: u32 = current_task.read_object(user_opt.try_into()?)?;
-                client
+                let async_work = client
                     .add_membership(ModernGroup(group))
-                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
+                // This "blocks" in order to synchronize with the internal
+                // state of the rtnetlink worker, but we're not blocking on
+                // the completion of any i/o or any expensive computation,
+                // so there's no need to support interrupts here.
+                async_work.wait_until_complete();
+                Ok(())
             }
             (SOL_NETLINK, NETLINK_DROP_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
                 let group: u32 = current_task.read_object(user_opt.try_into()?)?;
                 client
                     .del_membership(ModernGroup(group))
-                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
+                Ok(())
             }
             _ => self.inner.lock().setsockopt(current_task, level, optname, user_opt),
         }
