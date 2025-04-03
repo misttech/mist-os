@@ -520,7 +520,10 @@ class VmCowPages final : public VmHierarchyBase,
   };
   // Adds an allocated page to this cow pages at the specified offset, can be optionally zeroed and
   // any mappings invalidated. If an error is returned the caller retains ownership of |page|.
-  // Offset must be page aligned.
+  // Offset must be page aligned. Mappings being invalidated is controlled by |deferred| where if
+  // a nullptr is passed then no mappings, in this object or any child, will be invalidated. If
+  // |deferred| is non-null then mappings will be invalidated if necessary, both immediately in this
+  // object, and via |deferred| for the children.
   //
   // |overwrite| controls how the function handles pre-existing content at |offset|. If |overwrite|
   // does not permit replacing the content, ZX_ERR_ALREADY_EXISTS will be returned. If a page is
@@ -528,8 +531,8 @@ class VmCowPages final : public VmHierarchyBase,
   // and the caller takes ownership of this page. If the |overwrite| action is such that a page
   // cannot be released, it is valid for the caller to pass in nullptr for |released_page|.
   zx_status_t AddNewPageLocked(uint64_t offset, vm_page_t* page, CanOverwriteContent overwrite,
-                               VmPageOrMarker* released_page, bool zero = true,
-                               bool do_range_update = true) TA_REQ(lock());
+                               VmPageOrMarker* released_page, bool zero, DeferredOps* deferred)
+      TA_REQ(lock());
 
   // Adds a set of pages consecutively starting from the given offset. Regardless of the return
   // result ownership of the pages is taken. Pages are assumed to be in the ALLOC state and can be
@@ -539,8 +542,8 @@ class VmCowPages final : public VmHierarchyBase,
   // not valid to specify the |CanOverwriteContent::NonZero| option, as any pages that would get
   // released as a consequence cannot be returned.
   zx_status_t AddNewPagesLocked(uint64_t start_offset, list_node_t* pages,
-                                CanOverwriteContent overwrite, bool zero = true,
-                                bool do_range_update = true) TA_REQ(lock());
+                                CanOverwriteContent overwrite, bool zero, DeferredOps* deferred)
+      TA_REQ(lock());
 
   // Attempts to release pages in the pages list causing the range to become copy-on-write again.
   // For consistency if there is a parent or a backing page source, such that the range would not
@@ -1200,19 +1203,19 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // |p| must not be Empty()
   //
-  // This operation unmaps the corresponding offset from any existing mappings, unless
-  // |do_range_update| is false, in which case it will skip updating mappings.
+  // This operation unmaps the corresponding offset from any existing mappings, unless |deferred| is
+  // a |nullptr|, in which case it will skip updating mappings.
   //
   // Any previous content in the slot is returned and must be dealt with by the caller.
   [[nodiscard]] VmPageOrMarker CompleteAddPageLocked(AddPageTransaction& transaction,
-                                                     VmPageOrMarker&& p, bool do_range_update)
+                                                     VmPageOrMarker&& p, DeferredOps* deferred)
       TA_REQ(lock());
 
   // Similar to |CompleteAddPageLocked| except a |vm_page_t| is provided that is assumed to not yet
   // be in the |OBJECT| state, this page may also be optionally zeroed.
   [[nodiscard]] VmPageOrMarker CompleteAddNewPageLocked(AddPageTransaction& transaction,
                                                         vm_page_t* page, bool zero,
-                                                        bool do_range_update) TA_REQ(lock());
+                                                        DeferredOps* deferred) TA_REQ(lock());
 
   // Cancels an add page transaction and potentially frees the unused slot. It is required to call
   // this, instead of dropping an |AddPageTransaction| to ensure the page list does not gather empty
@@ -1231,7 +1234,7 @@ class VmCowPages final : public VmHierarchyBase,
   // the page given in |p| should insertion fail. Otherwise see those methods for a description of
   // the parameters.
   zx::result<VmPageOrMarker> AddPageLocked(uint64_t offset, VmPageOrMarker&& p,
-                                           CanOverwriteContent overwrite, bool do_range_update)
+                                           CanOverwriteContent overwrite, DeferredOps* deferred)
       TA_REQ(lock());
 
   // Unmaps and frees all the committed pages in the specified range.

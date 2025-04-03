@@ -339,7 +339,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     // Add all the preallocated pages to the object, this takes ownership of all pages regardless
     // of the outcome. This is a new VMO, but this call could fail due to OOM.
     status = cow_pages->AddNewPagesLocked(0, &prealloc_pages, VmCowPages::CanOverwriteContent::Zero,
-                                          true, false);
+                                          true, nullptr);
     if (status != ZX_OK) {
       return status;
     }
@@ -439,8 +439,8 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   // regardless of outcome.
   // This is a newly created VMO with a page source, so we don't expect to be overwriting anything
   // in its page list.
-  status = vmo->cow_pages_locked()->AddNewPagesLocked(0, &page_list,
-                                                      VmCowPages::CanOverwriteContent::None);
+  status = vmo->cow_pages_locked()->AddNewPagesLocked(
+      0, &page_list, VmCowPages::CanOverwriteContent::None, true, nullptr);
   if (status != ZX_OK) {
     return status;
   }
@@ -494,7 +494,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       // This is a newly created anonymous VMO, so we expect to be overwriting zeros. A newly
       // created anonymous VMO with no committed pages has all its content implicitly zero.
       status = vmo->cow_pages_locked()->AddNewPageLocked(
-          count * PAGE_SIZE, page, VmCowPages::CanOverwriteContent::Zero, nullptr, false, false);
+          count * PAGE_SIZE, page, VmCowPages::CanOverwriteContent::Zero, nullptr, false, nullptr);
       ASSERT_MSG(status == ZX_OK,
                  "AddNewPageLocked failed on page %zu of %zu at %#" PRIx64 " from [%#" PRIx64
                  ", %#" PRIx64 ")",
