@@ -3,15 +3,16 @@
 # found in the LICENSE file.
 
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "rustc_library")
 
-rust_library(
+rustc_library(
     name = "lib",
     srcs = ["src/lib.rs"],
     crate_name = "netext",
     edition = "2021",
     target_compatible_with = HOST_CONSTRAINTS,
     version = "0.1.0",
+    with_unit_tests = True,
     deps = [
         "//third_party/rust_crates/forks/nix-0.29.0:nix",
         "//third_party/rust_crates/vendor:anyhow",

@@ -2,35 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/host.gni")
-import("//build/rust/rustc_binary.gni")
-import("//build/rust/rustc_test.gni")
-import("//build/sdk/sdk_host_tool.gni")
-
-rustc_test("formatjson5_test") {
-  sources = [ "src/main.rs" ]
-  source_root = "src/main.rs"
-  edition = "2021"
-
-  deps = [
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:json5format",
-    "//third_party/rust_crates:structopt",
-  ]
-}
-
-sdk_host_tool("formatjson5_sdk") {
-  category = "partner"
-  output_name = "formatjson5"
-  deps = [ ":formatjson5" ]
-}
-
-install_host_tools("install") {
-  deps = [ ":formatjson5" ]
-
-  outputs = [ "formatjson5" ]
-}
-
 ## BAZEL2GN SENTINEL - DO NOT EDIT BELOW THIS LINE ##
 #
 #  ________  _________  ________  ________
@@ -66,10 +37,24 @@ if (is_host) {
   rustc_binary("formatjson5") {
     sources = [ "src/main.rs" ]
     edition = "2021"
+    with_unit_tests = true
     deps = [
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:json5format",
       "//third_party/rust_crates:structopt",
     ]
+  }
+}
+if (is_host) {
+  sdk_host_tool("formatjson5_sdk") {
+    category = "partner"
+    output_name = "formatjson5"
+    deps = [ ":formatjson5" ]
+  }
+}
+if (is_host) {
+  install_host_tools("install") {
+    outputs = [ "formatjson5" ]
+    deps = [ ":formatjson5" ]
   }
 }
