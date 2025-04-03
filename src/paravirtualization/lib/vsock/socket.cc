@@ -355,6 +355,9 @@ zx::result<fbl::unique_fd> CreateVirtioStreamSocket() {
 
   zxio_storage_t* listen_socket_storage = nullptr;
   fdio_t* listen_socket_fdio = fdio_zxio_create(&listen_socket_storage);
+  if (listen_socket_fdio == nullptr) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
   new (listen_socket_storage) ZxioSocket(*std::move(client_end));
 
   return zx::ok(fbl::unique_fd(fdio_bind_to_fd(listen_socket_fdio, -1, 0)));
