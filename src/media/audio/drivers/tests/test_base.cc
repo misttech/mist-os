@@ -27,8 +27,6 @@
 
 #include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
 
-inline constexpr bool kAllowCompositeDriverUnsupportedRingBufferFormats = true;
-
 namespace media::audio::drivers::test {
 
 using component_testing::ChildRef;
@@ -39,7 +37,6 @@ using component_testing::RealmRoot;
 using component_testing::Route;
 
 // Device discovery is done once at binary open; a fresh FIDL channel is used for each test.
-// TODO(b/301003578): When virtual audio is DFv2, remove DFv1-specific trampoline support.
 void TestBase::SetUp() {
   media::audio::test::TestFixture::SetUp();
 
@@ -58,6 +55,7 @@ void TestBase::SetUp() {
     case DriverType::Composite:
       // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
       // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
+      // TODO(b/301003578): When virtual audio is DFv2, remove DFv1-specific trampoline support.
       if (entry.device_type == DeviceType::Virtual) {
         CreateCompositeFromChannel(
             ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
@@ -847,30 +845,20 @@ void TestBase::RetrieveRingBufferFormats() {
     }
     composite()->GetRingBufferFormats(
         *ring_buffer_id_,
-        AddCallback("GetRingBufferFormats", [this](
-                                                fuchsia::hardware::audio::
-                                                    Composite_GetRingBufferFormats_Result result) {
-          if (!device_entry().isVirtual() && !device_entry().isA2DP() &&
-              kAllowCompositeDriverUnsupportedRingBufferFormats) {
-            if (result.is_err() &&
-                (result.err() == fuchsia::hardware::audio::DriverError::NOT_SUPPORTED)) {
-              GTEST_SKIP()
-                  << "*** this audio device is known to not (yet) support GetRingBufferFormats()."
-                  << " Skipping this test. ***";
-              __UNREACHABLE;
-            }
-          }
-          ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
-          auto& supported_formats = result.response().ring_buffer_formats;
-          EXPECT_FALSE(supported_formats.empty());
+        AddCallback("GetRingBufferFormats",
+                    [this](fuchsia::hardware::audio::Composite_GetRingBufferFormats_Result result) {
+                      ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
+                      auto& supported_formats = result.response().ring_buffer_formats;
+                      EXPECT_FALSE(supported_formats.empty());
 
-          for (size_t i = 0; i < supported_formats.size(); ++i) {
-            SCOPED_TRACE(testing::Message() << "Composite supported_formats[" << i << "]");
-            ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
-            auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
-            ring_buffer_pcm_formats_.push_back(std::move(format_set));
-          }
-        }));
+                      for (size_t i = 0; i < supported_formats.size(); ++i) {
+                        SCOPED_TRACE(testing::Message()
+                                     << "Composite supported_formats[" << i << "]");
+                        ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
+                        auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
+                        ring_buffer_pcm_formats_.push_back(std::move(format_set));
+                      }
+                    }));
   } else if (device_entry().isDai()) {
     dai()->GetRingBufferFormats(
         AddCallback("GetRingBufferFormats",
