@@ -33,6 +33,8 @@
         },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.usb.phy.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
+        { service: "fuchsia.boot.metadata.SerialNumberMetadata" },
     ],
     expose: [
         {
