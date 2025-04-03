@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -59,15 +59,15 @@ class TestPowerDevice : public DeviceType,
 
 zx_status_t TestPowerDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestPowerDevice>(parent);
-  pdev_protocol_t pdev;
   zx_status_t status;
 
   zxlogf(INFO, "TestPowerDevice::Create: %s ", DRIVER_NAME);
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not get ZX_PROTOCOL_PDEV", __func__);
-    return status;
+  zx::result pdev =
+      dev->DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent);
+  if (pdev.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
+    return pdev.status_value();
   }
 
   status = dev->DdkAdd(ddk::DeviceAddArgs("test-power")
