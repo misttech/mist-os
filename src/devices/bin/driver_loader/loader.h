@@ -152,13 +152,13 @@ class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher
       auto result = GetDepVmo(lib_dir, soname.c_str());
       if (result.is_ok()) {
         return RemoteModule::Decoded::Create(diag, std::move(*result), kPageSize);
-
-        // |MissingDependency| or |SystemError| will return true if we should continue
-        // processing even on error, or false if we should abort early.
-      } else if (result.error_value() == ZX_ERR_NOT_FOUND
-                     ? !diag.MissingDependency(soname.str())
-                     : !diag.SystemError("cannot open dependency ", soname.str(), ": ",
-                                         elfldltl::ZirconError{result.error_value()})) {
+      }
+      // |MissingDependency| or |SystemError| will return true if we should continue
+      // processing even on error, or false if we should abort early.
+      if (result.error_value() == ZX_ERR_NOT_FOUND
+              ? !diag.MissingDependency(soname.str())
+              : !diag.SystemError("cannot open dependency ", soname.str(), ": ",
+                                  elfldltl::ZirconError{result.error_value()})) {
         // Tell the linker to abort.
         return std::nullopt;
       }
