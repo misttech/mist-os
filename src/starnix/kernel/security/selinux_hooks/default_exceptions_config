@@ -33,14 +33,36 @@ todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default fd
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default file
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default anon_inode
 
-// https://fxbug.dev/385121365 - Kernel threads perform I/O on "adbd" FDs, failing checks.
+// https://fxbug.dev/385121365 - Kernel threads perform I/O on a "functionfs" file provided by "adbd".
 todo_deny https://fxbug.dev/385121365 kernel adbd fd
+todo_deny https://fxbug.dev/385121365 kernel functionfs file
 
 // https://fxbug.dev/407739795 - "adbd" reciprocates, using FDs created by the kernel.
 todo_deny https://fxbug.dev/407739795 adbd kernel fd
 
+// https://fxbug.dev/396378979 - Some platform components try to load .so's from vendor_file labeled files.
+todo_deny https://fxbug.dev/396378979 surfaceflinger vendor_file file
+todo_deny https://fxbug.dev/396378979 bootanim vendor_file file
+todo_deny https://fxbug.dev/396378979 zygote vendor_file file
+
+// https://fxbug.dev/385121365 - "netd" fails file "read" checks on /proc/sys/kernel/modprobe
+todo_deny https://fxbug.dev/385121365 netd usermodehelper file
+
+// https://fxbug.dev/407970458 - "init" and "wificond" try to play with "netlink_route_socket"s, and are denied.
+todo_deny https://fxbug.dev/407970458 init init netlink_route_socket
+todo_deny https://fxbug.dev/407970458 wificond wificond netlink_route_socket
+
+// https://fxbug.dev/407971655 - "vendor_init" tries to write to a "device" and is denied.
+todo_deny https://fxbug.dev/407971655 vendor_init device chr_file
+
 // https://fxbug.dev/408136119 - Missing policy configuration breaks one of the system daemons.
 todo_deny https://fxbug.dev/408136119 init device chr_file
+
+// https://fxbug.dev/408146899 - logd attempts to read the "cmdline" of an unlabeled process.
+todo_deny https://fxbug.dev/408146899 logd unlabeled file
+
+// https://fxbug.dev/408148161 - Fails to read "/proc/.../stat" of a zygote.
+todo_deny https://fxbug.dev/408148161 gmscore_app zygote file
 
 //
 // Exceptions required for the SELinux Test Suite container.
