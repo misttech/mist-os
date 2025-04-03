@@ -41,11 +41,14 @@ Ring::Ring(Ring&& other) noexcept {
 }
 
 Ring::~Ring() {
-  zx_status_t status =
-      VmAspace::kernel_aspace()->FreeRegion(reinterpret_cast<vaddr_t>(ring_buffer_.ptr));
-  if (status != ZX_OK) {
-    LTRACEF("failed to free ring buffer: %d\n", status);
-  }
+  LTRACE_ENTRY_OBJ;
+
+  // TODO (Herrera) : Implement kernel like dma buffer (src/devices/lib/dma-buffer/dma-buffer.cc)
+    //zx_status_t status =
+      //VmAspace::kernel_aspace()->FreeRegion(reinterpret_cast<vaddr_t>(ring_buffer_.ptr));
+  //if (status != ZX_OK) {
+    //LTRACEF("failed to free ring buffer: %d\n", status);
+  //}
 }
 
 Ring& Ring::operator=(Ring&& other) noexcept {
