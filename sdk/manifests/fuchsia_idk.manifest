@@ -302,6 +302,7 @@ fidl_library://fidl/fuchsia.hardware.usb.descriptor (unstable)
 fidl_library://fidl/fuchsia.hardware.usb.endpoint (unstable)
 fidl_library://fidl/fuchsia.hardware.usb.phy (unstable)
 fidl_library://fidl/fuchsia.hardware.usb.request (unstable)
+fidl_library://fidl/fuchsia.hardware.vreg (unstable)
 fidl_library://fidl/fuchsia.hwinfo
 fidl_library://fidl/fuchsia.images
 fidl_library://fidl/fuchsia.images2

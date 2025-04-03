@@ -115,6 +115,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint",
   "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy",
   "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request",
+  "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg",
   "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo",
   "//sdk/fidl/fuchsia.images2:fuchsia.images2",
   "//sdk/fidl/fuchsia.images:fuchsia.images",
