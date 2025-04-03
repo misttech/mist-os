@@ -44,13 +44,13 @@ cargo install --version 0.26.0 --force cbindgen
 Generate a Cargo.toml by following [the instructions on
 fuchsia.dev](https://fuchsia.dev/fuchsia-src/development/languages/rust/cargo)
 for the build target
-`//src/diagnostics/lib/cpp-log-decoder:lib`.
+`//src/lib/diagnostics/log/message/rust/cpp-log-decoder:lib`.
 
 As of this writing, this is done in the following way.
 
 1. Using `fx args`, add `//build/rust:cargo_toml_gen` to `host_labels`.
 
-2. Using `fx args`, add `//src/diagnostics/lib/cpp-log-decoder:lib`
+2. Using `fx args`, add `//src/lib/diagnostics/log/message/rust/cpp-log-decoder:lib`
    to `build_only_labels`.
 
 3. Build the `cargo_toml_gen` target and generate the `Cargo.toml`
@@ -62,7 +62,7 @@ fx args # then append "//src/diagnostics/lib/cpp-log-decoder:lib"
         # to `build_only_labels`
 
 fx build //build/rust:cargo_toml_gen
-fx gen-cargo //src/diagnostics/lib/cpp-log-decoder:_log_decoder_c_bindings_rustc_static.actual
+fx gen-cargo //src/lib/diagnostics/log/message/rust/cpp-log-decoder:_log_decoder_c_bindings_rustc_static.actual
 fx gen-cargo //src/lib/diagnostics/log/message/rust:lib.actual
 ```
 
@@ -73,6 +73,6 @@ create/update the bindings header. If you could not link the
 Fuchsia toolchain, you may substitute `RUSTUP_TOOLCHAIN=nightly`.
 
 ```
-RUSTUP_TOOLCHAIN=fuchsia cbindgen ~/fuchsia/src/diagnostics/lib/cpp-log-decoder -o ~/fuchsia/src/diagnostics/lib/cpp-log-decoder/log_decoder.h
+RUSTUP_TOOLCHAIN=fuchsia cbindgen ~/fuchsia/src/lib/diagnostics/log/message/rust/cpp-log-decoder -o ~/fuchsia/src/lib/diagnostics/log/message/rust/cpp-log-decoder/log_decoder.h
 ```
 
