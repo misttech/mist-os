@@ -5034,7 +5034,7 @@ struct BinderFeaturesDir {
 
 impl BinderFeaturesDir {
     fn new() -> Self {
-        Self { features: BTreeMap::from([("freeze_notification".into(), false)]) }
+        Self { features: BTreeMap::from([("freeze_notification".into(), true)]) }
     }
 }
 
