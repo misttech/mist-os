@@ -396,11 +396,8 @@ class VmCowPages final : public VmHierarchyBase,
   // If ZX_OK is returned then |supplied_len| will always be equal to |len|. For any other error
   // code the value of |supplied_len| is undefined.
   zx_status_t SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
-                                uint64_t* supplied_len, MultiPageRequest* page_request)
-      TA_REQ(lock());
-
-  zx_status_t SupplyPages(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
-                          uint64_t* supplied_len, MultiPageRequest* page_request) TA_EXCL(lock());
+                                uint64_t* supplied_len, DeferredOps& deferred,
+                                MultiPageRequest* page_request) TA_REQ(lock());
 
   // See VmObject::FailPageRequests
   zx_status_t FailPageRequestsLocked(VmCowRange range, zx_status_t error_status) TA_REQ(lock());

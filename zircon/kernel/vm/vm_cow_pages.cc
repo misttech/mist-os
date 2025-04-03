@@ -4916,17 +4916,9 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::SupplyPages(VmCowRange range, VmPageSpliceList* pages,
-                                    SupplyOptions options, uint64_t* supplied_len,
-                                    MultiPageRequest* page_request) {
-  canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
-  return SupplyPagesLocked(range, pages, options, supplied_len, page_request);
-}
-
 zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pages,
                                           SupplyOptions options, uint64_t* supplied_len,
-                                          MultiPageRequest* page_request) {
+                                          DeferredOps& deferred, MultiPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(range.is_page_aligned());
@@ -4975,9 +4967,6 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
 
   const uint64_t start = range.offset;
   const uint64_t end = range.end();
-
-  list_node freed_list;
-  list_initialize(&freed_list);
 
   // [new_pages_start, new_pages_start + new_pages_len) tracks the current run of
   // consecutive new pages added to this vmo.
@@ -5030,18 +5019,15 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
         DEBUG_ASSERT(src_page.IsPage());
         vm_page_t* page = src_page.ReleasePage();
         DEBUG_ASSERT(!list_in_list(&page->queue_node));
-        list_add_tail(&freed_list, &page->queue_node);
+        list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
       }
 
       if (likely(page_transaction.status_value() == ZX_ERR_ALREADY_EXISTS)) {
         // We hit the end of a run of absent pages, so notify the page source
         // of any new pages that were added and reset the tracking variables.
         if (new_pages_len) {
-          {
-            __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-            RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len),
-                                    RangeChangeOp::Unmap, &deferred);
-          }
+          RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap,
+                                  &deferred);
           if (page_source_) {
             page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
           }
@@ -5079,7 +5065,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       if (result.is_ok()) {
         CopyPageContentsForReplacementLocked(*result, src_page.Page());
         vm_page_t* free_page = src_page.ReleasePage();
-        list_add_tail(&freed_list, &free_page->queue_node);
+        list_add_tail(deferred.FreedList(this).List(), &free_page->queue_node);
       } else {
         old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page), nullptr);
       }
@@ -5118,7 +5104,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       DEBUG_ASSERT(!released_page->is_loaned());
       pmm_page_queues()->Remove(released_page);
       DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
-      list_add_tail(&freed_list, &released_page->queue_node);
+      list_add_tail(deferred.FreedList(this).List(), &released_page->queue_node);
     } else if (old_page.IsReference()) {
       FreeReference(old_page.ReleaseReference());
     } else {
@@ -5133,18 +5119,11 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
   // number of pages in the splice list.
   DEBUG_ASSERT(offset == end || status != ZX_OK);
   if (new_pages_len) {
-    {
-      __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-      RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap,
-                              &deferred);
-    }
+    RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap,
+                            &deferred);
     if (page_source_) {
       page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
     }
-  }
-
-  if (!list_is_empty(&freed_list)) {
-    FreePages(&freed_list);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());

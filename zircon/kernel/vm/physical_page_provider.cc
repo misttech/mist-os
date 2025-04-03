@@ -394,6 +394,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
 
       // First take the VMO lock before taking our lock to ensure lock ordering is correct. As we
       // hold a RefPtr we know that even if racing with OnClose this is a valid object.
+      VmCowPages::DeferredOps deferred(cow_pages_);
       Guard<VmoLockType> cow_lock{cow_pages_->lock()};
       bool detached;
       // Now take our lock and check to see if we have been detached.
@@ -410,7 +411,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
         // request.
         zx_status_t supply_result = cow_pages_->SupplyPagesLocked(
             VmCowRange(supply_offset, supply_length), &splice_list,
-            SupplyOptions::PhysicalPageProvider, &supplied_len, nullptr);
+            SupplyOptions::PhysicalPageProvider, &supplied_len, deferred, nullptr);
         ASSERT(supplied_len == supply_length || supply_result != ZX_OK);
         if (supply_result != ZX_OK) {
           // Supply can only fail due to being out of memory as we currently hold the lock and know

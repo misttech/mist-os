@@ -1865,11 +1865,14 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<VmoLockType> guard{lock()};
-
     uint64_t supply_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->SupplyPagesLocked(range, pages, options, &supply_len, &page_request);
+    zx_status_t status;
+    {
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
+      Guard<VmoLockType> guard{lock()};
+      status = cow_pages_locked()->SupplyPagesLocked(range, pages, options, &supply_len, deferred,
+                                                     &page_request);
+    }
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1885,7 +1888,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
     range = range.TrimedFromStart(supply_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
+      status = page_request.Wait();
       if (status != ZX_OK) {
         return status;
       }
