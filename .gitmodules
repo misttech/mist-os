@@ -5,7 +5,7 @@
 	ignore = all
 [submodule "third_party/acpica"]
 	path = third_party/acpica
-	url = https://fuchsia.googlesource.com/third_party/acpica
+	url = https://github.com/misttech/acpica
 	name = third_party/acpica
 	ignore = all
 [submodule "third_party/android/platform/bionic"]
@@ -52,6 +52,10 @@
 	path = third_party/jinja2/jinja2
 	url = https://fuchsia.googlesource.com/third_party/jinja2
 	name = third_party/jinja2
+[submodule "third_party/lk"]
+	name = third_party/lk
+	url = https://github.com/misttech/lk
+	path = third_party/lk
 	ignore = all
 [submodule "third_party/llvm-libc/src"]
 	path = third_party/llvm-libc/src
@@ -123,3 +127,7 @@
 	url = https://fuchsia.googlesource.com/third_party/zstd
 	name = third_party/zstd
 	ignore = all
+[submodule "vendor/misttech/third_party/lwip/src"]
+	name = misttech/third_party/lwip
+	path = vendor/misttech/third_party/lwip/src
+	url = https://github.com/misttech/lwip

@@ -1,40 +1,7 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
-import("//build/bind/bind.gni")
-import("//build/components.gni")
-import("//build/drivers.gni")
-import("//build/test.gni")
-
-driver_bind_rules("virtio_ethernet_bind") {
-  rules = "meta/virtio_netdevice.bind"
-  tests = "meta/bind-tests.json"
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
-    "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.pci",
-  ]
-}
-
-test("virtio-netdevice-test") {
-  sources = [ "netdevice_test.cc" ]
-  deps = [
-    ":virtio_netdevice_lib",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bus/lib/virtio:virtio-dfv1",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_package("virtio-netdevice-test-package") {
-  package_name = "virtio-netdevice-test"
-  deps = [ ":virtio-netdevice-test" ]
-}
 
 source_set("virtio_netdevice_lib") {
   sources = [
@@ -42,43 +9,13 @@ source_set("virtio_netdevice_lib") {
     "netdevice.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
-    "//src/connectivity/network/drivers/network-device/device:shared_lock",
-    "//src/devices/bus/lib/virtio:virtio-dfv1",
-    "//src/devices/lib/dev-operation",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_banjo_cpp",
+    "//src/connectivity/lib/network-device/buffer_descriptor",
+    "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
     "//src/lib/vmo_store",
+    "//vendor/misttech/src/connectivity/network/drivers/network-device:src",
   ]
-}
-
-fuchsia_cc_driver("virtio_netdevice-driver") {
-  legacy = true
-  output_name = "virtio_netdevice"
-  sources = [ "netdevice_driver.cc" ]
-  deps = [
-    ":virtio_ethernet_bind",
-    ":virtio_netdevice_lib",
-    "//src/devices/lib/driver",
-  ]
-}
-
-fuchsia_driver_component("virtio_netdevice") {
-  component_name = "virtio_netdevice"
-  deps = [ ":virtio_netdevice-driver" ]
-  info = "meta/virtio_ethernet-info.json"
-  manifest = "meta/virtio_netdevice.cml"
-}
-
-fuchsia_driver_package("package") {
-  package_name = "virtio_netdevice"
-  driver_components = [ ":virtio_netdevice" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":virtio-netdevice-test-package",
-    ":virtio_ethernet_bind_test",
-  ]
+  configs += [ "//build/config:default_include_dirs" ]
 }

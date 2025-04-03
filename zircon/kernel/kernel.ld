@@ -172,6 +172,10 @@ SECTIONS {
     *(.data.rel.ro.lk_init)
     PROVIDE_HIDDEN(__stop_lk_init = .);
 
+    PROVIDE_HIDDEN(__start_lk_fs = .);
+    *(.data.rel.ro.lk_fs)
+    PROVIDE_HIDDEN(__stop_lk_fs = .);
+
     PROVIDE_HIDDEN(__start_unittest_testcases = .);
     *(.data.rel.ro.unittest_testcases)
     PROVIDE_HIDDEN(__stop_unittest_testcases = .);

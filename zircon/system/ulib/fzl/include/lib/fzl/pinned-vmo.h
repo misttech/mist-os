@@ -5,16 +5,16 @@
 #ifndef LIB_FZL_PINNED_VMO_H_
 #define LIB_FZL_PINNED_VMO_H_
 
-#include <lib/zx/bti.h>
-#include <lib/zx/pmt.h>
-#include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
-#include <memory>
 #include <utility>
 
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
+#include <object/bus_transaction_initiator_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
+#include <vm/pinned_vm_object.h>
+#include <vm/vm_address_region.h>
 
 namespace fzl {
 
@@ -40,9 +40,10 @@ class PinnedVmo {
     return *this;
   }
 
-  zx_status_t Pin(const zx::vmo& vmo, const zx::bti& bti, uint32_t options);
-  zx_status_t PinRange(uint64_t offset, uint64_t len, const zx::vmo& vmo, const zx::bti& bti,
-                       uint32_t options);
+  zx_status_t Pin(const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                  const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti, uint32_t options);
+  zx_status_t PinRange(uint64_t offset, uint64_t len, const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                       const fbl::RefPtr<BusTransactionInitiatorDispatcher>&, uint32_t options);
   void Unpin();
 
   uint32_t region_count() const { return region_count_; }
@@ -54,11 +55,12 @@ class PinnedVmo {
 
  private:
   void UnpinInternal();
-  zx_status_t PinInternal(uint64_t offset, uint64_t len, const zx::vmo& vmo, const zx::bti& bti,
+  zx_status_t PinInternal(uint64_t offset, uint64_t len, const fbl::RefPtr<VmObjectDispatcher>& vmo,
+                          const fbl::RefPtr<BusTransactionInitiatorDispatcher>& bti,
                           uint32_t options);
 
-  zx::pmt pmt_;
-  std::unique_ptr<Region[]> regions_;
+  KernelHandle<PinnedMemoryTokenDispatcher> pmt_;
+  ktl::unique_ptr<Region[]> regions_;
   uint32_t region_count_ = 0;
 };
 

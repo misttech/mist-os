@@ -98,6 +98,10 @@ if (current_toolchain == default_toolchain) {
 
     # Always enable frame pointers.
     configs += [ "//build/config:frame_pointers" ]
+
+    if (is_mistos) {
+      configs += [ "//build/config/fuchsia:mistos_define" ]
+    }
   }
 }
 

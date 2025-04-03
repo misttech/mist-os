@@ -142,10 +142,6 @@ static_library("elfldltl") {
   if (is_linux) {
     configs -= [ "//build/config/linux:implicit-host-libs" ]
   }
-
-  if (is_mistos) {
-    configs += [ "//build/config/fuchsia:mistos_define" ]
-  }
 }
 
 if (is_elf) {

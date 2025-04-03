@@ -5,11 +5,12 @@
 #ifndef LIB_FZL_VMAR_MANAGER_H_
 #define LIB_FZL_VMAR_MANAGER_H_
 
-#include <lib/zx/vmar.h>
+#include <zircon/types.h>
 
 #include <fbl/macros.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <object/vm_address_region_dispatcher.h>
 
 namespace fzl {
 
@@ -38,7 +39,7 @@ class VmarManager : public fbl::RefCounted<VmarManager> {
                                                                   ZX_VM_CAN_MAP_READ |
                                                                   ZX_VM_CAN_MAP_WRITE);
 
-  const zx::vmar& vmar() const { return vmar_; }
+  const fbl::RefPtr<VmAddressRegion>& vmar() const { return vmar_; }
   void* start() const { return start_; }
   uint64_t size() const { return size_; }
   const fbl::RefPtr<VmarManager>& parent() const { return parent_; }
@@ -48,15 +49,15 @@ class VmarManager : public fbl::RefCounted<VmarManager> {
 
   VmarManager() = default;
   ~VmarManager() {
-    if (vmar_.is_valid()) {
-      vmar_.destroy();
+    if (vmar_) {
+      vmar_->Destroy();
     }
   }
 
   // suppress default constructors
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmarManager);
 
-  zx::vmar vmar_;
+  fbl::RefPtr<VmAddressRegion> vmar_;
   void* start_ = nullptr;
   uint64_t size_ = 0;
   fbl::RefPtr<VmarManager> parent_;

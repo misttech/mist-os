@@ -7,7 +7,9 @@
 
 #include <lib/stdcompat/optional.h>
 
+#ifndef __mist_os__
 #include <random>
+#endif
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_hash_table.h>
@@ -84,6 +86,7 @@ class SlabStorage : public AbstractStorage<_Key, _Meta> {
   GrowableSlab<Item, Key> slab_;
 };
 
+#ifndef __mist_os__
 // A storage base for VmoStore that uses an fbl::HashTable backing.
 // The hash table nodes are std::unique_ptrs that are fallibly allocated on insertion.
 //
@@ -206,6 +209,7 @@ class HashTableStorage : public AbstractStorage<_Key, _Meta> {
   std::default_random_engine rnd_;
   fbl::HashTable<Key, std::unique_ptr<HashTableVmo>> table_;
 };
+#endif
 
 // Provides a `Backing` for `VmoStore` that uses any implementer of `AbstractStorage`.
 // This type of `Backing` can be used if the static dispatch option provided by `VmoStore` is not

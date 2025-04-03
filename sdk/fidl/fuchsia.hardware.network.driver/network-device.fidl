@@ -611,7 +611,7 @@ closed protocol NetworkDeviceImpl {
     @async
     strict PrepareVmo(resource struct {
         id VmoId;
-        vmo zx.Handle:VMO;
+        vmo vector<byte>:1;
     }) -> (struct {
         s zx.Status;
     });

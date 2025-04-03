@@ -1,10 +1,10 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "netdevice.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/virtio/ring.h>
 #include <lib/zircon-internal/align.h>
@@ -12,22 +12,18 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <unistd.h>
+#include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <memory>
-#include <utility>
+#include <algorithm>
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <virtio/net.h>
 #include <virtio/virtio.h>
 
-#include "src/devices/bus/lib/virtio/trace.h"
-
-// Enables/disables debugging info
 #define LOCAL_TRACE 0
 
 namespace virtio {
@@ -56,10 +52,9 @@ uint16_t MaxVirtqueuePairs(const virtio_net_config& config, bool is_mq_supported
 
 }  // namespace
 
-NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
-                             std::unique_ptr<Backend> backend)
-    : virtio::Device(std::move(bti_handle), std::move(backend)),
-      DeviceType(bus_device),
+NetworkDevice::NetworkDevice(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
+                             ktl::unique_ptr<Backend> backend)
+    : virtio::Device(bti, ktl::move(backend)),
       rx_(this),
       tx_(this),
       vmo_store_({
@@ -70,17 +65,17 @@ NetworkDevice::NetworkDevice(zx_device_t* bus_device, zx::bti bti_handle,
               },
           .pin =
               vmo_store::PinOptions{
-                  .bti = zx::unowned_bti(bti()),
+                  .bti = bti,
                   .bti_pin_options = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE,
                   .index = true,
               },
       }),
-      mac_addr_proto_({&mac_addr_protocol_ops_, this}) {}
+      mac_addr_proto_({.ops = &mac_addr_protocol_ops_, .ctx = this}) {}
 
 NetworkDevice::~NetworkDevice() {}
 
 zx_status_t NetworkDevice::Init() {
-  fbl::AutoLock lock(&state_lock_);
+  Guard<BrwLockPi, BrwLockPi::Writer> guard(&state_lock_);
 
   // Reset the device.
   DeviceReset();
@@ -93,7 +88,7 @@ zx_status_t NetworkDevice::Init() {
   if (zx_status_t status =
           AckFeatures(&is_status_supported_, &is_multiqueue_supported_, &virtio_hdr_len_);
       status != ZX_OK) {
-    zxlogf(ERROR, "failed to ack features: %s", zx_status_get_string(status));
+    LTRACEF("failed to ack features: %d\n", status);
     return status;
   }
 
@@ -102,27 +97,21 @@ zx_status_t NetworkDevice::Init() {
   CopyDeviceConfig(&config, sizeof(config));
 
   // We've checked that the config.mac field is valid (VIRTIO_NET_F_MAC) in AckFeatures().
-  zxlogf(DEBUG, "mac: %02x:%02x:%02x:%02x:%02x:%02x", config.mac[0], config.mac[1], config.mac[2],
-         config.mac[3], config.mac[4], config.mac[5]);
-  zxlogf(DEBUG, "link active: %u", IsLinkActive(config, is_status_supported_));
-  zxlogf(DEBUG, "max virtqueue pairs: %u", MaxVirtqueuePairs(config, is_multiqueue_supported_));
+  LTRACEF("mac: %02x:%02x:%02x:%02x:%02x:%02x\n", config.mac[0], config.mac[1], config.mac[2],
+          config.mac[3], config.mac[4], config.mac[5]);
+  LTRACEF("link active: %u\n", IsLinkActive(config, is_status_supported_));
+  LTRACEF("max virtqueue pairs: %u\n", MaxVirtqueuePairs(config, is_multiqueue_supported_));
 
   static_assert(sizeof(config.mac) == sizeof(mac_.octets));
-  std::copy(std::begin(config.mac), std::end(config.mac), mac_.octets.begin());
+  std::ranges::copy(config.mac, std::begin(mac_.octets));
 
   if (zx_status_t status = vmo_store_.Reserve(MAX_VMOS); status != ZX_OK) {
-    zxlogf(ERROR, "failed to initialize vmo store: %s", zx_status_get_string(status));
+    LTRACEF("failed to initialize vmo store: %s\n", zx_status_get_string(status));
     return status;
   }
 
-  // Initialize the zx_device and publish us.
-  if (zx_status_t status = DdkAdd("virtio-net"); status != ZX_OK) {
-    zxlogf(ERROR, "failed to add device: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  tx_depth_ = std::min(GetRingSize(kTxId), kMaxDepth);
-  rx_depth_ = std::min(GetRingSize(kRxId), kMaxDepth);
+  tx_depth_ = ktl::min(GetRingSize(kTxId), kMaxDepth);
+  rx_depth_ = ktl::min(GetRingSize(kRxId), kMaxDepth);
 
   // Start the interrupt thread.
   StartIrqThread();
@@ -135,7 +124,7 @@ zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multi
   const uint64_t supported_features = DeviceFeaturesSupported();
 
   if (!(supported_features & VIRTIO_NET_F_MAC)) {
-    zxlogf(ERROR, "device does not have a given MAC address.");
+    LTRACEF("device does not have a given MAC address.\n");
     return ZX_ERR_NOT_SUPPORTED;
   }
   uint64_t enable_features = VIRTIO_NET_F_MAC;
@@ -172,15 +161,6 @@ zx_status_t NetworkDevice::AckFeatures(bool* is_status_supported, bool* is_multi
   return ZX_OK;
 }
 
-void NetworkDevice::DdkRelease() {
-  {
-    fbl::AutoLock lock(&state_lock_);
-    ifc_.clear();
-  }
-  virtio::Device::Release();
-  delete this;
-}
-
 void NetworkDevice::IrqRingUpdate() {
   for (;;) {
     bool again = IrqRingUpdateInternal();
@@ -191,17 +171,17 @@ void NetworkDevice::IrqRingUpdate() {
 }
 
 bool NetworkDevice::IrqRingUpdateInternal() {
-  network::SharedAutoLock state_lock(&state_lock_);
+  Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
   if (!ifc_.is_valid()) {
     return false;
   }
 
   bool more_work = false;
 
-  std::array<tx_result_t, kMaxDepth> tx_results;
+  ktl::array<tx_result_t, kMaxDepth> tx_results;
   auto tx_it = tx_results.begin();
   {
-    std::lock_guard lock(tx_lock_);
+    Guard<Mutex> guard(&tx_lock_);
     tx_.SetNoInterrupt();
     // Ring::IrqRingUpdate will call this lambda on each tx buffer completed
     // by the underlying device since the last IRQ.
@@ -219,12 +199,12 @@ bool NetworkDevice::IrqRingUpdateInternal() {
     ifc_.CompleteTx(tx_results.data(), count);
   }
 
-  std::array<rx_buffer_t, kMaxDepth> rx_buffers;
-  std::array<rx_buffer_part_t, kMaxDepth> rx_buffers_parts;
+  ktl::array<rx_buffer_t, kMaxDepth> rx_buffers;
+  ktl::array<rx_buffer_part_t, kMaxDepth> rx_buffers_parts;
   auto rx_part_it = rx_buffers_parts.begin();
   auto rx_it = rx_buffers.begin();
   {
-    std::lock_guard lock(rx_lock_);
+    Guard<Mutex> guard(&rx_lock_);
     rx_.SetNoInterrupt();
     // Ring::IrqRingUpdate will call this lambda on each rx buffer filled by
     // the underlying device since the last IRQ.
@@ -244,8 +224,8 @@ bool NetworkDevice::IrqRingUpdateInternal() {
       ZX_ASSERT_MSG(used_elem->len >= virtio_hdr_len_,
                     "got buffer (%u) smaller than virtio header (%u)", used_elem->len,
                     virtio_hdr_len_);
-      zxlogf(TRACE, "Receiving %d bytes (hdrlen = %u):", len, virtio_hdr_len_);
-      if (zxlog_level_enabled(TRACE)) {
+      LTRACEF("Receiving %d bytes (hdrlen = %u):\n", len, virtio_hdr_len_);
+      if (LOCAL_TRACE >= 2) {
         virtio_dump_desc(&desc);
       }
       *rx_part_it++ = {
@@ -257,8 +237,7 @@ bool NetworkDevice::IrqRingUpdateInternal() {
           .meta =
               {
                   .port = kPortId,
-                  .frame_type =
-                      static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
+                  .frame_type = FRAME_TYPE_ETHERNET,
               },
           .data_list = &*parts_list,
           .data_count = 1,
@@ -275,7 +254,7 @@ bool NetworkDevice::IrqRingUpdateInternal() {
 }
 
 void NetworkDevice::IrqConfigChange() {
-  network::SharedAutoLock lock(&state_lock_);
+  Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
   if (!ifc_.is_valid()) {
     return;
   }
@@ -288,9 +267,7 @@ port_status_t NetworkDevice::ReadStatus() const {
   virtio_net_config config;
   CopyDeviceConfig(&config, sizeof(config));
   return {
-      .flags = IsLinkActive(config, is_status_supported_)
-                   ? static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline)
-                   : 0,
+      .flags = IsLinkActive(config, is_status_supported_) ? STATUS_FLAGS_ONLINE : 0,
       .mtu = kMtu,
   };
 }
@@ -298,7 +275,7 @@ port_status_t NetworkDevice::ReadStatus() const {
 void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
                                           network_device_impl_init_callback callback,
                                           void* cookie) {
-  fbl::AutoLock lock(&state_lock_);
+  Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
   using Context = std::tuple<network_device_impl_init_callback, void*>;
   std::unique_ptr context = std::make_unique<Context>(callback, cookie);
@@ -307,11 +284,11 @@ void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* i
       kPortId, this, &network_port_protocol_ops_,
       [](void* ctx, zx_status_t status) {
         std::unique_ptr<Context> context(static_cast<Context*>(ctx));
-        auto [callback, cookie] = *context;
+        auto [_callback, _cookie] = *context;
         if (status != ZX_OK) {
-          zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+          LTRACEF("failed to add port: %s\n", zx_status_get_string(status));
         }
-        callback(cookie, status);
+        _callback(_cookie, status);
       },
       context.release());
 }
@@ -328,7 +305,7 @@ void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback ca
     if (zx_status_t status =
             AckFeatures(&is_status_supported, &is_multiqueue_supported, &header_length);
         status != ZX_OK) {
-      zxlogf(ERROR, "failed to ack features: %s", zx_status_get_string(status));
+      LTRACEF("failed to ack features: %d\n", status);
       return status;
     }
     ZX_ASSERT_MSG(is_status_supported == is_status_supported_,
@@ -342,23 +319,23 @@ void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback ca
                   header_length);
 
     if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
-      zxlogf(ERROR, "%s: Feature negotiation failed (%s)", tag(), zx_status_get_string(status));
+      LTRACEF("%s: Feature negotiation failed (%s)\n", tag(), zx_status_get_string(status));
       return status;
     }
 
     // Allocate virtqueues.
     {
-      std::lock_guard rx_lock(rx_lock_);
-      std::lock_guard tx_lock(tx_lock_);
+      Guard<Mutex> rx_guard(&rx_lock_);
+      Guard<Mutex> tx_guard(&tx_lock_);
       Ring rx_queue(this);
       if (zx_status_t status = rx_queue.Init(kRxId, rx_depth_); status != ZX_OK) {
-        zxlogf(ERROR, "failed to allocate rx virtqueue: %s", zx_status_get_string(status));
+        LTRACEF("failed to allocate rx virtqueue: %d\n", status);
         return status;
       }
       rx_ = std::move(rx_queue);
       Ring tx_queue(this);
       if (zx_status_t status = tx_queue.Init(kTxId, tx_depth_); status != ZX_OK) {
-        zxlogf(ERROR, "failed to allocate tx virtqueue: %s", zx_status_get_string(status));
+        LTRACEF("failed to allocate tx virtqueue: %d\n", status);
         return status;
       }
       tx_ = std::move(tx_queue);
@@ -376,13 +353,13 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
 
   // Return all pending buffers.
   {
-    network::SharedAutoLock state_lock(&state_lock_);
+    Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
     // Pending tx buffers.
     {
       std::array<tx_result_t, kMaxDepth> tx_return;
       auto iter = tx_return.begin();
       {
-        std::lock_guard lock(tx_lock_);
+        Guard<Mutex> guard(&tx_lock_);
         // Free all TX ring entries to prevent the IRQ handler from completing these buffers.
         tx_.IrqRingUpdate([this](vring_used_elem* used_elem) {
           []() __TA_ASSERT(tx_lock_) {}();
@@ -411,7 +388,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
       auto iter = rx_return.begin();
       auto parts_iter = rx_return_parts.begin();
       {
-        std::lock_guard lock(rx_lock_);
+        Guard<Mutex> guard(&rx_lock_);
         // Free all RX ring entries to prevent the IRQ handler from completing these buffers.
         rx_.IrqRingUpdate([this](vring_used_elem* used_elem) {
           []() __TA_ASSERT(rx_lock_) {}();
@@ -422,8 +399,7 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
         while (!rx_in_flight_.Empty()) {
           Descriptor d = rx_in_flight_.Pop();
           *iter++ = {
-              .meta = {.frame_type =
-                           static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
+              .meta = {.frame_type = FRAME_TYPE_ETHERNET},
               .data_list = &*parts_iter,
               .data_count = 1,
           };
@@ -456,8 +432,8 @@ void NetworkDevice::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
 }
 
 void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t buf_count) {
-  network::SharedAutoLock lock(&state_lock_);
-  std::lock_guard tx_lock(tx_lock_);
+  Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
+  Guard<Mutex> guard(&tx_lock_);
   for (const auto& buffer : cpp20::span(buf_list, buf_count)) {
     ZX_DEBUG_ASSERT_MSG(buffer.data_count == 1, "received unsupported scatter gather buffer %zu",
                         buffer.data_count);
@@ -523,10 +499,10 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
     tx_in_flight_buffer_ids_[id] = buffer.id;
     tx_in_flight_active_[id] = true;
     // Submit the descriptor and notify the back-end.
-    if (zxlog_level_enabled(TRACE)) {
+    if (LOCAL_TRACE >= 2) {
       virtio_dump_desc(desc);
     }
-    zxlogf(TRACE, "Sending %zu bytes (hdrlen = %u):", data.length, virtio_hdr_len_);
+    LTRACEF("Sending %zu bytes (hdrlen = %u):\n", data.length, virtio_hdr_len_);
     tx_.SubmitChain(id);
   }
   if (!tx_.NoNotify()) {
@@ -536,8 +512,8 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
 
 void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list,
                                                   size_t buf_count) {
-  network::SharedAutoLock lock(&state_lock_);
-  std::lock_guard rx_lock(rx_lock_);
+  Guard<BrwLockPi, BrwLockPi::Reader> state_guard(&state_lock_);
+  Guard<Mutex> guard(&rx_lock_);
   for (const auto& buffer : cpp20::span(buf_list, buf_count)) {
     const buffer_region_t& data = buffer.region;
 
@@ -561,15 +537,16 @@ void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
         .len = static_cast<uint32_t>(data.length),
         .flags = VRING_DESC_F_WRITE,
     };
+
     rx_in_flight_.Push({
         .buffer_id = buffer.id,
         .ring_id = id,
     });
     // Submit the descriptor and notify the back-end.
-    if (zxlog_level_enabled(TRACE)) {
+    if (LOCAL_TRACE >= 2) {
       virtio_dump_desc(desc);
     }
-    zxlogf(TRACE, "Queueing rx space with %zu bytes:", data.length);
+    LTRACEF("Queueing rx space with %zu bytes:\n", data.length);
     rx_.SubmitChain(id);
   }
   if (!rx_.NoNotify()) {
@@ -577,32 +554,36 @@ void NetworkDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
   }
 }
 
-void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
+void NetworkDevice::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, const uint8_t* vmo_list,
+                                                size_t vmo_count,
                                                 network_device_impl_prepare_vmo_callback callback,
                                                 void* cookie) {
+  fbl::RefPtr<VmObjectDispatcher> vmo = fbl::ImportFromRawPtr<VmObjectDispatcher>(
+      (VmObjectDispatcher*)(const_cast<uint8_t*>(vmo_list)));
+
   zx_status_t status = [this, &vmo_id, &vmo]() {
-    fbl::AutoLock vmo_lock(&state_lock_);
-    return vmo_store_.RegisterWithKey(vmo_id, std::move(vmo));
+    Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
+    return vmo_store_.RegisterWithKey(vmo_id, ktl::move(vmo));
   }();
   callback(cookie, status);
 }
 
 void NetworkDevice::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
-  fbl::AutoLock vmo_lock(&state_lock_);
-  if (zx::result<zx::vmo> status = vmo_store_.Unregister(vmo_id); status.status_value() != ZX_OK) {
-    zxlogf(ERROR, "failed to release vmo id = %d: %s", vmo_id, status.status_string());
+  Guard<BrwLockPi, BrwLockPi::Writer> state_guard(&state_lock_);
+  if (zx::result<fbl::RefPtr<VmObjectDispatcher>> status = vmo_store_.Unregister(vmo_id);
+      status.status_value() != ZX_OK) {
+    LTRACEF("failed to release vmo id = %d: %d\n", vmo_id, status.status_value());
   }
 }
 
 void NetworkDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
-  static constexpr uint8_t kRxTypesList[] = {
-      static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
+  static constexpr uint8_t kRxTypesList[] = {static_cast<uint8_t>(FRAME_TYPE_ETHERNET)};
   static constexpr frame_type_support_t kTxTypesList[] = {{
-      .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
-      .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
+      .type = static_cast<uint8_t>(FRAME_TYPE_ETHERNET),
+      .features = FRAME_FEATURES_RAW,
   }};
   *out_info = {
-      .port_class = static_cast<uint16_t>(fuchsia_hardware_network::wire::PortClass::kEthernet),
+      .port_class = PORT_CLASS_ETHERNET,
       .rx_types_list = kRxTypesList,
       .rx_types_count = std::size(kRxTypesList),
       .tx_types_list = kTxTypesList,
@@ -620,7 +601,7 @@ void NetworkDevice::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
 }
 
 void NetworkDevice::MacAddrGetAddress(mac_address_t* out_mac) {
-  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac->octets);
+  std::ranges::copy(mac_.octets, out_mac->octets);
 }
 
 void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {

@@ -50,7 +50,7 @@ source_set("ddktl") {
     "//src/lib/ddk",
   ]
 
-  if (is_fuchsia || is_mistos) {
+  if (is_fuchsia) {
     public_deps += [
       # <ddktl/device.h> has #include <lib/component/incoming/cpp/protocol.h>.
       "//sdk/lib/component/incoming/cpp",
@@ -81,6 +81,15 @@ source_set("ddktl") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
+
+  if (is_mistos) {
+    sources -= [ "fidl.cc" ]
+    public_deps -= [ "//sdk/lib/fidl/cpp/wire" ]
+    deps -= [
+      "//sdk/lib/driver/runtime:driver_runtime_cpp",
+      "//zircon/system/ulib/sync",
+    ]
+  }
 
   #  ________  _________  ________  ________
   # |\   ____\|\___   ___\\   __  \|\   __  \

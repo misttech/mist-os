@@ -31,6 +31,11 @@ class FifoDispatcher final : public PeeredDispatcher<FifoDispatcher, ZX_DEFAULT_
                             size_t* actual);
   zx_status_t ReadToUser(size_t elem_size, user_out_ptr<uint8_t> dst, size_t count, size_t* actual);
 
+#if __mist_os__
+  zx_status_t Write(size_t elem_size, const uint8_t* ptr, size_t count, size_t* actual);
+  zx_status_t Read(size_t elem_size, uint8_t* ptr, size_t count, size_t* actual);
+#endif
+
   // PeeredDispatcher implementation.
   void on_zero_handles_locked() TA_REQ(get_lock());
   void OnPeerZeroHandlesLocked() TA_REQ(get_lock());
@@ -43,6 +48,13 @@ class FifoDispatcher final : public PeeredDispatcher<FifoDispatcher, ZX_DEFAULT_
       TA_REQ(get_lock());
   ktl::variant<zx_status_t, UserCopyCaptureFaultsResult> ReadToUserLocked(
       size_t elem_size, user_out_ptr<uint8_t> ptr, size_t count, size_t* actual) TA_REQ(get_lock());
+
+#if __mist_os__
+  zx_status_t WriteLocked(size_t elem_size, const uint8_t* ptr, size_t count, size_t* actual)
+      TA_REQ(get_lock());
+  zx_status_t ReadLocked(size_t elem_size, uint8_t* ptr, size_t count, size_t* actual)
+      TA_REQ(get_lock());
+#endif
 
   const uint32_t elem_count_;
   const uint32_t elem_size_;

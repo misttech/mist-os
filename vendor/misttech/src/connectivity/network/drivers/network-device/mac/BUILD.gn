@@ -1,0 +1,18 @@
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("mac") {
+  sources = [
+    "mac_interface.cc",
+    "mac_interface.h",
+    "public/network_mac.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+  ]
+}

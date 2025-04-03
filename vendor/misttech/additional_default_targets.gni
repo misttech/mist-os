@@ -1,0 +1,15 @@
+# Platform builders can add targets to this list so that they get built with
+# the //:default target
+
+additional_default_targets = [
+  "//zircon/kernel:boot_tests",
+
+  # Generate ZBIs used to run on target
+  #"//build/images/mistos",
+
+  # Starnix Examples
+  "//src/starnix/examples",
+
+  # Mist Technologies
+  "//vendor/misttech/linux-rt",
+]

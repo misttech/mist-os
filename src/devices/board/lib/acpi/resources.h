@@ -1,3 +1,4 @@
+// Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,8 +6,11 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_
 
+#ifndef __mist_os__
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/natural_types.h>
+#endif  // __mist_os__
+
 #include <zircon/types.h>
 
 #include <acpica/acpi.h>
@@ -15,8 +19,10 @@
 #include "src/devices/board/lib/acpi/status.h"
 
 struct DeviceResources {
+#ifndef __mist_os__
   std::vector<fuchsia_hardware_spi_businfo::SpiChannel> spi;
   std::vector<fuchsia_hardware_i2c_businfo::I2CChannel> i2c;
+#endif  // __mist_os__
 };
 
 enum resource_address_type {
@@ -88,8 +94,8 @@ zx_status_t resource_parse_irq(ACPI_RESOURCE* res, resource_irq_t* out);
 // |device| - Device to which this resource belongs.
 // |res| - Resource to parse.
 // |resource_source| - Pointer which will have the ResourceSource's handle put into it.
-acpi::status<fuchsia_hardware_spi_businfo::SpiChannel> resource_parse_spi(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source);
+acpi::status<> resource_parse_spi(acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res,
+                                  ACPI_HANDLE* resource_source);
 
 // Parse the given I2C resource.
 // Arguments:
@@ -97,6 +103,7 @@ acpi::status<fuchsia_hardware_spi_businfo::SpiChannel> resource_parse_spi(
 // |device| - Device to which this resource belongs.
 // |res| - Resource to parse.
 // |resource_source| - Pointer which will have the ResourceSource's handle put into it.
-acpi::status<fuchsia_hardware_i2c_businfo::I2CChannel> resource_parse_i2c(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source);
+acpi::status<> resource_parse_i2c(acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res,
+                                  ACPI_HANDLE* resource_source);
+
 #endif  // SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_

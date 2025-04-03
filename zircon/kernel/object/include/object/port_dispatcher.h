@@ -172,6 +172,11 @@ class PortObserver final : public SignalObserver {
   PortObserver(uint32_t options, const Handle* handle, fbl::RefPtr<PortDispatcher> port,
                Lock<CriticalMutex>* port_lock, uint64_t key, zx_signals_t signals);
 
+#if __mist_os__
+  PortObserver(uint32_t options, void* handle, fbl::RefPtr<PortDispatcher> port,
+               Lock<CriticalMutex>* port_lock, uint64_t key, zx_signals_t signals);
+#endif
+
   ~PortObserver() final = default;
 
   // May only be called while holding PortDispatcher lock.
@@ -260,6 +265,11 @@ class PortDispatcher final : public SoloDispatcher<PortDispatcher, ZX_DEFAULT_PO
 
   // Called under the handle table lock.
   zx_status_t MakeObserver(uint32_t options, Handle* handle, uint64_t key, zx_signals_t signals);
+
+#if __mist_os__
+  zx_status_t MakeObserver(uint32_t options, fbl::RefPtr<Dispatcher> handle, uint64_t key,
+                           zx_signals_t signals);
+#endif
 
   // Returns true if at least one packet was removed from the queue.
   // Called under the handle table lock when |handle| is not null.

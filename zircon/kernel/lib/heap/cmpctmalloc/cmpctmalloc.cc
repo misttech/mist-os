@@ -981,6 +981,20 @@ NO_ASAN void* cmpct_alloc(size_t size) {
   return result;
 }
 
+#if __mist_os__
+NO_ASAN void* cmpct_realloc(void* payload, size_t size) {
+  if (payload == nullptr) {
+    return cmpct_alloc(size);
+  }
+  header_t* header = (header_t*)payload - 1;
+  size_t old_size = header->size - sizeof(header_t);
+  void* new_payload = cmpct_alloc(size);
+  memcpy(new_payload, payload, std::min(size, old_size));
+  cmpct_free(payload);
+  return new_payload;
+}
+#endif
+
 NO_ASAN static void cmpct_free_internal(void* payload, header_t* header)
     TA_REQ(TheHeapLock::Get()) {
   ZX_DEBUG_ASSERT(!is_tagged_as_free(header));  // Double free!

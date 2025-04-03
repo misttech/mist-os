@@ -36,7 +36,21 @@ source_set("top") {
     "//zircon/kernel/lib/version",
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/platform",
+
+    # LK
+    "//third_party/lk/lib/bio",
+    "//third_party/lk/lib/fs/fat",
+
+    # Board Drivers
+    "//vendor/misttech/devices/board/drivers/x86",
+
+    # Platform Drivers
+    "//vendor/misttech/dev/platform",
+
+    # LWIP
+    "//vendor/misttech/third_party/lwip",
   ]
+
   if (is_mistos) {
     deps += [
       "//vendor/misttech/zircon/kernel/lib/handoff",

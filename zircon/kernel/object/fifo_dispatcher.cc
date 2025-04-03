@@ -284,3 +284,143 @@ ktl::variant<zx_status_t, UserCopyCaptureFaultsResult> FifoDispatcher::ReadToUse
   *actual = (tail_ - old_tail);
   return ZX_OK;
 }
+
+#if __mist_os__
+
+zx_status_t FifoDispatcher::Write(size_t elem_size, const uint8_t* ptr, size_t count,
+                                  size_t* actual) {
+  canary_.Assert();
+
+  Guard<CriticalMutex> guard{get_lock()};
+  if (!peer()) {
+    return ZX_ERR_PEER_CLOSED;
+  }
+  AssertHeld(*peer()->get_lock());
+  return peer()->WriteLocked(elem_size, ptr, count, actual);
+}
+
+zx_status_t FifoDispatcher::WriteLocked(size_t elem_size, const uint8_t* ptr, size_t count,
+                                        size_t* actual) {
+  canary_.Assert();
+
+  if (elem_size != elem_size_) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (count == 0) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  uint32_t old_head = head_;
+
+  // total number of available empty slots in the fifo
+  size_t avail = elem_count_ - (head_ - tail_);
+
+  if (avail == 0) {
+    return ZX_ERR_SHOULD_WAIT;
+  }
+
+  bool was_empty = (avail == elem_count_);
+
+  if (count > avail) {
+    count = avail;
+  }
+
+  while (count > 0) {
+    uint32_t offset = (head_ % elem_count_);
+
+    // number of slots from target to end, inclusive
+    uint32_t n = elem_count_ - offset;
+
+    // number of slots we can actually copy
+    size_t to_copy = (count > n) ? n : count;
+
+    memcpy(&data_[offset * elem_size_], ptr, to_copy * elem_size_);
+
+    // adjust head and count
+    // due to size limitations on fifo, to_copy will always fit in a u32
+    head_ += static_cast<uint32_t>(to_copy);
+    count -= to_copy;
+    ptr += to_copy * elem_size_;
+  }
+
+  // if was empty, we've become readable
+  if (was_empty) {
+    UpdateStateLocked(0u, ZX_FIFO_READABLE);
+  }
+
+  // if now full, we're no longer writable
+  if (elem_count_ == (head_ - tail_)) {
+    AssertHeld(*peer()->get_lock());
+    peer()->UpdateStateLocked(ZX_FIFO_WRITABLE, 0u);
+  }
+
+  *actual = (head_ - old_head);
+  return ZX_OK;
+}
+
+zx_status_t FifoDispatcher::Read(size_t elem_size, uint8_t* ptr, size_t count, size_t* actual) {
+  canary_.Assert();
+  Guard<CriticalMutex> guard{get_lock()};
+  return ReadLocked(elem_size, ptr, count, actual);
+}
+
+zx_status_t FifoDispatcher::ReadLocked(size_t elem_size, uint8_t* ptr, size_t count,
+                                       size_t* actual) {
+  canary_.Assert();
+
+  if (elem_size != elem_size_) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  if (count == 0) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  uint32_t old_tail = tail_;
+
+  // total number of available entries to read from the fifo
+  size_t avail = (head_ - tail_);
+
+  if (avail == 0) {
+    return peer() ? ZX_ERR_SHOULD_WAIT : ZX_ERR_PEER_CLOSED;
+  }
+
+  bool was_full = (avail == elem_count_);
+
+  if (count > avail) {
+    count = avail;
+  }
+
+  while (count > 0) {
+    uint32_t offset = (tail_ % elem_count_);
+
+    // number of slots from target to end, inclusive
+    uint32_t n = elem_count_ - offset;
+
+    // number of slots we can actually copy
+    size_t to_copy = (count > n) ? n : count;
+
+    memcpy(ptr, &data_[offset * elem_size_], to_copy * elem_size_);
+
+    // adjust tail and count
+    // due to size limitations on fifo, to_copy will always fit in a u32
+    tail_ += static_cast<uint32_t>(to_copy);
+    count -= to_copy;
+    ptr += to_copy * elem_size_;
+  }
+
+  // if we were full, we have become writable
+  if (was_full && peer()) {
+    AssertHeld(*peer()->get_lock());
+    peer()->UpdateStateLocked(0u, ZX_FIFO_WRITABLE);
+  }
+
+  // if we've become empty, we're no longer readable
+  if ((head_ - tail_) == 0) {
+    UpdateStateLocked(ZX_FIFO_READABLE, 0u);
+  }
+
+  *actual = (tail_ - old_tail);
+  return ZX_OK;
+}
+
+#endif

@@ -934,6 +934,13 @@ zx_status_t PcieDevice::InitLegacyIrqStateLocked(PcieUpstreamNode& upstream) {
   // handler.
   irq_.legacy.pin = cfg_->Read(PciConfig::kInterruptPin);
   if (irq_.legacy.pin) {
+#if __mist_os__
+    // TODO(Herrera) PCI Swizzle is not working on QEMU (I guess).
+    // ACPICA is not returning the correct IRQ ID (always zero). So we force the kInterruptLine.
+    // The best scenario is to use MSI-X and avoid legacy IRQs, but MSI-X is not supported by
+    // current PCIe driver/bus.
+    irq_.legacy.irq_id = cfg_->Read(PciConfig::kInterruptLine);
+#else
     zx_status_t res = MapPinToIrqLocked(fbl::RefPtr<PcieUpstreamNode>(&upstream));
     if (res != ZX_OK) {
       TRACEF(
@@ -942,6 +949,7 @@ zx_status_t PcieDevice::InitLegacyIrqStateLocked(PcieUpstreamNode& upstream) {
           bus_id_, dev_id_, func_id_, irq_.legacy.pin);
       return res;
     }
+#endif
 
     irq_.legacy.shared_handler = bus_drv_.FindLegacyIrqHandler(irq_.legacy.irq_id);
     if (irq_.legacy.shared_handler == nullptr) {

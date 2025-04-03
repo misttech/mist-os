@@ -84,11 +84,7 @@ build_api_module("api") {
   data_keys = [ "build_api_modules" ]
   deps = [
     ":args",
-
-    #":tests",
     ":tool_paths",
-
-    #"//build/rbe:rbe_settings.json",
   ]
 }
 
@@ -227,32 +223,20 @@ build_api_module("tool_paths") {
     # Pull in tools from host_labels.
     ":host",
 
-    # ffx is used as part of the top-level build for every product configuration
-    # so should always be included in the tools manifest.
-    #"//src/developer/ffx($host_toolchain)",
-
     "//build/rust:tool_paths.llvm-profdata-rust($host_toolchain)",
     ":tool_paths.llvm-tools",
     ":tool_paths.metadata",
 
-    #"//build/images/updates:packages",
-    #"//src/sys/pkg/tests/system-tests:system_tests_tools($host_toolchain)",
-    #"//src/storage/bin/fvm($host_toolchain)",
     "//third_party/cobalt/src/bin/config_change_validator/src:bin($host_toolchain)",
     "//third_party/cobalt/src/bin/config_parser/src:bin($host_toolchain)",
 
-    #"//tools/doc_checker($host_toolchain)",
     "//tools/fidl:fidl-lint($host_toolchain)",
     "//tools/fidl:fidlfmt($host_toolchain)",
     "//tools/fidl/fidlc:host($host_toolchain)",
 
-    #"//zircon/third_party/uapp/mkfs-msdosfs($host_toolchain)",
-    #"//src/storage/blobfs/tools:blobfs($host_toolchain)",
+    "//zircon/third_party/uapp/mkfs-msdosfs($host_toolchain)",
     "//zircon/tools/lz4($host_toolchain)",
 
-    #"//zircon/tools/merkleroot($host_toolchain)",
-    #"//src/storage/minfs/tools:minfs($host_toolchain)",
-    #"//zircon/tools/xdc-server($host_toolchain)",
     "//zircon/tools/zbi($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
@@ -266,29 +250,15 @@ group("tool_paths.metadata") {
     "$rustc_prefix/bin/rustdoc",
     "$rustc_prefix/bin/rustfmt",
 
-    #"//src/testing/perfcompare",
-
-    # reclient is using fairly generic names (bootstrap, dumpstats). We may
-    # need to move these into their own group() at some point to namespace
-    # them.
-    #"//prebuilt/proprietary/third_party/reclient/$host_platform/bootstrap",
-    #"//prebuilt/proprietary/third_party/reclient/$host_platform/dumpstats",
-    #"//prebuilt/proprietary/third_party/reclient/$host_platform/reproxy",
-    #"//prebuilt/proprietary/third_party/reclient/$host_platform/rewrapper",
-    #"//prebuilt/sdk/bazel/bazel",
-    #"//prebuilt/third_party/buildifier/$host_platform/buildifier",
     "//prebuilt/third_party/clang/$host_platform/share/clang/clang-format-diff.py",
     "//prebuilt/third_party/clang/$host_platform/share/clang/clang-tidy-diff.py",
 
-    #"//prebuilt/third_party/dart/$host_platform/bin/dart",
     "//prebuilt/third_party/gn/$host_platform/gn",
     "//prebuilt/third_party/go/$host_platform/bin/go",
     "//prebuilt/third_party/go/$host_platform/bin/gofmt",
     "//prebuilt/third_party/ninja/$host_platform/ninja",
     "//prebuilt/third_party/python3/$host_platform/bin/python3",
     "//prebuilt/tools/shac/shac",
-
-    #"//third_party/catapult/tracing/bin/trace2html",
   ]
 
   renamed_prebuilt_tools = [
@@ -423,35 +393,6 @@ group("default") {
   deps = [
     "//:build_only",
     "//:host",
-    "//zircon/kernel:boot_tests",
-
-    # Produce Fuchsia libs zbi tests
-    #"//src/lib/fuchsia:tests",
-    #"//src/lib/fuchsia-runtime:tests",
-    #"//src/lib/process_builder:tests",
-    #"//src/lib/zircon:tests",
-    #"//src/storage/lib/vfs/rust:tests",
-    #"//src/sys/lib/elf_runner:tests",
-
-    # Produce mist-os libs zbi tests
-    #"//src/lib/mistos-bootfs:tests",
-    #"//src/lib/mistos-logger:tests",
-    #"//src/starnix_lite:tests",
-    #"//src/starnix_lite",
-
-    #"//src/starnix_lite/lib/usercopy:tests",
-
-    # Host tools tests
-    #"//zircon/tools:tests",
-
-    # Generate ZBIs used to run on target
-    #"//build/images/mistos",
-
-    # Starnix Examples
-    "//src/starnix/examples",
-
-    # Mist Technologies
-    "//vendor/misttech/zircon/kernel/lib/linux-rt",
   ]
 
   # Add any additional targets from the product.
@@ -501,8 +442,6 @@ group("host") {
     # Tools & tests added by the developer
     ":developer_host_tools",
   ]
-
-  #public_deps += [ "//bundles/tools:host_tools" ]
 }
 
 # WARNING: Known to infrastructure

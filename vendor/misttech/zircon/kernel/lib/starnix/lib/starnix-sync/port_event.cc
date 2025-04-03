@@ -131,6 +131,7 @@ fit::result<zx_status_t> PortEvent::ObjectWaitAsync(fbl::RefPtr<Dispatcher> hand
   }
 
   zx_rights_t rights = {};
+  // FIXME (Herrera) : h will be out of scope when this function returns
   auto h = Handle::Make(ktl::move(handle), rights);
   zx_status_t status = port_.dispatcher()->MakeObserver(opts, h.get(), key, signals);
   if (status != ZX_OK) {
