@@ -21,8 +21,8 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    BinderDriverReleaser, CacheMode, CurrentTaskAndLocked, DirectoryEntryType, FdFlags, FdNumber,
-    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    BinderDriverReleaser, BytesFile, CacheMode, CurrentTaskAndLocked, DirectoryEntryType, FdFlags,
+    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
     FsString, NamespaceNode, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
@@ -4779,6 +4779,7 @@ impl FileSystemOps for BinderFs {
 }
 
 const DEFAULT_BINDERS: [&str; 3] = ["binder", "hwbinder", "vndbinder"];
+const FEATURES_DIR: &str = "features";
 
 #[derive(Debug)]
 struct BinderFsDir {
@@ -4824,7 +4825,7 @@ impl FsNodeOps for BinderFsDir {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let entries = self
+        let mut entries = self
             .devices
             .keys()
             .map(|name| VecDirectoryEntry {
@@ -4833,6 +4834,11 @@ impl FsNodeOps for BinderFsDir {
                 inode: None,
             })
             .collect::<Vec<_>>();
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::DIR,
+            name: FEATURES_DIR.into(),
+            inode: None,
+        });
         Ok(VecDirectory::new_file(entries))
     }
 
@@ -4843,7 +4849,11 @@ impl FsNodeOps for BinderFsDir {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        if let Some(dev) = self.devices.get(name) {
+        if name == FEATURES_DIR {
+            Ok(node.fs().create_node(current_task, BinderFeaturesDir::new(), |ino| {
+                FsNodeInfo::new(ino, mode!(IFDIR, 0o755), FsCred::root())
+            }))
+        } else if let Some(dev) = self.devices.get(name) {
             let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
             Ok(node.fs().create_node(current_task, SpecialNode, |ino| {
                 let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
@@ -4866,6 +4876,56 @@ impl BinderFs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
         fs.set_root(BinderFsDir::new(locked, current_task)?);
         Ok(fs)
+    }
+}
+
+struct BinderFeaturesDir {
+    features: BTreeMap<FsString, bool>,
+}
+
+impl BinderFeaturesDir {
+    fn new() -> Self {
+        Self { features: BTreeMap::from([("freeze_notification".into(), false)]) }
+    }
+}
+
+impl FsNodeOps for BinderFeaturesDir {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        let entries = self
+            .features
+            .keys()
+            .map(|name| VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: name.clone(),
+                inode: None,
+            })
+            .collect::<Vec<_>>();
+        Ok(VecDirectory::new_file(entries))
+    }
+
+    fn lookup(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        if let Some(enable) = self.features.get(name) {
+            return Ok(node.fs().create_node(
+                current_task,
+                BytesFile::new_node(if *enable { b"1\n" } else { b"0\n" }.to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ));
+        }
+        error!(ENOENT, format!("looking for {name}"))
     }
 }
 
