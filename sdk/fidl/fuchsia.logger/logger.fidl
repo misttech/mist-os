@@ -14,6 +14,7 @@ using fuchsia.diagnostics.types;
 /// greater than the threshold being included in the
 /// printable logs.
 // TODO(https://fxbug.dev/42055808): Change this from `strict` to `flexible` #strictaudit
+@available(removed=NEXT)
 type LogLevelFilter = strict enum : int8 {
     TRACE = 0x10;
     DEBUG = 0x20;
@@ -34,14 +35,18 @@ const LOG_SEVERITY_MAX_STEP uint8 = 6;
 const LOG_VERBOSITY_STEP_SIZE uint8 = 0x1;
 
 /// Default log level used to initialize loggers.
+@available(removed=NEXT)
 const LOG_LEVEL_DEFAULT LogLevelFilter = LogLevelFilter.INFO;
 
 /// Max number of tags that can be passed to filter by listener.
+@available(removed=NEXT)
 const MAX_TAGS uint8 = 16;
 
 /// Max tag length that can be passed to filter by listener.
+@available(removed=NEXT)
 const MAX_TAG_LEN_BYTES uint8 = 63;
 
+@available(removed=NEXT)
 type LogFilterOptions = struct {
     filter_by_pid bool;
     pid uint64;
@@ -65,11 +70,13 @@ type LogFilterOptions = struct {
 };
 
 /// Max tags that will be attached to a LogMessage.
+@available(removed=NEXT)
 const MAX_TAGS_PER_LOG_MESSAGE uint8 = 5;
 
 /// Max byte size for message payload.
 const MAX_DATAGRAM_LEN_BYTES uint32 = 32768;
 
+@available(removed=NEXT)
 type LogMessage = struct {
     pid uint64;
     tid uint64;
@@ -94,6 +101,7 @@ type LogMessage = struct {
 
 /// Interface for LogListenerSafe to register to listen to logs.
 @discoverable(server="platform")
+@available(removed=NEXT)
 closed protocol Log {
     /// Dumps all cached logs by calling LogMany() in batches followed by Log() for each new log
     /// message.
@@ -105,7 +113,6 @@ closed protocol Log {
 
     /// Dumps all cached logs by calling LogMany() followed by Done() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    @available(removed=NEXT)
     strict DumpLogsSafe(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -113,7 +120,6 @@ closed protocol Log {
 
     /// Listens to new log entries by calling Log() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
-    @available(removed=NEXT)
     strict ListenSafeWithSelectors(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -168,9 +174,11 @@ closed(removed=26) open(added=26) protocol LogSink {
 };
 
 /// Max log bytes per call to a listener.
+@available(removed=NEXT)
 const MAX_LOG_MANY_SIZE_BYTES uint64 = 16384;
 
 /// A listener who will notify the `Log` of the receipt of each message.
+@available(removed=NEXT)
 closed protocol LogListenerSafe {
     /// Called for single messages.
     ///

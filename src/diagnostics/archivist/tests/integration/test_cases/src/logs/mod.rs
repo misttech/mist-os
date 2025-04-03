@@ -13,4 +13,5 @@ mod lifecycle_stop;
 mod log_stream;
 mod selectors;
 mod sorting;
+#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 mod utils;
