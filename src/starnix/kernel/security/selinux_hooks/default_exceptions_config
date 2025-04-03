@@ -36,6 +36,12 @@ todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default ano
 // https://fxbug.dev/385121365 - Kernel threads perform I/O on "adbd" FDs, failing checks.
 todo_deny https://fxbug.dev/385121365 kernel adbd fd
 
+// https://fxbug.dev/407739795 - "adbd" reciprocates, using FDs created by the kernel.
+todo_deny https://fxbug.dev/407739795 adbd kernel fd
+
+// https://fxbug.dev/408136119 - Missing policy configuration breaks one of the system daemons.
+todo_deny https://fxbug.dev/408136119 init device chr_file
+
 //
 // Exceptions required for the SELinux Test Suite container.
 //
