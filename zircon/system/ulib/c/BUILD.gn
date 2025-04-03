@@ -426,7 +426,12 @@ ifs_shared_library("c") {
 
 group("tests") {
   testonly = true
-  deps = [ "test" ]
+  deps = [ "test:tests" ]
+}
+
+group("bootfs-tests") {
+  testonly = true
+  deps = [ "test:bootfs-tests" ]
 }
 
 group("boot_tests") {

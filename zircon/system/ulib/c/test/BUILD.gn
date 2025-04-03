@@ -22,6 +22,11 @@ group("tests") {
   ]
 }
 
+group("bootfs-tests") {
+  testonly = true
+  deps = [ "sanitizer" ]
+}
+
 group("boot_tests") {
   testonly = true
   deps = [ ":boot-libc-unittests" ]
