@@ -841,8 +841,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // Callers should avoid calling pmm_free() directly from inside VmCowPages, and instead should use
   // this helper.
-  void FreePagesLocked(list_node* pages) TA_REQ(lock()) {
-    if (!is_source_handling_free_locked()) {
+  void FreePages(list_node* pages) {
+    if (!is_source_handling_free()) {
       CacheFree(pages);
       return;
     }
@@ -859,9 +859,9 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // Callers should avoid calling pmm_free_page() directly from inside VmCowPages, and instead
   // should use this helper.
-  void FreePageLocked(vm_page_t* page) TA_REQ(lock()) {
+  void FreePage(vm_page_t* page) {
     DEBUG_ASSERT(!list_in_list(&page->queue_node));
-    if (!is_source_handling_free_locked()) {
+    if (!is_source_handling_free()) {
       CacheFree(page);
       return;
     }
@@ -1498,7 +1498,7 @@ class VmCowPages final : public VmHierarchyBase,
   // UnlockRangeLocked() is valid.
   bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
 
-  bool is_source_handling_free_locked() const TA_REQ(lock()) {
+  bool is_source_handling_free() const {
     // As specified in the PageSourceProperties, the page source handles free iff it is specifying
     // specific pages.
     return is_source_supplying_specific_physical_pages();
@@ -2039,9 +2039,9 @@ class ScopedPageFreedList {
 
   ~ScopedPageFreedList() { ASSERT(list_is_empty(&list_)); }
 
-  void FreePagesLocked(VmCowPages* cow_pages) TA_REQ(cow_pages->lock()) {
+  void FreePages(VmCowPages* cow_pages) {
     if (!list_is_empty(&list_)) {
-      cow_pages->FreePagesLocked(&list_);
+      cow_pages->FreePages(&list_);
     }
   }
   list_node_t* List() { return &list_; }

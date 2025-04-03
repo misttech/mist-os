@@ -439,7 +439,7 @@ void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page) {
     Pmm::Node().FinishFreeLoanedPages(flph);
   } else {
     pmm_page_queues()->Remove(page);
-    FreePageLocked(page);
+    FreePage(page);
   }
 }
 
@@ -710,7 +710,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
     // parents, as well as removing any pages in our own page list.
     ScopedPageFreedList freed_list;
     ReleaseOwnedPagesLocked(0, parent, freed_list);
-    freed_list.FreePagesLocked(this);
+    freed_list.FreePages(this);
 
     DEBUG_ASSERT(parent.get() == parent_.get());
     if (parent_) {
@@ -1456,7 +1456,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   // them. Once there is a cow hierarchy tracking exactly what node a page was from to free it is
   // not performed, and it is assumed that therefore that we do not need to free owned pages to
   // their 'correct' object.
-  ASSERT(!is_source_handling_free_locked());
+  ASSERT(!is_source_handling_free());
 
   if (unidirectional) {
     return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
@@ -1923,7 +1923,7 @@ zx::result<VmPageOrMarker> VmCowPages::AddPageLocked(uint64_t offset, VmPageOrMa
   __UNINITIALIZED auto result = BeginAddPageLocked(offset, overwrite);
   if (unlikely(result.is_error())) {
     if (p.IsPage()) {
-      FreePageLocked(p.ReleasePage());
+      FreePage(p.ReleasePage());
     } else if (p.IsReference()) {
       FreeReference(p.ReleaseReference());
     }
@@ -1993,7 +1993,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
       }
 
       // Free all the pages back as we had ownership of them.
-      FreePagesLocked(pages);
+      FreePages(pages);
       return status;
     }
     offset += PAGE_SIZE;
@@ -2666,7 +2666,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
                                                 CanOverwriteContent::Zero)
           : target_->BeginAddPageLocked(offset_, CanOverwriteContent::Zero);
   if (page_transaction.is_error()) {
-    target_->FreePageLocked(out_page);
+    target_->FreePage(out_page);
     return page_transaction.take_error();
   }
 
@@ -3132,8 +3132,7 @@ zx_status_t VmCowPages::CommitRangeLocked(VmCowRange range, uint64_t* committed_
 
   auto list_cleanup = fit::defer([&page_list, this]() {
     if (!list_is_empty(&page_list)) {
-      AssertHeld(lock_ref());
-      FreePagesLocked(&page_list);
+      FreePages(&page_list);
     }
   });
 
@@ -3298,7 +3297,7 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
   page_remover.Flush();
-  freed_list.FreePagesLocked(this);
+  freed_list.FreePages(this);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -3598,9 +3597,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
 
   // See also free_any_pages below, which intentionally frees incrementally.
   auto auto_free = fit::defer([this, &freed_list]() {
-    AssertHeld(lock_ref());
     if (!list_is_empty(&freed_list)) {
-      FreePagesLocked(&freed_list);
+      FreePages(&freed_list);
     }
   });
 
@@ -3608,9 +3606,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track,
   // to allocate any pages then we would like to ensure that we do not cause total memory to peak
   // higher due to squirreling these pages away.
   auto free_any_pages = [this, &freed_list] {
-    AssertHeld(lock_ref());
     if (!list_is_empty(&freed_list)) {
-      FreePagesLocked(&freed_list);
+      FreePages(&freed_list);
     }
   };
 
@@ -4567,7 +4564,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
     ScopedPageFreedList freed_list;
     ReleaseOwnedPagesLocked(start, LockedPtr(), freed_list);
-    freed_list.FreePagesLocked(this);
+    freed_list.FreePages(this);
 
     // If the tail of a parent disappears, the children shouldn't be able to see that region again,
     // even if the parent is later reenlarged. So update the children's parent limits.
@@ -4766,9 +4763,8 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
       // If the zeroed out page is not incorporated into this VMO, free it.
       if (!zero_page_ptr->IsEmpty()) {
         vm_page_t* p = zero_page_ptr->ReleasePage();
-        AssertHeld(lock_ref());
         // The zero page is not part of any VMO at this point, so it should not be in a page queue.
-        FreePageLocked(p);
+        FreePage(p);
       }
     });
 
@@ -5153,7 +5149,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
   }
 
   if (!list_is_empty(&freed_list)) {
-    FreePagesLocked(&freed_list);
+    FreePages(&freed_list);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -5870,7 +5866,7 @@ void VmCowPages::DetachSourceLocked() {
       0, size_);
 
   page_remover.Flush();
-  freed_list.FreePagesLocked(this);
+  freed_list.FreePages(this);
 }
 
 void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op,
@@ -6164,91 +6160,93 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
   }
   compressor->Compress();
 
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  {
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
-  // Retrieve the result of compression now that we hold the VMO lock again.
-  VmCompressor::CompressResult compression_result = compressor->TakeCompressionResult();
+    // Retrieve the result of compression now that we hold the VMO lock again.
+    VmCompressor::CompressResult compression_result = compressor->TakeCompressionResult();
 
-  // We hold the VMO lock again and need to reclaim the temporary reference. Either the
-  // temporary reference is still installed, and since we hold the VMO lock we now own both the
-  // temp reference and the place, or the temporary reference got replaced, in which case it no
-  // longer exists and is not referring to page and so we own page.
-  //
-  // Determining what state we are in just requires re-looking up the slot and see if the temporary
-  // reference we installed is still there.
-  auto [slot, is_in_interval] =
-      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
-  DEBUG_ASSERT(!is_in_interval);
-  if (slot && slot->IsReference() && compressor->IsTempReference(slot->Reference())) {
-    // Slot still holds the original reference; need to replace it with the result of compression.
-    VmPageOrMarker::ReferenceValue old_ref{0};
-    if (const VmPageOrMarker::ReferenceValue* ref =
-            ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
-      // Compression succeeded, put the new reference in.
-      // When compression succeeded, the |compressor| internally copied the page's metadata from
-      // the temp reference to the new reference so we don't need to manually copy it here.
-      old_ref = VmPageOrMarkerRef(slot).SwapReferenceForReference(*ref);
-      reclamation_event_count_++;
-      reclaimed = true;
-    } else if (VmCompressor::FailTag* fail =
-                   ktl::get_if<VmCompressor::FailTag>(&compression_result)) {
-      // Compression failed, put the page back in the slot.
-      // The |compressor| doesn't know how to update the |page| with any changes we made to its
-      // metadata while compression was running, so we need to manually copy the metadata over to
-      // the page's share_count here.
-      DEBUG_ASSERT(page == fail->src_page.page);
-      page->object.share_count = fail->src_page.metadata;
-      old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
-      // TODO(https://fxbug.dev/42138396): Placing in a queue and then moving it is inefficient, but
-      // avoids needing to reason about whether reclamation could be manually attempted on pages
-      // that might otherwise not end up in the reclaimable queues.
-      SetNotPinnedLocked(page, offset);
-      // TODO(https://fxbug.dev/42138396): Marking this page as failing reclamation will prevent it
-      // from ever being tried again. As compression might succeed if the contents changes, we
-      // should consider moving the page out of this queue if it is modified.
-      pmm_page_queues()->CompressFailed(page);
-      // Page stays owned by the VMO.
-      page = nullptr;
-    } else {
-      ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
-      old_ref = slot->ReleaseReference();
-      // Check if we can clear the slot, or if we need to insert a marker. Unlike the full zero
-      // pages this simply needs to check if there's any visible content above us, and then if there
-      // isn't if the root is immutable or not (i.e. if it has a page source).
-      PageLookup content;
-      FindInitialPageContentLocked(offset, &content);
-      if (!content.cursor.current() && !content.owner->page_source_) {
-        *slot = VmPageOrMarker::Empty();
-        page_list_.ReturnEmptySlot(offset);
-        vm_vmo_compression_zero_slot.Add(1);
+    // We hold the VMO lock again and need to reclaim the temporary reference. Either the
+    // temporary reference is still installed, and since we hold the VMO lock we now own both the
+    // temp reference and the place, or the temporary reference got replaced, in which case it no
+    // longer exists and is not referring to page and so we own page.
+    //
+    // Determining what state we are in just requires re-looking up the slot and see if the
+    // temporary reference we installed is still there.
+    auto [slot, is_in_interval] =
+        page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
+    DEBUG_ASSERT(!is_in_interval);
+    if (slot && slot->IsReference() && compressor->IsTempReference(slot->Reference())) {
+      // Slot still holds the original reference; need to replace it with the result of compression.
+      VmPageOrMarker::ReferenceValue old_ref{0};
+      if (const VmPageOrMarker::ReferenceValue* ref =
+              ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
+        // Compression succeeded, put the new reference in.
+        // When compression succeeded, the |compressor| internally copied the page's metadata from
+        // the temp reference to the new reference so we don't need to manually copy it here.
+        old_ref = VmPageOrMarkerRef(slot).SwapReferenceForReference(*ref);
+        reclamation_event_count_++;
+        reclaimed = true;
+      } else if (VmCompressor::FailTag* fail =
+                     ktl::get_if<VmCompressor::FailTag>(&compression_result)) {
+        // Compression failed, put the page back in the slot.
+        // The |compressor| doesn't know how to update the |page| with any changes we made to its
+        // metadata while compression was running, so we need to manually copy the metadata over to
+        // the page's share_count here.
+        DEBUG_ASSERT(page == fail->src_page.page);
+        page->object.share_count = fail->src_page.metadata;
+        old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
+        // TODO(https://fxbug.dev/42138396): Placing in a queue and then moving it is inefficient,
+        // but avoids needing to reason about whether reclamation could be manually attempted on
+        // pages that might otherwise not end up in the reclaimable queues.
+        SetNotPinnedLocked(page, offset);
+        // TODO(https://fxbug.dev/42138396): Marking this page as failing reclamation will prevent
+        // it from ever being tried again. As compression might succeed if the contents changes, we
+        // should consider moving the page out of this queue if it is modified.
+        pmm_page_queues()->CompressFailed(page);
+        // Page stays owned by the VMO.
+        page = nullptr;
       } else {
-        *slot = VmPageOrMarker::Marker();
-        vm_vmo_compression_marker.Add(1);
+        ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
+        old_ref = slot->ReleaseReference();
+        // Check if we can clear the slot, or if we need to insert a marker. Unlike the full zero
+        // pages this simply needs to check if there's any visible content above us, and then if
+        // there isn't if the root is immutable or not (i.e. if it has a page source).
+        PageLookup content;
+        FindInitialPageContentLocked(offset, &content);
+        if (!content.cursor.current() && !content.owner->page_source_) {
+          *slot = VmPageOrMarker::Empty();
+          page_list_.ReturnEmptySlot(offset);
+          vm_vmo_compression_zero_slot.Add(1);
+        } else {
+          *slot = VmPageOrMarker::Marker();
+          vm_vmo_compression_marker.Add(1);
+        }
+        reclamation_event_count_++;
+        reclaimed = true;
       }
-      reclamation_event_count_++;
-      reclaimed = true;
+      // Temporary reference has been replaced, can return it to the compressor.
+      compressor->ReturnTempReference(old_ref);
+    } else {
+      // The temporary reference is no longer there. We know nothing else about the state of the VMO
+      // at this point and will just free any compression result and exit.
+      if (const VmPageOrMarker::ReferenceValue* ref =
+              ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
+        compressor->Free(*ref);
+      }
+      // If the slot is allocated, but empty, then make sure we properly return it.
+      if (slot && slot->IsEmpty()) {
+        page_list_.ReturnEmptySlot(offset);
+      }
+      // In this case we are still going to free the page, but it doesn't count as a reclamation as
+      // there is now something new in the slot we were trying to free.
     }
-    // Temporary reference has been replaced, can return it to the compressor.
-    compressor->ReturnTempReference(old_ref);
-  } else {
-    // The temporary reference is no longer there. We know nothing else about the state of the VMO
-    // at this point and will just free any compression result and exit.
-    if (const VmPageOrMarker::ReferenceValue* ref =
-            ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
-      compressor->Free(*ref);
-    }
-    // If the slot is allocated, but empty, then make sure we properly return it.
-    if (slot && slot->IsEmpty()) {
-      page_list_.ReturnEmptySlot(offset);
-    }
-    // In this case we are still going to free the page, but it doesn't count as a reclamation as
-    // there is now something new in the slot we were trying to free.
   }
   // One way or another the temporary reference has been returned, and so we can finalize.
   compressor->Finalize();
 
   if (page) {
-    FreePageLocked(page);
+    FreePage(page);
     page = nullptr;
   }
 
@@ -7078,29 +7076,19 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
 }
 
 VmCowPages::DeferredOps::~DeferredOps() {
-  const bool list_empty = list_is_empty(free_list_.List());
-  // Avoid lock acquisition if we have no work to do.
-  if (!list_empty || range_op_.has_value()) {
-    if (locked_range_update_) {
-      AssertHeld(self_->lock_ref());
-      if (range_op_.has_value()) {
-        self_->RangeChangeUpdateCowChildrenLocked(range_op_->range, range_op_->op);
-      }
-      if (!list_empty) {
-        free_list_.FreePagesLocked(self_);
-      }
-    } else {
-      if (range_op_.has_value()) {
-        LockedPtr self(self_, VmLockAcquireMode::First);
-        VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
-      }
-      // The pages must be freed *after* any range update is performed.
-      if (!list_empty) {
-        Guard<VmoLockType> guard{AssertOrderedLock, self_->lock(), self_->lock_order(),
-                                 VmLockAcquireMode::First};
-        free_list_.FreePagesLocked(self_);
-      }
+  if (locked_range_update_) {
+    AssertHeld(self_->lock_ref());
+    if (range_op_.has_value()) {
+      self_->RangeChangeUpdateCowChildrenLocked(range_op_->range, range_op_->op);
     }
+    free_list_.FreePages(self_);
+  } else {
+    if (range_op_.has_value()) {
+      LockedPtr self(self_, VmLockAcquireMode::First);
+      VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
+    }
+    // The pages must be freed *after* any range update is performed.
+    free_list_.FreePages(self_);
   }
   // The loaned pages must be freed *after* any range update is performed.
   if (flph_.has_value()) {
