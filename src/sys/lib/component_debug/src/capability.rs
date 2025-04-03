@@ -10,6 +10,8 @@ use cm_rust::{
     SourceName, UseDecl, UseDeclCommon,
 };
 use fidl_fuchsia_sys2 as fsys;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use moniker::Moniker;
 use thiserror::Error;
 
@@ -84,29 +86,37 @@ pub async fn get_all_route_segments(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<Vec<RouteSegment>, FindInstancesError> {
     let instances = get_all_instances(realm_query).await?;
-    let mut segments = vec![];
+    let query = query.as_str();
+    let mut results = FuturesUnordered::new();
 
     for instance in instances {
-        match get_resolved_declaration(&instance.moniker, realm_query).await {
-            Ok(decl) => {
-                let mut component_segments = get_segments(&instance.moniker, decl, &query);
-                segments.append(&mut component_segments)
-            }
-            // If the instance is not yet resolved, then we can't get its resolved declaration. If
-            // the component doesn't exist, then it's been destroyed since the `get_all_instances`
-            // call and we can't get its resolved declaration. Both of these things are expected,
-            // so ignore these errors.
-            Err(
-                GetDeclarationError::InstanceNotResolved(_)
-                | GetDeclarationError::InstanceNotFound(_),
-            ) => continue,
-            Err(err) => {
-                return Err(FindInstancesError::GetDeclarationError {
+        results.push(async move {
+            let result = get_resolved_declaration(&instance.moniker, realm_query);
+            match result.await {
+                Ok(decl) => {
+                    let component_segments = get_segments(&instance.moniker, decl, &query);
+                    Ok(component_segments)
+                }
+                // If the instance is not yet resolved, then we can't get its resolved declaration.
+                // If the component doesn't exist, then it's been destroyed since the
+                // `get_all_instances` call and we can't get its resolved declaration. Both of these
+                // things are expected, so ignore these errors.
+                Err(
+                    GetDeclarationError::InstanceNotResolved(_)
+                    | GetDeclarationError::InstanceNotFound(_),
+                ) => Ok(vec![]),
+                Err(err) => Err(FindInstancesError::GetDeclarationError {
                     moniker: instance.moniker.clone(),
                     err,
-                })
+                }),
             }
-        }
+        });
+    }
+
+    let mut segments = Vec::with_capacity(results.len());
+    while let Some(result) = results.next().await {
+        let mut component_segments = result?;
+        segments.append(&mut component_segments);
     }
 
     Ok(segments)

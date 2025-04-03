@@ -40,7 +40,6 @@ enum {
 #define KTRACE_ACTION_START          1 // options = grpmask, 0 = all
 #define KTRACE_ACTION_STOP           2 // options ignored
 #define KTRACE_ACTION_REWIND         3 // options ignored
-#define KTRACE_ACTION_NEW_PROBE      4 // options ignored, ptr = name
 #define KTRACE_ACTION_START_CIRCULAR 5 // options = grpmask, 0 = all
 
 #endif  // LIB_ZIRCON_INTERNAL_KTRACE_H_

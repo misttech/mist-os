@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
@@ -13,9 +14,11 @@ use ebpf::{
 };
 use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
@@ -39,6 +42,9 @@ pub struct Program {
     pub info: ProgramInfo,
     program: VerifiedEbpfProgram,
     maps: Vec<PinnedMap>,
+
+    /// The security state associated with this bpf Program.
+    pub security_state: security::BpfProgState,
 }
 
 fn map_ebpf_error(e: EbpfError) -> Errno {
@@ -63,6 +69,7 @@ impl Program {
         logger: &mut dyn OutputBuffer,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
+        Self::check_load_access(current_task, &info)?;
         let maps = link_maps_fds(current_task, &mut code)?;
         let maps_schema = maps.iter().map(|m| m.schema).collect();
         let mut logger = BufferVeriferLogger::new(logger);
@@ -71,7 +78,8 @@ impl Program {
             .create_calling_context(info.expected_attach_type, maps_schema)
             .map_err(map_ebpf_api_error)?;
         let program = verify_program(code, calling_context, &mut logger).map_err(map_ebpf_error)?;
-        Ok(Program { info, program, maps })
+        let security_state = security::bpf_prog_alloc(current_task);
+        Ok(Program { info, program, maps, security_state })
     }
 
     pub fn link<C: EbpfProgramContext<Map = PinnedMap>>(
@@ -92,6 +100,59 @@ impl Program {
             .map_err(map_ebpf_error)?;
 
         Ok(program)
+    }
+
+    fn check_load_access(current_task: &CurrentTask, info: &ProgramInfo) -> Result<(), Errno> {
+        if matches!(info.program_type, ProgramType::CgroupSkb | ProgramType::SocketFilter)
+            && current_task.kernel().disable_unprivileged_bpf.load(Ordering::Relaxed) == 0
+        {
+            return Ok(());
+        }
+        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            return Ok(());
+        }
+        security::check_task_capable(current_task, CAP_BPF)?;
+        match info.program_type {
+            // Loading tracing program types additionally require the CAP_PERFMON capability.
+            ProgramType::Kprobe
+            | ProgramType::Tracepoint
+            | ProgramType::PerfEvent
+            | ProgramType::RawTracepoint
+            | ProgramType::RawTracepointWritable
+            | ProgramType::Tracing => security::check_task_capable(current_task, CAP_PERFMON),
+
+            // Loading networking program types additionally require the CAP_NET_ADMIN capability.
+            ProgramType::SocketFilter
+            | ProgramType::SchedCls
+            | ProgramType::SchedAct
+            | ProgramType::Xdp
+            | ProgramType::SockOps
+            | ProgramType::SkSkb
+            | ProgramType::SkMsg
+            | ProgramType::SkLookup
+            | ProgramType::SkReuseport
+            | ProgramType::FlowDissector
+            | ProgramType::Netfilter => security::check_task_capable(current_task, CAP_NET_ADMIN),
+
+            // No additional checks are necessary for other program types.
+            ProgramType::CgroupDevice
+            | ProgramType::CgroupSkb
+            | ProgramType::CgroupSock
+            | ProgramType::CgroupSockAddr
+            | ProgramType::CgroupSockopt
+            | ProgramType::CgroupSysctl
+            | ProgramType::Ext
+            | ProgramType::LircMode2
+            | ProgramType::Lsm
+            | ProgramType::LwtIn
+            | ProgramType::LwtOut
+            | ProgramType::LwtSeg6Local
+            | ProgramType::LwtXmit
+            | ProgramType::StructOps
+            | ProgramType::Syscall
+            | ProgramType::Unspec
+            | ProgramType::Fuse => Ok(()),
+        }
     }
 }
 
@@ -118,7 +179,7 @@ fn link_maps_fds(
 
                     let fd = FdNumber::from_raw(instruction.imm);
                     let object = get_bpf_object(current_task, fd)?;
-                    let map = object.as_map()?;
+                    let map: &PinnedMap = object.as_map()?;
 
                     // Find the map in `maps` or insert it otherwise.
                     let maybe_index =

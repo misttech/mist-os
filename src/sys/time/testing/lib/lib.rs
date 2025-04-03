@@ -30,8 +30,6 @@ use push_source::{PushSource, TestUpdateAlgorithm, Update};
 use std::ops::Deref;
 use std::sync::Arc;
 use time_metrics_registry::PROJECT_ID;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
 use vfs::pseudo_directory;
 use zx::{self as zx, HandleBased, Rights};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
@@ -479,7 +477,7 @@ pub enum RtcOptions {
     /// Use this option if you need to implement corner cases, or
     /// very specific RTC behavior, such as abnormal configuration
     /// or anomalous behavior.
-    InjectedRtc(fidl_fuchsia_io::DirectoryProxy),
+    InjectedRtc(fio::DirectoryProxy),
 }
 
 impl From<fidl_test_time_realm::RtcOptions> for RtcOptions {
@@ -568,19 +566,8 @@ async fn setup_rtc(
                     let rtc_dir = rtc_dir.clone();
                     async move {
                         let _ = &handles;
-                        let scope = ExecutionScope::new();
-                        let (client_end, server_end) =
-                            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-                        let () = rtc_dir.open(
-                            scope.clone(),
-                            fio::OpenFlags::RIGHT_READABLE
-                                | fio::OpenFlags::RIGHT_WRITABLE
-                                | fio::OpenFlags::RIGHT_EXECUTABLE,
-                            vfs::path::Path::dot(),
-                            ServerEnd::new(server_end.into_channel()),
-                        );
                         let mut fs = ServiceFs::new();
-                        fs.add_remote("dev", client_end.into_proxy());
+                        fs.add_remote("dev", vfs::directory::serve_read_only(rtc_dir));
                         fs.serve_connection(handles.outgoing_dir)
                             .expect("failed to serve fake RTC ServiceFs");
                         fs.collect::<()>().await;
@@ -600,7 +587,7 @@ async fn setup_rtc(
                 .capability(
                     Capability::directory("dev-rtc")
                         .path("/dev/class/rtc")
-                        .rights(fio::RW_STAR_DIR),
+                        .rights(fio::R_STAR_DIR),
                 )
                 .from(&fake_rtc_server)
                 .to(&*timekeeper),

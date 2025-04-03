@@ -9,7 +9,10 @@ use crate::test_topology;
 use diagnostics_log_encoding::parse::parse_record;
 use diagnostics_log_encoding::{Argument, Record, Value};
 use futures::{future, StreamExt};
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
+use {
+    fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics,
+    fidl_fuchsia_diagnostics_types as fdiagnostics_types,
+};
 
 const PUPPET_NAME: &str = "puppet";
 
@@ -25,8 +28,8 @@ async fn listen_with_log_stream() {
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
     puppet
         .log_messages(vec![
-            (fdiagnostics::Severity::Info, "my msg: 10"),
-            (fdiagnostics::Severity::Warn, "my other msg: 20"),
+            (fdiagnostics_types::Severity::Info, "my msg: 10"),
+            (fdiagnostics_types::Severity::Warn, "my other msg: 20"),
         ])
         .await;
 
@@ -64,13 +67,13 @@ async fn listen_with_log_stream() {
         .take(2);
 
     let record = records.next().await.unwrap();
-    assert_eq!(record.severity, fdiagnostics::Severity::Info as u8);
+    assert_eq!(record.severity, fdiagnostics_types::Severity::Info.into_primitive());
     assert_eq!(message(&record), "my msg: 10");
     assert_eq!(moniker(&record), PUPPET_NAME);
     assert_eq!(url(&record), "puppet#meta/puppet.cm");
 
     let record = records.next().await.unwrap();
-    assert_eq!(record.severity, fdiagnostics::Severity::Warn as u8);
+    assert_eq!(record.severity, fdiagnostics_types::Severity::Warn.into_primitive());
     assert_eq!(message(&record), "my other msg: 20");
     assert_eq!(moniker(&record), PUPPET_NAME);
     assert_eq!(url(&record), "puppet#meta/puppet.cm");

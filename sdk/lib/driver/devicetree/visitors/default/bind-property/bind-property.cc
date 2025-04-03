@@ -35,7 +35,7 @@ zx::result<> BindPropertyVisitor::Visit(Node& node, const devicetree::PropertyDe
   fdf::NodeProperty prop(
       fdf::NodePropertyKey::WithStringValue(bind_fuchsia_devicetree::FIRST_COMPATIBLE),
       fdf::NodePropertyValue::WithStringValue(
-          std::string(*property->second.AsStringList()->begin())));
+          std::string(*property->second.AsStringList().value().begin())));
 
   FDF_LOG(DEBUG, "Added property %s to node '%s'", property->second.AsString()->data(),
           node.name().c_str());

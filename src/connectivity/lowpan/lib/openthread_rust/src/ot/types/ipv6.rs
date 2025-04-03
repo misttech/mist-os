@@ -526,8 +526,8 @@ pub enum NetifIdentifier {
     /// Functional equivalent of [`otsys::OT_NETIF_BACKBONE`](crate::otsys::OT_NETIF_BACKBONE).
     Backbone = OT_NETIF_BACKBONE as isize,
 
-    /// Functional equivalent of [`otsys::OT_NETIF_THREAD`](crate::otsys::OT_NETIF_THREAD).
-    Thread = OT_NETIF_THREAD as isize,
+    /// Functional equivalent of [`otsys::OT_NETIF_THREAD_HOST`](crate::otsys::OT_NETIF_THREAD_HOST).
+    Thread = OT_NETIF_THREAD_HOST as isize,
 
     /// Functional equivalent of [`otsys::OT_NETIF_UNSPECIFIED`](crate::otsys::OT_NETIF_UNSPECIFIED).
     Unspecified = OT_NETIF_UNSPECIFIED as isize,

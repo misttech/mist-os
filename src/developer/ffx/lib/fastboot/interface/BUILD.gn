@@ -2,48 +2,59 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  import("//build/rust/rustc_library.gni")
-  import("//build/rust/rustc_test.gni")
-  import("//build/testing/test_spec.gni")
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/testing/test_spec.gni")
 
-  rustc_library("lib") {
-    name = "ffx_fastboot_interface"
-    edition = "2021"
-    with_unit_tests = true
+assert(is_host,
+       "ffx_fastboot_interface is for use with the host toolchain only")
 
-    deps = [
-      "//src/developer/fastboot:lib",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:chrono",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:tokio",
-      "//third_party/rust_crates:tracing",
-    ]
+rustc_library("lib") {
+  name = "ffx_fastboot_interface"
+  edition = "2021"
+  with_unit_tests = true
 
-    test_deps = [
-      "//src/lib/fuchsia",
-      "//third_party/rust_crates:pretty_assertions",
-      "//third_party/rust_crates:rand",
-      "//third_party/rust_crates:tempfile",
-    ]
+  visibility = [
+    ":*",
+    "//src/developer/ffx/daemon/protocols/target_collection:*",
+    "//src/developer/ffx/lib/fastboot:*",
+    "//src/developer/ffx/lib/fastboot/transport/factory:*",
+    "//src/developer/ffx/lib/manual_targets:*",
+    "//src/developer/ffx/plugins/target/bootloader:*",
+    "//src/developer/ffx/plugins/target/flash:*",
+  ]
 
-    sources = [
-      "src/fastboot_interface.rs",
-      "src/fastboot_proxy.rs",
-      "src/interface_factory.rs",
-      "src/lib.rs",
-    ]
-  }
+  deps = [
+    "//src/developer/fastboot:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:chrono",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tokio",
+    "//third_party/rust_crates:tracing",
+  ]
 
-  group("ffx_fastboot_interface") {
-    public_deps = [ ":lib" ]
-  }
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:tempfile",
+  ]
 
-  group("tests") {
-    testonly = true
-    deps = [ ":lib_test" ]
-  }
+  sources = [
+    "src/fastboot_interface.rs",
+    "src/fastboot_proxy.rs",
+    "src/interface_factory.rs",
+    "src/lib.rs",
+  ]
+}
+
+group("ffx_fastboot_interface") {
+  public_deps = [ ":lib" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":lib_test" ]
 }

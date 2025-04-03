@@ -8,13 +8,34 @@
 #include <zircon/errors.h>
 #include <zircon/syscalls/object.h>
 
+#include <algorithm>
 #include <memory>
 
 #include <gtest/gtest.h>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 namespace memory {
+namespace {
+zx_info_kmem_stats_extended_t ExtendedStats(const zx_info_kmem_stats_t& stats) {
+  return zx_info_kmem_stats_extended_t{
+      .total_bytes = stats.total_bytes,
+      .free_bytes = stats.free_bytes,
+      .wired_bytes = stats.wired_bytes,
+      .total_heap_bytes = stats.total_heap_bytes,
+      .free_heap_bytes = stats.free_heap_bytes,
+      .vmo_bytes = stats.vmo_bytes,
+      .vmo_pager_total_bytes = stats.vmo_reclaim_total_bytes,
+      .vmo_pager_newest_bytes = stats.vmo_reclaim_newest_bytes,
+      .vmo_pager_oldest_bytes = stats.vmo_reclaim_oldest_bytes,
+      .vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes,
+      .vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes,
+      .mmu_overhead_bytes = stats.mmu_overhead_bytes,
+      .ipc_bytes = stats.ipc_bytes,
+      .other_bytes = stats.other_bytes,
+      .vmo_reclaim_disabled_bytes = stats.vmo_reclaim_disabled_bytes,
+  };
+}
+}  // namespace
 
 const zx_handle_t TestUtils::kRootHandle = 1;
 const zx_handle_t TestUtils::kSelfHandle = 2;
@@ -87,26 +108,6 @@ zx_status_t MockOS::GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, si
   return r->ret;
 }
 
-zx_info_kmem_stats_extended_t ExtendedStats(const zx_info_kmem_stats_t& stats) {
-  return zx_info_kmem_stats_extended_t{
-      .total_bytes = stats.total_bytes,
-      .free_bytes = stats.free_bytes,
-      .wired_bytes = stats.wired_bytes,
-      .total_heap_bytes = stats.total_heap_bytes,
-      .free_heap_bytes = stats.free_heap_bytes,
-      .vmo_bytes = stats.vmo_bytes,
-      .vmo_pager_total_bytes = stats.vmo_reclaim_total_bytes,
-      .vmo_pager_newest_bytes = stats.vmo_reclaim_newest_bytes,
-      .vmo_pager_oldest_bytes = stats.vmo_reclaim_oldest_bytes,
-      .vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes,
-      .vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes,
-      .mmu_overhead_bytes = stats.mmu_overhead_bytes,
-      .ipc_bytes = stats.ipc_bytes,
-      .other_bytes = stats.other_bytes,
-      .vmo_reclaim_disabled_bytes = stats.vmo_reclaim_disabled_bytes,
-  };
-}
-
 zx_status_t MockOS::GetKernelMemoryStats(
     const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client, zx_info_kmem_stats_t& kmem) {
   const GetInfoResponse* r = GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS);
@@ -144,7 +145,6 @@ zx_status_t MockOS::GetKernelMemoryStatsCompression(
   return r->ret;
 }
 
-// static.
 void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, CaptureLevel level) {
   capture->time_ = t.time;
   capture->kmem_ = t.kmem;
@@ -164,11 +164,11 @@ void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, Captur
   CaptureMaker::ReallocateDescendents(t.rooted_vmo_names, capture->koid_to_vmo_);
 }
 
-// static.
 std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summary) {
   std::vector<ProcessSummary> summaries = summary.process_summaries();
-  sort(summaries.begin(), summaries.end(),
-       [](const ProcessSummary& a, const ProcessSummary& b) { return a.koid() < b.koid(); });
+  std::ranges::sort(summaries, [](const ProcessSummary& a, const ProcessSummary& b) {
+    return a.koid() < b.koid();
+  });
   return summaries;
 }
 
@@ -181,7 +181,7 @@ zx_status_t CaptureSupplier::GetCapture(Capture* capture, CaptureLevel level,
                                         bool use_capture_supplier_time) {
   auto& t = templates_.at(index_);
   if (!use_capture_supplier_time) {
-    t.time = index_;
+    t.time = static_cast<int64_t>(index_);
   }
   index_++;
   TestUtils::CreateCapture(capture, t, level);

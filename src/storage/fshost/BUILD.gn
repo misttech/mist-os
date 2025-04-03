@@ -84,6 +84,7 @@ rustc_binary("fshost") {
     "testing:test_zxcrypt_config",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-sync",
   ]
   sources = [
     "src/boot_args.rs",

@@ -9,10 +9,10 @@ source_set("test-libs") {
   testonly = true
   public_deps = [
     "..:common",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-dma-buffer",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]
@@ -34,6 +34,7 @@ test("xhci-unittest-bin") {
   ]
   deps = [
     ":test-libs",
+    "//src/devices/lib/mmio:test_helper",
     "//zircon/system/ulib/mmio-ptr",
   ]
 }
@@ -116,7 +117,7 @@ test("xhci-endpoint-unittest-bin") {
   ]
   deps = [
     ":test-libs",
-    "//src/devices/testing/fake-bti",
+    "//sdk/lib/driver/fake-bti/cpp",
   ]
 }
 

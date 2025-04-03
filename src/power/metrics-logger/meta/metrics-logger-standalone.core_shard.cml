@@ -18,6 +18,8 @@
             subdir: "metrics-logger-standalone",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-temperature",
@@ -25,6 +27,14 @@
             subdir: "temperature",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.temperature.Service",
+            from: "parent",
+            to: "#metrics-logger-standalone",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-thermal",
@@ -32,11 +42,25 @@
             subdir: "thermal",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.thermal.Service",
+            from: "parent",
+            to: "#metrics-logger-standalone",
+        },
+        {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-power-sensor",
             to: "#metrics-logger-standalone",
             subdir: "power-sensor",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.power.sensor.Service",
+            from: "parent",
+            to: "#metrics-logger-standalone",
         },
         {
             protocol: "fuchsia.ui.activity.Provider",

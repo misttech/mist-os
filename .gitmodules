@@ -62,11 +62,6 @@
 	url = https://llvm.googlesource.com/llvm-project/libc
 	name = llvm-project/libc
 	ignore = all
-[submodule "third_party/luci-go"]
-	path = third_party/luci-go
-	url = https://fuchsia.googlesource.com/third_party/luci-go
-	name = third_party/luci-go
-	ignore = all
 [submodule "third_party/lz4"]
 	path = third_party/lz4
 	url = https://fuchsia.googlesource.com/third_party/lz4

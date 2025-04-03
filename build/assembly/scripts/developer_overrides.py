@@ -9,10 +9,14 @@ import os
 import shutil
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Optional
 
-from assembly import PackageCopier, PackageDetails, fast_copy_makedirs
-from assembly.assembly_input_bundle import CompiledPackageDefinition, DepSet
+from assembly import FilePath, PackageCopier, PackageDetails, fast_copy_makedirs
+from assembly.assembly_input_bundle import (
+    CompiledComponentDefinition,
+    CompiledPackageDefinition,
+    DepSet,
+)
 from depfile import DepFile
 from serialization import instance_from_dict, json_dump, json_load
 
@@ -23,7 +27,7 @@ from serialization import instance_from_dict, json_dump, json_load
 @dataclass
 class ShellCommandEntryFromGN:
     package: str
-    components: List[str]
+    components: list[str]
 
 
 @dataclass
@@ -42,17 +46,17 @@ class DeveloperOverridesFromGN:
     bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
-    packages: List[PackageDetails] = field(default_factory=list)
-    packages_to_compile: List[CompiledPackageDefinition] = field(
+    packages: list[PackageDetails] = field(default_factory=list)
+    packages_to_compile: list[CompiledPackageDefinition] = field(
         default_factory=list
     )
 
     # The type that's deserialized from what GN writes is different from that which will be written
     # out for Assembly to use.
-    shell_commands: List[ShellCommandEntryFromGN] = field(default_factory=list)
+    shell_commands: list[ShellCommandEntryFromGN] = field(default_factory=list)
 
 
-ShellCommandsForAssembly = Dict[str, List[str]]
+ShellCommandsForAssembly = dict[str, list[str]]
 
 
 @dataclass
@@ -89,8 +93,8 @@ class DeveloperOverridesForAssembly:
     bootfs_files_package: Optional[str] = field(default=None)
 
     # Packages we need to copy, so we'll need real types for those
-    packages: List[PackageDetails] = field(default_factory=list)
-    packages_to_compile: List[CompiledPackageDefinition] = field(
+    packages: list[PackageDetails] = field(default_factory=list)
+    packages_to_compile: list[CompiledPackageDefinition] = field(
         default_factory=list
     )
 
@@ -152,9 +156,9 @@ def main() -> int:
     )
 
     overrides_for_assembly.shell_commands = {}
-    for entry in overrides_from_gn.shell_commands:
-        overrides_for_assembly.shell_commands[entry.package] = [
-            f"bin/{name}" for name in entry.components
+    for shell_entry in overrides_from_gn.shell_commands:
+        overrides_for_assembly.shell_commands[shell_entry.package] = [
+            f"bin/{name}" for name in shell_entry.components
         ]
 
     if overrides_from_gn.packages:
@@ -175,6 +179,47 @@ def main() -> int:
         _, copy_deps = package_copier.perform_copy()
         deps.update(copy_deps)
 
+    # TODO(https://fxbug.dev/406838880) - Refactor this to use the same mechanisms in
+    # assembly_input_bundle.py.
+    if overrides_from_gn.packages_to_compile:
+        packages_to_compile: list[CompiledPackageDefinition] = []
+        for package in overrides_from_gn.packages_to_compile:
+            if package.contents:
+                raise ValueError(
+                    "\nExtra package contents for compiled_packages are not supported at this time.\n"
+                )
+            if package.includes:
+                raise ValueError(
+                    "\nExtra component includes for compiled_packages are not supported at this time.\n"
+                )
+            components: list[CompiledComponentDefinition] = []
+            for component in package.components:
+                shards: set[FilePath] = set()
+                for shard in component.shards:
+                    dest = os.path.join(
+                        args.outdir,
+                        "compiled_packages",
+                        package.name,
+                        component.component_name,
+                        os.path.basename(shard),
+                    )
+                    deps.add(shard)
+                    fast_copy_makedirs(shard, dest)
+                    shards.add(os.path.relpath(dest, args.outdir))
+                components.append(
+                    CompiledComponentDefinition(
+                        component.component_name, shards
+                    )
+                )
+            packages_to_compile.append(
+                CompiledPackageDefinition(
+                    package.name,
+                    components,
+                    bootfs_package=package.bootfs_package,
+                )
+            )
+        overrides_for_assembly.packages_to_compile = packages_to_compile
+
     outfile_path = os.path.join(args.outdir, "product_assembly_overrides.json")
 
     # There are potentially a few file paths listed in the overrides.  They need to be copied into
@@ -189,7 +234,7 @@ def main() -> int:
     # Copy the files to a pair of resources dirs:
     for raw_entry in input_file_path_entries:
         # The input_file_path_entries is a list of dicts, as the serialization library doesn't
-        # want to deserialize a 'List[Foo]'.
+        # want to deserialize a 'list[Foo]'.
         #
         # So here the list of dicts parsed from json above is individually deserialized into
         # the appropriate class.

@@ -26,7 +26,6 @@ const PageSourceProperties kProperties{
     .is_user_pager = false,
     .is_preserving_page_content = false,
     .is_providing_specific_physical_pages = true,
-    .is_handling_free = true,
 };
 
 }  // namespace
@@ -265,10 +264,16 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
             }
           }
           if (needs_evict) {
-            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
+            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset,
+                                                  VmCowPages::EvictionHintAction::Ignore);
             // Either we succeeded eviction, or another thread raced and did it first. If another
             // thread did it first then it would have done so under the VMO lock, which we have
-            // since acquired, and so we know the free completed and the page is in the PMM.
+            // since acquired, and so we know the page is either on the way (in a
+            // FreeLoanedPagesHolder) or in the PMM. We can ensure the page is fully migrated to the
+            // PMM by waiting for any holding to be concluded.
+            if (!page->is_free_loaned()) {
+              Pmm::Node().WithLoanedPage(page, [](vm_page_t* page) {});
+            }
           }
         });
       }
@@ -389,6 +394,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
 
       // First take the VMO lock before taking our lock to ensure lock ordering is correct. As we
       // hold a RefPtr we know that even if racing with OnClose this is a valid object.
+      VmCowPages::DeferredOps deferred(cow_pages_);
       Guard<VmoLockType> cow_lock{cow_pages_->lock()};
       bool detached;
       // Now take our lock and check to see if we have been detached.
@@ -405,7 +411,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
         // request.
         zx_status_t supply_result = cow_pages_->SupplyPagesLocked(
             VmCowRange(supply_offset, supply_length), &splice_list,
-            SupplyOptions::PhysicalPageProvider, &supplied_len, nullptr);
+            SupplyOptions::PhysicalPageProvider, &supplied_len, deferred, nullptr);
         ASSERT(supplied_len == supply_length || supply_result != ZX_OK);
         if (supply_result != ZX_OK) {
           // Supply can only fail due to being out of memory as we currently hold the lock and know

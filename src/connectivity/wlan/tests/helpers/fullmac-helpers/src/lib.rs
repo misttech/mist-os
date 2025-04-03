@@ -110,16 +110,6 @@ pub async fn handle_fullmac_startup(
     );
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QueryMacSublayerSupport {
-            responder,
-        })) => {
-            responder
-                .send(Ok(&config.mac_sublayer_support))
-                .expect("Failed to respond to QueryMacSublayerSupport");
-        }
-    );
-
-    assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QuerySecuritySupport {
             responder,
         })) => {

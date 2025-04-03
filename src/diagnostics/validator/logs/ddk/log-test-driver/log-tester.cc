@@ -66,7 +66,7 @@ void LogTester::GetInfo(GetInfoCompleter::Sync& completer) {
 
 void LogTester::EmitLog(EmitLogRequestView request, EmitLogCompleter::Sync& completer) {
   fx_log_severity_t severity;
-  switch (static_cast<fx_log_severity_t>(request->spec.record.severity)) {
+  switch (static_cast<fx_log_severity_t>(fidl::ToUnderlying(request->spec.record.severity))) {
     case FX_LOG_TRACE:
       severity = DDK_LOG_TRACE;
       break;

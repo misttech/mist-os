@@ -7,9 +7,10 @@ use crate::parser::{self, ParsingError, RequireEscaped, VerboseError};
 use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
-    self as fdiagnostics, ComponentSelector, Interest, LogInterestSelector, PropertySelector,
-    Selector, SelectorArgument, Severity, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
+    self as fdiagnostics, ComponentSelector, LogInterestSelector, PropertySelector, Selector,
+    SelectorArgument, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
 };
+use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};

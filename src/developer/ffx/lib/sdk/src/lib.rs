@@ -104,6 +104,12 @@ pub enum SdkRoot {
     ///  If the manifest is specified, it must be a relative path to the manifest,
     /// based on the root directory.
     Full { root: PathBuf, manifest: Option<String> },
+
+    /// No SDK root is known. This can happen when running ffx in-tree with an Isolate dir, or a
+    ///  directory where the search for ../meta/manifest.json fails.
+    ///  This is root is used to find host tools in the same directory as ffx is located. For example,
+    /// ffx is in ./host-tools and so is symbolizer.
+    HostTools { root: PathBuf },
 }
 
 /// A serde-serializable representation of ffx' sdk configuration.
@@ -160,10 +166,14 @@ impl SdkRoot {
                 match Self::find_sdk_root(&Path::new(&exe_path)) {
                     Ok(Some(root)) => root,
                     Ok(None) => {
-                        errors::ffx_bail!(
-                            "{}Could not find an SDK manifest in any parent of ffx's directory.",
-                            SDK_NOT_FOUND_HELP,
+                        tracing::error!(
+                            "Could not find an SDK manifest in any parent of ffx's directory.\
+                             Using {:?} as HostTools root",
+                            exe_path.parent().unwrap()
                         );
+                        return Ok(SdkRoot::HostTools {
+                            root: exe_path.parent().unwrap().to_path_buf(),
+                        });
                     }
                     Err(e) => {
                         errors::ffx_bail!("{}Error was: {:?}", SDK_NOT_FOUND_HELP, e);
@@ -234,6 +244,7 @@ impl SdkRoot {
                     None
                 }
             }
+            Self::HostTools { .. } => None,
         }
     }
 
@@ -275,6 +286,10 @@ impl SdkRoot {
                     anyhow!("Loading unknown sdk manifest at `{}`", root.display())
                 })
             }
+            Self::HostTools { root } => {
+                // This is not really a SDK, but a collection of host tools.
+                Sdk::from_host_tools(root)
+            }
         }
     }
 
@@ -285,6 +300,9 @@ impl SdkRoot {
             }
             Self::Full { root, manifest } => {
                 FfxSdkConfig { root: Some(root), manifest, module: None }
+            }
+            Self::HostTools { root } => {
+                FfxSdkConfig { root: Some(root), manifest: None, module: None }
             }
         }
     }
@@ -393,6 +411,16 @@ impl Sdk {
         })
     }
 
+    pub(crate) fn from_host_tools(host_tools_dir: PathBuf) -> Result<Self> {
+        Ok(Sdk {
+            path_prefix: host_tools_dir,
+            module: None,
+            parts: vec![],
+            real_paths: None,
+            version: SdkVersion::InTree,
+        })
+    }
+
     pub fn new() -> Self {
         Sdk {
             path_prefix: PathBuf::new(),
@@ -401,6 +429,13 @@ impl Sdk {
             real_paths: None,
             version: SdkVersion::Unknown,
         }
+    }
+
+    pub fn is_host_tools_only(&self) -> bool {
+        return self.path_prefix.exists()
+            && self.module.is_none()
+            && self.parts.is_empty()
+            && self.version == SdkVersion::InTree;
     }
 
     fn open_manifest(path: &Path) -> Result<fs::File> {
@@ -469,7 +504,17 @@ impl Sdk {
     /// A preferred alternative to this method is ffx_config::get_host_tool() which
     /// also considers configured overrides for the tools.
     pub fn get_host_tool(&self, name: &str) -> Result<PathBuf> {
-        self.get_host_tool_relative_path(name).map(|path| self.path_prefix.join(path))
+        let relative_path = self.get_host_tool_relative_path(name)?;
+
+        let full_path = self.path_prefix.join(relative_path);
+
+        if full_path.exists() {
+            tracing::info!("Path {full_path:?} found for {name}");
+            Ok(full_path)
+        } else {
+            tracing::info!("No path  found for {name}");
+            Err(anyhow!("No path  found for {name}"))
+        }
     }
 
     /// Get the metadata for all host tools
@@ -488,14 +533,33 @@ impl Sdk {
                     Ok(tool_path.to_owned())
                 }
                 Some([]) | None => {
-                    Err(anyhow!("No executable provided for tool '{}' (file list was empty)", name))
+                    // if this is a "host tools" SDK, return the tool name.
+                    if self.is_host_tools_only() {
+                        Ok(name.to_string())
+                    } else {
+                        Err(anyhow!(
+                            "No executable provided for tool '{}' (file list was empty)",
+                            name
+                        ))
+                    }
                 }
             })
             .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .min_by_key(|x| x.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
-            .ok_or_else(|| ffx_error!("Tool '{}' not found in SDK dir", name))?;
-        self.get_real_path(found_tool)
+            // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
+            .min_by_key(|x| x.len());
+
+        if let Some(tool) = found_tool {
+            self.get_real_path(tool)
+        } else {
+            if self.is_host_tools_only() {
+                Ok(PathBuf::from(name))
+            } else {
+                Err(anyhow!(
+                    "No executable provided for tool '{name}' (not found in SDK manifest files)"
+                ))
+            }
+        }
     }
 
     fn get_real_path(&self, path: impl AsRef<str>) -> Result<PathBuf> {
@@ -631,6 +695,7 @@ impl FfxToolFiles {
 mod test {
     use super::*;
     use regex::Regex;
+    use std::fs;
     use std::io::Write;
     use tempfile::{tempdir, TempDir};
 
@@ -781,11 +846,12 @@ mod test {
             fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
-
+        let expected = manifest_path.join("host_x64/zxdb");
+        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake zxdb");
         let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::Unknown).unwrap();
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
-        assert_eq!(manifest_path.join("host_x64/zxdb"), zxdb);
+        assert_eq!(expected, zxdb);
 
         let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
         assert_eq!(zxdb_cmd.get_program(), manifest_path.join("host_x64/zxdb"));
@@ -800,10 +866,12 @@ mod test {
         ))
         .unwrap();
 
+        let expected = manifest_path.join("host_x64/symbol-index");
+        fs::write(&expected, "#!/bin/bash\necho hello").expect("fake host tool");
         let sdk = Sdk::from_sdk_atoms(manifest_path, None, atoms, SdkVersion::InTree).unwrap();
         let symbol_index = sdk.get_host_tool("symbol-index").unwrap();
 
-        assert_eq!(manifest_path.join("host_x64/symbol-index"), symbol_index);
+        assert_eq!(expected, symbol_index);
 
         let symbol_index_cmd = sdk.get_host_tool_command("symbol-index").unwrap();
         assert_eq!(symbol_index_cmd.get_program(), manifest_path.join("host_x64/symbol-index"));
@@ -862,7 +930,8 @@ mod test {
             fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
-
+        let expected = sdk_root.join("tools/zxdb");
+        fs::write(&expected, "#!/bin/bash\n echo hello").expect("fake host tool");
         let sdk = Sdk {
             path_prefix: sdk_root.to_owned(),
             module: None,
@@ -872,7 +941,7 @@ mod test {
         };
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
-        assert_eq!(sdk_root.join("tools/zxdb"), zxdb);
+        assert_eq!(expected, zxdb);
 
         let zxdb_cmd = sdk.get_host_tool_command("zxdb").unwrap();
         assert_eq!(zxdb_cmd.get_program(), sdk_root.join("tools/zxdb"));
@@ -946,5 +1015,71 @@ mod test {
         std::fs::create_dir(meta_path).unwrap();
 
         assert!(SdkRoot::find_sdk_root(&start_path).unwrap().is_none());
+    }
+
+    #[fuchsia::test]
+    fn test_host_tool_root() {
+        let temp = tempdir().unwrap();
+
+        // It is difficult to test creating SdkRoot in a unit test since there is code that
+        // attempts to detect and navigate the build directory (and it does so well).
+
+        // The HostTool Root is effectively the "SDKRoot of last resort", so the tests should make
+        // sure it behaves predictably and fails gracefully if more than just host tools are accessed
+        // via this root.
+        let start_path = temp.path().to_path_buf().join("test1").join("test2");
+        std::fs::create_dir_all(start_path.clone()).unwrap();
+
+        let sdk_root = SdkRoot::HostTools { root: start_path.clone() };
+
+        let manifest = sdk_root.manifest_path();
+        assert!(manifest.is_none(), "Expected None manifest, got {manifest:?}");
+
+        let sdk = sdk_root.clone().get_sdk().expect("SDK from sdk_root");
+
+        assert_eq!(sdk.get_path_prefix(), start_path.as_path());
+
+        let config = sdk_root.to_config();
+
+        assert_eq!(config.root, Some(start_path));
+        assert_eq!(config.manifest, None);
+        assert_eq!(config.module, None);
+    }
+
+    #[fuchsia::test]
+    fn test_host_tool_sdk() {
+        let temp = tempdir().unwrap();
+
+        let start_path = temp.path().to_path_buf().join("some").join("bin");
+        std::fs::create_dir_all(start_path.clone()).unwrap();
+
+        // write a test host tool
+        fs::write(start_path.join("some-tool"), "contents of host tool").expect("write some-tool");
+
+        let sdk_root = SdkRoot::HostTools { root: start_path.clone() };
+
+        let sdk = sdk_root.clone().get_sdk().expect("SDK from sdk_root");
+
+        assert_eq!(sdk.get_path_prefix(), start_path.as_path());
+
+        let version = sdk.get_version();
+        match version {
+            SdkVersion::InTree => (),
+            _ => panic!("Expected in-tree SDK version, got {version:?}"),
+        };
+
+        assert!(sdk.is_host_tools_only());
+
+        let ffx_tools: Vec<_> = sdk.get_ffx_tools().collect();
+        assert!(ffx_tools.is_empty());
+
+        let some_tool = sdk.get_ffx_tool("ffx-some");
+        assert!(some_tool.is_none());
+
+        let host_tool = sdk.get_host_tool("some-tool").expect("some-tool");
+        assert_eq!(host_tool, start_path.join("some-tool"));
+
+        let some_cmd = sdk.get_host_tool_command("some-tool").expect("host tool command");
+        assert_eq!(some_cmd.get_program(), start_path.join("some-tool"));
     }
 }

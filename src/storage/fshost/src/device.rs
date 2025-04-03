@@ -27,6 +27,14 @@ pub trait Device: Send + Sync {
     /// Returns BlockInfo (the result of calling fuchsia.hardware.block/Block.Query).
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error>;
 
+    /// True if the device is managed by fshost (such as devices within the system GPT).
+    /// Devices are considered managed if either of the following hold:
+    /// - The device was matched by fshost, or
+    /// - The device comes from a component launched by fshost (e.g. the GPT component).
+    /// In practice, this means that low-level block drivers which fshost doesn't bind to are
+    /// unmanaged.
+    fn is_managed(&self) -> bool;
+
     /// True if this is a NAND device.
     fn is_nand(&self) -> bool;
 
@@ -39,6 +47,12 @@ pub trait Device: Send + Sync {
 
     /// Returns the path in the local namespace. This path is absolute, e.g. /dev/class/block/000.
     fn path(&self) -> &str;
+
+    /// Returns the source of this block device. This is primarily a debugging path, and it's
+    /// different for different device types. More specifically, for devfs-based devices it's the
+    /// topological path, for services it starts with the service path in the fshost namespace, and
+    /// for component sources it starts with the component moniker.
+    fn source(&self) -> &str;
 
     /// If this device is a partition, this returns the label. Otherwise, an error is returned.
     async fn partition_label(&mut self) -> Result<&str, Error>;
@@ -125,6 +139,10 @@ impl Device for NandDevice {
         true
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
         Err(anyhow!("not supported by nand device"))
     }
@@ -157,6 +175,10 @@ impl Device for NandDevice {
 
     fn path(&self) -> &str {
         self.block_device.path()
+    }
+
+    fn source(&self) -> &str {
+        self.topological_path()
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -275,6 +297,10 @@ impl Device for BlockDevice {
         Ok(info)
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     fn is_nand(&self) -> bool {
         false
     }
@@ -293,6 +319,10 @@ impl Device for BlockDevice {
 
     fn path(&self) -> &str {
         &self.path
+    }
+
+    fn source(&self) -> &str {
+        self.topological_path()
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -396,6 +426,8 @@ impl Device for BlockDevice {
 #[derive(Debug)]
 pub struct VolumeProtocolDevice {
     connector: Box<DirBasedBlockConnector>,
+    source: String,
+    is_managed: bool,
 
     // Cache a proxy to the device's Volume interface so we can use it internally.  (This assumes
     // that devices speak Volume, which is currently always true).
@@ -409,11 +441,19 @@ pub struct VolumeProtocolDevice {
 }
 
 impl VolumeProtocolDevice {
-    pub fn new(dir: fio::DirectoryProxy, path: impl ToString) -> Result<Self, Error> {
+    pub fn new(
+        dir: fio::DirectoryProxy,
+        path: impl ToString,
+        source: impl ToString,
+        is_managed: bool,
+    ) -> Result<Self, Error> {
+        let source = format!("{}/{}", source.to_string(), path.to_string());
         let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/volume"));
         let volume_proxy = connector.connect_volume()?.into_proxy();
         Ok(Self {
             connector,
+            source,
+            is_managed,
             volume_proxy,
             content_format: None,
             partition_label: None,
@@ -429,6 +469,10 @@ impl Device for VolumeProtocolDevice {
         let block_proxy = self.block_proxy()?;
         let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
+    }
+
+    fn is_managed(&self) -> bool {
+        self.is_managed
     }
 
     fn is_nand(&self) -> bool {
@@ -449,6 +493,10 @@ impl Device for VolumeProtocolDevice {
 
     fn topological_path(&self) -> &str {
         self.connector.path()
+    }
+
+    fn source(&self) -> &str {
+        &self.source
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -543,6 +591,10 @@ impl Device for RamdiskDevice {
         Ok(info)
     }
 
+    fn is_managed(&self) -> bool {
+        true
+    }
+
     fn is_nand(&self) -> bool {
         false
     }
@@ -560,6 +612,10 @@ impl Device for RamdiskDevice {
 
     fn topological_path(&self) -> &str {
         ""
+    }
+
+    fn source(&self) -> &str {
+        "fshost-ramdisk"
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -583,7 +639,7 @@ impl Device for RamdiskDevice {
     }
 
     fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
-        Ok(Box::new(RamdiskDeviceBlockConnector { ramdisk: self.ramdisk.clone() }))
+        Ok(Box::new(self.ramdisk.clone()))
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
@@ -603,18 +659,6 @@ impl Device for RamdiskDevice {
     }
 
     fn set_fshost_ramdisk(&mut self, _v: bool) {}
-}
-
-struct RamdiskDeviceBlockConnector {
-    ramdisk: Arc<RamdiskClient>,
-}
-
-impl BlockConnector for RamdiskDeviceBlockConnector {
-    fn connect_volume(
-        &self,
-    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
-        Ok(ClientEnd::new(self.ramdisk.open()?.into_channel()))
-    }
 }
 
 /// RegisteredDevices keeps track of significant devices so that they can be found later as

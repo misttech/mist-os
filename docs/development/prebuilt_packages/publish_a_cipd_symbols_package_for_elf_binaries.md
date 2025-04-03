@@ -1,4 +1,5 @@
 # Publish a CIPD symbols package for ELF binaries {#publish-a-symbols-cipd-package}
+
 A symbols package is used for symbolization in logs and
 debugging crashes. A CIPD prebuilt package that contains Fuchsia ELF binaries
 needs to have a companion symbols package that contains debug information for
@@ -25,8 +26,10 @@ the binaries.
 
     This means that each file must be stored as `<xx>/<xxxxxxxxxx>.debug`,
     where `<xx>` and `<xxxxxxxxx>` are hex strings derived from the `build-id`
-    hash value, of the unstripped binary. Each such file should match one
-    stripped ELF binary with the same `build-id` from the original package.
+    hash value, of the unstripped binary. Each of the `.debug` files should be
+    a copy of the unstripped ELF binary itself, not just the extracted debug
+    information. These files should map to the stripped ELF binary with
+    the same `build-id` from the original package.
 
     Note: The symbols package needs to not include the top-level `.build-id`
     directory.
@@ -72,7 +75,7 @@ the binaries.
 *   The Jiri checkout path for all symbols package must be
     `${FUCHSIA_DIR}/prebuilt/.build-id`.
 
-## Generate a symbols package
+## Generate a symbols package {#generate-symbols-package}
 
 To generate a symbols package, you need to:
 
@@ -85,32 +88,75 @@ To generate a symbols package, you need to:
     Clang toolchain, but regular Clang requires passing a special flag
     (`-Wl,--build-id`) to the linker.
 
-You can generate the stripped binary and the corresponding
-`build-id` directories with a single call to `llvm-objcopy`, as in the
-following example:
+The recommended way to generate a symbols package is to use the `buildidtool`
+prebuilt tool:
 
-```none
-# Copy out/libfoo.so to symbols/<xx>/<xxxxxxx>.debug according to its
-# `build-id` value (requires the library to be linked with -Wl,--build-id when
-# using Clang), and also copy the stripped version of the library to
-# stripped/libfoo.so
-#
-# NOTE: To strip executables, instead of libraries, replace --strip-all below
-#       with --strip-sections
-#
-UNSTRIPPED_LIB=out/libfoo.so
-STRIPPED_LIB=stripped/libfoo.so
+* For out-of-tree builds, you can get this tool from
+  [CIPD](https://chrome-infra-packages.appspot.com/p/fuchsia/tools/buildidtool){:# external}.
+
+Use the `buildidtool` to generate the symbol package directory structure:
+
+```bash
+# Example assuming your unstripped binary is at out/libfoo.so and you want to
+# create the symbols directory at ./symbols
+
+UNSTRIPPED_BINARY=out/libfoo.so
 SYMBOLS_DIR=./symbols
+BUILDIDTOOL="${FUCHSIA_DIR}/prebuilt/tools/buildidtool/linux-x64/buildidtool" # Adjust path as needed
 
-llvm-objcopy --strip-all \
-    --build-id-link-dir="${SYMBOLS_DIR}" \
-    --build-id-link-input=.debug \
-    "${UNSTRIPPED_LIB}" "${STRIPPED_LIB}"
+mkdir -p "${SYMBOLS_DIR}" # Ensure symbols directory exists
+
+"${BUILDIDTOOL}" --build-id-dir="${SYMBOLS_DIR}" -entry .debug="${UNSTRIPPED_BINARY}" -stamp "$(mktemp)"
 ```
 
-Repeat as many times as necessary to populate the `symbols/` directory,
-then upload its content (the files under `symbols/`) as your symbols package.
+Repeat this `buildidtool` command for each unstripped ELF binary in your
+prebuilt package to populate the `symbols/` directory.
 
-Don't forget to copy the content of the `stripped/` directory to your
-prebuilt CIPD package as well.
+Note: Don't forget to strip your ELF binaries for your main prebuilt CIPD
+package. You can use `llvm-objcopy --strip-all` or `llvm-strip`.
 
+Then, upload the content of the `symbols/` directory (not the directory itself)
+as your symbols package to CIPD.
+
+## Test symbols packages locally
+
+Before testing symbols packages locally, you should understand what a `jiri`
+entry for a symbols package looks like:
+
+```xml
+<package name=$CIPD_PATH-debug-symbols-$cpu # Example: ~/fuchsia/mypackage-debug-symbols-amd64
+         path="prebuilt/.build-id"
+         version=$CIPD_VERSION
+         attributes="debug-symbols,debug-symbols-$cpu,debug-symbols-$project"/>
+```
+
+**Explanation of attributes:**
+
+*   `path="prebuilt/.build-id"`: All symbol packages must be downloaded to the
+    `${FUCHSIA_DIR}/prebuilt/.build-id` directory in your project checkout.
+*   `attributes="debug-symbols,debug-symbols-$cpu, debug-symbols-$project"`:
+    This controls when the symbols package is downloaded.
+    *   `debug-symbols-$cpu` (e.g., `debug-symbols-arm64`, `debug-symbols-amd64`).
+    *   `debug-symbols-$project`: This attribute is used to download symbols
+        packages relevant to your specific project. For local testing, see the
+        instructions below.
+    *   `debug-symbols`: General convention.
+
+To be able to use `jiri` to fetch a symbols package for a local test, you need
+to configure `jiri`. For example, to configure jiri to fetch
+`debug-symbols-$project`:
+
+```posix-terminal
+jiri init -fetch-optional=debug-symbols-$project
+```
+
+Then, retrieve the packages:
+
+```posix-terminal
+jiri fetch-packages --local-manifest
+```
+
+Keep in mind that opting into symbol package download through Jiri attributes
+can significantly increase the disk space used by your project checkout. You can
+remove opted-in attributes by manually editing the `.jiri_root/attributes.json`
+file in your checkout's top-level directory.

@@ -195,6 +195,7 @@ impl WalkPaths for ProductPackagesConfig {
     ) -> anyhow::Result<()> {
         walk_package_set(&mut self.base, found, dest.join("base"))?;
         walk_package_set(&mut self.cache, found, dest.join("cache"))?;
+        walk_package_set(&mut self.bootfs, found, dest.join("bootfs"))?;
         Ok(())
     }
 }
@@ -340,6 +341,12 @@ impl JsonSchema for TeeClientConfigData {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
+pub enum TrustedAppType {
+    GlobalPlatform,
+    BinderRPC,
+}
+
 /// Configuration for how to run a trusted application in Fuchsia.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 pub struct TrustedApp {
@@ -347,6 +354,8 @@ pub struct TrustedApp {
     pub component_url: String,
     /// The GUID that identifies this trusted app for clients.
     pub guid: String,
+    /// Type of trusted application.
+    pub ta_type: TrustedAppType,
 }
 
 /// Product configuration options for the session:
@@ -433,6 +442,11 @@ mod tests {
                     {
                         manifest: "path/to/cache/package_manifest.json"
                     }
+                ],
+                bootfs: [
+                    {
+                        manifest: "path/to/bootfs/package_manifest.json"
+                    }
                 ]
             }
         "#;
@@ -474,6 +488,17 @@ mod tests {
                 "0".to_string(),
                 ProductPackageDetails {
                     manifest: "path/to/cache/package_manifest.json".into(),
+                    config_data: Vec::default()
+                }
+            )]
+            .into()
+        );
+        assert_eq!(
+            packages.bootfs,
+            [(
+                "0".to_string(),
+                ProductPackageDetails {
+                    manifest: "path/to/bootfs/package_manifest.json".into(),
                     config_data: Vec::default()
                 }
             )]

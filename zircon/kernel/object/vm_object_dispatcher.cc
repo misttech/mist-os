@@ -607,8 +607,10 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
 zx::result<fbl::RefPtr<ContentSizeManager>> VmObjectDispatcher::content_size_manager() {
   Guard<CriticalMutex> guard{get_lock()};
   if (unlikely(!content_size_mgr_)) {
-    // content_size_manager should never be called on physical or contiguous VMOs.
-    DEBUG_ASSERT(vmo_->is_paged() && !vmo_->is_contiguous());
+    // Physical & contiguous VMOs can't have associated stream.
+    if (!vmo_->is_paged() || vmo_->is_contiguous()) {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
     auto result = ContentSizeManager::Create(vmo_->size());
     if (result.is_error()) {
       return result.take_error();

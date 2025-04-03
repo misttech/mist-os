@@ -45,11 +45,15 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
-        { protocol: "fuchsia.scheduler.RoleManager" },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            availability: "optional",
+        },
         {
             protocol: [
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.settings.Privacy",
+                "fuchsia.time.external.Adjust",
             ],
             availability: "optional",
         },
@@ -57,6 +61,13 @@
             // Sets the platform's data collection bit.
             config: "fuchsia.starnix.runner.EnableDataCollection",
             key: "enable_data_collection",
+            type: "bool",
+            default: false,
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.time.config.WritableUTCTime",
+            key: "enable_utc_time_adjustment",
             type: "bool",
             default: false,
             availability: "transitional",
@@ -74,6 +85,7 @@
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
@@ -103,6 +115,7 @@
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",
+                "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
@@ -140,6 +153,16 @@
             to: [ "#kernels" ],
         },
         {
+            directory: "dev-serial",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
+            directory: "dev-trippoint",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             from: "parent",
@@ -151,7 +174,10 @@
             to: [ "#kernels" ],
         },
         {
-            config: [ "fuchsia.ui.VisualDebuggingLevel" ],
+            config: [
+                "fuchsia.time.config.WritableUTCTime",
+                "fuchsia.ui.VisualDebuggingLevel",
+            ],
             from: "parent",
             to: [ "#kernels" ],
         },

@@ -28,6 +28,7 @@ impl ModuleMapBuilder {
         &mut self,
         memory_range: Range<u64>,
         file_offset: u64,
+        filename_string_index: i64,
         build_id_string_index: i64,
     ) -> Result<u64, Error> {
         // Generate a unique non-zero ID for the new mapping.
@@ -43,6 +44,7 @@ impl ModuleMapBuilder {
             memory_start: memory_range.start,
             memory_limit: memory_range.end,
             file_offset,
+            filename: filename_string_index,
             build_id: build_id_string_index,
             ..Default::default()
         });
@@ -112,27 +114,31 @@ mod tests {
     use super::*;
     use itertools::Itertools;
 
-    // Placeholders for build ID string indices.
-    const FAKE_BUILD_ID_1: i64 = 1;
-    const FAKE_BUILD_ID_2: i64 = 2;
-    const FAKE_BUILD_ID_3: i64 = 3;
+    // Placeholders for filename and build ID string indices.
+    const FAKE_FILENAME_1: i64 = 1;
+    const FAKE_FILENAME_2: i64 = 2;
+    const FAKE_FILENAME_3: i64 = 3;
+    const FAKE_BUILD_ID_1: i64 = 4;
+    const FAKE_BUILD_ID_2: i64 = 5;
+    const FAKE_BUILD_ID_3: i64 = 6;
 
     #[test]
     fn test_mapping_can_resolve() {
         let mut mm = ModuleMapBuilder::default();
 
         // Describes a module that lives between addresses 100 and 200.
-        let mapping1_id = mm.add_mapping(100..200, 0, FAKE_BUILD_ID_1).unwrap();
+        let mapping1_id = mm.add_mapping(100..200, 0, FAKE_FILENAME_1, FAKE_BUILD_ID_1).unwrap();
         assert_ne!(mapping1_id, 0);
 
         // Describes a module that lives between addresses 1000 and 2000.
-        let mapping2_id = mm.add_mapping(1000..1500, 0, FAKE_BUILD_ID_2).unwrap();
+        let mapping2_id = mm.add_mapping(1000..1500, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2).unwrap();
         assert_ne!(mapping2_id, 0);
-        let mapping3_id = mm.add_mapping(1500..2000, 500, FAKE_BUILD_ID_2).unwrap();
+        let mapping3_id =
+            mm.add_mapping(1500..2000, 500, FAKE_FILENAME_2, FAKE_BUILD_ID_2).unwrap();
         assert_ne!(mapping3_id, 0);
 
         // Describes a module that lives between addresses 800 and 1000.
-        let mapping4_id = mm.add_mapping(800..1000, 200, FAKE_BUILD_ID_3).unwrap();
+        let mapping4_id = mm.add_mapping(800..1000, 200, FAKE_FILENAME_3, FAKE_BUILD_ID_3).unwrap();
         assert_ne!(mapping4_id, 0);
 
         let (table, resolver) = mm.build();
@@ -142,21 +148,25 @@ mod tests {
         assert_eq!(mapping1_data.memory_start, 100);
         assert_eq!(mapping1_data.memory_limit, 200);
         assert_eq!(mapping1_data.file_offset, 0);
+        assert_eq!(mapping1_data.filename, FAKE_FILENAME_1);
         assert_eq!(mapping1_data.build_id, FAKE_BUILD_ID_1);
         let mapping2_data = table.iter().filter(|e| e.id == mapping2_id).exactly_one().unwrap();
         assert_eq!(mapping2_data.memory_start, 1000);
         assert_eq!(mapping2_data.memory_limit, 1500);
         assert_eq!(mapping2_data.file_offset, 0);
+        assert_eq!(mapping2_data.filename, FAKE_FILENAME_2);
         assert_eq!(mapping2_data.build_id, FAKE_BUILD_ID_2);
         let mapping3_data = table.iter().filter(|e| e.id == mapping3_id).exactly_one().unwrap();
         assert_eq!(mapping3_data.memory_start, 1500);
         assert_eq!(mapping3_data.memory_limit, 2000);
         assert_eq!(mapping3_data.file_offset, 500);
+        assert_eq!(mapping3_data.filename, FAKE_FILENAME_2);
         assert_eq!(mapping3_data.build_id, FAKE_BUILD_ID_2);
         let mapping4_data = table.iter().filter(|e| e.id == mapping4_id).exactly_one().unwrap();
         assert_eq!(mapping4_data.memory_start, 800);
         assert_eq!(mapping4_data.memory_limit, 1000);
         assert_eq!(mapping4_data.file_offset, 200);
+        assert_eq!(mapping4_data.filename, FAKE_FILENAME_3);
         assert_eq!(mapping4_data.build_id, FAKE_BUILD_ID_3);
         assert_eq!(table.len(), 4, "No other entries should be present");
 
@@ -183,16 +193,19 @@ mod tests {
         let mut mm = ModuleMapBuilder::default();
 
         // Insert a module that lives between addresses 100 and 200.
-        let mapping_id = mm.add_mapping(100..200, 0, FAKE_BUILD_ID_1).unwrap();
+        let mapping_id = mm.add_mapping(100..200, 0, FAKE_FILENAME_1, FAKE_BUILD_ID_1).unwrap();
 
         // Try to insert overlapping mapping and verify that they all fail.
-        mm.add_mapping(100..200, 0, FAKE_BUILD_ID_1).expect_err("full range");
-        mm.add_mapping(100..150, 0, FAKE_BUILD_ID_2).expect_err("at the beginning of the range");
-        mm.add_mapping(150..200, 0, FAKE_BUILD_ID_2).expect_err("at the end of the range");
-        mm.add_mapping(90..101, 0, FAKE_BUILD_ID_2).expect_err("crosses the beginning");
-        mm.add_mapping(190..210, 0, FAKE_BUILD_ID_2).expect_err("crosses the end");
-        mm.add_mapping(110..190, 0, FAKE_BUILD_ID_2).expect_err("subset");
-        mm.add_mapping(90..210, 0, FAKE_BUILD_ID_2).expect_err("superset");
+        mm.add_mapping(100..200, 0, FAKE_FILENAME_1, FAKE_BUILD_ID_1).expect_err("full range");
+        mm.add_mapping(100..150, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2)
+            .expect_err("at the beginning of the range");
+        mm.add_mapping(150..200, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2)
+            .expect_err("at the end of the range");
+        mm.add_mapping(90..101, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2)
+            .expect_err("crosses the beginning");
+        mm.add_mapping(190..210, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2).expect_err("crosses the end");
+        mm.add_mapping(110..190, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2).expect_err("subset");
+        mm.add_mapping(90..210, 0, FAKE_FILENAME_2, FAKE_BUILD_ID_2).expect_err("superset");
 
         // Verify that the resulting table only contains the good mapping.
         let (table, _) = mm.build();
@@ -201,6 +214,7 @@ mod tests {
         assert_eq!(table[0].memory_start, 100);
         assert_eq!(table[0].memory_limit, 200);
         assert_eq!(table[0].file_offset, 0);
+        assert_eq!(table[0].filename, FAKE_FILENAME_1);
         assert_eq!(table[0].build_id, FAKE_BUILD_ID_1);
     }
 }

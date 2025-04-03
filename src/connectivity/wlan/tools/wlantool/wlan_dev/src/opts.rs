@@ -142,30 +142,30 @@ pub enum PhyCmd {
     #[structopt(name = "query")]
     /// queries a phy device
     Query {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         /// id of the phy to query
         phy_id: u16,
     },
     #[structopt(name = "get-country")]
     /// gets the phy's country used for WLAN regulatory purposes
     GetCountry {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         /// id of the phy to query
         phy_id: u16,
     },
     #[structopt(name = "set-country")]
     /// sets the phy's country for WLAN regulatory purpose
     SetCountry {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         /// id of the phy to query
         phy_id: u16,
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         country: String,
     },
     #[structopt(name = "clear-country")]
     /// sets the phy's country code to world-safe value
     ClearCountry {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         /// id of the phy to query
         phy_id: u16,
     },
@@ -176,16 +176,16 @@ pub enum IfaceCmd {
     #[structopt(name = "new")]
     /// creates a new iface device
     New {
-        #[structopt(short = "p", long = "phy", raw(required = "true"))]
+        #[structopt(short = "p", long = "phy", required = true)]
         /// id of the phy that will host the iface
         phy_id: u16,
 
         #[structopt(
             short = "r",
             long = "role",
-            raw(possible_values = "&RoleArg::variants()"),
+            possible_values = &RoleArg::variants(),
             default_value = "Client",
-            raw(case_insensitive = "true")
+            case_insensitive = true,
         )]
         /// role of the new iface
         role: RoleArg,
@@ -202,7 +202,7 @@ pub enum IfaceCmd {
     #[structopt(name = "del")]
     /// destroys an iface device
     Delete {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         /// iface id to destroy
         iface_id: u16,
     },
@@ -211,7 +211,7 @@ pub enum IfaceCmd {
     List,
     #[structopt(name = "query")]
     Query {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         iface_id: u16,
     },
     #[structopt(name = "minstrel")]
@@ -232,7 +232,7 @@ pub enum MinstrelCmd {
 pub struct ClientConnectCmd {
     #[structopt(short = "i", long = "iface", default_value = "0")]
     pub iface_id: u16,
-    #[structopt(short = "p", long = "password", help = "WPA2 PSK")]
+    #[structopt(short = "p", long = "password", help = "Password")]
     pub password: Option<String>,
     #[structopt(short = "hash", long = "hash", help = "WPA2 PSK as hex string")]
     pub psk: Option<String>,
@@ -240,13 +240,15 @@ pub struct ClientConnectCmd {
         short = "s",
         long = "scan-type",
         default_value = "passive",
-        raw(possible_values = "&ScanTypeArg::variants()"),
-        raw(case_insensitive = "true"),
+        possible_values = &ScanTypeArg::variants(),
+        case_insensitive = true,
         help = "Determines the type of scan performed on non-DFS channels when connecting."
     )]
     pub scan_type: ScanTypeArg,
+    #[structopt(short = "b", long = "bssid", help = "Specific BSSID to connect to")]
+    pub bssid: Option<String>,
     #[structopt(
-        raw(required = "true"),
+        required = true,
         help = "SSID of the target network. Connecting via only an SSID is deprecated and will be \
                 removed; use the `donut` tool instead."
     )]
@@ -267,8 +269,8 @@ pub struct ClientScanCmd {
         short = "s",
         long = "scan-type",
         default_value = "passive",
-        raw(possible_values = "&ScanTypeArg::variants()"),
-        raw(case_insensitive = "true"),
+        possible_values = &ScanTypeArg::variants(),
+        case_insensitive = true,
         help = "Experimental. Default scan type on each channel. \
                 Behavior may differ on DFS channel"
     )]

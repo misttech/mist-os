@@ -12,12 +12,12 @@ open protocol Device {
     /// Request to sent to nanohub to load the firmware.
     strict DownloadFirmware(resource struct {
         firmware
-                zx.Handle:<VMO, zx.Rights.MAP | zx.Rights.READ | zx.Rights.GET_PROPERTY | zx.Rights.EXECUTE>;
+                zx.Handle:<VMO, zx.RIGHTS_BASIC | zx.Rights.EXECUTE | zx.Rights.GET_PROPERTY | zx.Rights.MAP | zx.Rights.READ>;
         // Specify the location to jump to for reading the firmware.
         offset uint64;
     }) -> () error zx.Status;
 };
 
 service Service {
-    download_firmware client_end:Device;
+    nanohub client_end:Device;
 };

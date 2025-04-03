@@ -68,11 +68,11 @@ source_set("common") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/power/cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
 }

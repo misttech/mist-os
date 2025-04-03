@@ -13,6 +13,7 @@
         bind: "meta/bind/gpio.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.gpio.drivers.aml-gpio.gpioh" ],
         fallback: "false",
     },
     capabilities: [
@@ -21,6 +22,8 @@
     ],
     use: [
         { service: 'fuchsia.hardware.pinimpl.Service' },
+        { service: 'fuchsia.hardware.pinimpl.Metadata' },
+        { service: "fuchsia.scheduler.RoleName" },
     ],
     expose: [
         {

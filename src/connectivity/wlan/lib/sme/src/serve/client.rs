@@ -119,16 +119,16 @@ async fn handle_telemetry_fidl_request(
                 .and_then(|result| result);
             responder.send(support.as_ref().map_err(|e| *e))
         }
-        TelemetryRequest::GetCounterStats { responder, .. } => {
-            let counter_stats_fut = sme.lock().counter_stats();
-            let counter_stats = counter_stats_fut
+        TelemetryRequest::GetIfaceStats { responder, .. } => {
+            let iface_stats_fut = sme.lock().iface_stats();
+            let iface_stats = iface_stats_fut
                 .await
                 .map_err(|_| zx::Status::CONNECTION_ABORTED.into_raw())
                 .and_then(|stats| match stats {
-                    fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats) => Ok(stats),
-                    fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(err) => Err(err),
+                    fidl_mlme::GetIfaceStatsResponse::Stats(stats) => Ok(stats),
+                    fidl_mlme::GetIfaceStatsResponse::ErrorStatus(err) => Err(err),
                 });
-            responder.send(counter_stats.as_ref().map_err(|e| *e))
+            responder.send(iface_stats.as_ref().map_err(|e| *e))
         }
         TelemetryRequest::GetHistogramStats { responder, .. } => {
             let histogram_stats_fut = sme.lock().histogram_stats();

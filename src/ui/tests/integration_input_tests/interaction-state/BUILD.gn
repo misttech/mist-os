@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_test.gni")
 
 group("tests") {
@@ -16,7 +15,6 @@ rustc_test("interaction_state_test") {
   deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_rust",
-    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",

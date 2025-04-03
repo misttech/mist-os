@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
@@ -36,16 +37,17 @@ Shards tests produced by a build.
 }
 
 type testsharderFlags struct {
-	buildDir                 string
-	checkoutDir              string
-	outputFile               string
-	modifiersPath            string
-	affectedTestsPath        string
-	affectedTestsMaxAttempts int
-	affectedOnly             bool
-	skipUnaffected           bool
-	testsharderParamsFile    string
-	depsFile                 string
+	buildDir                    string
+	checkoutDir                 string
+	outputFile                  string
+	modifiersPath               string
+	affectedTestsPath           string
+	affectedTestsMaxAttempts    int
+	affectedOnly                bool
+	skipUnaffected              bool
+	testsharderParamsFile       string
+	depsFile                    string
+	ignoreMultiplyIsolatedLimit bool
 }
 
 func parseFlags() testsharderFlags {
@@ -60,6 +62,7 @@ func parseFlags() testsharderFlags {
 	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
 	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
 	flag.StringVar(&flags.depsFile, "deps-file", "", "path to a file to write all the builder deps to in the format expected from `cas archive -paths-json`.")
+	flag.BoolVar(&flags.ignoreMultiplyIsolatedLimit, "ignore-multiply-limit", false, "whether to ignore the limit on multiplied runs per isolated test")
 
 	flag.Usage = usage
 
@@ -117,7 +120,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, flags, params, flags.checkoutDir, m)
+	return execute(ctx, flags, params, m)
 }
 
 type buildModules interface {
@@ -140,7 +143,7 @@ var getHostPlatform = func() (string, error) {
 	return hostplatform.Name()
 }
 
-func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, checkoutDir string, m buildModules) error {
+func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
 	if flags.depsFile != "" && flags.outputFile == "" {
 		return fmt.Errorf("output-file needs to be set if deps-file is set")
 	}
@@ -186,6 +189,10 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	// actually applied by recipes. Centralize the default values in the build
 	// system.
 	testSpecs := m.TestSpecs()
+	metadataMap, err := metadata.GetMetadata(testSpecs, flags.checkoutDir)
+	if err != nil {
+		return err
+	}
 	var defaultCPU string
 	if err := m.Args().Get("target_cpu", &defaultCPU); err != nil {
 		return fmt.Errorf("failed to look up value of target_cpu arg: %w", err)
@@ -201,7 +208,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 			}
 		}
 	}
-	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts)
+	shards := testsharder.MakeShards(m.TestSpecs(), testListEntries, opts, metadataMap)
 
 	if perTestTimeout > 0 {
 		testsharder.ApplyTestTimeouts(shards, perTestTimeout)
@@ -323,8 +330,8 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	if newTargetDuration > targetDuration {
 		targetDuration = newTargetDuration
 	}
-	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix)
-	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix)
+	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix, flags.ignoreMultiplyIsolatedLimit)
+	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix, flags.ignoreMultiplyIsolatedLimit)
 	shards = append(multipliedAffectedShards, shards...)
 	shards = append(shards, multipliedShards...)
 
@@ -457,11 +464,11 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", flags.outputFile, err)
 		}
-		allDeps, err := testsharder.GetBuilderDeps(shards, flags.buildDir, m.Tools(), platform, append(extraDeps, absOutputFile))
+		allDeps, err := testsharder.GetBuilderDeps(shards, flags.buildDir, flags.checkoutDir, m.Tools(), platform, append(extraDeps, absOutputFile))
 		if err != nil {
 			return err
 		}
-		if err := testsharder.WriteCASPathsJSONFile(allDeps, flags.buildDir, flags.depsFile); err != nil {
+		if err := testsharder.WriteCASPathsJSONFile(allDeps, flags.buildDir, flags.checkoutDir, flags.depsFile); err != nil {
 			return err
 		}
 	}

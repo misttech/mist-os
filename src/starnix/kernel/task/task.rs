@@ -30,11 +30,11 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{
     sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
 };
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred, CLD_CONTINUED,
-    CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
+    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -320,14 +320,10 @@ pub struct CapturedThreadState {
     pub dirty: bool,
 }
 
-pub type RobustListHeadPtr =
-    MultiArchUserRef<uapi::robust_list_head, uapi::arch32::robust_list_head>;
-pub type RobustListPtr = MultiArchUserRef<uapi::robust_list, uapi::arch32::robust_list>;
-
-#[derive(Debug)]
-pub struct RobustListHead {
-    pub list: RobustList,
-    pub futex_offset: isize,
+impl ArchSpecific for CapturedThreadState {
+    fn is_arch32(&self) -> bool {
+        self.thread_state.is_arch32()
+    }
 }
 
 #[derive(Debug)]
@@ -335,38 +331,46 @@ pub struct RobustList {
     pub next: RobustListPtr,
 }
 
-impl RobustListHead {
-    pub fn read(current_task: &CurrentTask, ptr: RobustListHeadPtr) -> Result<Self, Errno> {
-        match ptr {
-            RobustListHeadPtr::Arch64(user_ref) => {
-                let head = current_task.read_object(user_ref)?;
-                Ok(Self {
-                    list: RobustList { next: RobustListPtr::from(head.list.next) },
-                    futex_offset: head.futex_offset as isize,
-                })
-            }
-            RobustListHeadPtr::Arch32(user_ref) => {
-                let head = current_task.read_object(user_ref)?;
-                Ok(Self {
-                    list: RobustList { next: RobustListPtr::from(head.list.next) },
-                    futex_offset: head.futex_offset as isize,
-                })
-            }
+pub type RobustListPtr =
+    MappingMultiArchUserRef<RobustList, uapi::robust_list, uapi::arch32::robust_list>;
+
+impl From<uapi::robust_list> for RobustList {
+    fn from(robust_list: uapi::robust_list) -> Self {
+        Self { next: RobustListPtr::from(robust_list.next) }
+    }
+}
+
+#[cfg(feature = "arch32")]
+impl From<uapi::arch32::robust_list> for RobustList {
+    fn from(robust_list: uapi::arch32::robust_list) -> Self {
+        Self { next: RobustListPtr::from(robust_list.next) }
+    }
+}
+
+#[derive(Debug)]
+pub struct RobustListHead {
+    pub list: RobustList,
+    pub futex_offset: isize,
+}
+
+pub type RobustListHeadPtr =
+    MappingMultiArchUserRef<RobustListHead, uapi::robust_list_head, uapi::arch32::robust_list_head>;
+
+impl From<uapi::robust_list_head> for RobustListHead {
+    fn from(robust_list_head: uapi::robust_list_head) -> Self {
+        Self {
+            list: robust_list_head.list.into(),
+            futex_offset: robust_list_head.futex_offset as isize,
         }
     }
 }
 
-impl RobustList {
-    pub fn read(current_task: &CurrentTask, ptr: RobustListPtr) -> Result<Self, Errno> {
-        match ptr {
-            RobustListPtr::Arch64(user_ref) => {
-                let list = current_task.read_object(user_ref)?;
-                Ok(Self { next: RobustListPtr::from(list.next) })
-            }
-            RobustListPtr::Arch32(user_ref) => {
-                let list = current_task.read_object(user_ref)?;
-                Ok(Self { next: RobustListPtr::from(list.next) })
-            }
+#[cfg(feature = "arch32")]
+impl From<uapi::arch32::robust_list_head> for RobustListHead {
+    fn from(robust_list_head: uapi::arch32::robust_list_head) -> Self {
+        Self {
+            list: robust_list_head.list.into(),
+            futex_offset: robust_list_head.futex_offset as isize,
         }
     }
 }
@@ -640,6 +644,11 @@ impl TaskMutableState {
     pub fn is_frozen(&self) -> bool {
         matches!(self.run_state(), RunState::Frozen(_))
     }
+
+    #[cfg(test)]
+    pub fn kernel_signals_for_test(&self) -> &VecDeque<KernelSignal> {
+        &self.kernel_signals
+    }
 }
 
 #[apply(state_implementation!)]
@@ -682,7 +691,7 @@ impl TaskMutableState<Base = Task> {
 
     pub fn set_ptrace(&mut self, tracer: Option<PtraceState>) -> Result<(), Errno> {
         if tracer.is_some() && self.ptrace.is_some() {
-            return Err(errno!(EPERM));
+            return error!(EPERM);
         }
 
         if tracer.is_none() {
@@ -1138,6 +1147,7 @@ impl Task {
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
         signal_mask: SigSet,
+        kernel_signals: VecDeque<KernelSignal>,
         vfork_event: Option<Arc<zx::Event>>,
         scheduler_policy: SchedulerPolicy,
         uts_ns: UtsNamespaceHandle,
@@ -1164,7 +1174,7 @@ impl Task {
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: SignalState::with_mask(signal_mask),
-                kernel_signals: Default::default(),
+                kernel_signals,
                 exit_status: None,
                 scheduler_policy,
                 uts_ns,

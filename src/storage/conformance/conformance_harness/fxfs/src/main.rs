@@ -89,7 +89,8 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                         | fio::NodeAttributesQuery::RDEV
                         | fio::NodeAttributesQuery::ACCESS_TIME
                         | fio::NodeAttributesQuery::CASEFOLD
-                        | fio::NodeAttributesQuery::SELINUX_CONTEXT,
+                        | fio::NodeAttributesQuery::SELINUX_CONTEXT
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
                     supports_services: false,
                 })?;
             }

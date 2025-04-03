@@ -5,7 +5,7 @@
 use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, DeviceInfo, PartitionInfo, WriteOptions};
-use fidl::endpoints::Proxy as _;
+use fidl::endpoints::{Proxy as _, ServerEnd};
 use std::borrow::Cow;
 use std::num::NonZero;
 use std::sync::Arc;
@@ -131,13 +131,17 @@ impl FakeServer {
     }
 
     pub fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy {
-        let (client, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let (client, server) = fidl::endpoints::create_endpoints();
+        self.connect(server);
+        client.into_proxy()
+    }
+
+    pub fn connect(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>) {
         let this = self.clone();
         fasync::Task::spawn(async move {
-            let _ = this.serve(stream).await;
+            let _ = this.serve(server.into_stream()).await;
         })
         .detach();
-        client
     }
 
     pub fn block_proxy(self: &Arc<Self>) -> fblock::BlockProxy {

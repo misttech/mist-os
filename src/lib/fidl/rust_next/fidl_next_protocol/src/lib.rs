@@ -24,6 +24,8 @@
 mod buffer;
 mod client;
 mod error;
+mod flexible;
+mod flexible_result;
 mod framework_error;
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia;
@@ -39,6 +41,8 @@ mod wire;
 pub use self::buffer::*;
 pub use self::client::*;
 pub use self::error::*;
+pub use self::flexible::*;
+pub use self::flexible_result::*;
 pub use self::framework_error::*;
 pub use self::server::*;
 pub use self::service::*;

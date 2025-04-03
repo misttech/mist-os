@@ -66,7 +66,7 @@ async fn file_report(
     }
     let attachments: Result<Vec<Attachment>, Error> = profiles
         .into_iter()
-        .group_by(|p| p.get_process_name().to_string())
+        .chunk_by(|p| p.get_process_name().to_string())
         .into_iter()
         .flat_map(|(_, profiles)| profiles.enumerate())
         .map(|(i, profile_report)| {

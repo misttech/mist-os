@@ -26,7 +26,10 @@ func TestFFXInstance(t *testing.T) {
 	}
 	fakeClock := clock.NewFakeClock()
 	ctx := clock.NewContext(context.Background(), fakeClock)
-	ffx, _ := NewFFXInstance(ctx, ffxPath, tmpDir, []string{}, "target", filepath.Join(tmpDir, "sshKey"), filepath.Join(tmpDir, "out"), UseFFXLegacy)
+	sshPriv := filepath.Join(tmpDir, "privKey")
+	sshPub := filepath.Join(tmpDir, "pubKey")
+	sshKeys := SSHInfo{SshPriv: sshPriv, SshPub: sshPub}
+	ffx, _ := NewFFXInstance(ctx, ffxPath, tmpDir, []string{}, "target", &sshKeys, filepath.Join(tmpDir, "out"), UseFFXLegacy)
 
 	var buf []byte
 	stdout := bytes.NewBuffer(buf)
@@ -62,7 +65,7 @@ func TestFFXInstance(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(testOutputDir, runSummaryFilename), runSummaryBytes, os.ModePerm); err != nil {
 		t.Errorf("failed to write run_summary.json: %s", err)
 	}
-	_, err := ffx.Test(ctx, build.TestList{}, outDir)
+	_, err := ffx.TestRun(ctx, build.TestList{}, outDir)
 	assertRunsExpectedCmd(
 		err,
 		stdout,
@@ -92,12 +95,13 @@ func TestFFXInstance(t *testing.T) {
 
 	assertRunsExpectedCmd(ffx.Stop(), stdout, "daemon stop -t 4000")
 
-	if _, err := ffx.GetSshPrivateKey(ctx); err != nil {
-		t.Errorf("failed to get ssh private key: %s", err)
+	fPrivKey := ffx.GetSshPrivateKey()
+	if sshPriv != fPrivKey {
+		t.Errorf("got wrong private key: %s (expected %s)", fPrivKey, sshPriv)
 	}
-
-	if _, err := ffx.GetSshAuthorizedKeys(ctx); err != nil {
-		t.Errorf("failed to get ssh private key: %s", err)
+	fPubKey := ffx.GetSshAuthorizedKeys()
+	if sshPub != fPubKey {
+		t.Errorf("got wrong private key: %s (expected %s)", fPubKey, sshPub)
 	}
 }
 

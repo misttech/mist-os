@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_RUNTIME_THREAD_CONTEXT_H_
 #define SRC_DEVICES_BIN_DRIVER_RUNTIME_THREAD_CONTEXT_H_
 
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <optional>
@@ -52,6 +53,8 @@ std::optional<zx_status_t> GetRoleProfileStatus();
 
 // Sets the result of setting the role profile for the current thread.
 void SetRoleProfileStatus(zx_status_t status);
+
+zx::result<const void*> GetDriverOnTid(zx_koid_t tid);
 
 }  // namespace thread_context
 

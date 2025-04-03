@@ -63,16 +63,6 @@ struct BaseWlanFullmacServerForStartup
     completer.Reply(fit::ok(std::move(response)));
   }
 
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-    fuchsia_wlan_common::MacSublayerSupport response(
-        fuchsia_wlan_common::RateSelectionOffloadExtension(false),
-        fuchsia_wlan_common::DataPlaneExtension(
-            fuchsia_wlan_common::DataPlaneType::kGenericNetworkDevice),
-        fuchsia_wlan_common::DeviceExtension(
-            true, fuchsia_wlan_common::MacImplementationType::kFullmac, false));
-    completer.Reply(fit::ok(response));
-  }
-
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
     fuchsia_wlan_common::SecuritySupport response(fuchsia_wlan_common::SaeFeature(false, true),
                                                   fuchsia_wlan_common::MfpFeature(false));
@@ -142,17 +132,6 @@ TEST(StartupShutdownTest, StartFailsIfQueryFails) {
     }
   };
   DriverTestType<QueryFails> driver_test;
-  ASSERT_FALSE(driver_test.StartDriver().is_ok());
-}
-
-TEST(StartupShutdownTest, StartFailsIfQueryMacSublayerSupportFails) {
-  struct QueryMacSublayerSupportFails : public BaseWlanFullmacServerForStartup {
-    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
-    void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-      completer.Reply(zx::error(ZX_ERR_INTERNAL));
-    }
-  };
-  DriverTestType<QueryMacSublayerSupportFails> driver_test;
   ASSERT_FALSE(driver_test.StartDriver().is_ok());
 }
 

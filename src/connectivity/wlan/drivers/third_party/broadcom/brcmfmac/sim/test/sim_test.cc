@@ -309,14 +309,6 @@ fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse SimInterface::Query() {
   return fidl::ToNatural(*result->value());
 }
 
-void SimInterface::QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp) {
-  auto result = client_.buffer(test_arena_)->QueryMacSublayerSupport();
-  ZX_ASSERT(result.ok());
-  ZX_ASSERT(!result->is_error());
-
-  *out_resp = result->value()->resp;
-}
-
 void SimInterface::QuerySecuritySupport(wlan_common::SecuritySupport* out_resp) {
   auto result = client_.buffer(test_arena_)->QuerySecuritySupport();
   ZX_ASSERT(result.ok());
@@ -328,6 +320,14 @@ void SimInterface::QuerySecuritySupport(wlan_common::SecuritySupport* out_resp) 
 void SimInterface::QuerySpectrumManagementSupport(
     wlan_common::SpectrumManagementSupport* out_resp) {
   auto result = client_.buffer(test_arena_)->QuerySpectrumManagementSupport();
+  ZX_ASSERT(result.ok());
+  ZX_ASSERT(!result->is_error());
+
+  *out_resp = result->value()->resp;
+}
+
+void SimInterface::QueryTelemetrySupport(fuchsia_wlan_stats::wire::TelemetrySupport* out_resp) {
+  auto result = client_.buffer(test_arena_)->QueryTelemetrySupport();
   ZX_ASSERT(result.ok());
   ZX_ASSERT(!result->is_error());
 

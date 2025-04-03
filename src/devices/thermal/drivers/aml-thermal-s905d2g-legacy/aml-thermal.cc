@@ -7,7 +7,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 #include <threads.h>
 #include <zircon/errors.h>
@@ -85,24 +85,27 @@ zx_status_t AmlThermal::SetTarget(uint32_t opp_idx,
 }
 
 zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDevFidl::FromFragment(device);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-thermal: failed to get pdev protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result pdev_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(device,
+                                                                                        "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev_device_info_t device_info;
-  zx_status_t status = pdev.GetDeviceInfo(&device_info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-thermal: failed to get device info: %d", status);
-    return status;
+  zx::result device_info_result = pdev.GetDeviceInfo();
+  if (device_info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", device_info_result.status_string());
+    return device_info_result.status_value();
   }
+  fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   // Get the voltage-table .
   size_t actual;
   aml_thermal_info_t thermal_info;
-  status = device_get_metadata(device, DEVICE_METADATA_PRIVATE, &thermal_info, sizeof(thermal_info),
-                               &actual);
+  zx_status_t status = device_get_metadata(device, DEVICE_METADATA_PRIVATE, &thermal_info,
+                                           sizeof(thermal_info), &actual);
   if (status != ZX_OK || actual != sizeof(thermal_info)) {
     zxlogf(ERROR, "aml-thermal: Could not get voltage-table metadata %d", status);
     return status;
@@ -118,7 +121,12 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
   }
 
   zx::resource smc_resource;
-  pdev.GetSmc(0, &smc_resource);
+  zx::result smc_resource_result = pdev.GetSmc(0);
+  if (smc_resource_result.is_ok()) {
+    smc_resource = std::move(smc_resource_result.value());
+  } else {
+    zxlogf(INFO, "Failed to get smc: %s", smc_resource_result.status_string());
+  }
   status = PopulateDvfsTable(smc_resource, thermal_info, &thermal_config);
   if (status != ZX_OK) {
     return status;

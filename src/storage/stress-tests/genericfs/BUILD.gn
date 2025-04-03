@@ -22,6 +22,7 @@ rustc_test("stressor-bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-sync",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/fs_management/rust:fs_management",
@@ -46,7 +47,4 @@ rustc_test("stressor-bin") {
     "instance_actor.rs",
     "main.rs",
   ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }

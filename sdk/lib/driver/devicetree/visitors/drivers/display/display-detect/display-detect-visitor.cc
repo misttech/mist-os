@@ -42,7 +42,7 @@ zx::result<> DisplayDetectVisitor::Visit(fdf_devicetree::Node& node,
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kDisplayDetect) == parser_output->end()) {
+  if (!parser_output->contains(kDisplayDetect)) {
     return zx::ok();
   }
 

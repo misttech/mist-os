@@ -234,19 +234,33 @@ template("assembly_developer_overrides") {
 
       # Gather the deps and inputs files for the package contents.
       if (defined(package.contents)) {
-        _contents = []
-        foreach(entry, package.contents) {
-          creation_inputs += [ entry.source ]
-          creation_deps += [ entry.label ]
+        print()
+        print(
+            "ERROR: 'contents' for 'compiled_packages' are not supported at this time in assembly developer overrides.")
+        print()
+        assert(false)
 
-          _contents += [
-            {
-              destination = entry.destination
-              source = rebase_path("${entry.source}", root_build_dir)
-            },
-          ]
-        }
-        _package.contents = _contents
+        # _contents = []
+        # foreach(entry, package.contents) {
+        #   creation_inputs += [ entry.source ]
+        #   creation_deps += [ entry.label ]
+
+        #   _contents += [
+        #     {
+        #       destination = entry.destination
+        #       source = rebase_path("${entry.source}", root_build_dir)
+        #     },
+        #   ]
+        # }
+        # _package.contents = _contents
+      }
+
+      if (defined(package.component_includes)) {
+        print()
+        print(
+            "ERROR: 'component_includes' for 'compiled_packages' are not supported at this time in assembly developer overrides.")
+        print()
+        assert(false)
       }
 
       # Gather the core shards as input files

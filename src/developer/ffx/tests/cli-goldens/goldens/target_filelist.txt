@@ -35,4 +35,5 @@ ffx/target/update/channel/list.golden
 ffx/target/update/channel/set.golden
 ffx/target/update/check-now.golden
 ffx/target/update/force-install.golden
+ffx/target/update/wait-for-commit.golden
 ffx/target/wait.golden

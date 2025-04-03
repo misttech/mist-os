@@ -56,6 +56,12 @@
             to: "#elements",
         },
         {
+            // TODO(https://fxbug.dev/406844662) - remove this when SDK shard is updated
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent/diagnostics",
+            to: "#elements",
+        },
+        {
             storage: "data",
             from: "parent",
             to: [

@@ -11,6 +11,7 @@ pub mod scope;
 mod send;
 mod time;
 
+pub use atomic_future::spawnable_future::SpawnableFuture;
 pub use common::EHandle;
 pub use local::{LocalExecutor, TestExecutor};
 pub use packets::{PacketReceiver, ReceiverRegistration};

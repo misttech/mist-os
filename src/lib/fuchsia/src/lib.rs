@@ -13,12 +13,17 @@
 // otherwise pulled in here.
 
 #![deny(missing_docs)]
-pub use fidl_fuchsia_diagnostics::{Interest, Severity};
+
 pub use fuchsia_macro::{main, test};
 use libc as _;
 #[doc(hidden)]
 pub use log::error;
 use std::future::Future;
+
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
+pub use fidl_fuchsia_diagnostics::{Interest, Severity};
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+pub use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 
 //
 // LOGGING INITIALIZATION
@@ -33,7 +38,7 @@ pub struct LoggingOptions<'a> {
 
     /// Allows to configure the minimum severity of the logs being emitted. Logs of lower severity
     /// won't be emitted.
-    pub interest: fidl_fuchsia_diagnostics::Interest,
+    pub interest: Interest,
 
     /// Whether or not logs will be blocking. By default logs are dropped when they can't be
     /// written to the socket. However, when this is set, the log statement will block until the

@@ -48,7 +48,7 @@ type CaptureError = flexible union {
 type DevicePackets = table {
     /// The device these packets were observed from.
     /// Always provided.
-    1: host_device string:io.MAX_FILENAME;
+    1: host_device io.Name;
     /// Set of packets that were observed.
     /// Always provided.
     2: packets vector<SnoopPacket>:MAX;
@@ -80,7 +80,7 @@ open protocol Snoop {
     /// Errors are reported through the client.
     flexible Start(resource table {
         1: follow bool;
-        2: host_device string:io.MAX_FILENAME;
+        2: host_device io.Name;
         3: client client_end:PacketObserver;
     });
 };

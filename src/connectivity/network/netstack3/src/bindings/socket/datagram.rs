@@ -33,6 +33,7 @@ use netstack3_core::socket::{
     SocketInfo,
 };
 use netstack3_core::sync::Mutex as CoreMutex;
+use netstack3_core::trace::trace_duration;
 use netstack3_core::udp::UdpPacketMeta;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
@@ -47,7 +48,7 @@ use crate::bindings::util::{
     TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
     TryIntoFidlWithContext,
 };
-use crate::bindings::{trace_duration, BindingId, BindingsCtx, Ctx};
+use crate::bindings::{BindingId, BindingsCtx, Ctx};
 
 use super::{IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties};
 

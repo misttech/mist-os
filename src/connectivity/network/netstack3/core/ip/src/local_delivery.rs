@@ -8,14 +8,12 @@ use core::num::NonZeroU16;
 
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
-use netstack3_base::IpExt;
+use netstack3_base::{IpExt, Marks};
 use packet_formats::ip::DscpAndEcn;
 use packet_formats::ipv4::options::Ipv4Option;
 use packet_formats::ipv4::Ipv4Header as _;
 use packet_formats::ipv6::ext_hdrs::{HopByHopOptionData, Ipv6ExtensionHeaderData};
 use packet_formats::ipv6::Ipv6Header as _;
-
-use crate::internal::routing::rules::Marks;
 
 /// Informs the transport layer of parameters for transparent local delivery.
 #[derive(Debug, GenericOverIp, Clone)]

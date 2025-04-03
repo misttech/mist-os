@@ -180,7 +180,9 @@ __EXPORT zx_status_t fdf_token_transfer(zx_handle_t token, fdf_handle_t handle) 
   return driver_runtime::DispatcherCoordinator::TokenTransfer(token, handle);
 }
 
-__EXPORT zx_status_t fdf_env_start() { return driver_runtime::DispatcherCoordinator::Start(); }
+__EXPORT zx_status_t fdf_env_start(uint32_t options) {
+  return driver_runtime::DispatcherCoordinator::Start(options);
+}
 
 __EXPORT void fdf_env_reset() { return driver_runtime::DispatcherCoordinator::EnvReset(); }
 
@@ -246,6 +248,14 @@ __EXPORT bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher) 
   return dispatcher->HasQueuedTasks();
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+__EXPORT void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
+                                                            size_t role_length) {
+  driver_runtime::AllowedSchedulerRoles::Get()->AddForDriver(driver,
+                                                             std::string_view(role, role_length));
+}
+#endif
+
 __EXPORT void fdf_internal_wait_until_all_dispatchers_idle() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersIdle();
 }
@@ -303,5 +313,21 @@ __EXPORT zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t
   return driver_runtime::DispatcherCoordinator::SetThreadLimit(
       std::string_view(scheduler_role, scheduler_role_len), max_threads);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+__EXPORT zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver) {
+  if (!out_driver) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  zx::result<const void*> info = thread_context::GetDriverOnTid(tid);
+  if (info.is_error()) {
+    return info.error_value();
+  }
+
+  *out_driver = info.value();
+  return ZX_OK;
+}
+#endif
 
 __END_CDECLS

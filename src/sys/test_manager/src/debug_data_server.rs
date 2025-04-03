@@ -4,7 +4,7 @@
 
 use crate::run_events::{RunEvent, SuiteEvents};
 use anyhow::Error;
-use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
+use fidl::endpoints::create_request_stream;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::stream::FusedStream;
@@ -210,15 +210,11 @@ pub(crate) async fn serve_iterator(
         let debug_data = next_files
             .into_iter()
             .map(|file_name| {
-                let (file, server) = create_proxy::<fio::NodeMarker>();
-                let file = fio::FileProxy::new(file.into_channel().unwrap());
-                directory.deprecated_open(
-                    fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                    fio::ModeType::empty(),
+                let file = fuchsia_fs::directory::open_file_async(
+                    &directory,
                     &file_name,
-                    server,
+                    fio::PERM_READABLE,
                 )?;
-
                 let (client, server) = zx::Socket::create_stream();
                 let t = fasync::Task::spawn(serve_file_over_socket(
                     file_name.clone(),

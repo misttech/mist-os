@@ -13,14 +13,15 @@ use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Mtu};
 use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
-    trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, IpDeviceAddr, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
-    TracingContext, TxMetadataBindingsTypes, WeakDeviceIdentifier,
+    AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId, InstantContext,
+    IpDeviceAddr, IpExt, Marks, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
     TransportPacketSerializer,
 };
+use netstack3_trace::trace_duration;
 use packet::{BufferMut, PacketConstraints, SerializeError};
 use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
@@ -31,7 +32,7 @@ use crate::internal::base::{
     SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
-use crate::internal::routing::rules::{Marks, RuleInput};
+use crate::internal::routing::rules::RuleInput;
 use crate::internal::routing::PacketOrigin;
 use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
@@ -363,11 +364,11 @@ impl<I: IpExt, D> IpSock<I, D> {
 
 /// The bindings execution context for IP sockets.
 pub trait IpSocketBindingsContext:
-    InstantContext + TracingContext + FilterBindingsContext + TxMetadataBindingsTypes
+    InstantContext + FilterBindingsContext + TxMetadataBindingsTypes
 {
 }
-impl<BC: InstantContext + TracingContext + FilterBindingsContext + TxMetadataBindingsTypes>
-    IpSocketBindingsContext for BC
+impl<BC: InstantContext + FilterBindingsContext + TxMetadataBindingsTypes> IpSocketBindingsContext
+    for BC
 {
 }
 
@@ -802,7 +803,7 @@ where
     CC::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
     O: SendOptions<I> + RouteResolutionOptions<I>,
 {
-    trace_duration!(bindings_ctx, c"ip::send_packet");
+    trace_duration!(c"ip::send_packet");
 
     // Extracted to a function without the serializer parameter to ease code
     // generation.

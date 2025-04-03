@@ -70,7 +70,7 @@ App::App(const fxl::CommandLine& command_line)
     // The provided buffer size is in MB, the controller takes the buffer size
     // in pages.
     uint32_t buffer_size_in_pages;
-    if (!GetBufferSizeInPages(buffer_size, &buffer_size_in_pages)) {
+    if (!GetBufferSizeInPages(static_cast<uint32_t>(buffer_size), &buffer_size_in_pages)) {
       FX_LOGS(ERROR) << "Buffer size too large";
       exit(EXIT_FAILURE);
     }

@@ -24,19 +24,19 @@ closed protocol Controller {
     /// Mounts a filesystem on a block device.
     strict Mount(resource struct {
         device client_end:fuchsia.device.Controller;
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
         options MountOptions;
     }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
     strict Unmount(struct {
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
     }) -> () error zx.Status;
 
     /// Formats a block device with a particular filesystem format
     strict Format(resource struct {
         device client_end:fuchsia.device.Controller;
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
         options FormatOptions;
     }) -> () error zx.Status;
 
@@ -44,6 +44,6 @@ closed protocol Controller {
     /// the block device
     strict Check(resource struct {
         device client_end:fuchsia.device.Controller;
-        name string:fuchsia.io.MAX_FILENAME;
+        name fuchsia.io.Name;
     }) -> () error zx.Status;
 };

@@ -22,13 +22,13 @@ group("bazel_inputs") {
 # NOTE: The targets below are NOT (and should NOT be) used by assembly in GN.
 # They are picked up by `//boards`, build API modules, and some release builders.
 bazel_board_configuration("x64") {
-  board_name = "pkvm-x64"
+  name = "pkvm-x64"
   bazel_board_configuration_target = "//boards/pkvm:x64"
   deps = [ ":bazel_inputs" ]
 }
 
 bazel_board_configuration("arm64") {
-  board_name = "pkvm-arm64"
+  name = "pkvm-arm64"
   bazel_board_configuration_target = "//boards/pkvm:arm64"
   deps = [ ":bazel_inputs" ]
 }

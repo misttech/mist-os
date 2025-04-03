@@ -113,7 +113,7 @@ void PositionTest::ValidatePositionInfo() {
   // Upon enabling notifications, our first notification might arrive immediately. Thus, the average
   // number of notification periods elapsed is (position_notification_count_ - 0.5).
   auto expected_timestamp =
-      zx::duration(position_notification_count_ * nsec_per_notif - nsec_per_notif / 2);
+      zx::duration((position_notification_count_ * nsec_per_notif) - (nsec_per_notif / 2));
 
   // Delivery-time requirements for pos notifications are loose; include a tolerance of +/-2 notifs.
   auto timestamp_tolerance = zx::duration(nsec_per_notif * 2);
@@ -271,14 +271,14 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
       [&]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
 
 void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
-                                    bool expect_audio_core_not_connected,
+                                    bool expect_audio_svcs_not_connected,
                                     bool enable_position_tests) {
   if (device_entry.isCodec()) {
     return;
   }
   // If audio_core is connected to the audio driver, admin tests will fail.
   // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (device_entry.isA2DP() || expect_audio_core_not_connected) {
+  if (device_entry.isA2DP() || expect_audio_svcs_not_connected) {
     if (enable_position_tests) {
       REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
       REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);

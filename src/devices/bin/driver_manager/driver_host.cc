@@ -85,12 +85,35 @@ zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
     }
     auto v1_driver_file = pkg_utils::OpenPkgFile(*pkg, *compat);
     if (v1_driver_file.is_error()) {
-      LOGF(ERROR, "Failed to open v1 driver file: %s", driver_file.status_string());
+      LOGF(ERROR, "Failed to open compat driver file: %s", v1_driver_file.status_string());
       return v1_driver_file.take_error();
     }
-    additional_root_modules.push_back(
-        fuchsia_driver_loader::RootModule{{.name = *compat, .binary = std::move(*v1_driver_file)}});
+    additional_root_modules.push_back(fuchsia_driver_loader::RootModule{
+        {.name = std::string(GetFilename(*compat)), .binary = std::move(*v1_driver_file)}});
   }
+
+  zx::result modules = fdf_internal::ProgramValueAsObjVector(wire_program, "modules");
+  if (modules.is_ok()) {
+    for (const auto& module : *modules) {
+      zx::result<std::string> module_name = fdf_internal::ProgramValue(module, "module_name");
+      if (module_name.is_error()) {
+        LOGF(ERROR, "Failed to get module name: %s", module_name.status_string());
+        return module_name.take_error();
+      }
+      if (module_name == "#program.compat") {
+        // Handled specially above already.
+        continue;
+      }
+      auto module_vmo = pkg_utils::OpenPkgFile(*pkg, *module_name);
+      if (module_vmo.is_error()) {
+        LOGF(ERROR, "Failed to open module: %s", module_vmo.status_string());
+        return module_vmo.take_error();
+      }
+      additional_root_modules.push_back(fuchsia_driver_loader::RootModule{
+          {.name = std::string(GetFilename(*module_name)), .binary = std::move(*module_vmo)}});
+    }
+  }
+
   return zx::ok(DriverHost::DriverLoadArgs(GetFilename(*binary), std::move(*driver_file),
                                            std::move(*lib_dir),
                                            std::move(additional_root_modules)));
@@ -263,12 +286,48 @@ zx::result<fuchsia_driver_host::ProcessInfo> DriverHostComponent::GetProcessInfo
   return zx::ok(*process_info_);
 }
 
+void DriverHostComponent::GetCrashInfo(
+    uint64_t thread_koid,
+    fit::callback<void(zx::result<fuchsia_driver_host::DriverCrashInfo>)> info_callback) const {
+  // Bypass the driver host if the crashing thread is the main thread which means the driver host
+  // itself is what crashed.
+  if (GetMainThreadKoid() == thread_koid) {
+    info_callback(zx::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+
+  driver_host_->FindDriverCrashInfoByThreadKoid(thread_koid)
+      .Then([callback = std::move(info_callback)](
+                fidl::WireUnownedResult<
+                    fuchsia_driver_host::DriverHost::FindDriverCrashInfoByThreadKoid>&
+                    result) mutable {
+        if (!result.ok()) {
+          callback(zx::error(result.status()));
+          return;
+        }
+        if (result->is_error()) {
+          callback(zx::error(result->error_value()));
+          return;
+        }
+
+        callback(zx::ok(fidl::ToNatural(*result->value())));
+      });
+}
+
 zx::result<uint64_t> DriverHostComponent::GetJobKoid() const {
   zx::result result = GetProcessInfo();
   if (result.is_error()) {
     return result.take_error();
   }
   return zx::ok(result->job_koid());
+}
+
+zx::result<uint64_t> DriverHostComponent::GetMainThreadKoid() const {
+  zx::result result = GetProcessInfo();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok(result->main_thread_koid());
 }
 
 zx::result<uint64_t> DriverHostComponent::GetProcessKoid() const {

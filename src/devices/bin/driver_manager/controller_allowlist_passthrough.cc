@@ -52,9 +52,14 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "block",                                                             // allow vim3 to boot
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/test.cm",  //  bind-fail-test
          "driver_runner_test",                                                // driver-runner-test
-         "test",  // power-manager-integration-test
      }},
-    {"Rebind", {kAllowAllUses}},
+    {"Rebind",
+     {
+         "block",               // ramdisk-tests
+         "driver_runner_test",  // driver-runner-test
+         "nand",                // nandpart-broker-test
+         "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/ddk-lifecycle-test.cm",  // ddk-lifecycle-test
+     }},
     {"UnbindChildren",
      {
          "block",               // fshost_integration_tests_fxfs_no_fxblob.cm

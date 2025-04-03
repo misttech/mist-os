@@ -67,7 +67,9 @@ void BootupTracker::CheckBootupDone() {
       LOGF(WARNING, "    a hanging bind process in the bind manager");
     }
   } else {
+    // LINT.IfChange
     LOGF(INFO, "Bootup completed.");
+    // LINT.ThenChange(//tools/testing/testrunner/tester.go)
   }
 
   for (auto& callback : callbacks_) {

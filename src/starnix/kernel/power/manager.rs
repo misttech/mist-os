@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use starnix_logging::log_warn;
 use starnix_sync::{Mutex, MutexGuard};
@@ -241,7 +242,10 @@ impl SuspendResumeManager {
                         (wake_time - suspend_start_time).into();
                     suspend_stats.last_time_in_sleep =
                         zx::BootDuration::from_nanos(res.suspend_time.unwrap_or(0));
-                    suspend_stats.last_resume_reason = res.resume_reason;
+                    // The "0" here is to mimic the expected power management success string,
+                    // while we don't have IRQ numbers to report.
+                    suspend_stats.last_resume_reason =
+                        res.resume_reason.map(|s| format!("0 {}", s));
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
@@ -252,14 +256,35 @@ impl SuspendResumeManager {
                     fuchsia_trace::Scope::Process
                 );
             }
-            _ => {
+            e => {
+                let wake_lock_names: Option<Vec<String>> = match e {
+                    Ok(Err(frunner::SuspendError::WakeLocksExist)) => {
+                        let mut names = vec![];
+                        for wl in &self.active_wake_locks() {
+                            names.push(wl.clone());
+                        }
+                        Some(names)
+                    }
+                    _ => None,
+                };
                 let wake_time = zx::BootInstant::get();
                 self.update_suspend_stats(|suspend_stats| {
                     suspend_stats.fail_count += 1;
                     suspend_stats.last_failed_errno = Some(errno!(EINVAL));
+                    // Power analysis tools require `Abort: ` in the case of failed suspends.
+                    suspend_stats.last_resume_reason = wake_lock_names
+                        .as_ref()
+                        .map(|reasons| format!("Abort: {}", reasons.join(" ")));
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
+                    if let Some(names) = wake_lock_names {
+                        let names_array =
+                            node.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, names.len());
+                        for (i, name) in names.iter().enumerate() {
+                            names_array.set(i, name);
+                        }
+                    }
                 });
                 fuchsia_trace::instant!(
                     c"power",
@@ -278,44 +303,32 @@ pub trait OnWakeOps: Send + Sync {
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle);
 }
 
-/// The signal that the runner raises when handing over an event to the kernel.
-/// While this signal is high the kernel will be kept awake.
-/// The kernel will clear this signal when it should no longer be kept awake.
-pub const RUNNER_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that a message has been handled.
-/// While this signal is low, no new messages will be sent to the kernel.
-/// The kernel will raise this signal when it is alright to receive new messages.
-pub const KERNEL_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_1;
-
-/// Tells the runner that we have handled the message and are ready to accept more messages.
-pub fn clear_wake_proxy_signal(event: &zx::EventPair) {
-    let (clear_mask, set_mask) = (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
-    match event.signal_peer(clear_mask, set_mask) {
-        Ok(_) => (),
-        Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
-    }
-}
-
-/// Raise the `RUNNER_PROXY_EVENT_SIGNAL`, which will prevent the container from being suspended.
-pub fn set_wake_proxy_signal(event: &zx::EventPair) {
-    let (clear_mask, set_mask) = (zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL);
-    match event.signal_peer(clear_mask, set_mask) {
-        Ok(_) => (),
-        Err(e) => log_warn!("Failed to signal wake event {:?}", e),
-    }
-}
-
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
+///
+/// The message counter's initial value will be set to 0.
+///
+/// The returned counter will be incremented each time there is an incoming message on the proxied
+/// channel. The starnix_kernel is expected to decrement the counter when that incoming message is
+/// handled.
+///
+/// Note that "message" in this context means channel message. This can be either a FIDL event, or
+/// a response to a FIDL message from the platform.
+///
+/// For example, the starnix_kernel may issue a hanging get to retrieve input events. When that
+/// hanging get returns, the counter will be incremented by 1. When the next hanging get has been
+/// scheduled, the input subsystem decrements the counter by 1.
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
 /// the container.
-pub fn create_proxy_for_wake_events(
+pub fn create_proxy_for_wake_events_counter_zero(
     remote_channel: zx::Channel,
     name: String,
-) -> (zx::Channel, zx::EventPair) {
+) -> (zx::Channel, zx::Counter) {
     let (local_proxy, kernel_channel) = zx::Channel::create();
-    let (resume_event, local_resume_event) = zx::EventPair::create();
+    let counter = zx::Counter::create().expect("failed to create counter");
+
+    let local_counter =
+        counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed to duplicate counter");
 
     let manager = fuchsia_component::client::connect_to_protocol_sync::<frunner::ManagerMarker>()
         .expect("failed");
@@ -328,13 +341,44 @@ pub fn create_proxy_for_wake_events(
             ),
             container_channel: Some(kernel_channel),
             remote_channel: Some(remote_channel),
-            resume_event: Some(resume_event),
+            counter: Some(counter),
             name: Some(name),
             ..Default::default()
         })
         .expect("Failed to create proxy");
 
-    (local_proxy, local_resume_event)
+    (local_proxy, local_counter)
+}
+
+/// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
+///
+/// The message counter's initial value will be set to 1, which will prevent the container from
+/// suspending until the caller decrements the counter.
+///
+/// The returned counter will be incremented each time there is an incoming message on the proxied
+/// channel. The starnix_kernel is expected to decrement the counter when that incoming message is
+/// handled.
+///
+/// Note that "message" in this context means channel message. This can be either a FIDL event, or
+/// a response to a FIDL message from the platform.
+///
+/// For example, the starnix_kernel may issue a hanging get to retrieve input events. When that
+/// hanging get returns, the counter will be incremented by 1. When the next hanging get has been
+/// scheduled, the input subsystem decrements the counter by 1.
+///
+/// The proxying is done by the Starnix runner, and allows messages on the channel to wake
+/// the container.
+pub fn create_proxy_for_wake_events_counter(
+    remote_channel: zx::Channel,
+    name: String,
+) -> (zx::Channel, zx::Counter) {
+    let (proxy, counter) = create_proxy_for_wake_events_counter_zero(remote_channel, name);
+
+    // Increment the counter by one so that the initial incoming message to the container will
+    // set the count to 0, instead of -1.
+    counter.add(1).expect("Failed to add to counter");
+
+    (proxy, counter)
 }
 
 /// Creates a watcher between clients and the Starnix runner.
@@ -352,4 +396,22 @@ pub fn create_watcher_for_wake_events(watcher: zx::EventPair) {
             zx::Instant::INFINITE,
         )
         .expect("Failed to register wake watcher");
+}
+
+mod test {
+    #[test]
+    fn test_counter_zero_initialization() {
+        let (_endpoint, endpoint) = zx::Channel::create();
+        let (_channel, counter) =
+            super::create_proxy_for_wake_events_counter_zero(endpoint, "test".into());
+        assert_eq!(counter.read(), Ok(0));
+    }
+
+    #[test]
+    fn test_counter_initialization() {
+        let (_endpoint, endpoint) = zx::Channel::create();
+        let (_channel, counter) =
+            super::create_proxy_for_wake_events_counter(endpoint, "test".into());
+        assert_eq!(counter.read(), Ok(1));
+    }
 }

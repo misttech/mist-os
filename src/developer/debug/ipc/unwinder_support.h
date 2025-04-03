@@ -6,9 +6,17 @@
 #define SRC_DEVELOPER_DEBUG_IPC_UNWINDER_SUPPORT_H_
 
 #include "src/developer/debug/ipc/records.h"
-#include "src/lib/unwinder/unwind.h"
+#include "src/developer/debug/shared/arch.h"
+
+namespace unwinder {
+struct Frame;
+class Registers;
+}  // namespace unwinder
 
 namespace debug_ipc {
+
+unwinder::Registers ConvertRegisters(debug::Arch arch,
+                                     const std::vector<debug::RegisterValue>& regs);
 
 std::vector<debug_ipc::StackFrame> ConvertFrames(const std::vector<unwinder::Frame>& frames);
 

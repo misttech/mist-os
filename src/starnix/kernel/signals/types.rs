@@ -22,6 +22,7 @@ use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Internal signal that cannot be masked, blocked or ignored.
+#[derive(Debug)]
 pub enum KernelSignal {
     Freeze(Waiter),
 }
@@ -377,12 +378,17 @@ impl SignalState {
     }
 }
 
-// Starnix code reuse the same object and parsing method for 32 and 64 signal information. Ensure
-// this is correct
-static_assertions::const_assert_eq!(
-    std::mem::size_of::<uapi::siginfo>(),
-    std::mem::size_of::<uapi::arch32::siginfo>()
-);
+// Ensure siginfo has the same size on all architecture and that the header is the same.
+uapi::check_arch_independent_layout! {
+    siginfo {
+        __bindgen_anon_1,
+        __bindgen_anon_1.__bindgen_anon_1,
+        __bindgen_anon_1._si_pad,
+        __bindgen_anon_1.__bindgen_anon_1.si_signo,
+        __bindgen_anon_1.__bindgen_anon_1.si_errno,
+        __bindgen_anon_1.__bindgen_anon_1.si_code,
+    }
+}
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
@@ -390,7 +396,6 @@ pub struct SignalInfoHeader {
     pub signo: u32,
     pub errno: i32,
     pub code: i32,
-    pub _pad: i32,
 }
 
 pub const SI_HEADER_SIZE: usize = std::mem::size_of::<SignalInfoHeader>();
@@ -483,7 +488,6 @@ macro_rules! signal_info_as_siginfo_bytes {
                     signo: $self.signal.number(),
                     errno: $self.errno,
                     code: $self.code,
-                    _pad: 0,
                 };
                 let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
                 let _ = header.write_to(&mut array[..SI_HEADER_SIZE]);

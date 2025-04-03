@@ -60,8 +60,7 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
             security=security,
         )
 
-        req = fidl_sme.ScanRequest()
-        req.passive = fidl_sme.PassiveScanRequest()
+        req = fidl_sme.ScanRequest(passive=fidl_sme.PassiveScanRequest())
         scan_results = (
             (await self.client_sme_proxy.scan_for_controller(req=req))
             .unwrap()
@@ -92,10 +91,11 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
                 pass
             elif security.security_mode == SecurityMode.WPA2:
                 protocol = fidl_security.Protocol.WPA2_PERSONAL
-                wpa = fidl_security.WpaCredentials()
-                wpa.passphrase = list(security.password.encode("ascii"))
-                credentials = fidl_security.Credentials()
-                credentials.wpa = wpa
+                credentials = fidl_security.Credentials(
+                    wpa=fidl_security.WpaCredentials(
+                        passphrase=list(security.password.encode("ascii"))
+                    )
+                )
             else:
                 fail(f"Unsupported security mode: {security.security_mode}")
 

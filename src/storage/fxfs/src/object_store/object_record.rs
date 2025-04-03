@@ -492,11 +492,11 @@ impl From<Timestamp> for std::time::Duration {
     }
 }
 
-pub type ObjectKind = ObjectKindV41;
+pub type ObjectKind = ObjectKindV46;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKindV41 {
+pub enum ObjectKindV46 {
     File {
         /// The number of references to this file.
         refs: u64,
@@ -519,6 +519,24 @@ pub enum ObjectKindV41 {
         /// interpret it however they like.
         link: Vec<u8>,
     },
+    EncryptedSymlink {
+        /// The number of references to this symbolic link.
+        refs: u64,
+        /// `link` is the target of the link and has no meaning within Fxfs; clients are free to
+        /// interpret it however they like.
+        /// `link` is stored here in encrypted form, encrypted with the symlink's key using the
+        /// same encryption scheme as the one used to encrypt filenames.
+        link: Vec<u8>,
+    },
+}
+
+#[derive(Migrate, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+#[migrate_to_version(ObjectKindV46)]
+pub enum ObjectKindV41 {
+    File { refs: u64 },
+    Directory { sub_dirs: u64, wrapping_key_id: Option<u128>, casefold: bool },
+    Graveyard,
+    Symlink { refs: u64, link: Vec<u8> },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
@@ -711,14 +729,14 @@ pub struct FsverityMetadataV33 {
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
-pub type ObjectValue = ObjectValueV41;
+pub type ObjectValue = ObjectValueV46;
 impl Value for ObjectValue {
     const DELETED_MARKER: Self = Self::None;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectValueV41 {
+pub enum ObjectValueV46 {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
     /// value are always filtered when a major compaction is performed, so the meaning must be the
     /// same as if the item was not present.
@@ -727,7 +745,7 @@ pub enum ObjectValueV41 {
     /// (None) i.e. their value is really a boolean: None => false, Some => true.
     Some,
     /// The value for an ObjectKey::Object record.
-    Object { kind: ObjectKindV41, attributes: ObjectAttributesV32 },
+    Object { kind: ObjectKindV46, attributes: ObjectAttributesV32 },
     /// Encryption keys for an object.
     Keys(EncryptionKeysV40),
     /// An attribute associated with a file object. |size| is the size of the attribute in bytes.
@@ -747,6 +765,22 @@ pub enum ObjectValueV41 {
     ExtendedAttribute(ExtendedAttributeValueV32),
     /// An attribute associated with a verified file object. |size| is the size of the attribute
     /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectValueV46)]
+pub enum ObjectValueV41 {
+    None,
+    Some,
+    Object { kind: ObjectKindV41, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV40),
+    Attribute { size: u64, has_overwrite_extents: bool },
+    Extent(ExtentValueV38),
+    Child(ChildValueV32),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValueV32),
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
@@ -927,6 +961,23 @@ impl ObjectValue {
             },
         }
     }
+    /// Creates an ObjectValue for an encrypted symlink object.
+    pub fn encrypted_symlink(
+        link: impl Into<Vec<u8>>,
+        creation_time: Timestamp,
+        modification_time: Timestamp,
+        project_id: u64,
+    ) -> ObjectValue {
+        ObjectValue::Object {
+            kind: ObjectKind::EncryptedSymlink { refs: 1, link: link.into() },
+            attributes: ObjectAttributes {
+                creation_time,
+                modification_time,
+                project_id,
+                ..Default::default()
+            },
+        }
+    }
     pub fn inline_extended_attribute(value: impl Into<Vec<u8>>) -> ObjectValue {
         ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(value.into()))
     }
@@ -935,10 +986,17 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = ObjectItemV43;
+pub type ObjectItem = ObjectItemV46;
+pub type ObjectItemV46 = Item<ObjectKeyV43, ObjectValueV46>;
 pub type ObjectItemV43 = Item<ObjectKeyV43, ObjectValueV41>;
 pub type ObjectItemV41 = Item<ObjectKeyV40, ObjectValueV41>;
 pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
+
+impl From<ObjectItemV43> for ObjectItemV46 {
+    fn from(item: ObjectItemV43) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
 
 impl From<ObjectItemV41> for ObjectItemV43 {
     fn from(item: ObjectItemV41) -> Self {

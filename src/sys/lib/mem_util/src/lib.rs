@@ -15,7 +15,7 @@ pub async fn open_file_data(
     parent: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<fmem::Data, FileError> {
-    let file = fuchsia_fs::directory::open_file_async(parent, path, fio::Flags::PERM_READ)?;
+    let file = fuchsia_fs::directory::open_file_async(parent, path, fio::PERM_READABLE)?;
     match file
         .get_backing_memory(fio::VmoFlags::READ)
         .await
@@ -82,11 +82,9 @@ pub enum DataError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::{create_proxy, ServerEnd};
     use futures::StreamExt;
     use std::sync::Arc;
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
-    use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::file::{FileLike, FileOptions};
@@ -100,7 +98,7 @@ mod tests {
             // `read_only` is a vmo file, returns the buffer in OnOpen
             "foo" => read_only("hello, world!"),
         };
-        let directory = serve_vfs_dir(fs);
+        let directory = vfs::directory::serve_read_only(fs);
 
         let data = open_file_data(&directory, "foo").await.unwrap();
         match bytes_from_data(&data).unwrap() {
@@ -116,7 +114,7 @@ mod tests {
         let fs = pseudo_directory! {
             "foo" => read_only(vmo_data),
         };
-        let directory = serve_vfs_dir(fs);
+        let directory = vfs::directory::serve_read_only(fs);
 
         let data = open_file_data(&directory, "foo").await.unwrap();
         match bytes_from_data(&data).unwrap() {
@@ -209,7 +207,7 @@ mod tests {
         let fs = pseudo_directory! {
             "foo" => Arc::new(NonVMOTestFile),
         };
-        let directory = serve_vfs_dir(fs);
+        let directory = vfs::directory::serve_read_only(fs);
 
         let data = open_file_data(&directory, "foo").await.unwrap();
         let data = bytes_from_data(&data).unwrap();
@@ -218,17 +216,5 @@ mod tests {
             Cow::Borrowed(b"hello, world!"),
             "must produce a borrowed value from fmem::Data::Bytes"
         );
-    }
-
-    fn serve_vfs_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
-        let fs_scope = ExecutionScope::new();
-        let (client, server) = create_proxy::<fio::DirectoryMarker>();
-        root.open(
-            fs_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
-        client
     }
 }

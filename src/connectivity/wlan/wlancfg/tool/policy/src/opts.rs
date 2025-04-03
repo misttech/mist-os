@@ -164,14 +164,14 @@ pub struct PolicyNetworkConfig {
     pub ssid: String,
     #[structopt(
         long = "security-type",
-        raw(possible_values = "&SecurityTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &SecurityTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub security_type: Option<SecurityTypeArg>,
     #[structopt(
         long = "credential-type",
-        raw(possible_values = "&CredentialTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &CredentialTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub credential_type: Option<CredentialTypeArg>,
     #[structopt(long)]
@@ -194,14 +194,14 @@ pub struct RemoveArgs {
     pub ssid: String,
     #[structopt(
         long = "security-type",
-        raw(possible_values = "&SecurityTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &SecurityTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub security_type: Option<SecurityTypeArg>,
     #[structopt(
         long = "credential-type",
-        raw(possible_values = "&CredentialTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &CredentialTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub credential_type: Option<CredentialTypeArg>,
     #[structopt(long)]
@@ -286,14 +286,14 @@ pub struct SaveNetworkArgs {
     pub ssid: String,
     #[structopt(
         long = "security-type",
-        raw(possible_values = "&SecurityTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &SecurityTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub security_type: SecurityTypeArg,
     #[structopt(
         long = "credential-type",
-        raw(possible_values = "&CredentialTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &CredentialTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub credential_type: Option<CredentialTypeArg>,
     #[structopt(long)]
@@ -306,8 +306,8 @@ pub struct ConnectArgs {
     pub ssid: String,
     #[structopt(
         long = "security-type",
-        raw(possible_values = "&SecurityTypeArg::variants()"),
-        raw(case_insensitive = "true")
+        possible_values = &SecurityTypeArg::variants(),
+        case_insensitive = true,
     )]
     pub security_type: Option<SecurityTypeArg>,
 }
@@ -357,7 +357,7 @@ pub enum PolicyAccessPointCmd {
 pub enum DeprecatedConfiguratorCmd {
     #[structopt(name = "suggest-mac")]
     SuggestAccessPointMacAddress {
-        #[structopt(raw(required = "true"))]
+        #[structopt(required = true)]
         mac: MacAddress,
     },
 }

@@ -10,27 +10,35 @@
 use starnix_core::signals::{send_freeze_signal, SignalInfo};
 use starnix_core::task::{Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
-use starnix_logging::{log_warn, track_stub};
-use starnix_sync::Mutex;
+use starnix_logging::{log_warn, trace_duration, track_stub, CATEGORY_STARNIX};
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error, pid_t};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
+
+use crate::signals::KernelSignal;
 
 /// All cgroups of the kernel. There is a single cgroup v2 hierarchy, and one-or-more cgroup v1
 /// hierarchies.
 /// TODO(https://fxbug.dev/389748287): Add cgroup v1 hierarchies on the kernel.
-pub struct Cgroups {
+pub struct KernelCgroups {
     pub cgroup2: Arc<CgroupRoot>,
 }
 
-impl Cgroups {
+impl KernelCgroups {
     pub fn new(kernel: Weak<Kernel>) -> Self {
         Self { cgroup2: CgroupRoot::new(kernel) }
+    }
+
+    /// Returns a locked `CgroupPidTable`, which guarantees that processes would not move in this
+    /// cgroup hierarchy until the lock is freed.
+    pub fn lock_cgroup2_pid_table(&self) -> MutexGuard<'_, CgroupPidTable> {
+        self.cgroup2.pid_table.lock()
     }
 }
 
@@ -107,6 +115,64 @@ pub trait CgroupOps: Send + Sync + 'static {
     fn thaw(&self);
 }
 
+/// `CgroupPidTable` contains the mapping of `ThreadGroup` (by pid) to non-root cgroup.
+/// If `pid` is valid but does not exist in the mapping, then it is assumed to be in the root cgroup.
+#[derive(Default)]
+pub struct CgroupPidTable(HashMap<pid_t, Weak<Cgroup>>);
+impl Deref for CgroupPidTable {
+    type Target = HashMap<pid_t, Weak<Cgroup>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for CgroupPidTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl CgroupPidTable {
+    /// Add a newly created `ThreadGroup` to the same cgroup as its parent. Assumes that
+    /// `ThreadGroup` does not have any `Task` associated with it.
+    pub fn inherit_cgroup(
+        &mut self,
+        parent_pid: pid_t,
+        child_pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) {
+        assert!(thread_group.read().tasks_count() == 0, "threadgroup must be newly created");
+
+        if let Some(weak_cgroup) = self.0.get(&parent_pid).cloned() {
+            let Some(cgroup) = weak_cgroup.upgrade() else {
+                log_warn!("ignored attempt to inherit a non-existant cgroup");
+                return;
+            };
+            assert!(
+                self.0.insert(child_pid, weak_cgroup).is_none(),
+                "child pid should not exist when inheriting"
+            );
+            // Skip freezer propagation because the `ThreadGroup` is newly created and has no tasks.
+            cgroup.state.lock().processes.insert(child_pid, WeakRef::from(thread_group));
+        }
+    }
+
+    /// Creates a new `KernelSignal` for a new `Task`, if that `Task` is added to a frozen cgroup.
+    pub fn maybe_create_freeze_signal(&self, pid: pid_t) -> Option<KernelSignal> {
+        let Some(weak_cgroup) = self.0.get(&pid) else {
+            return None;
+        };
+        let Some(cgroup) = weak_cgroup.upgrade() else {
+            return None;
+        };
+        let state = cgroup.state.lock();
+        if state.get_effective_freezer_state() != FreezerState::Frozen {
+            return None;
+        }
+        Some(KernelSignal::Freeze(state.create_freeze_waiter()))
+    }
+}
+
 /// `CgroupRoot` is the root of the cgroup hierarchy. The root cgroup is different from the rest of
 /// the cgroups in a cgroup hierarchy (sub-cgroups of the root) in a few ways:
 ///
@@ -121,7 +187,7 @@ pub trait CgroupOps: Send + Sync + 'static {
 #[derive(Default)]
 pub struct CgroupRoot {
     /// Look up cgroup by pid. Must be locked before child states.
-    pid_table: Mutex<HashMap<pid_t, Weak<Cgroup>>>,
+    pid_table: Mutex<CgroupPidTable>,
 
     /// Sub-cgroups of this cgroup.
     children: Mutex<CgroupChildren>,
@@ -155,28 +221,6 @@ impl CgroupRoot {
 
     pub fn get_cgroup(&self, pid: pid_t) -> Option<Weak<Cgroup>> {
         self.pid_table.lock().get(&pid).cloned()
-    }
-
-    pub fn inherit_cgroup(
-        &self,
-        parent_pid: pid_t,
-        child_pid: pid_t,
-        thread_group: &TempRef<'_, ThreadGroup>,
-    ) {
-        let mut pid_table = self.pid_table.lock();
-        if let Some(cgroup) = pid_table.get(&parent_pid).cloned() {
-            assert!(
-                pid_table.insert(child_pid, cgroup.clone()).is_none(),
-                "child pid should not exist when inheriting"
-            );
-            cgroup
-                .upgrade()
-                .expect("parent cgroup should not be deprecated")
-                .state
-                .lock()
-                .add_process(child_pid, thread_group)
-                .expect("cgroup should not be deleted");
-        }
     }
 }
 
@@ -229,8 +273,8 @@ impl CgroupOps for CgroupRoot {
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
-        let kernel_pids = self.kernel().pids.read().process_ids();
         let controlled_pids = self.pid_table.lock();
+        let kernel_pids = self.kernel().pids.read().process_ids();
         kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
     }
 
@@ -337,6 +381,14 @@ struct CgroupState {
 }
 
 impl CgroupState {
+    /// Creates a new Waiter that subscribes to the Cgroup's freezer WaitQueue. This `Waiter` can be
+    /// sent as a part of a `KernelSignal::Freeze` to freeze a `Task`.
+    fn create_freeze_waiter(&self) -> Waiter {
+        let waiter = Waiter::new_ignoring_signals();
+        self.wait_queue.wait_async(&waiter);
+        waiter
+    }
+
     // Goes through `processes` and remove processes that are no longer alive.
     fn update_processes(&mut self) {
         self.processes.retain(|_pid, thread_group| {
@@ -354,9 +406,8 @@ impl CgroupState {
         // SAFETY: static TempRefs are released after all signals are queued.
         let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
         for task in tasks {
-            let waiter = Waiter::new_ignoring_signals();
-            self.wait_queue.wait_async(&waiter);
-            send_freeze_signal(&task, waiter).expect("sending freeze signal should not fail");
+            send_freeze_signal(&task, self.create_freeze_waiter())
+                .expect("sending freeze signal should not fail");
         }
     }
 
@@ -598,6 +649,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn kill(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupKill");
         let state = self.state.lock();
         state.propagate_kill();
     }
@@ -624,6 +676,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn freeze(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupFreeze");
         let mut state = self.state.lock();
         let inherited_freezer_state = state.inherited_freezer_state;
         state.propagate_freeze(inherited_freezer_state);
@@ -631,6 +684,7 @@ impl CgroupOps for Cgroup {
     }
 
     fn thaw(&self) {
+        trace_duration!(CATEGORY_STARNIX, c"CgroupThaw");
         let mut state = self.state.lock();
         state.self_freezer_state = FreezerState::Thawed;
         let inherited_freezer_state = state.inherited_freezer_state;
@@ -641,7 +695,11 @@ impl CgroupOps for Cgroup {
 #[cfg(test)]
 mod test {
     use super::*;
-    use starnix_core::testing::create_kernel_and_task;
+    use assert_matches::assert_matches;
+    use starnix_core::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
+    use starnix_types::ownership::OwnedRef;
+    use starnix_uapi::signals::SIGCHLD;
+    use starnix_uapi::{CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 
     #[::fuchsia::test]
     async fn cgroup_path_from_root() {
@@ -654,5 +712,31 @@ mod test {
 
         assert_eq!(path_from_root(Some(Arc::downgrade(&test_cgroup))), Ok("/test".into()));
         assert_eq!(path_from_root(Some(Arc::downgrade(&child_cgroup))), Ok("/test/child".into()));
+    }
+
+    #[::fuchsia::test]
+    async fn cgroup_clone_task_in_frozen_cgroup() {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+
+        let root = &kernel.cgroups.cgroup2;
+        let cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
+
+        let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        cgroup
+            .add_process(process.get_pid(), &OwnedRef::temp(&process.thread_group))
+            .expect("add process to cgroup");
+        cgroup.freeze();
+        assert_eq!(cgroup.get_pids().first(), Some(process.get_pid()).as_ref());
+        assert_eq!(root.get_cgroup(process.get_pid()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
+
+        let thread = process.clone_task_for_test(
+            &mut locked,
+            (CLONE_THREAD | CLONE_SIGHAND | CLONE_VM) as u64,
+            Some(SIGCHLD),
+        );
+
+        let thread_state = thread.read();
+        let kernel_signals = thread_state.kernel_signals_for_test();
+        assert_matches!(kernel_signals.front(), Some(KernelSignal::Freeze(_)));
     }
 }

@@ -110,7 +110,7 @@ impl<'a> Closer<'a> {
 
 impl Drop for Closer<'_> {
     fn drop(&mut self) {
-        let lock = self.filesystem.lock().unwrap();
+        let lock = self.filesystem.lock();
         self.nodes.drain(..).for_each(|n: FatNode| n.close_ref(&lock));
     }
 }

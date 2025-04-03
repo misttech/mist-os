@@ -59,6 +59,11 @@ pub const fn regular_tracing_enabled() -> bool {
 }
 
 #[inline]
+pub fn regular_trace_category_enabled(category: &'static CStr) -> bool {
+    regular_tracing_enabled() && fuchsia_trace::category_enabled(category)
+}
+
+#[inline]
 pub const fn firehose_tracing_enabled() -> bool {
     cfg!(feature = "tracing_firehose")
 }
@@ -162,7 +167,6 @@ macro_rules! trace_flow_begin {
 macro_rules! trace_flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
-
         if $crate::regular_tracing_enabled() {
             $crate::__fuchsia_trace::flow_step!($category, $name, _flow_id $(, $key => $val)*);
         }
@@ -175,6 +179,72 @@ macro_rules! trace_flow_end {
         let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
         if $crate::regular_tracing_enabled() {
             $crate::__fuchsia_trace::flow_end!($category, $name, _flow_id $(, $key => $val)*);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! trace_instant_flow_begin {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::instant_flow_begin!(
+                $category,
+                $event_name,
+                $flow_name,
+                _flow_id
+                $(, $key => $val)*
+            );
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! trace_instant_flow_end {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::instant_flow_end!(
+                $category,
+                $event_name,
+                $flow_name,
+                _flow_id
+                $(, $key => $val)*
+            );
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! trace_instant_flow_step {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::instant_flow_step!(
+                $category,
+                $event_name,
+                $flow_name,
+                _flow_id
+                $(, $key => $val)*
+            );
         }
     };
 }

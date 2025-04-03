@@ -85,13 +85,9 @@
             availability: "same_as_target",
         },
         {
-            protocol: [
-                "fuchsia.net.filter.Control",
-                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
-            ],
+            protocol: [ "fuchsia.net.filter.Control" ],
 
-            // NS2 will not implement fuchsia.net.filter or fuchsia.net.ndp,
-            // mark as optional.
+            // NS2 will not implement fuchsia.net.filter, mark as optional.
             from: "#netstack",
             to: "#netcfg",
             availability: "same_as_target",
@@ -114,6 +110,7 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.name.DnsServerWatcher",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.stack.Stack",
@@ -226,6 +223,7 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
@@ -241,11 +239,6 @@
                 // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
                 // components running in the network realm, remove this.
                 "fuchsia.posix.socket.raw.Provider",
-
-                // TODO(https://fxbug.dev/42061698): make it possible to put this
-                // standalone import in its own paragraph without format-code
-                // reflowing the entire list.
-                "fuchsia.update.verify.NetstackVerifier",
             ],
             from: "#netstack",
         },

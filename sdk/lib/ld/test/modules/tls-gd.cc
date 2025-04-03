@@ -42,8 +42,7 @@ extern "C" int64_t TestStart() {
   }
 
   for (const auto& module : ld::AbiLoadedModules(ld::abi::_ld_abi)) {
-    if (!module.soname.str().empty() &&
-        (module.symbols.flags() & elfldltl::ElfDynFlags::kStaticTls)) {
+    if (!module.soname.empty() && (module.symbols.flags() & elfldltl::ElfDynFlags::kStaticTls)) {
       return 5;
     }
   }

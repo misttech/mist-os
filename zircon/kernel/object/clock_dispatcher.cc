@@ -7,22 +7,40 @@
 #include <lib/affine/ratio.h>
 #include <lib/affine/transform.h>
 #include <lib/arch/intrin.h>
+#include <lib/concurrent/seqlock.inc.h>
 #include <lib/counters.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/clock.h>
 
 #include <fbl/alloc_checker.h>
+#include <ktl/memory.h>
 #include <object/clock_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 
 KCOUNTER(dispatcher_clock_create_count, "dispatcher.clock.create")
 KCOUNTER(dispatcher_clock_destroy_count, "dispatcher.clock.destroy")
 
 namespace {
 
-inline zx_clock_transformation_t CopyTransform(const affine::Transform& src) {
-  return {src.a_offset(), src.b_offset(), {src.numerator(), src.denominator()}};
-}
+// TODO(johngro): Find a better place for this, or figure out a better way to
+// use the lockdep guards along with libfasttime
+template <typename T>
+class __TA_SCOPED_CAPABILITY SeqGuard {
+ public:
+  explicit SeqGuard(T& lock) __TA_ACQUIRE(lock) : irq_state_(arch_interrupt_save()), lock_(lock) {
+    lock_.Acquire();
+  }
+
+  ~SeqGuard() __TA_RELEASE() {
+    lock_.Release();
+    arch_interrupt_restore(irq_state_);
+  }
+
+ private:
+  interrupt_saved_state_t irq_state_;
+  T& lock_;
+};
 
 // Helpers which normalize access to the two versions of the update args.
 template <typename UpdateArgsType>
@@ -73,54 +91,126 @@ zx_status_t ClockDispatcher::Create(uint64_t options, const zx_clock_create_args
   }
 
   // Make sure that the backstop time is valid.  If this clock is being created
-  // with the "auto start" flag, then it begins life as a clone of clock
-  // monotonic, and the backstop time has to be <= the current clock monotonic
-  // value.  Otherwise, the clock starts in the stopped state, and any specified
-  // backstop time must simply be non-negative.
+  // with the "auto start" flag, then it begins life as a clone of its reference
+  // clock (either monotonic or boot) , and the backstop time has to be <= the
+  // current reference clock value.  Otherwise, the clock starts in the stopped
+  // state, and any specified backstop time must simply be non-negative.
   //
-  if (((options & ZX_CLOCK_OPT_AUTO_START) && (create_args.backstop_time > current_mono_time())) ||
+  const zx_time_t now = GetCurrentTime(options & ZX_CLOCK_OPT_BOOT);
+  if (((options & ZX_CLOCK_OPT_AUTO_START) && (create_args.backstop_time > now)) ||
       (create_args.backstop_time < 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // If the user requested a map-able clock, create a single-page VMO which we
+  // will use to share clock state with our user.
+  fbl::RefPtr<VmObjectPaged> vmo_paged;
+  if ((options & ZX_CLOCK_OPT_MAPPABLE) != 0) {
+    // Make sure to allocate our VMO with the `kAlwaysPinned` flag, for two
+    // reasons.
+    //
+    // 1) To save a bit of time and overhead, we use the physmap view of this
+    //    page in the kernel in order to access the actual memory.  If the page
+    //    backing this clock is not pinned, then this technique is no good.  _In
+    //    theory_, the page could be re-claimed then restored (to a different
+    //    physical location) invalidating our kernel-physmap view of the memory
+    //    in the process.  This cannot be allowed to happen.
+    // 2) Even if we make a kernel-specific PTE for the kernel view of the
+    //    memory (instead of using the physmap view), it needs to be accessed
+    //    from inside of a spinlock-equivalent (the exclusive form of the
+    //    seq-lock) during an Update operation.  We are going to be touching the
+    //    memory, but cannot allow a page fault during this operation, so it is
+    //    important that it always remain pinned.
+    static_assert(kMappedSize == PAGE_SIZE,
+                  "Mapped clock size must be a single page to ensure continuity");
+    zx_status_t res = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT,
+                                            VmObjectPaged::kAlwaysPinned, kMappedSize, &vmo_paged);
+    if (res != ZX_OK) {
+      return res;
+    }
+  }
+
   fbl::AllocChecker ac;
-  KernelHandle clock(fbl::AdoptRef(new (&ac) ClockDispatcher(options, create_args.backstop_time)));
+  KernelHandle clock(fbl::AdoptRef(
+      new (&ac) ClockDispatcher(options, create_args.backstop_time, ktl::move(vmo_paged))));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  *rights = default_rights();
+  // The new clock instance should have the default rights, plus the "map" right
+  // if the clock was created as map-able.
+  *rights = default_rights() | ((options & ZX_CLOCK_OPT_MAPPABLE) ? ZX_RIGHT_MAP : 0);
   *handle = ktl::move(clock);
+
   return ZX_OK;
 }
 
-ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
-    : options_(options), backstop_time_(backstop_time) {
+ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time,
+                                 fbl::RefPtr<VmObjectPaged> vmo)
+    : vmo_(ktl::move(vmo)) {
+  // Find our storage for our clock transformation, either in our VMO if we are
+  // mappable, or in our local storage if not.
+  if (vmo_ != nullptr) {
+    // Find the physical address of our VMO's (single) page, then use it to
+    // locate the kernel view of that page in the kernel's flat map.  There
+    // should be no possible way for this to fail, so unconditionally assert
+    // that everything goes as we expect.
+    static_assert(kMappedSize == PAGE_SIZE, "Mapped clock size must be exactly one page");
+
+    paddr_t pa;
+    const zx_status_t res = vmo_->GetPage(0, 0, nullptr, nullptr, nullptr, &pa);
+    ASSERT_MSG(res == ZX_OK, "Failed to get storage page for mappable clock (%d)", res);
+    ASSERT_MSG(is_physmap_phys_addr(pa),
+               "Mappable clock storage page is not in the physmap 0x%016lx", pa);
+    DEBUG_ASSERT((options & ZX_CLOCK_OPT_MAPPABLE) != 0);
+    clock_transformation_ = reinterpret_cast<ClockTransformationType*>(paddr_to_physmap(pa));
+
+    // Set the user-id of our VMO to be the same as our KOID.  This way, when a
+    // mapped clock is enumerated in a diagnostic info call, the KOID of this
+    // clock will be what gets reported in the info record.
+    vmo_->set_user_id(this->get_koid());
+
+    // Clocks (as kernel objects) currently don't have names, so we cannot use a
+    // similar trick to apply a name to how our mapped clock is reported.  For
+    // now, just set the name of the underlying VMO to "kernel-clock", so that
+    // it will be clear to someone looking at diagnostic info that the mapping
+    // is for a clock.
+    constexpr const char* default_name = "kernel-clock";
+    vmo_->set_name(default_name, strlen(default_name));
+  } else {
+    DEBUG_ASSERT((options & ZX_CLOCK_OPT_MAPPABLE) == 0);
+    clock_transformation_ = reinterpret_cast<ClockTransformationType*>(local_storage_);
+  }
+
+  // Explicitly placement new our transformation structure in our storage of choice.
+  new (clock_transformation_) ClockTransformationType(options, backstop_time);
+
+  // Initialize the internal transformation structure.
+  ClockTransformationType& t = *clock_transformation_;
+  ClockTransformationType::Params local_params;
   affine::Transform local_ticks_to_synthetic;
-  Params local_params;
 
   // Compute the initial state
-  if (options & ZX_CLOCK_OPT_AUTO_START) {
-    ZX_DEBUG_ASSERT(backstop_time <=
-                    current_mono_time());  // This should have been checked by Create
-    affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
+  if (t.options_ & ZX_CLOCK_OPT_AUTO_START) {
+    ZX_DEBUG_ASSERT(const zx_time_t now = GetCurrentTime(t.is_boot()); t.backstop_time_ <= now);
+    const affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
+    const zx_ticks_t now_ticks = t.GetCurrentTicks();
 
-    zx_ticks_t now_ticks = GetCurrentTicks();
     local_params.last_value_update_ticks = now_ticks;
     local_params.last_rate_adjust_update_ticks = now_ticks;
     local_ticks_to_synthetic = affine::Transform{
         0, 0, {ticks_to_time_ratio.numerator(), ticks_to_time_ratio.denominator()}};
     local_params.reference_to_synthetic = affine::Transform({0, 0, {1, 1}});
   } else {
-    local_ticks_to_synthetic = affine::Transform{0, backstop_time, {0, 1}};
-    local_params.reference_to_synthetic = affine::Transform{0, backstop_time, {0, 1}};
+    local_ticks_to_synthetic = affine::Transform{0, t.backstop_time_, {0, 1}};
+    local_params.reference_to_synthetic = affine::Transform{0, t.backstop_time_, {0, 1}};
   }
 
   // Publish the state from within the SeqLock
   {
-    SeqLockGuard<ExclusiveIrqSave> lock{&seq_lock_};
-    reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
-    params_.Update(local_params);
+    SeqGuard guard(t.seq_lock_);
+    t.reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    t.params_.Update(local_params);
   }
 
   // If we auto-started our clock, update our state.
@@ -131,56 +221,19 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
   kcounter_add(dispatcher_clock_create_count, 1);
 }
 
-ClockDispatcher::~ClockDispatcher() { kcounter_add(dispatcher_clock_destroy_count, 1); }
-
-zx_ticks_t ClockDispatcher::GetCurrentTicks() const {
-  return is_boot() ? current_boot_ticks() : current_mono_ticks();
+ClockDispatcher::~ClockDispatcher() {
+  // Explicitly destruct our clock transformation instance before its underlying
+  // storage goes away.
+  ktl::destroy_at(clock_transformation_);
+  kcounter_add(dispatcher_clock_destroy_count, 1);
 }
 
 zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
-  int64_t now_ticks;
-  affine::Transform ticks_to_synthetic;
-
-  bool transaction_success;
-  do {
-    SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
-    reference_ticks_to_synthetic_.Read(ticks_to_synthetic);
-    now_ticks = GetCurrentTicks();
-  } while (!transaction_success);
-
-  *out_now = ticks_to_synthetic.Apply(now_ticks);
-
-  return ZX_OK;
+  return clock_transformation_->Read(out_now);
 }
 
 zx_status_t ClockDispatcher::GetDetails(zx_clock_details_v1_t* out_details) {
-  int64_t now_ticks;
-  affine::Transform ticks_to_synthetic;
-  Params params;
-
-  bool transaction_success;
-  do {
-    SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
-    reference_ticks_to_synthetic_.Read(ticks_to_synthetic);
-    params_.Read(params);
-    now_ticks = GetCurrentTicks();
-  } while (!transaction_success);
-
-  out_details->generation_counter = params.generation_counter_;
-  out_details->reference_ticks_to_synthetic = CopyTransform(ticks_to_synthetic);
-  out_details->reference_to_synthetic = CopyTransform(params.reference_to_synthetic);
-  out_details->error_bound = params.error_bound;
-  out_details->query_ticks = now_ticks;
-  out_details->last_value_update_ticks = params.last_value_update_ticks;
-  out_details->last_rate_adjust_update_ticks = params.last_rate_adjust_update_ticks;
-  out_details->last_error_bounds_update_ticks = params.last_error_bounds_update_ticks;
-
-  // Options and backstop_time are constant over the life of the clock.  We
-  // don't need to latch them during the generation counter spin.
-  out_details->options = options_;
-  out_details->backstop_time = backstop_time_;
-
-  return ZX_OK;
+  return clock_transformation_->GetDetails(out_details);
 }
 
 template <typename UpdateArgsType>
@@ -213,23 +266,24 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
 
   bool clock_was_started = false;
   {
-    // Enter the sequence lock exclusively, ensuring that only one update can
-    // take place at a time.  We use a IrqSave for this because this operation
-    // should be very quick, and we may have observers who are spinning
-    // attempting to read the clock. We cannot afford to become preempted while
-    // we are performing an update operation.
-    SeqLockGuard<ExclusiveIrqSave> lock{&seq_lock_};
+    // Disable interrupts and enter the sequence lock exclusively, ensuring that
+    // only one update can take place at a time.  We disable interrupts for this
+    // because this operation should be very quick, and we may have observers
+    // who are spinning attempting to read the clock. We cannot afford to become
+    // preempted while we are performing an update operation.
+    ClockTransformationType& t = *clock_transformation_;
+    SeqGuard guard(t.seq_lock_);
 
     // If the clock has not yet been started, then we require the first update
     // to include a set operation.
-    if (!do_set && !is_started()) {
+    if (!do_set && !t.is_started()) {
       return ZX_ERR_BAD_STATE;
     }
 
     // Continue with the argument sanity checking.  Set operations are not
     // allowed on continuous clocks after the very first one (which is what
     // starts the clock).
-    if (do_set && is_continuous() && is_started()) {
+    if (do_set && t.is_continuous() && t.is_started()) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -237,7 +291,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     if constexpr (!args.IsV1) {
       // The following checks only apply if the clock is a monotonic clock which
       // has already been started.
-      if (is_started() && is_monotonic()) {
+      if (t.is_started() && t.is_monotonic()) {
         // Set operations for non-V1 update arguments made to a monotonic clock
         // must supply an explicit reference time.
         if (do_set && !reference_valid) {
@@ -247,7 +301,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
         // non-v1 set operations on monotonic clocks may not be combined with rate
         // change operations.  Additionally, rate change operations may not specify
         // an explicit reference time when being applied to monotonic clocks.
-        if (is_monotonic() && (do_set || reference_valid) && do_rate) {
+        if (t.is_monotonic() && (do_set || reference_valid) && do_rate) {
           return ZX_ERR_INVALID_ARGS;
         }
       }
@@ -259,16 +313,16 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     // be writing to these variable as we read them, meaning that no data races
     // should exist here.
     affine::Transform local_ticks_to_synthetic;
-    Params local_params;
-    params_.Read(local_params);
-    reference_ticks_to_synthetic_.Read(local_ticks_to_synthetic);
+    ClockTransformationType::Params local_params;
+    t.params_.Read(local_params);
+    t.reference_ticks_to_synthetic_.Read(local_ticks_to_synthetic);
 
     // Aliases make some of the typing a bit shorter.
     affine::Transform& t2s = local_ticks_to_synthetic;
     affine::Transform& m2s = local_params.reference_to_synthetic;
 
     // Mark the time at which this update will take place.
-    int64_t now_ticks = static_cast<int64_t>(GetCurrentTicks());
+    int64_t now_ticks = static_cast<int64_t>(t.GetCurrentTicks());
 
     // Don't bother updating the structures representing the transformation if:
     //
@@ -321,7 +375,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
         new_m2s_ratio = {static_cast<uint32_t>(1'000'000 + args.rate_adjust()), 1'000'000};
         new_t2s_ratio =
             affine::Ratio::Product(ticks_to_time_ratio, new_m2s_ratio, affine::Ratio::Exact::No);
-      } else if (is_started()) {
+      } else if (t.is_started()) {
         new_m2s_ratio = m2s.ratio();
         new_t2s_ratio = t2s.ratio();
       } else {
@@ -341,18 +395,18 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
       // 2) Backstop times are not violated.
       //
       int64_t new_synthetic_now = t2s.Apply(now_ticks);
-      if (is_monotonic() && (new_synthetic_now < old_t2s.Apply(now_ticks))) {
+      if (t.is_monotonic() && (new_synthetic_now < old_t2s.Apply(now_ticks))) {
         return ZX_ERR_INVALID_ARGS;
       }
 
-      if (new_synthetic_now < backstop_time_) {
+      if (new_synthetic_now < t.backstop_time_) {
         return ZX_ERR_INVALID_ARGS;
       }
     }
 
     // Everything checks out, we can proceed with the update.
     // Record whether or not this is the initial start of the clock.
-    clock_was_started = !is_started();
+    clock_was_started = !t.is_started();
 
     // If this was a set operation, record the new last update time.
     if (do_set) {
@@ -374,11 +428,9 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
       local_params.error_bound = args.error_bound();
     }
 
-    // We are finished.  Bump the generation counter and publish the results in
-    // the shared structures.
-    ++local_params.generation_counter_;
-    reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
-    params_.Update(local_params);
+    // We are finished,  publish the results in the shared structures.
+    t.reference_ticks_to_synthetic_.Update(local_ticks_to_synthetic);
+    t.params_.Update(local_params);
   }
 
   // Now that we are out of the time critical section, if the clock was just

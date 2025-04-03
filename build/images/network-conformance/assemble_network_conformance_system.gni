@@ -5,8 +5,9 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/info/info.gni")
+import("//build/testing/host_test_data.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core.gni")
 
 # Wraps assembled_system to allow adding internal network-conformance test stubs.
 #
@@ -28,6 +29,7 @@ template("assemble_network_conformance_system") {
 
   board_configuration(labels.board_config) {
     name = "network-conformance"
+    version = build_info_version
     kernel = {
       halt_on_panic = true
     }
@@ -103,8 +105,6 @@ template("assemble_network_conformance_system") {
 
   assembled_system(target_name) {
     testonly = true
-    include_legacy_bundle = true
-    legacy_bundle_must_be_empty = true
 
     if (!fxfs_blob) {
       generate_fvm = true

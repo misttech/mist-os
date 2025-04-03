@@ -240,10 +240,8 @@ variant("profile-rust") {
 
   rustflags = [ "-Cprofile-generate" ]
 
-  if (is_fuchsia || is_kernel) {
-    # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
-    rustflags += [ "-Cllvm-args=-disable-vp" ]
-  }
+  # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
+  rustflags += [ "-Cllvm-args=-disable-vp" ]
 }
 
 # Enable PGO-optimized build that uses a profile.

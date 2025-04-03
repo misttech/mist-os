@@ -8,7 +8,7 @@
 
 ## usage: fx set PRODUCT.BOARD [--with GNLABEL1,GNLABEL2,...]
 ##               [--release] [--auto-dir] [--args ARG] [--variant VARIANT]
-##               [--with-base GNLABEL1,GNLABEL2,...]
+##               [--with-test GNLABEL1,GNLABEL2,...]
 ##
 ## where PRODUCT is an entry from `//products` or `//vendor/*/products` and
 ## BOARD is an entry from `//boards` or `//vendor/*/boards`. Use the
@@ -51,8 +51,8 @@
 ##                         enable ALL supporting fuzzers.  Use --variant for
 ##                         individual fuzzers, e.g. "--variant asan-fuzzer/foo".
 ##   --rbe-mode            Use a preset RBE configuration.
-##                         Valid options: auto, off, cloudtop, legacy_default,
-##                         remote_cache_only, low_bandwidth.
+##                         Valid options: auto, off, workstation, cloudtop,
+##                         legacy_default, remote_cache_only, low_bandwidth.
 ##                         'auto' chooses one of the other options for you.
 ##                         See also build/toolchain/rbe_modes.gni for details.
 ##                         Default: auto
@@ -100,22 +100,6 @@
 ##                         can be run ephemerally. Multiple labels can be
 ##                         provided delimited by commas or the --with argument
 ##                         can be provided multiple times.
-##   --with-base GNLABEL   Labels of additional packages to include in the
-##                         'base' set of packages. These packages are included in
-##                         the system image and can be updated only with an OTA.
-##                         Multiple labels can be provided delimited by commas
-##                         or the --with-base argument can be provided multiple
-##                         times.
-##   --with-cache GNLABEL  Labels of additional packages to include in the
-##                         'cache' set of packages. These packages are made
-##                         available on disk immediately after paving and in
-##                         factory flows. These packages are not updated with
-##                         an OTA, but are instead updated ephemerally. This
-##                         cache of software can be evicted by the system if
-##                         storage pressure arises or other policies indicate.
-##                         Multiple labels can be provided delimited by commas
-##                         or the --with-cache argument can be provided
-##                         multiple times.
 ##   --with-test  GNLABEL  Labels of additional tests to include in the build.
 ##                         When run by 'fx test', these tests are ephemeral. To
 ##                         add host tests, either use '--with-host' qualify the

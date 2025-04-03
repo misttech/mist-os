@@ -16,7 +16,7 @@ impl KeyType {
     pub const IGTK: Self = Self(3);
     pub const PEER: Self = Self(4);
 }
-// LINT.ThenChange(//sdk/banjo/fuchsia.wlan.common/associnfo.fidl)
+// LINT.ThenChange(//sdk/fidl/fuchsia.wlan.ieee80211/fields.fidl)
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

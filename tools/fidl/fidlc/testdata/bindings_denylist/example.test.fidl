@@ -10,23 +10,26 @@ using test.dependent;
 @bindings_deny_list("there_are_no_bindings_with_this_name")
 const AllBindings uint32 = 0;
 
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust")
 type OnlySyzkaller = strict bits {
     A = 1;
 };
 
-@bindings_denylist("cpp, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
 type OnlyDart = strict enum {
     A = 1;
 };
 
-@bindings_denylist("cpp, dart, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, dart, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
 type OnlyGo = struct {};
 
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, syzkaller")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+type OnlyPython = table {};
+
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, syzkaller")
 type OnlyRust = table {};
 
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, python, rust, syzkaller")
 type OnlyLlcpp = strict union {
     1: x uint32;
 };
@@ -34,16 +37,16 @@ type OnlyLlcpp = strict union {
 // TODO(https://fxbug.dev/42151687): Libfuzzer depends on hlcpp and llcpp. A decision needs
 // to be made on how to manage these dependencies. For now, this test does not
 // denylist the dependencies.
-@bindings_denylist("cpp, dart, go, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, python, rust, syzkaller")
 closed protocol OnlyLibfuzzerAndDeps {};
 
 // TODO(https://fxbug.dev/42151687): C++ bindings natural messaging target depends on hlcpp
 // and C++ wire messaging target. A decision needs to be made on how to manage
 // these dependencies. For now, this test does not denylist the dependencies.
-@bindings_denylist("dart, go, libfuzzer, rust, syzkaller")
+@bindings_denylist("dart, go, libfuzzer, python, rust, syzkaller")
 closed protocol OnlyCppAndDeps {};
 
-@bindings_denylist("cpp, dart, go, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, libfuzzer, llcpp, python, rust, syzkaller")
 service OnlyHlcpp {};
 
 // This exists to test that when a particular method is denied to a binding,
@@ -77,6 +80,13 @@ closed protocol DenyEachBinding {
         b int32;
     }) error uint32;
 
+    @bindings_denylist("python")
+    strict OnlyDenyPython(struct {
+        a bool;
+    }) -> (struct {
+        b int32;
+    }) error uint32;
+
     @bindings_denylist("rust")
     strict OnlyDenyRust(struct {
         a bool;
@@ -94,7 +104,7 @@ closed protocol DenyEachBinding {
 
 // None of the "ShouldNeverAppear..." types/methods should appear in any bindings, as they are
 // children of parent declarations that are denylisted.
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
 closed protocol Denied {
     strict ShouldNeverAppearInAnyBinding(struct {
         should_never_appear_in_any_binding_1 struct {
@@ -110,7 +120,7 @@ closed protocol Denied {
 };
 
 closed protocol Allowed {
-    @bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+    @bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
     strict Denied() -> (struct {
         should_never_appear_in_any_binding_4 struct {
             a bool;
@@ -124,7 +134,7 @@ closed protocol Allowed {
     }) error uint32;
 };
 
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
 type DeniedAnonymous = struct {
     should_never_appear_in_any_binding_7 struct {
         a bool;
@@ -140,7 +150,7 @@ type DeniedAnonymous = struct {
 // Even though this ContainsAllowed protocol is denylisted for all bindings, the one composed from
 // the imported library into ImportsSameNameContext below should still appear in generated bindings.
 // This means that all generated bindings should have an "AlwaysAppearsInImportingLibrary" method.
-@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, rust, syzkaller")
+@bindings_denylist("cpp, dart, go, hlcpp, libfuzzer, llcpp, python, rust, syzkaller")
 closed protocol ContainsAllowed {};
 
 // This declaration should still appear in generated bindings, even though an identically name

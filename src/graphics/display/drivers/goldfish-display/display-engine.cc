@@ -401,7 +401,9 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   const layer_t& layer0 = display_config.layer_list[0];
   if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
     // Solid color fill layers are not yet supported.
+    // TODO(https://fxbug.dev/406525464): add support.
     layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   } else {
     // Scaling is allowed if destination frame match display and
     // source frame match image.

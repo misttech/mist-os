@@ -15,6 +15,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":bazel2gn_verifications(${host_toolchain})",
     ":build_tests_json_tests",
     ":regenerator_tests",
     "bazel:tests",
@@ -29,6 +30,42 @@ group("tests") {
     "tools:tests",
     "tracer:tests",
   ]
+}
+
+# Collect a list of directories with bazel2gn synced GN and Bazel build files
+# for `fx bazel2gn`.
+generated_file("bazel2gn_dir_list") {
+  testonly = true
+  outputs = [ "${root_out_dir}/bazel2gn_dir_list" ]
+  data_keys = [ "bazel2gn_dir" ]
+  deps = [ ":bazel2gn_verifications(${host_toolchain})" ]
+}
+
+if (is_host) {
+  group("bazel2gn_verifications") {
+    testonly = true
+    deps = [
+      "//build/tools/bazel2gn:verify_bazel2gn",
+      "//build/tools/formatjson5:verify_bazel2gn",
+      "//src/developer/ffx/lib/netext:verify_bazel2gn",
+      "//src/lib/fuchsia-async-macro:verify_bazel2gn",
+      "//tools/fidl/fidlgen_cpp:verify_bazel2gn",
+      "//tools/fidl/fidlgen_cpp/codegen:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp/codegen:verify_bazel2gn",
+      "//tools/fidl/fidlgen_hlcpp/coding_tables:verify_bazel2gn",
+      "//tools/fidl/fidlgen_rust:verify_bazel2gn",
+      "//tools/fidl/fidlgen_rust/codegen:verify_bazel2gn",
+      "//tools/fidl/lib/fidlgen:verify_bazel2gn",
+      "//tools/fidl/lib/fidlgen_cpp:verify_bazel2gn",
+      "//tools/lib/color:verify_bazel2gn",
+      "//tools/lib/isatty:verify_bazel2gn",
+      "//tools/lib/logger:verify_bazel2gn",
+      "//tools/net/device-finder:verify_bazel2gn",
+      "//tools/net/mdns:verify_bazel2gn",
+      "//tools/net/netboot:verify_bazel2gn",
+    ]
+  }
 }
 
 python_build_time_tests("regenerator_tests") {
@@ -210,6 +247,7 @@ group("non_hermetic_deps") {
     "//src/connectivity/bluetooth/core/bt-host:bazel_test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host:bt-host",
     "//src/connectivity/bluetooth/core/bt-host:bt-host.bazel_build",
+    "//src/connectivity/bluetooth/core/bt-host:bt-host.package",
     "//src/connectivity/bluetooth/core/bt-host:test_pkg",
     "//src/connectivity/bluetooth/core/bt-host:test_pkg.bazel_build",
     "//src/connectivity/bluetooth/core/bt-host/att:test_pkg",
@@ -259,27 +297,45 @@ group("non_hermetic_deps") {
   # `prebuilt_package` is hermetic.
   visibility += [
     "//examples/fortune:fortune_teller",
+    "//examples/fortune:fortune_teller.package",
     "//sdk/ctf:*",
     "//sdk/ctf/release:*",
     "//sdk/ctf/release/packages:*",
     "//src/chromium:chromium_common_tests_base_unittests",
+    "//src/chromium:chromium_common_tests_base_unittests.package",
     "//src/chromium:chromium_common_tests_blink_common_unittests",
+    "//src/chromium:chromium_common_tests_blink_common_unittests.package",
     "//src/chromium:chromium_common_tests_ipc_tests",
+    "//src/chromium:chromium_common_tests_ipc_tests.package",
     "//src/chromium:chromium_common_tests_media_unittests",
+    "//src/chromium:chromium_common_tests_media_unittests.package",
     "//src/chromium:chromium_common_tests_mojo_unittests",
+    "//src/chromium:chromium_common_tests_mojo_unittests.package",
     "//src/chromium:chromium_common_tests_skia_unittests",
+    "//src/chromium:chromium_common_tests_skia_unittests.package",
     "//src/chromium:chromium_web_engine_tests_web_engine_integration_tests",
+    "//src/chromium:chromium_web_engine_tests_web_engine_integration_tests.package",
     "//src/chromium:web_engine_pkg",
+    "//src/chromium:web_engine_pkg.package",
     "//src/chromium:web_engine_shell_pkg",
-    "//src/connectivity/bluetooth/core/bt-host:bt-host-oot",
+    "//src/chromium:web_engine_shell_pkg.package",
+    "//src/connectivity/bluetooth/core/bt-host:bt-host",
+    "//src/connectivity/bluetooth/core/bt-host:bt-host.package",
     "//src/connectivity/bluetooth/hci/virtual:virtual",
+    "//src/connectivity/bluetooth/hci/virtual:virtual.package",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
+    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi.package",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
+    "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg.package",
     "//src/devices/rtc/drivers/nxp:pcf8563",
+    "//src/devices/rtc/drivers/nxp:pcf8563.package",
     "//src/diagnostics/archivist/tests/pipeline_test:*",
     "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0",
+    "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0.package",
     "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-oot",
+    "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-oot.package",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
+    "//src/ui/backlight/drivers:chromebook-keyboard-backlight.package",
   ]
 
   # TODO(https://fxbug.dev/42165766): License analysis uses the output of 'fx gn gen', which
@@ -295,6 +351,7 @@ group("non_hermetic_deps") {
   # TODO(https://fxbug.dev/331492588): Template driver example wraps Bazel output in Ninja, and
   # depends on non_hermetic_deps.
   visibility += [
+    "//examples/drivers:*",
     "//examples/drivers/simple/dfv2:*",
     "//examples/drivers/template:*",
     "//examples/drivers/transport/driver/v2:*",
@@ -431,7 +488,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/runtime:*",
     "//zircon/system/ulib/smbios:*",
     "//zircon/system/ulib/spi:*",
-    "//zircon/system/ulib/storage-metrics:*",
     "//zircon/system/ulib/storage/buffer:*",
     "//zircon/system/ulib/storage/operation:*",
     "//zircon/system/ulib/svc:*",
@@ -500,7 +556,6 @@ group("config_data_template_allowlist") {
     "//src/factory/factory_store_providers/config/qemu:widevine",
     "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
     "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-config",
-    "//src/hwinfo:default_board_config",
     "//src/media/audio/config:chromebook-config",
     "//src/power/metrics-logger:*",
     "//src/security/lib/scrutiny/tests/*",
@@ -522,44 +577,5 @@ group("config_data_template_allowlist") {
     "//vendor/google/*",
     "//vendor/third_party/cobalt_registry:cobalt_registry",
     "//zircon/kernel/lib/userabi/userboot/tests:*",
-  ]
-}
-
-# All entries in this group MUST specify where the targets in question are used,
-# as justification for their existence.
-group("core_realm_shards_allowlist") {
-  visibility = []
-
-  # Used by in-tree tests
-  visibility +=
-      [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
-}
-
-group("legacy_bundle_allowlist") {
-  visibility = []
-
-  # Owned closely by the assembly team.
-  visibility += [
-    "//build/images/*",
-    "//src/tests/assembly/assemble_image/*",
-    "//vendor/google/*",
-  ]
-
-  # These are all tests that should ideally not be using a legacy bundle.
-  visibility += [
-    "//build/testing/boot_tests:*",
-    "//src/security/lib/scrutiny/collector:*",
-    "//src/security/lib/scrutiny/tests/structured_config:*",
-    "//src/security/tests/pkg_test/tests:*",
-    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
-    "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
-    "//src/tests/early-boot-coverage/*",
-    "//src/tests/limited_netsvc/image:*",
-    "//third_party/network-conformance/images:*",
-    "//zircon/kernel/lib/userabi/userboot/tests:*",
-    "//zircon/kernel/phys/test/debugdata-propagation:*",
-    "//zircon/system/ulib/c/test:*",
-    "//zircon/system/ulib/uart/test/interrupt-test:*",
-    "//zircon/system/utest/core:*",
   ]
 }

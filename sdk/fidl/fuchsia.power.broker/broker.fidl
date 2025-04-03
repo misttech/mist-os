@@ -248,9 +248,6 @@ type RequiredLevelError = flexible enum {
     UNKNOWN = 3;
 };
 
-// Unique ID provided by Power Broker (currently a UUID but subject to change).
-alias LeaseId = string:64;
-
 /// Provides element-scoped access to request leases to raise the levels of an
 /// element previously added via Topology.AddElement.
 open protocol Lessor {

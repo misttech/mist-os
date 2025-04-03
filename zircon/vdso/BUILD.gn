@@ -125,7 +125,7 @@ zither_golden_files("zx.asm.checked-in") {
   sources = [ "//zircon/system/public/zircon/errors.h" ]
 }
 
-# Depended on by //zircon/public/sysroot/sdk:sysroot_sdk.
+# Depended on by //zircon/public/sysroot_sdk.
 group("sysroot_sdk") {
   deps = [ ":zx.asm.checked-in" ]
 }
@@ -144,6 +144,7 @@ group("public") {
     "//src/zircon/lib/zircon/*",
     "//zircon/kernel/lib/userabi/vdso/*",
     "//zircon/public/sysroot/*",
+    "//zircon/public/sysroot_sdk/*",
   ]
   public_deps = [ ":zx_zither.legacy_syscall_cdecl" ]
   metadata = barrier_metadata

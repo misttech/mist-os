@@ -148,8 +148,6 @@ python_host_test("fuchsia_controller_socket_test") {
 }
 
 python_host_test("fuchsia_controller_fidl_server_test") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   main_source = "server.py"
   libraries = [
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -177,4 +175,23 @@ python_host_test("fuchsia_controller_fidl_construct_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]
   test_data_deps = [ ":fuchsia_controller_test_data" ]
+}
+
+python_host_test("fuchsia_controller_fidl_union_test") {
+  main_source = "test_union.py"
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings" ]
+  test_data_deps = [
+    ":fuchsia_controller_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data",
+    "//tools/fidl/fidlgen_python/tests/fidl:test.python.protocol_host_test_data",
+  ]
+}
+
+python_host_test("fuchsia_controller_fidl_reserved_names_test") {
+  main_source = "test_reserved_names.py"
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings" ]
+  test_data_deps = [
+    ":fuchsia_controller_test_data",
+    "//tools/fidl/fidlgen_python/tests/fidl:test.python.reserved_host_test_data",
+  ]
 }

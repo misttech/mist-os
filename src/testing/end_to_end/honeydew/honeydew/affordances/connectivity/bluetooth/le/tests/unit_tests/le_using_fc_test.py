@@ -40,7 +40,7 @@ _SAMPLE_CLIENT_WATCH_SERVICES_RESPONSE = (
             f_gatt_controller.ServiceInfo(
                 handle=f_gatt_controller.ServiceHandle(value=164),
                 kind=1,
-                type=f_bt.Uuid(value=[1]),
+                type_=f_bt.Uuid(value=[1]),
                 characteristics=None,
                 includes=None,
             )
@@ -63,7 +63,7 @@ _SAMPLE_DISCOVER_CHARACTERISTIC_RESPONSE = (
         characteristics=[
             f_gatt_controller.Characteristic(
                 handle=f_gatt_controller.Handle(value=22),
-                type=f_bt.Uuid(value=[1]),
+                type_=f_bt.Uuid(value=[1]),
                 properties=2,
                 permissions=None,
                 descriptors=None,
@@ -203,7 +203,7 @@ class BluetoothLETest(unittest.TestCase):
         mock_peer_id = f_bt.PeerId(value=mock_identifier)
         mock_options = f_ble_controller.ConnectionOptions(bondable_mode=True)
         self.bluetooth_le_obj._central_controller_proxy.connect.assert_called_with(
-            id=mock_peer_id, options=mock_options, handle=mock.ANY
+            id_=mock_peer_id, options=mock_options, handle=mock.ANY
         )
         self.assertEqual(
             self.bluetooth_le_obj.loop.run_until_complete.call_count, 1
@@ -326,12 +326,12 @@ class BluetoothLETest(unittest.TestCase):
         self.bluetooth_le_obj._remote_service_client = mock.MagicMock()
         mock_handle = 1
         self.bluetooth_le_obj.loop = mock.MagicMock()
-        mock_read_options = f_gatt_controller.ReadOptions()
-        mock_read_options.short_read = f_gatt_controller.ShortReadOptions()
-        mock_response = (
-            f_gatt_controller.RemoteServiceReadCharacteristicResult()
+        mock_read_options = f_gatt_controller.ReadOptions(
+            short_read=f_gatt_controller.ShortReadOptions()
         )
-        mock_response.response = _SAMPLE_READ_CHARACTERISTIC_RESPONSE
+        mock_response = f_gatt_controller.RemoteServiceReadCharacteristicResult(
+            response=_SAMPLE_READ_CHARACTERISTIC_RESPONSE
+        )
         self.bluetooth_le_obj.loop.run_until_complete = mock.MagicMock(
             return_value=mock_response
         )

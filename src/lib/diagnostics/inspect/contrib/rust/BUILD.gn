@@ -19,8 +19,6 @@ rustc_library("fuchsia-inspect-contrib") {
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:lru-cache",
     "//third_party/rust_crates:strum",
   ]
@@ -37,8 +35,6 @@ rustc_library("fuchsia-inspect-contrib") {
   sources = [
     "src/graph/digraph.rs",
     "src/graph/edge.rs",
-    "src/graph/events.rs",
-    "src/graph/metadata.rs",
     "src/graph/mod.rs",
     "src/graph/types.rs",
     "src/graph/vertex.rs",

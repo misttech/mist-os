@@ -19,11 +19,9 @@ use errors::ActionError;
 use fuchsia_async as fasync;
 use futures::future::select_all;
 use futures::prelude::*;
-use futures::select;
 use log::*;
 use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
-use std::pin::pin;
 use std::sync::Arc;
 use std::{fmt, iter};
 
@@ -34,7 +32,7 @@ pub struct ShutdownAction {
 }
 
 /// Indicates the type of shutdown being performed.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ShutdownType {
     /// An individual component instance was shut down. For example, this is used when
     /// a component instance is destroyed.
@@ -272,6 +270,13 @@ pub async fn do_shutdown(
     // PS: Pending shutdown of component {moniker} has taken more than WATCHDOG_TIMEOUT_SECS
     // FS: Finished shutdown of {moniker}
     // ES: Errored shutdown of {moniker}
+    let moniker = component.moniker.clone();
+    let _watchdog_task = fasync::Task::spawn(async move {
+        let mut interval = fasync::Interval::new(WATCHDOG_INTERVAL);
+        while let Some(_) = interval.next().await {
+            info!("=PS {}", moniker);
+        }
+    });
     {
         let state = component.lock_state().await;
         match *state {
@@ -307,26 +312,14 @@ pub async fn do_shutdown(
         info!("=US {}", component.moniker);
     }
 
-    let watchdog_fut = pin!(async {
-        let mut interval = fasync::Interval::new(WATCHDOG_INTERVAL);
-        while let Some(_) = interval.next().await {
-            info!("=PS {}", component.moniker);
+    match component.stop_instance_internal(true).await {
+        Ok(()) if shutdown_type == ShutdownType::System => info!("=FS {}", component.moniker),
+        Ok(()) => (),
+        Err(e) if shutdown_type == ShutdownType::System => {
+            info!("=ES {}", component.moniker);
+            return Err(e.into());
         }
-    });
-    let mut watchdog_fut = watchdog_fut.fuse();
-    let shutdown_fut = pin!(component.stop_instance_internal(true));
-    let mut shutdown_fut = shutdown_fut.fuse();
-    select! {
-        res = shutdown_fut => {
-            res.map_err(|err| {
-                warn!("=ES {}", component.moniker);
-                err
-            })?;
-        },
-        () = watchdog_fut => unreachable!("watchdog never exits"),
-    };
-    if matches!(shutdown_type, ShutdownType::System) {
-        info!("=FS {}", component.moniker);
+        Err(e) => return Err(e.into()),
     }
 
     Ok(())

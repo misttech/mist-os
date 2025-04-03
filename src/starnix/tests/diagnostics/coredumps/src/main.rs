@@ -84,7 +84,7 @@ async fn main() {
 // coredump report so the caller can try again..
 async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
     let kernel_inspect = ArchiveReader::inspect()
-        .select_all_for_moniker("kernel")
+        .select_all_for_component("kernel")
         .with_minimum_schema_count(1)
         .snapshot()
         .await?;

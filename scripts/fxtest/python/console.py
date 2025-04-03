@@ -204,7 +204,7 @@ class ConsoleOutput:
             skipped_text = skip_format(skipped, flags.style)
 
             print(
-                f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
+                f"\nRAN: {passed+failed} | {passed_text} | {failed_text} | {skipped_text}"
             )
 
             def print_tests(prefix: str, names: list[str]) -> None:

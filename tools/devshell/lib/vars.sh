@@ -66,7 +66,12 @@ fi
 # If build profiling is enabled, collect system stats during build,
 # including CPU, memory, disk I/O...
 BUILD_PROFILE_ENABLED=0
-readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx-build-profile-config"
+readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx/config/build-profile"
+readonly fx_build_profile_config_old="${FUCHSIA_DIR}/.fx-build-profile-config"
+if [[ -f "$fx_build_profile_config_old" ]]; then
+  fx-info "Moving $fx_build_profile_config_old to new location $fx_build_profile_config.  No further action is necessary."
+  mv "$fx_build_profile_config_old" "$fx_build_profile_config"
+fi
 if [[ -f "$fx_build_profile_config" ]]; then
   # shellcheck source=/dev/null
   source "$fx_build_profile_config"
@@ -283,6 +288,14 @@ function fx-export-default-target {
       export FUCHSIA_NODENAME_IS_FROM_FILE="true"
     fi
     export FUCHSIA_NODENAME
+  fi
+}
+
+# Forces the command to fail if a user specifies the -d flag
+function fx-fail-if-device-specified {
+  if [[ -n "${FUCHSIA_NODENAME_SET_BY_FX_FLAG}" ]]; then
+    fx-error "The -d flag is not supported when calling this function"
+    exit 1
   fi
 }
 
@@ -1046,20 +1059,23 @@ function fx-run-ninja {
   local -r build_uuid="$(fx-uuid)"
   local -a user_rbe_env=()
 
+  [[ "${FX_BUILD_AUTO_AUTH:-NOT_SET}" == "NOT_SET" ]] || {
+    fx-warn "FX_BUILD_AUTO_AUTH is no longer used from the environment."
+    cat <<EOF
+To disable gcert-based authentication in build tools, manually set in .fx/config/build-auth:
+
+  loas_cert_type=restricted
+
+You can confirm that authentication still works with 'fx rbe auth'.
+EOF
+  }
+
   local -a rbe_wrapper_loas_args=()
   if fx-build-needs-auth
   then
-    # TODO(b/342026853): automatic use of gcert for authentication in bazel
-    # is now the default, and is opt-out with FX_BUILD_AUTO_AUTH=0.
-    # Eventually, this will become permanent.
-    # gcert authentication for reclient already works.
     local -r loas_type_detected="$(fx-command-run rbe _check_loas_type)"
     local -r loas_type_for_reclient="$loas_type_detected"
-    local loas_type_for_bazel
-    if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
-    then loas_type_for_bazel="$loas_type_detected"
-    else loas_type_for_bazel="restricted"
-    fi
+    local -r loas_type_for_bazel="$loas_type_detected"
     rbe_wrapper_loas_args+=( --loas-type="$loas_type_for_reclient" )
     user_rbe_env+=(
       # Automatic auth with gcert (from re-client bootstrap) needs $USER.
@@ -1154,7 +1170,6 @@ function fx-run-ninja {
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
-    ${FX_BUILD_AUTO_AUTH+"FX_BUILD_AUTO_AUTH=$FX_BUILD_AUTO_AUTH"}
   )
 
   if [[ "${have_jobs}" ]]; then

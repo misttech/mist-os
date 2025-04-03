@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
@@ -33,6 +33,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -43,6 +44,29 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
+
+enum AvoidRebootWarning<'a> {
+    Udp(&'a SocketAddr),
+    Tcp(&'a SocketAddr),
+}
+
+impl Display for AvoidRebootWarning<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let (mode, addr) = match self {
+            Self::Udp(addr) => ("UDP", addr),
+            Self::Tcp(addr) => ("TCP", addr),
+        };
+        write!(
+            f,
+            r"
+Warning: the target does not have a node name and is in {} fastboot mode.
+Rediscovering the target after bootloader reboot will be impossible.
+Please try --no-bootloader-reboot to avoid a reboot.
+Using address {} as node name",
+            mode, addr
+        )
+    }
+}
 
 #[derive(FfxTool)]
 #[no_target]
@@ -387,22 +411,16 @@ Reboot the Target to the bootloader and re-run this command."
                     // We take the first address as when a target is in Fastboot mode and over
                     // UDP it only exposes one address
                     if let Some(addr) = addrs.into_iter().take(1).next() {
-                        let target_addr: TargetAddr = addr.into();
+                        let target_addr: TargetIpAddr = addr.into();
                         let socket_addr: SocketAddr = target_addr.into();
 
                         let target_name = if let Some(nodename) = &self.target_info.nodename {
                             nodename
                         } else {
-                            writeln!(
-                                writer,
-                                r"
-    Warning: the target does not have a node name and is in UDP fastboot mode.
-    Rediscovering the target after bootloader reboot will be impossible.
-    Please try --no-bootloader-reboot to avoid a reboot.
-    Using address {} as node name",
-                                socket_addr
-                            )
-                            .user_message("Error writing user message")?;
+                            if !cmd.no_bootloader_reboot {
+                                writeln!(writer, "{}", AvoidRebootWarning::Udp(&socket_addr))
+                                    .user_message("Error writing user message")?;
+                            }
                             &socket_addr.to_string()
                         };
                         let config = FastbootNetworkConnectionConfig::new_udp().await;
@@ -430,22 +448,16 @@ Reboot the Target to the bootloader and re-run this command."
                     // We take the first address as when a target is in Fastboot mode and over
                     // TCP it only exposes one address
                     if let Some(addr) = addrs.into_iter().take(1).next() {
-                        let target_addr: TargetAddr = addr.into();
+                        let target_addr: TargetIpAddr = addr.into();
                         let socket_addr: SocketAddr = target_addr.into();
 
                         let target_name = if let Some(nodename) = &self.target_info.nodename {
                             nodename
                         } else {
-                            writeln!(
-                                writer,
-                                r"
-Warning: the target does not have a node name and is in TCP fastboot mode.
-Rediscovering the target after bootloader reboot will be impossible.
-Please try --no-bootloader-reboot to avoid a reboot.
-Using address {} as node name",
-                                socket_addr
-                            )
-                            .user_message("Error writing user message")?;
+                            if !cmd.no_bootloader_reboot {
+                                writeln!(writer, "{}", AvoidRebootWarning::Tcp(&socket_addr))
+                                    .user_message("Error writing user message")?;
+                            }
                             &socket_addr.to_string()
                         };
                         let config = FastbootNetworkConnectionConfig::new_tcp().await;
@@ -676,7 +688,7 @@ mod test {
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_preprocess_flash_command_infers_product_bundle() {
         let env = ffx_config::test_init().await.expect("Failed to initialize test env");
         env.context
@@ -689,7 +701,7 @@ mod test {
         assert_eq!(cmd.product_bundle, Some("foo".to_string()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_nonexistent_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         assert!(preprocess_flash_cmd(&FlashCommand {
@@ -700,7 +712,7 @@ mod test {
         .is_err())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_clean_quotes() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let pb_tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -720,7 +732,7 @@ mod test {
         assert_eq!(Some(pb_tmp_file_name), cmd.product_bundle);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_nonexistent_ssh_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -734,7 +746,7 @@ mod test {
         .is_err())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_specify_manifest_twice_throws_error() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
@@ -749,5 +761,29 @@ mod test {
             &mut writer
         )
         .is_err());
+    }
+
+    #[test]
+    fn test_avoid_reboot_bootloader_warning() {
+        let udp_addr = "127.0.0.1:0".parse().unwrap();
+        let tcp_addr = "192.168.1.2:22".parse().unwrap();
+        let udp = AvoidRebootWarning::Udp(&udp_addr);
+        let tcp = AvoidRebootWarning::Tcp(&tcp_addr);
+        assert_eq!(
+            udp.to_string(),
+            r"
+Warning: the target does not have a node name and is in UDP fastboot mode.
+Rediscovering the target after bootloader reboot will be impossible.
+Please try --no-bootloader-reboot to avoid a reboot.
+Using address 127.0.0.1:0 as node name",
+        );
+        assert_eq!(
+            tcp.to_string(),
+            r"
+Warning: the target does not have a node name and is in TCP fastboot mode.
+Rediscovering the target after bootloader reboot will be impossible.
+Please try --no-bootloader-reboot to avoid a reboot.
+Using address 192.168.1.2:22 as node name",
+        );
     }
 }

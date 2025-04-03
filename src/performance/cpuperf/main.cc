@@ -119,7 +119,7 @@ static void SaveTrace(const cpuperf::SessionResultSpec& result_spec,
   FX_LOGS(DEBUG) << "Saving results of iteration " << iter;
 
   for (size_t trace = 0; trace < result_spec.num_traces; ++trace) {
-    if (reader->SetTrace(trace) != perfmon::ReaderStatus::kOk) {
+    if (reader->SetTrace(static_cast<uint32_t>(trace)) != perfmon::ReaderStatus::kOk) {
       // If we can't set the trace to this one it's unlikely we can continue.
       return;
     }

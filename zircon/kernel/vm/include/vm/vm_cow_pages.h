@@ -78,6 +78,20 @@ struct VmCowRange {
   VmCowRange TrimedFromStart(uint64_t amount) const {
     return VmCowRange(offset + amount, len - amount);
   }
+  // Returns the minimal range that covers both |this| and |other|. If these ranges are disjoint
+  // then the returned range will be larger than combined length of |this| and |other| in order to
+  // span both using a single range.
+  VmCowRange Cover(VmCowRange other) const {
+    if (is_empty()) {
+      return other;
+    }
+    if (other.is_empty()) {
+      return *this;
+    }
+    const uint64_t start = ktl::min(offset, other.offset);
+    const uint64_t end = ktl::max(offset + len, other.offset + other.len);
+    return VmCowRange(start, end - start);
+  }
   VmCowRange WithLength(uint64_t new_length) const { return VmCowRange(offset, new_length); }
   bool IsBoundedBy(uint64_t max) const;
 };
@@ -173,6 +187,7 @@ class VmCowPages final : public VmHierarchyBase,
     fbl::RefPtr<VmCowPages> ptr_;
     Guard<VmoLockType>::Adoptable lock_;
   };
+  class DeferredOps;
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
@@ -343,10 +358,10 @@ class VmCowPages final : public VmHierarchyBase,
 
   uint64_t ReclamationEventCountLocked() const TA_REQ(lock()) { return reclamation_event_count_; }
 
-  void DetachSourceLocked() TA_REQ(lock());
+  void DetachSource();
 
   // Resizes the range of this cow pages. |size| must be a multiple of the page size.
-  zx_status_t ResizeLocked(uint64_t size) TA_REQ(lock());
+  zx_status_t Resize(uint64_t size);
 
   // See VmObject::Lookup
   zx_status_t LookupLocked(VmCowRange range, VmObject::LookupFunction lookup_fn) TA_REQ(lock());
@@ -370,8 +385,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // |taken_len| is always filled with the amount of |len| that has been processed to allow for
   // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
-  zx_status_t TakePagesLocked(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
-                              MultiPageRequest* page_request) TA_REQ(lock());
+  zx_status_t TakePages(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
+                        MultiPageRequest* page_request);
 
   // See VmObject::SupplyPages
   //
@@ -381,11 +396,8 @@ class VmCowPages final : public VmHierarchyBase,
   // If ZX_OK is returned then |supplied_len| will always be equal to |len|. For any other error
   // code the value of |supplied_len| is undefined.
   zx_status_t SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
-                                uint64_t* supplied_len, MultiPageRequest* page_request)
-      TA_REQ(lock());
-
-  zx_status_t SupplyPages(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
-                          uint64_t* supplied_len, MultiPageRequest* page_request) TA_EXCL(lock());
+                                uint64_t* supplied_len, DeferredOps& deferred,
+                                MultiPageRequest* page_request) TA_REQ(lock());
 
   // See VmObject::FailPageRequests
   zx_status_t FailPageRequestsLocked(VmCowRange range, zx_status_t error_status) TA_REQ(lock());
@@ -434,8 +446,8 @@ class VmCowPages final : public VmHierarchyBase,
   // ZX_ERR_SHOULD_WAIT is returned the caller should wait on |page_request|. |alloc_list| will hold
   // any pages that were allocated but not used in case of delayed PMM allocations, so that it can
   // be reused across multiple successive calls whilst ensuring forward progress.
-  zx_status_t DirtyPagesLocked(VmCowRange range, list_node_t* alloc_list,
-                               AnonymousPageRequest* page_request) TA_REQ(lock());
+  zx_status_t DirtyPages(VmCowRange range, list_node_t* alloc_list,
+                         AnonymousPageRequest* page_request);
 
   using DirtyRangeEnumerateFunction = VmObject::DirtyRangeEnumerateFunction;
   // See VmObject::EnumerateDirtyRanges
@@ -505,7 +517,10 @@ class VmCowPages final : public VmHierarchyBase,
   };
   // Adds an allocated page to this cow pages at the specified offset, can be optionally zeroed and
   // any mappings invalidated. If an error is returned the caller retains ownership of |page|.
-  // Offset must be page aligned.
+  // Offset must be page aligned. Mappings being invalidated is controlled by |deferred| where if
+  // a nullptr is passed then no mappings, in this object or any child, will be invalidated. If
+  // |deferred| is non-null then mappings will be invalidated if necessary, both immediately in this
+  // object, and via |deferred| for the children.
   //
   // |overwrite| controls how the function handles pre-existing content at |offset|. If |overwrite|
   // does not permit replacing the content, ZX_ERR_ALREADY_EXISTS will be returned. If a page is
@@ -513,8 +528,8 @@ class VmCowPages final : public VmHierarchyBase,
   // and the caller takes ownership of this page. If the |overwrite| action is such that a page
   // cannot be released, it is valid for the caller to pass in nullptr for |released_page|.
   zx_status_t AddNewPageLocked(uint64_t offset, vm_page_t* page, CanOverwriteContent overwrite,
-                               VmPageOrMarker* released_page, bool zero = true,
-                               bool do_range_update = true) TA_REQ(lock());
+                               VmPageOrMarker* released_page, bool zero, DeferredOps* deferred)
+      TA_REQ(lock());
 
   // Adds a set of pages consecutively starting from the given offset. Regardless of the return
   // result ownership of the pages is taken. Pages are assumed to be in the ALLOC state and can be
@@ -524,8 +539,8 @@ class VmCowPages final : public VmHierarchyBase,
   // not valid to specify the |CanOverwriteContent::NonZero| option, as any pages that would get
   // released as a consequence cannot be returned.
   zx_status_t AddNewPagesLocked(uint64_t start_offset, list_node_t* pages,
-                                CanOverwriteContent overwrite, bool zero = true,
-                                bool do_range_update = true) TA_REQ(lock());
+                                CanOverwriteContent overwrite, bool zero, DeferredOps* deferred)
+      TA_REQ(lock());
 
   // Attempts to release pages in the pages list causing the range to become copy-on-write again.
   // For consistency if there is a parent or a backing page source, such that the range would not
@@ -535,11 +550,11 @@ class VmCowPages final : public VmHierarchyBase,
 
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
-  // |page_start_base| and |page_end_base| must be page aligned offsets within the range of the
-  // object. |dirty_track| specifies whether the range being zeroed subscribes to dirty tracking, if
-  // |true| the range will start out as dirty. |dirty_track| only has meaning if the VMO supports
-  // dirty tracking, otherwise it is ignored. |zeroed_len_out| will contain the length (in bytes)
-  // starting at |page_start_base| that was successfully zeroed.
+  // |range| must be page aligned offsets within the range of the object. |dirty_track| specifies
+  // whether the range being zeroed subscribes to dirty tracking, if |true| the range will start out
+  // as dirty. |dirty_track| only has meaning if the VMO supports dirty tracking, otherwise it is
+  // ignored. |zeroed_len_out| will contain the length (in bytes) starting at |range.offset| that
+  // was successfully zeroed.
   //
   // Returns one of the following:
   //  ZX_OK => The whole range was successfully zeroed.
@@ -547,9 +562,8 @@ class VmCowPages final : public VmHierarchyBase,
   //  operation. |zeroed_len_out| will contain the range that was partially zeroed, so the caller
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
-  zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base, bool dirty_track,
-                              MultiPageRequest* page_request, uint64_t* zeroed_len_out)
-      TA_REQ(lock());
+  zx_status_t ZeroPagesLocked(VmCowRange range, bool dirty_track, MultiPageRequest* page_request,
+                              uint64_t* zeroed_len_out) TA_REQ(lock());
 
   // Attempts to commit a range of pages. This has three kinds of return status
   //  ZX_OK => The whole range was successfully committed and |len| will be written to
@@ -618,6 +632,13 @@ class VmCowPages final : public VmHierarchyBase,
   };
   ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
                             VmCompressor* compressor);
+
+  // Helper for reclamation functions to perform common checks for whether or not reclamation should
+  // proceed. It takes two parameters, one being the original requested page and the other being
+  // the result of a page list Lookup or LookupMutable, allowing it to check if the page is still
+  // up to date and owned by this VMO.
+  template <typename T>
+  bool CanReclaimPageLocked(vm_page_t* page, T actual) TA_REQ(lock());
 
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed
@@ -713,26 +734,12 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
   using RangeChangeOp = VmObject::RangeChangeOp;
-  // Applies the specific operation to all mappings in the given range against this object. The
-  // operations is not applied to descendants/cow children.
-  enum class RangeChangeChildren : bool {
-    // The caller acknowledges that they may need to apply updates to mappings in the children, and
-    // promise to do so. A failure to actually perform the child range updates cannot be detected,
-    // but by requiring callers to explicitly acknowledge that they need to is intended to minimize
-    // errors.
-    Deferred,
-    // The caller states that they know that they have no children and therefore do not need to
-    // perform a range change on them. It is an error, and will trigger an assertion failure, to
-    // supply this if there are children.
-    AssumeNone,
-  };
-  void RangeChangeUpdateSelfLocked(VmCowRange range, RangeChangeOp op, RangeChangeChildren children)
+  // Applies the specific operation to all mappings in the given range. The mappings for the current
+  // object are operated on immediately, with any children being operated on using |deferred|. If
+  // the caller knows that no |DeferredOps| is needed (e.g. the VMO has no children and is not pager
+  // backed) then a nullptr can be provided.
+  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
-  // Applies the specific operation to all mappings in the given range for against descendants/cow
-  // children. The operation is not applied for this object.
-  // Takes ownership, and will drop, the lock for this object as children are iterated.
-  void RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
-                                    Guard<VmoLockType>::Adoptable adopt) TA_EXCL(lock());
   // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
   // this VMOs lock is held. This method exists while call sites transition to the above method that
   // takes ownership of the lock.
@@ -810,48 +817,51 @@ class VmCowPages final : public VmHierarchyBase,
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
-  void ReclaimPageForEviction(vm_page_t* page, uint64_t offset);
+  // Is also used as an internal helper by ReclaimPage.
+  VmCowPages::ReclaimCounts ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
+                                                   EvictionHintAction hint_action);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
   // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
   // If a VmCowPages is returned then this is a parent that needs to have MaybeDeadTransition called
   // on it.
-  fbl::RefPtr<VmCowPages> MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
-
-  // Unlocked helper around MaybeDeadTransitionLocked
   fbl::RefPtr<VmCowPages> MaybeDeadTransition();
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
   zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
-  // Helper to free |pages| to the PMM. |freeing_owned_pages| is set to true to indicate that this
-  // object had ownership of |pages|. This could either be true ownership, where the |pages| have
-  // been removed from this object's page list, or logical ownership, e.g. when a source page list
-  // has been handed over to SupplyPagesLocked(). If |freeing_owned_pages| is true, this function
-  // will also try to invoke FreePages() on the backing page source if it supports it.
+  // Helper to free |pages| to the PMM. This function will also try to invoke FreePages() on the
+  // backing page source if it supports it. Given the allowance of freeing pages from any object in
+  // the hierarchy, but the page source only being on the root, it is a requirement (and checked on
+  // clone creation), that if a page source is handling free then it may not have CoW children.
+  // There is also an equivalent assumption that if the page source is handling free, then the page
+  // source will be supplying all the pages and this object must never allocate directly from the
+  // PMM.
   //
   // Callers should avoid calling pmm_free() directly from inside VmCowPages, and instead should use
   // this helper.
-  void FreePagesLocked(list_node* pages, bool freeing_owned_pages) TA_REQ(lock()) {
-    if (!freeing_owned_pages || !is_source_handling_free_locked()) {
+  void FreePages(list_node* pages) {
+    if (!is_source_handling_free()) {
       CacheFree(pages);
       return;
     }
     page_source_->FreePages(pages);
   }
 
-  // Helper to free |page| to the PMM. |freeing_owned_page| is set to true to indicate that this
-  // object had ownership of |page|. This could either be true ownership, where the |page| has
-  // been removed from this object's page list, or logical ownership, e.g. when a source page list
-  // has been handed over to SupplyPagesLocked(). If |freeing_owned_pages| is true, this function
-  // will also try to invoke FreePages() on the backing page source if it supports it.
+  // Helper to free |pages| to the PMM. This function will also try to invoke FreePages() on the
+  // backing page source if it supports it. Given the allowance of freeing pages from any object in
+  // the hierarchy, but the page source only being on the root, it is a requirement (and checked on
+  // clone creation), that if a page source is handling free then it may not have CoW children.
+  // There is also an equivalent assumption that if the page source is handling free, then the page
+  // source will be supplying all the pages and this object must never allocate directly from the
+  // PMM.
   //
   // Callers should avoid calling pmm_free_page() directly from inside VmCowPages, and instead
   // should use this helper.
-  void FreePageLocked(vm_page_t* page, bool freeing_owned_page) TA_REQ(lock()) {
+  void FreePage(vm_page_t* page) {
     DEBUG_ASSERT(!list_in_list(&page->queue_node));
-    if (!freeing_owned_page || !is_source_handling_free_locked()) {
+    if (!is_source_handling_free()) {
       CacheFree(page);
       return;
     }
@@ -871,8 +881,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // A private helper that takes pages if this VmCowPages has a parent.
   zx_status_t TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, MultiPageRequest* page_request)
-      TA_REQ(lock());
+                                        uint64_t* taken_len, DeferredOps& deferred,
+                                        MultiPageRequest* page_request) TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
   friend class LockedParentWalker;
@@ -954,12 +964,18 @@ class VmCowPages final : public VmHierarchyBase,
     Guard<VmoLockType>::Adoptable lock_;
   };
 
+  // Helper for determining whether the current node should perform a dead transition or not.
+  bool should_dead_transition_locked() const TA_REQ(lock()) {
+    return !paged_ref_ && children_list_len_ == 0 && life_cycle_ == LifeCycle::Alive;
+  }
+
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
-  // to validate that it is correct to be doing this transition. May drop the lock during its
-  // execution.
+  // to validate that it is correct to be doing this transition. If there is a parent_ then |parent|
+  // is locked pointer to it and |sibling| must be as documented in |RemoveChildLocked|
   // Might return its parent_ RefPtr, which the caller must check if a dead transition is needed and
   // then release the RefPtr.
-  fbl::RefPtr<VmCowPages> DeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
+  fbl::RefPtr<VmCowPages> DeadTransitionLocked(const LockedPtr& parent, const LockedPtr& sibling)
+      TA_REQ(lock());
 
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {
@@ -1118,7 +1134,10 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper for removing a page from the PageQueues and freeing it (either to the PMM, or the owning
   // page source).
-  void RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_page) TA_REQ(lock());
+  void RemoveAndFreePageLocked(vm_page_t* page) TA_REQ(lock());
+
+  // Helper for removing a page from the PageQueues and adding to a deferred ops for later freeing.
+  void RemovePageLocked(vm_page_t* page, DeferredOps& ops) TA_REQ(lock());
 
   // Helper for removing a page from the page queues and either returning it immediately to the PMM
   // if it's a loaned page, or appending it to the supplied list.
@@ -1181,19 +1200,19 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // |p| must not be Empty()
   //
-  // This operation unmaps the corresponding offset from any existing mappings, unless
-  // |do_range_update| is false, in which case it will skip updating mappings.
+  // This operation unmaps the corresponding offset from any existing mappings, unless |deferred| is
+  // a |nullptr|, in which case it will skip updating mappings.
   //
   // Any previous content in the slot is returned and must be dealt with by the caller.
   [[nodiscard]] VmPageOrMarker CompleteAddPageLocked(AddPageTransaction& transaction,
-                                                     VmPageOrMarker&& p, bool do_range_update)
+                                                     VmPageOrMarker&& p, DeferredOps* deferred)
       TA_REQ(lock());
 
   // Similar to |CompleteAddPageLocked| except a |vm_page_t| is provided that is assumed to not yet
   // be in the |OBJECT| state, this page may also be optionally zeroed.
   [[nodiscard]] VmPageOrMarker CompleteAddNewPageLocked(AddPageTransaction& transaction,
                                                         vm_page_t* page, bool zero,
-                                                        bool do_range_update) TA_REQ(lock());
+                                                        DeferredOps* deferred) TA_REQ(lock());
 
   // Cancels an add page transaction and potentially frees the unused slot. It is required to call
   // this, instead of dropping an |AddPageTransaction| to ensure the page list does not gather empty
@@ -1212,7 +1231,7 @@ class VmCowPages final : public VmHierarchyBase,
   // the page given in |p| should insertion fail. Otherwise see those methods for a description of
   // the parameters.
   zx::result<VmPageOrMarker> AddPageLocked(uint64_t offset, VmPageOrMarker&& p,
-                                           CanOverwriteContent overwrite, bool do_range_update)
+                                           CanOverwriteContent overwrite, DeferredOps* deferred)
       TA_REQ(lock());
 
   // Unmaps and frees all the committed pages in the specified range.
@@ -1367,8 +1386,8 @@ class VmCowPages final : public VmHierarchyBase,
   // the appropriate share counts for the pages that are now shared by the new child. If there is a
   // parent_ then the passed in |parent| is a locked ptr to it.
   void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child,
-                                           const LockedPtr& parent) TA_REQ(lock())
-      TA_REQ(child->lock());
+                                           const LockedPtr& parent, bool update_backlinks)
+      TA_REQ(lock()) TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1411,7 +1430,10 @@ class VmCowPages final : public VmHierarchyBase,
   // If applicable this method will update the parent_limit_ to reflect that it has removed any
   // reference to its parent range.
   // The caller is responsible for actually freeing the pages, which are returned in freed_list.
-  void ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) TA_REQ(lock());
+  // If the caller has locked the immediate parent, then it can pass it in as |parent| to avoid
+  // double locking, otherwise if no parent or not locked a nullptr can be given.
+  void ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent,
+                               ScopedPageFreedList& freed_list) TA_REQ(lock());
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
@@ -1447,10 +1469,6 @@ class VmCowPages final : public VmHierarchyBase,
   // Helper to invalidate any READ requests in the specified range by spuriously resolving them.
   void InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
-  // Move all the pages from this VmCowPages object into another VmCowPages object.
-  // The receiving VmCowPages must not have any pages yet.
-  void MovePagesIntoLocked(VmCowPages& other) TA_REQ(lock()) TA_REQ(other.lock());
-
   // Replaces this node in its parent's child list with a hidden node and makes this node a child
   // of the newly created hidden node. Moves the pages that were stored at this node into the
   // newly created hidden node.
@@ -1460,7 +1478,11 @@ class VmCowPages final : public VmHierarchyBase,
   // updates that need to happen as a result. This does not modify the |parent_| member of the
   // removed child and if this is not being called due to |removed| being destructed it is the
   // callers responsibility to correct parent_.
-  void RemoveChildLocked(VmCowPages* removed) TA_REQ(lock()) TA_REQ(removed->lock());
+  // If |removed| has a sibling to its right (i.e. next in the children_list_) then |sibling| must
+  // be a locked pointer to it. The exception being if this is a hidden node with two children, in
+  // which case if |removed| is the right child then |sibling| should be set to the left child.
+  void RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling) TA_REQ(lock())
+      TA_REQ(removed->lock());
 
   // Inserts a newly created VmCowPages into this hierarchy as a child of this VmCowPages.
   // Initializes child members based on the passed in values that only have meaning when an object
@@ -1476,8 +1498,10 @@ class VmCowPages final : public VmHierarchyBase,
   // UnlockRangeLocked() is valid.
   bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
 
-  bool is_source_handling_free_locked() const TA_REQ(lock()) {
-    return page_source_ && page_source_->properties().is_handling_free;
+  bool is_source_handling_free() const {
+    // As specified in the PageSourceProperties, the page source handles free iff it is specifying
+    // specific pages.
+    return is_source_supplying_specific_physical_pages();
   }
 
   // Swap an old page for a new page in the page list. The old page must be at offset. The new page
@@ -1509,25 +1533,15 @@ class VmCowPages final : public VmHierarchyBase,
   void CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page)
       TA_REQ(lock());
 
-  // Internal helper for performing reclamation via eviction on pager backed VMOs.
-  // Assumes that the page is owned by this VMO at the specified offset.
-  ReclaimCounts ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
-                                             EvictionHintAction hint_action) TA_REQ(lock());
-
   // Internal helper for performing reclamation via compression on an anonymous VMO. Assumes that
-  // the page is owned by this VMO at the specified offset.
-  // Assumes that the provided |compressor| is not-null.
-  //
-  // Takes ownership of the lock and releases it before returning.
-  ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
-                                                VmCompressor* compressor,
-                                                Guard<VmoLockType>::Adoptable adopt);
+  // the provided |compressor| is not-null.
+  ReclaimCounts ReclaimPageForCompression(vm_page_t* page, uint64_t offset,
+                                          VmCompressor* compressor);
 
-  // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
-  // owned by this VMO at the specified offset. If any discarding happens the number of pages is
-  // returned. The passed in |page| must be the first page in the discardable VMO to trigger a
-  // discard, otherwise it will fail.
-  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
+  // Internal helper for performing reclamation against a discardable VMO. If any discarding happens
+  // the number of pages is returned. The passed in |page| must be the first page in the discardable
+  // VMO to trigger a discard, otherwise it will fail.
+  zx::result<uint64_t> ReclaimDiscardable(vm_page_t* page, uint64_t offset);
 
   // Internal helper for discarding a VMO. Will discard if VMO is unlocked returning the count.
   zx::result<uint64_t> DiscardPagesLocked() TA_REQ(lock());
@@ -1545,6 +1559,12 @@ class VmCowPages final : public VmHierarchyBase,
                                                bool dirty_track, list_node_t* freed_list,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
+
+  // Applies the specific operation to all mappings in the given range against descendants/cow
+  // children. The operation is not applied for this object. Only the DeferredOps is expected to
+  // call this.
+  // Takes ownership, and will drop, the lock for this object as children are iterated.
+  static void RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op);
 
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
@@ -1593,11 +1613,11 @@ class VmCowPages final : public VmHierarchyBase,
   // a lock order to satisfy lockdep. Here the gaps created by kLockOrderDelta can be used as the
   // order for these newly created nodes.
   //
-  // During a dead transition where a hidden node merge needs to happen we need to hold locks of
-  // three nodes: the hidden node and both of its children. Here the order is that the children must
-  // be acquired in list order, and then the parent. When acquiring the second child, since its
-  // lock order would be equal to the first child, the guaranteed gap between the first child and
-  // the parent lock order is used instead.
+  // During a dead transition we potentially need to hold locks of three nodes: the parent node and
+  // two of its children. Here the order is that the children must be acquired in list order, and
+  // then the parent. When acquiring the second child, since its lock order would be equal to the
+  // first child, the guaranteed gap between the first child and the parent lock order is used
+  // instead.
   static constexpr uint64_t kLockOrderDelta = 3;
   static constexpr uint64_t kLockOrderRoot = UINT64_MAX - kLockOrderDelta;
   static constexpr uint64_t kLockOrderFirstAnon = UINT64_MAX / 2;
@@ -2011,6 +2031,109 @@ class VmCowPages::LookupCursor {
   list_node_t* alloc_list_ = nullptr;
 
   friend VmCowPages;
+};
+
+class ScopedPageFreedList {
+ public:
+  explicit ScopedPageFreedList() { list_initialize(&list_); }
+
+  ~ScopedPageFreedList() { ASSERT(list_is_empty(&list_)); }
+
+  void FreePages(VmCowPages* cow_pages) {
+    if (!list_is_empty(&list_)) {
+      cow_pages->FreePages(&list_);
+    }
+    if (flph_.has_value()) {
+      Pmm::Node().FinishFreeLoanedPages(*flph_);
+    }
+  }
+  list_node_t* List() { return &list_; }
+  FreeLoanedPagesHolder& Flph() {
+    if (!flph_.has_value()) {
+      flph_.emplace();
+    }
+    return *flph_;
+  }
+
+ private:
+  list_node_t list_;
+  // The FLPH is a moderately large object and is wrapped in an optional to defer its construction
+  // unless it is actually needed.
+  ktl::optional<FreeLoanedPagesHolder> flph_;
+};
+
+// Helper object for finishing VmCowPages operations that must occur after the lock is dropped. This
+// is necessary due to some operations being externally locked. It is expected that this object is
+// stack allocated using the __UNINITIALIZED tag in a sequence like this:
+//
+//     __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_object_);
+//     Guard<VmoLockType> guard{cow_object_->lock()};
+//     cow_object_->DoOperationLocked(&deferred);
+//
+// The destruction order will then allow |deferred| to perform its actions after |guard| is
+// destructed and the lock is dropped.
+// This class it not thread safe.
+class VmCowPages::DeferredOps {
+ public:
+  // Construct a DeferredOps for the given VmCowPages. Must be constructed, and deconstructed,
+  // without the lock held. It is the callers responsibility to ensure the pointer remains valid
+  // over the lifetime of the object.
+  explicit DeferredOps(VmCowPages* self) TA_EXCL(self->lock());
+  // TODO(https://fxbug.dev/338300943): This is a transitional constructor to allow for the range
+  // change updates, and by extension this helper object, to be gradually moved outside the lock.
+  // Using this constructor instructs the DeferredOps that the lock is already held during both
+  // construction and destruction and it should not attempt to reacquire.
+  struct LockedTag {};
+  DeferredOps(VmCowPages* self, LockedTag tag) TA_REQ(self->lock())
+      : locked_range_update_(true), self_(self) {}
+  ~DeferredOps();
+
+  DeferredOps(const DeferredOps&) = delete;
+  DeferredOps(DeferredOps&&) = delete;
+  DeferredOps& operator=(const DeferredOps&) = delete;
+  DeferredOps& operator=(DeferredOps&&) = delete;
+
+ private:
+  // Methods are private as they are only intended for use by the VmCowPages and not the external
+  // caller holding this object on their stack.
+  friend VmCowPages;
+
+  // Indicate that the given range change operation should be performed later. Multiple ranges can
+  // be specified, although only a single range that covers all of them will actually be invalidated
+  // later, and the requested ops must all be the same (a mix of Unmap and UnmapZeroPage can be
+  // given, with the entire operation upgraded to Unmap).
+  void AddRange(VmCowPages* self, VmCowRange range, RangeChangeOp op);
+
+  // Retrieves the underlying resource containers. Any pages (loaned or otherwise) that are added
+  // will be freed *after* any range change operations are first performed.
+  ScopedPageFreedList& FreedList(VmCowPages* self) {
+    DEBUG_ASSERT(self == self_);
+    return freed_list_;
+  }
+
+  // TODO(https://fxbug.dev/338300943): Tracks whether the locked temporary constructor was used.
+  bool locked_range_update_ = false;
+
+  // A reference to the VmCowPages for any deferred operations to be run against.
+  VmCowPages* const self_;
+
+  // Track any potential range change update that should be run over the cow children.
+  struct DeferredRangeOp {
+    RangeChangeOp op;
+    VmCowRange range;
+  };
+  ktl::optional<DeferredRangeOp> range_op_;
+
+  // Track any resources that need to be freed after the range change update.
+  ScopedPageFreedList freed_list_;
+
+  // When operating on a VMO from a hierarchy that has a page source the page source lock is held
+  // over both the operation and our deferred operations. This serves to serialize operations
+  // against all VMOs in the hierarchy. This serialization is necessary since a hierarchy with a
+  // page source has parent VMOs whose contents is able to change, and if we had parallelism
+  // between multiple mutating operations with range change updates user space would be able to see
+  // inconsistent views of memory.
+  ktl::optional<Guard<Mutex>> page_source_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_

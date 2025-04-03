@@ -69,10 +69,11 @@ class BinaryDecoder {
   //
   // |result| will contain unpacked data iff Status is ok.
   //
-  // |T| should be a POD type that can be initialized via memcpy().
+  // |T| should be a standard layout, trivially copyable type that can be initialized via memcpy().
   template <typename T>
   zx_status_t Read(T* result) {
-    static_assert(std::is_pod<T>::value, "Function only supports POD types.");
+    static_assert(std::is_standard_layout<T>::value && std::is_trivially_copyable<T>::value,
+                  "Function only supports standard layout, trivially copyable types.");
     zx::result<cpp20::span<const uint8_t>> buffer = Read(sizeof(T));
     if (!buffer.is_ok()) {
       return buffer.status_value();

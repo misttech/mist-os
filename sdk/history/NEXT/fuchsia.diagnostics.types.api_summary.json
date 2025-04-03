@@ -1,55 +1,49 @@
 [
     {
         "kind": "table/member",
-        "name": "fuchsia.diagnostics.types/ComponentDiagnostics.tasks",
+        "name": "fuchsia.diagnostics.types/Interest.min_severity",
         "ordinal": "1",
-        "type": "fuchsia.diagnostics.types/ComponentTasks"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "table",
-        "name": "fuchsia.diagnostics.types/ComponentDiagnostics",
-        "resourceness": "resource"
+        "name": "fuchsia.diagnostics.types/Interest"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.diagnostics.types/ComponentTasks.component_task",
-        "ordinal": "1",
-        "type": "fuchsia.diagnostics.types/Task"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.DEBUG",
+        "value": "32"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.diagnostics.types/ComponentTasks.parent_task",
-        "ordinal": "2",
-        "type": "fuchsia.diagnostics.types/Task"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.ERROR",
+        "value": "80"
     },
     {
-        "kind": "table",
-        "name": "fuchsia.diagnostics.types/ComponentTasks",
-        "resourceness": "resource"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.FATAL",
+        "value": "96"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.diagnostics.types/Task.job",
-        "ordinal": "1",
-        "type": "zx/Handle:JOB"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.INFO",
+        "value": "48"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.diagnostics.types/Task.process",
-        "ordinal": "2",
-        "type": "zx/Handle:PROCESS"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.TRACE",
+        "value": "16"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.diagnostics.types/Task.thread",
-        "ordinal": "3",
-        "type": "zx/Handle:THREAD"
+        "kind": "enum/member",
+        "name": "fuchsia.diagnostics.types/Severity.WARN",
+        "value": "64"
     },
     {
-        "kind": "union",
-        "name": "fuchsia.diagnostics.types/Task",
+        "kind": "enum",
+        "name": "fuchsia.diagnostics.types/Severity",
         "strictness": "flexible",
-        "resourceness": "resource"
+        "type": "uint8"
     },
     {
         "kind": "library",

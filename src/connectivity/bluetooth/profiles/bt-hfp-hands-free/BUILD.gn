@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
@@ -83,7 +82,22 @@ fuchsia_structured_config_rust_lib("hfp_hands_free_profile_config") {
 
 fuchsia_structured_config_values("default_config_values") {
   cm_label = ":manifest"
-  values_source = "config/default.json5"
+  values = {
+    ec_or_nr = false
+    call_waiting_or_three_way_calling = false
+    cli_presentation_capability = false
+    voice_recognition_activation = false
+    remote_volume_control = false
+    wide_band_speech = false
+    enhanced_voice_recognition = false
+    enhanced_voice_recognition_with_text = false
+  }
+}
+
+fuchsia_package("without-config") {
+  package_name = "bt-hfp-hands-free"
+  validate_structured_config = false
+  deps = [ ":component" ]
 }
 
 fuchsia_package("bt-hfp-hands-free") {

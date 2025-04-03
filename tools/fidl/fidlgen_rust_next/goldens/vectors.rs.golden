@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for ExampleUseOfVectors {
     type Encoded = WireExampleUseOfVectors;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
+unsafe impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -23,14 +23,14 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 vector_of_uint8,
                 vector_of_vector_of_bool,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.vector_of_uint8, encoder, vector_of_uint8)?;
@@ -49,7 +49,7 @@ impl ::fidl_next::EncodableOption for Box<ExampleUseOfVectors> {
     type EncodedOption = ::fidl_next::WireBox<WireExampleUseOfVectors>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfVectors>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleUseOfVectors>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleUseOfVectors: ::fidl_next::Encode<___E>,
@@ -58,13 +58,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -84,13 +84,18 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
     }
 }
 
-/// The wire type corersponding to [`ExampleUseOfVectors`].
+/// The wire type corresponding to [`ExampleUseOfVectors`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfVectors {
     pub vector_of_uint8: ::fidl_next::WireVector<u8>,
 
     pub vector_of_vector_of_bool: ::fidl_next::WireVector<::fidl_next::WireVector<bool>>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireExampleUseOfVectors {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors
@@ -119,8 +124,21 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireExampleUseOfVectors>
+        for ::fidl_test_vectors::ExampleUseOfVectors
+    {
+        #[inline]
+        fn take_from(from: &crate::WireExampleUseOfVectors) -> Self {
+            Self {
+                vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),
+
+                vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
+                    &from.vector_of_vector_of_bool,
+                ),
+            }
+        }
+    }
+}

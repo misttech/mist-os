@@ -2,12 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_build_info//:args.bzl", "compilation_mode")
+load("@fuchsia_build_info//:args.bzl", "build_info_version", "compilation_mode")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_board_configuration",
     "fuchsia_board_input_bundle",
+    "fuchsia_board_input_bundle_set",
     "fuchsia_prebuilt_board_input_bundle",
+    "fuchsia_prebuilt_board_input_bundle_set",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -23,6 +25,7 @@ fuchsia_board_input_bundle(
         "//src/ui/input/drivers/adc-buttons",
         "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
     ],
+    version = build_info_version,
 )
 
 fuchsia_prebuilt_board_input_bundle(
@@ -50,6 +53,11 @@ fuchsia_prebuilt_board_input_bundle(
     files = "@gn_targets//boards/vim3:rtc_driver",
 )
 
+fuchsia_prebuilt_board_input_bundle_set(
+    name = "rtc_driver_bibs",
+    files = "//:rtc_driver_bib_set",
+)
+
 _COMMON_BOARD_INPUT_BUNDLES = [
     ":devicetree_board_driver",
     ":main_bundle",
@@ -59,13 +67,23 @@ _COMMON_BOARD_INPUT_BUNDLES = [
     ":bazel_drivers",
 ]
 
+fuchsia_board_input_bundle_set(
+    name = "vim3_bibs",
+    board_input_bundles = [
+        ":devicetree_board_driver",
+        ":main_bundle",
+        ":bazel_drivers",
+    ],
+    version = build_info_version,
+)
+
 _COMMON_FILESYSTEMS = {
     "vbmeta": {
         "key": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_devkey_atx_psk.pem)",
         "key_metadata": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_dev_atx_metadata.bin)",
     },
     "zbi": {
-        "compression": "zstd.17" if compilation_mode == "debug" else "zstd",
+        "compression": "zstd.16" if compilation_mode == "debug" else "zstd",
     },
     "fvm": {
         "blobfs": {
@@ -149,6 +167,9 @@ _COMMON_PROVIDED_FEATURES = [
 fuchsia_board_configuration(
     name = "vim3",
     board_input_bundles = _COMMON_BOARD_INPUT_BUNDLES,
+    # TODO(https://fxbug.dev/388852272): Enable this once vendor repos properly
+    # swap both the independent BIBs and the BIBs from sets.
+    # board_input_bundle_sets = [":vim3_bibs"],
     board_name = "vim3",
     devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
     filesystems = _COMMON_FILESYSTEMS,
@@ -157,11 +178,15 @@ fuchsia_board_configuration(
     },
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
+    version = build_info_version,
 )
 
 fuchsia_board_configuration(
     name = "reduced_perf_variation",
     board_input_bundles = _COMMON_BOARD_INPUT_BUNDLES,
+    # TODO(https://fxbug.dev/388852272): Enable this once vendor repos properly
+    # swap both the independent BIBs and the BIBs from sets.
+    # board_input_bundle_sets = [":vim3_bibs"],
     board_name = "vim3",
     devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
     filesystems = _COMMON_FILESYSTEMS,
@@ -175,4 +200,5 @@ fuchsia_board_configuration(
     },
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
+    version = build_info_version,
 )

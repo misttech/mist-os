@@ -122,6 +122,20 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<ExampleUseOfErrorSyntaxSynchronousProxy> for zx::Handle {
+    fn from(value: ExampleUseOfErrorSyntaxSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ExampleUseOfErrorSyntaxSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExampleUseOfErrorSyntaxProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,

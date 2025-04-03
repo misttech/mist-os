@@ -33,16 +33,16 @@ use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
     HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
-    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx,
-    NotFoundError, RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes,
-    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WeakIpAddressId,
-    WrapBroadcastMarker,
+    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, MarkDomain, Marks, Matcher as _,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,
     FilterBindingsTypes, FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata,
-    FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
-    WeakConnectionError, WeakConntrackConnection,
+    FilterMarkMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, MarkAction,
+    TransportPacketSerializer, Tuple, WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{
     Buf, BufferAlloc, BufferMut, GrowBuffer, PacketConstraints, ParseBufferMut, ParseMetadata,
@@ -96,7 +96,7 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Marks, Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
 use crate::internal::routing::{
     IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
@@ -342,6 +342,14 @@ impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes + TxMetadataBindin
         direction: ConnectionDirection,
     ) -> Option<ConntrackConnection<I, A, BT>> {
         self.conntrack_connection_and_direction.replace((conn, direction)).map(|(conn, _dir)| conn)
+    }
+}
+
+impl<I: packet_formats::ip::IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
+    FilterMarkMetadata for IpLayerPacketMetadata<I, A, BT>
+{
+    fn apply_mark_action(&mut self, domain: MarkDomain, action: MarkAction) {
+        action.apply(self.marks.get_mut(domain))
     }
 }
 
@@ -1069,7 +1077,6 @@ impl<DeviceId, BC: EventContext<RouterAdvertisementEvent<DeviceId>>> NdpBindings
 pub trait IpLayerBindingsContext<I: IpLayerIpExt, DeviceId>:
     InstantContext
     + EventContext<IpLayerEvent<DeviceId, I>>
-    + TracingContext
     + FilterBindingsContext
     + TxMetadataBindingsTypes
 {
@@ -1079,7 +1086,6 @@ impl<
         DeviceId,
         BC: InstantContext
             + EventContext<IpLayerEvent<DeviceId, I>>
-            + TracingContext
             + FilterBindingsContext
             + TxMetadataBindingsTypes,
     > IpLayerBindingsContext<I, DeviceId> for BC

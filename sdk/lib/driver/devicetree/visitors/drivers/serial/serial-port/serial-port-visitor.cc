@@ -44,18 +44,18 @@ zx::result<> SerialPortVisitor::Visit(fdf_devicetree::Node& node,
 
 zx::result<> SerialPortVisitor::ParseSerialPort(fdf_devicetree::Node& node,
                                                 fdf_devicetree::PropertyValues& properties) {
-  if (properties.find(kSerialport) == properties.end()) {
+  if (!properties.contains(kSerialport)) {
     return zx::ok();
   }
 
   auto& controller = GetController(node.id());
-  controller.serial_class = *properties.at(kSerialport)[0].AsUint32();
+  controller.serial_class = properties.at(kSerialport)[0].AsUint32().value();
 
   fuchsia_hardware_serial::SerialPortInfo serial_port_info = {};
   serial_port_info.serial_class() =
-      static_cast<fuchsia_hardware_serial::Class>(*properties.at(kSerialport)[0].AsUint32());
-  serial_port_info.serial_vid() = *properties.at(kSerialport)[1].AsUint32();
-  serial_port_info.serial_pid() = *properties.at(kSerialport)[2].AsUint32();
+      static_cast<fuchsia_hardware_serial::Class>(properties.at(kSerialport)[0].AsUint32().value());
+  serial_port_info.serial_vid() = properties.at(kSerialport)[1].AsUint32().value();
+  serial_port_info.serial_pid() = properties.at(kSerialport)[2].AsUint32().value();
 
   fit::result encoded = fidl::Persist(serial_port_info);
   if (encoded.is_error()) {
@@ -79,8 +79,7 @@ zx::result<> SerialPortVisitor::ParseSerialPort(fdf_devicetree::Node& node,
 
 SerialPortVisitor::UartController& SerialPortVisitor::GetController(
     fdf_devicetree::NodeID node_id) {
-  auto controller_iter = uart_controllers_.find(node_id);
-  if (controller_iter == uart_controllers_.end()) {
+  if (!uart_controllers_.contains(node_id)) {
     uart_controllers_[node_id] = UartController();
   }
   return uart_controllers_[node_id];
@@ -88,7 +87,7 @@ SerialPortVisitor::UartController& SerialPortVisitor::GetController(
 
 zx::result<> SerialPortVisitor::ParseReferenceChild(fdf_devicetree::Node& node,
                                                     fdf_devicetree::PropertyValues& properties) {
-  if (properties.find(kUarts) == properties.end()) {
+  if (!properties.contains(kUarts)) {
     return zx::ok();
   }
 

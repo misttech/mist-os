@@ -6,7 +6,7 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>
@@ -48,18 +48,18 @@ void AmlTSensor::UpdateRiseThresholdIrq(uint32_t irq) {
   auto reg_value = sensor_ctl.reg_value();
 
   // Disable the IRQ
-  reg_value &= ~(1 << (IRQ_RISE_ENABLE_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_RISE_ENABLE_SHIFT + irq));
   // Enable corresponding Fall IRQ
-  reg_value |= (1 << (IRQ_FALL_ENABLE_SHIFT + irq));
+  reg_value |= (1U << (IRQ_FALL_ENABLE_SHIFT + irq));
   // Clear Rise IRQ Stat.
-  reg_value |= (1 << (IRQ_RISE_STAT_CLR_SHIFT + irq));
+  reg_value |= (1U << (IRQ_RISE_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 
   // Write 0 to CLR_STAT bit.
   sensor_ctl = TsCfgReg1::Get().ReadFrom(&*sensor_base_mmio_);
   reg_value = sensor_ctl.reg_value();
-  reg_value &= ~(1 << (IRQ_RISE_STAT_CLR_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_RISE_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 }
@@ -70,18 +70,18 @@ void AmlTSensor::UpdateFallThresholdIrq(uint32_t irq) {
   auto reg_value = sensor_ctl.reg_value();
 
   // Disable the IRQ
-  reg_value &= ~(1 << (IRQ_FALL_ENABLE_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_FALL_ENABLE_SHIFT + irq));
   // Enable corresponding Rise IRQ
   reg_value |= (1 << (IRQ_RISE_ENABLE_SHIFT + irq));
   // Clear Fall IRQ Stat.
-  reg_value |= (1 << (IRQ_FALL_STAT_CLR_SHIFT + irq));
+  reg_value |= (1U << (IRQ_FALL_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 
   // Write 0 to CLR_STAT bit.
   sensor_ctl = TsCfgReg1::Get().ReadFrom(&*sensor_base_mmio_);
   reg_value = sensor_ctl.reg_value();
-  reg_value &= ~(1 << (IRQ_FALL_STAT_CLR_SHIFT + irq));
+  reg_value &= ~(1U << (IRQ_FALL_STAT_CLR_SHIFT + irq));
   sensor_ctl.set_reg_value(reg_value);
   sensor_ctl.WriteTo(&*sensor_base_mmio_);
 }
@@ -352,39 +352,51 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) {
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
                                fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
-  ddk::PDevFidl pdev{parent};
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-thermal: failed to get platform device");
-    return ZX_ERR_INTERNAL;
+  zx::result pdev_client_end =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev_device_info_t device_info;
-  if (zx_status_t status = pdev.GetDeviceInfo(&device_info); status != ZX_OK) {
-    zxlogf(ERROR, "aml-thermal: failed to get device info: %s", zx_status_get_string(status));
-    return status;
+  zx::result device_info_result = pdev.GetDeviceInfo();
+  if (device_info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", device_info_result.status_string());
+    return device_info_result.status_value();
   }
+  fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   // Map amlogic temperature sensor peripheral control registers.
-  if (zx_status_t status = pdev.MapMmio(kSensorMmio, &sensor_base_mmio_); status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result sensor_base_mmio = pdev.MapMmio(kSensorMmio);
+  if (sensor_base_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map sensor mmio: %s", sensor_base_mmio.status_string());
+    return sensor_base_mmio.status_value();
   }
+  sensor_base_mmio_ = std::move(sensor_base_mmio.value());
 
-  if (zx_status_t status = pdev.MapMmio(kTrimMmio, &trim_mmio_); status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result trim_mmio = pdev.MapMmio(kTrimMmio);
+  if (trim_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map trim mmio: %s", trim_mmio.status_string());
+    return trim_mmio.status_value();
   }
+  trim_mmio_ = std::move(trim_mmio.value());
 
-  if (zx_status_t status = pdev.MapMmio(kHiuMmio, &hiu_mmio_); status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map periph mmio: %d", status);
-    return status;
+  zx::result hiu_mmio = pdev.MapMmio(kHiuMmio);
+  if (hiu_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map hiu mmio: %s", hiu_mmio.status_string());
+    return hiu_mmio.status_value();
   }
+  hiu_mmio_ = std::move(hiu_mmio.value());
 
   // Map tsensor interrupt.
-  if (zx_status_t status = pdev.GetInterrupt(0, 0, &tsensor_irq_); status != ZX_OK) {
-    zxlogf(ERROR, "aml-tsensor: could not map tsensor interrupt");
-    return status;
+  zx::result irq = pdev.GetInterrupt(0);
+  if (irq.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", irq.status_string());
+    return irq.status_value();
   }
+  tsensor_irq_ = std::move(irq.value());
 
   return InitSensor(thermal_config, device_info.pid);
 }

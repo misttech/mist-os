@@ -242,9 +242,9 @@ zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_
   uint32_t bit_shift = ((vector & 0xf) << 1) + 1;
   uint32_t reg_val = arm_gicv2_read32(GICD_ICFGR(reg_ndx));
   if (tm == IRQ_TRIGGER_MODE_EDGE) {
-    reg_val |= (1 << bit_shift);
+    reg_val |= (1U << bit_shift);
   } else {
-    reg_val &= ~(1 << bit_shift);
+    reg_val &= ~(1U << bit_shift);
   }
   arm_gicv2_write32(GICD_ICFGR(reg_ndx), reg_val);
 

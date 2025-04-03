@@ -278,10 +278,12 @@ impl DeviceRegistry {
     ) where
         L: LockBefore<FileOpsCore>,
     {
-        if let Err(err) = devtmpfs_create_device(locked, current_task, device.metadata.clone()) {
-            log_warn!("Cannot add device {:?} in devtmpfs ({:?})", device.metadata, err);
+        if let Some(metadata) = &device.metadata {
+            if let Err(err) = devtmpfs_create_device(locked, current_task, metadata.clone()) {
+                log_warn!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
+            }
+            self.dispatch_uevent(UEventAction::Add, device);
         }
-        self.dispatch_uevent(UEventAction::Add, device);
     }
 
     /// Register a device with the `DeviceRegistry`.
@@ -347,7 +349,8 @@ impl DeviceRegistry {
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        let device = self.objects.create_device(name, metadata, class, create_device_sysfs_ops);
+        let device =
+            self.objects.create_device(name, Some(metadata), class, create_device_sysfs_ops);
         self.notify_device(locked, current_task, device.clone());
         device
     }
@@ -388,7 +391,7 @@ impl DeviceRegistry {
     /// registrations with these device numbers, use this function instead to register the device.
     ///
     /// Note: We do not currently allocate from this entire range because we have mistakenly
-    /// hardcoded some device registrations from the dynamic range. Once we fix these regirations
+    /// hardcoded some device registrations from the dynamic range. Once we fix these registrations
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.
@@ -441,9 +444,32 @@ impl DeviceRegistry {
         L: LockBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
-        let device = self.objects.create_device(name, metadata, class, create_device_sysfs_ops);
+        let device =
+            self.objects.create_device(name, Some(metadata), class, create_device_sysfs_ops);
         self.notify_device(locked, current_task, device.clone());
         device
+    }
+
+    /// Directly add a device to the KObjectStore that lacks a device number.
+    ///
+    /// This function should be used only by device do not have a major or a minor number. You can
+    /// identify these devices because they appear in sysfs and have an empty `uevent` file.
+    ///
+    /// See `register_device` for an explanation of the parameters.
+    pub fn add_numberless_device<F, N, L>(
+        &self,
+        _locked: &mut Locked<'_, L>,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        class: Class,
+        create_device_sysfs_ops: F,
+    ) -> Device
+    where
+        F: Fn(Device) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+        L: LockBefore<FileOpsCore>,
+    {
+        self.objects.create_device(name, None, class, create_device_sysfs_ops)
     }
 
     /// Remove a device directly added with `add_device`.
@@ -458,14 +484,16 @@ impl DeviceRegistry {
     ) where
         L: LockBefore<FileOpsCore>,
     {
-        self.dispatch_uevent(UEventAction::Remove, device.clone());
-        self.objects.destroy_device(&device);
+        if let Some(metadata) = &device.metadata {
+            self.dispatch_uevent(UEventAction::Remove, device.clone());
 
-        if let Err(err) =
-            devtmpfs_remove_node(locked, current_task, device.metadata.devname.as_ref())
-        {
-            log_error!("Cannot remove device {:?} ({:?})", device, err);
+            if let Err(err) = devtmpfs_remove_node(locked, current_task, metadata.devname.as_ref())
+            {
+                log_error!("Cannot remove device {:?} ({:?})", device, err);
+            }
         }
+
+        self.objects.destroy_device(&device);
     }
 
     /// Returns a list of the registered major device numbers for the given `DeviceMode` and their
@@ -715,7 +743,7 @@ mod tests {
                 create_test_device,
             )
             .unwrap();
-        let device_type = device.metadata.device_type;
+        let device_type = device.metadata.expect("has metadata").device_type;
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
         let node = FsNode::new_root(PanickingFsNode);
@@ -834,5 +862,35 @@ mod tests {
             .get_child("input".into())
             .expect("get input collection")
             .has_child("mice".into()));
+    }
+
+    #[::fuchsia::test]
+    async fn registry_add_and_remove_numberless_device() {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let registry = &kernel.device_registry;
+
+        let cooling_device = registry.add_numberless_device(
+            &mut locked,
+            &current_task,
+            "cooling_device0".into(),
+            registry.objects.virtual_thermal_class(),
+            DeviceDirectory::new,
+        );
+
+        assert!(registry
+            .objects
+            .class
+            .get_child("thermal".into())
+            .expect("get thermal class")
+            .has_child("cooling_device0".into()));
+
+        registry.remove_device(&mut locked, &current_task, cooling_device);
+
+        assert!(!registry
+            .objects
+            .class
+            .get_child("thermal".into())
+            .expect("get thermal class")
+            .has_child("cooling_device0".into()));
     }
 }

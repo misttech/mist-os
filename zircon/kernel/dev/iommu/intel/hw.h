@@ -312,14 +312,18 @@ struct RootEntry {
   RootEntrySubentry lower;
   RootEntrySubentry upper;
 };
-static_assert(ktl::is_pod<RootEntry>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<RootEntry> &&
+                  ktl::is_trivially_constructible_v<RootEntry>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(RootEntry) == 16, "wrong size");
 
 struct RootTable {
   static constexpr size_t kNumEntries = 256;
   RootEntry entry[kNumEntries];
 };
-static_assert(ktl::is_pod<RootTable>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<RootTable> &&
+                  ktl::is_trivially_constructible_v<RootTable>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(RootTable) == 4096, "wrong size");
 
 struct ContextEntry {
@@ -363,14 +367,18 @@ struct ContextEntry {
     k64Bit = 0b100,
   };
 };
-static_assert(ktl::is_pod<ContextEntry>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<ContextEntry> &&
+                  ktl::is_trivially_constructible_v<ContextEntry>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(ContextEntry) == 16, "wrong size");
 
 struct ContextTable {
   static constexpr size_t kNumEntries = 256;
   ContextEntry entry[kNumEntries];
 };
-static_assert(ktl::is_pod<ContextTable>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<ContextTable> &&
+                  ktl::is_trivially_constructible_v<ContextTable>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(ContextTable) == 4096, "wrong size");
 
 struct ExtendedContextEntry {
@@ -440,14 +448,18 @@ struct ExtendedContextEntry {
     k64Bit = 0b100,
   };
 };
-static_assert(ktl::is_pod<ExtendedContextEntry>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<ExtendedContextEntry> &&
+                  ktl::is_trivially_constructible_v<ExtendedContextEntry>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(ExtendedContextEntry) == 32, "wrong size");
 
 struct ExtendedContextTable {
   static constexpr size_t kNumEntries = 128;
   ExtendedContextEntry entry[kNumEntries];
 };
-static_assert(ktl::is_pod<ExtendedContextTable>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<ExtendedContextTable> &&
+                  ktl::is_trivially_constructible_v<ExtendedContextTable>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(ExtendedContextTable) == 4096, "wrong size");
 
 struct PasidEntry {
@@ -461,7 +473,9 @@ struct PasidEntry {
 
   void WriteTo(volatile PasidEntry* dst) { dst->raw = raw; }
 };
-static_assert(ktl::is_pod<PasidEntry>::value, "not POD");
+static_assert(ktl::is_standard_layout_v<PasidEntry> &&
+                  ktl::is_trivially_constructible_v<PasidEntry>,
+              "not standard layout or trivially constructable");
 static_assert(sizeof(PasidEntry) == 8, "wrong size");
 
 // TODO(https://fxbug.dev/355287217): Remove workaround for const/volatile qualified atomic_ref
@@ -491,7 +505,7 @@ static_assert(sizeof(PasidEntry) == 8, "wrong size");
      state.fetch_or(1ull << 63);
    }
  };
-  static_assert(ktl::is_pod<PasidState>::value, "not POD");
+  static_assert(ktl::is_pod_v<PasidState>, "not POD");
   static_assert(sizeof(PasidState) == 8, "wrong size");
 #endif
 

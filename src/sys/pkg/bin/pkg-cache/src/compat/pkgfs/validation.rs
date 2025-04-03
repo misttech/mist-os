@@ -12,7 +12,7 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as VfsPath;
-use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
+use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _};
 
 /// The pkgfs /ctl/validation directory, except it contains only the "missing" file (e.g. does not
 /// have the "present" file).
@@ -88,50 +88,12 @@ impl vfs::node::Node for Validation {
 impl vfs::directory::entry_container::Directory for Validation {
     fn open(
         self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: VfsPath,
-        server_end: ServerEnd<fio::NodeMarker>,
+        _scope: ExecutionScope,
+        _flags: fio::OpenFlags,
+        _path: VfsPath,
+        _server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let flags =
-            flags.difference(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
-
-        let object_request = flags.to_object_request(server_end);
-
-        if path.is_empty() {
-            object_request.handle(|object_request| {
-                if flags.intersects(
-                    fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::RIGHT_EXECUTABLE
-                        | fio::OpenFlags::CREATE
-                        | fio::OpenFlags::CREATE_IF_ABSENT
-                        | fio::OpenFlags::TRUNCATE
-                        | fio::OpenFlags::APPEND,
-                ) {
-                    return Err(zx::Status::NOT_SUPPORTED);
-                }
-
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
-            return;
-        }
-
-        if path.as_ref() == "missing" {
-            scope.clone().spawn(async move {
-                let missing_contents = self.make_missing_contents().await;
-                object_request.handle(|object_request| {
-                    vfs::file::serve(
-                        vfs::file::vmo::read_only(missing_contents),
-                        scope,
-                        &flags,
-                        object_request,
-                    )
-                });
-            });
-            return;
-        }
-
-        object_request.shutdown(zx::Status::NOT_FOUND);
+        panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
     }
 
     fn open3(
@@ -154,13 +116,11 @@ impl vfs::directory::entry_container::Directory for Validation {
                 }
             }
 
-            // `ImmutableConnection::create` checks that only directory flags are specified.
-            return object_request.spawn_connection(
-                scope,
-                self,
-                flags,
-                ImmutableConnection::create,
-            );
+            // `ImmutableConnection` checks that only directory flags are specified.
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+            return Ok(());
         }
 
         if path.as_ref() == "missing" {
@@ -221,7 +181,6 @@ mod tests {
     use vfs::directory::entry::GetEntryInfo;
     use vfs::directory::entry_container::Directory;
     use vfs::node::Node;
-    use vfs::ObjectRequest;
 
     struct TestEnv {
         _blobfs: BlobfsRamdisk,
@@ -246,45 +205,9 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open_rejects_disallowed_flags() {
-        let (_env, validation) = TestEnv::new().await;
-
-        for forbidden_flag in [
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::OpenFlags::CREATE,
-            fio::OpenFlags::CREATE_IF_ABSENT,
-            fio::OpenFlags::TRUNCATE,
-            fio::OpenFlags::APPEND,
-        ] {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            validation.clone().open(
-                ExecutionScope::new(),
-                fio::OpenFlags::DESCRIBE | forbidden_flag,
-                VfsPath::dot(),
-                server_end.into_channel().into(),
-            );
-
-            assert_matches!(
-                proxy.take_event_stream().next().await,
-                Some(Ok(fio::DirectoryEvent::OnOpen_{ s, info: None}))
-                    if s == zx::Status::NOT_SUPPORTED.into_raw()
-            );
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_self() {
         let (_env, validation) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        validation.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            VfsPath::dot(),
-            server_end.into_channel().into(),
-        );
-
+        let proxy = vfs::directory::serve(validation, fio::PERM_READABLE);
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
             vec![fuchsia_fs::directory::DirEntry {
@@ -295,6 +218,48 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open_rejects_invalid_flags() {
+        let (_env, validation) = TestEnv::new().await;
+
+        for invalid_flags in [
+            fio::Flags::FLAG_MUST_CREATE,
+            fio::Flags::FLAG_MAYBE_CREATE,
+            fio::PERM_WRITABLE,
+            fio::PERM_EXECUTABLE,
+        ] {
+            let proxy =
+                vfs::directory::serve(validation.clone(), fio::PERM_READABLE | invalid_flags);
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open_rejects_file_flags() {
+        let (_env, validation) = TestEnv::new().await;
+
+        // Requesting to open with `PROTOCOL_FILE` should return a `NOT_FILE` error.
+        {
+            let proxy = vfs::directory::serve(validation.clone(), fio::Flags::PROTOCOL_FILE);
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
+            );
+        }
+
+        // Opening with file flags is also invalid.
+        for file_flags in [fio::Flags::FILE_APPEND, fio::Flags::FILE_TRUNCATE] {
+            let proxy = vfs::directory::serve(validation.clone(), fio::PERM_READABLE | file_flags);
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_missing() {
         let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
             HashSet::from([[0; 32].into()]),
@@ -302,14 +267,11 @@ mod tests {
         )
         .await;
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        validation.clone().open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
+        let proxy = vfs::serve_file(
+            validation.clone(),
             VfsPath::validate_and_split("missing").unwrap(),
-            server_end.into_channel().into(),
+            fio::PERM_READABLE,
         );
-
         assert_eq!(
             fuchsia_fs::file::read(&proxy).await.unwrap(),
             b"0000000000000000000000000000000000000000000000000000000000000000\n".to_vec()
@@ -509,104 +471,6 @@ mod tests {
         assert_eq!(
             validation.make_missing_contents().await,
             format!("{missing_hash}\n").into_bytes()
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open3_self() {
-        let (_env, validation) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-            .handle(|req| validation.open3(ExecutionScope::new(), VfsPath::dot(), flags, req));
-
-        assert_eq!(
-            fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
-            vec![fuchsia_fs::directory::DirEntry {
-                name: "missing".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::File
-            }]
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open3_rejects_invalid_flags() {
-        let (_env, validation) = TestEnv::new().await;
-
-        for invalid_flags in [
-            fio::Flags::FLAG_MUST_CREATE,
-            fio::Flags::FLAG_MAYBE_CREATE,
-            fio::Flags::PERM_WRITE,
-            fio::Flags::PERM_EXECUTE,
-        ] {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let scope = ExecutionScope::new();
-            let flags = fio::Flags::PERM_READ | invalid_flags;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
-
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
-            );
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open3_rejects_file_flags() {
-        let (_env, validation) = TestEnv::new().await;
-
-        // Requesting to open with `PROTOCOL_FILE` should return a `NOT_FILE` error.
-        {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let scope = ExecutionScope::new();
-            let flags = fio::Flags::PROTOCOL_FILE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
-
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
-            );
-        }
-
-        // Opening with file flags is also invalid.
-        for file_flags in [fio::Flags::FILE_APPEND, fio::Flags::FILE_TRUNCATE] {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let scope = ExecutionScope::new();
-            let flags = fio::Flags::PERM_READ | file_flags;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
-
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
-            );
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open3_missing() {
-        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
-            HashSet::from([[0; 32].into()]),
-            std::iter::empty(),
-        )
-        .await;
-
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|req| {
-            validation.clone().open3(
-                ExecutionScope::new(),
-                VfsPath::validate_and_split("missing").unwrap(),
-                flags,
-                req,
-            )
-        });
-
-        assert_eq!(
-            fuchsia_fs::file::read(&proxy).await.unwrap(),
-            b"0000000000000000000000000000000000000000000000000000000000000000\n".to_vec()
         );
     }
 }

@@ -22,6 +22,7 @@ pub enum VerifyComponent {
     Storage,
     Netstack,
     Setui,
+    Omaha,
 }
 
 impl VerifyComponent {
@@ -31,6 +32,7 @@ impl VerifyComponent {
             VerifyComponent::Storage => "bootstrap/fshost",
             VerifyComponent::Netstack => "core/network/netstack",
             VerifyComponent::Setui => "core/setui_service",
+            VerifyComponent::Omaha => "core/system-update/omaha-client-service",
         }
     }
 }

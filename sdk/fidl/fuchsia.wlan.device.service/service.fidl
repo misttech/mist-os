@@ -53,12 +53,6 @@ type GetPowerSaveModeResponse = struct {
 };
 
 // TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
-type GetIfaceCounterStatsResponse = strict union {
-    1: stats fuchsia.wlan.stats.IfaceCounterStats;
-    2: error_status zx.Status;
-};
-
-// TODO(https://fxbug.dev/42164319): Move this to wlan_internal.fidl after https://fxbug.dev/42166364 is fixed
 type GetIfaceHistogramStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceHistogramStats;
     2: error_status zx.Status;
@@ -183,15 +177,5 @@ closed protocol DeviceMonitor {
     strict GetSmeTelemetry(resource struct {
         iface_id uint16;
         telemetry_server server_end:fuchsia.wlan.sme.Telemetry;
-    }) -> () error zx.Status;
-    /// Attempt to establish a new connection to feature queries for an SME.
-    /// Connections may be established for the whole lifetime of the SME, and
-    /// concurrent connections are safe since this is a read-only API.
-    /// Likely errors include:
-    ///     * NOT_FOUND: The given iface_id does not exist.
-    ///     * PEER_CLOSED: The underlying SME is shutting down.
-    strict GetFeatureSupport(resource struct {
-        iface_id uint16;
-        feature_support_server server_end:fuchsia.wlan.sme.FeatureSupport;
     }) -> () error zx.Status;
 };

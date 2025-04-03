@@ -12,7 +12,10 @@ use zx::HandleBased as _;
 
 /// Buffer size for socket read calls to `LoggerStream::buffer_and_drain`.
 const SOCKET_BUFFER_SIZE: usize = 2048;
-const NEWLINE: u8 = b'\n';
+
+/// Maximum length we will buffer for a single line. If a line is longer than this
+/// length it will be split up into multiple messages.
+const MAX_LINE_BUFFER_LENGTH: usize = 4096;
 
 /// Error returned by this library.
 #[derive(Debug, PartialEq, Eq, Error, Clone)]
@@ -90,7 +93,7 @@ impl Unpin for LoggerStream {}
 
 impl LoggerStream {
     /// Create a LoggerStream from the provided zx::Socket. The `socket` object
-    /// should be bound to its intented source stream (e.g. "stdout").
+    /// should be bound to its intended source stream (e.g. "stdout").
     pub fn new(socket: zx::Socket) -> Result<LoggerStream, zx::Status> {
         let l = LoggerStream { socket: fasync::Socket::from_socket(socket) };
         Ok(l)
@@ -104,31 +107,71 @@ impl LoggerStream {
     }
 
     /// Drain the `stream` and write all of its contents to `writer`. Bytes are
-    /// delimited by newline and each line will be passed to `writer.write`.
-    pub async fn buffer_and_drain(mut self, writer: &mut SocketLogWriter) -> Result<(), LogError> {
-        let mut message_buffer: Vec<u8> = Vec::new();
+    /// delimited by newline and each line will be passed to `writer.write` individually.
+    /// An optional `peek_fn` may be specified which is passed a reference to each line before
+    /// it is written.
+    pub async fn buffer_drain_and_peek(
+        mut self,
+        writer: &mut SocketLogWriter,
+        peek_fn: Option<impl Fn(&[u8])>,
+    ) -> Result<(), LogError> {
+        let mut line_buffer: Vec<u8> = Vec::with_capacity(MAX_LINE_BUFFER_LENGTH);
         let mut socket_buffer: Vec<u8> = vec![0; SOCKET_BUFFER_SIZE];
 
         while let Some(bytes_read) = NonZeroUsize::new(
             self.socket.read(&mut socket_buffer[..]).await.map_err(LogError::Read)?,
         ) {
             let bytes_read = bytes_read.get();
-            message_buffer.extend(&socket_buffer[..bytes_read]);
 
-            if let Some(last_newline_pos) = message_buffer.iter().rposition(|&x| x == NEWLINE) {
-                let () = writer.write(message_buffer.drain(..=last_newline_pos).as_slice()).await?;
+            let newline_iter =
+                socket_buffer[..bytes_read].iter().enumerate().filter_map(|(i, &b)| {
+                    if b == b'\n' {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+
+            let mut prev_offset = 0;
+            for idx in newline_iter {
+                let line = &socket_buffer[prev_offset..idx + 1];
+                if !line_buffer.is_empty() {
+                    writer.write(line_buffer.drain(..).as_slice()).await?;
+                }
+                if let Some(ref peek) = &peek_fn {
+                    peek(line);
+                }
+                writer.write(line).await?;
+                prev_offset = idx + 1;
+            }
+            if prev_offset != bytes_read {
+                line_buffer.extend_from_slice(&socket_buffer[prev_offset..bytes_read]);
             }
 
-            while message_buffer.len() >= SOCKET_BUFFER_SIZE {
-                let () = writer.write(message_buffer.drain(..).as_slice()).await?;
+            if line_buffer.len() > MAX_LINE_BUFFER_LENGTH {
+                let bytes = &line_buffer[..MAX_LINE_BUFFER_LENGTH];
+                if let Some(ref peek) = &peek_fn {
+                    peek(bytes);
+                }
+                writer.write(bytes).await?;
+                line_buffer.drain(..MAX_LINE_BUFFER_LENGTH);
             }
         }
 
-        if !message_buffer.is_empty() {
-            let () = writer.write(&message_buffer[..]).await?;
+        if !line_buffer.is_empty() {
+            let bytes = &line_buffer[..];
+            if let Some(ref peek) = &peek_fn {
+                peek(bytes);
+            }
+            writer.write(bytes).await?;
         }
 
         Ok(())
+    }
+
+    /// Convenience function for buffer_drain_and_peek without a peek function.
+    pub async fn buffer_and_drain(self, writer: &mut SocketLogWriter) -> Result<(), LogError> {
+        self.buffer_drain_and_peek(writer, None::<fn(&[u8])>).await
     }
 
     /// Take the underlying socket of this object.
@@ -164,6 +207,7 @@ mod tests {
     use futures::{try_join, TryStreamExt as _};
     use rand::distributions::{Alphanumeric, DistString as _};
     use rand::thread_rng;
+    use std::sync::mpsc;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -215,20 +259,66 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn buffer_and_drain_reads_message_until_last_newline() -> Result<(), Error> {
+    async fn buffer_and_drain_reads_each_line_as_a_new_message() -> Result<(), Error> {
         let (stream, tx) = create_logger_stream()?;
         let (mut logger, rx) = create_datagram_logger()?;
         let msg = "Hello World\nHola Mundo!\n你好，世界!";
 
+        let (tx_peeks, rx_peeks) = mpsc::channel();
+
         let () = take_and_write_to_socket(tx, msg)?;
         let (actual, ()) = try_join!(read_all_messages(rx), async move {
-            stream.buffer_and_drain(&mut logger).await.context("Failed to drain stream")
+            stream
+                .buffer_drain_and_peek(
+                    &mut logger,
+                    Some(move |line: &[u8]| tx_peeks.send(line.len()).unwrap()),
+                )
+                .await
+                .context("Failed to drain stream")
         },)?;
 
-        assert_eq!(
-            actual,
-            vec![String::from("Hello World\nHola Mundo!\n"), String::from("你好，世界!")],
-        );
+        let expected = vec![
+            "Hello World\n".to_string(),
+            "Hola Mundo!\n".to_string(),
+            "你好，世界!".to_string(),
+        ];
+        assert_eq!(actual, expected);
+
+        let lengths = rx_peeks.iter().collect::<Vec<_>>();
+
+        assert_eq!(lengths, expected.iter().map(|v| v.len()).collect::<Vec<_>>());
+
+        Ok(())
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn buffer_and_drain_does_not_buffer_past_maximum_size() -> Result<(), Error> {
+        let msg = get_random_string(MAX_LINE_BUFFER_LENGTH + 10);
+        let (stream, tx) = create_logger_stream()?;
+        let (mut logger, rx) = create_datagram_logger()?;
+
+        let (tx_peeks, rx_peeks) = mpsc::channel();
+
+        let () = take_and_write_to_socket(tx, &msg)?;
+        let (actual, ()) = try_join!(read_all_messages(rx), async move {
+            stream
+                .buffer_drain_and_peek(
+                    &mut logger,
+                    Some(move |line: &[u8]| {
+                        tx_peeks.send(line.len()).unwrap();
+                    }),
+                )
+                .await
+                .context("Failed to drain stream")
+        },)?;
+
+        let lengths = rx_peeks.iter().collect::<Vec<_>>();
+
+        assert_eq!(actual.len(), 2);
+        assert_eq!(actual[0], msg[0..MAX_LINE_BUFFER_LENGTH]);
+        assert_eq!(actual[1], msg[MAX_LINE_BUFFER_LENGTH..]);
+
+        assert_eq!(lengths, vec![MAX_LINE_BUFFER_LENGTH, 10]);
 
         Ok(())
     }
@@ -252,8 +342,17 @@ mod tests {
                 let maybe_bytes_read = rx.read(&mut buffer);
                 assert_eq!(maybe_bytes_read, Err(zx::Status::SHOULD_WAIT));
 
-                // Write last byte and convert zx::Socket back to fasync::Socket.
+                // Write last byte
                 let () = write_to_socket(&tx, &msg[SOCKET_BUFFER_SIZE - 1..SOCKET_BUFFER_SIZE])?;
+
+                // Confirm we still didn't write, waiting for newline.
+                let maybe_bytes_read = rx.read(&mut buffer);
+                assert_eq!(maybe_bytes_read, Err(zx::Status::SHOULD_WAIT));
+
+                // Drop socket to unblock the read routine.
+                std::mem::drop(tx);
+
+                // Convert zx::Socket back to fasync::Socket.
                 let mut rx = fasync::Socket::from_socket(rx);
                 let bytes_read =
                     rx.read(&mut buffer).await.context("Failed to read from socket")?;

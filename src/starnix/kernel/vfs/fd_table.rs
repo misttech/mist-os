@@ -344,7 +344,7 @@ impl FdTable {
         if removed.is_some() {
             Ok(())
         } else {
-            Err(errno!(EBADF))
+            error!(EBADF)
         }
     }
 

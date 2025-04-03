@@ -4,19 +4,12 @@
 
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_PYTHON_DICT_VISITOR_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_PYTHON_DICT_VISITOR_H_
+
 #include <Python.h>
 
-#include <string>
-
-#include <fuchsia_controller_abi/utils.h>
-
-#include "src/lib/fidl_codec/printer.h"
 #include "src/lib/fidl_codec/visitor.h"
-#include "utils.h"
 
 namespace fuchsia_controller::fidl_codec::python_dict_visitor {
-
-namespace fc = fuchsia_controller;
 
 class PythonDictVisitor : public ::fidl_codec::Visitor {
  public:
@@ -24,158 +17,40 @@ class PythonDictVisitor : public ::fidl_codec::Visitor {
   PyObject* result() { return result_; }
 
  private:
-  void VisitValue(const ::fidl_codec::Value* node, const ::fidl_codec::Type* for_type) override {
-    std::stringstream ss;
-    ::fidl_codec::PrettyPrinter printer(ss, ::fidl_codec::WithoutColors, false, "", 0, false);
-    node->PrettyPrint(for_type, printer);
-    result_ = PyUnicode_FromString(ss.str().c_str());
-  }
+  void VisitValue(const ::fidl_codec::Value* node, const ::fidl_codec::Type* for_type) override;
 
   void VisitInvalidValue(const ::fidl_codec::InvalidValue* node,
-                         const ::fidl_codec::Type* for_type) override {
-    PyErr_Format(PyExc_TypeError, "invalid value for type: %s",
-                 for_type ? for_type->Name().c_str() : "[unknown]");
-  }
+                         const ::fidl_codec::Type* for_type) override;
 
   void VisitNullValue(const ::fidl_codec::NullValue* node,
-                      const ::fidl_codec::Type* for_type) override {
-    Py_IncRef(Py_None);
-    result_ = Py_None;
-  }
+                      const ::fidl_codec::Type* for_type) override;
 
   void VisitBoolValue(const ::fidl_codec::BoolValue* node,
-                      const ::fidl_codec::Type* for_type) override {
-    result_ = PyBool_FromLong(node->value());
-  }
+                      const ::fidl_codec::Type* for_type) override;
 
   void VisitStringValue(const ::fidl_codec::StringValue* node,
-                        const ::fidl_codec::Type* for_type) override {
-    result_ = PyUnicode_FromStringAndSize(node->string().data(),
-                                          static_cast<Py_ssize_t>(node->string().length()));
-  }
+                        const ::fidl_codec::Type* for_type) override;
 
   void VisitUnionValue(const ::fidl_codec::UnionValue* node,
-                       const ::fidl_codec::Type* type) override {
-    auto res = fc::abi::utils::Object(PyDict_New());
-    PythonDictVisitor visitor;
-    node->value()->Visit(&visitor, node->member().type());
-    if (visitor.result() == nullptr) {
-      return;
-    }
-    PyDict_SetItemString(
-        res.get(),
-        ::fuchsia_controller::fidl_codec::utils::NormalizeMemberName(node->member().name()).c_str(),
-        visitor.result());
-    result_ = res.take();
-  }
+                       const ::fidl_codec::Type* type) override;
 
   void VisitStructValue(const ::fidl_codec::StructValue* node,
-                        const ::fidl_codec::Type* for_type) override {
-    auto res = fc::abi::utils::Object(PyDict_New());
-    for (const auto& member : node->struct_definition().members()) {
-      auto it = node->fields().find(member.get());
-      if (it == node->fields().end()) {
-        continue;
-      }
-      PythonDictVisitor visitor;
-      it->second->Visit(&visitor, member->type());
-      if (visitor.result() == nullptr) {
-        return;
-      }
-      PyDict_SetItemString(res.get(), member->name().c_str(), visitor.result());
-    }
-    result_ = res.take();
-  }
+                        const ::fidl_codec::Type* for_type) override;
 
   void VisitVectorValue(const ::fidl_codec::VectorValue* node,
-                        const ::fidl_codec::Type* for_type) override {
-    if (for_type == nullptr) {
-      PyErr_SetString(PyExc_TypeError,
-                      "expected vector type in during decoding. Received null value");
-      return;
-    }
-    const auto component_type = for_type->GetComponentType();
-    if (component_type == nullptr) {
-      PyErr_SetString(PyExc_TypeError, "vector value's type does not contain a component type");
-      return;
-    }
-    auto res = fc::abi::utils::Object(PyList_New(static_cast<Py_ssize_t>(node->values().size())));
-    Py_ssize_t values_size = static_cast<Py_ssize_t>(node->values().size());
-    const auto& values = node->values();
-    for (Py_ssize_t i = 0; i < values_size; ++i) {
-      PythonDictVisitor visitor;
-      values[i]->Visit(&visitor, component_type);
-      if (visitor.result() == nullptr) {
-        return;
-      }
-      PyList_SetItem(res.get(), i, visitor.result());
-    }
-    result_ = res.take();
-  }
+                        const ::fidl_codec::Type* for_type) override;
 
   void VisitTableValue(const ::fidl_codec::TableValue* node,
-                       const ::fidl_codec::Type* for_type) override {
-    auto res = fc::abi::utils::Object(PyDict_New());
-
-    for (const auto& member : node->table_definition().members()) {
-      if (member != nullptr) {
-        auto it = node->members().find(member.get());
-        if (it == node->members().end()) {
-          Py_IncRef(Py_None);
-          PyDict_SetItemString(res.get(), member->name().c_str(), Py_None);
-          continue;
-        }
-        if (it->second == nullptr || it->second->IsNull()) {
-          Py_IncRef(Py_None);
-          PyDict_SetItemString(res.get(), member->name().c_str(), Py_None);
-          continue;
-        }
-        PythonDictVisitor visitor;
-        it->second->Visit(&visitor, member->type());
-        if (visitor.result() == nullptr) {
-          return;
-        }
-        PyDict_SetItemString(res.get(), member->name().c_str(), visitor.result());
-      }
-    }
-    result_ = res.take();
-  }
+                       const ::fidl_codec::Type* for_type) override;
 
   void VisitDoubleValue(const ::fidl_codec::DoubleValue* node,
-                        const ::fidl_codec::Type* for_type) override {
-    double value;
-    node->GetDoubleValue(&value);
-    result_ = PyFloat_FromDouble(value);
-  }
+                        const ::fidl_codec::Type* for_type) override;
 
   void VisitIntegerValue(const ::fidl_codec::IntegerValue* node,
-                         const ::fidl_codec::Type* for_type) override {
-    uint64_t value;
-    bool negative;
-    node->GetIntegerValue(&value, &negative);
-    if (negative) {
-      // Max possible absolute value for a signed integer (2^63).
-      if (value > 1ul << 63) {
-        PyErr_SetString(PyExc_OverflowError, "Integer overflow");
-        return;
-      }
-      int64_t res = static_cast<int64_t>(value);
-      res *= -1;
-      result_ = PyLong_FromLongLong(res);
-    } else {
-      result_ = PyLong_FromUnsignedLongLong(value);
-    }
-  }
+                         const ::fidl_codec::Type* for_type) override;
 
   void VisitHandleValue(const ::fidl_codec::HandleValue* handle,
-                        const ::fidl_codec::Type* for_type) override {
-    if (handle->handle().handle == 0) {
-      Py_INCREF(Py_None);
-      result_ = Py_None;
-    } else {
-      result_ = PyLong_FromUnsignedLongLong(handle->handle().handle);
-    }
-  }
+                        const ::fidl_codec::Type* for_type) override;
 
   PyObject* result_{nullptr};
 };

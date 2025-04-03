@@ -62,7 +62,6 @@ common_deps = [
   "//src/lib/network/fidl_fuchsia_net_routes_ext",
   "//src/lib/network/packet",
   "//src/lib/replace-with",
-  "//src/lib/trace/rust:trace",
   "//src/lib/trace/rust:trace-provider",
   "//src/starnix/lib/ebpf",
   "//src/starnix/lib/ebpf_api",
@@ -154,7 +153,6 @@ common_sources = [
   "src/bindings/timers.rs",
   "src/bindings/util.rs",
   "src/bindings/util/result_ext.rs",
-  "src/bindings/verifier_worker.rs",
   "src/main.rs",
 ]
 

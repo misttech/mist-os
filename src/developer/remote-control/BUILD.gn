@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
@@ -46,7 +45,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
@@ -69,6 +68,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
   ]
@@ -89,6 +89,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/diagnostics/log/rust",
@@ -105,6 +106,7 @@ rustc_binary("bin") {
     "src/fdomain.rs",
     "src/main.rs",
     "src/usb.rs",
+    "src/vsock.rs",
   ]
 }
 

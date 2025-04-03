@@ -23,7 +23,7 @@ void Tracing::ReadKernelBuffer(zx_handle_t handle, void* data_buf, uint32_t offs
 
 // Rewinds kernel trace buffer.
 void Tracing::Rewind() {
-  const zx_status_t status = zx_ktrace_control(debug_resource_, KTRACE_ACTION_REWIND, 0, nullptr);
+  const zx_status_t status = zx_ktrace_control(tracing_resource_, KTRACE_ACTION_REWIND, 0, nullptr);
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "zx_ktrace_control(_, KTRACE_ACTION_REWIND, _, _)";
   }
@@ -32,7 +32,7 @@ void Tracing::Rewind() {
 // Starts kernel tracing.
 void Tracing::Start(uint32_t group_mask) {
   const zx_status_t status =
-      zx_ktrace_control(debug_resource_, KTRACE_ACTION_START, group_mask, nullptr);
+      zx_ktrace_control(tracing_resource_, KTRACE_ACTION_START, group_mask, nullptr);
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "zx_ktrace_control(_, KTRACE_ACTION_START, _, _)";
   }
@@ -42,7 +42,7 @@ void Tracing::Start(uint32_t group_mask) {
 
 // Stops kernel tracing.
 void Tracing::Stop() {
-  const zx_status_t status = zx_ktrace_control(debug_resource_, KTRACE_ACTION_STOP, 0, nullptr);
+  const zx_status_t status = zx_ktrace_control(tracing_resource_, KTRACE_ACTION_STOP, 0, nullptr);
   if (status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "zx_ktrace_control(_, KTRACE_ACTION_STOP, _, _)";
   }
@@ -57,11 +57,11 @@ size_t Tracing::ReadKernelRecords(trace::TraceReader::RecordConsumer consumer,
 
   uint8_t buffer[4096];
   size_t available_bytes = 0;
-  ReadKernelBuffer(debug_resource_, nullptr, 0, 0, &available_bytes);
+  ReadKernelBuffer(tracing_resource_, nullptr, 0, 0, &available_bytes);
 
   size_t bytes_processed = 0;
   while (bytes_processed < available_bytes) {
-    ReadKernelBuffer(debug_resource_, buffer, static_cast<uint32_t>(bytes_processed),
+    ReadKernelBuffer(tracing_resource_, buffer, static_cast<uint32_t>(bytes_processed),
                      sizeof(buffer), &bytes_read);
     if (bytes_read < 8) {
       break;

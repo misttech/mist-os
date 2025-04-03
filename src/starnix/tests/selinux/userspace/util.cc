@@ -8,19 +8,29 @@
 #include <lib/fit/defer.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/xattr.h>
 
 #include <string>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-void WriteContents(const std::string& file, const std::string& contents, bool create) {
-  auto fd = fbl::unique_fd(open(file.c_str(), O_WRONLY | (create ? O_CREAT : 0), 0777));
-  ASSERT_THAT(fd.get(), SyscallSucceeds()) << "while opening file for writing: " << file;
+#include "src/lib/files/file.h"
+#include "src/lib/files/file_descriptor.h"
 
-  ssize_t written = write(fd.get(), contents.data(), contents.size());
-  ASSERT_THAT(written, SyscallSucceeds());
-  EXPECT_EQ(size_t(written), contents.size()) << "short write in " << file;
+namespace {
+constexpr char kProcSelfAttrPath[] = "/proc/self/attr/";
+}
+
+fit::result<int> WriteExistingFile(const std::string& path, std::string_view data) {
+  auto fd = fbl::unique_fd(open(path.c_str(), O_WRONLY | O_TRUNC, 0777));
+  if (!fd.is_valid()) {
+    return fit::error(errno);
+  }
+  if (!fxl::WriteFileDescriptor(fd.get(), data.data(), data.size())) {
+    return fit::error(errno);
+  }
+  return fit::ok();
 }
 
 void LoadPolicy(const std::string& name) {
@@ -35,22 +45,78 @@ void LoadPolicy(const std::string& name) {
   auto unmap =
       fit::defer([address, fsize] { ASSERT_THAT(munmap(address, fsize), SyscallSucceeds()); });
 
-  WriteContents("/sys/fs/selinux/load", std::string(reinterpret_cast<char*>(address), fsize));
+  ASSERT_TRUE(WriteExistingFile("/sys/fs/selinux/load",
+                                std::string(reinterpret_cast<char*>(address), fsize))
+                  .is_ok());
 }
 
-std::string ReadFile(const std::string& name) {
-  auto fd = fbl::unique_fd(open(name.c_str(), O_RDONLY));
-  EXPECT_THAT(fd.get(), SyscallSucceeds()) << "while opening file for reading: " << name;
-  if (!fd) {
-    return "";
+fit::result<int, std::string> ReadFile(const std::string& path) {
+  std::string result;
+  if (files::ReadFileToString(path, &result)) {
+    return fit::ok(std::move(result));
   }
+  return fit::error(errno);
+}
 
-  std::string contents;
-  char buf[4096];
-  ssize_t read_len;
-  while ((read_len = read(fd.get(), buf, sizeof(buf))) > 0) {
-    contents.append(buf, read_len);
+std::string RemoveTrailingNul(std::string in) {
+  if (in.size() > 0 && in[in.size() - 1] == 0) {
+    in.pop_back();
   }
-  EXPECT_THAT(read_len, SyscallSucceeds()) << "error reading " << name;
-  return contents;
+  return in;
+}
+
+fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name) {
+  std::string attr_path(kProcSelfAttrPath);
+  attr_path.append(attr_name);
+
+  auto attr = ReadFile(attr_path);
+  if (attr.is_error()) {
+    return attr;
+  }
+  return fit::ok(RemoveTrailingNul(attr.value()));
+}
+
+fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view context) {
+  std::string attr_path(kProcSelfAttrPath);
+  attr_path.append(attr_name);
+
+  return WriteExistingFile(attr_path, context);
+}
+
+fit::result<int, std::string> GetLabel(int fd) {
+  char buf[256];
+  ssize_t result = fgetxattr(fd, "security.selinux", buf, sizeof(buf));
+  if (result < 0) {
+    return fit::error(errno);
+  }
+  // Use `RemoveTrailingNul` to strip off the trailing NUL if present.
+  return fit::ok(RemoveTrailingNul(std::string(buf, result)));
+}
+
+fit::result<int, std::string> GetLabel(const std::string& path) {
+  char buf[256];
+  ssize_t result = getxattr(path.c_str(), "security.selinux", buf, sizeof(buf));
+  if (result < 0) {
+    return fit::error(errno);
+  }
+  // Use `RemoveTrailingNul` to strip off the trailing NUL if present.
+  return fit::ok(RemoveTrailingNul(std::string(buf, result)));
+}
+
+ScopedEnforcement ScopedEnforcement::SetEnforcing() {
+  return ScopedEnforcement(/*enforcing=*/true);
+}
+
+ScopedEnforcement ScopedEnforcement::SetPermissive() {
+  return ScopedEnforcement(/*enforcing=*/false);
+}
+
+ScopedEnforcement::ScopedEnforcement(bool enforcing) {
+  EXPECT_TRUE(files::ReadFileToString("/sys/fs/selinux/enforce", &previous_state_));
+  std::string new_state = enforcing ? "1" : 0;
+  EXPECT_TRUE(files::WriteFile("/sys/fs/selinux/enforce", new_state));
+}
+
+ScopedEnforcement::~ScopedEnforcement() {
+  EXPECT_TRUE(files::WriteFile("/sys/fs/selinux/enforce", previous_state_));
 }

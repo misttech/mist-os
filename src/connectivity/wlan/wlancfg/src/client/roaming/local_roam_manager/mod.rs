@@ -53,7 +53,7 @@ pub enum RoamServiceRequest {
         ap_state: types::ApState,
         network_identifier: types::NetworkIdentifier,
         credential: Credential,
-        roam_sender: mpsc::Sender<types::ScannedCandidate>,
+        roam_request_sender: mpsc::Sender<PolicyRoamRequest>,
         roam_trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
     },
 }
@@ -74,7 +74,7 @@ impl RoamManager {
         ap_state: types::ApState,
         network_identifier: types::NetworkIdentifier,
         credential: Credential,
-        roam_sender: mpsc::Sender<types::ScannedCandidate>,
+        roam_request_sender: mpsc::Sender<PolicyRoamRequest>,
     ) -> roam_monitor::RoamDataSender {
         let (roam_trigger_data_sender, roam_trigger_data_receiver) =
             mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
@@ -84,7 +84,7 @@ impl RoamManager {
                 ap_state,
                 network_identifier,
                 credential,
-                roam_sender,
+                roam_request_sender,
                 roam_trigger_data_receiver,
             })
             .inspect_err(|e| {
@@ -114,9 +114,9 @@ pub async fn serve_local_roam_manager_requests(
                 match req {
                     // Create and start a roam monitor future, passing in handles from caller. This
                     // ensures that new data is initialized for every new caller (e.g. connected_state).
-                    RoamServiceRequest::InitializeRoamMonitor { ap_state, network_identifier, credential, roam_sender, roam_trigger_data_receiver }=> {
+                    RoamServiceRequest::InitializeRoamMonitor { ap_state, network_identifier, credential, roam_request_sender, roam_trigger_data_receiver }=> {
                         let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone(), saved_networks.clone(), past_roams.clone());
-                        let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roaming_policy, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone(), past_roams.clone());
+                        let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roaming_policy, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_request_sender.clone(), telemetry_sender.clone(), past_roams.clone());
                         monitor_futs.push(Box::pin(monitor_fut));
                     }
                 }

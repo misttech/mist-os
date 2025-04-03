@@ -87,6 +87,20 @@ impl TopSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<TopSynchronousProxy> for zx::Handle {
+    fn from(value: TopSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for TopSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TopProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,

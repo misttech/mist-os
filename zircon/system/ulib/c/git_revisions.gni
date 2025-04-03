@@ -19,36 +19,10 @@
 #     }
 #   }
 
-import("//build/checkout.gni")
 import("libc.gni")
 
-_gwp_asan_git_path = "${gwp_asan}/.git"
-_llvm_libc_git_path = "${llvm_libc}/.git"
-_scudo_git_path = "${scudo}/.git"
-
-# If submodules are in use, their .git is actually a text file pointing to the
-# real git directory, which is stored inside the root project's .git directory.
-# For instance, third_party/scudo/src/.git will contain:
-#   gitdir: ../../../.git/modules/third_party%2fscudo%2fsrc
-if (submodules) {
-  _gwp_asan_git_link = read_file(_gwp_asan_git_path, "string")
-  _gwp_asan_git_link_split = string_split(_gwp_asan_git_link)
-  assert(_gwp_asan_git_link_split[0] == "gitdir:")
-  _gwp_asan_git_path = "${gwp_asan}/${_gwp_asan_git_link_split[1]}"
-
-  _llvm_libc_git_link = read_file(_llvm_libc_git_path, "string")
-  _llvm_libc_git_link_split = string_split(_llvm_libc_git_link)
-  assert(_llvm_libc_git_link_split[0] == "gitdir:")
-  _llvm_libc_git_path = "${llvm_libc}/${_llvm_libc_git_link_split[1]}"
-
-  _scudo_git_link = read_file(_scudo_git_path, "string")
-  _scudo_git_link_split = string_split(_scudo_git_link)
-  assert(_scudo_git_link_split[0] == "gitdir:")
-  _scudo_git_path = "${scudo}/${_scudo_git_link_split[1]}"
-}
-
 libc_git_revisions = {
-  gwp_asan = read_file("${_gwp_asan_git_path}/HEAD", "trim string")
-  llvm_libc = read_file("${_llvm_libc_git_path}/HEAD", "trim string")
-  scudo = read_file("${_scudo_git_path}/HEAD", "trim string")
+  gwp_asan = read_file("${gwp_asan}/.git/HEAD", "trim string")
+  llvm_libc = read_file("${llvm_libc}/.git/HEAD", "trim string")
+  scudo = read_file("${scudo}/.git/HEAD", "trim string")
 }

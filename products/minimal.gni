@@ -35,10 +35,6 @@ bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 # Packages to be published to universe that do not go through assembly.
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 
-# These targets used to flow through GN assembly. Now add them explicitly to
-# Bazel assebmly to make sure they can be built for CIPD uploads.
-extra_bazel_assembly_targets = [ "//build/images/fuchsia:assembly_inputs" ]
-
 use_bazel_images_only = true
 assembly_board_configs = [ "//boards" ]
 assembly_partitions_configs = [ "//boards/partitions" ]

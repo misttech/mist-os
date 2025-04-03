@@ -44,6 +44,8 @@ macro_rules! impl_primitives {
 }
 
 impl_primitives! {
+    (),
+
     i8,
     WireI16,
     WireI32,

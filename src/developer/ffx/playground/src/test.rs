@@ -152,7 +152,7 @@ impl<T: AsRef<str>> Test<T> {
     /// Set `$fs_root` with a set of standard test directories.
     pub fn with_standard_test_dirs(mut self) -> Self {
         let simple = vfs::directory::immutable::simple();
-        let proxy = vfs::directory::spawn_directory(Arc::clone(&simple));
+        let proxy = vfs::directory::serve_read_only(Arc::clone(&simple));
         let test_subdir = vfs::directory::immutable::simple();
         let foo_subdir = vfs::directory::immutable::simple();
         let import_subdir = vfs::directory::immutable::simple();

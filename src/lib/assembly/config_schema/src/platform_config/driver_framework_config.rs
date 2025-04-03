@@ -19,8 +19,12 @@ pub struct TestFuzzingConfig {
     pub enable_test_shutdown_delays: bool,
 }
 
+fn is_true(val: &bool) -> bool {
+    *val
+}
+
 /// Platform configuration options for driver framework support.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct DriverFrameworkConfig {
     /// The list of driver components to load eagerly. Eager drivers are those that are forced to
@@ -39,8 +43,25 @@ pub struct DriverFrameworkConfig {
 
     /// Whether to enable the driver index's stop_on_idle feature, where it waits until it reaches
     /// an idle timeout, escrows its state and handles, then exits. If unspecified, this will
-    /// default to `true`.
+    /// default to `false`.
     /// See: https://fuchsia.dev/fuchsia-src/development/components/stop_idle
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_driver_index_stop_on_idle: bool,
+
+    /// Whether to use the rust driver host or to use the c++ one instead.
+    /// If unspecified, this will default to `true`.
+    #[serde(skip_serializing_if = "is_true")]
+    pub use_rust_driver_host: bool,
+}
+
+impl Default for DriverFrameworkConfig {
+    fn default() -> Self {
+        Self {
+            eager_drivers: Vec::new(),
+            disabled_drivers: Vec::new(),
+            test_fuzzing_config: None,
+            enable_driver_index_stop_on_idle: false,
+            use_rust_driver_host: true,
+        }
+    }
 }

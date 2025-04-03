@@ -17,7 +17,7 @@ namespace {
 
 namespace fio = fuchsia_io;
 
-constexpr size_t kMaxComponentLength = fio::wire::kMaxFilename;
+constexpr size_t kMaxComponentLength = fio::wire::kMaxNameLength;
 
 // Buffer used to hold the maximum possible path of a service instance. A service instance path is
 // made from two path components, each separated by '/', and must be terminated with a null byte.

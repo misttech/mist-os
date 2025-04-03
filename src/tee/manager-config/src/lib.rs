@@ -6,13 +6,17 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Configuration for how to run a trusted application in Fuchsia.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(dead_code)]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum Config {
+    GlobalPlatform(GlobalPlatformConfig),
+    BinderRpc,
+}
+
+// Configuration values specific to GlobalPlatform TAs.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct TAConfig {
-    /// The component url to run as the trusted application.
-    pub url: String,
+struct GlobalPlatformConfig {
     /// Only create one instance of the trusted app and route all connections to it.
     single_instance: bool,
     /// Whether `single_instance` trusted apps support multiple separate sessions.
@@ -21,6 +25,16 @@ pub struct TAConfig {
     /// The trusted app should continue running even in low power states and suspension.
     // TODO: Support instanceKeepAlive functionality.
     instance_keep_alive: bool,
+}
+
+/// Configuration for how to run a trusted application in Fuchsia.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TAConfig {
+    /// The component url to run as the trusted application.
+    pub url: String,
+    /// Type-specific configuration.
+    config: Config,
     /// Additional capabilities to pass to the component at `url`.
     capabilities: Vec<()>,
 }
@@ -29,11 +43,21 @@ impl TAConfig {
     pub fn new(url: String) -> Self {
         Self {
             url,
-            single_instance: false,
-            multi_session: false,
-            instance_keep_alive: false,
+            config: Config::GlobalPlatform(GlobalPlatformConfig {
+                single_instance: false,
+                multi_session: false,
+                instance_keep_alive: false,
+            }),
             capabilities: vec![],
         }
+    }
+
+    pub fn global_platform(url: String) -> Self {
+        Self::new(url)
+    }
+
+    pub fn binder_rpc(url: String) -> Self {
+        Self { url, config: Config::BinderRpc, capabilities: vec![] }
     }
 
     pub fn parse_config(path: &PathBuf) -> Result<Self> {

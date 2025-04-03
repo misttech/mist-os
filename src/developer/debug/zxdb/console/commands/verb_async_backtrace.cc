@@ -26,6 +26,7 @@
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/console/string_util.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
+#include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/expr.h"
 #include "src/developer/debug/zxdb/expr/expr_value.h"
 #include "src/developer/debug/zxdb/expr/expr_value_source.h"
@@ -451,99 +452,100 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
   return out;
 }
 
-// Format (usize, alloc::sync::Arc<fuchsia_async::runtime::fuchsia::executor::common::Task>)
+// Format (fuchsia_async::runtime::fuchsia::executor::atomic_future::AtomicFutureHandle, ())
 // Instead of return an AsyncOutputBuffer directly, use a callback to also return task_id.
-void FormatActiveTasksHashMapTuple(
+void FormatActiveTasksHashSetValue(
     const ExprValue& tuple, const FormatFutureOptions& options,
     const fxl::RefPtr<EvalContext>& context, int indent,
     fit::callback<void(uint64_t, fxl::RefPtr<AsyncOutputBuffer>)> cb) {
-  ErrOrValue arc_inner_ptr = ResolveNonstaticMember(context, tuple, {"__1", "ptr", "pointer"});
-  if (arc_inner_ptr.has_error())
-    return cb(0, FormatError("Invalid HashMap tuple (1)", arc_inner_ptr.err()));
-  ResolvePointer(
-      context, arc_inner_ptr.value(), [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
-        if (arc_inner.has_error())
-          return cb(0, FormatError("Invalid HashMap tuple (2)", arc_inner.err()));
-        ErrOrValue id = ResolveNonstaticMember(context, arc_inner.value(), {"data", "id"});
-        uint64_t task_id = 0;
-        if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
-          return cb(0, FormatError("Invalid HashMap tuple (3)", id.err()));
-        auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-        if (indent >= 3) {
-          out->Append(std::string(indent - 3, ' '));
-          out->Append(kAwaiteeMarker);
-        }
-        out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
-        out->Append(std::string(indent, ' '));
-        out->Append(kAwaiteeMarker);
-        // Arc -> Task -> AtomicFuture
-        ErrOrValue atomic_future =
-            ResolveNonstaticMember(context, arc_inner.value(), {"data", "future"});
-        if (atomic_future.has_error())
-          return cb(task_id, FormatError("Invalid HashMap tuple (4)", atomic_future.err()));
+  // HashSet<V> looks like HashMap<V, ()>.  Then it's AtomicFutureHandle -> NonNull.
+  ErrOrValue meta_ptr = ResolveNonstaticMember(context, tuple, {"__0", "__0", "pointer"});
+  if (meta_ptr.has_error())
+    return cb(0, FormatError("Invalid HashSet value (1)", meta_ptr.err()));
+  ResolvePointer(context, meta_ptr.value(), [=, cb = std::move(cb)](ErrOrValue meta) mutable {
+    if (meta.has_error())
+      return cb(0, FormatError("Invalid HashSet value (2)", meta.err()));
+    ErrOrValue id = ResolveNonstaticMember(context, meta.value(), {"id"});
+    uint64_t task_id = 0;
+    if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
+      return cb(0, FormatError("Invalid HashSet value (3)", id.err()));
+    auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+    if (indent >= 3) {
+      out->Append(std::string(indent - 3, ' '));
+      out->Append(kAwaiteeMarker);
+    }
+    out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
+    out->Append(std::string(indent, ' '));
+    out->Append(kAwaiteeMarker);
 
-        ErrOrValue state = ResolveNonstaticMember(context, atomic_future.value(), {"state"});
-        if (state.has_error())
-          return cb(task_id, FormatError("Invalid HashMap tuple (5)", state.err()));
+    ErrOrValue state = ResolveNonstaticMember(context, meta.value(), {"state"});
+    if (state.has_error())
+      return cb(task_id, FormatError("Invalid HashSet value (4)", state.err()));
 
-        // Read the state of the future.
-        uint64_t state_value;
-        if (auto result = state.value().PromoteTo64(&state_value); result.has_error())
-          return cb(task_id, FormatError("Invalid HashMap tuple (6)", result));
+    // Read the state of the future.
+    uint64_t state_value;
+    if (auto result = state.value().PromoteTo64(&state_value); result.has_error())
+      return cb(task_id, FormatError("Invalid HashSet value (5)", result));
 
-        // See if the future is DONE.
-        if (state_value & (1 << 2)) {
-          out->Complete("Finished\n");
-          return cb(task_id, out);
-        }
+    // See if the future is DONE.
+    if (state_value & (1ull << 61)) {
+      out->Complete("Finished\n");
+      return cb(task_id, out);
+    }
 
-        // AtomicFuture -> UnsafeCell -> Box<dyn FutureOrResult>
-        ErrOrValue value =
-            ResolveNonstaticMember(context, atomic_future.value(), {"future", "value"});
+    // Read the drop vtable pointer
+    ErrOrValue vtable_ptr = ResolveNonstaticMember(context, meta.value(), {"vtable"});
+    if (vtable_ptr.has_error())
+      return cb(task_id, FormatError("Invalid HashSet value (6)", vtable_ptr.err()));
 
-        // Now we have `Box<dyn FutureOrResult>`.  To determine the concrete type of the future we
-        // need to find the future's drop function.  We can't use FutureOrResult's drop because it
-        // doesn't have a drop method (it uses ManuallyDrop), so we have to find the `drop_future`
-        // method from the `FutureOrResult` trait.
+    ResolvePointer(context, vtable_ptr.value(), [=, cb = std::move(cb)](ErrOrValue vtable) mutable {
+      if (vtable.has_error())
+        return cb(task_id, FormatError("Invalid HashSet value (7)", vtable.err()));
 
-        // Extract pointer and vtable from the fat pointer.
-        ErrOrValue pointer_val = ResolveNonstaticMember(context, value.value(), {"pointer"});
-        ErrOrValue vtable_val = ResolveNonstaticMember(context, value.value(), {"vtable"});
-        TargetPointer vtable = 0;
-        if (pointer_val.has_error() || vtable_val.has_error() ||
-            vtable_val.value().PromoteTo64(&vtable).has_error())
-          return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (7)"));
+      ErrOrValue drop_fn = ResolveNonstaticMember(context, vtable.value(), {"drop"});
+      if (drop_fn.has_error())
+        return cb(task_id, FormatError("Invalid HashSet value (8)", drop_fn.err()));
 
-        // We want to get to the `drop_future` method which is the first method in the trait.  The
-        // vtable should be <drop, size, align, trait methods...>, so it's the fourth pointer.
-        context->GetDataProvider()->GetMemoryAsync(
-            vtable + 3 * sizeof(TargetPointer), sizeof(TargetPointer),
-            [=, cb = std::move(cb), pointer = pointer_val.value()](
-                const Err& err, std::vector<uint8_t> data) mutable {
-              if (err.has_error() || data.size() != sizeof(TargetPointer))
-                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (8)"));
+      uint64_t drop_fn_value;
+      if (auto result = drop_fn.value().PromoteTo64(&drop_fn_value); result.has_error())
+        return cb(task_id, FormatError("Invalid HashSet value (9)", result));
 
-              // Assume the same endian.
-              TargetPointer drop_in_place_addr = *reinterpret_cast<TargetPointer*>(data.data());
-              Location loc = context->GetLocationForAddress(drop_in_place_addr);
-              if (!loc.symbol())
-                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (9)"));
+      Location loc = context->GetLocationForAddress(drop_fn_value);
+      if (!loc.symbol()) {
+        uint64_t vtable_ptr_value;
+        [[maybe_unused]] auto x = vtable_ptr.value().PromoteTo64(&vtable_ptr_value);
+        return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashSet value (10)"));
+      }
 
-              const Function* func = loc.symbol().Get()->As<Function>();
-              if (!func || func->template_params().empty())
-                return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashMap tuple (10)"));
+      const Function* func = loc.symbol().Get()->As<Function>();
+      if (!func || func->template_params().empty())
+        return cb(task_id, FormatMessage(Syntax::kError, "Invalid HashSet value (11)"));
 
-              // Get the templated parameter and create a ModifiedType to that type.
-              LazySymbol pointed_to =
-                  func->template_params()[0].Get()->As<TemplateParameter>()->type();
-              auto derived = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, pointed_to);
+      auto derived =
+          fxl::MakeRefCounted<ModifiedType>(DwarfTag::kPointerType, func->parent().GetCached());
 
-              out->Complete(FormatFuture(ExprValue(derived, pointer.data(), pointer.source()),
-                                         options, context, 3 + indent));
+      CastExprValue(
+          context, CastType::kRust, meta_ptr.value(), derived, ExprValueSource(),
+          [=, cb = std::move(cb)](ErrOrValue atomic_future_ptr) mutable {
+            if (atomic_future_ptr.has_error())
+              return cb(task_id,
+                        FormatError("Invalid HashSet value (12)", atomic_future_ptr.err()));
 
-              cb(task_id, out);
-            });
-      });
+            ResolvePointer(
+                context, atomic_future_ptr.value(),
+                [=, cb = std::move(cb)](ErrOrValue atomic_future) mutable {
+                  ErrOrValue future = ResolveNonstaticMember(context, atomic_future.value(),
+                                                             {"future", "future", "value"});
+                  if (future.has_error())
+                    return cb(task_id, FormatError("Invalid HashSet value (13)", future.err()));
+
+                  out->Complete(FormatFuture(future.value(), options, context, 3 + indent));
+
+                  cb(task_id, out);
+                });
+          });
+    });
+  });
 }
 
 // Iterate over items in a hashbrown HashMap of any type.
@@ -621,16 +623,22 @@ void IterateHashMap(const ExprValue& hashmap, const fxl::RefPtr<EvalContext>& co
 }
 
 // Format HashMap<usize, alloc::sync::Arc<fuchsia_async::runtime::fuchsia::executor::common::Task>>
-fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashmap,
+fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashSet(const ErrOrValue& hashset,
                                                         const FormatFutureOptions& options,
                                                         const fxl::RefPtr<EvalContext>& context,
                                                         int indent) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+  ErrOrValue map = ResolveNonstaticMember(context, hashset.value(), {"map"});
+  if (map.has_error()) {
+    out->Complete(FormatError("Invalid HashSet"));
+    return out;
+  }
+
   using CallbackDataType = std::pair<uint64_t, fxl::RefPtr<AsyncOutputBuffer>>;
   IterateHashMap<CallbackDataType>(
-      hashmap.value(), context,
+      map.value(), context,
       [=](auto tuple, auto cb) {
-        FormatActiveTasksHashMapTuple(tuple, options, context, indent,
+        FormatActiveTasksHashSetValue(tuple, options, context, indent,
                                       [cb = std::move(cb)](auto task_id, auto output) mutable {
                                         cb(std::make_pair(task_id, std::move(output)));
                                       });
@@ -656,12 +664,12 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
   if (scope_state.has_error()) {
     return FormatError("Cannot locate scope state", scope_state.err());
   }
-  ErrOrValue hashmap = ResolveNonstaticMember(context, scope_state.value(), {"all_tasks", "base"});
-  if (hashmap.has_error()) {
-    return FormatError("Cannot locate all_tasks", hashmap.err());
+  ErrOrValue hashset = ResolveNonstaticMember(context, scope_state.value(), {"all_tasks", "base"});
+  if (hashset.has_error()) {
+    return FormatError("Cannot locate all_tasks", hashset.err());
   }
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  out->Append(FormatActiveTasksHashMap(hashmap.value(), options, context, indent));
+  out->Append(FormatActiveTasksHashSet(hashset.value(), options, context, indent));
 
   ErrOrValue children =
       ResolveNonstaticMember(context, scope_state.value(), {"children", "base", "map"});

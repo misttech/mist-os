@@ -119,6 +119,7 @@ impl Consumer {
         socket_path: &FsStr,
     ) -> Result<Self, anyhow::Error> {
         let conn_file = new_socket_file(
+            locked,
             current_task,
             SocketDomain::Unix,
             SocketType::Stream,

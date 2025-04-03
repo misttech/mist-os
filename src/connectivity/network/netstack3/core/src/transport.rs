@@ -63,23 +63,20 @@ use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler};
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
 use netstack3_icmp_echo::{IcmpSocketTxMetadata, IcmpSockets};
-use netstack3_tcp::{self as tcp, TcpCounters, TcpState, TcpTimerId};
-use netstack3_udp::{UdpCounters, UdpSocketTxMetadata, UdpState, UdpStateBuilder};
+use netstack3_tcp::{
+    self as tcp, TcpCountersWithSocket, TcpCountersWithoutSocket, TcpState, TcpTimerId,
+};
+use netstack3_udp::{
+    UdpCountersWithSocket, UdpCountersWithoutSocket, UdpSocketTxMetadata, UdpState,
+};
 
 use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 /// A builder for transport layer state.
 #[derive(Default, Clone)]
-pub struct TransportStateBuilder {
-    udp: UdpStateBuilder,
-}
+pub struct TransportStateBuilder;
 
 impl TransportStateBuilder {
-    /// Get the builder for the UDP state.
-    pub fn udp_builder(&mut self) -> &mut UdpStateBuilder {
-        &mut self.udp
-    }
-
     pub(crate) fn build_with_ctx<BC: BindingsContext>(
         self,
         bindings_ctx: &mut BC,
@@ -87,8 +84,8 @@ impl TransportStateBuilder {
         let now = bindings_ctx.now();
         let mut rng = bindings_ctx.rng();
         TransportLayerState {
-            udpv4: self.udp.clone().build(),
-            udpv6: self.udp.build(),
+            udpv4: Default::default(),
+            udpv6: Default::default(),
             tcpv4: TcpState::new(now, &mut rng),
             tcpv6: TcpState::new(now, &mut rng),
             icmp_echo_v4: Default::default(),
@@ -122,12 +119,28 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
         I::map_ip((), |()| &self.icmp_echo_v4, |()| &self.icmp_echo_v6)
     }
 
-    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-        I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
+    pub(crate) fn udp_counters_with_socket<I: Ip>(&self) -> &UdpCountersWithSocket<I> {
+        I::map_ip((), |()| &self.udpv4.counters_with_socket, |()| &self.udpv6.counters_with_socket)
     }
 
-    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
-        I::map_ip((), |()| &self.tcpv4.counters, |()| &self.tcpv6.counters)
+    pub(crate) fn udp_counters_without_socket<I: Ip>(&self) -> &UdpCountersWithoutSocket<I> {
+        I::map_ip(
+            (),
+            |()| &self.udpv4.counters_without_socket,
+            |()| &self.udpv6.counters_without_socket,
+        )
+    }
+
+    pub(crate) fn tcp_counters_with_socket<I: Ip>(&self) -> &TcpCountersWithSocket<I> {
+        I::map_ip((), |()| &self.tcpv4.counters_with_socket, |()| &self.tcpv6.counters_with_socket)
+    }
+
+    pub(crate) fn tcp_counters_without_socket<I: Ip>(&self) -> &TcpCountersWithoutSocket<I> {
+        I::map_ip(
+            (),
+            |()| &self.tcpv4.counters_without_socket,
+            |()| &self.tcpv6.counters_without_socket,
+        )
     }
 }
 

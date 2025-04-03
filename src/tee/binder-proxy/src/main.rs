@@ -11,9 +11,26 @@ mod trusted_app;
 
 use anyhow::{self, Context, Error};
 use android_system_microfuchsia_vm_service::aidl::android::system::microfuchsia::vm_service::IMicrofuchsia::GUEST_PORT;
+use fuchsia_component::client::Service;
 
 unsafe extern "C" {
     fn register_dev_urandom_compat() -> zx::sys::zx_status_t;
+}
+
+fn get_pmem_buffer() -> Result<zx::Vmo, Error> {
+    fuchsia_async::LocalExecutor::new().run_singlethreaded((async || {
+        log::info!("waiting for virtiopmem");
+        let virtio_pmem = Service::open(fidl_fuchsia_hardware_virtio_pmem::ServiceMarker)
+            .context("Failed to open service")?
+            .watch_for_any()
+            .await
+            .context("Failed to find instance")?
+            .connect_to_device()
+            .context("Failed to connect to device protocol")?;
+
+        let fidl_result = virtio_pmem.get().await?;
+        fidl_result.map_err(|e| anyhow::anyhow!("fidl error: {e}"))
+    })())
 }
 
 #[fuchsia::main]
@@ -27,7 +44,9 @@ fn main() -> Result<(), Error> {
 
     let config = binder_proxy_config::Config::take_from_startup_handle();
 
-    let binder_proxy = binder_proxy::BinderProxy::new(&config, GUEST_PORT as u32)?;
+    let shared_mem_vmo = if config.use_virtio_pmem { Some(get_pmem_buffer()?) } else { None };
+
+    let binder_proxy = binder_proxy::BinderProxy::new(&config, GUEST_PORT as u32, shared_mem_vmo)?;
 
     // We need to keep the RPCSessions alive for as long as the proxy itself is running.
     #[allow(clippy::collection_is_never_read)]

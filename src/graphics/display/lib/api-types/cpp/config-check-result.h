@@ -34,8 +34,10 @@ class ConfigCheckResult {
 
   explicit constexpr ConfigCheckResult(config_check_result_t banjo_result);
 
-  ConfigCheckResult(const ConfigCheckResult&) = default;
-  ConfigCheckResult& operator=(const ConfigCheckResult&) = default;
+  constexpr ConfigCheckResult(const ConfigCheckResult&) noexcept = default;
+  constexpr ConfigCheckResult(ConfigCheckResult&&) noexcept = default;
+  constexpr ConfigCheckResult& operator=(const ConfigCheckResult&) noexcept = default;
+  constexpr ConfigCheckResult& operator=(ConfigCheckResult&&) noexcept = default;
   ~ConfigCheckResult() = default;
 
   constexpr fuchsia_hardware_display_types::wire::ConfigResult ToFidl() const;

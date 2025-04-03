@@ -102,22 +102,26 @@ std::optional<std::vector<fuchsia::sysmem2::BufferCollectionTokenSyncPtr>> Creat
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator,
     fuchsia::sysmem2::BufferCollectionTokenSyncPtr& token, const size_t num_new_tokens) {
   fuchsia::sysmem2::BufferCollectionTokenGroupSyncPtr token_group;
-  fuchsia::sysmem2::BufferCollectionTokenCreateBufferCollectionTokenGroupRequest
-      create_group_request;
-  create_group_request.set_group_request(token_group.NewRequest());
-  if (const auto status = token->CreateBufferCollectionTokenGroup(std::move(create_group_request));
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not create buffer collection token group: "
-                   << zx_status_get_string(status);
-    return std::nullopt;
+  {
+    fuchsia::sysmem2::BufferCollectionTokenCreateBufferCollectionTokenGroupRequest
+        create_group_request;
+    create_group_request.set_group_request(token_group.NewRequest());
+    if (const auto status =
+            token->CreateBufferCollectionTokenGroup(std::move(create_group_request));
+        status != ZX_OK) {
+      FX_LOGS(ERROR) << "Could not create buffer collection token group: "
+                     << zx_status_get_string(status);
+      return std::nullopt;
+    }
   }
 
   // Create the requested children, then mark all children created and close out |token_group|.
-  std::vector<zx_rights_t> children_request_rights(num_new_tokens, ZX_RIGHT_SAME_RIGHTS);
-  fuchsia::sysmem2::BufferCollectionTokenGroupCreateChildrenSyncRequest create_children_request;
-  create_children_request.set_rights_attenuation_masks(std::move(children_request_rights));
   fuchsia::sysmem2::BufferCollectionTokenGroup_CreateChildrenSync_Result create_children_result;
   {
+    std::vector<zx_rights_t> children_request_rights(num_new_tokens, ZX_RIGHT_SAME_RIGHTS);
+    fuchsia::sysmem2::BufferCollectionTokenGroupCreateChildrenSyncRequest create_children_request;
+    create_children_request.set_rights_attenuation_masks(std::move(children_request_rights));
+
     auto status = token_group->CreateChildrenSync(std::move(create_children_request),
                                                   &create_children_result);
     if (status != ZX_OK) {
@@ -538,9 +542,18 @@ void DisplayCompositor::SetDisplayLayers(
 }
 
 bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetRenderDataOnDisplay", "display_id",
+                 data.display_id.value, "rectangle_count", data.rectangles.size());
+
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Every rectangle should have an associated image.
   const uint32_t num_images = static_cast<uint32_t>(data.images.size());
+
+  if (num_images == 0) {
+    // The Coordinator API doesn't allow zero layers.
+    // TODO(https://fxbug.dev/399228128): Use a Coordinator color layer instead of Vulkan fallback.
+    return false;
+  }
 
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
@@ -558,7 +571,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   for (uint32_t i = 0; i < num_images; i++) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
     if (image_id != allocation::kInvalidImageId) {
-      if (buffer_collection_supports_display_[data.images[i].collection_id]) {
+      if (display_imported_images_.count(data.images[i].identifier)) {
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
                         /*wait_id*/ kInvalidEventId);
       } else {
@@ -848,7 +861,6 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   const bool fallback_to_gpu_composition = !enable_display_composition_ ||
                                            test_args.force_gpu_composition ||
                                            !TryDirectToDisplay(render_data_list) || !CheckConfig();
-
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
     // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
@@ -879,10 +891,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
 bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render_data_list) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(enable_display_composition_);
-
-  // TODO(https://fxbug.dev/377979329): re-enable direct-to-display once we have relaxed the display
-  // coordinator's restrictions on image reuse.
-  return false;
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::TryDirectToDisplay");
 
   for (const auto& data : render_data_list) {
     if (!SetRenderDataOnDisplay(data)) {
@@ -969,6 +978,9 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   const auto pixel_format = renderer_->ChoosePreferredRenderTargetFormat(info.formats);
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
+  // JJOSH: leave these, probably.
+  FX_DCHECK(size.width > 0);
+  FX_DCHECK(size.height > 0);
 
   const fuchsia_hardware_display_types::wire::DisplayId display_id = display->display_id();
   FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())

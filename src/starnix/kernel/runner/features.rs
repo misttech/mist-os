@@ -3,20 +3,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Config;
-
+use crate::ContainerStartInfo;
 #[cfg(not(feature = "starnix_lite"))]
 use anyhow::{anyhow, Context, Error};
 #[cfg(feature = "starnix_lite")]
 use anyhow::{anyhow, Error};
 #[cfg(not(feature = "starnix_lite"))]
 use bstr::BString;
+use starnix_container_structured_config::Config as ContainerStructuredConfig;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 #[cfg(not(feature = "starnix_lite"))]
-use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
+use starnix_core::device::framebuffer::{AspectRatio, Framebuffer};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::remote_block_device::remote_block_device_init;
+use starnix_core::mm::MlockPinFlavor;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::vfs::FsString;
@@ -39,6 +40,7 @@ use starnix_modules_magma::magma_device_init;
 use starnix_modules_nanohub::nanohub_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
+use starnix_modules_thermal::thermal_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
@@ -47,7 +49,6 @@ use starnix_uapi::errors::Errno;
 #[cfg(not(feature = "starnix_lite"))]
 use std::sync::mpsc::channel;
 use std::sync::Arc;
-
 #[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
@@ -58,22 +59,36 @@ use {
 /// A collection of parsed features, and their arguments.
 #[derive(Default, Debug)]
 pub struct Features {
+    /// Features that must be available to the kernel after initialization.
     pub kernel: KernelFeatures,
 
+    /// SELinux configuration.
     pub selinux: SELinuxFeature,
 
+    /// Whether to enable ashmem.
     #[cfg(not(feature = "starnix_lite"))]
     pub ashmem: bool,
 
+    /// Whether to enable a framebuffer device.
     #[cfg(not(feature = "starnix_lite"))]
     pub framebuffer: bool,
 
+    /// Display aspect ratio.
+    pub aspect_ratio: Option<AspectRatio>,
+
+    /// This controls whether or not the default framebuffer background is black or colorful, to
+    /// aid debugging.
+    pub enable_visual_debugging: bool,
+
+    /// Whether to enable gralloc.
     #[cfg(not(feature = "starnix_lite"))]
     pub gralloc: bool,
 
+    /// Supported magma vendor IDs.
     #[cfg(not(feature = "starnix_lite"))]
     pub magma_supported_vendors: Option<Vec<u16>>,
 
+    /// Whether to enable gfxstream.
     #[cfg(not(feature = "starnix_lite"))]
     pub gfxstream: bool,
 
@@ -86,25 +101,34 @@ pub struct Features {
     /// Include the /custom_artifacts directory in the root file system.
     pub custom_artifacts: bool,
 
+    /// Whether to provide android with a serial number.
     #[cfg(not(feature = "starnix_lite"))]
     pub android_serialno: bool,
 
+    /// Whether to enable Starnix's self-profiling. Results are visible in inspect.
     pub self_profile: bool,
 
     #[cfg(not(feature = "starnix_lite"))]
-    pub aspect_ratio: Option<AspectRatio>,
-
+    /// Optional perfetto configuration.
     #[cfg(not(feature = "starnix_lite"))]
     pub perfetto: Option<FsString>,
 
+    /// Whether to enable support for Android's Factory Data Reset.
     #[cfg(not(feature = "starnix_lite"))]
     pub android_fdr: bool,
 
+    /// Whether to allow the root filesystem to be read/write.
     pub rootfs_rw: bool,
 
+    /// Whether to enable network manager and its filesystem.
     pub network_manager: bool,
 
+    /// Whether to enable the nanohub module.
     pub nanohub: bool,
+
+    pub enable_utc_time_adjustment: bool,
+
+    pub thermal: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug)]
@@ -126,14 +150,19 @@ impl Features {
                         enable_suid,
                         io_uring,
                         error_on_failed_reboot,
-                        enable_visual_debugging,
                         default_uid,
                         default_seclabel,
+                        selinux_test_suite,
                         default_ns_mount_options,
+                        mlock_always_onfault,
+                        mlock_pin_flavor,
+                        netstack_mark,
                     },
                 selinux,
                 ashmem,
                 framebuffer,
+                aspect_ratio,
+                enable_visual_debugging,
                 gralloc,
                 magma_supported_vendors,
                 gfxstream,
@@ -142,12 +171,13 @@ impl Features {
                 custom_artifacts,
                 android_serialno,
                 self_profile,
-                aspect_ratio,
                 perfetto,
                 android_fdr,
                 rootfs_rw,
                 network_manager,
                 nanohub,
+                enable_utc_time_adjustment,
+                thermal,
             } => {
                 inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -187,6 +217,13 @@ impl Features {
                 inspect_node.record_bool("rootfs_rw", *rootfs_rw);
                 inspect_node.record_bool("network_manager", *network_manager);
                 inspect_node.record_bool("nanohub", *nanohub);
+                inspect_node.record_string(
+                    "thermal",
+                    match thermal {
+                        Some(devices) => devices.join(","),
+                        None => "".to_string(),
+                    },
+                );
 
                 inspect_node.record_child("kernel", |kernel_node| {
                     kernel_node.record_bool("bpf_v2", *bpf_v2);
@@ -199,10 +236,17 @@ impl Features {
                         "default_seclabel",
                         default_seclabel.as_deref().unwrap_or_default(),
                     );
+                    kernel_node.record_bool("selinux_test_suite", *selinux_test_suite);
                     inspect_node.record_string(
                         "default_ns_mount_options",
                         format!("{:?}", default_ns_mount_options),
                     );
+                    inspect_node
+                        .record_bool("enable_utc_time_adjustment", *enable_utc_time_adjustment);
+                    inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
+                    inspect_node
+                        .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
+                    inspect_node.record_bool("netstack_mark", *netstack_mark);
                 });
             }
         });
@@ -212,12 +256,17 @@ impl Features {
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
-pub fn parse_features(
-    config: &Config,
-    structured_config: &starnix_kernel_structured_config::Config,
-) -> Result<Features, Error> {
+pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error> {
+    let ContainerStructuredConfig {
+        enable_utc_time_adjustment,
+        extra_features,
+        mlock_always_onfault,
+        mlock_pin_flavor,
+        ui_visual_debugging_level,
+    } = &start_info.config;
+
     let mut features = Features::default();
-    for entry in &config.program.features {
+    for entry in start_info.program.features.iter().chain(extra_features.iter()) {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -267,6 +316,7 @@ pub fn parse_features(
                         }).collect::<Result<Vec<u16>, Error>>()?);
             },
             ("nanohub", _) => features.nanohub = true,
+            ("netstack_mark", _) => features.kernel.netstack_mark = true,
             ("network_manager", _) => features.network_manager = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("gfxstream", _) => features.gfxstream = true,
@@ -289,21 +339,26 @@ pub fn parse_features(
             ("selinux", arg) => {
                 features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
             }
+            ("selinux_test_suite", _) => features.kernel.selinux_test_suite = true,
             ("test_data", _) => features.test_data = true,
+            ("thermal", Some(arg)) =>
+                features.thermal = Some(
+                    arg.split(',').map(String::from).collect::<Vec<String>>()),
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
             }
         };
     }
 
-    if structured_config.ui_visual_debugging_level > 0 {
-        features.kernel.enable_visual_debugging = true;
+    if *ui_visual_debugging_level > 0 {
+        features.enable_visual_debugging = true;
     }
+    features.enable_utc_time_adjustment = *enable_utc_time_adjustment;
 
-    features.kernel.default_uid = config.program.default_uid.0;
-    features.kernel.default_seclabel = config.program.default_seclabel.clone();
+    features.kernel.default_uid = start_info.program.default_uid.0;
+    features.kernel.default_seclabel = start_info.program.default_seclabel.clone();
     features.kernel.default_ns_mount_options =
-        if let Some(mount_options) = &config.program.default_ns_mount_options {
+        if let Some(mount_options) = &start_info.program.default_ns_mount_options {
             let options = mount_options
                 .iter()
                 .map(|item| {
@@ -317,6 +372,9 @@ pub fn parse_features(
         } else {
             None
         };
+
+    features.kernel.mlock_always_onfault = *mlock_always_onfault;
+    features.kernel.mlock_pin_flavor = MlockPinFlavor::parse(mlock_pin_flavor.as_str())?;
 
     Ok(features)
 }
@@ -334,7 +392,13 @@ pub fn run_container_features(
 
     #[cfg(not(feature = "starnix_lite"))]
     if features.framebuffer {
-        fb_device_init(locked, system_task);
+        let framebuffer = Framebuffer::device_init(
+            locked,
+            system_task,
+            features.aspect_ratio,
+            features.enable_visual_debugging,
+        )
+        .context("initializing framebuffer")?;
 
         let (touch_source_client, touch_source_server) = fidl::endpoints::create_endpoints();
         let (mouse_source_client, mouse_source_server) = fidl::endpoints::create_endpoints();
@@ -364,13 +428,13 @@ pub fn run_container_features(
         //
         // In the future, we would like to avoid initializing a framebuffer unconditionally on the
         // Kernel, at which point this logic will need to change.
-        *kernel.framebuffer.view_identity.lock() = Some(view_identity);
-        *kernel.framebuffer.view_bound_protocols.lock() = Some(view_bound_protocols);
+        *framebuffer.view_identity.lock() = Some(view_identity);
+        *framebuffer.view_bound_protocols.lock() = Some(view_bound_protocols);
 
-        let framebuffer = kernel.framebuffer.info.read();
+        let framebuffer_info = framebuffer.info.read();
 
-        let display_width = framebuffer.xres as i32;
-        let display_height = framebuffer.yres as i32;
+        let display_width = framebuffer_info.xres as i32;
+        let display_height = framebuffer_info.yres as i32;
 
         let touch_device =
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
@@ -418,7 +482,7 @@ pub fn run_container_features(
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
-        kernel.framebuffer.start_server(kernel, None).expect("Failed to start framebuffer server");
+        framebuffer.start_server(kernel, None);
     }
     #[cfg(not(feature = "starnix_lite"))]
     if features.gralloc {
@@ -474,6 +538,9 @@ pub fn run_container_features(
     if features.nanohub {
         nanohub_device_init(locked, system_task);
     }
+    if let Some(devices) = &features.thermal {
+        thermal_device_init(locked, system_task, devices.clone());
+    }
 
     Ok(())
 }
@@ -490,10 +557,7 @@ pub fn run_component_features(
         match entry.as_str() {
             "framebuffer" => {
                 #[cfg(not(feature = "starnix_lite"))]
-                kernel
-                    .framebuffer
-                    .start_server(kernel, incoming_dir.take())
-                    .expect("Failed to start framebuffer server");
+                Framebuffer::get(kernel)?.start_server(kernel, incoming_dir.take());
             }
             feature => {
                 return error!(ENOSYS, format!("Unsupported feature: {}", feature));

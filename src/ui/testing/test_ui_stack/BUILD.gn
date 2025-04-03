@@ -16,7 +16,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_cpp",
     "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_cpp",
-    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_cpp",
     "//sdk/fidl/fuchsia.input.virtualkeyboard:fuchsia.input.virtualkeyboard_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",

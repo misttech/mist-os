@@ -5,8 +5,9 @@
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecOutputBuffer};
 use crate::vfs::{
-    default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
-    FsNodeOps, SeekTarget, SimpleFileNode,
+    default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, Buffer, FileObject,
+    FileOps, FsNodeOps, OutputBufferCallback, PeekBufferSegmentsCallback, SeekTarget,
+    SimpleFileNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
@@ -273,7 +274,7 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DynamicFileBuf(VecDeque<u8>);
 impl DynamicFileBuf {
     pub fn write(&mut self, data: &[u8]) {
@@ -290,6 +291,46 @@ impl DynamicFileBuf {
         std::io::Write::write_fmt(&mut self.0, args).map_err(|_| errno!(EINVAL))?;
         let end_size = self.0.len();
         Ok(end_size - start_size)
+    }
+}
+
+impl Buffer for DynamicFileBuf {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        std::unimplemented!();
+    }
+
+    fn peek_each_segment(
+        &mut self,
+        _callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        std::unimplemented!();
+    }
+}
+
+impl OutputBuffer for DynamicFileBuf {
+    fn available(&self) -> usize {
+        std::unimplemented!();
+    }
+
+    fn bytes_written(&self) -> usize {
+        std::unimplemented!();
+    }
+
+    fn zero(&mut self) -> Result<usize, Errno> {
+        std::unimplemented!();
+    }
+
+    fn write_each(&mut self, _callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
+        std::unimplemented!();
+    }
+
+    fn write_all(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
+        self.write(buffer);
+        Ok(buffer.len())
+    }
+
+    unsafe fn advance(&mut self, _length: usize) -> Result<(), Errno> {
+        std::unimplemented!();
     }
 }
 

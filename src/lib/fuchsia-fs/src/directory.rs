@@ -772,15 +772,12 @@ mod tests {
     use futures::channel::oneshot;
     use proptest::prelude::*;
     use tempfile::TempDir;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
     use vfs::remote::remote_dir;
-    use vfs::{pseudo_directory, ObjectRequest};
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
-    #[cfg(target_os = "fuchsia")]
     #[cfg(target_os = "fuchsia")]
     const LONG_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(30);
 
@@ -986,15 +983,8 @@ mod tests {
             },
             "rw" => remote_dir(dir)
         };
-        let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let example_dir_flags =
-            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        ObjectRequest::new(example_dir_flags, &fio::Options::default(), example_dir_service.into())
-            .handle(|request| {
-                example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
-            });
+        let example_dir_proxy =
+            vfs::directory::serve(example_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         for (file_name, flags, should_succeed) in vec![
             ("ro/read_only", fio::PERM_READABLE, true),
@@ -1248,11 +1238,9 @@ mod tests {
     }
 
     // readdir
-    // TODO(https://fxbug.dev/324111518): Transition test to open3.
 
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir() {
-        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1260,17 +1248,11 @@ mod tests {
                 "ignored" => read_only(""),
             },
         };
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server_end.into_channel()),
-        );
+        let dir_proxy = vfs::directory::serve_read_only(dir);
 
         // run twice to check that seek offset is properly reset before reading the directory
         for _ in 0..2 {
-            let entries = readdir(&dir_client).await.expect("readdir failed");
+            let entries = readdir(&dir_proxy).await.expect("readdir failed");
             assert_eq!(
                 entries,
                 vec![
@@ -1284,10 +1266,8 @@ mod tests {
 
     // dir_contains
 
-    // TODO(https://fxbug.dev/324111518): Transition test to open3.
     #[fasync::run_singlethreaded(test)]
     async fn test_dir_contains() {
-        let (dir_client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let dir = pseudo_directory! {
             "afile" => read_only(""),
             "zzz" => read_only(""),
@@ -1295,19 +1275,13 @@ mod tests {
                 "ignored" => read_only(""),
             },
         };
-        let scope = ExecutionScope::new();
-        let () = dir.open(
-            scope,
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server_end.into_channel()),
-        );
+        let dir_proxy = vfs::directory::serve_read_only(dir);
 
         for file in &["afile", "zzz", "subdir"] {
-            assert!(dir_contains(&dir_client, file).await.unwrap());
+            assert!(dir_contains(&dir_proxy, file).await.unwrap());
         }
 
-        assert!(!dir_contains(&dir_client, "notin")
+        assert!(!dir_contains(&dir_proxy, "notin")
             .await
             .expect("error checking if dir contains notin"));
     }

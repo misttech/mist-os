@@ -23,6 +23,11 @@ _ZX_TYPES = [
 ]
 
 
+class Unsupported:
+    def __init__(self, _unsupported: typing.Self) -> None:
+        raise NotImplementedError
+
+
 def construct_response_object(response_ident: str, response_obj: Any) -> Any:
     obj = make_default_obj_from_ident(response_ident)
     return construct_result(obj, response_obj)
@@ -38,12 +43,16 @@ def construct_result(constructed_obj: T, parsed_obj: Any) -> T:
         return None
 
     if getattr(constructed_obj, "__fidl_kind__", None) == "union":
-        key = camel_case_to_snake_case(next(iter(parsed_obj.keys())))
-        sub_obj_type = getattr(constructed_obj, f"{key}_type")
-        sub_parsed_obj = parsed_obj[key]
-        setattr(constructed_obj, key, None)
+        # Union types only contain one variant when decoded, so take the first key.
+        internal_variant_name = (
+            f"_{camel_case_to_snake_case(next(iter(parsed_obj.keys())))}"
+        )
+        sub_obj_type = inspect.get_annotations(
+            type(constructed_obj), eval_str=True
+        )[internal_variant_name]
+        sub_parsed_obj = parsed_obj[internal_variant_name[1:]]
         return construct_from_name_and_type(
-            constructed_obj, sub_parsed_obj, key, sub_obj_type
+            constructed_obj, sub_parsed_obj, internal_variant_name, sub_obj_type
         )
     elements = inspect.get_annotations(type(constructed_obj), eval_str=True)
     for name, ty in elements.items():
@@ -69,7 +78,13 @@ def make_default_obj_from_ident(ident: str) -> Any:
     split = ident.split("/")
     library = "fidl." + split[0].replace(".", "_")
     ty = split[1]
-    mod = sys.modules[library]
+    try:
+        mod = sys.modules[library]
+    except KeyError:
+        # Try using fidl_ as the prefix because static FIDL bindings may
+        # be available.
+        library = "fidl_" + split[0].replace(".", "_")
+        mod = sys.modules[library]
     obj_ty = getattr(mod, ty)
     return obj_ty.make_default()
 
@@ -147,6 +162,21 @@ def unwrap_innermost_type(
         ty_args_mut.remove(type(None))
         return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
 
+    # Meta-typing layer that allows unions of IntEnum, IntFlag, and int because IntEnum and IntFlag
+    # are subclasses of int. This special case is an affordance made to support decode into static
+    # FIDL binding types.
+    if (
+        len(ty_args) == 2
+        and typing.get_origin(ty) in (Union, UnionType)
+        and all(issubclass(x, int) for x in ty_args)
+    ):
+        assert ty_args[0].__module__.startswith(
+            "fidl_"
+        ), f"Encountered union of int with non-static FIDL binding type: {_original_ty}"
+        ty_args_mut = list(ty_args)
+        ty_args_mut.remove(int)  # Retain the static FIDL binding type.
+        return unwrap_innermost_type(ty_args_mut[0], _original_ty=_original_ty)
+
     # The meta-typing layer is not an Optional, not an instance of ForwardRef, and has multiple
     # arguments.
     raise RuntimeError(
@@ -158,8 +188,8 @@ def _is_basic_fidl_type(ty: type) -> bool:
     return ty in [bool, int, float, str]
 
 
-# Assert that `value` is compatible with FIDL type `ty`. Some FIDL types are represented by int, so an
-# allowance is made to decode a ty from an int if `ty` if a fidl* module.
+# Assert that `value` is compatible with FIDL type `ty`. Some FIDL types are represented by int, so
+# an allowance is made to decode a ty from an int if `ty` is from a fidl* module.
 def _assert_compatible_fidl_type(value: Any, ty: type) -> None:
     assert isinstance(value, ty) or (
         getattr(ty, "__module__", "").startswith("fidl")
@@ -178,6 +208,31 @@ def construct_from_name_and_type(
 
     unwrapped_ty = unwrap_innermost_type(ty)
 
+    # The only field of a FIDL type that can be unwrapped to None is the response variant of a
+    # result union. This is because a result union always contains a response variant, even if it
+    # could only contain an empty success struct. The fidlgen_python bindings compile empty success
+    # structs to None, and so the response variant in such case has the type Optional[None].
+    #
+    # TODO(https://fxbug.dev/405126774): This assertion double-checks that the bindings always
+    # conform to what was just described. Once handling of result types is improved, this assertion
+    # will not be necessary.
+    if unwrapped_ty is type(None):
+        assert (
+            name == "_response"
+            and hasattr(constructed_obj, "_is_result")
+            and constructed_obj._is_result
+            and isinstance(sub_parsed_obj, dict)
+            and len(sub_parsed_obj) == 0
+        ), f"""
+            Non-result type being constructed with NoneType
+                sub_parsed_obj: {sub_parsed_obj!r}
+                constructed_obj: {constructed_obj!r}
+                name: {name}
+                ty: {ty!r}
+        """
+        setattr(constructed_obj, name, None)
+        return constructed_obj
+
     # Check for a basic FIDL type that cannot be unwrapped.
     if _is_basic_fidl_type(type(sub_parsed_obj)):
         _assert_compatible_fidl_type(sub_parsed_obj, unwrapped_ty)
@@ -193,7 +248,13 @@ def construct_from_name_and_type(
     ):
         assert isinstance(
             sub_parsed_obj, int
-        ), f"Received {unwrapped_ty} not represented as an int: {sub_parsed_obj}"
+        ), f"""
+            Received {unwrapped_ty} not represented as an int: {sub_parsed_obj}
+                sub_parsed_obj: {sub_parsed_obj!r}
+                constructed_obj: {constructed_obj!r}
+                name: {name}
+                ty: {ty!r}
+        """
         setattr(constructed_obj, name, sub_parsed_obj)
         return constructed_obj
 
@@ -201,7 +262,16 @@ def construct_from_name_and_type(
     # list. When sub_parsed_obj is a dict, this function assumes the contents of the dict are the
     # key value pair of some FIDL type, whether it's a struct, table, etc.
     if isinstance(sub_parsed_obj, dict):
-        sub_obj = unwrapped_ty.make_default()  # type: ignore[attr-defined]
+        assert hasattr(
+            unwrapped_ty, "make_default"
+        ), f"""
+            Failed to construct default {unwrapped_ty}
+                sub_parsed_obj: {sub_parsed_obj!r}
+                constructed_obj: {constructed_obj!r}
+                name: {name}
+                ty: {ty!r}
+        """
+        sub_obj = unwrapped_ty.make_default()
         sub_obj = construct_result(sub_obj, sub_parsed_obj)
         setattr(constructed_obj, name, sub_obj)
         return constructed_obj
@@ -227,7 +297,16 @@ def construct_from_name_and_type(
                     results.append(handle_list(item))
                     continue
 
-                sub_obj = unwrapped_ty.make_default()  # type: ignore[attr-defined]
+                assert hasattr(
+                    unwrapped_ty, "make_default"
+                ), f"""
+                    Failed to construct default {unwrapped_ty}
+                        sub_parsed_obj: {sub_parsed_obj!r}
+                        constructed_obj: {constructed_obj!r}
+                        name: {name}
+                        ty: {ty!r}
+                """
+                sub_obj = unwrapped_ty.make_default()
                 if isinstance(sub_obj, Enum):
                     # This is a bit of a special case that can't be set from behind a function,
                     # so the variable has to be set directly. This is also the case for bits

@@ -627,7 +627,7 @@ static void pc_init_timer(uint level) {
     // instead we use the time of clock selection ("now" according to the TSC)
     // to define the zero point on our ticks timeline moving forward.
     timer_set_ticks_to_time_ratio(rdtsc_ticks_to_clock_monotonic);
-    timer_set_initial_ticks_offset(-current_ticks_rdtsc());
+    timer_set_initial_ticks_offset(static_cast<uint64_t>(-current_ticks_rdtsc()));
 
     // A note about this casting operation.  There is a technical risk of UB
     // here, in the case that -mono_ticks_offset is a value too large to
@@ -704,7 +704,7 @@ static void pc_init_timer(uint level) {
       // See the HPET code above.  Observe the value of TSC as we figure out the
       // PIT offset so that we can define a function which maps EarlyTicks to
       // ticks.
-      timer_set_initial_ticks_offset(-current_ticks_pit());
+      timer_set_initial_ticks_offset(static_cast<uint64_t>(-current_ticks_pit()));
       const zx_ticks_t tsc_reference = current_ticks_rdtsc();
 
       affine::Ratio rdtsc_ticks_to_pit_ticks = affine::Ratio::Product(

@@ -9,15 +9,15 @@ use crate::refs::FatfsFileRef;
 use crate::types::File;
 use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::RwLock;
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::{Read, Seek, Write};
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use vfs::attributes;
 use vfs::directory::entry::EntryInfo;
-use vfs::execution_scope::ExecutionScope;
-use vfs::file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
-use vfs::{attributes, ObjectRequestRef};
+use vfs::file::{File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
 use zx::{self as zx, Status};
 
 fn extend(file: &mut File<'_>, mut current: u64, target: u64) -> Result<(), Status> {
@@ -101,7 +101,7 @@ impl FatFile {
         offset: Option<u64>,
         content: &[u8],
     ) -> Result<(u64, u64), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
         let mut file_offset = match offset {
             Some(offset) => {
@@ -136,15 +136,6 @@ impl FatFile {
         self.filesystem.mark_dirty();
         Ok((total_written as u64, file_offset))
     }
-
-    pub(crate) fn create_connection(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        object_request.spawn_connection(scope, self, flags, FidlIoConnection::create)
-    }
 }
 
 impl Node for FatFile {
@@ -164,7 +155,7 @@ impl Node for FatFile {
         name: &str,
         fs: &FatFilesystemInner,
     ) -> Result<(), Status> {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write();
         data.name = name.to_owned();
         // Safe because we hold the fs lock.
         let file = unsafe { self.file.get().as_mut() }.unwrap();
@@ -175,11 +166,11 @@ impl Node for FatFile {
     }
 
     fn did_delete(&self) {
-        self.data.write().unwrap().parent.take();
+        self.data.write().parent.take();
     }
 
     fn open_ref(&self, fs_lock: &FatFilesystemInner) -> Result<(), Status> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read();
         let file_ref = unsafe { self.file.get().as_mut() }.unwrap();
         unsafe { file_ref.open(&fs_lock, data.parent.as_deref(), &data.name) }
     }
@@ -208,7 +199,7 @@ impl vfs::node::Node for FatFile {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file(&fs_lock)?;
         let content_size = file.len() as u64;
         let creation_time = dos_to_unix_time(file.created());
@@ -236,7 +227,7 @@ impl vfs::node::Node for FatFile {
     }
 
     fn close(self: Arc<Self>) {
-        self.close_ref(&self.filesystem.lock().unwrap());
+        self.close_ref(&self.filesystem.lock());
     }
 
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
@@ -244,13 +235,13 @@ impl vfs::node::Node for FatFile {
     }
 
     fn will_clone(&self) {
-        self.open_ref(&self.filesystem.lock().unwrap()).unwrap();
+        self.open_ref(&self.filesystem.lock()).unwrap();
     }
 }
 
 impl Debug for FatFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FatFile").field("name", &self.data.read().unwrap().name).finish()
+        f.debug_struct("FatFile").field("name", &self.data.read().name).finish()
     }
 }
 
@@ -264,7 +255,7 @@ impl VfsFile for FatFile {
     }
 
     async fn truncate(&self, length: u64) -> Result<(), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
         seek_for_write(file, length)?;
         file.truncate().map_err(fatfs_error_to_status)?;
@@ -295,7 +286,7 @@ impl VfsFile for FatFile {
             return Err(Status::NOT_SUPPORTED);
         }
 
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
         let mut needs_flush = false;
         if let Some(creation_time) = attributes.creation_time {
@@ -315,13 +306,13 @@ impl VfsFile for FatFile {
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file(&fs_lock)?;
         Ok(file.len() as u64)
     }
 
     async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
 
         file.flush().map_err(fatfs_error_to_status)?;
@@ -331,7 +322,7 @@ impl VfsFile for FatFile {
 
 impl VfsFileIo for FatFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
+        let fs_lock = self.filesystem.lock();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
 
         let real_offset =
@@ -389,7 +380,7 @@ mod tests {
             let fs = disk.into_fatfs();
             let dir = fs.get_fatfs_root();
             let mut closer = Closer::new(&fs.filesystem());
-            dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
+            dir.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
             closer.add(FatNode::Dir(dir.clone()));
             let file = match dir
                 .open_child("test_file", fio::OpenFlags::empty(), &mut closer)
@@ -398,14 +389,14 @@ mod tests {
                 FatNode::File(f) => f,
                 val => panic!("Unexpected value {:?}", val),
             };
-            file.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
+            file.open_ref(&fs.filesystem().lock()).expect("open_ref failed");
             TestFile(file)
         }
     }
 
     impl Drop for TestFile {
         fn drop(&mut self) {
-            self.0.close_ref(&self.0.filesystem.lock().unwrap());
+            self.0.close_ref(&self.0.filesystem.lock());
         }
     }
 

@@ -17,8 +17,7 @@ use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
 use fidl::AsHandleRef;
 use fidl_fuchsia_fxfs::{
-    BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
-    ProjectIdRequestStream, ProjectIterToken,
+    BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
 };
 use fs_inspect::{FsInspectVolume, VolumeData};
 use fuchsia_sync::Mutex;
@@ -40,6 +39,7 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::entry_container::Directory as VfsDirectory;
+use vfs::directory::simple::Simple;
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -594,7 +594,6 @@ impl FsInspectVolume for FxVolume {
     }
 }
 
-#[async_trait]
 pub trait RootDir: FxNode + DirectoryEntry {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
 
@@ -602,8 +601,12 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
-    async fn handle_blob_creator_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
-    async fn handle_blob_reader_requests(self: Arc<Self>, _requests: BlobReaderRequestStream) {}
+    fn register_additional_volume_services(
+        self: Arc<Self>,
+        _svc_dir: &Simple,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -786,7 +789,7 @@ pub fn info_to_filesystem_info(
         free_shared_pool_bytes: 0,
         fs_id,
         block_size: block_size as u32,
-        max_filename_size: fio::MAX_FILENAME as u32,
+        max_filename_size: fio::MAX_NAME_LENGTH as u32,
         fs_type: fidl_fuchsia_fs::VfsType::Fxfs.into_primitive(),
         padding: 0,
         name: FXFS_INFO_NAME_FIDL,

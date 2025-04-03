@@ -247,10 +247,20 @@ impl SackBlocks {
         Some(TcpOption::Sack(inner.as_slice()))
     }
 
-    /// Returns an iterator over the [`SackBlock`]s contained in this option.
-    pub fn iter(&self) -> impl Iterator<Item = SackBlock> + '_ {
+    /// Returns an iterator over the *valid* [`SackBlock`]s contained in this
+    /// option.
+    pub fn iter_skip_invalid(&self) -> impl Iterator<Item = SackBlock> + '_ {
+        self.try_iter().filter_map(|r| match r {
+            Ok(s) => Some(s),
+            Err(InvalidSackBlockError(_, _)) => None,
+        })
+    }
+
+    /// Returns an iterator yielding the results of converting the blocks in
+    /// this option to valid [`SackBlock`]s.
+    pub fn try_iter(&self) -> impl Iterator<Item = Result<SackBlock, InvalidSackBlockError>> + '_ {
         let Self(inner) = self;
-        inner.iter().map(|block| SackBlock(block.left_edge().into(), block.right_edge().into()))
+        inner.iter().map(|block| SackBlock::try_from(*block))
     }
 
     /// Creates a new [`SackBlocks`] option from a slice of blocks seen in a TCP
@@ -268,7 +278,7 @@ impl SackBlocks {
         Self(
             iter.into_iter()
                 .take(Self::MAX_BLOCKS)
-                .map(|SackBlock(left, right)| TcpSackBlock::new(left.into(), right.into()))
+                .map(|block| TcpSackBlock::from(block))
                 .collect(),
         )
     }
@@ -280,11 +290,99 @@ impl SackBlocks {
     }
 }
 
-/// A selective ACK block.
-///
-/// Contains the left and right markers for a received data segment.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct SackBlock(pub SeqNum, pub SeqNum);
+mod sack_block {
+    use super::*;
+
+    /// A selective ACK block.
+    ///
+    /// Contains the left and right markers for a received data segment. It is a
+    /// witness for a valid non empty open range of `SeqNum`.
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    pub struct SackBlock {
+        // NB: We don't use core::ops::Range here because it doesn't implement Copy.
+        left: SeqNum,
+        right: SeqNum,
+    }
+
+    impl SackBlock {
+        /// Attempts to create a new [`SackBlock`] with the range `[left, right)`.
+        ///
+        /// Returns an error if `right` is at or before `left`.
+        pub fn try_new(left: SeqNum, right: SeqNum) -> Result<Self, InvalidSackBlockError> {
+            if right.after(left) {
+                Ok(Self { left, right })
+            } else {
+                Err(InvalidSackBlockError(left, right))
+            }
+        }
+
+        /// Consumes this [`SackBlock`] returning a [`Range`] representation.
+        pub fn into_range(self) -> Range<SeqNum> {
+            let Self { left, right } = self;
+            Range { start: left, end: right }
+        }
+
+        /// Consumes this [`SackBlock`] returning a [`Range`] representation
+        /// unwrapping the [`SeqNum`] representation into `u32`.
+        pub fn into_range_u32(self) -> Range<u32> {
+            let Self { left, right } = self;
+            Range { start: left.into(), end: right.into() }
+        }
+
+        /// Returns the left (inclusive) edge of the block.
+        pub fn left(&self) -> SeqNum {
+            self.left
+        }
+
+        /// Returns the right (exclusive) edge of the block.
+        pub fn right(&self) -> SeqNum {
+            self.right
+        }
+
+        /// Returns a tuple of the left (inclusive) and right (exclusive) edges
+        /// of the block.
+        pub fn into_parts(self) -> (SeqNum, SeqNum) {
+            let Self { left, right } = self;
+            (left, right)
+        }
+    }
+
+    /// Error returned when attempting to create a [`SackBlock`] with an invalid
+    /// range (i.e. right edge <= left edge).
+    #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+    pub struct InvalidSackBlockError(pub SeqNum, pub SeqNum);
+
+    impl From<SackBlock> for TcpSackBlock {
+        fn from(value: SackBlock) -> Self {
+            let SackBlock { left, right } = value;
+            TcpSackBlock::new(left.into(), right.into())
+        }
+    }
+
+    impl TryFrom<TcpSackBlock> for SackBlock {
+        type Error = InvalidSackBlockError;
+
+        fn try_from(value: TcpSackBlock) -> Result<Self, Self::Error> {
+            Self::try_new(value.left_edge().into(), value.right_edge().into())
+        }
+    }
+
+    impl From<SackBlock> for Range<SeqNum> {
+        fn from(value: SackBlock) -> Self {
+            value.into_range()
+        }
+    }
+
+    impl TryFrom<Range<SeqNum>> for SackBlock {
+        type Error = InvalidSackBlockError;
+
+        fn try_from(value: Range<SeqNum>) -> Result<Self, Self::Error> {
+            let Range { start, end } = value;
+            Self::try_new(start, end)
+        }
+    }
+}
+pub use sack_block::{InvalidSackBlockError, SackBlock};
 
 /// The maximum length that the sequence number doesn't wrap around.
 pub const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
@@ -1228,8 +1326,8 @@ mod test {
             control: None,
             options: SegmentOptions {
                 sack_blocks: SackBlocks::from_iter([
-                    SackBlock(SeqNum::new(1), SeqNum::new(2)),
-                    SackBlock(SeqNum::new(4), SeqNum::new(6)),
+                    SackBlock::try_new(SeqNum::new(1), SeqNum::new(2)).unwrap(),
+                    SackBlock::try_new(SeqNum::new(4), SeqNum::new(6)).unwrap(),
                 ]),
             }
             .into(),
@@ -1315,5 +1413,26 @@ mod test {
         }))]
     fn flags_to_control(input: Flags) -> Result<Option<Control>, MalformedFlags> {
         input.control()
+    }
+
+    #[test]
+    fn sack_block_try_new() {
+        assert_matches!(SackBlock::try_new(SeqNum::new(1), SeqNum::new(2)), Ok(_));
+        assert_matches!(
+            SackBlock::try_new(SeqNum::new(0u32.wrapping_sub(1)), SeqNum::new(2)),
+            Ok(_)
+        );
+        assert_eq!(
+            SackBlock::try_new(SeqNum::new(1), SeqNum::new(1)),
+            Err(InvalidSackBlockError(SeqNum::new(1), SeqNum::new(1)))
+        );
+        assert_eq!(
+            SackBlock::try_new(SeqNum::new(2), SeqNum::new(1)),
+            Err(InvalidSackBlockError(SeqNum::new(2), SeqNum::new(1)))
+        );
+        assert_eq!(
+            SackBlock::try_new(SeqNum::new(0), SeqNum::new(0u32.wrapping_sub(1))),
+            Err(InvalidSackBlockError(SeqNum::new(0), SeqNum::new(0u32.wrapping_sub(1))))
+        );
     }
 }

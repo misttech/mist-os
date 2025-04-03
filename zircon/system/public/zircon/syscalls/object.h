@@ -67,6 +67,8 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_VMAR_MAPS                   ((zx_object_info_topic_t) 36u) // zx_info_maps_t[n]
 #define ZX_INFO_POWER_DOMAINS               ((zx_object_info_topic_t) 37u) // zx_info_power_domain_info_t[n] - next syscall.
 #define ZX_INFO_INTERRUPT                   ((zx_object_info_topic_t) 39u) // zx_info_interrupt_t[1].
+#define ZX_INFO_CLOCK_MAPPED_SIZE           ((zx_object_info_topic_t)40u)  // uint64_t
+
 
 // Return codes set when a task is killed.
 #define ZX_TASK_RETCODE_SYSCALL_KILL            ((int64_t) -1024)   // via zx_task_kill().

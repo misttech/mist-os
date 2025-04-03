@@ -17,6 +17,7 @@
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
 #include "src/developer/memory/monitor/high_water.h"
+#include "src/developer/memory/monitor/imminent_oom_observer.h"
 #include "src/developer/memory/monitor/logger.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/metrics.h"
@@ -25,6 +26,7 @@ namespace monitor {
 
 namespace test {
 class MemoryBandwidthInspectTest;
+class MonitorPressureTest;
 }  // namespace test
 
 class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
@@ -35,7 +37,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
       memory::CaptureMaker capture_maker,
       std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
           std::nullopt,
-      std::optional<zx_handle_t> root_job = std::nullopt,
+      ImminentOomObserver* imminent_oom_observer = nullptr,
       std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>>
           metric_event_logger_factory = std::nullopt,
       std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device = std::nullopt);
@@ -91,13 +93,10 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   pressure_signaler::Level level_;
 
   // Imminent OOM monitoring
-  void WaitForImminentOom();
-  void WatchForImminentOom();
-  zx_handle_t imminent_oom_event_handle_;
-  async::TaskClosureMethod<Monitor, &Monitor::WatchForImminentOom> watch_task_{this};
-  async::Loop imminent_oom_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  ImminentOomObserver* imminent_oom_observer_;
 
   friend class test::MemoryBandwidthInspectTest;
+  friend class test::MonitorPressureTest;
   FXL_DISALLOW_COPY_AND_ASSIGN(Monitor);
 };
 

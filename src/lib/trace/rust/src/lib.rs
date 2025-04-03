@@ -540,10 +540,11 @@ macro_rules! duration_end {
 /// to matching duration begin and duration end events are combined together in
 /// the trace; it is not necessary to repeat them.
 pub fn duration_begin(context: &TraceCategoryContext, name: &'static CStr, args: &[Arg<'_>]) {
+    let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
     let name_ref = context.register_string_literal(name);
-    context.write_duration_begin(name_ref, args);
+    context.write_duration_begin(ticks, name_ref, args);
 }
 
 /// Writes a duration end event only.
@@ -556,10 +557,11 @@ pub fn duration_begin(context: &TraceCategoryContext, name: &'static CStr, args:
 /// to matching duration begin and duration end events are combined together in
 /// the trace; it is not necessary to repeat them.
 pub fn duration_end(context: &TraceCategoryContext, name: &'static CStr, args: &[Arg<'_>]) {
+    let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
     let name_ref = context.register_string_literal(name);
-    context.write_duration_end(name_ref, args);
+    context.write_duration_end(ticks, name_ref, args);
 }
 
 /// AsyncScope maintains state around the context of async events generated via the
@@ -886,10 +888,11 @@ pub fn flow_begin(
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
+    let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
     let name_ref = context.register_string_literal(name);
-    context.write_flow_begin(name_ref, flow_id, args);
+    context.write_flow_begin(ticks, name_ref, flow_id, args);
 }
 
 /// Writes a flow end event with the specified id.
@@ -914,10 +917,11 @@ pub fn flow_end(
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
+    let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
     let name_ref = context.register_string_literal(name);
-    context.write_flow_end(name_ref, flow_id, args);
+    context.write_flow_end(ticks, name_ref, flow_id, args);
 }
 
 /// Writes a flow step event with the specified id.
@@ -942,10 +946,209 @@ pub fn flow_step(
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
+    let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
     let name_ref = context.register_string_literal(name);
-    context.write_flow_step(name_ref, flow_id, args);
+    context.write_flow_step(ticks, name_ref, flow_id, args);
+}
+
+/// Convenience macro to emit the beginning of a flow attached to an instant event.
+///
+/// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+/// duration event to attach to, or the relevant duration is very small, which makes visualizing
+/// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+/// to see in the tracing UI.
+///
+/// Example:
+///
+/// ```rust
+/// let flow_id = 1234;
+/// instant_flow_begin!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// ```
+#[macro_export]
+macro_rules! instant_flow_begin {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::instant_flow_begin(
+                    &context,
+                    $event_name,
+                    $flow_name,
+                    $flow_id,
+                    &[$($crate::ArgValue::of($key, $val)),*],
+                )
+            }
+        }
+    }
+}
+
+/// Convenience macro to emit the end of a flow attached to an instant event.
+///
+/// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+/// duration event to attach to, or the relevant duration is very small, which makes visualizing
+/// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+/// to see in the tracing UI.
+///
+/// Example:
+///
+/// ```rust
+/// let flow_id = 1234;
+/// instant_flow_end!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// ```
+#[macro_export]
+macro_rules! instant_flow_end {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::instant_flow_end(
+                    &context,
+                    $event_name,
+                    $flow_name,
+                    $flow_id,
+                    &[$($crate::ArgValue::of($key, $val)),*],
+                )
+            }
+        }
+    }
+}
+
+/// Convenience macro to emit a step in a flow attached to an instant event.
+///
+/// Flows must be attached to a duration event. This can be awkward when there isn't an obvious
+/// duration event to attach to, or the relevant duration is very small, which makes visualizing
+/// difficult. This emits a flow event wrapped in a self contained instant event that is also easy
+/// to see in the tracing UI.
+///
+/// Example:
+///
+/// ```rust
+/// let flow_id = 1234;
+/// instant_flow_step!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// ```
+#[macro_export]
+macro_rules! instant_flow_step {
+    (
+        $category:expr,
+        $event_name:expr,
+        $flow_name:expr,
+        $flow_id:expr
+        $(, $key:expr => $val:expr)*
+    ) => {
+        {
+            static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
+            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                $crate::instant_flow_step(
+                    &context,
+                    $event_name,
+                    $flow_name,
+                    $flow_id,
+                    &[$($crate::ArgValue::of($key, $val)),*],
+                )
+            }
+        }
+    }
+}
+
+/// Convenience function to emit the beginning of a flow attached to an instant event.
+///
+/// Flow events describe control flow handoffs between threads or across processes. They are
+/// typically represented as arrows in a visualizer. Flow arrows are from the end of the duration
+/// event which encloses the beginning of the flow to the beginning of the duration event which
+/// encloses the next step or the end of the flow. The id serves to correlate flows which share the
+/// same category and name across processes.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
+/// with additional information. The arguments provided to matching flow begin, flow step, and flow
+/// end events are combined together in the trace; it is not necessary to repeat them.
+pub fn instant_flow_begin(
+    context: &TraceCategoryContext,
+    event_name: &'static CStr,
+    flow_name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
+    let ticks = zx::BootTicks::get();
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    let event_name_ref = context.register_string_literal(event_name);
+    let flow_name_ref = context.register_string_literal(flow_name);
+
+    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_flow_begin(ticks, flow_name_ref, flow_id, args);
+    context.write_duration_end(ticks, event_name_ref, args);
+}
+
+/// Convenience function to the end of a flow attached to an instant event.
+///
+/// Flow events describe control flow handoffs between threads or across processes. They are
+/// typically represented as arrows in a visualizer. Flow arrows are from the end of the duration
+/// event which encloses the beginning of the flow to the beginning of the duration event which
+/// encloses the next step or the end of the flow. The id serves to correlate flows which share the
+/// same category and name across processes.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
+/// with additional information. The arguments provided to matching flow begin, flow step, and flow
+/// end events are combined together in the trace; it is not necessary to repeat them.
+pub fn instant_flow_end(
+    context: &TraceCategoryContext,
+    event_name: &'static CStr,
+    flow_name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
+    let ticks = zx::BootTicks::get();
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    let event_name_ref = context.register_string_literal(event_name);
+    let flow_name_ref = context.register_string_literal(flow_name);
+
+    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_flow_end(ticks, flow_name_ref, flow_id, args);
+    context.write_duration_end(ticks, event_name_ref, args);
+}
+
+/// Convenience function to emit a step in a flow attached to an instant event.
+///
+/// Flow events describe control flow handoffs between threads or across processes. They are
+/// typically represented as arrows in a visualizer. Flow arrows are from the end of the duration
+/// event which encloses the beginning of the flow to the beginning of the duration event which
+/// encloses the next step or the end of the flow. The id serves to correlate flows which share the
+/// same category and name across processes.
+///
+/// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
+/// with additional information. The arguments provided to matching flow begin, flow step, and flow
+/// end events are combined together in the trace; it is not necessary to repeat them.
+pub fn instant_flow_step(
+    context: &TraceCategoryContext,
+    event_name: &'static CStr,
+    flow_name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
+    let ticks = zx::BootTicks::get();
+    assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
+
+    let event_name_ref = context.register_string_literal(event_name);
+    let flow_name_ref = context.register_string_literal(flow_name);
+
+    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_flow_step(ticks, flow_name_ref, flow_id, args);
+    context.write_duration_end(ticks, event_name_ref, args);
 }
 
 // translated from trace-engine/types.h for inlining
@@ -1137,8 +1340,12 @@ impl TraceCategoryContext {
         self.write_duration(name_ref, start_time, args);
     }
 
-    fn write_duration_begin(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::BootTicks::get();
+    fn write_duration_begin(
+        &self,
+        ticks: zx::BootTicks,
+        name_ref: sys::trace_string_ref_t,
+        args: &[Arg<'_>],
+    ) {
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_duration_begin_event_record(
@@ -1155,11 +1362,15 @@ impl TraceCategoryContext {
 
     pub fn write_duration_begin_with_inline_name(&self, name: &str, args: &[Arg<'_>]) {
         let name_ref = trace_make_inline_string_ref(name);
-        self.write_duration_begin(name_ref, args);
+        self.write_duration_begin(zx::BootTicks::get(), name_ref, args);
     }
 
-    fn write_duration_end(&self, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
-        let ticks = zx::BootTicks::get();
+    fn write_duration_end(
+        &self,
+        ticks: zx::BootTicks,
+        name_ref: sys::trace_string_ref_t,
+        args: &[Arg<'_>],
+    ) {
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_duration_end_event_record(
@@ -1176,7 +1387,7 @@ impl TraceCategoryContext {
 
     pub fn write_duration_end_with_inline_name(&self, name: &str, args: &[Arg<'_>]) {
         let name_ref = trace_make_inline_string_ref(name);
-        self.write_duration_end(name_ref, args);
+        self.write_duration_end(zx::BootTicks::get(), name_ref, args);
     }
 
     fn write_async_begin(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
@@ -1258,8 +1469,13 @@ impl TraceCategoryContext {
         }
     }
 
-    fn write_flow_begin(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::BootTicks::get();
+    fn write_flow_begin(
+        &self,
+        ticks: zx::BootTicks,
+        name_ref: sys::trace_string_ref_t,
+        flow_id: Id,
+        args: &[Arg<'_>],
+    ) {
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_begin_event_record(
@@ -1275,8 +1491,13 @@ impl TraceCategoryContext {
         }
     }
 
-    fn write_flow_end(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::BootTicks::get();
+    fn write_flow_end(
+        &self,
+        ticks: zx::BootTicks,
+        name_ref: sys::trace_string_ref_t,
+        flow_id: Id,
+        args: &[Arg<'_>],
+    ) {
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_end_event_record(
@@ -1292,8 +1513,13 @@ impl TraceCategoryContext {
         }
     }
 
-    fn write_flow_step(&self, name_ref: sys::trace_string_ref_t, flow_id: Id, args: &[Arg<'_>]) {
-        let ticks = zx::BootTicks::get();
+    fn write_flow_step(
+        &self,
+        ticks: zx::BootTicks,
+        name_ref: sys::trace_string_ref_t,
+        flow_id: Id,
+        args: &[Arg<'_>],
+    ) {
         let thread_ref = self.register_current_thread();
         unsafe {
             sys::trace_context_write_flow_step_event_record(
@@ -1947,7 +2173,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let name_ref = context.register_string_literal(self.name);
         let flow_id = self.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::BootTicks::get();
-        context.write_flow_begin(name_ref, *flow_id, &[]);
+        context.write_flow_begin(zx::BootTicks::get(), name_ref, *flow_id, &[]);
         self.args.push(ArgValue::of("state", "created"));
         context.write_duration(name_ref, duration_start, &self.args);
         self.args.pop();
@@ -1963,7 +2189,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let name_ref = context.register_string_literal(this.name);
         let flow_id = this.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::BootTicks::get();
-        context.write_flow_step(name_ref, *flow_id, &[]);
+        context.write_flow_step(zx::BootTicks::get(), name_ref, *flow_id, &[]);
         let result = this.future.poll(cx);
         let result_str: &'static str = if result.is_pending() { "pending" } else { "ready" };
         this.args.push(ArgValue::of("state", result_str));
@@ -1978,7 +2204,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
         let name_ref = context.register_string_literal(this.name);
         let flow_id = this.flow_id.get_or_insert_with(Id::new);
         let duration_start = zx::BootTicks::get();
-        context.write_flow_end(name_ref, *flow_id, &[]);
+        context.write_flow_end(zx::BootTicks::get(), name_ref, *flow_id, &[]);
         this.args.push(ArgValue::of("state", "dropped"));
         context.write_duration(name_ref, duration_start, &this.args);
         this.args.pop();

@@ -10,6 +10,10 @@
     use: [
         { protocol: "fuchsia.vsock.Connector" },
         {
+            service: [ "fuchsia.hardware.virtio.pmem.Service" ],
+            availability: "optional",
+        },
+        {
             directory: "ta",
             rights: [ "rx*" ],
             path: "/ta",
@@ -17,6 +21,13 @@
         {
             config: "fuchsia.binder.BindToLoopback",
             key: "bind_to_loopback",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
+        {
+            config: "fuchsia.binder.UseVirtioPmem",
+            key: "use_virtio_pmem",
             type: "bool",
             availability: "optional",
             default: false,

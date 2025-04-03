@@ -66,11 +66,6 @@ pub async fn add_ffx_launch_event(
     metrics_svc.send_events().await
 }
 
-/// Add a metric announcing what protocol our RCS proxy is using.
-pub async fn add_ffx_rcs_protocol_event(proto_name: &str) -> Result<()> {
-    add_custom_event(Some("ffx_rcs_protocol"), Some(&proto_name), None, BTreeMap::new()).await
-}
-
 pub async fn add_daemon_metrics_event(request_str: &str) {
     let request = request_str.to_string();
     let analytics_start = Instant::now();

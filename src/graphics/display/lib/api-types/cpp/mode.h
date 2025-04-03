@@ -56,8 +56,10 @@ class Mode {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr Mode(const Mode::ConstructorArgs& args);
 
-  Mode(const Mode&) = default;
-  Mode& operator=(const Mode&) = default;
+  constexpr Mode(const Mode&) noexcept = default;
+  constexpr Mode(Mode&&) noexcept = default;
+  constexpr Mode& operator=(const Mode&) noexcept = default;
+  constexpr Mode& operator=(Mode&&) noexcept = default;
   ~Mode() = default;
 
   friend constexpr bool operator==(const Mode& lhs, const Mode& rhs);

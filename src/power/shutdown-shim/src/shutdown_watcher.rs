@@ -179,7 +179,7 @@ impl ShutdownWatcher {
         let watcher_futures = {
             // Take the current watchers out of the RefCell because we'll be modifying the vector
             let watchers = self.reboot_watchers.lock().await;
-            println!("[shutdown-shim] Notifying {:?} watchers of reboot", watchers.len());
+            println!("[shutdown-shim] notifying {:?} watchers of reboot", watchers.len());
             watchers.clone().into_iter().map(|(key, watcher_proxy)| {
                 let reasons = reasons.clone();
                 async move {

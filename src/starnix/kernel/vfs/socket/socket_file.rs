@@ -12,7 +12,7 @@ use crate::vfs::socket::{
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -20,14 +20,19 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-pub fn new_socket_file(
+pub fn new_socket_file<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
     open_flags: OpenFlags,
     protocol: SocketProtocol,
-) -> Result<FileHandle, Errno> {
+) -> Result<FileHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     Ok(Socket::new_file(
+        locked,
         current_task,
         Socket::new(current_task, domain, socket_type, protocol)?,
         open_flags,

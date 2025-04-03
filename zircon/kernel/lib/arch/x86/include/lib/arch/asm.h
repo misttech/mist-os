@@ -28,6 +28,13 @@
   .endr
 .endm
 
+.macro .cfi.all_call_used op
+  .irp reg,%rax,%rcx,%rdx,%rsi,%rdi,%r8,%r9,%r10,%r11
+    \op \reg
+  .endr
+  .cfi.all_vectorfp \op
+.endm
+
 // Allow both 32-bit and 64-bit .prologue.fp and .epilogue.fp can share the
 // same implementation, since they only differ in register name and size.
 #if defined(__i386__)
@@ -39,7 +46,6 @@
 #  define RBP_LP %rbp
 #  define SIZEOF_LP 8
 #endif
-
 
 // Standard prologue sequence for FP setup, with CFI.
 // Note that this realigns the SP from entry state to be ready for a call.

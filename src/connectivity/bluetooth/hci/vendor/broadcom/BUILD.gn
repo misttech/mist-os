@@ -113,11 +113,12 @@ cc_test_executable("tests_executable") {
 
   deps = [
     ":common",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",

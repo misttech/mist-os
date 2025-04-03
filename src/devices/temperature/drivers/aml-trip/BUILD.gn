@@ -18,32 +18,44 @@ driver_bind_rules("aml-trip-bind") {
   ]
 }
 
-fuchsia_cc_driver("aml-trip-driver") {
-  output_name = "aml-trip"
-
+source_set("common") {
   sources = [
     "aml-trip-device.cc",
+    "aml-trip-device.h",
     "aml-trip.cc",
+    "aml-trip.h",
+    "aml-tsensor-regs.h",
     "util.cc",
+    "util.h",
   ]
   deps = [
-    ":aml-trip-bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/logging/cpp:cpp",
+    "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
+    "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint_cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/lib/mmio",
     "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_cc_driver("aml-trip-driver") {
+  output_name = "aml-trip"
+  deps = [
+    ":aml-trip-bind",
+    ":common",
   ]
 }
 

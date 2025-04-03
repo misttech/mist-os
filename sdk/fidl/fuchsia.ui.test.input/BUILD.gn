@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.ui.test.input") {
   sdk_category = "partner"
   stable = true
-  sdk_area = "HCI"
+  sdk_area = "UI"
 
   sources = [
     "media_buttons.fidl",

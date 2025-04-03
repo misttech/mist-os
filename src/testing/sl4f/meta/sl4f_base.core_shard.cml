@@ -258,11 +258,19 @@
             to: "#sl4f",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-temperature",
             to: "#sl4f",
             subdir: "temperature",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.temperature.Service",
+            from: "parent",
+            to: "#sl4f",
         },
         {
             directory: "dev-topological",

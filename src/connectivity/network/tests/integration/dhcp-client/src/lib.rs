@@ -714,10 +714,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
     let (watch_result, ()) = join!(watch_fut, shutdown_fut);
     assert_matches!(
         watch_result,
-        Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
-            status: _,
-            protocol_name: _
-        }))
+        Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed { .. }))
     );
 }
 
@@ -753,7 +750,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
             watch_config_result,
             Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
                 status: zx::Status::PEER_CLOSED,
-                protocol_name: _
+                ..
             }))
         );
 
@@ -905,7 +902,7 @@ async fn client_handles_address_removal<N: Netstack>(
             config_stream.try_next().await,
             Err(fnet_dhcp_ext::Error::Fidl(fidl::Error::ClientChannelClosed {
                 status: zx::Status::PEER_CLOSED,
-                protocol_name: _,
+                ..
             }))
         );
         let terminal_event = client

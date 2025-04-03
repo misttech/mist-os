@@ -289,8 +289,9 @@ class AmlSpiDriver : public fdf::DriverBase {
       fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
-  void OnGetSchedulerRoleName(fdf::StartCompleter completer,
-                              const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name);
+  void OnGetSchedulerRoleName(
+      fdf::StartCompleter completer,
+      const std::optional<fuchsia_scheduler::RoleName>& scheduler_role_name);
   void OnCompatServerInitialized(fdf::StartCompleter completer);
   void AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_config_t& config,
                zx::interrupt interrupt, zx::bti bti,
@@ -312,7 +313,8 @@ class AmlSpiDriver : public fdf::DriverBase {
   compat::AsyncInitializedDeviceServer compat_server_;
   std::unique_ptr<AmlSpi> device_;
   async::Executor executor_;
-  fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> spi_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_scheduler::RoleName> scheduler_role_name_metadata_server_;
 };
 
 }  // namespace spi

@@ -22,6 +22,7 @@ rustc_library("block-client") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/storage/lib/block_protocol",
     "//src/storage/lib/trace",
     "//third_party/rust_crates:anyhow",
@@ -50,6 +51,7 @@ rustc_library("fake-block-client") {
     ":block-client",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/rust/zx",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:async-trait",
   ]
   sources = [ "src/fake_block_client.rs" ]

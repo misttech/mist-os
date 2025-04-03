@@ -37,6 +37,12 @@
             availability: "optional",
         },
         {
+            directory: "block",
+            rights: [ "r*" ],
+            path: "/block",
+            availability: "optional",
+        },
+        {
             directory: "root-ssl-certificates",
             rights: [ "r*" ],
             path: "/config/ssl",
@@ -108,6 +114,7 @@
                 "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.logger.Log",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.name.Lookup",

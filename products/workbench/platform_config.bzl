@@ -39,6 +39,9 @@ workbench_platform_config = {
             },
         },
     },
+    "driver_framework": {
+        "use_rust_driver_host": True,
+    },
     "timekeeper": {
         "first_sampling_delay_sec": 86400,
         "back_off_time_between_pull_samples_sec": 86400,
@@ -62,6 +65,7 @@ workbench_platform_config = {
         "enabled": True,
     },
     "ui": {
+        "display_composition": False,  # JJOSH: DO NOT SUBMIT, SHOULD BE True
         "enabled": True,
         "supported_input_devices": [
             "button",

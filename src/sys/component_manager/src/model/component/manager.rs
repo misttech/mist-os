@@ -128,10 +128,11 @@ impl ComponentManagerInstance {
     ) -> Result<fstatecontrol::AdminProxy, RebootError> {
         let (exposed_dir, server) = endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = self.root();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+        const FLAGS: fio::Flags = fio::PERM_READABLE;
+        let mut object_request = FLAGS.to_object_request(server);
         root.open_exposed(OpenRequest::new(
             root.execution_scope.clone(),
-            fio::OpenFlags::empty(),
+            FLAGS,
             Path::dot(),
             &mut object_request,
         ))

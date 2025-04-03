@@ -71,8 +71,6 @@ rustc_library("lib") {
     "src/args.rs",
     "src/common.rs",
     "src/lib.rs",
-    "src/subcommands/debug_bind/args.rs",
-    "src/subcommands/debug_bind/mod.rs",
     "src/subcommands/device/args.rs",
     "src/subcommands/device/mod.rs",
     "src/subcommands/disable/args.rs",

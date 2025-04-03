@@ -70,19 +70,6 @@ class IncomingNamespace {
 };
 
 class MetadataTest : public ::testing::Test {
- public:
-  void SetUp() override {
-    auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    incoming_namespace_.SyncCall(&IncomingNamespace::Serve, std::move(server));
-
-    std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
-    namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
-        {.path = "/", .directory = std::move(client)}});
-    zx::result incoming = fdf::Namespace::Create(namespace_entries);
-    ASSERT_OK(incoming);
-    incoming_ = std::make_shared<fdf::Namespace>(std::move(incoming.value()));
-  }
-
  protected:
   void InitIncomingNamespace(bool start_metadata_server) {
     if (start_metadata_server) {
@@ -97,14 +84,14 @@ class MetadataTest : public ::testing::Test {
         {.path = "/", .directory = std::move(client)}});
     zx::result incoming = fdf::Namespace::Create(namespace_entries);
     ASSERT_OK(incoming);
-    incoming_ = std::make_shared<fdf::Namespace>(std::move(incoming.value()));
+    incoming_.emplace(std::move(incoming.value()));
   }
 
   void SetIncomingMetadata(const fuchsia_hardware_test::Metadata& metadata) {
     incoming_namespace_.SyncCall(&IncomingNamespace::SetMetadata, std::move(metadata));
   }
 
-  const std::shared_ptr<fdf::Namespace>& incoming() { return incoming_; }
+  const fdf::Namespace& incoming() { return incoming_.value(); }
 
  private:
   fdf_testing::DriverRuntime runtime;
@@ -112,7 +99,7 @@ class MetadataTest : public ::testing::Test {
       runtime.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_namespace_{
       background_driver_dispatcher_->async_dispatcher(), std::in_place};
-  std::shared_ptr<fdf::Namespace> incoming_;
+  std::optional<fdf::Namespace> incoming_;
 
   // Sets the global logger instance which is needed by functions within the `fdf_metadata`
   // namespace in order to make `FDF_LOG` statements.

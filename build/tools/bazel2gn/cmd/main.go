@@ -26,6 +26,7 @@ var (
 	bazelInputPath = flag.String("bazel_input_path", "", "Path to read the BUILD.bazel file from.")
 	gnOutputPath   = flag.String("gn_output_path", "", "Path to output the converted GN targest to.")
 	checkOnly      = flag.Bool("check_only", false, "When true, compare generated GN content with the input GN file without writing to it")
+	diffOutputPath = flag.String("diff_output_path", "", "Path to write the diff to, only useful when checkOnly is true")
 )
 
 // bazelBuiltins contains all known Bazel builtin functions. The starlark parser
@@ -62,6 +63,12 @@ const (
 # rerun bazel2gn.
 
 import("//build/tools/bazel2gn/bazel_migration.gni")
+
+# A self-verification target for generated content in this file.
+if (is_host) {
+  verify_bazel2gn("verify_bazel2gn") {
+  }
+}
 `
 
 	sentinelComment = "## BAZEL2GN SENTINEL - DO NOT EDIT BELOW THIS LINE ##"
@@ -80,6 +87,10 @@ func main() {
 
 	if *gnBin == "" {
 		log.Fatal("--gn_bin is required, see --help")
+	}
+
+	if *diffOutputPath != "" && !*checkOnly {
+		log.Fatalf("--diff_output_path is set to %s, but --check_only is not set", *diffOutputPath)
 	}
 
 	opts := new(syntax.FileOptions)
@@ -126,8 +137,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to read full content of %s", *gnOutputPath)
 		}
+		diffPrintout := ""
 		if diff := cmp.Diff(string(actual), finalContent); diff != "" {
-			log.Fatalf(`
+			diffPrintout = fmt.Sprintf(`
 The following BUILD files are not in sync:
 
   - %s
@@ -142,6 +154,14 @@ Diff of GN targets (-actual, +expected):
 %s`,
 				*bazelInputPath, *gnOutputPath, diff)
 		}
+		if *diffOutputPath != "" {
+			if err := writeDiffOutput(*diffOutputPath, diffPrintout); err != nil {
+				log.Fatalf("Failed to write diff output: %v", err)
+			}
+		}
+		if diffPrintout != "" {
+			log.Fatal(diffPrintout)
+		}
 	} else {
 		// Open the GN file again for write.
 		gnOut, err = os.OpenFile(*gnOutputPath, os.O_WRONLY|os.O_TRUNC, 0)
@@ -152,6 +172,17 @@ Diff of GN targets (-actual, +expected):
 			log.Fatalf("Failed to write final GN build file: %v", err)
 		}
 	}
+}
+
+func writeDiffOutput(path string, content string) error {
+	diffOut, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("opening %s for writing: %v", path, err)
+	}
+	if _, err := io.WriteString(diffOut, content); err != nil {
+		return fmt.Errorf("writing diff to %s: %v", *diffOutputPath, err)
+	}
+	return nil
 }
 
 func gnTargetsToPreserve(r io.Reader) (string, error) {

@@ -154,6 +154,9 @@ mod tests {
         ])
     }
 
+    /// This test makes sure we sensibly handle config schemas that would normally be banned by cmc.
+    /// It's like a golden test but the golden infrastructure relies on being able to use real
+    /// component manifests so this operates directly on TokenStreams.
     #[test]
     fn bad_field_names() {
         let decl = config_decl! {
@@ -197,6 +200,16 @@ type Config = struct {
             use fidl::unpersist;
             use fuchsia_inspect::{Node};
             use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+            use std::convert::TryInto;
+
+            // This is generated from the config schema for the component. Component Manager also
+            // computes this in parallel to allow config libraries that its config VMO's ABI matches
+            // expectations.
+            const EXPECTED_CHECKSUM: &[u8] = &[
+                0xb5, 0xf9, 0x33, 0xe8, 0x94, 0x56, 0x3a, 0xf9, 0x61, 0x39, 0xe5, 0x05, 0x79, 0x4b,
+                0x88, 0xa5, 0x3e, 0xd4, 0xd1, 0x5c, 0x32, 0xe2, 0xb4, 0x49, 0x9e, 0x42, 0xeb, 0xa3,
+                0x32, 0xb1, 0xf5, 0xbb
+            ];
 
             #[derive(Debug)]
             pub struct Config {
@@ -213,55 +226,144 @@ type Config = struct {
             }
 
             impl Config {
+                /// Take the config startup handle and parse its contents.
+                ///
+                /// # Panics
+                ///
+                /// If the config startup handle was already taken or if it is not valid.
                 pub fn take_from_startup_handle() -> Self {
-                    let config_vmo: zx::Vmo = take_startup_handle(HandleInfo::new(HandleType::ComponentConfigVmo, 0))
-                        .expect("Config VMO handle must be provided and cannot already have been taken.")
+                    let handle_info = HandleInfo::new(HandleType::ComponentConfigVmo, 0);
+                    let config_vmo: zx::Vmo = take_startup_handle(handle_info)
+                        .expect("Config VMO handle must be present.")
                         .into();
-                    let config_size = config_vmo.get_content_size().expect("must be able to read config vmo content size");
-                    assert_ne!(config_size, 0, "config vmo must be non-empty");
+                    Self::from_vmo(&config_vmo).expect("Config VMO handle must be valid.")
+                }
 
-                    let config_bytes = config_vmo.read_to_vec(0, config_size).expect("must be able to read config vmo");
+                /// Parse `Self` from `vmo`.
+                pub fn from_vmo(vmo: &zx::Vmo) -> Result<Self, Error> {
+                    let config_size = vmo.get_content_size().map_err(Error::GettingContentSize)?;
+                    let config_bytes =
+                        vmo.read_to_vec(0, config_size).map_err(Error::ReadingConfigBytes)?;
+                    Self::from_bytes(&config_bytes)
+                }
 
-                    let checksum_length = u16::from_le_bytes([config_bytes[0], config_bytes[1]]) as usize;
-                    let fidl_start = 2 + checksum_length;
-                    let observed_checksum = &config_bytes[2..fidl_start];
-                    let expected_checksum = vec![
-                        0xb5, 0xf9, 0x33, 0xe8, 0x94, 0x56, 0x3a, 0xf9, 0x61, 0x39, 0xe5, 0x05, 0x79,
-                        0x4b, 0x88, 0xa5, 0x3e, 0xd4, 0xd1, 0x5c, 0x32, 0xe2, 0xb4, 0x49, 0x9e, 0x42,
-                        0xeb, 0xa3, 0x32, 0xb1, 0xf5, 0xbb
-                    ];
-
-                    assert_eq!(observed_checksum, expected_checksum, "checksum from config VMO does not match expected checksum");
-
-                    let fidl_config: FidlConfig = unpersist(&config_bytes[fidl_start..]).expect("must be able to parse bytes as config FIDL");
-
-                    Self {
+                /// Parse `Self` from `bytes`.
+                pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+                    let (checksum_len_bytes, bytes) =
+                        bytes.split_at_checked(2).ok_or(Error::TooFewBytes)?;
+                    let checksum_len_bytes: [u8; 2] = checksum_len_bytes
+                        .try_into()
+                        .expect("previous call guaranteed 2 element slice");
+                    let checksum_length = u16::from_le_bytes(checksum_len_bytes) as usize;
+                    let (observed_checksum, bytes) =
+                        bytes.split_at_checked(checksum_length).ok_or(Error::TooFewBytes)?;
+                    if observed_checksum != EXPECTED_CHECKSUM {
+                        return Err(Error::ChecksumMismatch {
+                            observed_checksum: observed_checksum.to_vec(),
+                        });
+                    }
+                    let fidl_config: FidlConfig = unpersist(bytes).map_err(Error::Unpersist)?;
+                    Ok(Self {
                         snake_case_string: fidl_config.snake_case_string,
                         lower_camel_case_string: fidl_config.lower_camel_case_string,
                         upper_camel_case_string: fidl_config.upper_camel_case_string,
                         const_case: fidl_config.const_case,
                         string_that_has02_digits: fidl_config.string_that_has02_digits,
-                        mixed_lower_camel_snake_case_string: fidl_config.mixed_lower_camel_snake_case_string,
-                        mixed_upper_camel_snake_case_string: fidl_config.mixed_upper_camel_snake_case_string,
+                        mixed_lower_camel_snake_case_string: fidl_config
+                            .mixed_lower_camel_snake_case_string,
+                        mixed_upper_camel_snake_case_string: fidl_config
+                            .mixed_upper_camel_snake_case_string,
                         multiple__underscores: fidl_config.multiple__underscores,
                         unsafe_: fidl_config.unsafe_,
                         server_mode_: fidl_config.server_mode_
-                    }
+                    })
                 }
-                pub fn record_inspect(&self, inspector_node : & Node) {
+                pub fn record_inspect(&self, inspector_node: &Node) {
                     inspector_node.record_bool("snake_case_string", self.snake_case_string);
-                    inspector_node.record_bool("lowerCamelCaseString", self.lower_camel_case_string);
-                    inspector_node.record_bool("UpperCamelCaseString", self.upper_camel_case_string);
+                    inspector_node
+                        .record_bool("lowerCamelCaseString", self.lower_camel_case_string);
+                    inspector_node
+                        .record_bool("UpperCamelCaseString", self.upper_camel_case_string);
                     inspector_node.record_bool("CONST_CASE", self.const_case);
-                    inspector_node.record_bool("stringThatHas02Digits", self.string_that_has02_digits);
-                    inspector_node.record_bool("mixedLowerCamel_snakeCaseString", self.mixed_lower_camel_snake_case_string);
-                    inspector_node.record_bool("MixedUpperCamel_SnakeCaseString", self.mixed_upper_camel_snake_case_string);
+                    inspector_node
+                        .record_bool("stringThatHas02Digits", self.string_that_has02_digits);
+                    inspector_node.record_bool(
+                        "mixedLowerCamel_snakeCaseString",
+                        self.mixed_lower_camel_snake_case_string
+                    );
+                    inspector_node.record_bool(
+                        "MixedUpperCamel_SnakeCaseString",
+                        self.mixed_upper_camel_snake_case_string
+                    );
                     inspector_node.record_bool("multiple__underscores", self.multiple__underscores);
                     inspector_node.record_bool("unsafe", self.unsafe_);
                     inspector_node.record_bool("ServerMode", self.server_mode_);
                 }
             }
-        }.to_string();
+
+            #[derive(Debug)]
+            pub enum Error {
+                /// Failed to read the content size of the VMO.
+                GettingContentSize(zx::Status),
+                /// Failed to read the content of the VMO.
+                ReadingConfigBytes(zx::Status),
+                /// The VMO was too small for this config library.
+                TooFewBytes,
+                /// The VMO's config ABI checksum did not match this library's.
+                ChecksumMismatch { observed_checksum: Vec<u8> },
+                /// Failed to parse the non-checksum bytes of the VMO as this library's FIDL type.
+                Unpersist(fidl::Error),
+            }
+
+            impl std::fmt::Display for Error {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    match self {
+                        Self::GettingContentSize(status) => {
+                            write!(f, "Failed to get content size: {status}")
+                        }
+                        Self::ReadingConfigBytes(status) => {
+                            write!(f, "Failed to read VMO content: {status}")
+                        }
+                        Self::TooFewBytes => {
+                            write!(f, "VMO content is not large enough for this config library.")
+                        }
+                        Self::ChecksumMismatch { observed_checksum } => {
+                            write!(
+                                f,
+                                "ABI checksum mismatch, expected {:?}, got {:?}",
+                                EXPECTED_CHECKSUM, observed_checksum,
+                            )
+                        }
+                        Self::Unpersist(fidl_error) => {
+                            write!(f, "Failed to parse contents of config VMO: {fidl_error}")
+                        }
+                    }
+                }
+            }
+
+            impl std::error::Error for Error {
+                #[allow(unused_parens, reason = "rustfmt errors without parens here")]
+                fn source(&self) -> Option<(&'_ (dyn std::error::Error + 'static))> {
+                    match self {
+                        Self::GettingContentSize(ref status)
+                        | Self::ReadingConfigBytes(ref status) => Some(status),
+                        Self::TooFewBytes => None,
+                        Self::ChecksumMismatch { .. } => None,
+                        Self::Unpersist(ref fidl_error) => Some(fidl_error),
+                    }
+                }
+                fn description(&self) -> &str {
+                    match self {
+                        Self::GettingContentSize(_) => "getting content size",
+                        Self::ReadingConfigBytes(_) => "reading VMO contents",
+                        Self::TooFewBytes => "VMO contents too small",
+                        Self::ChecksumMismatch { .. } => "ABI checksum mismatch",
+                        Self::Unpersist(_) => "FIDL parsing error",
+                    }
+                }
+            }
+        }
+        .to_string();
 
         assert_eq!(actual_rust_src, expected_rust_src);
     }

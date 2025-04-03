@@ -35,10 +35,10 @@ open protocol Manager {
     /// `remote_channel`.
     ///
     /// If any messages arrive on `remote_channel` while the container is suspended via
-    /// `SuspendContainer`, the container will be resumed and `resume_event` will be signaled with
-    /// `ZX_EVENT_SIGNALED`. Any suspend call that is made while that signal is present on
-    /// `resume_event` will wake immediately. The container is responsible for clearing
-    /// `ZX_EVENT_SIGNALED`.
+    /// `SuspendContainer`, the container will be resumed and `counter` will be incremented.
+    ///
+    /// Once that message is handled by the container, and it's ok to suspend the container again
+    /// (relative to that message), the counter is expected to be decremented.
     flexible ProxyWakeChannel(resource table {
         /// The job of the container that holds the other end of `container_channel`.
         1: container_job zx.Handle:JOB;
@@ -49,12 +49,17 @@ open protocol Manager {
         /// The channel endpoint that is connected to a component outside the container.
         3: remote_channel zx.Handle:CHANNEL;
 
-        /// The event that will be signaled when a message appears on `container_channel` while the
-        /// container is suspended.
-        4: resume_event zx.Handle:EVENTPAIR;
-
         /// The name of the proxy, used for debugging purposes.
-        5: name string:PROXY_NAME_LEN;
+        4: name string:PROXY_NAME_LEN;
+
+        /// A counter that is used to count how many unhandled requests have been sent to the
+        /// container. If this counter is non-zero, the container will not be able to suspend.
+        ///
+        /// Each time the client handles a message on the proxied channel, it is expected to
+        /// decrement the counter by 1. This decrement should only happen once the client is
+        /// ready to allow suspension. Often this means that a new hanging get has been sent on
+        /// the proxied channel.
+        5: counter zx.Handle:COUNTER;
     });
 
     /// Registers an eventpair that will be signaled when the container is suspended or resumed.

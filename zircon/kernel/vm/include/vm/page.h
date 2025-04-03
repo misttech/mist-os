@@ -21,6 +21,8 @@
 #include <vm/page_state.h>
 #include <vm/phys/arena.h>
 
+class FreeLoanedPagesHolder;
+
 // core per page structure allocated at pmm arena creation time
 struct vm_page {
   struct list_node queue_node;
@@ -117,6 +119,10 @@ struct vm_page {
       // page table.
       uint num_mappings;
     } __PACKED mmu;
+    struct {
+      // Loaned pages maintain an optional backlink while in the alloc state to their holder object.
+      FreeLoanedPagesHolder* owner;
+    } __PACKED alloc;
   };
   using object_t = decltype(object);
 

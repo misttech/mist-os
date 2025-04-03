@@ -3,6 +3,7 @@
 
 use crate::{MAX_TAGS, MAX_TAG_LEN, MIN_PACKET_SIZE};
 use diagnostics_log_encoding::parse::ParseError;
+use moniker::MonikerError;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -26,6 +27,15 @@ pub enum MessageError {
     NotNullTerminated { terminator: u8 },
     #[error("buffer too small ({len}) to contain a valid log message (min {})", MIN_PACKET_SIZE)]
     ShortRead { len: usize },
+    #[error("No URL found in extended record")]
+    MissingUrl,
+    #[error("No moniker found in extended record")]
+    MissingMoniker,
+    #[error("couldn't parse moniker: {parse_error:?}")]
+    MonikerParseError {
+        #[from]
+        parse_error: MonikerError,
+    },
 }
 
 impl PartialEq for MessageError {

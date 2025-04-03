@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Empty {
     type Encoded = WireEmpty;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Empty
+unsafe impl<___E> ::fidl_next::Encode<___E> for Empty
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -21,12 +21,12 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
 
-            } = slot;
+            } = out;
         }
 
         Ok(())
@@ -37,7 +37,7 @@ impl ::fidl_next::EncodableOption for Box<Empty> {
     type EncodedOption = ::fidl_next::WireBox<WireEmpty>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<Empty>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Empty>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Empty: ::fidl_next::Encode<___E>,
@@ -46,13 +46,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -69,10 +69,15 @@ impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
     }
 }
 
-/// The wire type corersponding to [`Empty`].
+/// The wire type corresponding to [`Empty`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmpty {}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmpty {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
+}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmpty
 where
@@ -108,7 +113,7 @@ impl ::fidl_next::Encodable for EmptyProtocolSendRequest {
     type Encoded = WireEmptyProtocolSendRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -116,13 +121,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
@@ -135,7 +140,7 @@ impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireEmptyProtocolSendRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendRequest: ::fidl_next::Encode<___E>,
@@ -144,13 +149,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -170,11 +175,16 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRe
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendRequest`].
+/// The wire type corresponding to [`EmptyProtocolSendRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendRequest {
     pub e: crate::WireEmpty,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendRequest
@@ -214,7 +224,7 @@ impl ::fidl_next::Encodable for EmptyProtocolReceiveRequest {
     type Encoded = WireEmptyProtocolReceiveRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolReceiveRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolReceiveRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -222,13 +232,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
@@ -241,7 +251,7 @@ impl ::fidl_next::EncodableOption for Box<EmptyProtocolReceiveRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireEmptyProtocolReceiveRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolReceiveRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolReceiveRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolReceiveRequest: ::fidl_next::Encode<___E>,
@@ -250,13 +260,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -276,11 +286,16 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolRec
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolReceiveRequest`].
+/// The wire type corresponding to [`EmptyProtocolReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolReceiveRequest {
     pub e: crate::WireEmpty,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolReceiveRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolReceiveRequest
@@ -320,7 +335,7 @@ impl ::fidl_next::Encodable for EmptyProtocolSendAndReceiveRequest {
     type Encoded = WireEmptyProtocolSendAndReceiveRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -328,13 +343,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
@@ -347,7 +362,7 @@ impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendAndReceiveRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireEmptyProtocolSendAndReceiveRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendAndReceiveRequest: ::fidl_next::Encode<___E>,
@@ -356,13 +371,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -384,11 +399,16 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendAndReceiveRequest`].
+/// The wire type corresponding to [`EmptyProtocolSendAndReceiveRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveRequest {
     pub e: crate::WireEmpty,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendAndReceiveRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendAndReceiveRequest
@@ -428,7 +448,7 @@ impl ::fidl_next::Encodable for EmptyProtocolSendAndReceiveResponse {
     type Encoded = WireEmptyProtocolSendAndReceiveResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -436,13 +456,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 e,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.e, encoder, e)?;
@@ -455,7 +475,7 @@ impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendAndReceiveResponse> {
     type EncodedOption = ::fidl_next::WireBox<WireEmptyProtocolSendAndReceiveResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendAndReceiveResponse: ::fidl_next::Encode<___E>,
@@ -464,13 +484,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -492,11 +512,16 @@ impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     }
 }
 
-/// The wire type corersponding to [`EmptyProtocolSendAndReceiveResponse`].
+/// The wire type corresponding to [`EmptyProtocolSendAndReceiveResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireEmptyProtocolSendAndReceiveResponse {
     pub e: crate::WireEmpty,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyProtocolSendAndReceiveResponse {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyProtocolSendAndReceiveResponse
@@ -525,6 +550,20 @@ where
 pub struct EmptyProtocol;
 
 pub mod empty_protocol {
+    pub mod prelude {
+        pub use crate::{
+            empty_protocol, EmptyProtocol, EmptyProtocolClientHandler, EmptyProtocolClientSender,
+            EmptyProtocolServerHandler, EmptyProtocolServerSender,
+        };
+
+        pub use crate::EmptyProtocolReceiveRequest;
+
+        pub use crate::EmptyProtocolSendAndReceiveRequest;
+
+        pub use crate::EmptyProtocolSendAndReceiveResponse;
+
+        pub use crate::EmptyProtocolSendRequest;
+    }
 
     pub struct Send;
 
@@ -646,10 +685,10 @@ where
     ___T: ::fidl_next::Transport,
     ___H: EmptyProtocolClientHandler<___T>,
 
-    crate::WireEmptyProtocolReceiveRequest:
+    <empty_protocol::Receive as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
-    crate::WireEmptyProtocolSendAndReceiveResponse:
+    <empty_protocol::SendAndReceive as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -682,7 +721,7 @@ pub trait EmptyProtocolServerSender {
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireEmptyProtocolReceiveRequest,
+            Encoded = <empty_protocol::Receive as ::fidl_next::Method>::Response,
         >;
 }
 
@@ -699,7 +738,7 @@ where
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireEmptyProtocolReceiveRequest,
+            Encoded = <empty_protocol::Receive as ::fidl_next::Method>::Response,
         >,
     {
         self.as_untyped().send_event(2301564782476583487, request)
@@ -778,17 +817,62 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{EmptyProtocolClientSender, EmptyProtocolServerSender};
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireEmpty> for ::fidl_test_emptystruct::Empty {
+        #[inline]
+        fn take_from(from: &crate::WireEmpty) -> Self {
+            Self {}
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolReceiveRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolReceiveRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendAndReceiveRequest>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendAndReceiveRequest) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyProtocolSendAndReceiveResponse>
+        for ::fidl_test_emptystruct::EmptyProtocolSendAndReceiveResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyProtocolSendAndReceiveResponse) -> Self {
+            Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `EmptyProtocol`
     /// protocol.
     pub type EmptyProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::EmptyProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::EmptyProtocol> for ::fidl_test_emptystruct::EmptyProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::EmptyProtocol) -> Self {
+            Self
+        }
+    }
 }

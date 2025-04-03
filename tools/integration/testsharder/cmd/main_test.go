@@ -540,12 +540,12 @@ func TestExecute(t *testing.T) {
 			}
 
 			// testsharder assumes the build dir is two subdirectories down from the checkout root.
-			checkoutRoot := t.TempDir()
-			tc.flags.buildDir = filepath.Join(checkoutRoot, "out", "temp")
+			tc.flags.checkoutDir = t.TempDir()
+			tc.flags.buildDir = filepath.Join(tc.flags.checkoutDir, "out", "temp")
 			if tc.flags.depsFile != "" {
 				tc.flags.depsFile = filepath.Join(t.TempDir(), tc.flags.depsFile)
-				// When using depsFile, the outputFile must be within the checkoutRoot.
-				tc.flags.outputFile = filepath.Join(checkoutRoot, goldenBasename)
+				// When using depsFile, the outputFile must be within the checkoutDir.
+				tc.flags.outputFile = filepath.Join(tc.flags.checkoutDir, goldenBasename)
 			} else {
 				tc.flags.outputFile = filepath.Join(t.TempDir(), goldenBasename)
 			}
@@ -613,7 +613,7 @@ func TestExecute(t *testing.T) {
 					{Name: "boot-test_product_bundle", Path: "boot-test_product_bundle"},
 				},
 			}
-			if err := execute(ctx, tc.flags, tc.params, checkoutRoot, m); err != nil {
+			if err := execute(ctx, tc.flags, tc.params, m); err != nil {
 				t.Fatal(err)
 			}
 

@@ -34,9 +34,9 @@ BluetoothConnectionType = bluetooth_types.BluetoothConnectionType
 _SAMPLE_KNOWN_DEVICES_OUTPUT = f_btsys_controller.AccessWatchPeersResponse(
     updated=[
         f_btsys_controller.Peer(
-            id=f_bt.PeerId(value=16085008211800713200),
+            id_=f_bt.PeerId(value=16085008211800713200),
             address=f_bt.Address(
-                bytes=[88, 111, 107, 249, 15, 248], type=f_bt.AddressType(1)
+                bytes_=[88, 111, 107, 249, 15, 248], type_=f_bt.AddressType(1)
             ),
             technology=f_btsys_controller.TechnologyType(2),
             connected=True,
@@ -174,7 +174,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         )
         assert self.bluetooth_common_fc_obj._pairing_delegate_server is not None
         self.bluetooth_common_fc_obj._pairing_controller_proxy.set_pairing_delegate.assert_called_with(
-            input=1, output=1, delegate=mock.ANY
+            input_=1, output=1, delegate=mock.ANY
         )
 
     @parameterized.expand(
@@ -205,7 +205,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         )
         dummy_peer_id = f_bt.PeerId(value=dummy_identifier)
         self.bluetooth_common_fc_obj._access_controller_proxy.connect.assert_called_with(
-            id=dummy_peer_id
+            id_=dummy_peer_id
         )
         self.assertEqual(
             self.bluetooth_common_fc_obj.loop.run_until_complete.call_count, 2
@@ -221,7 +221,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
         )
         dummy_peer_id = f_bt.PeerId(value=dummy_identifier)
         self.bluetooth_common_fc_obj._access_controller_proxy.forget.assert_called_with(
-            id=dummy_peer_id
+            id_=dummy_peer_id
         )
         self.bluetooth_common_fc_obj.loop.run_until_complete.assert_called_once()
 
@@ -247,7 +247,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
                 f_btsys_controller.HostInfo(
                     addresses=[
                         f_bt.Address(
-                            bytes=[88, 111, 107, 249, 15, 248], type="0"
+                            bytes_=[88, 111, 107, 249, 15, 248], type_="0"
                         )
                     ]
                 )
@@ -310,7 +310,7 @@ class BluetoothCommonFCTests(unittest.TestCase):
             le_security_level=None, bondable_mode=None, transport=None
         )
         self.bluetooth_common_fc_obj._access_controller_proxy.pair.assert_called_with(
-            id=dummy_peer_id, options=dummy_options
+            id_=dummy_peer_id, options=dummy_options
         )
         self.assertEqual(
             self.bluetooth_common_fc_obj.loop.run_until_complete.call_count, 2

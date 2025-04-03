@@ -37,7 +37,7 @@ class MockRegistersInternal {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_registers::Device>::Create();
     reset_mock_->Init(std::move(server_end));
 
-    ddk::PDevFidl pdev;
+    fdf::PDev pdev;
     zx::resource smc_monitor;
     auto device = std::make_unique<AmlNnaDevice>(
         fake_parent_.get(), hiu_mock_.GetMmioBuffer(), power_mock_.GetMmioBuffer(),

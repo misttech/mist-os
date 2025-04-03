@@ -1,5 +1,5 @@
 {
-    "short_description": "Virtual audio DFv1 driver used for integration testing",
+    "short_description": "Driver that can create legacy virtual audio codec, DAI, and stream devices",
     "manufacturer": "",
     "families": [],
     "models": [],

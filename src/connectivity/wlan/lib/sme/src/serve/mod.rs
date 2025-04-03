@@ -40,9 +40,6 @@ async fn serve_generic_sme(
     mut telemetry_server_sender: Option<
         mpsc::UnboundedSender<fidl::endpoints::ServerEnd<fidl_sme::TelemetryMarker>>,
     >,
-    mut feature_support_server_sender: mpsc::UnboundedSender<
-        fidl::endpoints::ServerEnd<fidl_sme::FeatureSupportMarker>,
-    >,
 ) -> Result<(), anyhow::Error> {
     loop {
         match generic_sme_request_stream.next().await {
@@ -96,16 +93,6 @@ async fn serve_generic_sme(
                         };
                         responder.send(response)
                     }
-                    fidl_sme::GenericSmeRequest::GetFeatureSupport {
-                        feature_support_server,
-                        responder,
-                    } => {
-                        let response = feature_support_server_sender
-                            .send(feature_support_server)
-                            .await
-                            .map_err(|_| zx::Status::PEER_CLOSED.into_raw());
-                        responder.send(response)
-                    }
                 };
                 if let Err(e) = result {
                     error!("Failed to respond to SME handle request: {}", e);
@@ -131,7 +118,6 @@ pub fn create_sme(
     cfg: crate::Config,
     mlme_event_stream: MlmeEventStream,
     device_info: &fidl_mlme::DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     inspector: fuchsia_inspect::Inspector,
@@ -169,7 +155,7 @@ pub fn create_sme(
         fidl_common::WlanMacRole::Ap => {
             let (sender, receiver) = mpsc::unbounded();
             let (mlme_req_sink, mlme_req_stream, fut) =
-                ap::serve(device_info, mac_sublayer_support, mlme_event_stream, receiver);
+                ap::serve(device_info, mlme_event_stream, receiver);
             (
                 SmeServer::Ap(sender),
                 mlme_req_sink,
@@ -185,57 +171,15 @@ pub fn create_sme(
             return Err(format_err!("Unknown WlanMacRole type: {:?}", device_info.role));
         }
     };
-    let (feature_support_sender, feature_support_receiver) = mpsc::unbounded();
-    let feature_support_fut =
-        serve_fidl(mlme_req_sink.clone(), feature_support_receiver, handle_feature_support_query)
-            .map(|result| result.map(|_| ()));
-    let generic_sme_fut = serve_generic_sme(
-        generic_sme_request_stream,
-        mlme_req_sink,
-        server,
-        telemetry_sender,
-        feature_support_sender,
-    );
+    let generic_sme_fut =
+        serve_generic_sme(generic_sme_request_stream, mlme_req_sink, server, telemetry_sender);
     let unified_fut = async move {
         select! {
             sme_fut = sme_fut.fuse() => sme_fut,
             generic_sme_fut = generic_sme_fut.fuse() => generic_sme_fut,
-            feature_support_fut = feature_support_fut.fuse() => feature_support_fut,
         }
     };
     Ok((mlme_req_stream, Box::pin(unified_fut)))
-}
-
-async fn handle_feature_support_query(
-    mlme_sink: crate::MlmeSink,
-    query: fidl_sme::FeatureSupportRequest,
-) -> Result<(), fidl::Error> {
-    match query {
-        fidl_sme::FeatureSupportRequest::QueryDiscoverySupport { responder } => {
-            let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
-            mlme_sink.send(crate::MlmeRequest::QueryDiscoverySupport(mlme_responder));
-            responder
-                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
-        }
-        fidl_sme::FeatureSupportRequest::QueryMacSublayerSupport { responder } => {
-            let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
-            mlme_sink.send(crate::MlmeRequest::QueryMacSublayerSupport(mlme_responder));
-            responder
-                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
-        }
-        fidl_sme::FeatureSupportRequest::QuerySecuritySupport { responder } => {
-            let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
-            mlme_sink.send(crate::MlmeRequest::QuerySecuritySupport(mlme_responder));
-            responder
-                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
-        }
-        fidl_sme::FeatureSupportRequest::QuerySpectrumManagementSupport { responder } => {
-            let (mlme_responder, mlme_receiver) = crate::responder::Responder::new();
-            mlme_sink.send(crate::MlmeRequest::QuerySpectrumManagementSupport(mlme_responder));
-            responder
-                .send(mlme_receiver.await.as_ref().map_err(|_| zx::Status::CANCELED.into_raw()))
-        }
-    }
 }
 
 // The returned future successfully terminates when MLME closes the channel
@@ -332,7 +276,7 @@ mod tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::test_utils::fake_features::{
-        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
+        fake_security_support, fake_spectrum_management_support_empty,
     };
 
     #[test]
@@ -352,7 +296,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &device_info,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector,
@@ -376,7 +319,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &test_utils::fake_device_info([0; 6].into()),
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector,
@@ -427,7 +369,6 @@ mod tests {
             crate::Config::default(),
             mlme_event_stream,
             &device_info,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspector.clone(),
@@ -571,19 +512,20 @@ mod tests {
     }
 
     #[test]
-    fn generic_sme_get_counter_stats_for_client() {
+    fn generic_sme_get_iface_stats_for_client() {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
         let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
 
         // Forward request to MLME.
-        let mut counter_fut = telemetry_proxy.get_counter_stats();
+        let mut counter_fut = telemetry_proxy.get_iface_stats();
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Mock response from MLME. Use a fake error code to make the response easily verifiable.
         let counter_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let counter_responder = assert_variant!(counter_req, crate::MlmeRequest::GetIfaceCounterStats(responder) => responder);
-        counter_responder.respond(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(1337));
+        let counter_responder =
+            assert_variant!(counter_req, crate::MlmeRequest::GetIfaceStats(responder) => responder);
+        counter_responder.respond(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(1337));
 
         // Verify that the response made it to us without alteration.
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -600,135 +542,6 @@ mod tests {
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(telemetry_server);
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(helper.exec.run_until_stalled(&mut telemetry_fut), Poll::Ready(Ok(Err(_))));
-    }
-
-    fn get_feature_support_proxy(
-        helper: &mut GenericSmeTestHelper,
-        serve_fut: &mut Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
-    ) -> fidl_sme::FeatureSupportProxy {
-        let (proxy, server) = create_proxy();
-        let mut features_fut = helper.proxy.get_feature_support(server);
-        assert_variant!(helper.exec.run_until_stalled(serve_fut), Poll::Pending);
-        assert_variant!(helper.exec.run_until_stalled(&mut features_fut), Poll::Ready(Ok(Ok(()))));
-        proxy
-    }
-
-    #[test_case(fidl_common::WlanMacRole::Client)]
-    #[test_case(fidl_common::WlanMacRole::Ap)]
-    fn generic_sme_discovery_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
-        let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
-
-        let mut discovery_support_fut = feature_support_proxy.query_discovery_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Mock response from MLME.
-        let discovery_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let discovery_responder = assert_variant!(discovery_req, crate::MlmeRequest::QueryDiscoverySupport(responder) => responder);
-        let expected_discovery_support = fidl_common::DiscoverySupport {
-            scan_offload: fidl_common::ScanOffloadExtension {
-                supported: true,
-                scan_cancel_supported: false,
-            },
-            probe_response_offload: fidl_common::ProbeResponseOffloadExtension { supported: false },
-        };
-        discovery_responder.respond(expected_discovery_support);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let discovery_support = assert_variant!(helper.exec.run_until_stalled(&mut discovery_support_fut), Poll::Ready(Ok(support)) => support);
-        assert_eq!(discovery_support, Ok(expected_discovery_support));
-    }
-
-    #[test_case(fidl_common::WlanMacRole::Client)]
-    #[test_case(fidl_common::WlanMacRole::Ap)]
-    fn generic_sme_mac_sublayer_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
-        let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
-
-        let mut mac_sublayer_support_fut = feature_support_proxy.query_mac_sublayer_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Mock response from MLME.
-        let mac_sublayer_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let mac_sublayer_responder = assert_variant!(mac_sublayer_req, crate::MlmeRequest::QueryMacSublayerSupport(responder) => responder);
-        let expected_mac_sublayer_support = fidl_common::MacSublayerSupport {
-            rate_selection_offload: fidl_common::RateSelectionOffloadExtension { supported: true },
-            data_plane: fidl_common::DataPlaneExtension {
-                data_plane_type: fidl_common::DataPlaneType::GenericNetworkDevice,
-            },
-            device: fidl_common::DeviceExtension {
-                is_synthetic: true,
-                mac_implementation_type: fidl_common::MacImplementationType::Softmac,
-                tx_status_report_supported: false,
-            },
-        };
-        mac_sublayer_responder.respond(expected_mac_sublayer_support);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let mac_sublayer_support = assert_variant!(helper.exec.run_until_stalled(&mut mac_sublayer_support_fut), Poll::Ready(Ok(support)) => support);
-        assert_eq!(mac_sublayer_support, Ok(expected_mac_sublayer_support));
-    }
-
-    #[test_case(fidl_common::WlanMacRole::Client)]
-    #[test_case(fidl_common::WlanMacRole::Ap)]
-    fn generic_sme_security_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
-        let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
-
-        let mut security_support_fut = feature_support_proxy.query_security_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Mock response from MLME.
-        let security_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let security_responder = assert_variant!(security_req, crate::MlmeRequest::QuerySecuritySupport(responder) => responder);
-        let expected_security_support = fidl_common::SecuritySupport {
-            sae: fidl_common::SaeFeature {
-                driver_handler_supported: true,
-                sme_handler_supported: false,
-            },
-            mfp: fidl_common::MfpFeature { supported: true },
-        };
-        security_responder.respond(expected_security_support);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let security_support = assert_variant!(helper.exec.run_until_stalled(&mut security_support_fut), Poll::Ready(Ok(support)) => support);
-        assert_eq!(security_support, Ok(expected_security_support));
-    }
-
-    #[test_case(fidl_common::WlanMacRole::Client)]
-    #[test_case(fidl_common::WlanMacRole::Ap)]
-    fn generic_sme_spectrum_management_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
-        let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
-
-        let mut spectrum_support_fut = feature_support_proxy.query_spectrum_management_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Mock response from MLME.
-        let spectrum_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let spectrum_responder = assert_variant!(spectrum_req, crate::MlmeRequest::QuerySpectrumManagementSupport(responder) => responder);
-        let expected_spectrum_support = fidl_common::SpectrumManagementSupport {
-            dfs: fidl_common::DfsFeature { supported: true },
-        };
-        spectrum_responder.respond(expected_spectrum_support);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let spectrum_support = assert_variant!(helper.exec.run_until_stalled(&mut spectrum_support_fut), Poll::Ready(Ok(support)) => support);
-        assert_eq!(spectrum_support, Ok(expected_spectrum_support));
-    }
-
-    #[test_case(fidl_common::WlanMacRole::Client)]
-    #[test_case(fidl_common::WlanMacRole::Ap)]
-    fn generic_sme_support_query_cancelled(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
-        let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
-
-        let mut discovery_support_fut = feature_support_proxy.query_discovery_support();
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // No response from MLME, drop the responder instead. This might happen during shutdown.
-        let discovery_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
-        let discovery_responder = assert_variant!(discovery_req, crate::MlmeRequest::QueryDiscoverySupport(responder) => responder);
-        drop(discovery_responder);
-        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-        let discovery_support = assert_variant!(helper.exec.run_until_stalled(&mut discovery_support_fut), Poll::Ready(Ok(support)) => support);
-        assert_eq!(discovery_support, Err(zx::Status::CANCELED.into_raw()));
     }
 
     #[test_case(fidl_common::WlanMacRole::Client)]

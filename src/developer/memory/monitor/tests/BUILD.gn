@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
@@ -23,6 +22,7 @@ cc_test_executable("memory_monitor_unittests") {
     "logger_unittest.cc",
     "metrics_unittest.cc",
     "monitor_fidl_unittest.cc",
+    "monitor_pressure_unittest.cc",
   ]
 
   deps = [

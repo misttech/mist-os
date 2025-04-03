@@ -52,7 +52,10 @@ function propagate_owner_files {
   cd "$vendor_dir"
   for crate in *
   do
-    if [[ ! -f "$vendor_dir/$crate/OWNERS" ]]; then
+    # vendor_dir can have generated Bazel build files in it, filter them out.
+    # i.e. Only walk into subdirectories, which are vendored third-party crates.
+    local path="${vendor_dir}/${crate}"
+    if [[ -d "${path}" && ! -f "${path}/OWNERS" ]]; then
       cd "$owners_tmp"
       local latest_version="$(latest_version_dir $crate)"
       if [[ "$latest_version" != "$crate" ]]; then
@@ -84,6 +87,27 @@ function propagate_license_files {
       fi
     fi
   done
+}
+
+# Prepares a temporary workspace to run `crates_vendor` to generate BUILD.bazel
+# files for third-party Rust crates.
+function prepare_bazel_workspace {
+  local workspace_dir=$1
+
+  ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/BUILD.bazel" "${workspace_dir}/BUILD.bazel"
+  ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/WORKSPACE.bazel" "${workspace_dir}/WORKSPACE.bazel"
+  ln -s "${FUCHSIA_DIR}/build/bazel/update-rustc-third-party/crate_annotations.bzl" "${workspace_dir}/crate_annotations.bzl"
+
+  ln -s "${FUCHSIA_DIR}/prebuilt/third_party/bazel/linux-x64/bazel-real" "${workspace_dir}/bazel"
+  ln -s "${FUCHSIA_DIR}/prebuilt/third_party/buildifier/linux-x64/buildifier" "${workspace_dir}/buildifier"
+  ln -s "${FUCHSIA_DIR}/prebuilt/third_party/rust/linux-x64" "${workspace_dir}/rust_toolchain"
+  ln -s "${FUCHSIA_DIR}/third_party/bazel_rules_rust" "${workspace_dir}/rules_rust"
+
+  # Relative paths of rust_crates need to be the same to $FUCHSIA_DIR and
+  # $workspace_dir, so the generated BUILD.bazel would have correct paths when
+  # used in the platform build.
+  mkdir "${workspace_dir}/third_party"
+  ln -s "${FUCHSIA_DIR}/third_party/rust_crates" "${workspace_dir}/third_party/rust_crates"
 }
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
@@ -134,13 +158,10 @@ trap "rm -rf ${TMP}" EXIT
 (cd $VENDOR_DIR; $(preserve_files $TMP 'OWNERS'))
 (cd $VENDOR_DIR; $(preserve_files $TMP 'LICENSE'))
 
-rm -rf $VENDOR_DIR
-(cd $FUCHSIA_DIR; $PREBUILT_RUST_DIR/bin/cargo vendor \
-  --manifest-path $FUCHSIA_DIR/third_party/rust_crates/Cargo.toml \
-  --versioned-dirs $VENDOR_DIR \
-  -q)
-
-$FUCHSIA_DIR/third_party/rust_crates/plus_to_minus.py --vendor-dir $VENDOR_DIR
+bazel_workspace="${TMP}/bazel_workspace"
+mkdir "${bazel_workspace}"
+prepare_bazel_workspace "${bazel_workspace}"
+(cd "${bazel_workspace}" && ./bazel run --enable_bzlmod=false :crates_vendor)
 
 # Restore files for unchanged directories.
 shopt -s nullglob

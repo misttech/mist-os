@@ -175,6 +175,10 @@ async def args_gn_collector() -> list[data.Result]:
             "--with-cache argument of `fx set`",
         ),
         host_labels=("Host labels", "--with-host argument of `fx set`"),
+        developer_test_labels=(
+            "Developer tests",
+            "--with-test argument of `fx set`",
+        ),
     )
 
     # Locate the args.gn file and run it through `gn format`. This

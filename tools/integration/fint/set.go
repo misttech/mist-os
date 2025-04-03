@@ -215,31 +215,6 @@ func runGen(
 	return stdoutBuf.String(), nil
 }
 
-// findGNIFile returns the relative path to a board or product file in a
-// checkout, given a basename. It checks the root of the checkout as well as
-// each vendor/* directory for a file matching "<dirname>/<basename>.gni", e.g.
-// "boards/core.gni".
-func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
-	dirs, err := filepath.Glob(filepath.Join(checkoutDir, "vendor", "*", dirname))
-	if err != nil {
-		return "", err
-	}
-	dirs = append(dirs, filepath.Join(checkoutDir, dirname))
-
-	for _, dir := range dirs {
-		path := filepath.Join(dir, fmt.Sprintf("%s.gni", basename))
-		exists, err := osmisc.FileExists(path)
-		if err != nil {
-			return "", err
-		}
-		if exists {
-			return filepath.Rel(checkoutDir, path)
-		}
-	}
-
-	return "", nil
-}
-
 func genArgs(
 	ctx context.Context,
 	staticSpec *fintpb.Static,
@@ -333,15 +308,7 @@ func genArgs(
 		vars["test_durations_file"] = testDurationsFile
 	}
 
-	// TODO(ihuh): Remove once builders are including this target in their universe
-	// packages.
-	if staticSpec.IncludeZbiTests {
-		staticSpec.UniversePackages = append(staticSpec.UniversePackages, "//bundles/boot_tests")
-	}
-
 	for varName, values := range map[string][]string{
-		"base_package_labels":     staticSpec.BasePackages,
-		"cache_package_labels":    staticSpec.CachePackages,
 		"universe_package_labels": staticSpec.UniversePackages,
 	} {
 		targetLists[varName] = values

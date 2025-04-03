@@ -32,9 +32,9 @@ source_set("common") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/virtio:virtio-dfv1",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
   ]
 }
@@ -67,6 +67,7 @@ test("test") {
   sources = [ "test.cc" ]
   deps = [
     ":common",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/zxtest",
   ]
 }

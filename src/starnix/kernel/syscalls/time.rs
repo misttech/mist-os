@@ -12,7 +12,7 @@ use crate::task::{
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
-use starnix_logging::{log_trace, track_stub};
+use starnix_logging::{log_debug, log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
@@ -34,7 +34,7 @@ use zx::{
 pub type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
 pub type ITimerSpecPtr = MultiArchUserRef<uapi::itimerspec, uapi::arch32::itimerspec>;
 pub type ITimerValPtr = MultiArchUserRef<uapi::itimerval, uapi::arch32::itimerval>;
-type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
+pub type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
 type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 
 fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespec, Errno> {
@@ -140,12 +140,55 @@ pub fn sys_gettimeofday(
 
 pub fn sys_settimeofday(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _tv: UserRef<timeval>,
+    current_task: &CurrentTask,
+    tv: UserRef<timeval>,
     _tz: UserRef<timezone>,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297305428"), "settimeofday()");
-    error!(ENOSYS)
+    const SEC_IN_NANOS: i64 = 1_000_000_000;
+    const USEC_IN_NANOS: i64 = 1000;
+    let kernel = current_task.kernel();
+    if let Some(ref proxy) = kernel.time_adjustment_proxy {
+        // Setting time is allowed.
+        let boot_now = zx::BootInstant::get();
+        let tv = current_task.read_object(tv)?;
+
+        // Any errors here result in EINVAL, there should be no overflow in "normal" situations.
+        let utc_now_sec_as_nanos =
+            tv.tv_sec.checked_mul(SEC_IN_NANOS).ok_or_else(|| errno!(EINVAL))?;
+        let utc_now_usec_as_nanos =
+            tv.tv_usec.checked_mul(USEC_IN_NANOS).ok_or_else(|| errno!(EINVAL))?;
+        let utc_now_nanos = utc_now_sec_as_nanos
+            .checked_add(utc_now_usec_as_nanos)
+            .ok_or_else(|| errno!(EINVAL))?;
+        log_debug!(
+            "settimeofday: reporting reference: boot_now={:?}, utc_now_nanos={:?}",
+            boot_now,
+            utc_now_nanos
+        );
+        proxy
+            .report_boot_to_utc_mapping(
+                boot_now.into(),
+                utc_now_nanos,
+                zx::MonotonicInstant::INFINITE,
+            )
+            .map_err(|e| {
+                log_error!("FIDL error: {:?}", e);
+                // Maybe a weird choice of the error code, but the only choice
+                // between the documented error codes for `settimeofday` that
+                // seems relevant for when FIDL breaks.
+                errno!(ENOSYS)
+            })?
+            .map_err(|e| {
+                log_error!("remote error: {:?}", e);
+                // Remote should normally report an error only as a result of
+                // invalid user input. Hence, EINVAL.
+                errno!(EINVAL)
+            })
+    } else {
+        // We expect most systems not to be allowed to set time.
+        log_debug!("settimeofday: No functionality");
+        error!(ENOSYS)
+    }
 }
 
 pub fn sys_clock_nanosleep(

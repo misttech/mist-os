@@ -98,7 +98,6 @@ template("fidl_library") {
   requires_compatibility_tests = defined(invoker.sdk_category)
 
   is_unversioned_vendor_sdk = false
-  is_in_internal_only_idk = false
 
   # Validate `sdk_category` while determining `category_allowlist_deps`, which
   # will be used later.
@@ -114,27 +113,21 @@ template("fidl_library") {
     # All categories should have an allowlist, and the "${target_name}" for all
     # libraries in that list should be deps of an SDK molecule in
     # //sdk/fidl/BUILD.gn to ensure there are no category violations.
-    if (category == "internal_only_idk") {
-      # Libraries in this category are not included in an IDK and have no
-      # compatibility requirements. Uuse the allowlist to prevent addition of
-      # more libraries to this category.
-      # TODO(https://fxbug.dev/333907192): Remove `is_in_internal_only_idk` and
-      # this branch entirely once the allowlist is empty.
-      is_in_internal_only_idk = true
-      requires_compatibility_tests = false
-      category_allowlist_deps =
-          [ "//sdk/fidl:internal_only_idk_libs_allowlist" ]
-    } else if (category == "compat_test") {
+    if (category == "compat_test") {
       # Ensures that all libraries in the "compat_test" category are in the
       # "sdk_compat_test_libs_allowlist" target, which is used to ensure
       # that the API compatibility tests actually run on these libraries.
       category_allowlist_deps = [ "//sdk/fidl:sdk_compat_test_libs_allowlist" ]
-    } else if (category == "partner_internal") {
-      # Ensures that all libraries in the "partner_internal" category are in the
-      # "sdk_partner_internal_libs_allowlist" target, which is used to ensure
+    } else if (category == "host_tool") {
+      # Ensures that all libraries in the "host_tool" category are in the
+      # "sdk_host_tool_libs_allowlist" target, which is used to ensure
       # that the API compatibility tests actually run on these libraries.
-      category_allowlist_deps =
-          [ "//sdk/fidl:sdk_partner_internal_libs_allowlist" ]
+      category_allowlist_deps = [ "//sdk/fidl:sdk_host_tool_libs_allowlist" ]
+    } else if (category == "prebuilt") {
+      # Ensures that all libraries in the "prebuilt" category are in the
+      # "sdk_prebuilt_libs_allowlist" target, which is used to ensure
+      # that the API compatibility tests actually run on these libraries.
+      category_allowlist_deps = [ "//sdk/fidl:sdk_prebuilt_libs_allowlist" ]
     } else if (category == "partner") {
       if (is_vendor_library) {
         # Vendor SDK libraries are `is_sdk_included_publishable` but not in the
@@ -149,12 +142,11 @@ template("fidl_library") {
     } else {
       assert(
           false,
-          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner', 'partner_internal', and 'compat_test'. For libraries not in the IDK, do not specify `sdk_category`.")
+          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner', 'prebuilt', 'host_tool', and 'compat_test'. For libraries not in the IDK, do not specify `sdk_category`.")
     }
   } else {
     category_allowlist_deps = []
     sdk_category_string_for_assert = "not specified"
-    not_needed([ "is_in_internal_only_idk" ])
   }
 
   # All publishable libraries must have compatibility tests.
@@ -193,7 +185,7 @@ template("fidl_library") {
 
   assert(
       is_stable || !defined(invoker.sdk_category) ||
-          invoker.sdk_category == "partner" || is_in_internal_only_idk,
+          invoker.sdk_category == "partner",
       "Libraries in category '${sdk_category_string_for_assert}' must specify `stable=true`.")
 
   # Make sure  the same variables are forwarded to both fidl_ir() instances.
@@ -211,32 +203,17 @@ template("fidl_library") {
   # unstable. CTF tests, which target `NEXT`, similarly build code that depends
   # on unstable libraries.
   # Treat such libraries as unversioned until each is resolved.
-  _unversioned_libraries_used_by_sdk_prebuilts_or_ctf = [
+  _libraries_in_unsupported_scenarios = [
     # Do not add to this list without discussing with the FIDL team.
     # It is likely that only instances of the scenarios described in
     # https://fxbug.dev/369892217 should be added.
 
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
-
-    # TODO(https://fxbug.dev/365602422): For each of these UI-related libraries,
-    # either remove the dependency from the CTF tests or make the library stable
-    # then remove the library from the list below.
-    "fuchsia.ui.observation.scope",
-    "fuchsia.ui.observation.test",
-    "fuchsia.ui.pointer.augment",
-    "fuchsia.ui.test.conformance",
-    "fuchsia.ui.test.context",
-
-    # TODO(https://fxbug.dev/365602428): For each of these libraries, either
-    # remove the dependency from the CTF tests or make the library stable then
-    # remove the library from the list below.
-    "fuchsia.examples",
-    "fuchsia.pkg.test",
   ]
-  _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf =
-      _unversioned_libraries_used_by_sdk_prebuilts_or_ctf + [ library_name ] -
-      [ library_name ] != _unversioned_libraries_used_by_sdk_prebuilts_or_ctf
+  _is_libraries_in_unsupported_scenarios =
+      _libraries_in_unsupported_scenarios + [ library_name ] -
+      [ library_name ] != _libraries_in_unsupported_scenarios
 
   # TODO(https://fxbug.dev/364422340): Remove when the internal "zx" library is properly versioned.
   _is_internal_zx_library =
@@ -284,7 +261,7 @@ template("fidl_library") {
       fidlc_versioned_arg = "fuchsia:HEAD"
     } else {
       assert(
-          !defined(invoker.sdk_category) || is_in_internal_only_idk,
+          !defined(invoker.sdk_category),
           "Libraries with an SDK category should be stable or at least require compatibility tests.")
 
       # All libraries in the "fuchsia" namespace must be versioned. For unstable
@@ -294,7 +271,7 @@ template("fidl_library") {
       # Temporary exceptions to the above rule. See the TODOs where each
       # variable is declared. Update the comment about "temporary exceptions" in
       # fidl.gni when removing the last one.
-      if (_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) {
+      if (_is_libraries_in_unsupported_scenarios) {
         fidlc_versioned_arg = "unversioned"
       } else if (_is_banjo_sysmem) {
         fidlc_versioned_arg = "fuchsia"
@@ -313,7 +290,7 @@ template("fidl_library") {
 
   # These are used in conditions, including within asserts, that are not always executed.
   not_needed([
-               "_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf",
+               "_is_libraries_in_unsupported_scenarios",
                "_is_internal_zx_library",
                "_is_banjo_sysmem",
                "_is_documentation_example",
@@ -324,15 +301,14 @@ template("fidl_library") {
            requires_compatibility_tests &&
            (is_sdk_included_publishable ||
                 invoker.sdk_category == "compat_test" ||
-                invoker.sdk_category == "partner_internal")) ||
+                invoker.sdk_category == "host_tool" ||
+                invoker.sdk_category == "prebuilt")) ||
           (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !is_stable &&
                !requires_compatibility_tests && !is_sdk_included_publishable) ||
           (fidlc_versioned_arg == "fuchsia:HEAD" && !is_stable &&
-               (requires_compatibility_tests == defined(invoker.sdk_category) ||
-                    (is_in_internal_only_idk &&
-                         !requires_compatibility_tests))) ||
+               requires_compatibility_tests == defined(invoker.sdk_category)) ||
           (fidlc_versioned_arg == "unversioned" &&
-               _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
+               _is_libraries_in_unsupported_scenarios) ||
           (fidlc_versioned_arg == "unversioned" && !is_stable &&
                !requires_compatibility_tests &&
                (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk)) ||
@@ -714,11 +690,6 @@ template("fidl_library") {
 
       category = invoker.sdk_category
 
-      # TODO(https://fxbug.dev/333907192): Remove when the allowlist is removed.
-      if (is_in_internal_only_idk) {
-        category = "internal"
-      }
-
       if (is_stable) {
         if (defined(invoker.api)) {
           api = invoker.api
@@ -748,15 +719,12 @@ template("fidl_library") {
       files = all_files
 
       metadata = {
-        # Metadata to allow us to query all FIDL IR and source files.
-        fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
-        generated_sources = fidl_json
-
         # For libraries included in an IDK, add the metadata to the list used to
         # generate documentation.
-        # Historically, libraries in the  "partner_internal" SDK category have
-        # also been published, so include them as well.
-        if (is_sdk_included_publishable || category == "partner_internal") {
+        # Historically, libraries in the  "host_tool" and "prebuilt" SDK
+        # categories have also been published, so include them as well.
+        if (is_sdk_included_publishable || category == "host_tool" ||
+            category == "prebuilt") {
           sdk_fidl_json_data = [
             {
               name = library_name

@@ -17,7 +17,10 @@ rustc_library("fdf_sys") {
     "src/lib.rs",
   ]
 
-  visibility = [ "//sdk/lib/driver/*" ]
+  visibility = [
+    "//sdk/lib/driver/*",
+    "//src/devices/bin/driver-host-rust/*",
+  ]
 }
 
 fuchsia_unittest_package("fdf_sys_tests") {

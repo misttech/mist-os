@@ -124,7 +124,7 @@ void VmObjectPaged::DestructorHelper() {
                                              reference_list_);
     }
     DEBUG_ASSERT(reference_list_.is_empty());
-    deferred = cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+    deferred = cow_pages_;
   }
   while (deferred) {
     deferred = deferred->MaybeDeadTransition();
@@ -339,7 +339,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     // Add all the preallocated pages to the object, this takes ownership of all pages regardless
     // of the outcome. This is a new VMO, but this call could fail due to OOM.
     status = cow_pages->AddNewPagesLocked(0, &prealloc_pages, VmCowPages::CanOverwriteContent::Zero,
-                                          true, false);
+                                          true, nullptr);
     if (status != ZX_OK) {
       return status;
     }
@@ -439,8 +439,8 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   // regardless of outcome.
   // This is a newly created VMO with a page source, so we don't expect to be overwriting anything
   // in its page list.
-  status = vmo->cow_pages_locked()->AddNewPagesLocked(0, &page_list,
-                                                      VmCowPages::CanOverwriteContent::None);
+  status = vmo->cow_pages_locked()->AddNewPagesLocked(
+      0, &page_list, VmCowPages::CanOverwriteContent::None, true, nullptr);
   if (status != ZX_OK) {
     return status;
   }
@@ -494,7 +494,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       // This is a newly created anonymous VMO, so we expect to be overwriting zeros. A newly
       // created anonymous VMO with no committed pages has all its content implicitly zero.
       status = vmo->cow_pages_locked()->AddNewPageLocked(
-          count * PAGE_SIZE, page, VmCowPages::CanOverwriteContent::Zero, nullptr, false, false);
+          count * PAGE_SIZE, page, VmCowPages::CanOverwriteContent::Zero, nullptr, false, nullptr);
       ASSERT_MSG(status == ZX_OK,
                  "AddNewPageLocked failed on page %zu of %zu at %#" PRIx64 " from [%#" PRIx64
                  ", %#" PRIx64 ")",
@@ -1266,122 +1266,92 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<VmoLockType> guard{lock()};
+  // May need to zero in chunks across multiple different lock acquisitions so loop until nothing
+  // left to do.
+  while (len > 0) {
+    // We might need a page request if the VMO is backed by a page source.
+    __UNINITIALIZED MultiPageRequest page_request;
+    uint64_t zeroed_len = 0;
+    zx_status_t status;
+    {
+      Guard<VmoLockType> guard{lock()};
 
-  // Zeroing a range behaves as if it were an efficient zx_vmo_write. As we cannot write to uncached
-  // vmo, we also cannot zero an uncahced vmo.
-  if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
-    return ZX_ERR_BAD_STATE;
-  }
+      // Zeroing a range behaves as if it were an efficient zx_vmo_write. As we cannot write to
+      // uncached vmo, we also cannot zero an uncahced vmo.
+      if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
+        return ZX_ERR_BAD_STATE;
+      }
 
-  // Validate the length is in range of the vmo.
-  if (!InRange(offset, len, size_locked())) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
+      // Validate the range.
+      ktl::optional<VmCowRange> cow_range = GetCowRangeSizeCheckLocked(offset, len);
+      if (!cow_range) {
+        return ZX_ERR_OUT_OF_RANGE;
+      }
 
-  // Construct our initial range. Already checked the range above so we know it cannot overflow.
-  uint64_t start = offset;
-  uint64_t end = start + len;
-
-  // Helper that checks and establishes our invariants. We use this after calling functions that
-  // may have temporarily released the lock.
-  auto establish_invariants = [this, &end]() TA_REQ(lock()) {
-    if (end > size_locked()) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-    if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
-      return ZX_ERR_BAD_STATE;
-    }
-    return ZX_OK;
-  };
-
-  uint64_t start_page_base = ROUNDDOWN(start, PAGE_SIZE);
-  uint64_t end_page_base = ROUNDDOWN(end, PAGE_SIZE);
-
-  if (unlikely(start_page_base != start)) {
-    // We're doing partial page writes, so we should be dirty tracking.
-    DEBUG_ASSERT(dirty_track);
-    // Need to handle the case were end is unaligned and on the same page as start
-    if (unlikely(start_page_base == end_page_base)) {
-      return ZeroPartialPageLocked(start_page_base, start - start_page_base, end - start_page_base,
-                                   &guard);
-    }
-    zx_status_t status =
-        ZeroPartialPageLocked(start_page_base, start - start_page_base, PAGE_SIZE, &guard);
-    if (status == ZX_OK) {
-      status = establish_invariants();
-    }
-    if (status != ZX_OK) {
-      return status;
-    }
-    start = start_page_base + PAGE_SIZE;
-  }
-
-  if (unlikely(end_page_base != end)) {
-    // We're doing partial page writes, so we should be dirty tracking.
-    DEBUG_ASSERT(dirty_track);
-    zx_status_t status = ZeroPartialPageLocked(end_page_base, 0, end - end_page_base, &guard);
-    if (status == ZX_OK) {
-      status = establish_invariants();
-    }
-    if (status != ZX_OK) {
-      return status;
-    }
-    end = end_page_base;
-  }
-
-  // Now that we have a page aligned range we can try hand over to the cow pages zero method.
+      // Check for any non-page aligned start and handle separately.
+      if (!IS_PAGE_ALIGNED(offset)) {
+        // We're doing partial page writes, so we should be dirty tracking.
+        DEBUG_ASSERT(dirty_track);
+        const uint64_t page_base = ROUNDDOWN(offset, PAGE_SIZE);
+        const uint64_t zero_start_offset = offset - page_base;
+        const uint64_t zero_len = ktl::min(PAGE_SIZE - zero_start_offset, len);
+        status = ZeroPartialPageLocked(page_base, zero_start_offset, zero_start_offset + zero_len,
+                                       &guard);
+        if (status != ZX_OK) {
+          return status;
+        }
+        // Advance over the length we zeroed and then, since the lock might have been dropped, go
+        // around the loop to redo the checks.
+        offset += zero_len;
+        len -= zero_len;
+        continue;
+      }
+      // The start is page aligned, so if the remaining length is not a page size then perform the
+      // final sub-page zero.
+      if (len < PAGE_SIZE) {
+        DEBUG_ASSERT(dirty_track);
+        return ZeroPartialPageLocked(offset, 0, len, &guard);
+      }
+      // Offset is page aligned, and we have at least one full page to process, so find the page
+      // aligned length to hand over to the cow pages zero method.
+      VmCowRange zero_range = cow_range->WithLength(ROUNDDOWN(cow_range->len, PAGE_SIZE));
 
 #if DEBUG_ASSERT_IMPLEMENTED
-  // Currently we want ZeroPagesLocked() to not decommit any pages from a contiguous VMO.  In debug
-  // we can assert that (not a super fast assert, but seems worthwhile; it's debug only).
-  uint64_t page_count_before = is_contiguous() ? cow_pages_locked()->DebugGetPageCountLocked() : 0;
+      // Currently we want ZeroPagesLocked() to not decommit any pages from a contiguous VMO.  In
+      // debug we can assert that (not a super fast assert, but seems worthwhile; it's debug only).
+      uint64_t page_count_before =
+          is_contiguous() ? cow_pages_locked()->DebugGetPageCountLocked() : 0;
 #endif
+      // Now that we have a page aligned range we can try hand over to the cow pages zero method.
+      status =
+          cow_pages_locked()->ZeroPagesLocked(zero_range, dirty_track, &page_request, &zeroed_len);
+      if (zeroed_len != 0) {
+        // Mark modified since we wrote zeros.
+        mark_modified_locked();
+      }
 
-  auto mark_modified = fit::defer([this, original_start = start, &start]() {
-    if (start > original_start) {
-      // Mark modified since we wrote zeros.
-      AssertHeld(lock_ref());
-      mark_modified_locked();
+#if DEBUG_ASSERT_IMPLEMENTED
+      if (is_contiguous()) {
+        uint64_t page_count_after = cow_pages_locked()->DebugGetPageCountLocked();
+        DEBUG_ASSERT(page_count_after == page_count_before);
+      }
+#endif
     }
-  });
 
-  // We might need a page request if the VMO is backed by a page source.
-  __UNINITIALIZED MultiPageRequest page_request;
-  while (start < end) {
-    uint64_t zeroed_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->ZeroPagesLocked(start + cow_range_.offset, end + cow_range_.offset,
-                                            dirty_track, &page_request, &zeroed_len);
+    // Wait on any page request, which is the only non-fatal error case.
     if (status == ZX_ERR_SHOULD_WAIT) {
-      // If we're not asked to dirty track, we won't be creating any new dirty pages so we shouldn't
-      // need to wait on a page request.
-      DEBUG_ASSERT(dirty_track);
-      guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
-      if (status != ZX_OK) {
-        if (status == ZX_ERR_TIMED_OUT) {
-          DumpLocked(0, false);
-        }
-        return status;
+      status = page_request.Wait();
+      if (status == ZX_ERR_TIMED_OUT) {
+        Dump(0, false);
       }
-      // We dropped the lock while waiting. Check the invariants again.
-      status = establish_invariants();
-      if (status != ZX_OK) {
-        return status;
-      }
-    } else if (status != ZX_OK) {
+    }
+    if (status != ZX_OK) {
       return status;
     }
     // Advance over pages that had already been zeroed.
-    start += zeroed_len;
+    offset += zeroed_len;
+    len -= zeroed_len;
   }
-
-#if DEBUG_ASSERT_IMPLEMENTED
-  if (is_contiguous()) {
-    uint64_t page_count_after = cow_pages_locked()->DebugGetPageCountLocked();
-    DEBUG_ASSERT(page_count_after == page_count_before);
-  }
-#endif
   return ZX_OK;
 }
 
@@ -1404,23 +1374,12 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  zx_status_t status = cow_pages_locked()->ResizeLocked(s);
-  if (status != ZX_OK) {
-    return status;
-  }
-  // We were able to successfully resize. Mark as modified.
-  mark_modified_locked();
-  return ZX_OK;
+  return cow_pages_->Resize(s);
 }
 
 // perform some sort of copy in/out on a range of the object using a passed in lambda for the copy
-// routine. The copy routine has the expected type signature of: (uint64_t src_offset, uint64_t
-// dest_offset, bool write, Guard<VmoLockType> *guard) -> zx_status_t The passed in guard may have
-// its CallUnlocked member used, but if it does then ZX_OK must not be the return value. A return of
-// ZX_ERR_SHOULD_WAIT implies that the attempted copy should be tried again at the exact same
-// offsets.
+// routine. The copy routine has the expected type signature of: (void *ptr, uint64_t offset,
+//  uint64_t len) -> UserCopyCaptureFaultsResult.
 template <typename T>
 zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
                                                    VmObjectReadWriteOptions options, T copyfunc,
@@ -1531,9 +1490,12 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // If a fault has actually occurred, then we will have captured fault info that we can use
         // to handle the fault.
         if (copy_result.fault_info.has_value()) {
-          guard->CallUnlocked([&info = *copy_result.fault_info, &status] {
-            status = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
-          });
+          guard->CallUnlocked(
+              [&info = *copy_result.fault_info, to_fault = len - dest_offset, &status] {
+                // If status is not ZX_OK, there is no guarantee that any of the data has been
+                // copied.
+                status = Thread::Current::SoftFaultInRange(info.pf_va, info.pf_flags, to_fault);
+              });
           if (status == StatusType(ZX_OK)) {
             status = LockDroppedTag{};
           }
@@ -1860,11 +1822,8 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<VmoLockType> guard{lock()};
-
     uint64_t taken_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->TakePagesLocked(range, pages, &taken_len, &page_request);
+    zx_status_t status = cow_pages_->TakePages(range, pages, &taken_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1880,7 +1839,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     range = range.TrimedFromStart(taken_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
+      status = page_request.Wait();
       if (status != ZX_OK) {
         return status;
       }
@@ -1906,11 +1865,14 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<VmoLockType> guard{lock()};
-
     uint64_t supply_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->SupplyPagesLocked(range, pages, options, &supply_len, &page_request);
+    zx_status_t status;
+    {
+      __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
+      Guard<VmoLockType> guard{lock()};
+      status = cow_pages_locked()->SupplyPagesLocked(range, pages, options, &supply_len, deferred,
+                                                     &page_request);
+    }
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1926,7 +1888,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
     range = range.TrimedFromStart(supply_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
+      status = page_request.Wait();
       if (status != ZX_OK) {
         return status;
       }
@@ -1936,7 +1898,6 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 }
 
 zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
-  zx_status_t status;
   // It is possible to encounter delayed PMM allocations, which requires waiting on the
   // page_request.
   __UNINITIALIZED AnonymousPageRequest page_request;
@@ -1946,34 +1907,33 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<VmoLockType> guard{lock()};
-  // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
+  // Initialize a list of allocated pages that DirtyPages will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
-  // to DirtyPagesLocked. Instead of having to allocate and free pages in case DirtyPagesLocked
+  // to DirtyPages. Instead of having to allocate and free pages in case DirtyPages
   // cannot successfully dirty the entire range atomically, we can just hold on to the allocated
   // pages and use them for the next call. This ensures that we are making forward progress with
-  // each successive call to DirtyPagesLocked.
+  // each successive call to DirtyPages.
   list_node alloc_list;
   list_initialize(&alloc_list);
   auto alloc_list_cleanup = fit::defer([&alloc_list, this]() -> void {
     if (!list_is_empty(&alloc_list)) {
-      AssertHeld(lock_ref());
-      cow_pages_locked()->FreePagesLocked(&alloc_list, true);
+      cow_pages_->FreePages(&alloc_list);
     }
   });
-  do {
-    status = cow_pages_locked()->DirtyPagesLocked(*cow_range, &alloc_list, &page_request);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t wait_status;
-      guard.CallUnlocked([&page_request, &wait_status]() { wait_status = page_request.Wait(); });
-      if (wait_status != ZX_OK) {
-        return wait_status;
-      }
-      // If the wait was successful, loop around and try the call again, which will re-validate any
-      // state that might have changed when the lock was dropped.
+  while (true) {
+    zx_status_t status = cow_pages_->DirtyPages(*cow_range, &alloc_list, &page_request);
+    if (status == ZX_OK) {
+      return ZX_OK;
     }
-  } while (status == ZX_ERR_SHOULD_WAIT);
-  return status;
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      status = page_request.Wait();
+    }
+    if (status != ZX_OK) {
+      return status;
+    }
+    // If the wait was successful, loop around and try the call again, which will re-validate any
+    // state that might have changed when the lock was dropped.
+  }
 }
 
 zx_status_t VmObjectPaged::EnumerateDirtyRanges(uint64_t offset, uint64_t len,

@@ -51,13 +51,13 @@ _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
 ASYNC_OP_TIMEOUT: int = 10
 
 
-class AdvertisedPeripheralImpl(f_ble_controller.AdvertisedPeripheral.Server):
+class AdvertisedPeripheralImpl(f_ble_controller.AdvertisedPeripheralServer):
     def on_connected(
         self, request: f_ble_controller.AdvertisedPeripheralOnConnectedRequest
     ) -> None:
         _LOGGER.info(
             "Advertised Peripheral Connected with peer: %s",
-            request.peer.id.value,
+            request.peer.id_.value,
         )
         self._peripheral_connection = request.connection
         raise StopServer
@@ -137,20 +137,20 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             )
 
         assert self._peripheral_controller_proxy is None
-        self._peripheral_controller_proxy = f_ble_controller.Peripheral.Client(
+        self._peripheral_controller_proxy = f_ble_controller.PeripheralClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothLEPeripheral"]
             )
         )
 
         assert self._central_controller_proxy is None
-        self._central_controller_proxy = f_ble_controller.Central.Client(
+        self._central_controller_proxy = f_ble_controller.CentralClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothLECentral"]
             )
         )
         assert self._gatt_server_proxy is None
-        self._gatt_server_proxy = f_gatt_controller.Server.Client(
+        self._gatt_server_proxy = f_gatt_controller.ServerClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["BluetoothGattServer"]
             )
@@ -194,7 +194,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             A dict of all known LE remote devices.
         """
         (central_client, central_server) = Channel.create()
-        watcher = f_ble_controller.ScanResultWatcher.Client(central_client)
+        watcher = f_ble_controller.ScanResultWatcherClient(central_client)
         filter_options = f_ble_controller.Filter()
         scan_options = f_ble_controller.ScanOptions(filters=[filter_options])
         assert self._central_controller_proxy is not None
@@ -208,9 +208,9 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             central_client.close()
             await task1
         for peer in res.updated:
-            self.known_le_devices[peer.id.value] = {
+            self.known_le_devices[peer.id_.value] = {
                 "name": peer.name,
-                "id": peer.id,
+                "id": peer.id_,
                 "bonded": peer.bonded,
                 "connectable": peer.connectable,
             }
@@ -227,7 +227,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         """
         peer_id = f_bt.PeerId(value=identifier)
         (conn_client, conn_server) = Channel.create()
-        self._connection_client = f_ble_controller.Connection.Client(
+        self._connection_client = f_ble_controller.ConnectionClient(
             conn_client.take()
         )
         connection_options = f_ble_controller.ConnectionOptions(
@@ -236,7 +236,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         try:
             assert self._central_controller_proxy is not None
             self._central_controller_proxy.connect(
-                id=peer_id,
+                id_=peer_id,
                 options=connection_options,
                 handle=conn_server.take(),
             )
@@ -346,7 +346,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
                 self._connection_client is not None
             )  # the central connection handle should request Gatt client
             (client, server) = Channel.create()
-            client = f_gatt_controller.Client.Client(client)
+            client = f_gatt_controller.ClientClient(client)
             self._connection_client.request_gatt_client(
                 client=server.take()
             )  # bind server end of gatt2 client
@@ -380,7 +380,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         for service in res.updated:
             self.service_info[service.handle.value] = {
                 "kind": service.kind,
-                "type": service.type,
+                "type": service.type_,
                 "characteristics": service.characteristics,
                 "includes": service.includes,
             }
@@ -404,7 +404,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
             self._gatt_client.connect_to_service(
                 handle=service_handle, service=server.take()
             )
-            client = f_gatt_controller.RemoteService.Client(client)
+            client = f_gatt_controller.RemoteServiceClient(client)
             self._remote_service_client = client
         except Exception as e:
             raise bt_errors.BluetoothError(
@@ -434,7 +434,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         for characteristic in res.characteristics:
             remote_response[characteristic.handle.value] = {
                 "handle": characteristic.handle.value,
-                "type": characteristic.type.value,
+                "type": characteristic.type_.value,
                 "properties": characteristic.properties,
                 "permissions": characteristic.permissions,
                 "descriptors": characteristic.descriptors,
@@ -460,8 +460,9 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
                 self._remote_service_client is not None
             )  # we must have a connected client to make a remote service
             service_handle = f_gatt_controller.ServiceHandle(value=handle)
-            read_options = f_gatt_controller.ReadOptions()
-            read_options.short_read = f_gatt_controller.ShortReadOptions()
+            read_options = f_gatt_controller.ReadOptions(
+                short_read=f_gatt_controller.ShortReadOptions()
+            )
             res = self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._remote_service_client.read_characteristic(

@@ -191,7 +191,7 @@ uint8_t AcpiChecksum(const void* _buf, size_t len) {
   //
   //   foo.checksum = AcpiChecksum(&foo, sizeof(foo));
   //
-  return -c;
+  return static_cast<uint8_t>(-c);
 }
 
 zx::result<const AcpiRsdt*> ValidateRsdt(PhysMemReader& reader, uint32_t rsdt_pa,

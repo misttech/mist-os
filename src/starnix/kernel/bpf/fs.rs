@@ -5,10 +5,12 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use super::BpfMap;
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::security::{self, PermissionFlags};
 use crate::task::{
     CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
 };
@@ -20,7 +22,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
 use ebpf::MapSchema;
-use ebpf_api::{compute_map_storage_size, PinnedMap, RINGBUF_SIGNAL};
+use ebpf_api::{compute_map_storage_size, RINGBUF_SIGNAL};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -47,12 +49,12 @@ pub enum BpfHandle {
     // Stub used to fake loading of programs of unknown types.
     ProgramStub(u32),
 
-    Map(PinnedMap),
+    Map(Arc<BpfMap>),
     BpfTypeFormat(Arc<BpfTypeFormat>),
 }
 
 impl BpfHandle {
-    pub fn as_map(&self) -> Result<&PinnedMap, Errno> {
+    pub fn as_map(&self) -> Result<&BpfMap, Errno> {
         match self {
             Self::Map(ref map) => Ok(map),
             _ => error!(EINVAL),
@@ -68,7 +70,7 @@ impl BpfHandle {
     // Returns VMO and schema if this handle references a map.
     fn get_map_vmo(&self) -> Result<(Arc<zx::Vmo>, MapSchema), Errno> {
         match self {
-            Self::Map(map) => {
+            Self::Map(ref map) => {
                 let vmo = map.vmo().ok_or_else(|| errno!(ENODEV))?;
                 Ok((vmo, map.schema))
             }
@@ -83,6 +85,19 @@ impl BpfHandle {
             Self::BpfTypeFormat(_) => "bpf-type",
         }
     }
+
+    /// Performs security-related checks when opening a BPF map.
+    pub(super) fn security_check_open_fd(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        match self {
+            Self::Map(bpf_map) => security::check_bpf_map_access(
+                current_task,
+                &bpf_map,
+                PermissionFlags::from_bpf_flags(bpf_map.flags),
+            ),
+            Self::Program(program) => security::check_bpf_prog_access(current_task, &program),
+            _ => Ok(()),
+        }
+    }
 }
 
 impl From<Program> for BpfHandle {
@@ -91,9 +106,9 @@ impl From<Program> for BpfHandle {
     }
 }
 
-impl From<PinnedMap> for BpfHandle {
-    fn from(map: PinnedMap) -> Self {
-        Self::Map(map)
+impl From<BpfMap> for BpfHandle {
+    fn from(map: BpfMap) -> Self {
+        Self::Map(Arc::new(map))
     }
 }
 
@@ -149,20 +164,24 @@ impl FileOps for BpfHandle {
 
         let memory_object = match schema.map_type {
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
+                let page_size = *PAGE_SIZE as usize;
                 // Starting from the second page, this cannot be mapped writable.
-                if length > *PAGE_SIZE as usize {
+                if length > page_size {
                     if prot.contains(ProtectionFlags::WRITE) {
                         return error!(EPERM);
                     }
                     // This cannot be mapped outside of the 2 control pages and the 2 data sections.
-                    if length > 2 * (*PAGE_SIZE as usize) + 2 * schema.max_entries as usize {
+                    if length > 2 * page_size + 2 * schema.max_entries as usize {
                         return error!(EINVAL);
                     }
                 }
 
+                // The first page of the ring buffer VMO is not visible to
+                // user-space processes. Return a VMO slice that doesn't
+                // include the first page.
+                let clone_size = 2 * page_size + schema.max_entries as usize;
                 let vmo_dup = vmo
-                    .as_handle_ref()
-                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .create_child(zx::VmoChildOptions::SLICE, page_size as u64, clone_size as u64)
                     .map_err(|_| errno!(EIO))?
                     .into();
                 Arc::new(MemoryObject::RingBuf(vmo_dup))

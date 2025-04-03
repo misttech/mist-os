@@ -73,22 +73,11 @@ extern char _end[];
 extern paddr_t zero_page_paddr;
 extern vm_page_t* zero_page;
 
-static inline size_t get_kernel_size() { return _end - __executable_start; }
-
 // return a pointer to the zero page
 static inline vm_page_t* vm_get_zero_page(void) { return zero_page; }
 
 // return the physical address of the zero page
 static inline paddr_t vm_get_zero_page_paddr(void) { return zero_page_paddr; }
-
-// List of the kernel program's various segments.
-struct kernel_region {
-  const char* name;
-  vaddr_t base;
-  size_t size;
-  uint arch_mmu_flags;
-};
-extern const ktl::span<const kernel_region> kernel_regions;
 
 // internal kernel routines below, do not call directly
 

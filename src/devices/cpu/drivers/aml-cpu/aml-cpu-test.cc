@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <optional>
@@ -13,7 +14,6 @@
 #include <gtest/gtest.h>
 #include <sdk/lib/inspect/testing/cpp/inspect.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/cpu/drivers/aml-cpu/aml-cpu-driver.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -214,13 +214,13 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
     device_server_.Initialize("pdev");
     EXPECT_EQ(ZX_OK, device_server_.Serve(dispatcher, &to_driver_vfs));
 
-    std::map<uint32_t, fake_pdev::Mmio> mmios;
+    std::map<uint32_t, fdf_fake::Mmio> mmios;
     mmios[0] = mmio_.mmio();
 
-    pdev_server_.SetConfig(fake_pdev::FakePDevFidl::Config{
+    pdev_server_.SetConfig(fdf_fake::FakePDev::Config{
         .mmios = std::move(mmios),
         .device_info =
-            pdev_device_info_t{
+            fdf::PDev::DeviceInfo{
                 .pid = PDEV_PID_ASTRO,
             },
     });
@@ -254,7 +254,7 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
 
   compat::DeviceServer device_server_;
   FakeMmio mmio_;
-  fake_pdev::FakePDevFidl pdev_server_;
+  fdf_fake::FakePDev pdev_server_;
   TestPowerDevice power_server_;
   TestClockDevice clock_pll_div16_server_;
   TestClockDevice clock_cpu_div16_server_;

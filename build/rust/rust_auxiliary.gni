@@ -369,7 +369,6 @@ template("rust_auxiliary") {
       if (defined(zip_rustdoc_to)) {
         outputs += [ zip_rustdoc_to ]
       }
-      _rebased_target_gen_dir = rebase_path(target_gen_dir, root_build_dir)
       if (is_fuchsia) {
         _extern_html_root_url = "${rustdoc_extern_html_root_url_base}"
       } else {
@@ -379,7 +378,7 @@ template("rust_auxiliary") {
       args = [
         "--touch",
         rebase_path(_rustdoc_stamp_output, root_build_dir),
-        "@${_rebased_target_gen_dir}/${_deps_file_rmeta}",
+        "@" + rebase_path(_deps_rmeta_output, root_build_dir),
         "--extern-html-root-url=$_extern_html_root_url",
       ]
       if (defined(aliased_deps)) {
@@ -423,7 +422,7 @@ template("rust_auxiliary") {
         "-Zunstable-options",
         "--out-dir",
         rebase_path(_rustdoc_out_dir, root_build_dir),
-        "@${_rebased_target_gen_dir}/${_transdeps_file}",
+        "@" + rebase_path(_transdeps_output, root_build_dir),
         "--sysroot=${rebased_rustc_prefix}",
         "--crate-type=${rust_crate_type}",
         "--crate-name=${_crate_name}",

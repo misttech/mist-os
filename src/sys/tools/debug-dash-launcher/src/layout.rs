@@ -8,10 +8,7 @@ use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use log::warn;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
-use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
 use vfs::service::endpoint;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
@@ -125,18 +122,17 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
 
     // Create forwarding entries for namespace protocols
     for entry in entries {
-        let svc_dir = std::clone::Clone::clone(&svc_dir);
+        let svc_dir = Clone::clone(&svc_dir);
         let protocol_name = entry.name.clone();
         vfs.add_entry(
             protocol_name.clone(),
-            endpoint(move |_, channel| {
-                let server_end = channel.into_zx_channel().into();
+            endpoint(move |_, server_end| {
                 svc_dir
-                    .deprecated_open(
-                        fio::OpenFlags::NOT_DIRECTORY,
-                        fio::ModeType::empty(),
+                    .open(
                         &protocol_name,
-                        server_end,
+                        fio::Flags::PROTOCOL_SERVICE,
+                        &Default::default(),
+                        server_end.into_zx_channel(),
                     )
                     .unwrap();
             }),
@@ -165,16 +161,8 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
     ) {
         warn!(err:?; "Could not inject fuchsia.process.Resolver into filesystem layout. Ignoring.");
     }
-    let (svc_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    let server_end = server_end.into_channel().into();
-    vfs.open(
-        ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        Path::dot(),
-        server_end,
-    );
 
-    svc_dir
+    vfs::directory::serve_read_only(vfs)
 }
 
 fn to_name_info(path: &str, directory: fio::DirectoryProxy) -> fproc::NameInfo {

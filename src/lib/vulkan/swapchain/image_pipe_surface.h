@@ -58,6 +58,10 @@ class ImagePipeSurface {
            VK_IMAGE_USAGE_STORAGE_BIT;
   }
 
+  static VkCompositeAlphaFlagsKHR SupportedAlphaFlags() {
+    return VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR | VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+  }
+
   virtual bool Init() { return true; }
   virtual bool CanPresentPendingImage() { return true; }
 
@@ -68,6 +72,7 @@ class ImagePipeSurface {
   virtual bool CreateImage(VkDevice device, VkLayerDispatchTable* pDisp, VkFormat format,
                            VkImageUsageFlags usage, VkSwapchainCreateFlagsKHR swapchain_flags,
                            VkExtent2D extent, uint32_t image_count,
+                           VkCompositeAlphaFlagBitsKHR alpha_flags,
                            const VkAllocationCallbacks* pAllocator,
                            std::vector<ImageInfo>* image_info_out) = 0;
   // Removes an image resource from the pipe.

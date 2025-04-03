@@ -74,26 +74,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "legacy-bundle"
-        }
-      },
-      "optionality": "optional",
-      "long": "--legacy-bundle",
-      "short": null,
-      "description": "the path to the legacy assembly input bundle directory",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--legacy-bundle-must-be-empty",
-      "short": null,
-      "description": "enforce that the legacy AIB is empty",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "package-validation"
         }
       },

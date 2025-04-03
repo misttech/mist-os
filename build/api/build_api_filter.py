@@ -15,13 +15,30 @@ class BuildApiFilter(object):
         """Initialization. |ninja_artifacts| is a list of Ninja file paths."""
         self._ninja_artifacts = set(ninja_artifacts)
 
-    def _filter_json_scopes(self, input_json: T.Any, key_name: str) -> str:
+    def _filter_json_scopes(
+        self, input_json: T.Any, key_name: str
+    ) -> T.List[str]:
+        assert isinstance(input_json, list)
         return [s for s in input_json if s[key_name] in self._ninja_artifacts]
 
     def _filter_json_path_list(
         self, input_paths: T.Sequence[str]
     ) -> T.Sequence[str]:
         return [p for p in input_paths if p in self._ninja_artifacts]
+
+    def _filter_json_scopes_with_multiple_keys(
+        self, input_json: T.Any, key_names: T.Sequence[str]
+    ) -> T.List[str]:
+        assert isinstance(input_json, list)
+        return [
+            s
+            for s in input_json
+            if any(
+                s[key_name] in self._ninja_artifacts
+                for key_name in key_names
+                if key_name in s
+            )
+        ]
 
     def filter_api_json(self, api_module: str, json_content: T.Any) -> T.Any:
         """Filter the content of a given build API module.
@@ -62,6 +79,11 @@ class BuildApiFilter(object):
 
         if api_module == "binaries":
             return self._filter_json_scopes(json_content, "debug")
+
+        if api_module == "debug_symbols":
+            return self._filter_json_scopes_with_multiple_keys(
+                json_content, ("debug", "manifest")
+            )
 
         if api_module == "boards":
             return self._filter_json_scopes(json_content, "outdir")

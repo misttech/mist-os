@@ -1,7 +1,6 @@
 ffx/driver.golden
 ffx/driver/conformance.golden
 ffx/driver/conformance/test.golden
-ffx/driver/debug-bind.golden
 ffx/driver/device.golden
 ffx/driver/device/bind.golden
 ffx/driver/device/rebind.golden

@@ -7,9 +7,10 @@ use crate::client::types;
 use crate::util::historical_list::{HistoricalList, Timestamped};
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
 use log::error;
+use wlan_common::sequestered::Sequestered;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-    fuchsia_async as fasync,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
 };
 
 pub const ROAMING_CHANNEL_BUFFER_SIZE: usize = 100;
@@ -128,16 +129,24 @@ pub enum RoamTriggerDataOutcome {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RoamReason {
     RssiBelowThreshold,
     SnrBelowThreshold,
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct PolicyRoamRequest {
     pub candidate: types::ScannedCandidate,
     pub reasons: Vec<RoamReason>,
+}
+impl From<PolicyRoamRequest> for fidl_sme::RoamRequest {
+    fn from(item: PolicyRoamRequest) -> Self {
+        fidl_sme::RoamRequest {
+            bss_description: Sequestered::release(item.candidate.bss.bss_description),
+        }
+    }
 }
 
 /// Only used for recording when the last roam attempts happened in order to limit their frequency.

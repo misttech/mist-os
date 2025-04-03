@@ -22,7 +22,7 @@
             to: [ "#test" ],
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.gpu.magma.Service",
             from: "parent",
             to: [ "#test" ],
         },

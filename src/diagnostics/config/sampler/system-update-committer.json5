@@ -38,6 +38,24 @@
         },
         {
             event_codes: [
+                4,
+            ],
+            metric_id: 121,
+            metric_type: "Integer",
+            selector: "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_timeout",
+            upload_once: true,
+        },
+        {
+            event_codes: [
+                5,
+            ],
+            metric_id: 121,
+            metric_type: "Integer",
+            selector: "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_internal",
+            upload_once: true,
+        },
+        {
+            event_codes: [
                 3,
                 1,
             ],
@@ -48,12 +66,22 @@
         },
         {
             event_codes: [
+                4,
                 3,
-                2,
             ],
             metric_id: 122,
             metric_type: "Occurrence",
-            selector: "core/system-update/system-update-committer:root/verification/ota_verification_failure:fidl",
+            selector: "core/system-update/system-update-committer:root/verification/ota_verification_failure:timeout",
+            upload_once: true,
+        },
+        {
+            event_codes: [
+                5,
+                4,
+            ],
+            metric_id: 122,
+            metric_type: "Occurrence",
+            selector: "core/system-update/system-update-committer:root/verification/ota_verification_failure:internal",
             upload_once: true,
         },
     ],

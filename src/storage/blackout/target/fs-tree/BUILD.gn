@@ -39,9 +39,6 @@ rustc_binary("blackout-fxfs-tree-bin") {
   ]
   sources = [ "src/main.rs" ]
   rustenv = [ "DATA_FILESYSTEM_FORMAT=fxfs" ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_component("blackout-fxfs-tree-component") {

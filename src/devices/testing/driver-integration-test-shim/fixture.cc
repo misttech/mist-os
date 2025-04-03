@@ -179,6 +179,11 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
+      .capabilities = {Directory{.name = "block", .rights = fuchsia::io::R_STAR_DIR}},
+      .source = {ChildRef{"fshost"}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "factory", .rights = fuchsia::io::R_STAR_DIR}},
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},

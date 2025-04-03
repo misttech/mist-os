@@ -171,7 +171,7 @@ static uint16_t ip6_checksum(ip6_hdr* ip, unsigned type, size_t length) {
   sum = checksum(ip->src, 32 + length, sum);
 
   // 0 is illegal, so 0xffff remains 0xffff
-  return (sum != 0xFFFF) ? ~sum : sum;
+  return (sum != 0xFFFF) ? (uint16_t)~sum : sum;
 }
 
 static int ip6_setup(ip6_pkt* p, const ip6_addr* daddr, size_t length, uint8_t type) {

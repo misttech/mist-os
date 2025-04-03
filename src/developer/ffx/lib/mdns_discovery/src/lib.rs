@@ -592,7 +592,7 @@ fn make_target<B: SplitByteSlice + Copy>(
                         }
                     }
                     if let Some(ip) = ip_addr {
-                        ssh_address = Some(ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+                        ssh_address = Some(ffx::TargetIpAddrInfo::IpPort(ffx::TargetIpPort {
                             ip,
                             scope_id: 0,
                             port: ssh_port,
@@ -981,7 +981,6 @@ mod tests {
     use ::mdns::protocol::{
         Class, DomainBuilder, EmbeddedPacketBuilder, Message, MessageBuilder, RecordBuilder, Type,
     };
-    use fidl_fuchsia_developer_ffx::TargetAddrInfo::IpPort;
     use fidl_fuchsia_developer_ffx::TargetIpPort;
     use fidl_fuchsia_net::IpAddress::Ipv4;
     use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
@@ -1044,7 +1043,7 @@ mod tests {
         );
         assert_eq!(
             t.ssh_address,
-            Some(IpPort(TargetIpPort {
+            Some(ffx::TargetIpAddrInfo::IpPort(TargetIpPort {
                 ip: Ipv4(Ipv4Address { addr: [123, 11, 22, 33] }),
                 scope_id: 0,
                 port: 54321

@@ -9,6 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
@@ -621,24 +622,25 @@ zx_status_t AmlSpiNand::Init() {
 zx_status_t AmlSpiNand::Create(void *ctx, zx_device_t *parent) {
   zx_status_t status = ZX_OK;
 
-  ddk::PDevFidl pdev(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                        "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result controller_mmio = pdev.MapMmio(0);
+  if (controller_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map controller mmio: %s", controller_mmio.status_string());
+    return controller_mmio.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> controller_mmio;
-  status = pdev.MapMmio(0, &controller_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev.MapMmio spifc reg failed");
-    return status;
-  }
-
-  std::optional<fdf::MmioBuffer> clk_mmio;
-  status = pdev.MapMmio(1, &clk_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev.MapMmio nand reg failed");
-    return status;
+  zx::result clk_mmio = pdev.MapMmio(1);
+  if (clk_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map clock mmio: %s", clk_mmio.status_string());
+    return clk_mmio.status_value();
   }
 
   auto spifc = std::make_unique<AmlSpiFlashController>(std::move(controller_mmio.value()),

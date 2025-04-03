@@ -13,6 +13,7 @@
         compat: "driver/goodix.so",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.ui.input.drivers.goodix.gt92xx.device" ],
     },
     use: [
         {

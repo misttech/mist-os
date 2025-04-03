@@ -7,6 +7,7 @@ use anyhow::{Context as _, Result};
 use component_debug::dirs::*;
 use component_debug::lifecycle::*;
 use fuchsia_component::client::connect_to_protocol_at_path;
+use futures::channel::oneshot;
 use futures::prelude::*;
 use log::*;
 use moniker::Moniker;
@@ -16,7 +17,7 @@ use std::rc::{Rc, Weak};
 use {
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
-    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
+    fidl_fuchsia_diagnostics_types as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
     fidl_fuchsia_sys2 as fsys,
 };
 
@@ -41,7 +42,7 @@ struct Client {
 /// Indicates a connection request to be handled by the `connector` argument of
 /// `RemoteControlService::new`
 pub enum ConnectionRequest {
-    Overnet(fidl::Socket),
+    Overnet(fidl::Socket, oneshot::Sender<u64>),
     FDomain(fidl::Socket),
 }
 
@@ -81,9 +82,14 @@ impl RemoteControlService {
     ) -> Result<()> {
         match request {
             connector::ConnectorRequest::EstablishCircuit { id, socket, responder } => {
-                (self.connector)(ConnectionRequest::Overnet(socket), Rc::downgrade(self));
+                let (nodeid_sender, nodeid_receiver) = oneshot::channel();
+                (self.connector)(
+                    ConnectionRequest::Overnet(socket, nodeid_sender),
+                    Rc::downgrade(self),
+                );
+                let node_id = nodeid_receiver.await?;
                 client.allocated_ids.borrow_mut().push(id);
-                responder.send()?;
+                responder.send(node_id)?;
                 Ok(())
             }
             connector::ConnectorRequest::FdomainToolboxSocket { socket, responder } => {
@@ -110,6 +116,9 @@ impl RemoteControlService {
                     diagnostics::Severity::Error => error!(tag:%; "{}", message),
                     // Tracing crate doesn't have a Fatal level, just log an error with a FATAL message embedded.
                     diagnostics::Severity::Fatal => error!(tag:%; "<FATAL> {}", message),
+                    diagnostics::Severity::__SourceBreaking { .. } => {
+                        error!(tag:%; "<UNKNOWN> {message}")
+                    }
                 }
                 responder.send()?;
                 Ok(())
@@ -613,12 +622,18 @@ mod tests {
         let RcsEnv { system_info_proxy, use_default_identifier } = env;
         if use_default_identifier {
             Rc::new(RemoteControlService::new_with_allocator(
-                |_, _| (),
+                |req, _| match req {
+                    ConnectionRequest::Overnet(_, sender) => sender.send(0u64).unwrap(),
+                    _ => (),
+                },
                 move || Ok(Box::new(DefaultIdentifier { boot_timestamp_nanos: BOOT_TIME })),
             ))
         } else {
             Rc::new(RemoteControlService::new_with_allocator(
-                |_, _| (),
+                |req, _| match req {
+                    ConnectionRequest::Overnet(_, sender) => sender.send(0u64).unwrap(),
+                    _ => (),
+                },
                 move || {
                     Ok(Box::new(HostIdentifier {
                         interface_state_proxy: setup_fake_interface_state_service(),
@@ -669,7 +684,7 @@ mod tests {
     }
 
     fn setup_fake_lifecycle_controller() -> fsys::LifecycleControllerProxy {
-        fidl::endpoints::spawn_stream_handler(
+        fidl_test_util::spawn_stream_handler(
             move |request: fsys::LifecycleControllerRequest| async move {
                 match request {
                     fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
@@ -695,7 +710,7 @@ mod tests {
     /// (ie. incoming namespace, outgoing directory, etc) the capability is
     /// expected to be requested from.
     fn setup_fake_realm_query(capability_set: fsys::OpenDirType) -> fsys::RealmQueryProxy {
-        fidl::endpoints::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
+        fidl_test_util::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
                 fsys::RealmQueryRequest::DeprecatedOpen {
                     moniker,
@@ -899,8 +914,8 @@ mod tests {
 
         let (pumpkin_a, _) = fidl::Socket::create_stream();
         let (pumpkin_b, _) = fidl::Socket::create_stream();
-        connector_proxy.establish_circuit(1234, pumpkin_a).await.unwrap();
-        connector_proxy.establish_circuit(4567, pumpkin_b).await.unwrap();
+        let _node_ida = connector_proxy.establish_circuit(1234, pumpkin_a).await.unwrap();
+        let _node_idb = connector_proxy.establish_circuit(4567, pumpkin_b).await.unwrap();
 
         let ident = rcs_proxy.identify_host().await.unwrap().unwrap();
         let ids = ident.ids.unwrap();

@@ -5,8 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.developer.remotecontrol") {
-  sdk_category = "partner_internal"
-  sdk_area = "Unknown"
+  sdk_category = "host_tool"
+  sdk_area = "Developer"
   stable = true
   sources = [
     "host-identification.fidl",
@@ -17,6 +17,7 @@ fidl("fuchsia.developer.remotecontrol") {
     "//sdk/fidl/fuchsia.buildinfo",
     "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//sdk/fidl/fuchsia.hwinfo",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.net",

@@ -10,7 +10,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
 
 def collect_partitions_config(
     root_dir: str, partitions_config: argparse.FileType
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     config = json.load(partitions_config)
     inputs = [partitions_config.name]
     outputs = []

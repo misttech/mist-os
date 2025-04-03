@@ -57,6 +57,47 @@ group("tests_no_e2e") {
 bazel_test_package_group("bazel_tests") {
   tests = [
     {
+      test_package_target = "//examples/drivers/simple/dfv2:simple-driver-test"
+      test_component_names = [ "simple-driver-test-bin" ]
+      test_specs = {
+        environments = basic_envs
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target = "//examples/drivers/template:template-test"
+      test_component_names = [ "template-test-bin" ]
+      test_specs = {
+        environments = basic_envs
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+    },
+    {
+      test_package_target =
+          "//examples/drivers/transport/driver/v2:driver-transport-test"
+      test_package_name = "driver_transport_example_test"
+      test_component_names = [
+        "child-driver-test-bin",
+        "parent-driver-test-bin",
+      ]
+      test_specs = {
+        environments = basic_envs
+      }
+    },
+    {
+      test_package_target = "//sdk/lib/driver/devicetree/examples/example-board:example-board-test-package"
+      test_package_name = "example-board-test"
+      test_component_names = [ "example-board-test" ]
+      deps = [
+        "//sdk/lib/driver/devicetree/examples/example-board:test-dtb",
+        "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
+      ]
+    },
+    {
       test_package_target = "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree-test-package"
       test_package_name = "vim3-devicetree-test"
       test_component_names = [ "vim3-devicetree-test" ]

@@ -39,11 +39,10 @@ fuchsia_virtual_device(
 
 fuchsia_product_bundle(
     name = "product_bundle_eng.x64",
-    board_name = "x64",
     default_virtual_device = ":microfuchsia_emu_x64",
     main = ":microfuchsia_eng.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "microfuchsia_eng",
+    product_bundle_name = "microfuchsia_eng.x64",
     virtual_devices = [
         ":microfuchsia_emu_x64",
     ],
@@ -51,11 +50,10 @@ fuchsia_product_bundle(
 
 fuchsia_product_bundle(
     name = "product_bundle_eng.pkvm-x64",
-    board_name = "pkvm-x64",
     default_virtual_device = ":microfuchsia_emu_x64",
     main = ":microfuchsia_eng.pkvm-x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:pkvm-x64",
-    product_bundle_name = "microfuchsia_eng",
+    product_bundle_name = "microfuchsia_eng.pkvm-x64",
     virtual_devices = [
         ":microfuchsia_emu_x64",
     ],
@@ -63,19 +61,17 @@ fuchsia_product_bundle(
 
 fuchsia_product_bundle(
     name = "product_bundle_eng.arm64",
-    board_name = "arm64",
     main = ":microfuchsia_eng.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_bundle_name = "microfuchsia_eng",
+    product_bundle_name = "microfuchsia_eng.arm64",
 )
 
 fuchsia_product_bundle(
     name = "product_bundle_eng.pkvm-arm64",
-    board_name = "pkvm-arm64",
     default_virtual_device = ":microfuchsia_emu_arm64",
     main = ":microfuchsia_eng.pkvm-arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:pkvm-arm64",
-    product_bundle_name = "microfuchsia_eng",
+    product_bundle_name = "microfuchsia_eng.pkvm-arm64",
     virtual_devices = [
         ":microfuchsia_emu_arm64",
     ],
@@ -151,6 +147,7 @@ fuchsia_product_configuration(
                 {
                     "component_url": "fuchsia-pkg://fuchsia.com/ta-noop#meta/ta-runtime.cm",
                     "guid": "185d0391-bb47-495a-ba57-d6c6b808bfae",
+                    "ta_type": "GlobalPlatform",
                 },
             ],
         },

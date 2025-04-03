@@ -89,7 +89,10 @@ impl<R> SessionParser<R> {
                     Err(e) => ParseOutcome::Error(e),
                 }
             }
-            Err(nom::Err::Error(e) | nom::Err::Failure(e)) => ParseOutcome::Error(e),
+            Err(nom::Err::Error(e) | nom::Err::Failure(e)) => {
+                self.buffer = vec![];
+                ParseOutcome::Error(e)
+            }
             Err(nom::Err::Incomplete(needed)) => {
                 ParseOutcome::NeedMoreBytes(match needed {
                     // Fall back to asking for the max trace record size if we don't know
@@ -408,7 +411,36 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn session_with_incomplete_trailing_record() {
+    fn session_with_invalid_record_in_middle() {
+        let mut session = vec![];
+        // Add the magic record from the simple trace before we add our bogus record so we don't
+        // error on an invalid first record.
+        session.extend(&SIMPLE_TRACE_FXT[..8]);
+        // This error is not valid because it's not UTF-8
+        let invalid_record = vec![
+            103, 0, 2, 15, 128, 1, 0, 0, 229, 253, 9, 0, 0, 0, 0, 0, 98, 105, 110, 100, 101, 114,
+            58, 57, 51, 54, 95, 68, 255, 255, 255, 0, 40, 0, 166, 0, 0, 0, 0, 0, 125, 125, 4, 0, 0,
+            0, 0, 0,
+        ];
+        session.extend(invalid_record);
+        session.extend(&SIMPLE_TRACE_FXT[8..]);
+        let mut parser = SessionParser::new(std::io::Cursor::new(session));
+        let mut records = vec![];
+        let mut had_error_record = false;
+        while let Some(record) = parser.next() {
+            match record {
+                Ok(record) => records.push(record),
+                Err(_) => had_error_record = true,
+            }
+        }
+        // We want to test that even we seeing an invalid record, we still parse the rest of the
+        // session.
+        assert_eq!(records, expected_simple_trace_records().0);
+        assert_eq!(had_error_record, true);
+    }
+
+    #[fuchsia::test]
+    fn sessioninvalid_recordwith_incomplete_trailing_record() {
         use crate::string::STRING_REF_INLINE_BIT;
 
         let mut session = SIMPLE_TRACE_FXT.to_vec();

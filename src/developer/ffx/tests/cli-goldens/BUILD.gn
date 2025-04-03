@@ -119,8 +119,7 @@ if (has_board) {
       golden_processor_tool = ":ffx_cli_goldens"
       ffx_path = _ffx_path
       tool_list = _tool_list
-      visible_label =
-          get_label_info(":ffx-golden-command-list", "label_no_toolchain")
+      visible_label = get_label_info(":tests", "label_no_toolchain")
 
       # Since we're iterating over the command list to generate
       # these targets, add the command list as dependency

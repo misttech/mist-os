@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::mem::replace;
+use core::mem::{replace, MaybeUninit};
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder, WireHandle, WireOptionalHandle};
 use crate::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom,
+    Slot, TakeFrom, ZeroPadding,
 };
 
 use zx::sys::zx_handle_t;
@@ -20,10 +20,18 @@ pub struct WireChannel {
     handle: WireHandle,
 }
 
+unsafe impl ZeroPadding for WireChannel {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
+        WireHandle::zero_padding(handle);
+    }
+}
+
 impl WireChannel {
-    /// Encodes a channel as present in a slot.
-    pub fn set_encoded_present(slot: Slot<'_, Self>) {
-        munge!(let Self { handle } = slot);
+    /// Encodes a channel as present in an output.
+    pub fn set_encoded_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
         WireHandle::set_encoded_present(handle);
     }
 
@@ -64,16 +72,24 @@ pub struct WireOptionalChannel {
     handle: WireOptionalHandle,
 }
 
+unsafe impl ZeroPadding for WireOptionalChannel {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
+        WireOptionalHandle::zero_padding(handle);
+    }
+}
+
 impl WireOptionalChannel {
-    /// Encodes a channel as present in a slot.
-    pub fn set_encoded_present(slot: Slot<'_, Self>) {
-        munge!(let Self { handle } = slot);
+    /// Encodes a channel as present in an output.
+    pub fn set_encoded_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
         WireOptionalHandle::set_encoded_present(handle);
     }
 
-    /// Encodes a channel as absent in a slot.
-    pub fn set_encoded_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { handle } = slot);
+    /// Encodes a channel as absent in an output.
+    pub fn set_encoded_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { handle } = out);
         WireOptionalHandle::set_encoded_absent(handle);
     }
 
@@ -103,15 +119,15 @@ impl Encodable for Channel {
     type Encoded = WireChannel;
 }
 
-impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
+unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         let channel = replace(self, Channel::from(Handle::invalid()));
 
-        munge!(let WireChannel { handle } = slot);
+        munge!(let WireChannel { handle } = out);
         Handle::from(channel).encode(encoder, handle)
     }
 }
@@ -120,15 +136,15 @@ impl EncodableOption for Channel {
     type EncodedOption = WireOptionalChannel;
 }
 
-impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Channel {
+unsafe impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Channel {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption>,
+        out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         let channel = this.map(|channel| replace(channel, Channel::from(Handle::invalid())));
 
-        munge!(let WireOptionalChannel { handle } = slot);
+        munge!(let WireOptionalChannel { handle } = out);
         Handle::encode_option(channel.map(Handle::from).as_mut(), encoder, handle)
     }
 }

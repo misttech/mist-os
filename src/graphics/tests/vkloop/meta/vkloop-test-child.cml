@@ -10,11 +10,7 @@
         binary: "bin/vkloop",
     },
     use: [
-        {
-            directory: "dev-class",
-            rights: [ "r*" ],
-            path: "/dev/class",
-        },
+        { service: "fuchsia.gpu.magma.Service" },
         {
             protocol: [
                 "fuchsia.driver.development.Manager",
@@ -25,24 +21,25 @@
             ],
         },
         {
-            from: "parent",
             config: "fuchsia.gpu.test.GpuVendorId",
+            from: "parent",
             key: "gpu_vendor_id",
             availability: "transitional",
             type: "uint32",
         },
         {
-            from: "parent",
             config: "fuchsia.gpu.test.GpuDriverUrl",
+            from: "parent",
             key: "gpu_driver_url",
             availability: "transitional",
             type: "string",
             max_size: 1024,
         },
         {
+            config: "fuchsia.gpu.test.DisabledTestPattern",
+
             // A Gtest negative pattern (colon-separated list of globs) that identifies a set of tests to disable.
             from: "parent",
-            config: "fuchsia.gpu.test.DisabledTestPattern",
             key: "disabled_test_pattern",
             availability: "transitional",
             type: "string",

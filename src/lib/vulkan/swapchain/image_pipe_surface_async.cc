@@ -10,10 +10,12 @@
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <vk_dispatch_table_helper.h>
+#include <vulkan/vulkan_core.h>
 
 // May need to fall back to `buffer_collection_token` instead of `buffer_collection_token2`
 // in `Flatland.RegisterBufferCollectionArgs()`.
 #include <zircon/availability.h>
+
 #if !FUCHSIA_API_LEVEL_AT_LEAST(25)
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #endif
@@ -165,6 +167,7 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
                                         VkFormat format, VkImageUsageFlags usage,
                                         VkSwapchainCreateFlagsKHR swapchain_flags,
                                         VkExtent2D extent, uint32_t image_count,
+                                        VkCompositeAlphaFlagBitsKHR alpha_flags,
                                         const VkAllocationCallbacks* pAllocator,
                                         std::vector<ImageInfo>* image_info_out) {
   // To create BufferCollection, the image must have a valid format.
@@ -441,7 +444,7 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
       return false;
     }
     async::PostTask(loop_.dispatcher(), [this, info, import_token_dup = std::move(import_token_dup),
-                                         i, extent]() mutable {
+                                         i, extent, alpha_flags]() mutable {
       std::lock_guard<std::mutex> lock(mutex_);
       if (!channel_closed_) {
         OneWayResult result = fit::ok();
@@ -454,10 +457,12 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
         result = FlatlandClient()->SetImageDestinationSize(
             {{info.image_id}, {extent.width, extent.height}});
 
-        // SRC_OVER determines if this image should be blennded with what is behind and does
-        // not ignore alpha channel. It is different than VkCompositeAlphaFlagBitsKHR modes.
-        result = FlatlandClient()->SetImageBlendingFunction(
-            {{info.image_id}, fuchsia_ui_composition::BlendMode::kSrcOver});
+        assert(alpha_flags == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR || alpha_flags == VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR);
+        auto blend_mode = alpha_flags == VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR
+                              ? fuchsia_ui_composition::BlendMode::kSrc
+                              : fuchsia_ui_composition::BlendMode::kSrcOver;
+
+        result = FlatlandClient()->SetImageBlendingFunction({{info.image_id}, blend_mode});
 
         if (result.is_error()) {
           fprintf(stderr, "%s: Failed to create image and configure size/blending: %s\n", kTag,

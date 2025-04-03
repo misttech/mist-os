@@ -324,15 +324,12 @@ mod socket_tests {
 mod file_tests {
     use super::*;
     use crate::output::InMemoryDirectoryWriter;
-    use fidl::endpoints::ServerEnd;
     use futures::prelude::*;
     use maplit::hashmap;
     use std::collections::HashMap;
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
     use vfs::directory::helper::DirectlyMutable;
     use vfs::directory::immutable::Simple;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
@@ -381,26 +378,6 @@ mod file_tests {
             copy_debug_data(iterator_proxy, Box::new(directory_writer)),
         )
         .await;
-    }
-
-    async fn serve_and_copy_directory(
-        fake_dir: Arc<Simple>,
-        directory_writer: InMemoryDirectoryWriter,
-    ) {
-        let (directory_client, directory_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        fake_dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(directory_service.into_channel()),
-        );
-        copy_custom_artifact_directory(directory_client, Box::new(directory_writer))
-            .await
-            .expect("reading custom directory");
     }
 
     fn test_cases() -> Vec<(&'static str, Arc<Simple>, HashMap<PathBuf, Vec<u8>>)> {
@@ -472,8 +449,12 @@ mod file_tests {
     #[fuchsia::test]
     async fn test_copy_dir() {
         for (name, fake_dir, expected_files) in test_cases() {
+            let directory =
+                vfs::directory::serve(fake_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             let artifact = InMemoryDirectoryWriter::default();
-            serve_and_copy_directory(fake_dir, artifact.clone()).await;
+            copy_custom_artifact_directory(directory, Box::new(artifact.clone()))
+                .await
+                .expect("reading custom directory");
             let actual_files: HashMap<_, _> = artifact
                 .files
                 .lock()

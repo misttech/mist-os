@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "protocols is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "ffx_ssh"
   edition = "2021"
@@ -50,20 +52,20 @@ rustc_library("lib") {
 group("target") {
   testonly = true
 
-  deps = [ ":lib($host_toolchain)" ]
+  deps = [ ":lib" ]
 }
 
 group("tests") {
   testonly = true
 
-  deps = [ ":lib_test($host_toolchain)" ]
+  deps = [ ":lib_test" ]
 }
 
 group("ssh") {
   testonly = true
 
   deps = [
-    ":lib($host_toolchain)",
+    ":lib",
     ":tests",
   ]
 }

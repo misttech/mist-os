@@ -7,7 +7,7 @@ use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{errno, from_status_like_fdio};
+use starnix_uapi::{error, from_status_like_fdio};
 use std::sync::{Arc, Weak};
 use zx::{self as zx, AsHandleRef, HandleRef};
 
@@ -33,7 +33,7 @@ impl TimerOps for MonotonicZxTimer {
                 .timer
                 .set(t, zx::MonotonicDuration::default())
                 .map_err(|status| from_status_like_fdio!(status))?,
-            TargetTime::BootInstant(_) | TargetTime::RealTime(_) => return Err(errno!(EINVAL)),
+            TargetTime::BootInstant(_) | TargetTime::RealTime(_) => return error!(EINVAL),
         };
 
         Ok(())
@@ -78,7 +78,7 @@ impl TimerOps for BootZxTimer {
                 .timer
                 .set(estimate_boot_deadline_from_utc(t), zx::Duration::default())
                 .map_err(|status| from_status_like_fdio!(status))?,
-            TargetTime::Monotonic(_) => return Err(errno!(EINVAL)),
+            TargetTime::Monotonic(_) => return error!(EINVAL),
         }
         Ok(())
     }

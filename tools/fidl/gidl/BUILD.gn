@@ -38,6 +38,10 @@ conformance_golden_items = [
     extension = "cc"
   },
   {
+    language = "python"
+    extension = "py"
+  },
+  {
     language = "rust"
     extension = "rs"
   },

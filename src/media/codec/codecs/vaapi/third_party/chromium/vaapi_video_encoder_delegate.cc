@@ -10,12 +10,12 @@
 // #include "base/memory/ref_counted_memory.h"
 // #include "media/base/video_frame.h"
 // #include "media/gpu/codec_picture.h"
-#include "media/gpu/gpu_video_encode_accelerator_helpers.h"
+#include "src/media/third_party/chromium_media/media/gpu/gpu_video_encode_accelerator_helpers.h"
 // #include "media/gpu/macros.h"
 // #include "media/gpu/vaapi/va_surface.h"
 // #include "media/gpu/vaapi/vaapi_utils.h"
 // #include "media/gpu/vaapi/vaapi_wrapper.h"
-#include "media/video/video_encode_accelerator.h"
+#include "src/media/third_party/chromium_media/media/video/video_encode_accelerator.h"
 #include "vaapi_wrapper.h"
 
 namespace media {

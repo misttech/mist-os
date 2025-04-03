@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 
 assert(target_cpu == "x64", "gfxstream is only for x64")
 

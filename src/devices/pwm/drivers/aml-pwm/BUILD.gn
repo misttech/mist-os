@@ -25,7 +25,6 @@ fuchsia_cc_driver("aml-pwm-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-pwm.cc" ]
   deps = [
     ":common",
     "//src/devices/lib/driver",
@@ -50,10 +49,7 @@ fuchsia_driver_package("package") {
 
 test("aml-pwm-test-bin") {
   output_name = "aml-pwm-test"
-  sources = [
-    "aml-pwm-test.cc",
-    "aml-pwm.cc",
-  ]
+  sources = [ "aml-pwm-test.cc" ]
   deps = [
     ":common",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
@@ -66,12 +62,16 @@ test("aml-pwm-test-bin") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-group("common") {
+source_set("common") {
+  sources = [
+    "aml-pwm.cc",
+    "aml-pwm.h",
+  ]
+  deps = [ "//sdk/lib/driver/platform-device/cpp" ]
   public_deps = [
     ":aml-pwm-bind",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",

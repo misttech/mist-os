@@ -134,8 +134,30 @@ pub enum Partition {
         size: Option<u64>,
     },
 
+    /// A partition prepared for the Recovery Zircon Boot Image (ZBI).
+    /// This is for AB-slotted recovery images.
+    /// R-slotted recovery images should use Partition::ZBI and Slot::R.
+    RecoveryZBI {
+        /// The partition name.
+        name: String,
+        /// The slot of the partition.
+        slot: Slot,
+        /// An optional size constraint in bytes for the partition.
+        size: Option<u64>,
+    },
+
     /// A partition prepared for the Verified Boot Metadata (VBMeta).
     VBMeta {
+        /// The partition name.
+        name: String,
+        /// The slot of the partition.
+        slot: Slot,
+        /// An optional size constraint for the partition.
+        size: Option<u64>,
+    },
+
+    /// A partition prepared for the Recovery Verified Boot Metadata (VBMeta).
+    RecoveryVBMeta {
         /// The partition name.
         name: String,
         /// The slot of the partition.
@@ -176,7 +198,9 @@ impl Partition {
     pub fn name(&self) -> &String {
         match &self {
             Self::ZBI { name, .. } => name,
+            Self::RecoveryZBI { name, .. } => name,
             Self::VBMeta { name, .. } => name,
+            Self::RecoveryVBMeta { name, .. } => name,
             Self::FVM { name, .. } => name,
             Self::Fxfs { name, .. } => name,
             Self::Dtbo { name, .. } => name,
@@ -187,7 +211,9 @@ impl Partition {
     pub fn slot(&self) -> Option<&Slot> {
         match &self {
             Self::ZBI { slot, .. } => Some(slot),
+            Self::RecoveryZBI { slot, .. } => Some(slot),
             Self::VBMeta { slot, .. } => Some(slot),
+            Self::RecoveryVBMeta { slot, .. } => Some(slot),
             Self::FVM { .. } => None,
             Self::Fxfs { .. } => None,
             Self::Dtbo { slot, .. } => Some(slot),
@@ -198,7 +224,9 @@ impl Partition {
     pub fn size(&self) -> Option<&u64> {
         match &self {
             Self::ZBI { size, .. } => size.as_ref(),
+            Self::RecoveryZBI { size, .. } => size.as_ref(),
             Self::VBMeta { size, .. } => size.as_ref(),
+            Self::RecoveryVBMeta { size, .. } => size.as_ref(),
             Self::FVM { size, .. } => size.as_ref(),
             Self::Fxfs { size, .. } => size.as_ref(),
             Self::Dtbo { size, .. } => size.as_ref(),
@@ -270,8 +298,18 @@ mod tests {
                         slot: "A",
                     },
                     {
+                        type: "RecoveryZBI",
+                        name: "recovery_a",
+                        slot: "A",
+                    },
+                    {
                         type: "VBMeta",
                         name: "vbmeta_b",
+                        slot: "B",
+                    },
+                    {
+                        type: "RecoveryVBMeta",
+                        name: "vbmeta_recovery_b",
                         slot: "B",
                     },
                     {
@@ -307,7 +345,7 @@ mod tests {
 
         assert_eq!(config.bootloader_partitions[0].image, test_dir.join("tpl_image"));
         assert_eq!(config.unlock_credentials[0], test_dir.join("unlock_credentials.zip"));
-        assert_eq!(config.partitions.len(), 6);
+        assert_eq!(config.partitions.len(), 8);
         assert_eq!(config.hardware_revision, "hw");
     }
 

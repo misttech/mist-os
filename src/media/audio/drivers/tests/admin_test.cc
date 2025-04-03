@@ -15,10 +15,14 @@
 #include <cstring>
 #include <numeric>
 #include <optional>
+#include <unordered_set>
 
 #include <gtest/gtest.h>
 
 namespace media::audio::drivers::test {
+
+constexpr bool kDumpElementsAndTopologies = false;
+constexpr bool kIgnoreNoncompliantDaiEndpoints = true;
 
 void AdminTest::TearDown() {
   DropRingBuffer();
@@ -197,7 +201,8 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
                               uint32_t notifications_per_ring = 0) {
   ASSERT_FALSE(device_entry().isCodec());
 
-  ASSERT_TRUE(ring_buffer_props_) << "RequestBuffer was called before RequestRingBufferChannel";
+  ASSERT_TRUE(ring_buffer_props_.has_value())
+      << "RequestBuffer was called before RequestRingBufferChannel";
 
   min_ring_buffer_frames_ = min_ring_buffer_frames;
   notifications_per_ring_ = notifications_per_ring;
@@ -402,6 +407,102 @@ void AdminTest::DropRingBuffer() {
   zx::nanosleep(zx::deadline_after(zx::msec(100)));
 }
 
+// Validate that the collection of element IDs found in the topology list are complete and correct.
+void AdminTest::ValidateElementTopologyClosure() {
+  if constexpr (kDumpElementsAndTopologies) {
+    std::stringstream ss;
+    ss << "Elements[" << elements().size() << "]:\n";
+    auto element_idx = 0u;
+    for (const auto& element : elements()) {
+      ss << "        [" << element_idx++ << "] id " << element.id() << ", type " << element.type()
+         << '\n';
+    }
+    ss << "Topologies[" << topologies().size() << "]:\n";
+    auto topology_idx = 0u;
+    for (const auto& topology : topologies()) {
+      ss << "        [" << topology_idx++ << "] id " << topology.id() << ", edges["
+         << topology.processing_elements_edge_pairs().size() << "]:\n";
+      auto edge_idx = 0u;
+      for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
+        ss << "            [" << edge_idx++ << "] " << edge_pair.processing_element_id_from << "->"
+           << edge_pair.processing_element_id_to << '\n';
+      }
+    }
+    printf("%s", ss.str().c_str());
+  }
+
+  ASSERT_FALSE(elements().empty());
+  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> unused_element_ids;
+  for (const auto& element : elements()) {
+    unused_element_ids.insert(element.id());
+  }
+  const std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> all_element_ids =
+      unused_element_ids;
+
+  ASSERT_FALSE(topologies().empty());
+  for (const auto& topology : topologies()) {
+    std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> edge_source_ids;
+    std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> edge_dest_ids;
+    for (const auto& edge_pair : topology.processing_elements_edge_pairs()) {
+      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_from))
+          << "Topology " << topology.id() << " contains unknown element "
+          << edge_pair.processing_element_id_from;
+      ASSERT_TRUE(all_element_ids.contains(edge_pair.processing_element_id_to))
+          << "Topology " << topology.id() << " contains unknown element "
+          << edge_pair.processing_element_id_to;
+      unused_element_ids.erase(edge_pair.processing_element_id_from);
+      unused_element_ids.erase(edge_pair.processing_element_id_to);
+      edge_source_ids.insert(edge_pair.processing_element_id_from);
+      edge_dest_ids.insert(edge_pair.processing_element_id_to);
+    }
+    for (const auto& source_id : edge_source_ids) {
+      fuchsia::hardware::audio::signalprocessing::ElementType source_element_type;
+      for (const auto& element : elements()) {
+        if (element.id() == source_id) {
+          source_element_type = element.type();
+        }
+      }
+      if (edge_dest_ids.contains(source_id)) {
+        if constexpr (!kIgnoreNoncompliantDaiEndpoints) {
+          ASSERT_NE(source_element_type,
+                    fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT)
+              << "Element " << source_id << " is not an endpoint in topology " << topology.id()
+              << ", but is DAI_INTERCONNECT";
+        }
+        ASSERT_NE(source_element_type,
+                  fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+            << "Element " << source_id << " is not an endpoint in topology " << topology.id()
+            << ", but is RING_BUFFER";
+        edge_dest_ids.erase(source_id);
+      } else {
+        ASSERT_TRUE(source_element_type ==
+                        fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
+                    source_element_type ==
+                        fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+            << "Element " << source_id << " is a terminal (source) endpoint in topology "
+            << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
+      }
+    }
+    for (const auto& dest_id : edge_dest_ids) {
+      fuchsia::hardware::audio::signalprocessing::ElementType dest_element_type;
+      for (const auto& element : elements()) {
+        if (element.id() == dest_id) {
+          dest_element_type = element.type();
+        }
+      }
+      ASSERT_TRUE(dest_element_type ==
+                      fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT ||
+                  dest_element_type ==
+                      fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER)
+          << "Element " << dest_id << " is a terminal (destination) endpoint in topology "
+          << topology.id() << ", but is neither DAI_INTERCONNECT nor RING_BUFFER";
+    }
+  }
+  ASSERT_TRUE(unused_element_ids.empty())
+      << unused_element_ids.size() << "elements (including id " << *unused_element_ids.cbegin()
+      << ") were not referenced in any topology";
+}
+
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
   class CLASS_NAME : public AdminTest {                                         \
    public:                                                                      \
@@ -413,6 +514,49 @@ void AdminTest::DropRingBuffer() {
 // Test cases that target each of the various admin commands
 //
 // Any case not ending in disconnect/error should WaitForError, in case the channel disconnects.
+
+// Verify the driver responds to the GetHealthState query.
+DEFINE_ADMIN_TEST_CLASS(CompositeHealth, { RequestHealthAndExpectHealthy(); });
+
+// Verify a valid unique_id, manufacturer, product are successfully received.
+DEFINE_ADMIN_TEST_CLASS(CompositeProperties, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ValidateProperties();
+});
+
+// Verify that a valid element list is successfully received.
+DEFINE_ADMIN_TEST_CLASS(GetElements, { RequestElements(); });
+
+// Verify that a valid topology list is successfully received.
+DEFINE_ADMIN_TEST_CLASS(GetTopologies, { RequestTopologies(); });
+
+// Verify that a valid topology is successfully received.
+DEFINE_ADMIN_TEST_CLASS(GetTopology, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+  RequestTopology();
+});
+
+// All elements should be in at least one topology, all topology elements should be known.
+DEFINE_ADMIN_TEST_CLASS(ElementTopologyClosure, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestElements());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestTopologies());
+
+  ValidateElementTopologyClosure();
+});
+
+// Verify that format-retrieval responses are successfully received and are complete and valid.
+DEFINE_ADMIN_TEST_CLASS(CompositeRingBufferFormats, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  WaitForError();
+});
+
+// Verify that format-retrieval responses are successfully received and are complete and valid.
+DEFINE_ADMIN_TEST_CLASS(CompositeDaiFormats, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveDaiFormats());
+  WaitForError();
+});
 
 // Verify that a Reset() returns a valid completion.
 DEFINE_ADMIN_TEST_CLASS(Reset, { ResetAndExpectResponse(); });
@@ -629,6 +773,19 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   WaitForError();
 });
 
+// Create a RingBuffer, drop it, recreate it, then interact with it in any way (e.g. GetProperties).
+DEFINE_ADMIN_TEST_CLASS(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
+
+  // Dropped first ring buffer, creating second one.
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+
+  RequestRingBufferProperties();
+  WaitForError();
+});
+
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
@@ -691,10 +848,11 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
       [&]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
 
 void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
-                                 bool expect_audio_core_not_connected) {
-  // If audio_core is connected to the audio driver, admin tests will fail.
-  // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (!(device_entry.isA2DP() || expect_audio_core_not_connected)) {
+                                 bool expect_audio_svcs_not_connected) {
+  // If audio_core or audio_device_registry is connected to the audio driver, admin tests will fail.
+  // We test a hermetic instance of the A2DP driver, so audio services are never connected to it --
+  // thus we can always run the admin tests on it.
+  if (!(device_entry.isA2DP() || expect_audio_svcs_not_connected)) {
     return;
   }
 
@@ -704,6 +862,35 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(CodecStop, device_entry);
     REGISTER_ADMIN_TEST(CodecStart, device_entry);
   } else if (device_entry.isComposite()) {
+    // signalprocessing element test cases
+    //
+    REGISTER_ADMIN_TEST(GetElements, device_entry);
+    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
+    // REGISTER_ADMIN_TEST(GetElementStates, device_entry);
+    // REGISTER_ADMIN_TEST(SetElementState, device_entry);
+
+    // signalprocessing topology test cases
+    //
+    REGISTER_ADMIN_TEST(GetTopologies, device_entry);
+    REGISTER_ADMIN_TEST(ElementTopologyClosure, device_entry);
+    REGISTER_ADMIN_TEST(GetTopology, device_entry);
+    // TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
+    // REGISTER_ADMIN_TEST(SetTopology, device_entry);
+
+    // Composite test cases
+    //
+    REGISTER_ADMIN_TEST(CompositeHealth, device_entry);
+    REGISTER_ADMIN_TEST(CompositeProperties, device_entry);
+    REGISTER_ADMIN_TEST(CompositeRingBufferFormats, device_entry);
+    REGISTER_ADMIN_TEST(CompositeDaiFormats, device_entry);
+    // TODO(https://fxbug.dev/42075676): Add Composite testing (e.g. Reset, SetDaiFormat).
+    // REGISTER_ADMIN_TEST(SetDaiFormat, device_entry); // test all DAIs, not just the first.
+    // Reset should close RingBuffers and revert SetTopology, SetElementState and SetDaiFormat.
+    // REGISTER_ADMIN_TEST(CompositeReset, device_entry);
+
+    // RingBuffer test cases
+    //
+    // TODO(https://fxbug.dev/42075676): Add Composite testing (all RingBuffers, not just first).
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
     REGISTER_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
@@ -725,6 +912,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else if (device_entry.isDai()) {
@@ -749,6 +937,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else if (device_entry.isStreamConfig()) {
@@ -773,16 +962,13 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(RingBufferStopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStopWhileStoppedIsPermitted, device_entry);
 
+    REGISTER_ADMIN_TEST(GetRingBufferPropertiesAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   } else {
     FAIL() << "Unknown device type";
   }
 }
-
-// TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
-
-// TODO(https://fxbug.dev/42075676): Add more Composite testing (e.g. Reset, SetDaiFormat).
 
 // TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests (delay and position).
 

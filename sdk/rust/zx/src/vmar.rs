@@ -4,6 +4,7 @@
 
 //! Type-safe bindings for Zircon vmar objects.
 
+use crate::clock::Clock;
 use crate::iob::Iob;
 use crate::{
     object_get_info, object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle,
@@ -379,6 +380,30 @@ impl Vmar {
                 region_index,
                 region_offset,
                 region_len,
+                &mut addr,
+            )
+        };
+        ok(status)?;
+        Ok(addr)
+    }
+
+    /// Wraps the [zx_vmar_map_clock](https://fuchsia.dev/fuchsia-src/reference/syscalls/zx_vmar_map_clock.md)
+    /// syscall.
+    pub fn map_clock(
+        &self,
+        options: VmarFlags,
+        vmar_offset: usize,
+        clock: &Clock,
+        length: usize,
+    ) -> Result<usize, Status> {
+        let mut addr = 0;
+        let status = unsafe {
+            sys::zx_vmar_map_clock(
+                self.raw_handle(),
+                options.bits(),
+                vmar_offset,
+                clock.raw_handle(),
+                length,
                 &mut addr,
             )
         };

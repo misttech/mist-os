@@ -4,7 +4,6 @@
 
 import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/ui/bin/terminal/terminal_args.gni")

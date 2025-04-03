@@ -31,10 +31,10 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_remote_control_proxy()
-        rcs = remotecontrol.RemoteControl.Client(ch)
+        rcs = remotecontrol.RemoteControlClient(ch)
 
         def echo(
-            proxy: remotecontrol.RemoteControl.Client, s: str
+            proxy: remotecontrol.RemoteControlClient, s: str
         ) -> typing.Awaitable[typing.Any]:
             return proxy.echo_string(value=s)
 

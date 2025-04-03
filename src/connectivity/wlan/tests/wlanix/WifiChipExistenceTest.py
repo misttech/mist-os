@@ -7,7 +7,7 @@ Test that the device has at least one WifiChip.
 
 import asyncio
 
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from antlion import base_test
 from fuchsia_controller_py import Channel
 from mobly import test_runner
@@ -19,7 +19,7 @@ class WifiChipExistenceTest(base_test.WlanixBaseTestClass):
     def test_get_chip_ids(self) -> None:
         proxy, server = Channel.create()
         self.wlanix_proxy.get_wifi(wifi=server.take())
-        wifi_proxy = fidl_wlanix.Wifi.Client(proxy)
+        wifi_proxy = fidl_wlanix.WifiClient(proxy)
 
         response = asyncio.run(wifi_proxy.get_chip_ids()).unwrap()
         assert_is_not(
@@ -27,6 +27,9 @@ class WifiChipExistenceTest(base_test.WlanixBaseTestClass):
             None,
             "Wifi.GetChipIds() response is missing a chip_ids value",
         )
+        assert (
+            response.chip_ids is not None
+        ), "Wifi.GetChipIds() response is missing chip_ids"
         assert_greater(len(response.chip_ids), 0)
 
 

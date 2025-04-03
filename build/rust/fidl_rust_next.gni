@@ -35,6 +35,13 @@ import("//build/rust/rustc_library.gni")
 #  * testonly, visibility, public_deps
 #    - Optional: Usual GN meanings.
 #
+#  * emit_compat
+#    - Optional: Whether to generate compatibility impls for the existing Rust bindings. Defaults to
+#      false. The dependency on the existing crate must be added manually.
+#
+#  * contains_drivers
+#    - Optional: Whether to enable driver-specific code.
+#
 template("fidl_rust_next") {
   assert(defined(invoker.library_name),
          "fidl_rust_next(\"$target_name\") must define `library_name`")
@@ -52,8 +59,8 @@ template("fidl_rust_next") {
                            "fidl_gen_dir",
                            "library_name",
                          ])
-  crate_name = "fidl_next_" + string_replace(library_name, ".", "_")
-  file_stem = "$fidl_gen_dir/$crate_name"
+  _crate_name = "fidl_next_" + string_replace(library_name, ".", "_")
+  file_stem = "${fidl_gen_dir}/${_crate_name}"
 
   if (is_fidl_toolchain) {
     filename = "$file_stem.rs"
@@ -92,6 +99,9 @@ template("fidl_rust_next") {
         "--rustfmt-config",
         rebase_path("//rustfmt.toml", root_build_dir),
       ]
+      if (defined(invoker.emit_compat) && invoker.emit_compat) {
+        args += [ "--emit-compat" ]
+      }
 
       deps = [ fidl_ir_target ]
 
@@ -105,12 +115,14 @@ template("fidl_rust_next") {
                  "public_deps",
                  "visibility",
                  "disable_rustdoc",
+                 "contains_drivers",
                ])
   } else {
     not_needed(invoker,
                [
                  "fidl_ir_json",
                  "fidl_ir_target",
+                 "emit_compat",
                ])
 
     rustc_library(target_name) {
@@ -122,7 +134,7 @@ template("fidl_rust_next") {
                                "disable_rustdoc",
                              ])
 
-      name = crate_name
+      name = _crate_name
       output_dir = "$target_out_dir/$target_name"
       version = "0.1.0"
       edition = "2018"
@@ -131,6 +143,9 @@ template("fidl_rust_next") {
       deps = [ "//src/lib/fidl/rust_next/fidl_next" ]
       if (defined(invoker.deps)) {
         deps += invoker.deps
+      }
+      if (defined(invoker.emit_compat) && invoker.emit_compat) {
+        deps += [ "//src/lib/fidl/rust/fidl" ]
       }
 
       # TODO(https://fxbug.dev/42055130): Avoid this suppression. At the time of
@@ -157,6 +172,12 @@ template("fidl_rust_next") {
       sources = [ "$file_stem.rs" ]
 
       configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+
+      if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
+        features = [ "driver" ]
+      } else {
+        not_needed([ "contains_drivers" ])
+      }
     }
   }
 }

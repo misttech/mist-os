@@ -16,16 +16,16 @@ use net_types::{MulticastAddr, UnicastAddr, Witness};
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    trace_duration, BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, FrameDestination,
-    HandleableTimer, LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
-    RecvIpFrameMeta, ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason,
-    SendableFrameMeta, TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes,
-    WeakDeviceIdentifier, WrapBroadcastMarker,
+    BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
+    LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
+    ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    TimerContext, TimerHandler, TxMetadataBindingsTypes, WeakDeviceIdentifier, WrapBroadcastMarker,
 };
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
 use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
+use netstack3_trace::trace_duration;
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
 use packet_formats::ethernet::{
@@ -454,7 +454,7 @@ impl DeviceReceiveFrameSpec for EthernetLinkDevice {
 
 impl<CC, BC> ReceivableFrameMeta<CC, BC> for RecvEthernetFrameMeta<CC::DeviceId>
 where
-    BC: EthernetIpLinkDeviceBindingsContext + TracingContext,
+    BC: EthernetIpLinkDeviceBindingsContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv4>, BC>
         + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata<BC>, Ipv6>, BC>
@@ -469,7 +469,7 @@ where
         bindings_ctx: &mut BC,
         mut buffer: B,
     ) {
-        trace_duration!(bindings_ctx, c"device::ethernet::receive_frame");
+        trace_duration!(c"device::ethernet::receive_frame");
         let Self { device_id } = self;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
         core_ctx.increment_both(&device_id, |counters: &DeviceCounters| &counters.recv_frame);

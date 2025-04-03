@@ -13,6 +13,7 @@ pub struct Enum {
     pub attributes: Attributes,
     pub members: Vec<EnumMember>,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     #[serde(rename = "strict")]
     pub is_strict: bool,
     #[serde(rename = "type")]

@@ -1256,7 +1256,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "__tre_mem_new_impl",
     "trunc",
     "truncate",
-    "truncf",
     "truncl",
     "tss_create",
     "tss_delete",

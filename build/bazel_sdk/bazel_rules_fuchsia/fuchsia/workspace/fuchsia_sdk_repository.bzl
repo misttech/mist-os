@@ -162,7 +162,7 @@ def _fuchsia_sdk_repository_impl(ctx):
     # Resolve labels early to avoid repository rule restarts.
     resolve_repository_labels(runtime)
 
-    generate_sdk_repository(runtime, manifests, ctx.attr.use_rules_fuchsia)
+    generate_sdk_repository(runtime, manifests)
 
 fuchsia_sdk_repository = repository_rule(
     doc = """
@@ -199,18 +199,38 @@ Loads a particular version of the Fuchsia IDK.
             doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",
             allow_single_file = True,
         ),
-        "use_rules_fuchsia": attr.bool(
-            doc =
-                """
-                Use the @rules_fuchsia repository name to load all Fuchsia Bazel SDK rules in the generated
-                repository files. Defaults to @fuchsia_sdk otherwise for compatibility reasons. For details
-                see https://fxbug.dev/381126633.
-                """,
-            default = True,
-        ),
         "buildifier": attr.label(
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
             allow_single_file = True,
+        ),
+        "visibility_templates": attr.string_list_dict(
+            doc = """Allows for the addition of additional visibility lists.
+
+            This attribute lets the caller specify a set of additional visibility
+            parameters to be passed into the templates when we generate the repositry.
+            For a list of keys refer to the generate_sdk_build_rules.bzl file.
+
+            When you pass in the labels you must specify the fully qualified name of
+            the label to ensure that we reference the correct labels. For example,
+            if you are wanting to refer to a target within the root repository you should
+            use a path like @@//foo:__pkg__. If you were to pass in this value as
+            //foo:__pkg__ then it will be passed into the template in a way that makes
+            bazel think it belongs to the repository you are generating.
+
+            The values in this list can contain a wildcard ("*") expanded out to include
+            all of the directories at that location but there are restrictions to the
+            usage.
+              - The expansion will only work on repos that are name "@@".
+              - The expansion only supports a single "*"
+              - The expansion will check that a BUILD.bazel file exists at the location
+                  that is being expanded and will add it if true but will not check that
+                  the BUILD.bazel file contains the target that is being expanded.
+
+            Examples of the wildcard expansion are:
+              - @@//src/*/foo:bar
+              - @@//src/*:bar
+              - @@//src/*/foo
+            """,
         ),
     },
 )

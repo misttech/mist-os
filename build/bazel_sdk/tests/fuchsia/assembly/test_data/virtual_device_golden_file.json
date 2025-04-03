@@ -27,7 +27,7 @@
             },
             "vsock": {
                 "enabled": false,
-                "cid": 3
+                "cid": 0
             }
         },
         "name": "test",

@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.session.window") {
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   sources = [
     "manager.fidl",

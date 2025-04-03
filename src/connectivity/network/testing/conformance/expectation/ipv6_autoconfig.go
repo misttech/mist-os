@@ -50,21 +50,23 @@ var ipv6AutoconfigExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCase
 }
 
 var ipv6AutoconfigExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	{1, 1}:  Pass,
-	{1, 2}:  Pass,
-	{1, 3}:  Pass,
-	{1, 4}:  Pass,
-	{1, 5}:  Pass,
-	{2, 1}:  Pass,
-	{2, 2}:  Fail,
+	{1, 1}: Pass,
+	{1, 2}: Pass,
+	{1, 3}: Pass,
+	{1, 4}: Pass,
+	{1, 5}: Pass,
+	{2, 1}: Pass,
+	// TODO(https://fxbug.dev/407754539): This test case causes contamination
+	// for other cases.
+	{2, 2}:  Skip,
 	{2, 3}:  Pass,
 	{3, 1}:  Pass,
 	{3, 2}:  AnvlSkip,
 	{3, 3}:  Pass,
 	{3, 4}:  Pass,
 	{3, 5}:  Fail,
-	{4, 1}:  NoResponse,
-	{4, 2}:  Fail,
+	{4, 1}:  Pass,
+	{4, 2}:  Pass,
 	{5, 1}:  Pass,
 	{5, 2}:  AnvlSkip,
 	{5, 3}:  Pass,

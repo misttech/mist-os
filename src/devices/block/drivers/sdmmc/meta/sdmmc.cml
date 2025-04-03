@@ -12,6 +12,7 @@
         binary: "driver/sdmmc.so",
         bind: "meta/bind/sdmmc.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.block.drivers.sdmmc.worker" ],
         colocate: "true",
     },
     capabilities: [

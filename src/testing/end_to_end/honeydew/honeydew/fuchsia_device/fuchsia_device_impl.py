@@ -893,7 +893,7 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            buildinfo_provider_proxy = f_buildinfo.Provider.Client(
+            buildinfo_provider_proxy = f_buildinfo.ProviderClient(
                 self.fuchsia_controller.connect_device_proxy(
                     _FC_PROXIES["BuildInfo"]
                 )
@@ -918,7 +918,7 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            hwinfo_device_proxy = f_hwinfo.Device.Client(
+            hwinfo_device_proxy = f_hwinfo.DeviceClient(
                 self.fuchsia_controller.connect_device_proxy(
                     _FC_PROXIES["DeviceInfo"]
                 )
@@ -941,7 +941,7 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            hwinfo_product_proxy = f_hwinfo.Product.Client(
+            hwinfo_product_proxy = f_hwinfo.ProductClient(
                 self.fuchsia_controller.connect_device_proxy(
                     _FC_PROXIES["ProductInfo"]
                 )
@@ -968,7 +968,7 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            rcs_proxy = fd_remotecontrol.RemoteControl.Client(
+            rcs_proxy = fd_remotecontrol.RemoteControlClient(
                 self.fuchsia_controller.ctx.connect_remote_control_proxy()
             )
             asyncio.run(
@@ -988,7 +988,7 @@ class FuchsiaDeviceImpl(
             FuchsiaControllerError: On FIDL communication failure.
         """
         try:
-            power_proxy = fhp_statecontrol.Admin.Client(
+            power_proxy = fhp_statecontrol.AdminClient(
                 self.fuchsia_controller.connect_device_proxy(
                     _FC_PROXIES["PowerAdmin"]
                 )
@@ -1023,7 +1023,7 @@ class FuchsiaDeviceImpl(
             Bytes containing snapshot data as a zip archive.
         """
         # Snapshot is sent over the channel as |fuchsia.io.File|.
-        file_proxy = f_io.File.Client(channel_client)
+        file_proxy = f_io.FileClient(channel_client)
 
         # Get file size for verification later.
         try:
@@ -1088,7 +1088,7 @@ class FuchsiaDeviceImpl(
         )
 
         try:
-            feedback_proxy = f_feedback.DataProvider.Client(
+            feedback_proxy = f_feedback.DataProviderClient(
                 self.fuchsia_controller.connect_device_proxy(
                     _FC_PROXIES["Feedback"]
                 )

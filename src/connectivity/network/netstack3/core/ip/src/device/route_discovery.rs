@@ -221,22 +221,10 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6RouteDiscoveryContext<BC>>
                     return;
                 };
                 assert!(routes.remove(&route), "invalidated route should be discovered");
-                del_discovered_ipv6_route(core_ctx, bindings_ctx, &device_id, route);
+                core_ctx.del_discovered_ipv6_route(bindings_ctx, &device_id, route);
             },
         )
     }
-}
-
-fn del_discovered_ipv6_route<
-    BC: Ipv6RouteDiscoveryBindingsContext,
-    CC: Ipv6DiscoveredRoutesContext<BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    route: Ipv6DiscoveredRoute,
-) {
-    core_ctx.del_discovered_ipv6_route(bindings_ctx, device_id, route);
 }
 
 fn invalidate_route<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6DiscoveredRoutesContext<BC>>(
@@ -248,7 +236,7 @@ fn invalidate_route<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6DiscoveredRou
 ) {
     // Routes with an infinite lifetime have no timers.
     let _: Option<(BC::Instant, ())> = state.timers.cancel(bindings_ctx, &route);
-    del_discovered_ipv6_route(core_ctx, bindings_ctx, device_id, route)
+    core_ctx.del_discovered_ipv6_route(bindings_ctx, device_id, route)
 }
 
 #[cfg(test)]

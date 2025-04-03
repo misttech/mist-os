@@ -60,7 +60,7 @@ The tests can be run with:
   --builder-name fuchsia/global.ci/core.x64-release \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 This will run through the whole test paving the build to the latest version
@@ -77,7 +77,7 @@ determine the build ids from the downgrade and upgrade builds, then run:
   --build-id 123456789... \
   --build-id 987654321... \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 Or you can combine these options:
@@ -89,7 +89,7 @@ Or you can combine these options:
   --build-id 123456789... \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 ### Reboot Testing
@@ -104,7 +104,7 @@ can be done by running:
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 Or if you want to test a build, you can use:
@@ -130,7 +130,7 @@ for you. You can run it like this:
   --builder-name fuchsia/global.ci/core.x64-release \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 This will setup a `tmux` with 3 windows, one for the serial session on
@@ -179,7 +179,7 @@ performs an OTA to this new version:
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```
 
 ### Last Known Good to local build OTA
@@ -197,5 +197,5 @@ directory will successfully boot coming from a previous version.
   --builder-name fuchsia/global.ci/core.x64-release \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-475e-82ef \
-  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+  --device-hostname fe80::e493:5839:b86a:f7f1%qemu
 ```

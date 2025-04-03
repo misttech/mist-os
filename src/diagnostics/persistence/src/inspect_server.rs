@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::file_handler;
-use anyhow::Error;
 use log::*;
 use serde_json::{json, Value as JsonValue};
 
@@ -37,11 +36,10 @@ fn store_data(inspect_node: &fuchsia_inspect::Node, name: &str, data: &JsonValue
     }
 }
 
-pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) -> Result<(), Error> {
-    let remembered_data = file_handler::remembered_data()?;
-    for service in remembered_data {
-        persist_root.record_child(service.name, |service_node| {
-            for tag in service.data {
+pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) {
+    for file_handler::ServiceEntry { name, data } in file_handler::remembered_data() {
+        persist_root.record_child(name, |service_node| {
+            for tag in data {
                 let json_data = serde_json::from_str(&tag.data).unwrap_or_else(|err| {
                     error!("Error {:?} parsing stored data", err);
                     json!("<<Error parsing saved data>>")
@@ -50,12 +48,12 @@ pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) -> Result<(), 
             }
         });
     }
-    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use anyhow::Error;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::Inspector;
 

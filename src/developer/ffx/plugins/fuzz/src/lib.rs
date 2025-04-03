@@ -28,6 +28,7 @@ mod shell;
 /// parallel. This assumption is fulfilled by `ffx` itself: See //src/developer/ffx/src/main.rs,
 /// in which `main` has an attribute of `#[fuchsia_async::run_singlethreaded]`.
 #[derive(FfxTool)]
+// TODO(https://fxbug.dev/403625605): Once fuzz is OK, remove the experimental check.
 #[check(AvailabilityFlag("fuzzing"))]
 pub struct FuzzTool {
     remote_control: RemoteControlProxyHolder,

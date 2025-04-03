@@ -46,6 +46,12 @@
             to: "#binder-proxy",
         },
         {
+            config: "fuchsia.binder.UseVirtioPmem",
+            from: "void",
+            to: "#binder-proxy",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.vsock.Connector",
             from: "parent",
             to: "#binder-proxy",

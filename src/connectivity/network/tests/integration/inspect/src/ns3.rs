@@ -188,6 +188,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     },
                 }
             })
@@ -200,6 +236,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     },
                 }
             })
@@ -217,7 +289,43 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             NumPending: 0u64,
                             NumReady: 0u64,
                             Contents: "{}",
-                        }
+                        },
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     },
                 }
             })
@@ -231,6 +339,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv4",
                         State: "SynSent",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 1u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: diagnostics_assertions::NonZeroUintProperty,
+                                ResetsSent: 0u64,
+                                SynsSent: diagnostics_assertions::NonZeroUintProperty,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     },
                 }
             })
@@ -243,6 +387,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     }
                 }
             })
@@ -255,6 +435,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         RemoteAddress: "[NOT CONNECTED]",
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     }
                 }
             })
@@ -272,7 +488,43 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                             NumPending: 0u64,
                             NumReady: 0u64,
                             Contents: "{}",
-                        }
+                        },
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 0u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: 0u64,
+                                ResetsSent: 0u64,
+                                SynsSent: 0u64,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     }
                 }
             })
@@ -286,6 +538,42 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
                         TransportProtocol: "TCP",
                         NetworkProtocol: "IPv6",
                         State: "SynSent",
+                        Counters: {
+                            PassiveConnectionOpenings: 0u64,
+                            ActiveConnectionOpenings: 1u64,
+                            FastRecovery: 0u64,
+                            EstablishedClosed: 0u64,
+                            EstablishedResets: 0u64,
+                            EstablishedTimedout: 0u64,
+                            "Rx": {
+                                ReceivedSegmentsDispatched: 0u64,
+                                ResetsReceived: 0u64,
+                                SynsReceived: 0u64,
+                                FinsReceived: 0u64,
+                                "Errors": {
+                                    ListenerQueueOverflow: 0u64,
+                                    PassiveOpenNoRouteErrors: 0u64,
+                                },
+                            },
+                            "Tx": {
+                                SegmentsSent: diagnostics_assertions::NonZeroUintProperty,
+                                ResetsSent: 0u64,
+                                SynsSent: diagnostics_assertions::NonZeroUintProperty,
+                                FinsSent: 0u64,
+                                Timeouts: 0u64,
+                                Retransmits: 0u64,
+                                FastRetransmits: 0u64,
+                                SlowStartRetransmits: 0u64,
+                                "Errors": {
+                                    SegmentSendErrors: 0u64,
+                                    ActiveOpenNoRouteErrors: 0u64,
+                                }
+                            },
+                            "Errors": {
+                                FailedConnectionOpenings: 0u64,
+                                FailedPortReservations: 0u64,
+                            }
+                        },
                     }
                 }
             })
@@ -375,17 +663,43 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
     // NB: The sockets are keyed by an opaque debug identifier.
     let sockets = data.get_child("Sockets").unwrap();
     let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
-    diagnostics_assertions::assert_data_tree!(data, "root": contains {
-        Sockets: {
-            sock_name => {
-                LocalAddress: want_local,
-                RemoteAddress: want_remote,
-                TransportProtocol: want_proto,
-                NetworkProtocol: I::NAME,
-                MulticastGroupMemberships: {},
-            },
+    match proto {
+        fposix_socket::DatagramSocketProtocol::Udp => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                Sockets: {
+                    sock_name => {
+                        LocalAddress: want_local,
+                        RemoteAddress: want_remote,
+                        TransportProtocol: want_proto,
+                        NetworkProtocol: I::NAME,
+                        MulticastGroupMemberships: {},
+                        Counters: {
+                            Rx: {
+                                "Delivered": 0u64,
+                            },
+                            Tx: {
+                                "Sent": 0u64,
+                                "Errors": 0u64,
+                            },
+                        },
+                    },
+                }
+            })
         }
-    })
+        fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+            diagnostics_assertions::assert_data_tree!(data, "root": contains {
+                Sockets: {
+                    sock_name => {
+                        LocalAddress: want_local,
+                        RemoteAddress: want_remote,
+                        TransportProtocol: want_proto,
+                        NetworkProtocol: I::NAME,
+                        MulticastGroupMemberships: {},
+                    },
+                }
+            })
+        }
+    }
 }
 
 #[netstack_test]
@@ -438,6 +752,8 @@ async fn inspect_multicast_group_memberships<I: TestIpExt>(name: &str) {
                 RemoteAddress: "[NOT CONNECTED]",
                 TransportProtocol: "UDP",
                 NetworkProtocol: I::NAME,
+                // NB: The "Counters" schema is verified elsewhere; ignore it.
+                Counters: contains {},
                 MulticastGroupMemberships: {
                     "0": {
                         MulticastGroup: format!("{multicast_addr}"),
@@ -1408,6 +1724,7 @@ async fn inspect_counters(name: &str) {
                 "V4": {
                     "Rx": {
                         Received: 1u64,
+                        Delivered: 1u64,
                         "Errors": {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,
@@ -1423,6 +1740,7 @@ async fn inspect_counters(name: &str) {
                 "V6": {
                     "Rx": {
                         Received: 0u64,
+                        Delivered: 0u64,
                         "Errors": {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,

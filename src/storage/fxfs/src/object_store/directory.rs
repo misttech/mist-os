@@ -7,6 +7,7 @@ use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
+use crate::object_store::key_manager::ToCipherSet;
 use crate::object_store::object_record::{
     ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
     ObjectKind, ObjectValue, Timestamp,
@@ -21,15 +22,15 @@ use crate::object_store::{
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
-use byteorder::{ByteOrder, LittleEndian};
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
+use mundane::hash::{Digest, Hasher as MundaneHasher};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use zerocopy::IntoBytes;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 use super::FSCRYPT_KEY_ID;
 
@@ -80,7 +81,7 @@ impl MutableAttributesInternal {
 ///
 /// Even without casefold, the hash still provides some value in the case where we do not know
 /// the encryption key to decrypt filenames. In these cases, we embed the hash in the base64
-/// encoded synthetic filenames we generate which we leverage to jump closer
+/// encoded proxy filenames we generate which we leverage to jump closer
 /// to records of interest in lookups and iterators.
 fn get_casefold_hash(key: Option<&Key>, name: &str, casefold: bool) -> u32 {
     // Special case for empty string. This means start from beginning of the directory.
@@ -116,73 +117,87 @@ fn decrypt_filename(key: &Key, object_id: u64, data: &Vec<u8>) -> Result<String,
     Ok(String::from_utf8(raw)?)
 }
 
-/// When we can't decrypt a filename, we present this synthetic unicode-safe encoded name instead.
+/// A proxy filename is used when we don't have the keys to decrypt the actual filename.
 ///
-/// The encoded form is unicode-friendly and includes:
-///  * The casefold_hash which allows us to jump close to a point in our index.
-///  * A 48 byte prefix of raw so we can jump even closer to the encrypted filename target.
-///  * A hash of 'raw' so we can iterate over what's left and be confident we don't have collisions.
+/// When working with locked directories, we encode both Dentry and user provided
+/// filenames using this struct before comparing them.
 ///
-/// (The reason we need a prefix and raw_hash is because the base64 encoding of a long filename may
-/// exceed the maximum filename length of the system.)
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-struct SyntheticFilename {
-    casefold_hash: u32,
-    raw_prefix: Vec<u8>,
-    pub raw_hash: u64,
+/// The hash code is encoded directly, allowing an index in some cases, even when entries
+/// are encrypted.
+///
+/// Encrypted filenames are unprintable so we base64 encode but base64 encoding uses 4 bytes for
+/// every 3 bytes of input long filenames cannot be represented like this without exceeding the
+/// NAME_LEN limit (255).
+///
+/// As a work around to keep uniqueness, for filenames longer than 149 bytes, we use the filename
+/// prefix and calculate the sha256 of the full encrypted name.  This produces a filename that is
+/// under the limit and very likely to remain unique.
+///
+#[repr(C, packed)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    PartialOrd,
+    FromBytes,
+    Immutable,
+    KnownLayout,
+    IntoBytes,
+    Unaligned,
+)]
+pub struct ProxyFilename {
+    hash_code: u64,
+    filename: [u8; 149], // Note: This may be a prefix for long filenames.
+    sha256: [u8; 32],    // This is only set if filename is a prefix.
 }
 
-impl SyntheticFilename {
-    /// Maps a raw filename to a 64-bit hash value.
-    /// This is size-bounded to avoid blowing max filename length when we base64 encode the result.
-    /// This is only used when we don't have the decryption keys to get the actual utf8 filename.
-    fn raw_filename_to_raw_hash(raw: &Vec<u8>) -> u64 {
-        let mut hasher = rustc_hash::FxHasher::default();
-        raw.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    /// Decodes a synthetic base64 filename into its internal components.
-    pub fn decode(synthetic_filename: &str) -> Self {
-        // Note the error case here -- We shouldn't generally get a filename that doesn't match our
-        // encoding but if we do, we declare all such strings as being 'before' valid encodings
-        // as a simplification.
-        let mut data =
-            BASE64_URL_SAFE_NO_PAD.decode(synthetic_filename).unwrap_or_else(|_| vec![0u8; 12]);
-        if data.len() < 12 {
-            data.resize(12, 0);
+impl ProxyFilename {
+    pub fn new(hash_code: u64, raw_filename: &[u8]) -> Self {
+        let mut filename = [0u8; 149];
+        let mut sha256 = [0u8; 32];
+        if raw_filename.len() < filename.len() {
+            filename[..raw_filename.len()].copy_from_slice(raw_filename);
+        } else {
+            let len = filename.len();
+            filename.copy_from_slice(&raw_filename[..len]);
+            sha256 = mundane::hash::Sha256::hash(raw_filename).bytes();
         }
-        let casefold_hash = LittleEndian::read_u32(&data[0..4]);
-        let raw_hash = LittleEndian::read_u64(&data[4..12]);
-        let raw_prefix = data[12..].to_vec();
-        Self { casefold_hash, raw_prefix, raw_hash }
-    }
-
-    /// Returns the synthetic base64 filename.
-    pub fn encode(&self) -> String {
-        let mut data = [0u8; 60];
-        LittleEndian::write_u32(&mut data[0..4], self.casefold_hash);
-        LittleEndian::write_u64(&mut data[4..12], self.raw_hash);
-        let len = std::cmp::min(self.raw_prefix.len(), 48);
-        data[12..12 + len].copy_from_slice(&self.raw_prefix);
-        BASE64_URL_SAFE_NO_PAD.encode(&data[..12 + len])
-    }
-
-    /// Populates synthetic filename from fields generally taken from ObjectKey::EncryptedChild.
-    pub fn from_object_key(casefold_hash: u32, raw: &Vec<u8>) -> Self {
-        let raw_hash = Self::raw_filename_to_raw_hash(raw);
-        let mut raw_prefix = raw.clone();
-        raw_prefix.truncate(48);
-        Self { casefold_hash, raw_prefix, raw_hash }
+        Self { hash_code, filename, sha256 }
     }
 
     /// Returns an ObjectKey that is guaranteed to be equal to or less than the file that this
-    /// SyntheticFilename represents. The only case it is less is if a file has the same
+    /// ProxyFilename represents. The only case it is less is if a file has the same
     /// casefold_hash and also the same 48 byte filename prefix. In this rare case, we lean on
-    /// raw_hash to disambiguate, which may lead to the prefix pointing to records before the
+    /// sha256 to disambiguate, which may lead to the prefix pointing to records before the
     /// desired file.
     pub fn to_query_key(&self, object_id: u64) -> ObjectKey {
-        ObjectKey::encrypted_child(object_id, self.raw_prefix.clone(), self.casefold_hash)
+        let mut filename = self.filename.to_vec();
+        while let Some(0) = filename.last() {
+            filename.pop();
+        }
+        ObjectKey::encrypted_child(object_id, filename, self.hash_code as u32)
+    }
+}
+
+impl Into<String> for ProxyFilename {
+    fn into(self) -> String {
+        let mut bytes = self.as_bytes().to_vec();
+        while let Some(0) = bytes.last() {
+            bytes.pop();
+        }
+        BASE64_URL_SAFE_NO_PAD.encode(bytes)
+    }
+}
+
+impl From<&str> for ProxyFilename {
+    fn from(s: &str) -> Self {
+        let mut bytes = BASE64_URL_SAFE_NO_PAD
+            .decode(s)
+            .unwrap_or_else(|_| vec![0; std::mem::size_of::<ProxyFilename>()]);
+        bytes.resize(std::mem::size_of::<ProxyFilename>(), 0);
+        Self::read_from_bytes(&bytes).unwrap()
     }
 }
 
@@ -632,7 +647,7 @@ impl<S: HandleOwner> Directory<S> {
                     }
                 }
             } else {
-                let target_filename = SyntheticFilename::decode(name);
+                let target_filename: ProxyFilename = name.into();
                 let query_key = target_filename.to_query_key(self.object_id());
                 let layer_set = self.store().tree().layer_set();
                 let mut merger = layer_set.merger();
@@ -650,9 +665,9 @@ impl<S: HandleOwner> Directory<S> {
                             value,
                             sequence,
                         }) if *object_id == self.object_id()
-                            && *casefold_hash == target_filename.casefold_hash =>
+                            && *casefold_hash == target_filename.hash_code as u32 =>
                         {
-                            let filename = SyntheticFilename::from_object_key(*casefold_hash, name);
+                            let filename = ProxyFilename::new(*casefold_hash as u64, name);
                             if filename == target_filename {
                                 break Some(Item {
                                     key: key.clone(),
@@ -919,25 +934,82 @@ impl<S: HandleOwner> Directory<S> {
         // See _POSIX_SYMLINK_MAX.
         ensure!(link.len() <= 256, FxfsError::BadPath);
         let symlink_id = self.store().get_next_object_id(transaction.txn_guard()).await?;
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::insert_object(
-                ObjectKey::object(symlink_id),
-                ObjectValue::symlink(link, Timestamp::now(), Timestamp::now(), 0),
-            ),
-        );
-        transaction.add(
-            self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name, self.casefold()),
-                ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
-            ),
-        );
+        let wrapping_key_id = self.wrapping_key_id.lock().clone();
+        let mut link = link.to_vec();
+
+        if let Some(wrapping_key_id) = wrapping_key_id {
+            if let Some(crypt) = self.store().crypt() {
+                let (wrapped_key, unwrapped_key) =
+                    crypt.create_key_with_id(symlink_id, wrapping_key_id).await?;
+
+                // Note that it's possible that this entry gets inserted into the key manager but
+                // this transaction doesn't get committed. This shouldn't be a problem because
+                // unused keys get purged on a standard timeout interval and this key shouldn't
+                // conflict with any other keys.
+                let unwrapped_keys = vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))];
+                self.store().key_manager.insert(symlink_id, &unwrapped_keys, false);
+                let symlink_key = Key::new(unwrapped_keys.to_cipher_set(), 0);
+
+                let dir_key = if let Some(key) = self.get_fscrypt_key().await? {
+                    key
+                } else {
+                    bail!(FxfsError::NoKey);
+                };
+                let casefold_hash = get_casefold_hash(Some(&dir_key), name, self.casefold());
+                let encrypted_name = encrypt_filename(&dir_key, self.object_id(), name)?;
+                symlink_key.encrypt_filename(symlink_id, &mut link)?;
+
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::insert_object(
+                        ObjectKey::object(symlink_id),
+                        ObjectValue::encrypted_symlink(link, Timestamp::now(), Timestamp::now(), 0),
+                    ),
+                );
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::insert_object(
+                        ObjectKey::keys(symlink_id),
+                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
+                            FSCRYPT_KEY_ID,
+                            wrapped_key,
+                        )]))),
+                    ),
+                );
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::replace_or_insert_object(
+                        ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash),
+                        ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
+                    ),
+                );
+            } else {
+                return Err(anyhow!("No crypt"));
+            }
+        } else {
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::insert_object(
+                    ObjectKey::object(symlink_id),
+                    ObjectValue::symlink(link, Timestamp::now(), Timestamp::now(), 0),
+                ),
+            );
+            transaction.add(
+                self.store().store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::child(self.object_id(), &name, self.casefold()),
+                    ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
+                ),
+            );
+        };
+
+        let now = Timestamp::now();
         self.update_dir_attributes_internal(
             transaction,
             self.object_id(),
             MutableAttributesInternal {
-                modification_time: Some(Timestamp::now().as_nanos()),
+                modification_time: Some(now.as_nanos()),
+                change_time: Some(now),
                 ..Default::default()
             },
         )
@@ -1006,12 +1078,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
-        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
         if self.wrapping_key_id.lock().is_some() {
-            if !matches!(descriptor, ObjectDescriptor::File | ObjectDescriptor::Directory) {
-                return Err(anyhow!(FxfsError::InvalidArgs)
-                    .context("Encrypted directories can only have file or directory children"));
-            }
             let key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
             let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
             let encrypted_name = encrypt_filename(&key, self.object_id(), name)?;
@@ -1258,13 +1325,13 @@ impl<S: HandleOwner> Directory<S> {
                 (ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash), None)
             } else {
                 // Locked EncryptedChild case.
-                let filename = SyntheticFilename::decode(from);
+                let filename: ProxyFilename = from.into();
                 let key = filename.to_query_key(self.object_id());
                 if from == "" {
                     // The empty filename case indicates we want to iterate everything...
                     (key, None)
                 } else {
-                    // ...otherwise scan for a synthetic file match.
+                    // ...otherwise scan for a proxy file match.
                     (key, Some(filename))
                 }
             }
@@ -1291,9 +1358,9 @@ impl<S: HandleOwner> Directory<S> {
                         },
                     ..
                 }) if *object_id == self.object_id() => {
-                    // If using synthetic file names, skip ahead until we find the one we're after.
+                    // If using proxy file names, skip ahead until we find the one we're after.
                     if let Some(requested_filename) = &requested_filename {
-                        let filename = SyntheticFilename::from_object_key(*casefold_hash, name);
+                        let filename = ProxyFilename::new(*casefold_hash as u64, name);
                         if &filename == requested_filename {
                             break;
                         }
@@ -1351,7 +1418,7 @@ pub struct DirectoryIterator<'a, 'b> {
     object_id: u64,
     iter: MergerIterator<'a, 'b, ObjectKey, ObjectValue>,
     key: Option<Key>,
-    // Holds decrypted or synthetic filenames so we can return a reference from get().
+    // Holds decrypted or proxy filenames so we can return a reference from get().
     filename: Option<String>,
 }
 
@@ -1393,7 +1460,7 @@ impl DirectoryIterator<'_, '_> {
                 anyhow!(FxfsError::Internal).context("Bad UTF-8 encrypted filename")
             })?);
         } else {
-            self.filename = Some(SyntheticFilename::from_object_key(casefold_hash, &name).encode());
+            self.filename = Some(ProxyFilename::new(casefold_hash as u64, &name).into());
         }
         Ok(())
     }
@@ -1594,10 +1661,10 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
                 // unlinks are permitted but renames are not allowed for locked directories.
                 bail!(FxfsError::NoKey);
             }
-            // We have to scan for the right child as synthetic names
+            // We have to scan for the right child as proxy filenames
             // only contain a encrypted filename prefix and we need the full key for the
             // destination.
-            let synthetic_filename = SyntheticFilename::decode(dst.1);
+            let proxy_filename: ProxyFilename = dst.1.into();
 
             let layer_set = dst.0.store().tree().layer_set();
             let mut merger = layer_set.merger();
@@ -1610,8 +1677,8 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
                 ..
             }) = iter.iter.get()
             {
-                let filename = SyntheticFilename::from_object_key(*casefold_hash, name);
-                if filename == synthetic_filename {
+                let filename = ProxyFilename::new(*casefold_hash as u64, name);
+                if filename == proxy_filename {
                     transaction
                         .add(store_id, Mutation::replace_or_insert_object(key.clone(), new_value));
                 } else {
@@ -1647,9 +1714,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        encrypt_filename, get_casefold_hash, replace_child_with_object, SyntheticFilename,
-    };
+    use super::{encrypt_filename, get_casefold_hash, replace_child_with_object, ProxyFilename};
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
     use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
@@ -3793,7 +3858,7 @@ mod tests {
     async fn test_create_casefold_encrypted_directory() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
-        let synthetic_filename: SyntheticFilename;
+        let proxy_filename: ProxyFilename;
         let object_id;
         {
             let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
@@ -3845,21 +3910,22 @@ mod tests {
             // Check that we can look up the original name.
             assert!(dir.lookup("bAr").await.expect("original lookup failed").is_some());
 
-            // Derive the synthetic name now, for use later when operating on the locked volume
+            // Derive the proxy filename now, for use later when operating on the locked volume
             // as we won't have the key then.
             let key = dir.get_fscrypt_key().await.expect("key").unwrap();
             let casefold_hash = get_casefold_hash(Some(&key), "bAr", true);
             let encrypted_name =
                 encrypt_filename(&key, dir.object_id(), "bAr").expect("encrypt_filename");
-            synthetic_filename = SyntheticFilename::from_object_key(casefold_hash, &encrypted_name);
+            proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
 
             // Check that we can lookup via a case insensitive name.
             assert!(dir.lookup("BAR").await.expect("casefold lookup failed").is_some());
 
-            // This is a rather brittle test but it is here to check that the hash values
-            // generated are stable across releases.
-            assert_eq!(get_casefold_hash(Some(&key), "bar", true), 3080479075);
-            assert_eq!(get_casefold_hash(Some(&key), "BaR", true), 3080479075);
+            // Check hash values generated are stable across case.
+            assert_eq!(
+                get_casefold_hash(Some(&key), "bar", true),
+                get_casefold_hash(Some(&key), "BaR", true)
+            );
 
             // We can't easily check iteration from here as we only get encrypted entries so
             // we just count instead.
@@ -3894,18 +3960,16 @@ mod tests {
 
             // Check that we can NOT look up the original name.
             assert!(dir.lookup("bAr").await.expect("lookup failed").is_none());
-            // We should instead see the synthetic filename.
-            assert!(dir
-                .lookup(&synthetic_filename.encode())
-                .await
-                .expect("lookup failed")
-                .is_some());
+            // We should instead see the proxy filename.
+            let filename: String = proxy_filename.into();
+            assert!(dir.lookup(&filename).await.expect("lookup failed").is_some());
 
             let layer_set = dir.store().tree().layer_set();
             let mut merger = layer_set.merger();
             let mut iter = dir.iter_from(&mut merger, "").await.expect("iter");
             let item = iter.get().expect("expect item");
-            assert_eq!(item.0, synthetic_filename.encode().as_str());
+            let filename: String = proxy_filename.into();
+            assert_eq!(item.0, &filename);
             iter.advance().await.expect("advance");
             assert_eq!(None, iter.get());
 
@@ -3919,9 +3983,9 @@ mod tests {
     }
 
     /// Search for a pair of filenames that encode to the same casefold hash and same
-    /// 48-byte encrypted name prefix, but different raw_hash.
+    /// filename prefix, but different sha256.
     /// We are specifically looking for a case where encrypted_child of a > encrypted_child of b
-    /// but synthetic_filename of a < synthetic filename of b or vice versa.
+    /// but proxy_filename of a < proxy filename of b or vice versa.
     /// This is to fully test the iterator logic for locked directories.
     ///
     /// Note this is a SLOW process (~12 seconds on my workstation with release build).
@@ -3929,26 +3993,23 @@ mod tests {
     ///
     /// Returns a pair of filenames on success, None on failure.
     #[allow(dead_code)]
-    fn find_out_of_order_raw_hash_long_prefix_pair(
+    fn find_out_of_order_sha256_long_prefix_pair(
         object_id: u64,
         key: &fxfs_crypto::Key,
     ) -> Option<[String; 2]> {
-        let mut collision_map: std::collections::HashMap<u32, (usize, SyntheticFilename, Vec<u8>)> =
+        let mut collision_map: std::collections::HashMap<u32, (usize, ProxyFilename, Vec<u8>)> =
             std::collections::HashMap::new();
         for i in 0..(1usize << 32) {
-            let filename = format!("0123456789abcdef0123456789abcdef0123456789abcdef_{i}");
+            let filename = format!("{:0>160}_{i}", 0);
             let casefold_hash = get_casefold_hash(Some(&key), &filename, true);
             let encrypted_name =
                 encrypt_filename(&key, object_id, &filename).expect("encrypt_filename");
-            let a = SyntheticFilename::from_object_key(casefold_hash, &encrypted_name);
-            let casefold_hash = a.casefold_hash;
+            let a = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
+            let casefold_hash = a.hash_code as u32;
             if let Some((j, b, b_encrypted_name)) = collision_map.get(&casefold_hash) {
-                assert_eq!(a.raw_prefix, b.raw_prefix);
-                if encrypted_name.cmp(b_encrypted_name) != a.raw_hash.cmp(&b.raw_hash) {
-                    return Some([
-                        format!("0123456789abcdef0123456789abcdef0123456789abcdef_{i}"),
-                        format!("0123456789abcdef0123456789abcdef0123456789abcdef_{j}"),
-                    ]);
+                assert_eq!(a.filename, b.filename);
+                if encrypted_name.cmp(b_encrypted_name) != a.sha256.cmp(&b.sha256) {
+                    return Some([format!("{:0>160}_{i}", 0), format!("{:0>160}_{j}", 0)]);
                 }
             } else {
                 collision_map.insert(casefold_hash, (i, a, encrypted_name));
@@ -3958,7 +4019,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_synthetic_filenames() {
+    async fn test_proxy_filename() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let mut filenames = Vec::new();
@@ -4009,32 +4070,30 @@ mod tests {
             // Nb: We use a rather expensive brute force search to find two filenames that:
             //   1. Have the same casefold_hash.
             //   2. Have the same prefix.
-            //   3. Have an encrypted names and raw_hash that sort differently.
+            //   3. Have an encrypted names and sha256 that sort differently.
             // This is to exercise iter_from and lookup() handling scanning of locked directories.
             // This search returns stable results so in the interest of cheap tests, this code
             // is commented out but should be equivalent to the constants below.
-            // let collision_pair =
-            //     find_out_of_order_raw_hash_long_prefix_pair(dir.object_id(), &key);
-            let collision_pair = [
-                "0123456789abcdef0123456789abcdef0123456789abcdef_4704261".to_string(),
-                "0123456789abcdef0123456789abcdef0123456789abcdef_27996".to_string(),
-            ];
+            //let collision_pair =
+            //    find_out_of_order_sha256_long_prefix_pair(dir.object_id(), &key).unwrap();
+            let collision_pair =
+                [format!("{:0>160}_{}", 0, 3047256), format!("{:0>160}_{}", 0, 918)];
             // Create set of files with a common prefix, long enough to exceed prefix length of 48.
-            // The first 48 encrypted name bytes will be the same, but the `raw_hash` will differ.
+            // The first 48 encrypted name bytes will be the same, but the `sha256` will differ.
             for filename in (0..64)
                 .into_iter()
-                .map(|i| format!("0123456789abcdef0123456789abcdef0123456789abcdef_{i}"))
+                .map(|i| format!("{:0>160}_{i}", 0))
                 .chain(collision_pair.into_iter())
             {
                 let casefold_hash = get_casefold_hash(Some(&key), &filename, true);
                 let encrypted_name =
                     encrypt_filename(&key, dir.object_id(), &filename).expect("encrypt_filename");
-                let synthetic = SyntheticFilename::from_object_key(casefold_hash, &encrypted_name);
+                let proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
                 let file = dir
                     .create_child_file(&mut transaction, &filename)
                     .await
                     .expect("create_child_file failed");
-                filenames.push((synthetic, file.object_id()));
+                filenames.push((proxy_filename, file.object_id()));
             }
             transaction.commit().await.expect("commit failed");
 
@@ -4056,31 +4115,31 @@ mod tests {
             let dir = Directory::open(&store, object_id).await.expect("open failed");
             assert!(dir.casefold());
 
-            // Ensure uniqueness of the synthetic filenames.
+            // Ensure uniqueness of the proxy filenames.
             assert_eq!(
-                filenames.iter().map(|(name, _)| name.encode()).collect::<HashSet<_>>().len(),
+                filenames.iter().map(|(name, _)| (*name).into()).collect::<HashSet<String>>().len(),
                 filenames.len()
             );
 
-            let raw_prefix = filenames[0].0.raw_prefix.clone();
-            for (synthetic_filename, object_id) in &filenames {
+            let filename = filenames[0].0.filename.clone();
+            for (proxy_filename, object_id) in &filenames {
                 // We used such a long prefix that we expect all files to share it.
-                assert_eq!(raw_prefix, synthetic_filename.raw_prefix);
+                assert_eq!(filename, proxy_filename.filename);
 
+                let proxy_filename_str: String = (*proxy_filename).into();
                 let item = dir
-                    .lookup(&synthetic_filename.encode())
+                    .lookup(&proxy_filename_str)
                     .await
                     .expect("lookup failed")
                     .expect("lookup is not None");
-                assert_eq!(item.0, *object_id, "Mismatch for filename '{synthetic_filename:?}'");
+                assert_eq!(item.0, *object_id, "Mismatch for filename '{proxy_filename:?}'");
 
-                // Lookup synthetic filename using iter_from
+                // Lookup proxy filename using iter_from
                 let layer_set = dir.store().tree().layer_set();
                 let mut merger = layer_set.merger();
-                let iter =
-                    dir.iter_from(&mut merger, &synthetic_filename.encode()).await.expect("iter");
+                let iter = dir.iter_from(&mut merger, &proxy_filename_str).await.expect("iter");
                 let item = iter.get().expect("expect item");
-                assert_eq!(item.0, synthetic_filename.encode().as_str());
+                assert_eq!(item.0, &proxy_filename_str);
                 assert_eq!(item.1, *object_id);
             }
 

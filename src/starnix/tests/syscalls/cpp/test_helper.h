@@ -219,6 +219,7 @@ struct MemoryMappingExt : public MemoryMapping {
   bool ContainsFlag(std::string_view flag) const {
     return std::ranges::find(vm_flags, flag) != vm_flags.end();
   }
+  friend std::ostream &operator<<(std::ostream &os, const MemoryMappingExt &mapping);
 };
 
 #define MY_NLMSG_OK(nlh, len) NLMSG_OK((nlh), static_cast<decltype((nlh)->nlmsg_len)>(len))

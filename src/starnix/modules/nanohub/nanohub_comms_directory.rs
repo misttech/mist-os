@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::socket_tunnel_file::SocketTunnelSysfsFile;
+use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
@@ -25,8 +25,8 @@ impl NanohubCommsDirectory {
         Self { base_dir: DeviceDirectory::new(device) }
     }
 
-    fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
-        let mut entries = DeviceDirectory::create_file_ops_entries();
+    fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
+        let mut entries = self.base_dir.create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"display_panel_name".into(),
@@ -86,7 +86,7 @@ impl FsNodeOps for NanohubCommsDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(Self::create_file_ops_entries()))
+        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
     }
 
     fn lookup(
@@ -120,9 +120,7 @@ impl FsNodeOps for NanohubCommsDirectory {
             )),
             b"download_firmware" => Ok(node.fs().create_node(
                 current_task,
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/download_firmware".into(),
-                ),
+                FirmwareFile::new(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"firmware_name" => Ok(node.fs().create_node(

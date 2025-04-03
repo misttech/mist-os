@@ -7,7 +7,7 @@ Battery of tests of the lifecycle of ifaces managed by wlanix.
 
 import asyncio
 
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from fuchsia_controller_py import Channel
 from mobly import base_test, test_runner
 from mobly.asserts import assert_equal
@@ -29,7 +29,7 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         asyncio.run(
             self.wifi_chip_proxy.create_sta_iface(iface=server.take())
         ).unwrap()
-        wifi_sta_iface = fidl_wlanix.WifiStaIface.Client(proxy)
+        wifi_sta_iface = fidl_wlanix.WifiStaIfaceClient(proxy)
 
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()

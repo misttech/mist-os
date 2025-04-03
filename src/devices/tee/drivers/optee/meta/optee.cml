@@ -13,6 +13,7 @@
         colocate: "false",
         compat: "driver/optee.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.tee.default" ],
     },
     capabilities: [
         { service: "fuchsia.hardware.tee.Service" },

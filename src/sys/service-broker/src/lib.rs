@@ -134,9 +134,10 @@ fn get_program_strvec<'a>(
 pub async fn main(
     ns_entries: Vec<fprocess::NameInfo>,
     directory_request: ServerEnd<fio::DirectoryMarker>,
-    _lifecycle: ServerEnd<fpl::LifecycleMarker>,
+    lifecycle: ServerEnd<fpl::LifecycleMarker>,
     program: Option<fdata::Dictionary>,
 ) -> Result<()> {
+    drop(lifecycle);
     if directory_request.is_invalid_handle() {
         bail!("No valid handle found for outgoing directory");
     }

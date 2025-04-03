@@ -87,7 +87,7 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
             &mut |connection_state| {
                 match connection_state {
                     FastbootConnectionState::Udp(addrs) => {
-                        self.addr = addrs.first().unwrap().into()
+                        self.addr = addrs.iter().find_map(|x| x.try_into().ok()).unwrap();
                     }
                     s @ _ => {
                         return Err(InterfaceFactoryError::RediscoverTargetNotInCorrectTransport(
@@ -133,7 +133,7 @@ impl TargetFilter for UdpTargetFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use addr::TargetAddr;
+    use addr::TargetIpAddr;
     use std::net::{IpAddr, Ipv4Addr};
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -144,7 +144,7 @@ mod test {
     fn filter_target_test() -> Result<()> {
         let node_name = "jod".to_string();
         let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        let addr = TargetAddr::from(socket);
+        let addr = TargetIpAddr::from(socket);
 
         let mut filter = UdpTargetFilter { node_name };
 

@@ -928,43 +928,46 @@ impl gmp::v2::ProtocolConfig for IgmpConfig {
 }
 
 /// Statistics about IGMP.
+///
+/// The counter type `C` is generic to facilitate testing.
 #[derive(Debug, Default)]
-pub struct IgmpCounters {
+#[cfg_attr(test, derive(PartialEq))]
+pub struct IgmpCounters<C = Counter> {
     // Count of IGMPv1 queries received.
-    rx_igmpv1_query: Counter,
+    rx_igmpv1_query: C,
     // Count of IGMPv2 queries received.
-    rx_igmpv2_query: Counter,
+    rx_igmpv2_query: C,
     // Count of IGMPv3 queries received.
-    rx_igmpv3_query: Counter,
+    rx_igmpv3_query: C,
     // Count of IGMPv1 reports received.
-    rx_igmpv1_report: Counter,
+    rx_igmpv1_report: C,
     // Count of IGMPv2 reports received.
-    rx_igmpv2_report: Counter,
+    rx_igmpv2_report: C,
     // Count of IGMPv3 reports received.
-    rx_igmpv3_report: Counter,
+    rx_igmpv3_report: C,
     // Count of Leave Group messages received.
-    rx_leave_group: Counter,
+    rx_leave_group: C,
     // The count of received IGMP messages that could not be parsed.
-    rx_err_parse: Counter,
+    rx_err_parse: C,
     // Count of queries that were rejected because the Router Alert option was
     // not present.
-    rx_err_missing_router_alert_in_query: Counter,
+    rx_err_missing_router_alert_in_query: C,
     // Count of queries that were rejected because they weren't sent to the
     // all-systems address.
-    rx_err_rejected_general_query: Counter,
+    rx_err_rejected_general_query: C,
     // Count of received IGMP messages that were rejected because they had
     // an invalid TTL.
-    rx_err_bad_ttl: Counter,
+    rx_err_bad_ttl: C,
     // Count of IGMPv1 reports sent.
-    tx_igmpv1_report: Counter,
+    tx_igmpv1_report: C,
     // Count of IGMPv2 reports sent.
-    tx_igmpv2_report: Counter,
+    tx_igmpv2_report: C,
     // Count of IGMPv3 reports sent.
-    tx_igmpv3_report: Counter,
+    tx_igmpv3_report: C,
     // Count of Leave Group messages sent.
-    tx_leave_group: Counter,
+    tx_leave_group: C,
     // Count of IGMP messages that could not be sent.
-    tx_err: Counter,
+    tx_err: C,
 }
 
 impl Inspectable for IgmpCounters {
@@ -1239,26 +1242,7 @@ mod tests {
         }
     }
 
-    // Like [`IgmpCounters`], but supports test asserts with `PartialEq`.
-    #[derive(Debug, Default, PartialEq)]
-    struct CounterExpectations {
-        rx_igmpv1_query: u64,
-        rx_igmpv2_query: u64,
-        rx_igmpv3_query: u64,
-        rx_igmpv1_report: u64,
-        rx_igmpv2_report: u64,
-        rx_igmpv3_report: u64,
-        rx_leave_group: u64,
-        rx_err_parse: u64,
-        rx_err_missing_router_alert_in_query: u64,
-        rx_err_rejected_general_query: u64,
-        rx_err_bad_ttl: u64,
-        tx_igmpv1_report: u64,
-        tx_igmpv2_report: u64,
-        tx_igmpv3_report: u64,
-        tx_leave_group: u64,
-        tx_err: u64,
-    }
+    type CounterExpectations = IgmpCounters<u64>;
 
     impl CounterExpectations {
         #[track_caller]

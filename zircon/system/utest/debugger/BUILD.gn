@@ -36,7 +36,6 @@ test("debugger-test") {
     "//sdk/lib/tbi",
     "//src/lib/debug:backtrace-request",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/test-utils",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

@@ -10,6 +10,7 @@
         runner: "driver",
         binary: "driver/fusb302.so",
         bind: "meta/bind/fusb302-bind.bindbc",
+        allowed_scheduler_roles: [ "fuchsia.devices.power.drivers.fusb302.interrupt" ],
     },
     use: [
         {

@@ -52,9 +52,9 @@ impl Eq for Errno {}
 impl Display for Errno {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if let Some(context) = &self.context {
-            write!(f, "errno {} from {}, context: {}", self.code, self.location, context)
+            write!(f, "{} from {}, context: {}", self.code, self.location, context)
         } else {
-            write!(f, "errno {} from {}", self.code, self.location)
+            write!(f, "{} from {}", self.code, self.location)
         }
     }
 }
@@ -94,7 +94,7 @@ impl From<Errno> for zx_status::Status {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct ErrnoCode(u32);
 
 impl ErrnoCode {
@@ -151,6 +151,12 @@ impl ErrnoCode {
 
         // Always restart if the signal did not call a handler (i.e. SIGSTOP).
         should_restart_even_if_sigaction_handler_not_null || sigaction.sa_handler.addr == 0
+    }
+}
+
+impl Debug for ErrnoCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -517,7 +523,7 @@ mod tests {
     fn basic_errno_formatting() {
         let location = std::panic::Location::caller();
         let errno = Errno { code: ENOENT, location, context: None };
-        assert_eq!(errno.to_string(), format!("errno ENOENT(2) from {}", location));
+        assert_eq!(errno.to_string(), format!("ENOENT(2) from {}", location));
     }
 
     #[test]
@@ -526,7 +532,7 @@ mod tests {
         let errno = Errno { code: ENOENT, location, context: Some("TEST CONTEXT".to_string()) };
         assert_eq!(
             errno.to_string(),
-            format!("errno ENOENT(2) from {}, context: TEST CONTEXT", location)
+            format!("ENOENT(2) from {}, context: TEST CONTEXT", location)
         );
     }
 

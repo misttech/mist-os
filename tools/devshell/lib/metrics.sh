@@ -601,12 +601,12 @@ function track-command-execution {
     args=""
   fi
 
-  # Limit to the first 100 characters of arguments.
-  # The GA4 API supports up to 100 characters for parameter values
+  # Limit to the first 500 characters of arguments.
+  # The GA4 360 supports up to 500 characters for parameter values
   local args_truncated=0
-  local args1="${args:0:100}"
-  local args2="${args:100:100}"
-  if [[ "${#args}" -gt 200 ]]; then
+  local args1="${args:0:500}"
+  local args2="${args:500:500}"
+  if [[ "${#args}" -gt 1000 ]]; then
     args_truncated=1
   fi
 
@@ -690,9 +690,9 @@ function track-command-finished {
   fi
 
   local args_truncated=0
-  local args1="${args:0:100}"
-  local args2="${args:100:100}"
-  if [[ "${#args}" -gt 200 ]]; then
+  local args1="${args:0:500}"
+  local args2="${args:500:500}"
+  if [[ "${#args}" -gt 1000 ]]; then
     args_truncated=1
   fi
 
@@ -767,6 +767,7 @@ function track-build-event {
 
   local args_gn=""
   local args_json=""
+  local env_flags=""
 
   metrics-read-config
   if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
@@ -790,14 +791,32 @@ function track-build-event {
     args_json=""
   fi
 
-  switches="${switches:0:100}"
-  ninja_switches="${ninja_switches:0:100}"
-  fuchsia_targets="${fuchsia_targets:0:100}"
+  switches="${switches:0:500}"
+  ninja_switches="${ninja_switches:0:500}"
+  fuchsia_targets="${fuchsia_targets:0:500}"
 
-  local args_gn1="${args_gn:0:100}"
-  local args_gn2="${args_gn:100:100}"
-  local args_json1="${args_json:0:100}"
-  local args_json2="${args_json:100:100}"
+  local args_gn1="${args_gn:0:500}"
+  local args_gn2="${args_gn:500:500}"
+  local args_json1="${args_json:0:500}"
+  local args_json2="${args_json:500:500}"
+
+  if [[ "${FUCHSIA_FX_ITERATIVE}" -eq 1 ]]; then
+    env_flags="${env_flags}+iterative"
+  else
+    env_flags="${env_flags}-iterative"
+  fi
+
+  if [[ "${FUCHSIA_FX_TEST_RUN}" -eq 1 ]]; then
+    env_flags="${env_flags}+test"
+  else
+    env_flags="${env_flags}-test"
+  fi
+
+  if [[ "${FUCHSIA_FX_MULTI_RUN}" -eq 1 ]]; then
+    env_flags="${env_flags}+multi"
+  else
+    env_flags="${env_flags}-multi"
+  fi
 
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
@@ -812,6 +831,7 @@ function track-build-event {
     --argjson end_time_micros "${end_time}" \
     --argjson target_count "${target_count}" \
     --argjson is_clean_build "${is_clean_build}" \
+    --arg env_flags "${env_flags}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"

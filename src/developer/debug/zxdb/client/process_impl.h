@@ -10,6 +10,7 @@
 
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/zxdb/client/memory_dump.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
@@ -86,6 +87,11 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
     memory_blocks_[thread_koid] = std::move(memory_blocks);
   }
 
+  // unwinder::AsyncMemory::Delegate implementation.
+  void FetchMemoryRanges(std::vector<std::pair<uint64_t, uint32_t>> ranges,
+                         fit::callback<void()> done) override;
+  unwinder::Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override;
+
  private:
   enum {
     kUnloaded,
@@ -134,6 +140,9 @@ class ProcessImpl : public Process, public ProcessSymbols::Notifications {
 
   // Lazily-populated.
   mutable fxl::RefPtr<ProcessSymbolDataProvider> symbol_data_provider_;
+
+  // Memory cached from |FetchMemoryRanges|.
+  std::vector<MemoryDump> cached_memory_;
 
   fxl::WeakPtrFactory<ProcessImpl> weak_factory_;
 

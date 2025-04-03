@@ -133,24 +133,14 @@ pub fn publish(
     options: PublishOptions,
 ) -> Option<PublishedInspectController> {
     let PublishOptions { vmo_preference, tree_name, inspect_sink_client } = options;
-    let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), vmo_preference) {
-        Ok((task, tree)) => (task, tree),
-        Err(err) => {
-            error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
-            return None;
-        }
-    };
+    let scope = fasync::Scope::new_with_name("inspect_runtime::publish");
+    let tree = service::spawn_tree_server(inspector.clone(), vmo_preference, &scope);
 
-    let inspect_sink = match inspect_sink_client {
-        None => match client::connect_to_protocol::<finspect::InspectSinkMarker>() {
-            Ok(inspect_sink) => inspect_sink,
-            Err(err) => {
-                error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
-                return None;
-            }
-        },
-        Some(client_end) => client_end.into_proxy(),
-    };
+    let inspect_sink = inspect_sink_client.map(|client| client.into_proxy()).or_else(|| {
+        client::connect_to_protocol::<finspect::InspectSinkMarker>()
+            .map_err(|err| error!(err:%; "failed to spawn the fuchsia.inspect.Tree server"))
+            .ok()
+    })?;
 
     // unwrap: safe since we have a valid tree handle coming from the server we spawn.
     let tree_koid = tree.basic_info().unwrap().koid;
@@ -163,13 +153,13 @@ pub fn publish(
         return None;
     }
 
-    Some(PublishedInspectController::new(inspector.clone(), server_task, tree_koid))
+    Some(PublishedInspectController::new(inspector.clone(), scope, tree_koid))
 }
 
 #[pin_project]
 pub struct PublishedInspectController {
     #[pin]
-    task: fasync::Task<()>,
+    scope: fasync::scope::Join,
     inspector: Inspector,
     tree_koid: zx::Koid,
 }
@@ -197,8 +187,8 @@ impl EscrowOptions {
 }
 
 impl PublishedInspectController {
-    fn new(inspector: Inspector, task: fasync::Task<()>, tree_koid: zx::Koid) -> Self {
-        Self { inspector, task, tree_koid }
+    fn new(inspector: Inspector, scope: fasync::Scope, tree_koid: zx::Koid) -> Self {
+        Self { inspector, scope: scope.join(), tree_koid }
     }
 
     /// Escrows a frozen copy of the VMO of the associated Inspector replacing the current live
@@ -231,7 +221,7 @@ impl PublishedInspectController {
             error!(err:%; "failed to escrow inspect data");
             return None;
         }
-        self.task.await;
+        self.scope.await;
         Some(EscrowToken { token: ep1 })
     }
 }
@@ -241,7 +231,7 @@ impl Future for PublishedInspectController {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        this.task.poll(cx)
+        this.scope.poll(cx)
     }
 }
 

@@ -363,14 +363,6 @@ config("static-libc++") {
 # to ensure the code with this requirement doesn't get compiled in ways that won't
 # work.  This config can be changed to add switches when those needs arise.
 config("pure") {
-  # TODO(https://fxbug.dev/42076005): This disables the SwitchToLookupTable optimization,
-  # which is not PIC-friendly under LTO.
-  if ((current_toolchain == shlib_toolchain ||
-       toolchain_variant.is_pic_default) &&
-      (optimize == "size_lto" || toolchain_variant.tags + [ "lto" ] -
-                                 [ "lto" ] != toolchain_variant.tags)) {
-    cflags = [ "-fno-jump-tables" ]
-  }
 }
 
 variant("rodso") {

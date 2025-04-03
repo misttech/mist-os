@@ -11,11 +11,13 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
-use starnix_uapi::errors::{errno, Errno, EAGAIN};
+use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
+use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
+use std::sync::atomic::Ordering;
 use std::sync::{mpsc, Arc, OnceLock};
 
 const BUFFER_SIZE: i32 = 1_049_000;
@@ -25,6 +27,12 @@ pub struct Syslog {
     syscall_subscription: OnceLock<Mutex<LogSubscription>>,
 }
 
+pub enum SyslogAccess {
+    DevKmsg,
+    ProcKmsg,
+    Syscall(SyslogAction),
+}
+
 impl Syslog {
     pub fn init(&self, system_task: &CurrentTask) -> Result<(), anyhow::Error> {
         let subscription = LogSubscription::snapshot_then_subscribe(system_task)?;
@@ -32,20 +40,30 @@ impl Syslog {
         Ok(())
     }
 
-    // TODO(b/316630310): for now, all actions on the syslog are privileged.
-    // READ_ALL and SIZE_BUFFER should be granted unprivileged access if
-    // `/proc/sys/kernel/dmesg_restrict` is 0, which also allows to read /dev/kmsg.
-    pub fn access(&self, current_task: &CurrentTask) -> Result<GrantedSyslog<'_>, Errno> {
-        Self::validate_access(current_task)?;
+    pub fn access(
+        &self,
+        current_task: &CurrentTask,
+        access: SyslogAccess,
+    ) -> Result<GrantedSyslog<'_>, Errno> {
+        Self::validate_access(current_task, access)?;
         let syscall_subscription = self.subscription()?;
         Ok(GrantedSyslog { syscall_subscription })
     }
 
-    pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
-        if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
-            security::check_task_capable(current_task, CAP_SYSLOG)?;
+    /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
+    /// capability, or global admin capability.
+    pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
+        // According to syslog(2) man, ReadAll (3) and SizeBuffer (10) are allowed unprivileged
+        // access only if restrict_dmsg is 0;
+        if matches!(access, SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer))
+            && !current_task.kernel().restrict_dmesg.load(Ordering::Relaxed)
+        {
+            return Ok(());
         }
-        Ok(())
+        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            return Ok(());
+        }
+        security::check_task_capable(current_task, CAP_SYSLOG)
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {
@@ -219,7 +237,7 @@ impl LogSubscription {
             // The channel was closed and there's no more messages in the queue.
             Err(mpsc::TryRecvError::Disconnected) => Ok(None),
             // No messages available but the channel hasn't closed.
-            Err(mpsc::TryRecvError::Empty) => Err(errno!(EAGAIN)),
+            Err(mpsc::TryRecvError::Empty) => error!(EAGAIN),
         }
     }
 }

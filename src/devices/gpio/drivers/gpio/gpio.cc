@@ -8,6 +8,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 #include <lib/fit/defer.h>
 #include <zircon/types.h>
@@ -327,23 +328,19 @@ void GpioDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> serve
 void GpioRootDevice::Start(fdf::StartCompleter completer) {
   uint32_t controller_id = 0;
 
-  fidl::Arena arena;
-
   std::optional<fuchsia_hardware_pinimpl::Metadata> metadata;
   {
-    zx::result result = compat::GetMetadata<fuchsia_hardware_pinimpl::Metadata>(
-        incoming(), DEVICE_METADATA_GPIO_CONTROLLER);
+    zx::result result =
+        fdf_metadata::GetMetadataIfExists<fuchsia_hardware_pinimpl::Metadata>(*incoming());
     if (result.is_error()) {
-      if (result.status_value() == ZX_ERR_NOT_FOUND) {
-        FDF_LOG(INFO, "No gpio metadata provided");
-      } else {
-        FDF_LOG(ERROR, "Failed to decode metadata: %s", result.status_string());
-        completer(result.take_error());
-        return;
-      }
-    } else {
-      metadata.emplace(std::move(result.value()));
+      FDF_LOG(ERROR, "Failed to get metadata: %s", result.status_string());
+      completer(result.take_error());
+      return;
     }
+    if (!result.value().has_value()) {
+      FDF_LOG(INFO, "No gpio metadata provided");
+    }
+    metadata = std::move(result.value());
   }
 
   if (metadata.has_value() && metadata->controller_id().has_value()) {
@@ -352,11 +349,18 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
     FDF_LOG(INFO, "No controller ID provided. Assuming controller ID = 0");
   }
 
-  zx::result scheduler_role = compat::GetMetadata<fuchsia_scheduler::RoleName>(
-      incoming(), DEVICE_METADATA_SCHEDULER_ROLE_NAME);
-  if (scheduler_role.is_ok()) {
+  zx::result scheduler_role_name_result =
+      fdf_metadata::GetMetadataIfExists<fuchsia_scheduler::RoleName>(*incoming());
+  if (scheduler_role_name_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get scheduler role name: %s",
+            scheduler_role_name_result.status_string());
+    completer(scheduler_role_name_result.take_error());
+    return;
+  }
+  if (scheduler_role_name_result.value().has_value()) {
+    const auto& scheduler_role_name = scheduler_role_name_result.value().value();
     zx::result result = fdf::SynchronizedDispatcher::Create(
-        {}, "GPIO", [](fdf_dispatcher_t*) {}, scheduler_role->role());
+        {}, "GPIO", [](fdf_dispatcher_t*) {}, scheduler_role_name.role());
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to create SynchronizedDispatcher: %s", result.status_string());
       completer(result.take_error());
@@ -367,7 +371,7 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
     // that dispatcher instead of the default dispatcher passed to this method.
     fidl_dispatcher_.emplace(*std::move(result));
 
-    FDF_LOG(DEBUG, "Using dispatcher with role \"%s\"", scheduler_role->role().c_str());
+    FDF_LOG(DEBUG, "Using dispatcher with role \"%s\"", scheduler_role_name.role().c_str());
   }
 
   {

@@ -22,18 +22,19 @@ int main(int argc, const char** argv) {
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "ktrace_provider");
   trace_provider.SetGetKnownCategoriesCallback(ktrace_provider::GetKnownCategories);
 
-  auto debug_client_end = component::Connect<fuchsia_kernel::DebugResource>();
-  if (debug_client_end.is_error()) {
-    FX_PLOGS(ERROR, debug_client_end.error_value()) << "Failed to get connect to debug resource";
+  auto tracing_client_end = component::Connect<fuchsia_kernel::TracingResource>();
+  if (tracing_client_end.is_error()) {
+    FX_PLOGS(ERROR, tracing_client_end.error_value())
+        << "Failed to get connect to tracing resource";
     return 1;
   }
-  auto debug_result = fidl::SyncClient(std::move(*debug_client_end))->Get();
-  if (!debug_result.is_ok()) {
-    FX_LOGS(ERROR) << debug_result.error_value() << " Failed to get debug resource";
+  auto tracing_result = fidl::SyncClient(std::move(*tracing_client_end))->Get();
+  if (!tracing_result.is_ok()) {
+    FX_LOGS(ERROR) << tracing_result.error_value() << " Failed to get tracing resource";
     return 1;
   }
 
-  ktrace_provider::App app(std::move(debug_result->resource()), command_line);
+  ktrace_provider::App app(std::move(tracing_result->resource()), command_line);
   loop.Run();
   return 0;
 }

@@ -77,6 +77,7 @@ per_test_suffices = [
   "StartupModulesPriorityOverGlobal",
   "RtldNoLoadBasic",
   "DlIteratePhdrBasic",
+  "ModuleNameOwnership",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -791,6 +792,12 @@ test_executable("passive-abi-basic") {
 test_executable("passive-abi-rdebug") {
   can_be_in_process = true
   sources = [ "passive-abi-rdebug.cc" ]
+  deps = [ "../.." ]
+}
+
+test_executable("passive-abi-preinit-array") {
+  can_be_in_process = true
+  sources = [ "passive-abi-preinit-array.cc" ]
   deps = [ "../.." ]
 }
 

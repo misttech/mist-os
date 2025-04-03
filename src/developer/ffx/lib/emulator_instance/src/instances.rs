@@ -301,7 +301,7 @@ mod tests {
         let valid_femu = r#"{"emulator_configuration":{"device":{"audio":{"model":"hda"},"cpu":{
             "architecture":"x64","count":0},"memory":{"quantity":8192,"units":"megabytes"},
             "pointing_device":"mouse","screen":{"height":800,"width":1280,"units":"pixels"},
-            "vsock":{"enabled":false,"cid":3},
+            "vsock":{"enabled":false,"cid":0},
             "storage":{"quantity":2,"units":"gigabytes"}},"flags":{"args":[],"envs":{},"features":[],
             "kernel_args":[],"options":[]},"guest":{"fvm_image":"/path/to/fvm.blk","kernel_image":
             "/path/to/multiboot.bin","zbi_image":"/path/to/fuchsia.zbi"},"host":{"acceleration":

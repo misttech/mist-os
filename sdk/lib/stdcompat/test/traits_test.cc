@@ -129,7 +129,10 @@ TEST(VariableTemplatesTest, IsAliasForStd) {
   static_assert(&cpp17::is_const_v<int> == &std::is_const_v<int>);
   static_assert(&cpp17::is_empty_v<int> == &std::is_empty_v<int>);
   static_assert(&cpp17::is_final_v<int> == &std::is_final_v<int>);
+#if __cplusplus < 202002L
+  // is_pod is deprecated in C++20.
   static_assert(&cpp17::is_pod_v<int> == &std::is_pod_v<int>);
+#endif
   static_assert(&cpp17::is_polymorphic_v<int> == &std::is_polymorphic_v<int>);
   static_assert(&cpp17::is_signed_v<int> == &std::is_signed_v<int>);
   static_assert(&cpp17::is_standard_layout_v<int> == &std::is_standard_layout_v<int>);

@@ -10,12 +10,12 @@
 #include <va/va_drmcommon.h>
 
 #include "h264_accelerator.h"
-#include "media/base/video_codecs.h"
-#include "media/gpu/h264_decoder.h"
 #include "src/media/codec/codecs/vaapi/third_party/chromium/h264_vaapi_video_encoder_delegate.h"
 #include "src/media/codec/codecs/vaapi/third_party/chromium/vaapi_picture.h"
 #include "src/media/codec/codecs/vaapi/third_party/chromium/vaapi_wrapper.h"
+#include "src/media/third_party/chromium_media/media/base/video_codecs.h"
 #include "src/media/third_party/chromium_media/media/gpu/gpu_video_encode_accelerator_helpers.h"
+#include "src/media/third_party/chromium_media/media/gpu/h264_decoder.h"
 
 CodecAdapterVaApiEncoder::CodecAdapterVaApiEncoder(std::mutex& lock,
                                                    CodecAdapterEvents* codec_adapter_events)

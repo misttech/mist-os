@@ -4011,12 +4011,11 @@ static bool vmo_skip_range_update_test() {
     // Perform the requested range update.
     {
       Guard<VmoLockType> guard{hidden_parent->lock()};
+      VmCowPages::DeferredOps deferred(hidden_parent.get(), VmCowPages::DeferredOps::LockedTag{});
       const VmCowRange range_update =
           VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE);
-      hidden_parent->RangeChangeUpdateSelfLocked(range_update, VmCowPages::RangeChangeOp::Unmap,
-                                                 VmCowPages::RangeChangeChildren::Deferred);
-      hidden_parent->RangeChangeUpdateCowChildrenLocked(range_update,
-                                                        VmCowPages::RangeChangeOp::Unmap);
+      hidden_parent->RangeChangeUpdateLocked(range_update, VmCowPages::RangeChangeOp::Unmap,
+                                             &deferred);
     }
     // Check all the mappings are either there or not there as expected.
     bool expected[kNumPages];

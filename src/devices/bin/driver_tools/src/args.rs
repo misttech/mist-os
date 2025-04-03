@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::subcommands::debug_bind::args::DebugBindCommand;
 use super::subcommands::device::args::DeviceCommand;
 use super::subcommands::disable::args::DisableCommand;
 use super::subcommands::dump::args::DumpCommand;
@@ -41,7 +40,6 @@ pub struct DriverCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DriverSubCommand {
-    DebugBind(DebugBindCommand),
     Device(DeviceCommand),
     Disable(DisableCommand),
     Dump(DumpCommand),
@@ -62,7 +60,6 @@ pub enum DriverSubCommand {
 #[argh(subcommand)]
 pub enum DriverSubCommand {
     Conformance(ConformanceCommand),
-    DebugBind(DebugBindCommand),
     Device(DeviceCommand),
     Disable(DisableCommand),
     Dump(DumpCommand),

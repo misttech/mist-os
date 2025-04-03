@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
 import(
@@ -38,6 +37,7 @@ rustc_library("lib") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/lib/bounded-node",
     "//src/sys/pkg/lib/channel-config",
     "//src/sys/pkg/lib/eager-package-config",

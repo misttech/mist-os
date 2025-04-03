@@ -198,3 +198,54 @@ decode_failure("OptionalEmptyStructInvalidPresenceIndicator") {
     type = OptionalEmptyStructWrapper,
     err = INVALID_PRESENCE_INDICATOR,
 }
+
+success("RecursiveEmptyStruct") {
+    value = RecursiveEmptyStruct{ // 0
+        inner: RecursiveEmptyStruct{ // 1
+            inner: null,
+        },
+    },
+    bytes = {
+        v2 = [
+            repeat(0xff):8, // 0
+            repeat(0x00):8, // 1
+        ],
+    },
+}
+
+success("RecursiveEmptyStructArrayWrapper") {
+    // gidl-format off
+    value = RecursiveEmptyStructArrayWrapper { // 0
+        arr: [ // 0
+            RecursiveEmptyStruct { // 0
+                inner: RecursiveEmptyStruct { // 1
+                    inner: null,
+                }
+            }
+        ]
+    },
+    // gidl-format on
+    bytes = {
+        v2 = [
+            repeat(0xff):8, // 0
+            repeat(0x00):8, // 1
+        ],
+    },
+}
+
+success("RecursiveEmptyStructVectorWrapper") {
+    value = RecursiveEmptyStructVectorWrapper{ // 0
+        vec: [
+            RecursiveEmptyStruct{ // 1
+                inner: null,
+            },
+        ],
+    },
+    bytes = {
+        v2 = [
+            num(1):8, // vector count
+            repeat(0xff):8, // vector data
+            repeat(0x00):8, // 1
+        ],
+    },
+}

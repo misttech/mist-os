@@ -9,12 +9,15 @@ import argparse
 import dataclasses
 import errno
 import filecmp
+import hashlib
+import json
 import os
 import shlex
 import shutil
 import stat
 import subprocess
 import sys
+import time
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 # Directory where to find Starlark input files.
@@ -250,6 +253,9 @@ _DEBUG = False
 # Set this to True to debug .build-id copies from the Bazel output base
 # to the Ninja build directory.
 _DEBUG_BUILD_ID_COPIES = _DEBUG
+
+# Set this to True to debug the bazel query cache.
+_DEBUG_BAZEL_QUERIES = _DEBUG
 
 # Set this to True to assert when non-symlink repository files are found.
 # This is useful to find them when performing expensive builds on CQ
@@ -1198,11 +1204,70 @@ def main() -> int:
         Returns:
             On success, a list of output lines. On failure return None.
         """
+        # The result of queries does not change between incremental builds,
+        # as their outputs only depend on the shape of the Bazel graph, not
+        # the content of the artifacts. Due to this, it is possible to cache
+        # the outputs to save several seconds per bazel_action() invocation.
+        #
+        # The data is simply stored under $WORKSPACE/fuchsia_build_generated/bazel_query_cache/
+        # which will be removed by each `fx gen` call, since it may change the Bazel
+        # graph dependencies, and thus the query results.
+
+        cache_key_args = [query_type] + query_args
+        cache_key = hashlib.sha256(
+            repr(cache_key_args).encode("utf-8")
+        ).hexdigest()
+        cache_file = os.path.join(
+            args.workspace_dir,
+            f"fuchsia_build_generated/bazel_query_cache/{cache_key}.json",
+        )
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "rt") as f:
+                    cache_value = json.load(f)
+                assert cache_value["key_args"] == cache_key_args
+                if _DEBUG_BAZEL_QUERIES:
+                    print(
+                        f"DEBUG: Found cached values for query: {cache_key_args}",
+                        file=sys.stderr,
+                    )
+                return cache_value["output_lines"]
+            except Exception as e:
+                print(
+                    f"WARNING: Error when reading cached values for query: {cache_key_args}:\n{e}",
+                    file=sys.stderr,
+                )
+
+        if _DEBUG_BAZEL_QUERIES:
+            query_start_time = time.time()
+
         ret = run_bazel_query(query_type, query_args, False)
         if ret.returncode != 0:
             return None
-        else:
-            return ret.stdout.splitlines()
+
+        result = ret.stdout.splitlines()
+
+        # Write the result to the cache.
+        new_cache_value = {
+            "key_args": cache_key_args,
+            "output_lines": result,
+        }
+        if _DEBUG_BAZEL_QUERIES:
+            print(
+                f"DEBUG: Query took %.1f seconds for: {cache_key_args}"
+                % (time.time() - query_start_time),
+                file=sys.stderr,
+            )
+            print(
+                f"DEBUG: Writing query values to cache1 for: {cache_key_args}:\n",
+                file=sys.stderr,
+            )
+
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, "wt") as f:
+            json.dump(new_cache_value, f)
+
+        return result
 
     configured_args = args.extra_bazel_args
 
@@ -1285,6 +1350,15 @@ def main() -> int:
 
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
+
+    # Save the command.profile.gz data for analysis.
+    # Convert '//some/gn:label' into 'obj/some/gn/label.command.profile.gz'
+    command_profile_dest = os.path.join(
+        current_dir,
+        "obj",
+        f"{args.gn_target_label[2:].replace(':', '/')}.command.profile.gz",
+    )
+    cmd += ["--profile", command_profile_dest]
 
     # NOTE: It is important to NOT capture output from this subprocess, to make
     # sure console output from Bazel are correctly printed out by Ninja.

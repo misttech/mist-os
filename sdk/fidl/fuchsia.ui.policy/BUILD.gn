@@ -13,7 +13,7 @@ fidl("fuchsia.ui.policy") {
 
   sdk_category = "partner"
   stable = true
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   sources = [
     "device_listener.fidl",

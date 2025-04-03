@@ -31,7 +31,7 @@ use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
-const TEST_DISK_BLOCK_SIZE: u32 = 512;
+pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 
 // The default disk size is about 110MiB, with about 106MiB dedicated to the data volume. This size
@@ -373,7 +373,7 @@ impl DiskBuilder {
             Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
         } else {
             // Format the volume manager onto the disk directly.
-            Box::new(move || Ok(server.volume_proxy().into_client_end().unwrap()))
+            Box::new(move |server_end| Ok(server.connect(server_end)))
         };
 
         if self.volumes_spec.fxfs_blob {

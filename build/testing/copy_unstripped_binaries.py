@@ -15,13 +15,22 @@ import elfinfo
 def try_link(binary: str, build_id_dir: Path) -> Path:
     info = elfinfo.get_elf_info(binary)
     build_id = info.build_id
-    if info.stripped or not build_id or len(build_id) <= 2:
+    if not build_id or len(build_id) <= 2:
         return
     dest_dir = build_id_dir / build_id[:2]
     dest_dir.mkdir(exist_ok=True)
+
+    # There are two files, the (stripped) binary file, and the unstripped "debug" file. The build_id
+    # directory should have both. This will be the stripped binary file.
+    dest = dest_dir / build_id[2:]
+    if not dest.exists():  # When two source binaries resolves to the same.
+        os.link(binary, dest)
+
+    # And this is the unstripped "debug" file.
     dest = dest_dir / (build_id[2:] + ".debug")
     if not dest.exists():  # When two source binaries resolves to the same.
         os.link(binary, dest)
+
     return dest
 
 

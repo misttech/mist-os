@@ -110,6 +110,26 @@ in this test, you can be sure it also works as expected.
 Once you've gotten the stub to build and pass CQ, land it.  Next, move on to the
 implementation CL.
 
+#### 5. Add FIDL language bindings for new Zircon objects
+
+To enable the use of a new Zircon object (i.e. `zx.Handle:COUNTER`) in the C++
+and Rust language bindings, there are a few additional areas that must be
+updated. These updates allow the language binding code generators to know how to
+handle a new Zircon object.
+
+For FIDL C++ language bindings, update:
+
+- `ShortObjTypeName` in [`//src/lib/fidl_codec/display_handle.cc`][fidlcodec-display-handle]
+- `DisplayObjType` in [`//src/lib/fidl_codec/printer.cc`][fidlcodec-printer]
+- Add object header to [`//sdk/lib/fidl/hlcpp/include/lib/fidl/cpp/internal/header.h`][fidlcpp-header]
+- `handleSubtypeConsts` in [`//tools/fidl/lib/fidlgen_cpp/handles.go`][fidlgencpp-handles]
+- `zxNames` in [`//tools/fidl/lib/fidlgen_cpp/name_transforms.go`][fidlgencpp-name-transforms]
+
+For FIDL Rust language bindings, update:
+
+- `ObjectType` in [`//sdk/rust/zx/src/handle.rs`][rust-handle]
+- `invoke_for_handle_types` in [`//src/lib/fuchsia-async/src/handle/mod.rs`][fasync-handle]
+
 ### Implementation CL: Filling in the stub
 
 Now it's time to replace the stub implementation with a real one, add real tests
@@ -156,3 +176,10 @@ search rather than CL in gerrit. -->
 [rust]: /sdk/rust/zx
 [codec-handle]: /src/lib/fidl_codec/display_handle.cc
 [codec-printer]: /src/lib/fidl_codec/printer.cc
+[fidlcodec-display-handle]: /src/lib/fidl_codec/display_handle.cc
+[fidlcodec-printer]: /src/lib/fidl_codec/printer.cc
+[fidlcpp-header]: /sdk/lib/fidl/hlcpp/include/lib/fidl/cpp/internal/header.h
+[fidlgencpp-handles]: /tools/fidl/lib/fidlgen_cpp/handles.go
+[fidlgencpp-name-transforms]: /tools/fidl/lib/fidlgen_cpp/name_transforms.go
+[rust-handle]: /sdk/rust/zx/src/handle.rs
+[fasync-handle]: /src/lib/fuchsia-async/src/handle/mod.rs

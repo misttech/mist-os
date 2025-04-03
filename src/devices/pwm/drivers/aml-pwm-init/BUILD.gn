@@ -33,10 +33,10 @@ fuchsia_cc_driver("aml-pwm-init-driver") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]

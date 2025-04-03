@@ -4,7 +4,6 @@
 
 if (target_cpu == "arm64") {
   import("//build/bazel/drivers/bazel_driver_package.gni")
-  import("//build/bazel/wrappers.gni")
 
   bazel_driver_package("bazel_package") {
     bazel_target = "//src/devices/clock/drivers/vim3-clk:vim3-clk"
@@ -16,22 +15,6 @@ if (target_cpu == "arm64") {
       "meson_gate.h",
       "meson_pll.cc",
       "meson_pll.h",
-      "vim3_clk.cc",
-      "vim3_clk.h",
-    ]
-  }
-
-  bazel_fuchsia_test_package("vim3-clk-test-package") {
-    test_package_name = "vim3-clk-test"
-    test_component_names = [ "vim3-clk-test-bin" ]
-    inputs = [
-      "aml-fclk.h",
-      "aml-fclk-rates.cc",
-      "meson_gate.cc",
-      "meson_gate.h",
-      "meson_pll.cc",
-      "meson_pll.h",
-      "test.cc",
       "vim3_clk.cc",
       "vim3_clk.h",
     ]

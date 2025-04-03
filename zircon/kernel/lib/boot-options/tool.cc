@@ -81,6 +81,18 @@ struct Equal {
     };
     return std::visit(equal, value, init);
   }
+
+  template <typename UartDriver>
+  constexpr bool operator()(const uart::all::Config<UartDriver>& value,
+                            const uart::all::Config<UartDriver>& init) const {
+    bool are_equal = false;
+    value.Visit([&]<typename Driver1>(const uart::Config<Driver1>& dcfg_1) {
+      init.Visit([&]<typename Driver2>(const uart::Config<Driver2>& dcfg_2) {
+        are_equal = dcfg_1 == dcfg_2;
+      });
+    });
+    return are_equal;
+  }
 };
 
 template <typename T>

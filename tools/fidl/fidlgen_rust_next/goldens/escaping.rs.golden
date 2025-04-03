@@ -20,7 +20,7 @@ impl ::fidl_next::Encodable for DocCommentWithQuotes {
     type Encoded = WireDocCommentWithQuotes;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes
+unsafe impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -28,12 +28,12 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
 
-            } = slot;
+            } = out;
         }
 
         Ok(())
@@ -44,7 +44,7 @@ impl ::fidl_next::EncodableOption for Box<DocCommentWithQuotes> {
     type EncodedOption = ::fidl_next::WireBox<WireDocCommentWithQuotes>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     DocCommentWithQuotes: ::fidl_next::Encode<___E>,
@@ -53,13 +53,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -76,10 +76,15 @@ impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
     }
 }
 
-/// The wire type corersponding to [`DocCommentWithQuotes`].
+/// The wire type corresponding to [`DocCommentWithQuotes`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDocCommentWithQuotes {}
+
+unsafe impl ::fidl_next::ZeroPadding for WireDocCommentWithQuotes {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
+}
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDocCommentWithQuotes
 where
@@ -111,8 +116,15 @@ pub const SMILE_LOWER: &str = "\u{1f600}";
 
 pub const SMILE_UPPER: &str = "\u{1f600}";
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireDocCommentWithQuotes>
+        for ::fidl_test_escaping::DocCommentWithQuotes
+    {
+        #[inline]
+        fn take_from(from: &crate::WireDocCommentWithQuotes) -> Self {
+            Self {}
+        }
+    }
+}

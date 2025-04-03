@@ -322,6 +322,7 @@ impl TryFrom<process_builder::NamespaceEntry> for Entry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use fidl::endpoints::Proxy as _;
     use fuchsia_async as fasync;
     use zx::{AsHandleRef, Peered};
 
@@ -360,8 +361,6 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[fasync::run_singlethreaded(test)]
     async fn test_clone() {
-        use vfs::directory::entry_container::Directory;
-        use vfs::execution_scope::ExecutionScope;
         use vfs::file::vmo::read_only;
 
         // Set up a directory server.
@@ -370,14 +369,7 @@ mod tests {
                 "bar" => read_only(b"Fuchsia"),
             },
         };
-        let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(server_end.into()),
-        );
+        let client_end = vfs::directory::serve_read_only(dir).into_client_end().unwrap();
 
         // Make a namespace pointing to that server.
         let mut namespace = Namespace::new();

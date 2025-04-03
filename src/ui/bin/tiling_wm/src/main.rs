@@ -312,6 +312,8 @@ impl TilingWm {
     ) -> Result<TilingWm, Error> {
         let flatland = connect_to_protocol::<ui_comp::FlatlandMarker>()
             .expect("failed to connect to fuchsia.ui.flatland.Flatland");
+        flatland.set_debug_name("TilingWM")?;
+
         let mut id_generator = IdGenerator::new();
 
         // Create the root transform for tiles.

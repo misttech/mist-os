@@ -84,8 +84,6 @@ pub struct RsnCfg {
 struct InfraBss {
     ssid: Ssid,
     rsn_cfg: Option<RsnCfg>,
-    capabilities: mac::CapabilityInfo,
-    rates: Vec<SupportedRate>,
     clients: HashMap<MacAddr, RemoteClient>,
     aid_map: aid::Map,
     op_radio_cfg: OpRadioConfig,
@@ -94,7 +92,6 @@ struct InfraBss {
 
 pub struct Context {
     device_info: DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     mlme_sink: MlmeSink,
     timer: Timer<Event>,
 }
@@ -117,18 +114,12 @@ pub enum StartResult {
 impl ApSme {
     pub fn new(
         device_info: DeviceInfo,
-        mac_sublayer_support: fidl_common::MacSublayerSupport,
     ) -> (Self, crate::MlmeSink, crate::MlmeStream, timer::EventStream<Event>) {
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
         let sme = ApSme {
             state: Some(State::Idle {
-                ctx: Context {
-                    device_info,
-                    mac_sublayer_support,
-                    mlme_sink: MlmeSink::new(mlme_sink.clone()),
-                    timer,
-                },
+                ctx: Context { device_info, mlme_sink: MlmeSink::new(mlme_sink.clone()), timer },
             }),
         };
         (sme, MlmeSink::new(mlme_sink), mlme_stream, time_stream)
@@ -334,8 +325,6 @@ impl super::Station for ApSme {
                     ctx,
                     ssid,
                     rsn_cfg,
-                    capabilities,
-                    rates,
                     op_radio_cfg,
                     start_responder,
                     stop_responders,
@@ -582,8 +571,6 @@ fn handle_start_conf(
     mut ctx: Context,
     ssid: Ssid,
     rsn_cfg: Option<RsnCfg>,
-    capabilities: mac::CapabilityInfo,
-    rates: Vec<SupportedRate>,
     op_radio_cfg: OpRadioConfig,
     start_responder: Responder<StartResult>,
     stop_responders: Vec<Responder<fidl_sme::StopApResultCode>>,
@@ -598,8 +585,6 @@ fn handle_start_conf(
                         rsn_cfg,
                         clients: HashMap::new(),
                         aid_map: aid::Map::default(),
-                        capabilities,
-                        rates,
                         op_radio_cfg,
                         ctx,
                     },
@@ -697,9 +682,7 @@ impl InfraBss {
         client.handle_assoc_ind(
             &mut self.ctx,
             &mut self.aid_map,
-            self.capabilities,
             ind.capability_info,
-            &self.rates,
             &ind.rates.into_iter().map(SupportedRate).collect::<Vec<_>>()[..],
             &self.rsn_cfg,
             ind.rsne,
@@ -863,7 +846,6 @@ mod tests {
     use wlan_common::test_utils::fake_capabilities::{
         fake_2ghz_band_capability_vht, fake_5ghz_band_capability, fake_5ghz_band_capability_ht_cbw,
     };
-    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
 
     lazy_static! {
         static ref AP_ADDR: MacAddr = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66].into();
@@ -1593,8 +1575,7 @@ mod tests {
     // run in an async context and not call `wlan_common::timer::Timer::now` without an
     // executor.
     async fn create_sme() -> (ApSme, MlmeStream, timer::EventStream<Event>) {
-        let (ap_sme, _mlme_sink, mlme_stream, time_stream) =
-            ApSme::new(fake_device_info(*AP_ADDR), fake_mac_sublayer_support());
+        let (ap_sme, _mlme_sink, mlme_stream, time_stream) = ApSme::new(fake_device_info(*AP_ADDR));
         (ap_sme, mlme_stream, time_stream)
     }
 }

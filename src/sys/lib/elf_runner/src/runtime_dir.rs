@@ -10,7 +10,7 @@ use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
-use vfs::path::Path as fvfsPath;
+use vfs::object_request::ToObjectRequest as _;
 use vfs::tree_builder::TreeBuilder;
 
 // Simple directory type which is used to implement `ComponentStartInfo.runtime_directory`.
@@ -110,14 +110,14 @@ impl RuntimeDirBuilder {
 
         let runtime_directory = runtime_tree_builder.build();
 
-        // Serve the runtime directory
-        runtime_directory.clone().open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fvfsPath::dot(),
-            self.server_end,
-        );
+        const SERVE_FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_WRITABLE);
 
+        // Serve the runtime directory
+        let object_request = SERVE_FLAGS.to_object_request(self.server_end.into_channel());
+        let dir = runtime_directory.clone();
+        object_request.handle(|request| {
+            dir.open3(ExecutionScope::new(), vfs::Path::dot(), SERVE_FLAGS, request)
+        });
         RuntimeDirectory(runtime_directory)
     }
 }

@@ -11,7 +11,7 @@ import("//build/assembly/update_package.gni")
 import("//build/compiled_action.gni")
 import("//build/components/fuchsia_package.gni")
 import("//build/components/fuchsia_test_component.gni")
-import("//build/config.gni")
+
 import("//build/dist/resource.gni")
 import("//build/dist/zip_resource.gni")
 import("//build/info/info.gni")
@@ -275,6 +275,7 @@ template("assemble_security_pkg_test_system") {
 
   board_configuration(labels.board_config) {
     name = invoker.board_name
+    version = "fake_version"
     filesystems = {
       fvm = {
         slice_size = 1048576

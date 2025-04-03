@@ -4,7 +4,6 @@
 
 import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/testing/cc_test_executable.gni")
 
 group("tests") {

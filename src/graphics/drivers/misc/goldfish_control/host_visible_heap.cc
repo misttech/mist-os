@@ -144,24 +144,6 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
   return fpromise::ok(std::move(buffer2_params));
 }
 
-fuchsia_hardware_goldfish::wire::CreateBuffer2Params GetCreateBuffer2Params(
-    fidl::AnyArena& allocator,
-    const fuchsia_sysmem2::wire::SingleBufferSettings& single_buffer_settings, uint64_t paddr) {
-  using fuchsia_hardware_goldfish::wire::CreateBuffer2Params;
-
-  ZX_DEBUG_ASSERT(single_buffer_settings.has_buffer_settings());
-
-  const auto& buffer_settings = single_buffer_settings.buffer_settings();
-
-  ZX_DEBUG_ASSERT(buffer_settings.has_size_bytes());
-  uint64_t size_bytes = buffer_settings.size_bytes();
-  CreateBuffer2Params buffer2_params(allocator);
-  buffer2_params.set_size(allocator, size_bytes)
-      .set_memory_property(fuchsia_hardware_goldfish::wire::kMemoryPropertyHostVisible)
-      .set_physical_address(allocator, paddr);
-  return buffer2_params;
-}
-
 }  // namespace
 
 HostVisibleHeap::Block::Block(zx::vmo vmo, uint64_t paddr,
@@ -241,6 +223,12 @@ void HostVisibleHeap::AllocateVmo(AllocateVmoRequestView request,
   }
 
   bool is_image = request->settings.has_image_format_constraints();
+  if (!is_image) {
+    zxlogf(ERROR, "Creating a host-visible data buffer is not supported.");
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
   TRACE_DURATION(
       "gfx", "HostVisibleHeap::CreateResource", "type", is_image ? "image" : "buffer",
       "image:width", is_image ? request->settings.image_format_constraints().min_size().width : 0,
@@ -257,58 +245,34 @@ void HostVisibleHeap::AllocateVmo(AllocateVmoRequestView request,
   // handle so that there is no handle/resource leakage.
   auto cleanup_handle = fit::defer([this, buffer_key] { control()->FreeBufferHandle(buffer_key); });
 
-  if (is_image) {
-    fidl::Arena allocator;
-    // ColorBuffer creation.
-    auto create_params = GetCreateColorBuffer2Params(allocator, request->settings, paddr);
-    if (create_params.is_error()) {
-      completer.ReplyError(create_params.error());
-      return;
-    }
-
-    // Create actual ColorBuffer and map physical address |paddr| to
-    // address of the ColorBuffer's host memory.
-    auto result = control()->CreateColorBuffer2(child_vmo, buffer_key, create_params.take_value());
-    if (result.is_error()) {
-      zxlogf(ERROR, "[%s] CreateColorBuffer error: status %d", kTag, status);
-      completer.Close(result.error());
-      return;
-    }
-    if (result.value().res != ZX_OK) {
-      zxlogf(ERROR, "[%s] CreateColorBuffer2 failed: res = %d", kTag, result.value().res);
-      completer.ReplyError(result.value().res);
-      return;
-    }
-
-    // Host visible ColorBuffer should have page offset of zero, otherwise
-    // part of the page mapped from address space device not used for the
-    // ColorBuffer can be leaked.
-    ZX_DEBUG_ASSERT(result.value().hw_address_page_offset == 0u);
-  } else {
-    fidl::Arena allocator;
-    // Data buffer creation.
-    auto create_params = GetCreateBuffer2Params(allocator, request->settings, paddr);
-
-    // Create actual data buffer and map physical address |paddr| to
-    // address of the buffer's host memory.
-    auto result =
-        control()->CreateBuffer2(allocator, child_vmo, buffer_key, std::move(create_params));
-    if (result.is_error()) {
-      zxlogf(ERROR, "[%s] CreateBuffer2 error: status %d", kTag, status);
-      completer.Close(result.error());
-      return;
-    }
-    if (result.value().is_err()) {
-      zxlogf(ERROR, "[%s] CreateBuffer2 failed: res = %d", kTag, result.value().err());
-      completer.ReplyError(result.value().err());
-      return;
-    }
-
-    // Host visible Buffer should have page offset of zero, otherwise
-    // part of the page mapped from address space device not used for
-    // the buffer can be leaked.
-    ZX_DEBUG_ASSERT(result.value().response().hw_address_page_offset == 0u);
+  fidl::Arena allocator;
+  // ColorBuffer creation.
+  auto create_params = GetCreateColorBuffer2Params(allocator, request->settings, paddr);
+  if (create_params.is_error()) {
+    completer.ReplyError(create_params.error());
+    return;
   }
+
+  // Create actual ColorBuffer and map physical address |paddr| to
+  // address of the ColorBuffer's host memory.
+  auto color_buffer_result =
+      control()->CreateColorBuffer2(child_vmo, buffer_key, create_params.take_value());
+  if (color_buffer_result.is_error()) {
+    zxlogf(ERROR, "[%s] CreateColorBuffer error: status %d", kTag, status);
+    completer.Close(color_buffer_result.error());
+    return;
+  }
+  if (color_buffer_result.value().res != ZX_OK) {
+    zxlogf(ERROR, "[%s] CreateColorBuffer2 failed: res = %d", kTag,
+           color_buffer_result.value().res);
+    completer.ReplyError(color_buffer_result.value().res);
+    return;
+  }
+
+  // Host visible ColorBuffer should have page offset of zero, otherwise
+  // part of the page mapped from address space device not used for the
+  // ColorBuffer can be leaked.
+  ZX_DEBUG_ASSERT(color_buffer_result.value().hw_address_page_offset == 0u);
 
   // Heap should fill VMO with zeroes before returning it to clients.
   // Since VMOs allocated by address space device are physical VMOs not

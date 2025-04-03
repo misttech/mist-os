@@ -55,6 +55,7 @@ rustc_library("fuchsia-audio") {
     ]
 
     test_deps = [
+      "//src/lib/fidl/rust/fidl_test_util",
       "//src/lib/fuchsia",
       "//src/storage/lib/vfs/rust:vfs",
       "//third_party/rust_crates:assert_matches",

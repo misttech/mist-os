@@ -13,6 +13,7 @@ use futures::prelude::*;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid, NULL_ADDR};
 use itertools::Itertools;
 use std::fmt;
+use std::str::FromStr;
 use wlan_common::bss::{BssDescription, Protection};
 use wlan_common::scan::ScanResult;
 use wlan_common::security::wep::WepKey;
@@ -314,6 +315,7 @@ async fn do_client_connect(
     async fn try_get_bss_desc(
         scan_result: fidl_sme::ClientSmeScanResult,
         ssid: &Ssid,
+        bssid: Option<&Bssid>,
     ) -> Result<fidl_common::BssDescription, Error> {
         let mut bss_description = None;
         match scan_result {
@@ -328,7 +330,12 @@ async fn do_client_connect(
                         // which failed conversion, `scan_result` must be cloned for debug
                         // logging if conversion fails.
                         match ScanResult::try_from(scan_result.clone()) {
-                            Ok(scan_result) => scan_result.bss_description.ssid == *ssid,
+                            Ok(scan_result) => {
+                                // Find a matching SSID and (if provided) BSSID
+                                scan_result.bss_description.ssid == *ssid
+                                    && scan_result.bss_description.bssid
+                                        == *bssid.unwrap_or(&scan_result.bss_description.bssid)
+                            }
                             Err(e) => {
                                 println!("Failed to convert ScanResult: {:?}", e);
                                 println!("  {:?}", scan_result);
@@ -344,7 +351,7 @@ async fn do_client_connect(
                 return Err(format_err!("failed to fetch scan result: {:?}", scan_error_code));
             }
         }
-        bss_description.ok_or_else(|| format_err!("failed to find BSS information for SSID"))
+        bss_description.ok_or_else(|| format_err!("failed to find a matching BSS in scan results"))
     }
 
     println!(
@@ -352,8 +359,9 @@ async fn do_client_connect(
         future detailed BSS information will be required to connect! Use the `donut` tool to \
         connect to networks using an SSID."
     );
-    let opts::ClientConnectCmd { iface_id, ssid, password, psk, scan_type } = cmd;
+    let opts::ClientConnectCmd { iface_id, ssid, bssid, password, psk, scan_type } = cmd;
     let ssid = Ssid::try_from(ssid)?;
+    let bssid = bssid.as_deref().map(MacAddr::from_str).transpose().unwrap().map(Bssid::from);
     let sme = get_client_sme(monitor_proxy, iface_id).await?;
     let req = match scan_type {
         ScanTypeArg::Active => fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
@@ -363,7 +371,7 @@ async fn do_client_connect(
         ScanTypeArg::Passive => fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}),
     };
     let scan_result = sme.scan(&req).await.context("error sending scan request")?;
-    let bss_description = try_get_bss_desc(scan_result, &ssid).await?;
+    let bss_description = try_get_bss_desc(scan_result, &ssid, bssid.as_ref()).await?;
     let authentication = match fidl_security::Authentication::try_from(SecurityContext {
         unparsed_password_text: password,
         unparsed_psk_text: psk,
@@ -977,6 +985,7 @@ mod tests {
         let cmd = opts::ClientConnectCmd {
             iface_id: 0,
             ssid: String::from_utf8(vec![65; 33]).unwrap(),
+            bssid: None,
             password: None,
             psk: None,
             scan_type: opts::ScanTypeArg::Passive,

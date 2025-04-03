@@ -46,5 +46,10 @@
             to: [ "#system-activity-governor" ],
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "#role_manager",
+            to: "#system-activity-governor",
+        },
     ],
 }

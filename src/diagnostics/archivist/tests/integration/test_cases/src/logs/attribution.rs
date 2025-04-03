@@ -7,7 +7,7 @@ use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Severity};
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
 use futures::StreamExt;
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics_types as fdiagnostics};
 
 // This test verifies that Archivist knows about logging from this component.
 #[fuchsia::test]

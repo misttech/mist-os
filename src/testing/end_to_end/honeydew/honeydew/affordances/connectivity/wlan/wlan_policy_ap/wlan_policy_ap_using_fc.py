@@ -50,7 +50,7 @@ _ACCESS_POINT_LISTENER_PROXY = FidlEndpoint(
 
 @dataclass
 class _AccessPointControllerState:
-    proxy: f_wlan_policy.AccessPointController.Client
+    proxy: f_wlan_policy.AccessPointControllerClient
     updates: asyncio.Queue[list[AccessPointState]]
     # Keep the async task for fuchsia.wlan.policy/AccessPointStateUpdates so it
     # doesn't get garbage collected when cancelled.
@@ -146,7 +146,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         """
         controller_client, controller_server = Channel.create()
         access_point_controller_proxy = (
-            f_wlan_policy.AccessPointController.Client(controller_client.take())
+            f_wlan_policy.AccessPointControllerClient(controller_client.take())
         )
 
         updates: asyncio.Queue[list[AccessPointState]] = asyncio.Queue()
@@ -159,7 +159,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
             access_point_state_updates_server.serve()
         )
 
-        access_point_provider_proxy = f_wlan_policy.AccessPointProvider.Client(
+        access_point_provider_proxy = f_wlan_policy.AccessPointProviderClient(
             self._fc_transport.connect_device_proxy(
                 _ACCESS_POINT_PROVIDER_PROXY
             )
@@ -294,7 +294,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
             self._access_point_controller.access_point_state_updates_server_task
         )
 
-        access_point_listener_proxy = f_wlan_policy.AccessPointListener.Client(
+        access_point_listener_proxy = f_wlan_policy.AccessPointListenerClient(
             self._fc_transport.connect_device_proxy(
                 _ACCESS_POINT_LISTENER_PROXY
             )
@@ -354,7 +354,7 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         )
 
 
-class AccessPointStateUpdatesImpl(f_wlan_policy.AccessPointStateUpdates.Server):
+class AccessPointStateUpdatesImpl(f_wlan_policy.AccessPointStateUpdatesServer):
     """Server to receive WLAN access point state changes.
 
     Receive updates on the current summary of wlan access point operating

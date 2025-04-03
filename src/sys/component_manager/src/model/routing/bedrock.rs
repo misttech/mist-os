@@ -179,7 +179,7 @@ impl ExposeRouteRequest {
                         decl.target_name, target.moniker
                     );
                 };
-                let Capability::DictionaryRouter(_) = &capability else {
+                let Capability::DirEntryRouter(_) = &capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
                                  type: {:?}",

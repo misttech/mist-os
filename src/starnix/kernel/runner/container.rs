@@ -21,12 +21,14 @@ use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
+use fidl_fuchsia_time_external::AdjustMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
+use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
@@ -67,7 +69,7 @@ use zx::{
 #[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
@@ -154,9 +156,12 @@ fn attribution_info_for_kernel(
     ]
 }
 
-pub struct Config {
+#[derive(Debug)]
+pub struct ContainerStartInfo {
     /// Configuration specified by the component's `program` block.
     pub program: ContainerProgram,
+
+    pub config: ContainerStructuredConfig,
 
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
@@ -170,9 +175,51 @@ pub struct Config {
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
 
+    /// An eventpair that debuggers can use to defer the launch of the container.
+    break_on_start: Option<zx::EventPair>,
+
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
+}
+
+const MISSING_CONFIG_VMO_CONTEXT: &str = concat!(
+    "Retrieving container config VMO. ",
+    "If this fails, make sure your container CML includes ",
+    "//src/starnix/containers/container.shard.cml.",
+);
+
+impl ContainerStartInfo {
+    fn new(mut start_info: frunner::ComponentStartInfo) -> Result<Self, Error> {
+        let program = start_info.program.as_ref().context("retrieving program block")?;
+        let program: ContainerProgram =
+            runner::serde::deserialize_program(&program).context("parsing program block")?;
+
+        let encoded_config =
+            start_info.encoded_config.as_ref().context(MISSING_CONFIG_VMO_CONTEXT)?;
+        let config = match encoded_config {
+            fmem::Data::Bytes(b) => ContainerStructuredConfig::from_bytes(b),
+            fmem::Data::Buffer(b) => ContainerStructuredConfig::from_vmo(&b.vmo),
+            other => anyhow::bail!("unknown Data variant {other:?}"),
+        }
+        .context("parsing container structured config")?;
+
+        let ns = start_info.ns.take().context("retrieving container namespace")?;
+        let container_namespace = ContainerNamespace::from(ns);
+
+        let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
+        let component_instance = start_info.component_instance;
+
+        Ok(Self {
+            program,
+            config,
+            outgoing_dir,
+            container_namespace,
+            component_instance,
+            break_on_start: start_info.break_on_start,
+            runtime_dir: start_info.runtime_dir,
+        })
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -243,7 +290,7 @@ pub struct ContainerProgram {
 
 /// Specifies a role override for a class of tasks whose process and thread names match provided
 /// patterns.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Default, Deserialize)]
 struct RealtimeSchedulerMapping {
     /// The role name to use for tasks matching the provided patterns.
     role: String,
@@ -253,26 +300,14 @@ struct RealtimeSchedulerMapping {
     thread: String,
 }
 
-fn default_uid() -> runner::serde::StoreAsString<u32> {
-    runner::serde::StoreAsString(42)
+impl std::fmt::Debug for RealtimeSchedulerMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "process `{}` thread `{}` role `{}`", self.process, self.thread, self.role)
+    }
 }
 
-fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
-    let program = start_info.program.as_ref().expect("must specify a program block");
-    let program: ContainerProgram = runner::serde::deserialize_program(&program).unwrap();
-    let ns = start_info.ns.take().expect("Unable to access container namespace!");
-    let container_namespace = ContainerNamespace::from(ns);
-
-    let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
-    let component_instance = start_info.component_instance;
-
-    Config {
-        program,
-        outgoing_dir,
-        container_namespace,
-        component_instance,
-        runtime_dir: start_info.runtime_dir,
-    }
+fn default_uid() -> runner::serde::StoreAsString<u32> {
+    runner::serde::StoreAsString(42)
 }
 
 // Creates a CString from a String. Calling this with an invalid CString will panic.
@@ -282,7 +317,7 @@ fn to_cstr(str: &str) -> CString {
 
 #[must_use = "The container must run serve on this config"]
 pub struct ContainerServiceConfig {
-    config: Config,
+    start_info: ContainerStartInfo,
     request_stream: frunner::ComponentControllerRequestStream,
     receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
 }
@@ -362,7 +397,7 @@ impl Container {
 
     pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
-            self.serve_outgoing_directory(service_config.config.outgoing_dir),
+            self.serve_outgoing_directory(service_config.start_info.outgoing_dir),
             server_component_controller(
                 self.kernel.clone(),
                 service_config.request_stream,
@@ -443,20 +478,19 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
-    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 let request_stream = controller.into_stream();
-                let mut config = get_config_from_component_start_info(start_info);
+                let mut start_info = ContainerStartInfo::new(start_info)?;
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container = create_container(&mut config, sender, structured_config)
-                    .await
-                    .with_source_context(|| {
-                        format!("creating container \"{}\"", &config.program.name)
+                let container =
+                    create_container(&mut start_info, sender).await.with_source_context(|| {
+                        format!("creating container \"{}\"", start_info.program.name)
                     })?;
-                let service_config = ContainerServiceConfig { config, request_stream, receiver };
+                let service_config =
+                    ContainerServiceConfig { start_info, request_stream, receiver };
 
                 #[cfg(not(feature = "starnix_lite"))]
                 container.kernel.kthreads.spawn_future({
@@ -484,23 +518,23 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
-    config: &mut Config,
+    start_info: &mut ContainerStartInfo,
     task_complete: oneshot::Sender<TaskResult>,
-    structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    log_info!("Creating container {:#?}, {:#?}", config.program, structured_config);
-    let pkg_channel = config.container_namespace.get_namespace_channel("/pkg").unwrap();
+    log_debug!("Creating container {start_info:#?}");
+    let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
-    let features = parse_features(&config, structured_config)?;
+    let features = parse_features(&start_info)?;
 
     #[cfg(not(feature = "starnix_lite"))]
-    let mut kernel_cmdline = BString::from(config.program.kernel_cmdline.as_bytes());
+    log_debug!("Creating container with {:#?}", features);
+    let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     #[cfg(feature = "starnix_lite")]
-    let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
+    let kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
 
     #[cfg(not(feature = "starnix_lite"))]
     if features.android_serialno {
@@ -529,7 +563,7 @@ async fn create_container(
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
     let mut rt_mappings = RoleOverrides::new();
-    for m in &config.program.rt_role_overrides {
+    for m in &start_info.program.rt_role_overrides {
         rt_mappings.add(m.process.clone(), m.thread.clone(), m.role.clone());
     }
     let rt_mappings = rt_mappings.build().context("adding custom realtime task role")?;
@@ -566,24 +600,37 @@ async fn create_container(
     let security_state =
         security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
 
+    // XXX(fmil): Should there also be a condition to allow this *only* for specific containers?
+    //
+    // `config.enable_utc_time_adjustment` is set through config capability
+    // `fuchsia.time.config.WritableUTCTime`.
+    let time_adjustment_proxy = if features.enable_utc_time_adjustment {
+        connect_to_protocol_sync::<AdjustMarker>()
+            .map_err(|e| log_error!("could not connect to fuchsia.time.external/Adjust: {:?}", e))
+            .ok()
+    } else {
+        // See the comment above. UTC adjustment is a per-product setting.
+        log_info!("UTC adjustment is forbidden.");
+        None
+    };
+
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
-        config.container_namespace.try_clone()?,
+        start_info.container_namespace.try_clone()?,
         scheduler_manager,
         Some(crash_reporter),
         kernel_node,
-        #[cfg(not(feature = "starnix_lite"))]
-        features.aspect_ratio.as_ref(),
         security_state,
         procfs_device_tree_setup,
+        time_adjustment_proxy,
     )
-    .with_source_context(|| format!("creating Kernel: {}", &config.program.name))?;
+    .with_source_context(|| format!("creating Kernel: {}", &start_info.program.name))?;
     let fs_context = create_fs_context(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         &features,
-        config,
+        start_info,
         &pkg_dir_proxy,
     )
     .source_context("creating FsContext")?;
@@ -622,7 +669,7 @@ async fn create_container(
     mount_filesystems(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &system_task,
-        config,
+        start_info,
         &pkg_dir_proxy,
     )
     .source_context("mounting filesystems")?;
@@ -641,7 +688,7 @@ async fn create_container(
         init_remote_block_devices(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             &system_task,
-            config,
+            start_info,
         )
         .source_context("initalizing remote block devices")?;
     }
@@ -650,10 +697,10 @@ async fn create_container(
     // startup_file_path to be created. The task struct is still used
     // to initialize the system up until this point, regardless of whether
     // or not there is an actual init to be run.
-    let argv = if config.program.init.is_empty() {
+    let argv = if start_info.program.init.is_empty() {
         vec![DEFAULT_INIT.to_string()]
     } else {
-        config.program.init.clone()
+        start_info.program.init.clone()
     }
     .iter()
     .map(|s| to_cstr(s))
@@ -667,13 +714,31 @@ async fn create_container(
         )
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let initial_name = if config.program.init.is_empty() {
+    let initial_name = if start_info.program.init.is_empty() {
         CString::default()
     } else {
-        CString::new(config.program.init[0].clone())?
+        CString::new(start_info.program.init[0].clone())?
     };
 
-    let rlimits = parse_rlimits(&config.program.rlimits)?;
+    let rlimits = parse_rlimits(&start_info.program.rlimits)?;
+
+    // Serve the runtime directory.
+    if let Some(runtime_dir) = start_info.runtime_dir.take() {
+        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
+    }
+
+    // At this point the runtime environment has been prepared but nothing is actually running yet.
+    // Pause here if a debugger needs time to attach to the job.
+    if let Some(break_on_start) = start_info.break_on_start.take() {
+        log_debug!("Waiting for signal from debugger before spawning init process...");
+        if let Err(e) =
+            fuchsia_async::OnSignals::new(break_on_start, zx::Signals::EVENTPAIR_PEER_CLOSED).await
+        {
+            log_warn!(e:%; "Received break_on_start eventpair but couldn't wait for PEER_CLOSED.");
+        }
+    }
+
+    log_debug!("Creating init process.");
     let init_task = CurrentTask::create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
@@ -682,7 +747,7 @@ async fn create_container(
         Arc::clone(&fs_context),
         &rlimits,
     )
-    .with_source_context(|| format!("creating init task: {:?}", &config.program.init))?;
+    .with_source_context(|| format!("creating init task: {:?}", &start_info.program.init))?;
 
     execute_task_with_prerun_result(
         kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -698,19 +763,14 @@ async fn create_container(
         None,
     )?;
 
-    if !config.program.startup_file_path.is_empty() {
-        wait_for_init_file(&config.program.startup_file_path, &system_task, init_pid).await?;
+    if !start_info.program.startup_file_path.is_empty() {
+        wait_for_init_file(&start_info.program.startup_file_path, &system_task, init_pid).await?;
     };
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
         Arc::downgrade(&kernel),
-        config.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
+        start_info.component_instance.take().ok_or_else(|| Error::msg("No component instance"))?,
     );
-
-    // Serve the runtime directory.
-    if let Some(runtime_dir) = config.runtime_dir.take() {
-        kernel.kthreads.spawn_future(serve_runtime_dir(runtime_dir));
-    }
 
     Ok(Container {
         kernel,
@@ -724,13 +784,13 @@ fn create_fs_context(
     locked: &mut Locked<'_, Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
-    config: &Config,
+    start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
-    let mut mounts_iter = config.program.mounts.iter();
+    let mut mounts_iter = start_info.program.mounts.iter();
     let mut root = MountAction::new_for_root(
         locked,
         kernel,
@@ -817,10 +877,10 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 fn mount_filesystems(
     locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
-    config: &Config,
+    start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
-    let mut mounts_iter = config.program.mounts.iter();
+    let mut mounts_iter = start_info.program.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
@@ -838,9 +898,9 @@ fn mount_filesystems(
 fn init_remote_block_devices(
     locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
-    config: &Config,
+    start_info: &ContainerStartInfo,
 ) -> Result<(), Error> {
-    let devices_iter = config.program.remote_block_devices.iter();
+    let devices_iter = start_info.program.remote_block_devices.iter();
     for device_spec in devices_iter {
         create_remote_block_device_from_spec(locked, system_task, device_spec)
             .with_source_context(|| format!("creating remoteblk from spec: {}", &device_spec))?;
@@ -919,6 +979,12 @@ async fn wait_for_init_file(
 
 async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
     let mut fs = fuchsia_component::server::ServiceFs::new();
+    match create_job_id_vmo() {
+        Ok(vmo) => {
+            fs.dir("elf").add_vmo_file_at("job_id", vmo);
+        }
+        Err(e) => log_error!(e:%; "failed to create vmo with job id for debuggers"),
+    }
     match fs.serve_connection(runtime_dir) {
         Ok(_) => {
             fs.add_fidl_service(|job_requests: TaskProviderRequestStream| {
@@ -933,6 +999,14 @@ async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
         }
         Err(e) => log_error!("Couldn't serve runtime directory: {e:?}"),
     }
+}
+
+fn create_job_id_vmo() -> Result<zx::Vmo, Error> {
+    let job_id = fuchsia_runtime::job_default().get_koid().context("reading own job koid")?;
+    let job_id_str = job_id.raw_koid().to_string();
+    let job_id_vmo = zx::Vmo::create(job_id_str.len() as u64).context("creating job id vmo")?;
+    job_id_vmo.write(job_id_str.as_bytes(), 0).context("write job id to vmo")?;
+    Ok(job_id_vmo)
 }
 
 async fn serve_task_provider(mut job_requests: TaskProviderRequestStream) -> Result<(), Error> {

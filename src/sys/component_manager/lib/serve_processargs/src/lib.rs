@@ -215,14 +215,12 @@ mod test_util {
         impl RemoteLike for Sender {
             fn open(
                 self: Arc<Self>,
-                scope: ExecutionScope,
+                _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
-                relative_path: Path,
-                server_end: ServerEnd<fio::NodeMarker>,
+                _relative_path: Path,
+                _server_end: ServerEnd<fio::NodeMarker>,
             ) {
-                scope.spawn(async move {
-                    self.0.send((relative_path, server_end.into_channel())).await.unwrap();
-                });
+                panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
             }
 
             fn open3(
@@ -620,7 +618,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (dir, receiver) = mock_dir();
         let scope = ExecutionScope::new();
-        let dir_proxy = serve_directory(dir, &scope, fio::OpenFlags::DIRECTORY).unwrap();
+        let dir_proxy = serve_directory(dir, &scope, fio::PERM_READABLE).unwrap();
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();

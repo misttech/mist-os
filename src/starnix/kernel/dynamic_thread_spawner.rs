@@ -5,7 +5,7 @@
 use crate::task::{with_new_current_task, CurrentTask, Task};
 use futures::channel::oneshot;
 use futures::TryFutureExt;
-use starnix_logging::log_error;
+use starnix_logging::{log_debug, log_error};
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_types::ownership::{release_after, WeakRef};
 use starnix_uapi::errno;
@@ -17,6 +17,8 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 
 type BoxedClosure = Box<dyn FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static>;
+
+const DEFAULT_THREAD_ROLE: &str = "fuchsia.starnix.fair.16";
 
 /// A thread pool that immediately execute any new work sent to it and keep a maximum number of
 /// idle threads.
@@ -82,6 +84,26 @@ impl DynamicThreadSpawner {
             let _ = sender.send(f(locked, current_task));
         });
         receiver.recv().map_err(|_| errno!(EINTR))
+    }
+
+    /// Run the given closure on a thread with `role` applied if possible.
+    ///
+    /// This method will use an idle thread in the pool if one is available, otherwise it will
+    /// start a new thread. When this method returns, it is guaranteed that a thread is
+    /// responsible to start running the closure.
+    pub fn spawn_with_role<F>(&self, role: &'static str, f: F)
+    where
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+    {
+        self.spawn(move |locked, current_task| {
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(role) {
+                log_debug!(e:%; "failed to set kthread role");
+            }
+            f(locked, current_task);
+            if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(DEFAULT_THREAD_ROLE) {
+                log_debug!(e:%; "failed to reset kthread role to default priority");
+            }
+        });
     }
 
     /// Run the given closure on a thread.

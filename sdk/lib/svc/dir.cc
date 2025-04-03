@@ -205,6 +205,8 @@ zx_status_t svc_directory_remove_entry(svc_dir_t* dir, const char* path, size_t 
   return status;
 }
 
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
+
 // Deprecated function implementations
 zx_status_t svc_dir_create(async_dispatcher_t* dispatcher, zx_handle_t dir_request,
                            svc_dir_t** result) {
@@ -273,3 +275,5 @@ zx_status_t svc_dir_remove_entry_by_path(svc_dir_t* dir, const char* path, const
 }
 
 zx_status_t svc_dir_destroy(svc_dir_t* dir) { return svc_directory_destroy(dir); }
+
+#endif

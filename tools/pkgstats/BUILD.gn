@@ -16,11 +16,13 @@ if (is_host) {
     test_environments = [ host_env ]
     deps = [
       "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+      "//src/lib/assembly/assembly_manifest",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-pkg",
+      "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:camino",
@@ -39,7 +41,13 @@ if (is_host) {
       "templates/package.html.hbs",
     ]
     source_root = "src/main.rs"
-    sources = [ "src/main.rs" ]
+    sources = [
+      "src/html.rs",
+      "src/main.rs",
+      "src/print.rs",
+      "src/process.rs",
+      "src/types.rs",
+    ]
   }
   install_host_tools("install") {
     deps = [ ":bin" ]

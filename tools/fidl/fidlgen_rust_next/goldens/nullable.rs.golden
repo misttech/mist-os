@@ -18,7 +18,7 @@ impl ::fidl_next::Encodable for Int32Wrapper {
     type Encoded = WireInt32Wrapper;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Int32Wrapper
+unsafe impl<___E> ::fidl_next::Encode<___E> for Int32Wrapper
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -26,13 +26,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -45,7 +45,7 @@ impl ::fidl_next::EncodableOption for Box<Int32Wrapper> {
     type EncodedOption = ::fidl_next::WireBox<WireInt32Wrapper>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<Int32Wrapper>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Int32Wrapper>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Int32Wrapper: ::fidl_next::Encode<___E>,
@@ -54,13 +54,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -80,11 +80,16 @@ impl ::fidl_next::TakeFrom<WireInt32Wrapper> for Int32Wrapper {
     }
 }
 
-/// The wire type corersponding to [`Int32Wrapper`].
+/// The wire type corresponding to [`Int32Wrapper`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt32Wrapper {
     pub val: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireInt32Wrapper {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt32Wrapper
@@ -127,7 +132,7 @@ impl ::fidl_next::Encodable for SimpleProtocolAddRequest {
     type Encoded = WireSimpleProtocolAddRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -135,14 +140,14 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 a,
                 b,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
@@ -157,7 +162,7 @@ impl ::fidl_next::EncodableOption for Box<SimpleProtocolAddRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireSimpleProtocolAddRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleProtocolAddRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleProtocolAddRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SimpleProtocolAddRequest: ::fidl_next::Encode<___E>,
@@ -166,13 +171,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -197,13 +202,18 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddRequest> for SimpleProtocolAddRe
     }
 }
 
-/// The wire type corersponding to [`SimpleProtocolAddRequest`].
+/// The wire type corresponding to [`SimpleProtocolAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddRequest {
     pub a: ::fidl_next::WireI32,
 
     pub b: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddRequest
@@ -246,7 +256,7 @@ impl ::fidl_next::Encodable for SimpleProtocolAddResponse {
     type Encoded = WireSimpleProtocolAddResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for SimpleProtocolAddResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -254,13 +264,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 sum,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.sum, encoder, sum)?;
@@ -273,7 +283,7 @@ impl ::fidl_next::EncodableOption for Box<SimpleProtocolAddResponse> {
     type EncodedOption = ::fidl_next::WireBox<WireSimpleProtocolAddResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleProtocolAddResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleProtocolAddResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SimpleProtocolAddResponse: ::fidl_next::Encode<___E>,
@@ -282,13 +292,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -308,11 +318,16 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddR
     }
 }
 
-/// The wire type corersponding to [`SimpleProtocolAddResponse`].
+/// The wire type corresponding to [`SimpleProtocolAddResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddResponse {
     pub sum: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleProtocolAddResponse {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddResponse
@@ -341,6 +356,16 @@ where
 pub struct SimpleProtocol;
 
 pub mod simple_protocol {
+    pub mod prelude {
+        pub use crate::{
+            simple_protocol, SimpleProtocol, SimpleProtocolClientHandler,
+            SimpleProtocolClientSender, SimpleProtocolServerHandler, SimpleProtocolServerSender,
+        };
+
+        pub use crate::SimpleProtocolAddRequest;
+
+        pub use crate::SimpleProtocolAddResponse;
+    }
 
     pub struct Add;
 
@@ -408,7 +433,7 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SimpleProtocolClientHandler<___T>,
 
-    crate::WireSimpleProtocolAddResponse:
+    <simple_protocol::Add as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -505,7 +530,7 @@ impl ::fidl_next::Encodable for SimpleUnion {
     type Encoded = WireSimpleUnion;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SimpleUnion
+unsafe impl<___E> ::fidl_next::Encode<___E> for SimpleUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -513,9 +538,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireSimpleUnion { raw } = slot);
+        ::fidl_next::munge!(let WireSimpleUnion { raw } = out);
 
         match self {
             Self::A(value) => {
@@ -535,7 +560,7 @@ impl ::fidl_next::EncodableOption for Box<SimpleUnion> {
     type EncodedOption = WireOptionalSimpleUnion;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleUnion>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SimpleUnion>
 where
     ___E: ?Sized,
     SimpleUnion: ::fidl_next::Encode<___E>,
@@ -544,13 +569,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalSimpleUnion { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalSimpleUnion { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
-            ::fidl_next::Encode::encode(&mut **inner, encoder, slot)?;
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
+            ::fidl_next::Encode::encode(&mut **inner, encoder, value_out)?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
         }
@@ -564,11 +589,11 @@ impl ::fidl_next::TakeFrom<WireSimpleUnion> for SimpleUnion {
     fn take_from(from: &WireSimpleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireI32>()
             })),
 
             2 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get().deref_unchecked()
+                from.raw.get().deref_unchecked::<::fidl_next::WireF32>()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -593,6 +618,14 @@ pub struct WireSimpleUnion {
     raw: ::fidl_next::RawWireUnion,
 }
 
+unsafe impl ::fidl_next::ZeroPadding for WireSimpleUnion {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
+    }
+}
+
 pub mod simple_union {
     pub enum Ref<'union> {
         A(&'union ::fidl_next::WireI32),
@@ -604,9 +637,13 @@ pub mod simple_union {
 impl WireSimpleUnion {
     pub fn as_ref(&self) -> crate::simple_union::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::simple_union::Ref::A(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::simple_union::Ref::A(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireI32>()
+            }),
 
-            2 => crate::simple_union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            2 => crate::simple_union::Ref::B(unsafe {
+                self.raw.get().deref_unchecked::<::fidl_next::WireF32>()
+            }),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -663,6 +700,14 @@ impl ::core::fmt::Debug for WireSimpleUnion {
 #[repr(transparent)]
 pub struct WireOptionalSimpleUnion {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptionalSimpleUnion {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
+    }
 }
 
 impl WireOptionalSimpleUnion {
@@ -752,7 +797,7 @@ impl ::fidl_next::Encodable for StructWithNullableHandle {
     type Encoded = WireStructWithNullableHandle;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableHandle
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableHandle
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -762,13 +807,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -781,7 +826,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableHandle> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableHandle>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableHandle>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableHandle>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableHandle: ::fidl_next::Encode<___E>,
@@ -790,13 +835,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -821,11 +866,16 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableHandle> for StructWithNullableH
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableHandle`].
+/// The wire type corresponding to [`StructWithNullableHandle`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableHandle {
     pub val: ::fidl_next::fuchsia::WireOptionalHandle,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableHandle {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableHandle
@@ -855,14 +905,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableProtocol {
     pub val:
-        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
+        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -872,7 +922,7 @@ impl ::fidl_next::Encodable for StructWithNullableProtocol {
     type Encoded = WireStructWithNullableProtocol;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableProtocol
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableProtocol
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -882,13 +932,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -901,7 +951,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableProtocol> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableProtocol>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableProtocol>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableProtocol>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableProtocol: ::fidl_next::Encode<___E>,
@@ -910,13 +960,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -927,7 +977,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -940,12 +990,17 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableProtocol`].
+/// The wire type corresponding to [`StructWithNullableProtocol`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableProtocol {
     pub val:
-        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::SimpleProtocol>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableProtocol {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableProtocol
@@ -975,14 +1030,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableRequest {
     pub val:
-        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
+        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -992,7 +1047,7 @@ impl ::fidl_next::Encodable for StructWithNullableRequest {
     type Encoded = WireStructWithNullableRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -1002,13 +1057,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -1021,7 +1076,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableRequest: ::fidl_next::Encode<___E>,
@@ -1030,13 +1085,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -1047,7 +1102,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                Option<::fidl_next::fuchsia::zx::Handle>,
+                Option<::fidl_next::fuchsia::zx::Channel>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -1060,12 +1115,17 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableRequest`].
+/// The wire type corresponding to [`StructWithNullableRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableRequest {
     pub val:
-        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::SimpleProtocol>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableRequest
@@ -1100,7 +1160,7 @@ impl ::fidl_next::Encodable for StructWithNullableString {
     type Encoded = WireStructWithNullableString;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableString
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableString
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -1110,13 +1170,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -1129,7 +1189,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableString> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableString>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableString>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableString>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableString: ::fidl_next::Encode<___E>,
@@ -1138,13 +1198,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -1158,11 +1218,16 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableString> for StructWithNullableS
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableString`].
+/// The wire type corresponding to [`StructWithNullableString`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableString {
     pub val: ::fidl_next::WireOptionalString,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableString {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableString
@@ -1197,7 +1262,7 @@ impl ::fidl_next::Encodable for StructWithNullableStruct {
     type Encoded = WireStructWithNullableStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableStruct
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableStruct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -1207,13 +1272,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -1226,7 +1291,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableStruct> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableStruct>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableStruct>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableStruct>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableStruct: ::fidl_next::Encode<___E>,
@@ -1235,13 +1300,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -1255,11 +1320,16 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableStruct> for StructWithNullableS
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableStruct`].
+/// The wire type corresponding to [`StructWithNullableStruct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableStruct {
     pub val: ::fidl_next::WireBox<crate::WireInt32Wrapper>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableStruct {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct
@@ -1302,7 +1372,7 @@ impl ::fidl_next::Encodable for StructWithNullableUnion {
     type Encoded = WireStructWithNullableUnion;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableUnion
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -1310,13 +1380,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -1329,7 +1399,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableUnion> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableUnion>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableUnion>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableUnion>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableUnion: ::fidl_next::Encode<___E>,
@@ -1338,13 +1408,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -1365,11 +1435,16 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUn
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableUnion`].
+/// The wire type corresponding to [`StructWithNullableUnion`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableUnion {
     pub val: crate::WireOptionalSimpleUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableUnion {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
@@ -1402,7 +1477,7 @@ impl ::fidl_next::Encodable for StructWithNullableVector {
     type Encoded = WireStructWithNullableVector;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StructWithNullableVector
+unsafe impl<___E> ::fidl_next::Encode<___E> for StructWithNullableVector
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -1412,13 +1487,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 val,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.val, encoder, val)?;
@@ -1431,7 +1506,7 @@ impl ::fidl_next::EncodableOption for Box<StructWithNullableVector> {
     type EncodedOption = ::fidl_next::WireBox<WireStructWithNullableVector>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableVector>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructWithNullableVector>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableVector: ::fidl_next::Encode<___E>,
@@ -1440,13 +1515,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -1460,11 +1535,16 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableVector> for StructWithNullableV
     }
 }
 
-/// The wire type corersponding to [`StructWithNullableVector`].
+/// The wire type corresponding to [`StructWithNullableVector`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableVector {
     pub val: ::fidl_next::WireOptionalVector<::fidl_next::WireI32>,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStructWithNullableVector {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector
@@ -1490,17 +1570,139 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{SimpleProtocolClientSender, SimpleProtocolServerSender};
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireInt32Wrapper> for ::fidl_test_nullable::Int32Wrapper {
+        #[inline]
+        fn take_from(from: &crate::WireInt32Wrapper) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleProtocolAddRequest>
+        for ::fidl_test_nullable::SimpleProtocolAddRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleProtocolAddRequest) -> Self {
+            Self {
+                a: ::fidl_next::TakeFrom::take_from(&from.a),
+
+                b: ::fidl_next::TakeFrom::take_from(&from.b),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleProtocolAddResponse>
+        for ::fidl_test_nullable::SimpleProtocolAddResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleProtocolAddResponse) -> Self {
+            Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `SimpleProtocol`
     /// protocol.
     pub type SimpleProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SimpleProtocol>;
+
+    impl ::fidl_next::TakeFrom<crate::SimpleProtocol> for ::fidl_test_nullable::SimpleProtocolMarker {
+        #[inline]
+        fn take_from(from: &crate::SimpleProtocol) -> Self {
+            Self
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSimpleUnion> for ::fidl_test_nullable::SimpleUnion {
+        #[inline]
+        fn take_from(from: &crate::WireSimpleUnion) -> Self {
+            match from.as_ref() {
+                crate::simple_union::Ref::A(value) => {
+                    Self::A(::fidl_next::TakeFrom::take_from(value))
+                }
+
+                crate::simple_union::Ref::B(value) => {
+                    Self::B(::fidl_next::TakeFrom::take_from(value))
+                }
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireOptionalSimpleUnion>
+        for Option<Box<::fidl_test_nullable::SimpleUnion>>
+    {
+        #[inline]
+        fn take_from(from: &crate::WireOptionalSimpleUnion) -> Self {
+            if let Some(inner) = from.as_ref() {
+                Some(::fidl_next::TakeFrom::take_from(inner))
+            } else {
+                None
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableHandle>
+        for ::fidl_test_nullable::StructWithNullableHandle
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableHandle) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableProtocol>
+        for ::fidl_test_nullable::StructWithNullableProtocol
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableProtocol) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableRequest>
+        for ::fidl_test_nullable::StructWithNullableRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableRequest) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableString>
+        for ::fidl_test_nullable::StructWithNullableString
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableString) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableStruct>
+        for ::fidl_test_nullable::StructWithNullableStruct
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableStruct) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableUnion>
+        for ::fidl_test_nullable::StructWithNullableUnion
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableUnion) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStructWithNullableVector>
+        for ::fidl_test_nullable::StructWithNullableVector
+    {
+        #[inline]
+        fn take_from(from: &crate::WireStructWithNullableVector) -> Self {
+            Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
+        }
+    }
 }

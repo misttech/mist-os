@@ -23,17 +23,27 @@ use std::fs::File;
 pub struct FxfsBuilder {
     manifest: BlobManifest,
     size_bytes: Option<u64>,
+    compression_enabled: bool,
 }
 
 impl FxfsBuilder {
     /// Construct a new FxfsBuilder.
     pub fn new() -> Self {
-        FxfsBuilder { manifest: BlobManifest::default(), size_bytes: None }
+        FxfsBuilder {
+            manifest: BlobManifest::default(),
+            size_bytes: None,
+            compression_enabled: true,
+        }
     }
 
     /// Sets the target image size.
     pub fn set_size(&mut self, size_bytes: u64) {
         self.size_bytes = Some(size_bytes)
+    }
+
+    /// Disables the compression of blobs in the image.
+    pub fn disable_compression(&mut self) {
+        self.compression_enabled = false;
     }
 
     /// Add a package to fxfs by inserting every blob mentioned in the `package_manifest` on the
@@ -91,6 +101,7 @@ impl FxfsBuilder {
             self.manifest.to_vec(),
             blobs_json_path.as_str(),
             self.size_bytes,
+            self.compression_enabled,
         )
         .await?;
         cleanup.0 = None;

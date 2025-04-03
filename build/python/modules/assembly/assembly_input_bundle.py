@@ -14,7 +14,7 @@ import pathlib
 import shutil
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, TextIO, Tuple, Union
+from typing import Any, Optional, TextIO, Union
 
 import serialization
 from assembly import package_copier
@@ -34,17 +34,17 @@ __all__ = [
     "PackageDetails",
 ]
 
-PackageManifestList = List[FilePath]
+PackageManifestList = list[FilePath]
 PackageName = str
 ComponentName = str
-DepSet = Set[FilePath]
-FileEntryList = List[FileEntry]
-FileEntrySet = Set[FileEntry]
-ComponentShards = Set[FilePath]
+DepSet = set[FilePath]
+FileEntryList = list[FileEntry]
+FileEntrySet = set[FileEntry]
+ComponentShards = set[FilePath]
 Merkle = str
-BlobList = List[Tuple[Merkle, FilePath]]
-SubpackageManifests = Dict[Merkle, FilePath]
-ConfigDataEntries = Dict[PackageName, Set[FileEntry]]
+BlobList = list[tuple[Merkle, FilePath]]
+SubpackageManifests = dict[Merkle, FilePath]
+ConfigDataEntries = dict[PackageName, set[FileEntry]]
 
 
 class AssemblyInputBundleCreationException(Exception):
@@ -72,7 +72,7 @@ class DriverDetails:
     """Details for constructing a driver manifest fragment from a driver package"""
 
     package: FilePath = field()  # Path to the package manifest
-    components: Set[FilePath] = field(default_factory=set)
+    components: set[FilePath] = field(default_factory=set)
 
 
 @dataclass
@@ -94,7 +94,7 @@ class PackageDetails:
         return self.package < other.package
 
 
-PackageDetailsList = List[PackageDetails]
+PackageDetailsList = list[PackageDetails]
 
 
 @dataclass
@@ -107,7 +107,7 @@ class CompiledComponentDefinition:
     # Name of the component
     component_name: str = field()
     # Component shards to compile together
-    shards: Set[FilePath] = field(default_factory=set)
+    shards: set[FilePath] = field(default_factory=set)
 
 
 @dataclass
@@ -118,11 +118,11 @@ class CompiledPackageDefinition:
     # Name of the package
     name: str = field()
     # Dictionary mapping components to cml files by name
-    components: List[CompiledComponentDefinition] = field(default_factory=list)
+    components: list[CompiledComponentDefinition] = field(default_factory=list)
     # Other files to include in the compiled package
-    contents: Set[FileEntry] = field(default_factory=set)
+    contents: set[FileEntry] = field(default_factory=set)
     # CML files included by the component cml
-    includes: Set[FilePath] = field(default_factory=set)
+    includes: set[FilePath] = field(default_factory=set)
     # Whether to extract the contents of this package into bootfs
     bootfs_package: bool = field(default=False)
 
@@ -140,13 +140,13 @@ class CompiledPackageDefinitionFromGN:
     # Name of the package
     name: str = field()
     # Package manifests that include files to add to `contents`
-    packages: List[FilePath] = field(default_factory=list)
+    packages: list[FilePath] = field(default_factory=list)
     # Dictionary mapping components to cml files by name
-    components: List[CompiledComponentDefinition] = field(default_factory=list)
+    components: list[CompiledComponentDefinition] = field(default_factory=list)
     # Other files to include in the compiled package
-    contents: Set[FileEntry] = field(default_factory=set)
+    contents: set[FileEntry] = field(default_factory=set)
     # CML files included by the component cml
-    component_includes: Set[FileEntry] = field(default_factory=set)
+    component_includes: set[FileEntry] = field(default_factory=set)
     # Whether to extract the contents of this package into bootfs
     bootfs_package: bool = field(default=False)
 
@@ -295,32 +295,32 @@ class AssemblyInputBundle:
     # Fields shared with ImageAssemblyConfig.
     kernel: KernelInfo = field(default_factory=KernelInfo)
     qemu_kernel: Optional[FilePath] = None
-    boot_args: Set[str] = field(default_factory=set)
-    bootfs_files: Set[FileEntry] = field(default_factory=set)
-    bootfs_packages: Set[FilePath] = field(default_factory=set)
+    boot_args: set[str] = field(default_factory=set)
+    bootfs_files: set[FileEntry] = field(default_factory=set)
+    bootfs_packages: set[FilePath] = field(default_factory=set)
 
-    packages: Set[PackageDetails] = field(default_factory=set)
+    packages: set[PackageDetails] = field(default_factory=set)
     config_data: ConfigDataEntries = field(default_factory=dict)
-    blobs: Set[FilePath] = field(default_factory=set)
-    base_drivers: List[DriverDetails] = field(default_factory=list)
-    boot_drivers: List[DriverDetails] = field(default_factory=list)
-    bootfs_shell_commands: Dict[str, List[str]] = field(
+    blobs: set[FilePath] = field(default_factory=set)
+    base_drivers: list[DriverDetails] = field(default_factory=list)
+    boot_drivers: list[DriverDetails] = field(default_factory=list)
+    bootfs_shell_commands: dict[str, list[str]] = field(
         default_factory=functools.partial(defaultdict, list)
     )
-    shell_commands: Dict[str, List[str]] = field(
+    shell_commands: dict[str, list[str]] = field(
         default_factory=functools.partial(defaultdict, list)
     )
-    packages_to_compile: List[CompiledPackageDefinition] = field(
+    packages_to_compile: list[CompiledPackageDefinition] = field(
         default_factory=list
     )
     bootfs_files_package: Optional[FilePath] = None
-    memory_buckets: Set[FilePath] = field(default_factory=set)
+    memory_buckets: set[FilePath] = field(default_factory=set)
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""
         return serialization.json_dumps(self, indent=2)
 
-    def add_packages(self, packages: List[PackageDetails]):
+    def add_packages(self, packages: list[PackageDetails]):
         for details in sorted(packages):
             # This 'in' check only looks at the package manifest file path and
             # ignores the package set. This is intentional in order to
@@ -329,7 +329,7 @@ class AssemblyInputBundle:
                 raise ValueError(f"Duplicate package {details.package}")
             self.packages.add(details)
 
-    def all_file_paths(self) -> List[FilePath]:
+    def all_file_paths(self) -> list[FilePath]:
         """Return a list of all files that are referenced by this AssemblyInputBundle."""
         file_paths = []
         file_paths.extend([p.package for p in self.packages])
@@ -418,49 +418,49 @@ class AIBCreator:
         self.outdir = outdir
 
         # The packages (paths to package manifests)
-        self.packages: Set[PackageDetails] = set()
+        self.packages: set[PackageDetails] = set()
 
         # The shell command configurations
-        self.shell_commands: Dict[str, List[str]] = defaultdict(list)
-        self.bootfs_shell_commands: Dict[str, List[str]] = defaultdict(list)
+        self.shell_commands: dict[str, list[str]] = defaultdict(list)
+        self.bootfs_shell_commands: dict[str, list[str]] = defaultdict(list)
 
         # The kernel info
         self.kernel = KernelInfo()
-        self.boot_args: Set[str] = set()
+        self.boot_args: set[str] = set()
 
         # The emulator kernel.
         self.qemu_kernel: Optional[FilePath] = None
 
         # Bootfs info
-        self.bootfs_files: Set[FileEntry] = set()
+        self.bootfs_files: set[FileEntry] = set()
         self.bootfs_files_package: Optional[FilePath] = None
-        self.bootfs_packages: Set[FilePath] = set()
+        self.bootfs_packages: set[FilePath] = set()
 
         # The config_data entries
         self.config_data: FileEntryList = []
 
         # Additional base drivers directly specified without requiring
         # us to parse GN generated files
-        self.provided_base_driver_details: List[DriverDetails] = list()
+        self.provided_base_driver_details: list[DriverDetails] = list()
 
         # Additional boot drivers directly specified without requiring
         # us to parse GN generated files
-        self.provided_boot_driver_details: List[DriverDetails] = list()
+        self.provided_boot_driver_details: list[DriverDetails] = list()
 
         # A set containing all the unique packageUrls seen by the AIBCreator instance
-        self.package_urls: Set[str] = set()
+        self.package_urls: set[str] = set()
 
         # A list of CompiledPackageDefinitions from either a parsed json GN
         # scope, or directly set by the legacy AIB creator.
-        self.compiled_packages: List[CompiledPackageDefinitionFromGN] = list()
+        self.compiled_packages: list[CompiledPackageDefinitionFromGN] = list()
 
         # Memory buckets to add to memory monitor.
-        self.memory_buckets: Set[FilePath] = set()
+        self.memory_buckets: set[FilePath] = set()
 
         # The package copying mechanism.
         self.package_copier: PackageCopier = PackageCopier(outdir)
 
-    def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
+    def build(self) -> tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
         Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
         outdir, tracking all copy operations in a DepFile that is returned with the resultant bundle.
@@ -583,9 +583,9 @@ class AIBCreator:
 
         # Track all the FileEntries for includes, to make sure that we don't get
         # any duplicate destination paths with different source paths.
-        all_copied_include_entries: Set[FileEntry] = set()
+        all_copied_include_entries: set[FileEntry] = set()
         for package in self.compiled_packages:
-            components: List[CompiledComponentDefinition] = []
+            components: list[CompiledComponentDefinition] = []
             for component_def in package.components:
                 copied_shards, component_deps = self._copy_component_shards(
                     component_def.shards,
@@ -601,7 +601,7 @@ class AIBCreator:
                 deps.update(component_deps)
 
             # This assumes that package.includes has actually been passed to the
-            # AIB creator as Set[FileEntry] instead of a Set[FilePath].  This is
+            # AIB creator as set[FileEntry] instead of a set[FilePath].  This is
             # not ideal, but it allows the reuse of the CompiledPackageDefinition
             # type without any other changes.
             #
@@ -692,13 +692,13 @@ class AIBCreator:
 
     def _prepare_packages_for_copying(
         self,
-        package_details_list: List[PackageDetails],
+        package_details_list: list[PackageDetails],
     ) -> PackageDetailsList:
         """Queue up the packages for copying, and return the list of package details, using the destination path"""
 
         # Resultant paths to package manifests
         package_details: PackageDetailsList = []
-        manifest_path_mapping: Dict[FilePath, FilePath] = {}
+        manifest_path_mapping: dict[FilePath, FilePath] = {}
 
         # Bail early if empty
         if not package_details_list:
@@ -728,11 +728,11 @@ class AIBCreator:
         return package_details
 
     def _prepare_drivers_for_copying(
-        self, driver_details_list: List[DriverDetails], pkg_set: str
-    ) -> List[DriverDetails]:
+        self, driver_details_list: list[DriverDetails], pkg_set: str
+    ) -> list[DriverDetails]:
         """Queue up the package copying for each driver, returning a DriverDetails with the new destination path"""
 
-        driver_details: List[DriverDetails] = []
+        driver_details: list[DriverDetails] = []
 
         for driver_detail in driver_details_list:
             try:
@@ -774,7 +774,7 @@ class AIBCreator:
         self,
         component_includes: FileEntrySet,
         existing_shard_includes: FileEntrySet,
-    ) -> Tuple[FileEntrySet, DepSet]:
+    ) -> tuple[FileEntrySet, DepSet]:
         deps: DepSet = set()
         shard_includes: FileEntrySet = set()
         for entry in component_includes:
@@ -805,7 +805,7 @@ class AIBCreator:
 
     def _copy_component_shard(
         self, component_shard: FilePath, package_name: str, component_name: str
-    ) -> Tuple[FilePath, DepSet]:
+    ) -> tuple[FilePath, DepSet]:
         deps: DepSet = set()
         # The shard is copied to a path based on the name of the package, the
         # name of the component, and the filename of the shard:
@@ -827,11 +827,11 @@ class AIBCreator:
 
     def _copy_component_shards(
         self,
-        component_shards: Union[ComponentShards, List[FilePath]],
+        component_shards: Union[ComponentShards, list[FilePath]],
         package_name: str,
         component_name: str,
-    ) -> Tuple[List[FilePath], DepSet]:
-        shard_file_paths: List[FilePath] = list()
+    ) -> tuple[list[FilePath], DepSet]:
+        shard_file_paths: list[FilePath] = list()
         deps: DepSet = set()
         for shard in component_shards:
             destination, copy_deps = self._copy_component_shard(
@@ -843,7 +843,7 @@ class AIBCreator:
 
     def _copy_file_entries(
         self, entries: Union[FileEntrySet, FileEntryList], subdirectory: str
-    ) -> Tuple[FileEntryList, DepSet]:
+    ) -> tuple[FileEntryList, DepSet]:
         results: FileEntryList = []
         deps: DepSet = set()
 
@@ -869,7 +869,7 @@ class AIBCreator:
 
         return (results, deps)
 
-    def _copy_config_data_entries(self) -> Tuple[ConfigDataEntries, DepSet]:
+    def _copy_config_data_entries(self) -> tuple[ConfigDataEntries, DepSet]:
         """
         Take a list of entries for the config_data package, copy them into the
         appropriate layout for the assembly input bundle, and then return the

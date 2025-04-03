@@ -96,9 +96,9 @@ import("plugins.gni")
 #     See //build/sdk/sdk_atom.gni.
 template("ffx_plugin") {
   if (defined(invoker.name)) {
-    crate_name = invoker.name
+    _crate_name = invoker.name
   } else {
-    crate_name = target_name
+    _crate_name = target_name
   }
 
   tests_deps = []
@@ -140,13 +140,13 @@ template("ffx_plugin") {
         sdk_category = "partner"
       }
 
+      assert(sdk_category == "partner",
+             "Unexpected SDK category '${sdk_category}'.")
       category_marker = "//sdk/categories:marker-${sdk_category}"
-      if (sdk_category == "partner") {
-        disallowed_category_markers =
-            markers_partner_idk_prebuilts_must_not_depend_on
-      } else {
-        assert(false, "Unexpected SDK category '${sdk_category}'.")
-      }
+
+      # Host tools in the IDK can depend on up to "host_tool" regardless of category.
+      disallowed_category_markers =
+          markers_partner_idk_host_tools_must_not_depend_on
     } else {
       # The plugin is not in an IDK, so there are no restrictions.
       disallowed_category_markers = []
@@ -169,13 +169,13 @@ template("ffx_plugin") {
         json_merge_deps += [ get_label_info(d, "dir") + ":config.json" ]
       }
 
-      sub_cmd_gen = crate_name + "_sub_command_gen"
+      sub_cmd_gen = _crate_name + "_sub_command_gen"
       command(sub_cmd_gen) {
         output_name = "cmd_args.rs"
         plugin_deps = invoker.plugin_deps
       }
 
-      sub_cmd = crate_name + "_sub_command"
+      sub_cmd = _crate_name + "_sub_command"
       rustc_library(sub_cmd) {
         edition = "2018"
         source_root = "$target_gen_dir/cmd_args.rs"
@@ -217,7 +217,7 @@ template("ffx_plugin") {
       suite_target_additional_deps += [ "//src/developer/ffx/lib/writer:lib" ]
     }
 
-    args_target_name = crate_name + "_args"
+    args_target_name = _crate_name + "_args"
 
     if (defined(invoker.config_data)) {
       json_merge_sources += invoker.config_data
@@ -322,7 +322,7 @@ template("ffx_plugin") {
     ]
     suite_target_additional_deps += _plugins_rs_deps
 
-    plugins_name = crate_name + "_plugins"
+    plugins_name = _crate_name + "_plugins"
     plugins(plugins_name) {
       visibility = [ ":*" ]
       output_name = "plugins.rs"
@@ -332,7 +332,7 @@ template("ffx_plugin") {
         sub_command = sub_cmd
       }
       includes_execution = includes_execution
-      execution_lib = crate_name
+      execution_lib = _crate_name
 
       # The `plugins()` template does not use `assert_no_deps` or `deps`, so
       # we cannot apply markers to these variables. The `visibility` above
@@ -342,7 +342,7 @@ template("ffx_plugin") {
     }
 
     if (includes_execution) {
-      rustc_library(crate_name) {
+      rustc_library(_crate_name) {
         # This template is used to generate plugins.rs via the
         # plugins GN template. If the template changes, then
         # all plugin dependencies need to be regenerated, so
@@ -370,17 +370,17 @@ template("ffx_plugin") {
         assert_no_deps = disallowed_category_markers
       }
 
-      suite_target_additional_deps += [ ":" + crate_name ]
+      suite_target_additional_deps += [ ":${_crate_name}" ]
 
       if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
-        tests_deps += [ ":" + crate_name + "_test" ]
+        tests_deps += [ ":${_crate_name}_test" ]
       }
     } else {
       # TODO(https://fxbug.dev/378585405): Address presenence of unused `deps`
       # parameter when not building the execution library.
     }
 
-    rustc_library(crate_name + "_suite") {
+    rustc_library("${_crate_name}_suite") {
       source_root = "$target_gen_dir/plugins.rs"
       edition = "2018"
       with_unit_tests = false
@@ -430,7 +430,7 @@ template("ffx_plugin") {
     }
   }
 
-  group(crate_name + "_tests") {
+  group("${_crate_name}_tests") {
     testonly = true
     deps = tests_deps
   }

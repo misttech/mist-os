@@ -15,8 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, List
 
-import fidl.fuchsia_wlan_ieee80211 as fidl_ieee80211
-import fidl.fuchsia_wlan_wlanix as fidl_wlanix
+import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from antlion import utils
 from antlion.controllers.access_point import setup_ap
 from antlion.controllers.ap_lib.hostapd_constants import (
@@ -28,7 +27,7 @@ from antlion.controllers.ap_lib.hostapd_utils import generate_random_password
 from fuchsia_controller_py import Channel
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, signals, test_runner
-from mobly.asserts import assert_equal, assert_is_not, assert_true, fail
+from mobly.asserts import assert_equal, assert_true, fail
 from wlanix_testing import base_test
 
 
@@ -133,11 +132,12 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
             proxy, server = Channel.create()
             self.supplicant_sta_iface_proxy.add_network(network=server.take())
             supplicant_sta_network_proxy = (
-                fidl_wlanix.SupplicantStaNetwork.Client(proxy)
+                fidl_wlanix.SupplicantStaNetworkClient(proxy)
             )
 
-            fidl_ssid = fidl_ieee80211.Ssid(list(ssid.encode("ascii")))
-            supplicant_sta_network_proxy.set_ssid(ssid=fidl_ssid)
+            supplicant_sta_network_proxy.set_ssid(
+                ssid=list(ssid.encode("ascii"))
+            )
             if password:
                 supplicant_sta_network_proxy.set_psk_passphrase(
                     passphrase=list(password.encode("ascii"))
@@ -152,6 +152,10 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
             logger.info(f'Successfully connected to "{ssid}"!')
 
             state_change = await state_change_queue.get()
+            assert isinstance(
+                state_change,
+                fidl_wlanix.SupplicantStaIfaceCallbackOnStateChangedRequest,
+            ), f"Expected OnStateChanged. Got {state_change!r}"
             assert_equal(
                 state_change.new_state,
                 fidl_wlanix.StaIfaceCallbackState.COMPLETED,
@@ -169,11 +173,11 @@ class SupplicantStaIfaceCallbackContext:
         | fidl_wlanix.SupplicantStaIfaceCallbackOnDisconnectedRequest
         | fidl_wlanix.SupplicantStaIfaceCallbackOnAssociationRejectedRequest
     ]
-    callback_proxy: fidl_wlanix.SupplicantStaIfaceCallback.Client
+    callback_proxy: fidl_wlanix.SupplicantStaIfaceCallbackClient
 
 
 class SupplicantStaIfaceCallbackServer(
-    fidl_wlanix.SupplicantStaIfaceCallback.Server
+    fidl_wlanix.SupplicantStaIfaceCallbackServer
 ):
     def __init__(
         self,
@@ -216,7 +220,7 @@ class SupplicantStaIfaceCallbackServer(
         self.server_task = asyncio.get_running_loop().create_task(self.serve())
         return SupplicantStaIfaceCallbackContext(
             state_change_queue=self.state_change_queue,
-            callback_proxy=fidl_wlanix.SupplicantStaIfaceCallback.Client(proxy),
+            callback_proxy=fidl_wlanix.SupplicantStaIfaceCallbackClient(proxy),
         )
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
@@ -260,7 +264,7 @@ async def read_iface_index_or_fail(
             fidl_wlanix.Nl80211MessageType.MESSAGE,
             "After filtering all other message types, a type other than MESSAGE was received.",
         )
-        assert_is_not(response.payload, None, "MESSAGE must contain a payload")
+        assert response.payload is not None, "MESSAGE must contain a payload"
 
         formatted_response_payload = [
             format(b, "#04x") for b in response.payload

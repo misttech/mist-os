@@ -18,6 +18,11 @@
             type: "int64",
             value: 5000,
         },
+        {
+            config: "fuchsia.system-update-committer.CommitTimeoutSeconds",
+            type: "int64",
+            value: 300,
+        },
     ],
     offer: [
         {
@@ -26,12 +31,15 @@
             to: "#system-update-committer",
         },
         {
+            config: "fuchsia.system-update-committer.CommitTimeoutSeconds",
+            from: "self",
+            to: "#system-update-committer",
+        },
+        {
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.paver.Paver",
-                "fuchsia.update.verify.BlobfsVerifier",
                 "fuchsia.update.verify.HealthVerification",
-                "fuchsia.update.verify.NetstackVerifier",
             ],
             from: "parent",
             to: "#system-update-committer",

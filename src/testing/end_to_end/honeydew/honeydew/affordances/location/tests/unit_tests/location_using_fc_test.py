@@ -83,7 +83,7 @@ class LocationFCTests(unittest.TestCase):
     def test_set_region_works(self) -> None:
         """Test if set_region works with valid input."""
         self.location_obj._regulatory_region_configurator = mock.MagicMock(
-            spec=f_location_namedplace.RegulatoryRegionConfigurator.Client
+            spec=f_location_namedplace.RegulatoryRegionConfiguratorClient
         )
         self.location_obj._regulatory_region_configurator.set_region.return_value = (
             None
@@ -93,7 +93,7 @@ class LocationFCTests(unittest.TestCase):
     def test_set_region_fails_internal_error(self) -> None:
         """Verify set_region fails when the location stack errors."""
         self.location_obj._regulatory_region_configurator = mock.MagicMock(
-            spec=f_location_namedplace.RegulatoryRegionConfigurator.Client
+            spec=f_location_namedplace.RegulatoryRegionConfiguratorClient
         )
         self.location_obj._regulatory_region_configurator.set_region.side_effect = ZxStatus(
             ZxStatus.ZX_ERR_INTERNAL

@@ -154,38 +154,37 @@ impl ClientBuilder {
         Ok(Client { dir, creator, reader })
     }
 
-    /// `Client` will connect to and use fuchsia.fxfs/BlobReader for reads. Sets the VmexResource
+    /// [`Client`] will connect to and use fuchsia.fxfs/BlobReader for reads. Sets the VmexResource
     /// for `Client`. The VmexResource is used by `get_backing_memory` to mark blobs as executable.
     pub fn use_reader(self) -> Self {
         Self { use_reader: Reader::Use { use_vmex: true }, ..self }
     }
 
-    /// `Client` will connect to and use fuchsia.fxfs/BlobReader for reads. Does not set the
+    /// [`Client`] will connect to and use fuchsia.fxfs/BlobReader for reads. Does not set the
     /// VmexResource.
     pub fn use_reader_no_vmex(self) -> Self {
         Self { use_reader: Reader::Use { use_vmex: false }, ..self }
     }
 
-    /// If set, `Client` will connect to and use fuchsia.fxfs/BlobCreator for writes.
+    /// If set, [`Client`] will connect to and use fuchsia.fxfs/BlobCreator for writes.
     pub fn use_creator(self) -> Self {
         Self { use_creator: true, ..self }
     }
 
-    /// If set, `Client` will connect to /blob in the current component's namespace with
-    /// OPEN_RIGHT_READABLE.
+    /// If set, [`Client`] will connect to /blob in the current component's namespace with
+    /// [`fio::PERM_READABLE`].
     pub fn readable(self) -> Self {
         Self { readable: true, ..self }
     }
 
-    /// If set, `Client` will connect to /blob in the current component's namespace with
-    /// OPEN_RIGHT_WRITABLE. WRITABLE is needed so that `delete_blob` can call
-    /// fuchsia.io/Directory.Unlink.
+    /// If set, [`Client`] will connect to /blob in the current component's namespace with
+    /// [`fio::PERM_WRITABLE`] which needed so that [`Client::delete_blob`] can unlink the file.
     pub fn writable(self) -> Self {
         Self { writable: true, ..self }
     }
 
-    /// If set, `Client` will connect to /blob in the current component's namespace with
-    /// OPEN_RIGHT_EXECUTABLE.
+    /// If set, [`Client`] will connect to /blob in the current component's namespace with
+    /// [`fio::PERM_EXECUTABLE`].
     pub fn executable(self) -> Self {
         Self { executable: true, ..self }
     }
@@ -268,7 +267,7 @@ impl Client {
 
     /// Open a blob for read. `scope` will only be used if the client was configured to use
     /// fuchsia.fxfs.BlobReader.
-    pub fn open_blob_for_read(
+    pub fn deprecated_open_blob_for_read(
         &self,
         blob: &Hash,
         flags: fio::OpenFlags,
@@ -298,7 +297,7 @@ impl Client {
 
     /// Open a blob for read using open3. `scope` will only be used if the client was configured to
     /// use fuchsia.fxfs.BlobReader.
-    pub fn open3_blob_for_read(
+    pub fn open_blob_for_read(
         &self,
         blob: &Hash,
         flags: fio::Flags,
@@ -509,22 +508,22 @@ fn open_blob_with_reader<P: ProtocolsExt + Send>(
     protocols: P,
     object_request: ObjectRequest,
 ) {
-    object_request.spawn(&scope.clone(), move |object_request| {
-        Box::pin(async move {
-            let get_vmo_result = reader.get_vmo(&blob_hash.into()).await.map_err(|fidl_error| {
-                if let fidl::Error::ClientChannelClosed { status, .. } = fidl_error {
-                    error!("Blob reader channel closed: {:?}", status);
-                    status
-                } else {
-                    error!("Transport error on get_vmo: {:?}", fidl_error);
-                    zx::Status::INTERNAL
-                }
-            })?;
-            let vmo = get_vmo_result.map_err(zx::Status::from_raw)?;
-            let vmo_blob = vmo_blob::VmoBlob::new(vmo);
-            object_request.create_connection(scope, vmo_blob, protocols, StreamIoConnection::create)
-        })
-    });
+    scope.clone().spawn(object_request.handle_async(async move |object_request| {
+        let get_vmo_result = reader.get_vmo(&blob_hash.into()).await.map_err(|fidl_error| {
+            if let fidl::Error::ClientChannelClosed { status, .. } = fidl_error {
+                error!("Blob reader channel closed: {:?}", status);
+                status
+            } else {
+                error!("Transport error on get_vmo: {:?}", fidl_error);
+                zx::Status::INTERNAL
+            }
+        })?;
+        let vmo = get_vmo_result.map_err(zx::Status::from_raw)?;
+        let vmo_blob = vmo_blob::VmoBlob::new(vmo);
+        object_request
+            .create_connection::<StreamIoConnection<_>, _>(scope, vmo_blob, protocols)
+            .await
+    }));
 }
 
 #[derive(thiserror::Error, Debug)]

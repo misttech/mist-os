@@ -342,11 +342,13 @@ pub fn new_remote_file(
         // Set the file mode to socket.
         mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
     }
-    let file_handle = Anon::new_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
-        let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-        update_info_from_attrs(&mut info, &attrs);
-        info
-    });
+    // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
+    let file_handle =
+        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
+            let mut info = FsNodeInfo::new(id, mode, FsCred::root());
+            update_info_from_attrs(&mut info, &attrs);
+            info
+        });
     Ok(file_handle)
 }
 
@@ -921,14 +923,7 @@ impl FsNodeOps for RemoteNode {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        // TODO(https://fxbug.dev/360171961): Add symlink support for fscrypt.
-        // Fail if user tries to create a symlink inside an encrypted directory.
-        {
-            let node_info = node.fetch_and_refresh_info(locked, current_task)?;
-            if node_info.wrapping_key_id.is_some() {
-                return error!(ENOTSUP);
-            }
-        }
+        node.fail_if_locked(locked, current_task)?;
 
         let name = get_name_str(name)?;
         let zxio = Arc::new(

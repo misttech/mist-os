@@ -6,8 +6,42 @@
 
 #include "src/developer/debug/shared/arch.h"
 #include "src/developer/debug/shared/register_info.h"
+#include "src/lib/unwinder/unwind.h"
 
 namespace debug_ipc {
+
+unwinder::Registers ConvertRegisters(debug::Arch arch,
+                                     const std::vector<debug::RegisterValue>& regs) {
+  std::optional<unwinder::Registers> res = std::nullopt;
+
+  switch (arch) {
+    case debug::Arch::kX64:
+      res = unwinder::Registers(unwinder::Registers::Arch::kX64);
+      // The first 4 registers are out-of-order.
+      res->Set(unwinder::RegisterID::kX64_rax, static_cast<uint64_t>((regs)[0].GetValue()));
+      res->Set(unwinder::RegisterID::kX64_rbx, static_cast<uint64_t>((regs)[1].GetValue()));
+      res->Set(unwinder::RegisterID::kX64_rcx, static_cast<uint64_t>((regs)[2].GetValue()));
+      res->Set(unwinder::RegisterID::kX64_rdx, static_cast<uint64_t>((regs)[3].GetValue()));
+      for (int i = 4; i < static_cast<int>(unwinder::RegisterID::kX64_last); i++) {
+        res->Set(static_cast<unwinder::RegisterID>(i), static_cast<uint64_t>((regs)[i].GetValue()));
+      }
+      break;
+    case debug::Arch::kArm64:
+      res = unwinder::Registers(unwinder::Registers::Arch::kArm64);
+      for (int i = 0; i < static_cast<int>(unwinder::RegisterID::kArm64_last); i++) {
+        res->Set(static_cast<unwinder::RegisterID>(i), static_cast<uint64_t>((regs)[i].GetValue()));
+      }
+      break;
+    case debug::Arch::kRiscv64:
+      FX_NOTREACHED() << "Riscv64 is not supported yet";
+      break;
+    default:
+      FX_NOTREACHED() << "Unknown platform";
+      break;
+  }
+
+  return *res;
+}
 
 std::vector<debug_ipc::StackFrame> ConvertFrames(const std::vector<unwinder::Frame>& frames) {
   std::vector<debug_ipc::StackFrame> res;
@@ -39,6 +73,7 @@ std::vector<debug_ipc::StackFrame> ConvertFrames(const std::vector<unwinder::Fra
         frame_regs.emplace_back(info->id, val);
       }
     }
+
     res.emplace_back(ip, sp, 0, frame_regs);
   }
 

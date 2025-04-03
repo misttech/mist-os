@@ -19,6 +19,38 @@ driver_bind_rules("aml_nna_bind") {
   ]
 }
 
+source_set("common") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  sources = [
+    "a5-nna-regs.h",
+    "aml-nna.cc",
+    "aml-nna.h",
+    "s905d3-nna-regs.h",
+    "t931-nna-regs.h",
+  ]
+  deps = [
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
+    "//zircon/system/ulib/fbl",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/platform-device/cpp",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver:driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
+
 fuchsia_cc_driver("aml-nna-driver") {
   legacy = true
   output_name = "aml-nna"
@@ -26,20 +58,9 @@ fuchsia_cc_driver("aml-nna-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-nna.cc" ]
   deps = [
     ":aml_nna_bind",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver:driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
+    ":common",
   ]
 }
 
@@ -58,26 +79,13 @@ fuchsia_driver_package("package") {
 
 test("aml-nna-test-bin") {
   output_name = "aml-nna-test"
-  sources = [
-    "aml-nna-test.cc",
-    "aml-nna.cc",
-  ]
+  sources = [ "aml-nna-test.cc" ]
   deps = [
-    ":aml_nna_bind",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+    ":common",
     "//sdk/lib/async-loop:async-loop-cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zxtest",
   ]
 }

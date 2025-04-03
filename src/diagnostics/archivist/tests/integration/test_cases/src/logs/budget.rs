@@ -6,7 +6,7 @@ use crate::{test_topology, utils};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use futures::StreamExt;
 use std::collections::VecDeque;
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics_types as fdiagnostics};
 
 const SPAM_COUNT: usize = 1001;
 

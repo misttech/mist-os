@@ -93,7 +93,7 @@ class RuntimeDispatcher : public AsyncDispatcher {
     if (!use_threads_) {
       // We stopped all the runtime threads, so make sure they are up again for the
       // rest of the benchmarks.
-      ASSERT_OK(fdf_env_start());
+      ASSERT_OK(fdf_env_start(0));
     }
   }
 

@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::ops::ControlFlow;
-
 use crate::painter::layer_workbench::passes::PassesSharedState;
-use crate::painter::layer_workbench::{Context, Index, LayerWorkbenchState, OptimizerTileWriteOp};
+use crate::painter::layer_workbench::{Context, Index, LayerWorkbenchState};
 use crate::painter::{Func, LayerProps, Style};
 
 pub fn skip_trivial_clips_pass<'w, 'c, P: LayerProps>(
     workbench: &'w mut LayerWorkbenchState,
     state: &'w mut PassesSharedState,
     context: &'c Context<'_, P>,
-) -> ControlFlow<OptimizerTileWriteOp> {
+) {
     struct Clip {
         is_full: bool,
         last_layer_id: u32,
@@ -74,6 +72,4 @@ pub fn skip_trivial_clips_pass<'w, 'c, P: LayerProps>(
             workbench.ids.set_mask(i, false);
         }
     }
-
-    ControlFlow::Continue(())
 }

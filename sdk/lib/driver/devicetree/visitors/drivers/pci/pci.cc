@@ -6,6 +6,9 @@
 
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <zircon/errors.h>
+
+#include <algorithm>
 
 namespace pci_dt {
 
@@ -14,7 +17,11 @@ namespace {
 zx::result<PciRange> ParsePciRange(devicetree::ByteView bytes, uint32_t num_size_cells,
                                    uint32_t num_parent_address_cells) {
   // First byte is the high cell of the bus address. Store it separately.
-  auto bus_address_high_cell = devicetree::PropertyValue(bytes.subspan(0, sizeof(uint32_t)));
+  std::optional<uint32_t> bus_address_high_cell =
+      devicetree::PropertyValue(bytes.subspan(0, sizeof(uint32_t))).AsUint32();
+  if (!bus_address_high_cell.has_value()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   // Parse the rest as if it was a 2-address-cell range.
   bytes = bytes.subspan(sizeof(uint32_t), bytes.size() - sizeof(uint32_t));
@@ -22,7 +29,7 @@ zx::result<PciRange> ParsePciRange(devicetree::ByteView bytes, uint32_t num_size
   return zx::ok(PciRange{
       .range = devicetree::RangesPropertyElement(
           bytes, {2 /* num_address_cells */, num_size_cells, num_parent_address_cells}),
-      .bus_address_high_cell = *bus_address_high_cell.AsUint32(),
+      .bus_address_high_cell = bus_address_high_cell.value(),
   });
 }
 
@@ -39,15 +46,21 @@ zx::result<std::pair<uint32_t, uint32_t>> ParseAddressAndInterruptCells(
   if (address_cells_prop == properties.end()) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  uint32_t address_cells = *address_cells_prop->second.AsUint32();
+  std::optional<uint32_t> address_cells_u32 = address_cells_prop->second.AsUint32();
+  if (!address_cells_u32.has_value()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   auto interrupt_cells_prop = properties.find("#interrupt-cells");
   if (interrupt_cells_prop == properties.end()) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  uint32_t interrupt_cells = *interrupt_cells_prop->second.AsUint32();
+  std::optional<uint32_t> interrupt_cells_u32 = interrupt_cells_prop->second.AsUint32();
+  if (!interrupt_cells_u32.has_value()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
-  return zx::ok(std::make_pair(address_cells, interrupt_cells));
+  return zx::ok(std::make_pair(address_cells_u32.value(), interrupt_cells_u32.value()));
 }
 
 bool InterruptControllerIsArmGicV3(fdf_devicetree::Node& interrupt_parent_node) {
@@ -56,17 +69,13 @@ bool InterruptControllerIsArmGicV3(fdf_devicetree::Node& interrupt_parent_node) 
     FDF_LOG(ERROR, "Could not find compatible node on interrupt parent");
     return false;
   }
-  auto compatible_list = compatible_prop->second.AsStringList();
+  std::optional<devicetree::StringList<>> compatible_list = compatible_prop->second.AsStringList();
   if (!compatible_list) {
     FDF_LOG(ERROR, "Could not parse compatible node on interrupt parent");
     return false;
   }
-  for (auto compatible : *compatible_list) {
-    if (compatible == "arm,gic-v3") {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(compatible_list.value(),
+                             [](auto compatible) { return compatible == "arm,gic-v3"; });
 }
 
 class InterruptParentMap {
@@ -133,27 +142,35 @@ zx::result<InterruptMapElementParseResult> ParseInterruptMapElement(
 
   // Interrupt-map: 3-tuples of (child-interrupt, interrupt-parent, parent-interrupt)
   // child-interrupt: address (#address-cells), then interrupt (#interrupt-cells)
-  auto child_address_view = advance_cells(address_cells);
+  zx::result child_address_view = advance_cells(address_cells);
   if (child_address_view.is_error()) {
     return child_address_view.take_error();
   }
-  auto child_interrupt_view = advance_cells(interrupt_cells);
+  zx::result child_interrupt_view = advance_cells(interrupt_cells);
   if (child_interrupt_view.is_error()) {
     return child_interrupt_view.take_error();
   }
 
   // We interpret the child's interrupt view as the pin.
-  uint32_t pin = *devicetree::PropertyValue(*child_interrupt_view).AsUint32();
+  std::optional<uint32_t> pin = devicetree::PropertyValue(*child_interrupt_view).AsUint32();
+  if (!pin.has_value()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   // interrupt-parent: phandle (always u32)
   auto interrupt_parent_view = advance_cells(1);
   if (interrupt_parent_view.is_error()) {
     return interrupt_parent_view.take_error();
   }
-  auto interrupt_parent_phandle = *devicetree::PropertyValue(*interrupt_parent_view).AsUint32();
+  std::optional<uint32_t> interrupt_parent_phandle =
+      devicetree::PropertyValue(*interrupt_parent_view).AsUint32();
+  if (!interrupt_parent_phandle.has_value()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   // Find the interrupt parent based on phandle.
-  auto interrupt_parent_info = interrupts.FindInterruptParent(interrupt_parent_phandle);
+  zx::result interrupt_parent_info =
+      interrupts.FindInterruptParent(interrupt_parent_phandle.value());
   if (interrupt_parent_info.is_error()) {
     return interrupt_parent_info.take_error();
   }
@@ -177,8 +194,12 @@ zx::result<InterruptMapElementParseResult> ParseInterruptMapElement(
   }
 
   // Currently, we consider only the first cell of the child address in our address computation.
-  BusAddress child_unit_address(
-      *devicetree::PropertyValue(child_address_view->subspan(0, sizeof(uint32_t))).AsUint32());
+  std::optional<BusAddress> child_unit_address(
+      devicetree::PropertyValue(child_address_view->subspan(0, sizeof(uint32_t))).AsUint32());
+  if (!child_unit_address.has_value()) {
+    FDF_LOG(ERROR, "Invalid child unit address");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
   // In Gicv3, we interpret the parent interrupt specification as a 3-tuple of cells.
   auto parent_interrupt_specification =
@@ -189,7 +210,7 @@ zx::result<InterruptMapElementParseResult> ParseInterruptMapElement(
                                        static_cast<uint32_t>(*parent_interrupt_specification[2]));
 
   Gicv3InterruptMapElement interrupt{
-      .child_unit_address = child_unit_address, .pin = pin, .parent = parent};
+      .child_unit_address = child_unit_address.value(), .pin = pin.value(), .parent = parent};
 
   return zx::ok(InterruptMapElementParseResult{
       .interrupt = std::make_optional(interrupt),
@@ -203,8 +224,8 @@ zx::result<std::vector<Gicv3InterruptMapElement>> ParseInterruptMap(
   std::vector<Gicv3InterruptMapElement> results;
   InterruptParentMap parent_map(node);
   while (bytes.size() > 0) {
-    auto map_element = ParseInterruptMapElement(bytes, *decoder.num_address_cells(),
-                                                *decoder.num_interrupt_cells(), parent_map);
+    zx::result map_element = ParseInterruptMapElement(bytes, *decoder.num_address_cells(),
+                                                      *decoder.num_interrupt_cells(), parent_map);
     if (map_element.is_error()) {
       return map_element.take_error();
     }
@@ -290,6 +311,10 @@ zx::result<> PciVisitor::DriverVisit(fdf_devicetree::Node& node,
   gic_v3_interrupt_map_elements_ = std::move(*interrupt_map);
 
   auto compatible = node.properties().find("compatible");
+  if (compatible == node.properties().end()) {
+    FDF_LOG(ERROR, "Failed to find 'compatible' property");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
   is_extended_ = compatible->second.AsString() == std::string("pci-host-ecam-generic");
 
   return zx::ok();

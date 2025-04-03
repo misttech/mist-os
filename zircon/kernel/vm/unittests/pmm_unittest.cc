@@ -93,7 +93,10 @@ class ManagedPmmNode {
     return ZX_OK;
   }
   void FreeLoanedPage(vm_page_t* page) {
-    node_.FreeLoanedPage(page, [](vm_page_t* page) { Pmm::Node().GetPageQueues()->Remove(page); });
+    FreeLoanedPagesHolder flph;
+    node_.BeginFreeLoanedPage(
+        page, [](vm_page_t* page) { Pmm::Node().GetPageQueues()->Remove(page); }, flph);
+    Pmm::Node().FinishFreeLoanedPages(flph);
   }
 
  private:

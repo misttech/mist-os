@@ -49,7 +49,7 @@ ffx_plugin("ffx_flash") {
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]

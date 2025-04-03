@@ -106,7 +106,12 @@ int main(int argc, const char** argv) {
   auto os = CreateMockOS();
   auto capture_maker = memory::CaptureMaker::Create(CreateMockOS()).value();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  monitor::Monitor app{loop.dispatcher(), memory_monitor_config::Config{},
+  monitor::Monitor app{loop.dispatcher(),
+                       // Pick non-zero arbitrary delays.
+                       memory_monitor_config::Config{{.critical_capture_delay_s = 10,
+                                                      .imminent_oom_capture_delay_s = 10,
+                                                      .normal_capture_delay_s = 10,
+                                                      .warning_capture_delay_s = 10}},
                        std::move(capture_maker)};
   loop.Run();
   return 0;

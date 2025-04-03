@@ -28,12 +28,6 @@ class BasicTest : public TestBase {
  protected:
   void TearDown() override;
 
-  void RequestHealthAndExpectHealthy();
-  void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
-
-  void RetrieveProperties();
-  void ValidateProperties();
-
   void WatchGainStateAndExpectUpdate();
   void WatchGainStateAndExpectNoUpdate();
   void RequestSetGain();

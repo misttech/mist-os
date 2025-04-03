@@ -328,6 +328,8 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
   if (need_syscall_for_ticks) {
     REDIRECT_SYSCALL(mutator, zx_ticks_get, SYSCALL_zx_ticks_get_via_kernel);
     REDIRECT_SYSCALL(mutator, zx_ticks_get_boot, SYSCALL_zx_ticks_get_boot_via_kernel);
+    REDIRECT_SYSCALL(mutator, zx_clock_read_mapped, clock_read_mapped_via_kernel);
+    REDIRECT_SYSCALL(mutator, zx_clock_get_details_mapped, clock_get_details_mapped_via_kernel);
   }
 
   if (gBootOptions->vdso_clock_get_force_syscall) {

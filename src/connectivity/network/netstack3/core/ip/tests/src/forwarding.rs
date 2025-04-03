@@ -7,7 +7,7 @@ use net_declare::{net_subnet_v4, net_subnet_v6};
 use net_types::ip::{AddrSubnet, IpAddress as _, Ipv4Addr, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::{IpDeviceAddr, MarkDomain};
+use netstack3_base::{IpDeviceAddr, MarkDomain, Marks};
 use test_case::test_case;
 
 use netstack3_base::testutil::TestIpExt;
@@ -21,7 +21,7 @@ use netstack3_core::testutil::{
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, InternalForwarding,
-    MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, RouteResolveOptions, Rule,
+    MarkMatcher, MarkMatchers, Metric, RawMetric, ResolvedRoute, RouteResolveOptions, Rule,
     RuleAction, RuleMatcher,
 };
 

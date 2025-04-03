@@ -310,15 +310,6 @@ template("rustc_artifact") {
       crate_name = string_replace(invoker.crate_name, "-", "_")
       crate_root = invoker.crate_root
 
-      # Don't define Rust auxiliary deps targets for targets that go through
-      # rustc_artifact, because this template defines a rust_auxiliary target
-      # above. aux_deps targets are only useful for third-party targets that use
-      # GN builtin Rust templates (rust_library and rust_proc_macro).
-      if (invoker.target_type == "rust_library" ||
-          invoker.target_type == "rust_proc_macro") {
-        define_aux_deps = false
-      }
-
       rustflags = _rustflags
       if (rust_rbe_enable) {
         rustflags += [ "--remote-flag=--label='" +

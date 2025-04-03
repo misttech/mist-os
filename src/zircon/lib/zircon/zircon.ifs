@@ -564,8 +564,10 @@ Symbols:
   - { Name: _zx_clock_create, Type: Func }
   - { Name: _zx_clock_get_boot, Type: Func }
   - { Name: _zx_clock_get_details, Type: Func }
+  - { Name: _zx_clock_get_details_mapped, Type: Func }
   - { Name: _zx_clock_get_monotonic, Type: Func }
   - { Name: _zx_clock_read, Type: Func }
+  - { Name: _zx_clock_read_mapped, Type: Func }
   - { Name: _zx_clock_update, Type: Func }
   - { Name: _zx_counter_add, Type: Func }
   - { Name: _zx_counter_create, Type: Func }
@@ -617,7 +619,6 @@ Symbols:
   - { Name: _zx_job_set_policy, Type: Func }
   - { Name: _zx_ktrace_control, Type: Func }
   - { Name: _zx_ktrace_read, Type: Func }
-  - { Name: _zx_ktrace_write, Type: Func }
   - { Name: _zx_msi_allocate, Type: Func }
   - { Name: _zx_msi_create, Type: Func }
   - { Name: _zx_mtrace_control, Type: Func }
@@ -743,6 +744,7 @@ Symbols:
   - { Name: _zx_vmar_allocate, Type: Func }
   - { Name: _zx_vmar_destroy, Type: Func }
   - { Name: _zx_vmar_map, Type: Func }
+  - { Name: _zx_vmar_map_clock, Type: Func }
   - { Name: _zx_vmar_map_iob, Type: Func }
   - { Name: _zx_vmar_op_range, Type: Func }
   - { Name: _zx_vmar_protect, Type: Func }
@@ -1324,8 +1326,10 @@ Symbols:
   - { Name: zx_clock_create, Type: Func, Weak: true }
   - { Name: zx_clock_get_boot, Type: Func, Weak: true }
   - { Name: zx_clock_get_details, Type: Func, Weak: true }
+  - { Name: zx_clock_get_details_mapped, Type: Func, Weak: true }
   - { Name: zx_clock_get_monotonic, Type: Func, Weak: true }
   - { Name: zx_clock_read, Type: Func, Weak: true }
+  - { Name: zx_clock_read_mapped, Type: Func, Weak: true }
   - { Name: zx_clock_update, Type: Func, Weak: true }
   - { Name: zx_counter_add, Type: Func, Weak: true }
   - { Name: zx_counter_create, Type: Func, Weak: true }
@@ -1377,7 +1381,6 @@ Symbols:
   - { Name: zx_job_set_policy, Type: Func, Weak: true }
   - { Name: zx_ktrace_control, Type: Func, Weak: true }
   - { Name: zx_ktrace_read, Type: Func, Weak: true }
-  - { Name: zx_ktrace_write, Type: Func, Weak: true }
   - { Name: zx_msi_allocate, Type: Func, Weak: true }
   - { Name: zx_msi_create, Type: Func, Weak: true }
   - { Name: zx_mtrace_control, Type: Func, Weak: true }
@@ -1503,6 +1506,7 @@ Symbols:
   - { Name: zx_vmar_allocate, Type: Func, Weak: true }
   - { Name: zx_vmar_destroy, Type: Func, Weak: true }
   - { Name: zx_vmar_map, Type: Func, Weak: true }
+  - { Name: zx_vmar_map_clock, Type: Func, Weak: true }
   - { Name: zx_vmar_map_iob, Type: Func, Weak: true }
   - { Name: zx_vmar_op_range, Type: Func, Weak: true }
   - { Name: zx_vmar_protect, Type: Func, Weak: true }

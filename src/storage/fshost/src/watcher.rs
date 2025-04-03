@@ -89,12 +89,20 @@ impl WatchSource for PathSource {
 #[derive(Clone, Debug)]
 pub struct DirSource {
     dir: fio::DirectoryProxy,
+    // The name of the source of these devices, for example the moniker of a component providing
+    // them. Used for logging and debugging.
+    source: String,
+    // Whether the block devices yielded by the source are managed by fshost or not; see
+    // `Device::is_managed`.
+    is_managed: bool,
 }
 
 impl DirSource {
     /// Creates a `DirSource` that connects a `VolumeProtocolDevice` to each entry in `dir`.
-    pub fn new(dir: fio::DirectoryProxy) -> Self {
-        Self { dir }
+    /// `is_managed` indicates that the yielded devices are fshost-managed and should be set for
+    /// sources that fshost creates and feeds back to itself.  See `Device::is_managed`.
+    pub fn new(dir: fio::DirectoryProxy, source: impl ToString, is_managed: bool) -> Self {
+        Self { dir, source: source.to_string(), is_managed }
     }
 }
 
@@ -105,13 +113,16 @@ impl WatchSource for DirSource {
             .await
             .with_context(|| format!("Failed to watch dir"))?;
         let dir = Arc::new(fuchsia_fs::directory::clone(&self.dir)?);
+        let source = self.source.clone();
+        let is_managed = self.is_managed;
         Ok(Box::pin(common_filters(watcher).filter_map(move |filename| {
             let dir = dir.clone();
+            let source = source.clone();
             async move {
                 let dir_clone = fuchsia_fs::directory::clone(&dir)
                     .map_err(|err| log::warn!(err:?; "Failed to clone dir"))
                     .ok()?;
-                VolumeProtocolDevice::new(dir_clone, filename)
+                VolumeProtocolDevice::new(dir_clone, filename, source, is_managed)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
                         log::warn!(err:?; "Failed to create device (maybe it went away?)");
@@ -160,7 +171,9 @@ impl Watcher {
         mut device_tx: mpsc::UnboundedSender<Box<dyn Device>>,
     ) {
         while let Some(device) = device_stream.next().await {
-            device_tx.send(device).await.expect("failed to send device");
+            if let Err(error) = device_tx.send(device).await {
+                log::warn!(error:?; "Failed to send device");
+            }
         }
     }
 }
@@ -274,7 +287,7 @@ mod tests {
         let (_watcher, mut device_stream) = Watcher::new(vec![
             Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block)),
             Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)),
-            Box::new(DirSource::new(client)),
+            Box::new(DirSource::new(client, "test-dir-source", false)),
         ])
         .await
         .expect("failed to make watcher");

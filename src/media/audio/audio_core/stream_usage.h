@@ -292,7 +292,7 @@ class StreamUsageMask final {
   // Unsets `usage` from the bitmask.
   constexpr void erase(const StreamUsage& usage) {
     if (!usage.is_empty()) {
-      mask_ &= ~(1 << HashStreamUsage(usage));
+      mask_ &= static_cast<uint32_t>(~(1 << HashStreamUsage(usage)));
     }
   }
 

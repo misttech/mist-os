@@ -6,8 +6,7 @@ use crate::color_transform_manager::ColorTransformManager;
 use ::input_pipeline::input_device::InputDeviceType;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 use ::input_pipeline::interaction_state_handler::{
-    handle_interaction_aggregator_request_stream, handle_interaction_notifier_request_stream,
-    init_interaction_hanging_get,
+    handle_interaction_notifier_request_stream, init_interaction_hanging_get,
 };
 use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
 use anyhow::{Context, Error};
@@ -17,7 +16,6 @@ use fidl_fuchsia_element::{
 };
 use fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream;
 use fidl_fuchsia_input_interaction::NotifierRequestStream;
-use fidl_fuchsia_input_interaction_observation::AggregatorRequestStream;
 use fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream;
 use fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream;
 use fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream;
@@ -71,7 +69,6 @@ enum ExposedServices {
     InputDeviceRegistry(InputDeviceRegistryRequestStream),
     LightSensor(LightSensorRequestStream),
     SceneManager(SceneManagerRequestStream),
-    UserInteractionObservation(AggregatorRequestStream),
     UserInteraction(NotifierRequestStream),
 }
 
@@ -121,7 +118,6 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(ExposedServices::GraphicalPresenter)
         .add_fidl_service(ExposedServices::InputDeviceRegistry)
         .add_fidl_service(ExposedServices::SceneManager)
-        .add_fidl_service(ExposedServices::UserInteractionObservation)
         .add_fidl_service(ExposedServices::UserInteraction);
 
     let light_sensor_configuration: Option<LightSensorConfiguration> =
@@ -387,28 +383,6 @@ async fn main() -> Result<(), Error> {
                     Err(e) => {
                         warn!("failed to forward fuchsia.recovery.policy.Device: {:?}", e)
                     }
-                }
-            }
-            ExposedServices::UserInteractionObservation(stream) => {
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                {
-                    fasync::Task::local(async move {
-                    match handle_interaction_aggregator_request_stream(stream)
-                        .await
-                    {
-                        Ok(()) => (),
-                        Err(e) => {
-                            warn!(
-                        "failure while serving fuchsia.input.interaction.observation.Aggregator: {:?}",
-                        e
-                    );
-                        }}
-                    }).detach();
-                }
-                #[cfg(fuchsia_api_level_less_than = "HEAD")]
-                {
-                    let _ = stream;
-                    error!("scene_manager built without InteractionStateHandler due to stable API level.")
                 }
             }
             ExposedServices::UserInteraction(stream) => {

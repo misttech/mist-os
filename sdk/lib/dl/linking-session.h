@@ -10,15 +10,27 @@
 #include <lib/fit/result.h>
 #include <lib/ld/decoded-module-in-memory.h>
 #include <lib/ld/load-module.h>
-#include <lib/ld/tlsdesc.h>
 
 #include <ranges>
 
 #include "concat-view.h"
 #include "diagnostics.h"
 #include "runtime-module.h"
+#include "tls-desc-resolver.h"
 
 namespace dl {
+
+using size_type = Elf::size_type;
+
+// This is the result returned by a successful LinkingSession once it has been
+// committed (see LinkingSession::Commit).
+struct LinkingResult {
+  // The list of modules loaded by the LinkingSession.
+  ModuleList loaded_modules;
+  // The updated max TLS modid: this value is incremented for every new module
+  // that is loaded and defines a TLS variable. The
+  size_type max_tls_modid;
+};
 
 // A LinkingSession encapsulates the decoding, loading, relocation and creation
 // of RuntimeModules from a single dlopen call. A LinkingSession instance only
@@ -27,17 +39,20 @@ namespace dl {
 template <class Loader>
 class LinkingSession {
  public:
-  using size_type = Elf::size_type;
-
   // Not copyable, not movable.
   LinkingSession(const LinkingSession&) = delete;
   LinkingSession(LinkingSession&&) = delete;
 
+  // TODO(https://fxbug.dev/342480690): Have the LinkingSession take a reference
+  // to the RuntimeDynamicLinker instead of separate fields.
   // A LinkingSession is provided a reference to the dynamic linker's list of
   // already loaded modules to refer to during the linking procedure, and the
   // max static TLS module id from the passive ABI to use for TLS resolution.
-  explicit LinkingSession(const ModuleList& loaded_modules, size_type max_static_tls_modid)
-      : loaded_modules_(loaded_modules), tls_desc_resolver_(max_static_tls_modid) {}
+  explicit LinkingSession(const ModuleList& loaded_modules, size_type max_static_tls_modid,
+                          size_type max_tls_modid)
+      : loaded_modules_(loaded_modules),
+        max_static_tls_modid_(max_static_tls_modid),
+        max_tls_modid_(max_tls_modid) {}
 
   ~LinkingSession() = default;
 
@@ -55,36 +70,17 @@ class LinkingSession {
   // The caller calls Commit() to finalize the LinkingSession after it has
   // loaded and linked all the modules needed for a single dlopen call. This
   // will transfer ownership of the RuntimeModules created during this session
-  // to the caller.
-  ModuleList Commit() && { return std::move(runtime_modules_); }
+  // and provide an updated max_tls_modid in the LinkingResult returned back to
+  // the caller.
+  LinkingResult Commit() && {
+    return {.loaded_modules = std::move(runtime_modules_), .max_tls_modid = max_tls_modid_};
+  }
 
  private:
   // Forward declaration; see definition below.
   class SessionModule;
 
   using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule>>;
-
-  class TlsDescResolver : public ld::LocalRuntimeTlsDescResolver {
-   public:
-    explicit TlsDescResolver(size_type max_static_tls_modid)
-        : max_static_tls_modid_(max_static_tls_modid) {}
-
-    TlsDescGot operator()(Addend addend) const {
-      return ld::LocalRuntimeTlsDescResolver::operator()(addend);
-    }
-
-    fit::result<bool, TlsDescGot> operator()(auto& diag, const auto& defn) const {
-      assert(defn.tls_module_id() != 0);
-      if (defn.tls_module_id() <= max_static_tls_modid_) {
-        return ld::LocalRuntimeTlsDescResolver::operator()(diag, defn);
-      }
-      return fit::error{
-          diag.FormatError("TODO(https://fxbug.dev/342480690): dynamic TLS is not supported")};
-    }
-
-   private:
-    size_type max_static_tls_modid_;
-  };
 
   // TODO(https://fxbug.dev/333573264): Talk about how previously-loaded modules
   // are handled in this function.
@@ -120,15 +116,14 @@ class LinkingSession {
         return fit::error(true);
       }
 
-      if (auto dep_names = module.Load(diag, *std::move(file))) {
+      if (auto dep_names = module.Load(diag, *std::move(file), max_tls_modid_)) {
         // Create and enqueue a module for each dependency, skipping
         // dependencies that have already been enqueued. The module that was
         // loaded will also store a reference to the dependency's RuntimeModule
         // in its direct_deps list.
         auto enqueue_dep = [this, &diag, &parent_list = module.runtime_module().direct_deps()](
                                const Soname& name) {
-          if (std::find(session_modules_.begin(), session_modules_.end(), name) !=
-              session_modules_.end()) {
+          if (std::ranges::any_of(session_modules_, name.equal_to())) {
             return true;
           }
           if (const RuntimeModule* dep = EnqueueModule(diag, name)) {
@@ -225,7 +220,7 @@ class LinkingSession {
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, resolution_modules, tls_desc_resolver_) &&
+      return session_module.Relocate(diag, resolution_modules, max_static_tls_modid_) &&
              session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
@@ -253,9 +248,17 @@ class LinkingSession {
   // created.
   const ModuleList& loaded_modules_;
 
-  // TODO(https://fxbug.dev/342480690): Support Dynamic TLS.
-  // The resolver used for TLSDESC relocations.
-  const TlsDescResolver tls_desc_resolver_;
+  // This is the maximum static TLS modid received by the dynamic linker at the
+  // time of this linking session. This value is passed to SessionModule.Relocate
+  // during relocations.
+  size_type max_static_tls_modid_ = 0;
+
+  // This is the max TLS modid value provided by the dynamic linker when this
+  // LinkingSession was created. This value gets incremented and assigned to
+  // each new TLS module that is loaded as a part of this LinkingSession. The
+  // updated max_tls_modid_ is returned back to the dynamic linker in the
+  // LinkingResult from the LinkingSession::Commit.
+  size_type max_tls_modid_;
 };
 
 // SessionModule is the temporary data structure created to load a file and
@@ -270,12 +273,6 @@ class LinkingSession<Loader>::SessionModule
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
   using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<ld::kMaxSegments>::Container>;
-  using TlsDescGot = Elf::TlsDescGot<>;
-
-  // This is the observer used to collect DT_NEEDED offsets from the dynamic phdr.
-  static const constexpr std::string_view kNeededError{"DT_NEEDED offsets"};
-  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
-      Elf, elfldltl::ElfDynTag::kNeeded, Vector<size_type>, kNeededError>;
 
   // The SessionModule::Create(...) takes a reference to the Module for the
   // file, setting information on it during the loading, decoding, and
@@ -297,7 +294,7 @@ class LinkingSession<Loader>::SessionModule
   // the the ABI module. A vector of Soname objects of the module's DT_NEEDEDs
   // are returned to the caller.
   template <class File>
-  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file) {
+  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file, size_type& max_tls_modid) {
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
@@ -308,15 +305,17 @@ class LinkingSession<Loader>::SessionModule
     }
 
     Vector<size_type> needed_offsets;
-    // TODO(https://fxbug.dev/331421403): TLS is not supported yet.
-    size_type max_tls_modid = 0;
     if (!decoded().DecodeFromMemory(  //
             diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
             elfldltl::DynamicInitObserver(decoded().module().init),
-            elfldltl::DynamicFiniObserver(decoded().module().fini), NeededObserver(needed_offsets)))
-        [[unlikely]] {
+            elfldltl::DynamicFiniObserver(decoded().module().fini),
+            decoded().MakeNeededObserver(needed_offsets))) [[unlikely]] {
       return {};
+    }
+
+    if (decoded().tls_module_id() > 0) {
+      runtime_module_.set_tls_module(decoded().tls_module());
     }
 
     // After successfully loading the file, finalize the module's mapping by
@@ -324,32 +323,16 @@ class LinkingSession<Loader>::SessionModule
     // will be used to apply relro protections later.
     relro_ = decoded().CommitLoader(std::move(loader));
 
-    // TODO(https://fxbug.dev/366279579): The code that parses the names from
-    // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
-    Vector<Soname> dep_names;
-    if (dep_names.reserve(diag, kNeededError, needed_offsets.size())) [[likely]] {
-      for (size_type offset : needed_offsets) {
-        std::string_view name = this->symbol_info().string(offset);
-        if (name.empty()) [[unlikely]] {
-          diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
-                           this->symbol_info().strtab().size());
-          return {};
-        }
-        if (!dep_names.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
-          return {};
-        }
-      }
-      return std::move(dep_names);
-    }
-
-    return {};
+    // Return the parsed Sonames from the DT_NEEDED offsets.
+    return decoded().template ReifyNeeded<Vector>(diag, needed_offsets);
   }
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // ordered list of modules as needed.
-  bool Relocate(Diagnostics& diag, const auto& ordered_modules,
-                const TlsDescResolver& tls_desc_resolver) {
-    auto memory = ld::ModuleMemory{module()};
+  bool Relocate(Diagnostics& diag, const auto& ordered_modules, size_type max_static_tls_modid) {
+    TlsDescResolver tls_desc_resolver =
+        TlsDescResolver(max_static_tls_modid, runtime_module_.tls_desc_indirect_list());
+    ld::ModuleMemory memory = ld::ModuleMemory{module()};
     auto resolver =
         elfldltl::MakeSymbolResolver(runtime_module_, ordered_modules, diag, tls_desc_resolver);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&

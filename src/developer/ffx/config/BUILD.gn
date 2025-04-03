@@ -88,6 +88,7 @@ rustc_library("lib") {
   inputs = [
     "test_data/sdk/meta/manifest.json",
     "test_data/sdk/tools/x64/a_host_tool-meta.json",
+    "test_data/sdk/tools/x64/a-host-tool",
   ]
 
   _domains_test_data_path =

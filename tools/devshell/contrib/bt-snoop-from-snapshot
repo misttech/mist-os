@@ -129,13 +129,16 @@ def get_device_from_metrics(metrics, device_name):
         key = k[len(device_key_prefix):]
         devices[key] = v
 
-  try:
-    return devices[device_name]
-  except KeyError:
-    reason = 'Device not present: "' + device_name + '". Valid device names: ' + \
-      ", ".join(devices.keys())
+  if device_name not in devices:
+    if len(devices) == 1:
+      name = list(devices.keys())[0]
+      return devices[name]
+
+    valid_device_names = ", ".join(devices.keys())
+    reason = f'Device not present: "{device_name}". Valid device names: {valid_device_names}'
     raise ConversionError(reason)
 
+  return devices[device_name]
 
 def main():
   """Take a path to a fuchsia snapshot zip file and write binary pcap data to stdout"""

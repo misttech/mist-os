@@ -7,7 +7,8 @@
 #include <zircon/types.h>
 
 using callback = void (*)(uint64_t address, uint64_t size, uint64_t file_offset,
-                          const uint8_t* build_id, size_t build_id_len, void* callback_arg);
+                          const uint8_t* build_id, size_t build_id_len, uint64_t vaddr,
+                          const char* name, size_t name_len, void* callback_arg);
 
 // Calls the given `callback` for each ELF executable segment in the given process.
 extern "C" __EXPORT zx_status_t ElfSearchExecutableRegions(zx_handle_t process_handle,
@@ -19,7 +20,8 @@ extern "C" __EXPORT zx_status_t ElfSearchExecutableRegions(zx_handle_t process_h
       if (phdr.p_type != PT_LOAD || (phdr.p_flags & PF_X) == 0)
         continue;
       callback(info.vaddr + phdr.p_vaddr, phdr.p_memsz, phdr.p_offset, info.build_id.data(),
-               info.build_id.size(), callback_arg);
+               info.build_id.size(), phdr.p_vaddr, info.name.data(), info.name.length(),
+               callback_arg);
     }
   });
 }

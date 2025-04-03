@@ -8,7 +8,7 @@ fidl("fuchsia.intl.test") {
   testonly = true
   sdk_category = "compat_test"
   stable = true
-  sdk_area = "HCI"
+  sdk_area = "UI"
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.component.sandbox",

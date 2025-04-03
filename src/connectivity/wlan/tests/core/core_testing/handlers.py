@@ -30,7 +30,7 @@ class ConnectTransactionContext:
     server: Channel
 
 
-class ConnectTransactionEventHandler(fidl_sme.ConnectTransaction.EventHandler):
+class ConnectTransactionEventHandler(fidl_sme.ConnectTransactionEventHandler):
     def __init__(
         self,
         verbose: bool = True,
@@ -86,9 +86,7 @@ class ConnectTransactionEventHandler(fidl_sme.ConnectTransaction.EventHandler):
 
     def __enter__(self) -> ConnectTransactionContext:
         proxy, server = Channel.create()
-        super().__init__(
-            client=fidl_sme.ConnectTransaction.Client(proxy.take())
-        )
+        super().__init__(client=fidl_sme.ConnectTransactionClient(proxy.take()))
         self.server_task = asyncio.get_running_loop().create_task(self.serve())
         return ConnectTransactionContext(
             txn_queue=self.txn_queue,

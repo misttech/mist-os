@@ -117,5 +117,12 @@
             instance_id: "4d5f882f294857b5eb02688fd1e284611a4154737bd00dbb47f53aa5e1276237",
             moniker: "/core/lowpan-ot-driver",
         },
+
+        // Timekeeper uses persistent storage in some assemblies where RTC is emulated with
+        // storage.
+        {
+            instance_id: "c05b4ae75b8453016b45861d4cce75d804ac6a5f76b52070042847a33bf902bf",
+            moniker: "/core/timekeeper",
+        },
     ],
 }

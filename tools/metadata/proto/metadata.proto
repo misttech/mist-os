@@ -4,9 +4,9 @@
 
 syntax = "proto3";
 
-// This proto is located at
-// https://github.com/googleapis/googleapis/blob/master/google/type/date.proto
-import "google/type/date.proto";
+package metadata;
+
+option go_package = "go.fuchsia.dev/fuchsia/tools/metadata/proto";
 
 // Monorail contains the project configuration for the Monorail issue tracker.
 message Monorail {
@@ -33,6 +33,17 @@ message Presubmit {
   repeated string auto_reviewers = 2;
 }
 
+message Date {
+  // Year of the date. Must be from 1 to 9999.
+  int32 year = 1;
+
+  // Month of the year. Must be from 1 to 12.
+  int32 month = 2;
+
+  // Day of the month. Must be from 1 to 31.
+  int32 day = 3;
+}
+
 message Metadata {
   // name is the name of the API/Package/Program.
   string name = 1;
@@ -40,7 +51,7 @@ message Metadata {
   // url points to some documentation/landing page.
   string url = 3;
   // Date this metadata was last reviewed by a human.
-  google.type.Date last_reviewed_date = 4;
+  Date last_reviewed_date = 4;
   repeated Tracker trackers = 5;
   // presubmits are used for defining presubmits.
   // The field is marked repeated for future expansion, but only

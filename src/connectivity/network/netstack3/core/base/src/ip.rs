@@ -8,11 +8,13 @@ use core::num::NonZeroU32;
 
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6SourceAddr, Mtu};
 use packet_formats::icmp::{
-    Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4RedirectCode,
+    IcmpDestUnreachable, Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4RedirectCode,
     Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode,
     Icmpv6TimeExceededCode,
 };
 use packet_formats::ip::IpProtoExt;
+use strum::{EnumCount as _, IntoEnumIterator as _};
+use strum_macros::{EnumCount, EnumIter};
 
 /// `Ip` extension trait to assist in defining [`NextHop`].
 pub trait BroadcastIpExt: Ip {
@@ -58,11 +60,11 @@ impl Mms {
 /// An ICMPv4 error type and code.
 ///
 /// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
+/// relevant information (e.g. code) for that error type.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Icmpv4ErrorCode {
-    DestUnreachable(Icmpv4DestUnreachableCode),
+    DestUnreachable(Icmpv4DestUnreachableCode, IcmpDestUnreachable),
     Redirect(Icmpv4RedirectCode),
     TimeExceeded(Icmpv4TimeExceededCode),
     ParameterProblem(Icmpv4ParameterProblemCode),
@@ -75,12 +77,12 @@ impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4ErrorCode {
 /// An ICMPv6 error type and code.
 ///
 /// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
+/// relevant information (e.g. code) for that error type.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Icmpv6ErrorCode {
     DestUnreachable(Icmpv6DestUnreachableCode),
-    PacketTooBig,
+    PacketTooBig(Mtu),
     TimeExceeded(Icmpv6TimeExceededCode),
     ParameterProblem(Icmpv6ParameterProblemCode),
 }
@@ -181,11 +183,85 @@ impl IpExt for Ipv6 {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Mark(pub Option<u32>);
 
+impl From<Option<u32>> for Mark {
+    fn from(m: Option<u32>) -> Self {
+        Self(m)
+    }
+}
+
 /// Mark domains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumCount, EnumIter)]
 pub enum MarkDomain {
     /// The first mark.
     Mark1,
     /// The second mark.
     Mark2,
+}
+
+const MARK_DOMAINS: usize = MarkDomain::COUNT;
+
+/// A storage backed by an array with the same cardinality of [`MarkDomain`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct MarkStorage<T>([T; MARK_DOMAINS]);
+
+impl<T> MarkStorage<T> {
+    /// Creates [`MarkStorage`]s from an iterator of `(MarkDomain, U)`.
+    ///
+    /// An unspecified domain will remain default. For the same domain,
+    /// a later value in the iterator will override an earlier value.
+    ///
+    /// For a specified domain, `(Some(value)).into()` will be written.
+    pub fn new<U, IntoIter>(iter: IntoIter) -> Self
+    where
+        IntoIter: IntoIterator<Item = (MarkDomain, U)>,
+        T: From<Option<U>> + Copy,
+    {
+        let mut storage = MarkStorage([None.into(); MARK_DOMAINS]);
+        for (domain, value) in iter.into_iter() {
+            *storage.get_mut(domain) = Some(value).into();
+        }
+        storage
+    }
+
+    fn domain_as_index(domain: MarkDomain) -> usize {
+        match domain {
+            MarkDomain::Mark1 => 0,
+            MarkDomain::Mark2 => 1,
+        }
+    }
+
+    /// Gets an immutable reference to the mark at the given domain.
+    pub fn get(&self, domain: MarkDomain) -> &T {
+        let Self(inner) = self;
+        &inner[Self::domain_as_index(domain)]
+    }
+
+    /// Gets a mutable reference to the mark at the given domain.
+    pub fn get_mut(&mut self, domain: MarkDomain) -> &mut T {
+        let Self(inner) = self;
+        &mut inner[Self::domain_as_index(domain)]
+    }
+
+    /// Returns an iterator over the mark domains.
+    pub fn iter(&self) -> impl Iterator<Item = (MarkDomain, &T)> {
+        let Self(inner) = self;
+        MarkDomain::iter().map(move |domain| (domain, &inner[Self::domain_as_index(domain)]))
+    }
+
+    /// Zips with another storage so that the domains align.
+    pub fn zip_with<'a, U>(
+        &'a self,
+        MarkStorage(other): &'a MarkStorage<U>,
+    ) -> impl Iterator<Item = (MarkDomain, &'a T, &'a U)> + 'a {
+        let Self(this) = self;
+        MarkDomain::iter().zip(this.iter().zip(other.iter())).map(|(d, (t, u))| (d, t, u))
+    }
+}
+
+/// The 2 marks that can be attached to packets.
+pub type Marks = MarkStorage<Mark>;
+
+impl Marks {
+    /// Unmarked marks.
+    pub const UNMARKED: Self = MarkStorage([Mark(None), Mark(None)]);
 }

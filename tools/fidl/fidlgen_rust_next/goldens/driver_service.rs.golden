@@ -20,7 +20,7 @@ pub trait DriverOnlyServiceInstance {
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SomeDriverProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
         Self::Error,
     >;
@@ -38,7 +38,7 @@ where
     ) -> Result<
         ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SomeDriverProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
         Self::Error,
     > {
@@ -50,7 +50,15 @@ where
 #[derive(Debug)]
 pub struct SomeDriverProtocol;
 
-pub mod some_driver_protocol {}
+pub mod some_driver_protocol {
+    pub mod prelude {
+        pub use crate::{
+            some_driver_protocol, SomeDriverProtocol, SomeDriverProtocolClientHandler,
+            SomeDriverProtocolClientSender, SomeDriverProtocolServerHandler,
+            SomeDriverProtocolServerSender,
+        };
+    }
+}
 
 /// A helper trait for the `SomeDriverProtocol` client sender.
 pub trait SomeDriverProtocolClientSender {
@@ -138,13 +146,6 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{
-        DriverOnlyServiceInstance, SomeDriverProtocolClientSender, SomeDriverProtocolServerSender,
-    };
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
@@ -153,4 +154,14 @@ pub mod compat {
     /// protocol.
     pub type SomeDriverProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::SomeDriverProtocol>
+        for ::fidl_test_driverservice::SomeDriverProtocolMarker
+    {
+        #[inline]
+        fn take_from(from: &crate::SomeDriverProtocol) -> Self {
+            Self
+        }
+    }
 }

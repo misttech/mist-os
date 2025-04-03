@@ -26,6 +26,7 @@ void arch_spin_lock_non_instrumented(arch_spin_lock_t* lock) {
                                           ktl::memory_order_relaxed)) {
       break;
     }
+    arch::Yield();
   }
 
   on_lock_acquired(lock);
@@ -49,6 +50,7 @@ void arch_spin_lock_trace_instrumented(arch_spin_lock_t* lock,
                                           ktl::memory_order_relaxed)) {
       break;
     }
+    arch::Yield();
   }
   spin_tracer.Finish(spin_tracing::FinishType::kLockAcquired, encoded_lock_id);
 

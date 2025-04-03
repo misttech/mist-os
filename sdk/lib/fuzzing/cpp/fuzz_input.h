@@ -28,7 +28,7 @@ class FuzzInput final {
   // assume that data pointed to by |out| may have been modified.
   template <typename T>
   bool CopyObject(T* out) {
-    static_assert(std::is_pod<T>());
+    static_assert(std::is_standard_layout<T>() && std::is_trivially_copyable<T>());
     uint8_t* out_buf = reinterpret_cast<uint8_t*>(out);
     return CopyBytes(out_buf, sizeof(T));
   }

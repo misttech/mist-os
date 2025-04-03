@@ -99,7 +99,7 @@ class NetstackFCTests(unittest.TestCase):
     def test_list_interfaces(self) -> None:
         """Test if list_interfaces works."""
         self.netstack_obj._state_proxy = mock.MagicMock(
-            spec=f_net_interfaces.State.Client
+            spec=f_net_interfaces.StateClient
         )
 
         def get_watcher(
@@ -143,14 +143,15 @@ class NetstackFCTests(unittest.TestCase):
         )
 
         self.netstack_obj._interfaces_proxy = mock.MagicMock(
-            spec=f_net_root.Interfaces.Client
+            spec=f_net_root.InterfacesClient
         )
 
-        mac_result = f_net_root.InterfacesGetMacResult()
-        mac_result.response = f_net_root.InterfacesGetMacResponse(
-            mac=f_net.MacAddress(
-                octets=list(_TEST_MAC.bytes()),
-            ),
+        mac_result = f_net_root.InterfacesGetMacResult(
+            response=f_net_root.InterfacesGetMacResponse(
+                mac=f_net.MacAddress(
+                    octets=list(_TEST_MAC.bytes()),
+                ),
+            )
         )
 
         self.netstack_obj._interfaces_proxy.get_mac.side_effect = [
@@ -190,7 +191,7 @@ class NetstackFCTests(unittest.TestCase):
         )
 
 
-class TestWatcherImpl(f_net_interfaces.Watcher.Server):
+class TestWatcherImpl(f_net_interfaces.WatcherServer):
     """Iterator for netstack events."""
 
     def __init__(
@@ -204,19 +205,20 @@ class TestWatcherImpl(f_net_interfaces.Watcher.Server):
         self,
     ) -> f_net_interfaces.WatcherWatchResponse:
         """Get next set of NetworkConfigs."""
-        event = f_net_interfaces.Event()
 
         if len(self._items) == 0:
             if self._done:
                 raise ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
             else:
-                # Indicate no more existing events will be sent.
-                event.idle = f_net_interfaces.Empty()
                 self._done = True
-        else:
-            event.existing = self._items.pop(0).to_fidl()
+                # Indicate no more existing events will be sent.
+                return f_net_interfaces.WatcherWatchResponse(
+                    event=f_net_interfaces.Event(idle=f_net_interfaces.Empty())
+                )
 
-        return f_net_interfaces.WatcherWatchResponse(event=event)
+        return f_net_interfaces.WatcherWatchResponse(
+            event=f_net_interfaces.Event(existing=self._items.pop(0).to_fidl())
+        )
 
 
 if __name__ == "__main__":

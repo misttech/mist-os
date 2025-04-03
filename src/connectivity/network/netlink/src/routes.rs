@@ -395,7 +395,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         let grant = match control.get_authorization_for_interface().await {
             Ok(grant) => grant,
             Err(fnet_interfaces_ext::admin::TerminalError::Fidl(
-                fidl::Error::ClientChannelClosed { status, protocol_name },
+                fidl::Error::ClientChannelClosed { status, protocol_name, .. },
             )) => {
                 log_debug!(
                     "{}: netstack dropped the {} channel, interface {} does not exist",
@@ -1455,6 +1455,7 @@ mod tests {
 
     use anyhow::Error;
     use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::future::{Future, FutureExt as _};
     use futures::{SinkExt as _, Stream};
@@ -1466,10 +1467,13 @@ mod tests {
     use netlink_packet_core::NetlinkPayload;
     use test_case::test_case;
 
+    use crate::client::AsyncWorkItem;
     use crate::eventloop::{EventLoopComponent, Optional, Required};
     use crate::interfaces::testutil::FakeInterfacesHandler;
     use crate::messaging::testutil::{FakeSender, SentMessage};
+    use crate::protocol_family::route::NetlinkRouteNotifiedGroup;
     use crate::route_tables::ManagedNetlinkRouteTableIndex;
+    use crate::FeatureFlags;
 
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
     const V4_SUB2: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.1/32");
@@ -1600,6 +1604,7 @@ mod tests {
     >(
         table: RouteTableKey,
     ) {
+        let scope = fasync::Scope::new();
         let (subnet, next_hop) =
             I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
         let table_id = match table {
@@ -1637,14 +1642,18 @@ mod tests {
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
             ),
         };
-        let (mut right_sink, right_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[right_group],
-        );
-        let (mut wrong_sink, wrong_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_2,
-            &[wrong_group],
-        );
+        let (mut right_sink, right_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[right_group],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut wrong_sink, wrong_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_2,
+                &[wrong_group],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
         let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
         route_clients.add_client(right_client);
         route_clients.add_client(wrong_client);
@@ -1802,6 +1811,8 @@ mod tests {
         );
         assert_eq!(&right_sink.take_messages()[..], &[]);
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
+        drop(route_clients);
+        scope.join().await;
     }
 
     #[ip_test(I, test = false)]
@@ -1809,6 +1820,7 @@ mod tests {
     async fn handle_route_watcher_event_two_routesets<
         I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     >() {
+        let scope = fasync::Scope::new();
         let (subnet, next_hop) =
             I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
 
@@ -1867,14 +1879,18 @@ mod tests {
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
             ),
         };
-        let (mut right_sink, right_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[right_group],
-        );
-        let (mut wrong_sink, wrong_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_2,
-            &[wrong_group],
-        );
+        let (mut right_sink, right_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[right_group],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
+        let (mut wrong_sink, wrong_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_2,
+                &[wrong_group],
+            );
+        let _join_handle = scope.spawn(async_work_drain_task);
         let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
         route_clients.add_client(right_client);
         route_clients.add_client(wrong_client);
@@ -2033,6 +2049,8 @@ mod tests {
             )]
         );
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
+        drop(route_clients);
+        scope.join().await;
     }
 
     #[test_case(V4_SUB1, V4_NEXTHOP1)]
@@ -2155,6 +2173,7 @@ mod tests {
         type RoutesV6Worker = Optional;
         type RuleV4Worker = Optional;
         type RuleV6Worker = Optional;
+        type NduseroptWorker = Optional;
     }
 
     struct Setup<W, R> {
@@ -2168,6 +2187,7 @@ mod tests {
         pub interfaces_request_stream: fnet_root::InterfacesRequestStream,
         pub request_sink:
             mpsc::Sender<crate::eventloop::UnifiedRequest<FakeSender<RouteNetlinkMessage>>>,
+        pub async_work_sink: mpsc::UnboundedSender<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
     }
 
     fn setup_with_route_clients_yielding_admin_server_ends<
@@ -2182,6 +2202,7 @@ mod tests {
         let (request_sink, request_stream) = mpsc::channel(1);
         let (interfaces_proxy, interfaces) =
             fidl::endpoints::create_proxy::<fnet_root::InterfacesMarker>();
+        let (async_work_sink, async_work_receiver) = mpsc::unbounded();
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
@@ -2197,6 +2218,7 @@ mod tests {
             interfaces_handler: EventLoopComponent::Present(interfaces_handler),
             route_clients: EventLoopComponent::Present(route_clients),
             interfaces_proxy: EventLoopComponent::Present(interfaces_proxy),
+            async_work_receiver,
 
             interfaces_state_proxy: EventLoopComponent::Absent(Optional),
             v4_routes_state: EventLoopComponent::Absent(Optional),
@@ -2207,8 +2229,10 @@ mod tests {
             v6_route_table_provider: EventLoopComponent::Absent(Optional),
             v4_rule_table: EventLoopComponent::Absent(Optional),
             v6_rule_table: EventLoopComponent::Absent(Optional),
+            ndp_option_watcher_provider: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
+            feature_flags: FeatureFlags::test(),
         };
 
         let (IpInvariant(inputs), server_ends) = I::map_ip_out(
@@ -2312,6 +2336,7 @@ mod tests {
             route_sets: (routes_set_provider, route_table_provider),
             interfaces_request_stream,
             request_sink,
+            async_work_sink,
         }
     }
 
@@ -2334,6 +2359,7 @@ mod tests {
             route_sets: (routes_set_provider, route_table_provider),
             interfaces_request_stream,
             request_sink,
+            async_work_sink,
         } = setup_with_route_clients_yielding_admin_server_ends::<I>(route_clients);
         let route_set_stream =
             fnet_routes_ext::testutil::admin::serve_all_route_sets_with_table_id::<I>(
@@ -2373,6 +2399,7 @@ mod tests {
             route_sets: route_set_stream,
             interfaces_request_stream,
             request_sink,
+            async_work_sink,
         }
     }
 
@@ -2478,6 +2505,7 @@ mod tests {
                 interfaces: EventLoopComponent::Absent(Optional),
                 rules_v4: EventLoopComponent::Absent(Optional),
                 rules_v6: EventLoopComponent::Absent(Optional),
+                nduseropt: EventLoopComponent::Absent(Optional),
             },
             IpVersion::V6 => crate::eventloop::IncludedWorkers {
                 routes_v4: EventLoopComponent::Absent(Optional),
@@ -2485,6 +2513,7 @@ mod tests {
                 interfaces: EventLoopComponent::Absent(Optional),
                 rules_v4: EventLoopComponent::Absent(Optional),
                 rules_v6: EventLoopComponent::Absent(Optional),
+                nduseropt: EventLoopComponent::Absent(Optional),
             },
         };
 
@@ -2503,6 +2532,7 @@ mod tests {
             route_sets: route_set_stream,
             interfaces_request_stream: _,
             request_sink: _,
+            async_work_sink: _,
         } = setup::<I>();
         let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
         let watcher_fut = pin!(respond_to_watcher_with_routes(watcher_stream, [route], None));
@@ -2547,6 +2577,7 @@ mod tests {
             route_sets: route_set_stream,
             interfaces_request_stream: _,
             request_sink: _,
+            async_work_sink: _,
         } = setup::<I>();
         let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
         let routes_existing = [route.clone()];
@@ -2584,6 +2615,7 @@ mod tests {
             route_sets: route_set_stream,
             interfaces_request_stream: _,
             request_sink: _,
+            async_work_sink: _,
         } = setup::<I>();
         let event_loop_fut = pin!(run_event_loop::<I>(event_loop_inputs));
         let routes_existing = [route.clone()];
@@ -2701,92 +2733,66 @@ mod tests {
     where
         A::Version: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     {
-        let (mut route_sink, route_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[ModernGroup(match A::Version::VERSION {
-                IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
-                IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
-            })],
-        );
-        let (mut other_sink, other_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_2,
-            &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
-        );
-        let Setup {
-            event_loop_inputs,
-            mut watcher_stream,
-            route_sets: mut route_set_stream,
-            interfaces_request_stream,
-            request_sink,
-        } = setup_with_route_clients::<A::Version>({
-            let route_clients = ClientTable::default();
-            route_clients.add_client(route_client.clone());
-            route_clients.add_client(other_client);
-            route_clients
-        });
+        let scope = fasync::Scope::new();
+        let result = {
+            let (mut route_sink, route_client, async_work_drain_task) =
+                crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                    crate::client::testutil::CLIENT_ID_1,
+                    &[ModernGroup(match A::Version::VERSION {
+                        IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
+                        IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
+                    })],
+                );
+            let _join_handle = scope.spawn(async_work_drain_task);
+            let (mut other_sink, other_client, async_work_drain_task) =
+                crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                    crate::client::testutil::CLIENT_ID_2,
+                    &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
+                );
+            let _join_handle = scope.spawn(async_work_drain_task);
+            let Setup {
+                event_loop_inputs,
+                mut watcher_stream,
+                route_sets: mut route_set_stream,
+                interfaces_request_stream,
+                request_sink,
+                async_work_sink: _,
+            } = setup_with_route_clients::<A::Version>({
+                let route_clients = ClientTable::default();
+                route_clients.add_client(route_client.clone());
+                route_clients.add_client(other_client);
+                route_clients
+            });
 
-        let mut event_loop_fut = pin!(run_event_loop::<A::Version>(event_loop_inputs)
-            .map(|res| match res {
-                Err(e) => {
-                    log_debug!("event_loop_fut exiting with error {:?}", e);
-                    Err::<std::convert::Infallible, _>(e)
-                }
-            })
-            .fuse());
-
-        let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
-            watcher_stream.by_ref(),
-            std::iter::once(fnet_routes_ext::Event::<A::Version>::Idle.try_into().unwrap()),
-        );
-        futures::select! {
-            () = watcher_stream_fut.fuse() => {},
-            err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
-        }
-        assert_eq!(&route_sink.take_messages()[..], &[]);
-        assert_eq!(&other_sink.take_messages()[..], &[]);
-
-        let route_client = &route_client;
-        let fut = async {
-            // Add some initial route state by sending through PendingRequests.
-            let initial_new_routes =
-                get_test_route_events_new_route_args(subnet, next_hop1, next_hop2);
-            let count_initial_new_routes = initial_new_routes.len();
-
-            let request_sink = futures::stream::iter(initial_new_routes)
-                .fold(request_sink, |mut request_sink, args| async move {
-                    let (completer, waiter) = oneshot::channel();
-                    request_sink
-                        .send(
-                            Request {
-                                args,
-                                sequence_number: TEST_SEQUENCE_NUMBER,
-                                client: route_client.clone(),
-                                completer,
-                            }
-                            .into(),
-                        )
-                        .await
-                        .unwrap();
-                    assert_matches!(waiter.await.unwrap(), Ok(()));
-                    request_sink
+            let mut event_loop_fut = pin!(run_event_loop::<A::Version>(event_loop_inputs)
+                .map(|res| match res {
+                    Err(e) => {
+                        log_debug!("event_loop_fut exiting with error {:?}", e);
+                        Err::<std::convert::Infallible, _>(e)
+                    }
                 })
-                .await;
+                .fuse());
 
-            // Ensure these messages to load the initial route state are
-            // received prior to handling the next requests. The messages for
-            // these requests are not needed by the callers, so drop them.
-            for _ in 0..count_initial_new_routes {
-                // Drop two messages: once for adding the route to the managed table,
-                // and another for the double-writing of the route to the main table.
-                let _ = route_sink.next_message().await;
-                let _ = route_sink.next_message().await;
+            let watcher_stream_fut = respond_to_watcher::<A::Version, _>(
+                watcher_stream.by_ref(),
+                std::iter::once(fnet_routes_ext::Event::<A::Version>::Idle.try_into().unwrap()),
+            );
+            futures::select! {
+                () = watcher_stream_fut.fuse() => {},
+                err = event_loop_fut => unreachable!("eventloop should not return: {err:?}"),
             }
-            assert_eq!(route_sink.next_message().now_or_never(), None);
+            assert_eq!(&route_sink.take_messages()[..], &[]);
+            assert_eq!(&other_sink.take_messages()[..], &[]);
 
-            let (results, _request_sink) = futures::stream::iter(args)
-                .fold(
-                    (Vec::new(), request_sink),
-                    |(mut results, mut request_sink), args| async move {
+            let route_client = &route_client;
+            let fut = async {
+                // Add some initial route state by sending through PendingRequests.
+                let initial_new_routes =
+                    get_test_route_events_new_route_args(subnet, next_hop1, next_hop2);
+                let count_initial_new_routes = initial_new_routes.len();
+
+                let request_sink = futures::stream::iter(initial_new_routes)
+                    .fold(request_sink, |mut request_sink, args| async move {
                         let (completer, waiter) = oneshot::channel();
                         request_sink
                             .send(
@@ -2800,46 +2806,82 @@ mod tests {
                             )
                             .await
                             .unwrap();
-                        results.push(waiter.await.unwrap());
-                        (results, request_sink)
-                    },
-                )
-                .await;
+                        assert_matches!(waiter.await.unwrap(), Ok(()));
+                        request_sink
+                    })
+                    .await;
 
-            let messages = {
-                assert_eq!(&other_sink.take_messages()[..], &[]);
-                let mut messages = Vec::new();
-                while messages.len() < num_sink_messages {
-                    messages.push(route_sink.next_message().await);
+                // Ensure these messages to load the initial route state are
+                // received prior to handling the next requests. The messages for
+                // these requests are not needed by the callers, so drop them.
+                for _ in 0..count_initial_new_routes {
+                    // Drop two messages: once for adding the route to the managed table,
+                    // and another for the double-writing of the route to the main table.
+                    let _ = route_sink.next_message().await;
+                    let _ = route_sink.next_message().await;
                 }
                 assert_eq!(route_sink.next_message().now_or_never(), None);
-                messages
+
+                let (results, _request_sink) = futures::stream::iter(args)
+                    .fold(
+                        (Vec::new(), request_sink),
+                        |(mut results, mut request_sink), args| async move {
+                            let (completer, waiter) = oneshot::channel();
+                            request_sink
+                                .send(
+                                    Request {
+                                        args,
+                                        sequence_number: TEST_SEQUENCE_NUMBER,
+                                        client: route_client.clone(),
+                                        completer,
+                                    }
+                                    .into(),
+                                )
+                                .await
+                                .unwrap();
+                            results.push(waiter.await.unwrap());
+                            (results, request_sink)
+                        },
+                    )
+                    .await;
+
+                let messages = {
+                    assert_eq!(&other_sink.take_messages()[..], &[]);
+                    let mut messages = Vec::new();
+                    while messages.len() < num_sink_messages {
+                        messages.push(route_sink.next_message().await);
+                    }
+                    assert_eq!(route_sink.next_message().now_or_never(), None);
+                    messages
+                };
+
+                (messages, results)
             };
 
-            (messages, results)
+            let route_set_fut = respond_to_route_set_modifications::<A::Version, _, _>(
+                route_set_stream.by_ref(),
+                watcher_stream.by_ref(),
+                route_set_results,
+            )
+            .fuse();
+
+            let root_interfaces_fut = root_handler(interfaces_request_stream).fuse();
+
+            let (messages, results) = futures::select! {
+                (messages, results) = fut.fuse() => (messages, results),
+                res = futures::future::join3(
+                        route_set_fut,
+                        root_interfaces_fut,
+                        event_loop_fut,
+                    ) => {
+                    unreachable!("eventloop/stream handlers should not return: {res:?}")
+                }
+            };
+
+            TestRequestResult { messages, waiter_results: results }
         };
-
-        let route_set_fut = respond_to_route_set_modifications::<A::Version, _, _>(
-            route_set_stream.by_ref(),
-            watcher_stream.by_ref(),
-            route_set_results,
-        )
-        .fuse();
-
-        let root_interfaces_fut = root_handler(interfaces_request_stream).fuse();
-
-        let (messages, results) = futures::select! {
-            (messages, results) = fut.fuse() => (messages, results),
-            res = futures::future::join3(
-                    route_set_fut,
-                    root_interfaces_fut,
-                    event_loop_fut,
-                ) => {
-                unreachable!("eventloop/stream handlers should not return: {res:?}")
-            }
-        };
-
-        TestRequestResult { messages, waiter_results: results }
+        scope.join().await;
+        result
     }
 
     #[test_case(V4_SUB1, V4_NEXTHOP1, V4_NEXTHOP2; "v4_route_dump")]
@@ -4797,380 +4839,399 @@ mod tests {
     async fn garbage_collects_empty_table<
         I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
     >() {
-        let (_route_sink, route_client) = crate::client::testutil::new_fake_client::<NetlinkRoute>(
-            crate::client::testutil::CLIENT_ID_1,
-            &[ModernGroup(match I::VERSION {
-                IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
-                IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
-            })],
-        );
-        let route_clients = ClientTable::default();
-        route_clients.add_client(route_client.clone());
+        let (_route_sink, route_client, async_work_drain_task) =
+            crate::client::testutil::new_fake_client::<NetlinkRoute>(
+                crate::client::testutil::CLIENT_ID_1,
+                &[ModernGroup(match I::VERSION {
+                    IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
+                    IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
+                })],
+            );
+        let join_handle = fasync::Task::spawn(async_work_drain_task);
+        {
+            // Move `route_client` into the scope so it gets dropped.
+            let route_client = route_client;
+            let route_clients = ClientTable::default();
+            route_clients.add_client(route_client.clone());
 
-        let Setup {
-            event_loop_inputs,
-            watcher_stream,
-            route_sets: (main_route_table_server_end, route_table_provider_server_end),
-            interfaces_request_stream: _,
-            mut request_sink,
-        } = setup_with_route_clients_yielding_admin_server_ends::<I>(route_clients);
+            let Setup {
+                event_loop_inputs,
+                watcher_stream,
+                route_sets: (main_route_table_server_end, route_table_provider_server_end),
+                interfaces_request_stream: _,
+                mut request_sink,
+                async_work_sink: _,
+            } = setup_with_route_clients_yielding_admin_server_ends::<I>(route_clients);
 
-        let mut main_route_table_fut =
-            pin!(fnet_routes_ext::testutil::admin::serve_noop_route_sets_with_table_id::<I>(
-                main_route_table_server_end,
-                MAIN_FIDL_TABLE_ID
-            )
-            .fuse());
+            let mut main_route_table_fut =
+                pin!(fnet_routes_ext::testutil::admin::serve_noop_route_sets_with_table_id::<I>(
+                    main_route_table_server_end,
+                    MAIN_FIDL_TABLE_ID
+                )
+                .fuse());
 
-        let mut watcher_stream = pin!(watcher_stream.fuse());
-        let mut route_table_provider_stream =
-            pin!(route_table_provider_server_end.into_stream().fuse());
+            let mut watcher_stream = pin!(watcher_stream.fuse());
+            let mut route_table_provider_stream =
+                pin!(route_table_provider_server_end.into_stream().fuse());
 
-        let mut event_loop = {
-            let included_workers = match I::VERSION {
-                IpVersion::V4 => crate::eventloop::IncludedWorkers {
-                    routes_v4: EventLoopComponent::Present(()),
-                    routes_v6: EventLoopComponent::Absent(Optional),
-                    interfaces: EventLoopComponent::Absent(Optional),
-                    rules_v4: EventLoopComponent::Absent(Optional),
-                    rules_v6: EventLoopComponent::Absent(Optional),
-                },
-                IpVersion::V6 => crate::eventloop::IncludedWorkers {
-                    routes_v4: EventLoopComponent::Absent(Optional),
-                    routes_v6: EventLoopComponent::Present(()),
-                    interfaces: EventLoopComponent::Absent(Optional),
-                    rules_v4: EventLoopComponent::Absent(Optional),
-                    rules_v6: EventLoopComponent::Absent(Optional),
-                },
+            let mut event_loop = {
+                let included_workers = match I::VERSION {
+                    IpVersion::V4 => crate::eventloop::IncludedWorkers {
+                        routes_v4: EventLoopComponent::Present(()),
+                        routes_v6: EventLoopComponent::Absent(Optional),
+                        interfaces: EventLoopComponent::Absent(Optional),
+                        rules_v4: EventLoopComponent::Absent(Optional),
+                        rules_v6: EventLoopComponent::Absent(Optional),
+                        nduseropt: EventLoopComponent::Absent(Optional),
+                    },
+                    IpVersion::V6 => crate::eventloop::IncludedWorkers {
+                        routes_v4: EventLoopComponent::Absent(Optional),
+                        routes_v6: EventLoopComponent::Present(()),
+                        interfaces: EventLoopComponent::Absent(Optional),
+                        rules_v4: EventLoopComponent::Absent(Optional),
+                        rules_v6: EventLoopComponent::Absent(Optional),
+                        nduseropt: EventLoopComponent::Absent(Optional),
+                    },
+                };
+
+                let event_loop_fut = event_loop_inputs.initialize(included_workers).fuse();
+                let watcher_fut = async {
+                    let watch_req =
+                        watcher_stream.by_ref().next().await.expect("should not have ended");
+                    // Start with no routes.
+                    fnet_routes_ext::testutil::handle_watch::<I>(
+                        watch_req,
+                        vec![fnet_routes_ext::Event::<I>::Idle.try_into().unwrap()],
+                    )
+                }
+                .fuse();
+
+                futures::select! {
+                    () = main_route_table_fut => unreachable!(),
+                    (event_loop_result, ()) = futures::future::join(
+                            event_loop_fut, watcher_fut) => {
+                        event_loop_result.expect("should not get error")
+                    }
+                }
             };
 
-            let event_loop_fut = event_loop_inputs.initialize(included_workers).fuse();
-            let watcher_fut = async {
-                let watch_req =
-                    watcher_stream.by_ref().next().await.expect("should not have ended");
-                // Start with no routes.
-                fnet_routes_ext::testutil::handle_watch::<I>(
-                    watch_req,
-                    vec![fnet_routes_ext::Event::<I>::Idle.try_into().unwrap()],
+            let (completer, mut initial_add_request_waiter) = oneshot::channel();
+
+            let new_route_args = NewRouteArgs::Unicast(I::map_ip_out(
+                (),
+                |()| {
+                    create_unicast_new_route_args(
+                        V4_SUB1,
+                        V4_NEXTHOP1,
+                        DEV1.into(),
+                        METRIC1,
+                        MANAGED_ROUTE_TABLE_INDEX,
+                    )
+                },
+                |()| {
+                    create_unicast_new_route_args(
+                        V6_SUB1,
+                        V6_NEXTHOP1,
+                        DEV1.into(),
+                        METRIC1,
+                        MANAGED_ROUTE_TABLE_INDEX,
+                    )
+                },
+            ));
+            let expected_route = fnet_routes_ext::Route::<I>::from(new_route_args);
+
+            // Request that a route is installed in a new table.
+            request_sink
+                .try_send(
+                    Request {
+                        args: RequestArgs::Route(RouteRequestArgs::New(new_route_args)),
+                        sequence_number: TEST_SEQUENCE_NUMBER,
+                        client: route_client.clone(),
+                        completer,
+                    }
+                    .into(),
                 )
-            }
-            .fuse();
+                .expect("should succeed");
 
-            futures::select! {
-                () = main_route_table_fut => unreachable!(),
-                (event_loop_result, ()) = futures::future::join(event_loop_fut, watcher_fut) => {
-                    event_loop_result.expect("should not get error")
-                }
-            }
-        };
+            // Run the event loop and observe the new table get created and the
+            // route set requests go out.
+            let (mut route_table_stream, mut route_set_stream) = {
+                let event_loop_fut = event_loop
+                    .run_one_step_in_tests()
+                    .map(|result| result.expect("event loop should not hit error"))
+                    .fuse();
+                let route_table_fut = async {
+                    let (server_end, _name) =
+                        fnet_routes_ext::admin::concretize_route_table_provider_request::<I>(
+                            route_table_provider_stream
+                                .next()
+                                .await
+                                .expect("should not have ended"),
+                        )
+                        .expect("should not get error");
+                    let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
-        let (completer, mut initial_add_request_waiter) = oneshot::channel();
-
-        let new_route_args = NewRouteArgs::Unicast(I::map_ip_out(
-            (),
-            |()| {
-                create_unicast_new_route_args(
-                    V4_SUB1,
-                    V4_NEXTHOP1,
-                    DEV1.into(),
-                    METRIC1,
-                    MANAGED_ROUTE_TABLE_INDEX,
-                )
-            },
-            |()| {
-                create_unicast_new_route_args(
-                    V6_SUB1,
-                    V6_NEXTHOP1,
-                    DEV1.into(),
-                    METRIC1,
-                    MANAGED_ROUTE_TABLE_INDEX,
-                )
-            },
-        ));
-        let expected_route = fnet_routes_ext::Route::<I>::from(new_route_args);
-
-        // Request that a route is installed in a new table.
-        request_sink
-            .try_send(
-                Request {
-                    args: RequestArgs::Route(RouteRequestArgs::New(new_route_args)),
-                    sequence_number: TEST_SEQUENCE_NUMBER,
-                    client: route_client.clone(),
-                    completer,
-                }
-                .into(),
-            )
-            .expect("should succeed");
-
-        // Run the event loop and observe the new table get created and the route set requests go
-        // out.
-        let (mut route_table_stream, mut route_set_stream) = {
-            let event_loop_fut = event_loop
-                .run_one_step_in_tests()
-                .map(|result| result.expect("event loop should not hit error"))
-                .fuse();
-            let route_table_fut = async {
-                let (server_end, _name) =
-                    fnet_routes_ext::admin::concretize_route_table_provider_request::<I>(
-                        route_table_provider_stream.next().await.expect("should not have ended"),
+                    let request = I::into_route_table_request_result(
+                        route_table_stream.by_ref().next().await.expect("should not have ended"),
                     )
                     .expect("should not get error");
-                let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
-                let request = I::into_route_table_request_result(
-                    route_table_stream.by_ref().next().await.expect("should not have ended"),
-                )
-                .expect("should not get error");
+                    let responder = match request {
+                        RouteTableRequest::GetTableId { responder } => responder,
+                        _ => panic!("should be GetTableId"),
+                    };
+                    responder.send(OTHER_FIDL_TABLE_ID.get()).expect("should succeed");
 
-                let responder = match request {
-                    RouteTableRequest::GetTableId { responder } => responder,
-                    _ => panic!("should be GetTableId"),
-                };
-                responder.send(OTHER_FIDL_TABLE_ID.get()).expect("should succeed");
+                    let request = I::into_route_table_request_result(
+                        route_table_stream.by_ref().next().await.expect("should not have ended"),
+                    )
+                    .expect("should not get error");
 
-                let request = I::into_route_table_request_result(
-                    route_table_stream.by_ref().next().await.expect("should not have ended"),
-                )
-                .expect("should not get error");
+                    let server_end = match request {
+                        RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
+                            route_set
+                        }
+                        _ => panic!("should be NewRouteSet"),
+                    };
+                    let mut route_set_stream = server_end.into_stream().boxed().fuse();
 
-                let server_end = match request {
-                    RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => route_set,
-                    _ => panic!("should be NewRouteSet"),
-                };
-                let mut route_set_stream = server_end.into_stream().boxed().fuse();
+                    let request = I::into_route_set_request_result(
+                        route_set_stream.by_ref().next().await.expect("should not have ended"),
+                    )
+                    .expect("should not get error");
 
-                let request = I::into_route_set_request_result(
-                    route_set_stream.by_ref().next().await.expect("should not have ended"),
-                )
-                .expect("should not get error");
+                    let (route, responder) = match request {
+                        RouteSetRequest::AddRoute { route, responder } => (route, responder),
+                        _ => panic!("should be AddRoute"),
+                    };
+                    let route = route.expect("should successfully convert FIDl");
+                    assert_eq!(route, expected_route);
 
-                let (route, responder) = match request {
-                    RouteSetRequest::AddRoute { route, responder } => (route, responder),
-                    _ => panic!("should be AddRoute"),
-                };
-                let route = route.expect("should successfully convert FIDl");
-                assert_eq!(route, expected_route);
-
-                responder.send(Ok(true)).expect("sending response should succeed");
-                (route_table_stream, route_set_stream)
-            }
-            .fuse();
-            futures::select! {
-                () = main_route_table_fut => unreachable!(),
-                ((), streams) = futures::future::join(event_loop_fut, route_table_fut) => streams
-            }
-        };
-
-        {
-            let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
-            // The new route table should be present in the map.
-            let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
-                Some(RouteTableLookup::Managed(table)) => table,
-                _ => panic!("table should be present"),
-            };
-            assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
-
-            // But the new route won't be tracked because we haven't confirmed it via the watcher
-            // yet.
-            assert!(routes_worker.fidl_route_map.route_is_uninstalled_in_tables(
-                &expected_route,
-                [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
-            ));
-        }
-
-        // The request won't be complete until we've confirmed addition via the watcher.
-        assert_matches!(initial_add_request_waiter.try_recv(), Ok(None));
-
-        // Run the event loop while yielding the new route via the watcher.
-        {
-            let event_loop_fut = async {
-                // Handling two events, so run two steps.
-                event_loop.run_one_step_in_tests().await.expect("should not hit error");
-                event_loop.run_one_step_in_tests().await.expect("should not hit error");
-            }
-            .fuse();
-            let watcher_fut = async {
-                let watch_req =
-                    watcher_stream.by_ref().next().await.expect("should not have ended");
-                // Show that the route was added for both the main and the owned FIDL table.
-                fnet_routes_ext::testutil::handle_watch::<I>(
-                    watch_req,
-                    vec![
-                        fnet_routes_ext::Event::<I>::Added(fnet_routes_ext::InstalledRoute {
-                            route: expected_route,
-                            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
-                                metric: METRIC1,
-                            },
-                            table_id: MAIN_FIDL_TABLE_ID,
-                        })
-                        .try_into()
-                        .unwrap(),
-                        fnet_routes_ext::Event::<I>::Added(fnet_routes_ext::InstalledRoute {
-                            route: expected_route,
-                            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
-                                metric: METRIC1,
-                            },
-                            table_id: OTHER_FIDL_TABLE_ID,
-                        })
-                        .try_into()
-                        .unwrap(),
-                    ],
-                );
-            };
-            let ((), ()) = futures::join!(event_loop_fut, watcher_fut);
-        }
-
-        {
-            let (routes_worker, _route_table_map) = event_loop.route_table_state::<I>();
-
-            // The route should be noted as stored in both tables now.
-            assert!(routes_worker.fidl_route_map.route_is_installed_in_tables(
-                &expected_route,
-                [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
-            ));
-        }
-
-        assert_matches!(initial_add_request_waiter.try_recv(), Ok(Some(Ok(()))));
-
-        let (completer, mut del_request_waiter) = oneshot::channel();
-
-        let del_route_args = I::map_ip_out(
-            (),
-            |()| {
-                create_unicast_del_route_args(
-                    V4_SUB1,
-                    Some(V4_NEXTHOP1),
-                    Some(DEV1.into()),
-                    Some(METRIC1),
-                    MANAGED_ROUTE_TABLE_INDEX,
-                )
-            },
-            |()| {
-                create_unicast_del_route_args(
-                    V6_SUB1,
-                    Some(V6_NEXTHOP1),
-                    Some(DEV1.into()),
-                    Some(METRIC1),
-                    MANAGED_ROUTE_TABLE_INDEX,
-                )
-            },
-        );
-
-        // Request the route's removal.
-        request_sink
-            .try_send(
-                Request {
-                    args: RequestArgs::Route(RouteRequestArgs::Del(DelRouteArgs::Unicast(
-                        del_route_args,
-                    ))),
-                    sequence_number: TEST_SEQUENCE_NUMBER,
-                    client: route_client.clone(),
-                    completer,
+                    responder.send(Ok(true)).expect("sending response should succeed");
+                    (route_table_stream, route_set_stream)
                 }
-                .into(),
-            )
-            .expect("should succeed");
-
-        // Observe and handle the removal requests.
-        {
-            let event_loop_fut = event_loop
-                .run_one_step_in_tests()
-                .map(|result| result.expect("event loop should not hit error"))
                 .fuse();
-            let route_set_fut = async {
-                let request = I::into_route_set_request_result(
-                    route_set_stream.next().await.expect("should not have ended"),
-                )
-                .expect("should not get error");
-                let (route, responder) = match request {
-                    RouteSetRequest::RemoveRoute { route, responder } => (route, responder),
-                    _ => panic!("should be DelRoute"),
+                futures::select! {
+                    () = main_route_table_fut => unreachable!(),
+                    ((), streams) = futures::future::join(event_loop_fut, route_table_fut) => {
+                        streams
+                    }
+                }
+            };
+
+            {
+                let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
+                // The new route table should be present in the map.
+                let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
+                    Some(RouteTableLookup::Managed(table)) => table,
+                    _ => panic!("table should be present"),
                 };
-                let route = route.expect("should successfully convert FIDl");
-                assert_eq!(route, expected_route);
+                assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
 
-                responder.send(Ok(true)).expect("sending response should succeed");
+                // But the new route won't be tracked because we haven't
+                // confirmed it via the watcher yet.
+                assert!(routes_worker.fidl_route_map.route_is_uninstalled_in_tables(
+                    &expected_route,
+                    [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
+                ));
             }
-            .fuse();
 
-            futures::select! {
-                () = main_route_table_fut => unreachable!(),
-                ((), ()) = futures::future::join(event_loop_fut, route_set_fut) => (),
+            // The request won't be complete until we've confirmed addition via the watcher.
+            assert_matches!(initial_add_request_waiter.try_recv(), Ok(None));
+
+            // Run the event loop while yielding the new route via the watcher.
+            {
+                let event_loop_fut = async {
+                    // Handling two events, so run two steps.
+                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                }
+                .fuse();
+                let watcher_fut = async {
+                    let watch_req =
+                        watcher_stream.by_ref().next().await.expect("should not have ended");
+                    // Show that the route was added for both the main and the owned FIDL table.
+                    fnet_routes_ext::testutil::handle_watch::<I>(
+                        watch_req,
+                        vec![
+                            fnet_routes_ext::Event::<I>::Added(fnet_routes_ext::InstalledRoute {
+                                route: expected_route,
+                                effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                                    metric: METRIC1,
+                                },
+                                table_id: MAIN_FIDL_TABLE_ID,
+                            })
+                            .try_into()
+                            .unwrap(),
+                            fnet_routes_ext::Event::<I>::Added(fnet_routes_ext::InstalledRoute {
+                                route: expected_route,
+                                effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                                    metric: METRIC1,
+                                },
+                                table_id: OTHER_FIDL_TABLE_ID,
+                            })
+                            .try_into()
+                            .unwrap(),
+                        ],
+                    );
+                };
+                let ((), ()) = futures::join!(event_loop_fut, watcher_fut);
             }
-        }
 
-        // We still haven't confirmed the removal via the watcher.
-        {
-            let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
-            // The route table should still be present in the map.
-            let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
-                Some(RouteTableLookup::Managed(table)) => table,
-                _ => panic!("table should be present"),
-            };
-            assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
+            {
+                let (routes_worker, _route_table_map) = event_loop.route_table_state::<I>();
 
-            assert!(routes_worker.fidl_route_map.route_is_installed_in_tables(
-                &expected_route,
-                [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
-            ));
-        }
-        assert_matches!(del_request_waiter.try_recv(), Ok(None));
-
-        // Run the event loop while yielding the deleted route via the watcher.
-        {
-            let event_loop_fut = async {
-                // Handling two events, so run two steps.
-                event_loop.run_one_step_in_tests().await.expect("should not hit error");
-                event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                // The route should be noted as stored in both tables now.
+                assert!(routes_worker.fidl_route_map.route_is_installed_in_tables(
+                    &expected_route,
+                    [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
+                ));
             }
-            .fuse();
-            let watcher_fut = async {
-                let watch_req =
-                    watcher_stream.by_ref().next().await.expect("should not have ended");
-                // Show that the route was removed for both the main and the owned FIDL table.
-                fnet_routes_ext::testutil::handle_watch::<I>(
-                    watch_req,
-                    vec![
-                        fnet_routes_ext::Event::<I>::Removed(fnet_routes_ext::InstalledRoute {
-                            route: expected_route,
-                            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
-                                metric: 0,
-                            },
-                            table_id: MAIN_FIDL_TABLE_ID,
-                        })
-                        .try_into()
-                        .unwrap(),
-                        fnet_routes_ext::Event::<I>::Removed(fnet_routes_ext::InstalledRoute {
-                            route: expected_route,
-                            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
-                                metric: 0,
-                            },
-                            table_id: OTHER_FIDL_TABLE_ID,
-                        })
-                        .try_into()
-                        .unwrap(),
-                    ],
-                );
-            };
-            let ((), ()) = futures::join!(event_loop_fut, watcher_fut);
-        }
 
-        {
-            let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
+            assert_matches!(initial_add_request_waiter.try_recv(), Ok(Some(Ok(()))));
 
-            // The route should be noted as being removed from both tables now.
-            assert!(routes_worker.fidl_route_map.route_is_uninstalled_in_tables(
-                &expected_route,
-                [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
-            ));
+            let (completer, mut del_request_waiter) = oneshot::channel();
 
-            // And the table should now be cleaned up from the map.
-            assert_matches!(route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX), None);
-        }
-        assert_matches!(del_request_waiter.try_recv(), Ok(Some(Ok(()))));
+            let del_route_args = I::map_ip_out(
+                (),
+                |()| {
+                    create_unicast_del_route_args(
+                        V4_SUB1,
+                        Some(V4_NEXTHOP1),
+                        Some(DEV1.into()),
+                        Some(METRIC1),
+                        MANAGED_ROUTE_TABLE_INDEX,
+                    )
+                },
+                |()| {
+                    create_unicast_del_route_args(
+                        V6_SUB1,
+                        Some(V6_NEXTHOP1),
+                        Some(DEV1.into()),
+                        Some(METRIC1),
+                        MANAGED_ROUTE_TABLE_INDEX,
+                    )
+                },
+            );
 
-        // Because the table was dropped from the map, the route table request stream should close.
-        let route_table_request = route_table_stream.next().await;
-        assert!(route_table_request.is_none());
+            // Request the route's removal.
+            request_sink
+                .try_send(
+                    Request {
+                        args: RequestArgs::Route(RouteRequestArgs::Del(DelRouteArgs::Unicast(
+                            del_route_args,
+                        ))),
+                        sequence_number: TEST_SEQUENCE_NUMBER,
+                        client: route_client.clone(),
+                        completer,
+                    }
+                    .into(),
+                )
+                .expect("should succeed");
+
+            // Observe and handle the removal requests.
+            {
+                let event_loop_fut = event_loop
+                    .run_one_step_in_tests()
+                    .map(|result| result.expect("event loop should not hit error"))
+                    .fuse();
+                let route_set_fut = async {
+                    let request = I::into_route_set_request_result(
+                        route_set_stream.next().await.expect("should not have ended"),
+                    )
+                    .expect("should not get error");
+                    let (route, responder) = match request {
+                        RouteSetRequest::RemoveRoute { route, responder } => (route, responder),
+                        _ => panic!("should be DelRoute"),
+                    };
+                    let route = route.expect("should successfully convert FIDl");
+                    assert_eq!(route, expected_route);
+
+                    responder.send(Ok(true)).expect("sending response should succeed");
+                }
+                .fuse();
+
+                futures::select! {
+                    () = main_route_table_fut => unreachable!(),
+                    ((), ()) = futures::future::join(event_loop_fut, route_set_fut) => (),
+                }
+            }
+
+            // We still haven't confirmed the removal via the watcher.
+            {
+                let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
+                // The route table should still be present in the map.
+                let table = match route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX) {
+                    Some(RouteTableLookup::Managed(table)) => table,
+                    _ => panic!("table should be present"),
+                };
+                assert_eq!(table.fidl_table_id, OTHER_FIDL_TABLE_ID);
+
+                assert!(routes_worker.fidl_route_map.route_is_installed_in_tables(
+                    &expected_route,
+                    [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
+                ));
+            }
+            assert_matches!(del_request_waiter.try_recv(), Ok(None));
+
+            // Run the event loop while yielding the deleted route via the watcher.
+            {
+                let event_loop_fut = async {
+                    // Handling two events, so run two steps.
+                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                    event_loop.run_one_step_in_tests().await.expect("should not hit error");
+                }
+                .fuse();
+                let watcher_fut = async {
+                    let watch_req =
+                        watcher_stream.by_ref().next().await.expect("should not have ended");
+                    // Show that the route was removed for both the main and the owned FIDL table.
+                    fnet_routes_ext::testutil::handle_watch::<I>(
+                        watch_req,
+                        vec![
+                            fnet_routes_ext::Event::<I>::Removed(fnet_routes_ext::InstalledRoute {
+                                route: expected_route,
+                                effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                                    metric: 0,
+                                },
+                                table_id: MAIN_FIDL_TABLE_ID,
+                            })
+                            .try_into()
+                            .unwrap(),
+                            fnet_routes_ext::Event::<I>::Removed(fnet_routes_ext::InstalledRoute {
+                                route: expected_route,
+                                effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                                    metric: 0,
+                                },
+                                table_id: OTHER_FIDL_TABLE_ID,
+                            })
+                            .try_into()
+                            .unwrap(),
+                        ],
+                    );
+                };
+                let ((), ()) = futures::join!(event_loop_fut, watcher_fut);
+            }
+
+            {
+                let (routes_worker, route_table_map) = event_loop.route_table_state::<I>();
+
+                // The route should be noted as being removed from both tables now.
+                assert!(routes_worker.fidl_route_map.route_is_uninstalled_in_tables(
+                    &expected_route,
+                    [&OTHER_FIDL_TABLE_ID, &MAIN_FIDL_TABLE_ID]
+                ));
+
+                // And the table should now be cleaned up from the map.
+                assert_matches!(route_table_map.get(&MANAGED_ROUTE_TABLE_INDEX), None);
+            }
+            assert_matches!(del_request_waiter.try_recv(), Ok(Some(Ok(()))));
+
+            // Because the table was dropped from the map, the route table
+            // request stream should close.
+            let route_table_request = route_table_stream.next().await;
+            assert!(route_table_request.is_none());
+        };
+        join_handle.await;
     }
 }

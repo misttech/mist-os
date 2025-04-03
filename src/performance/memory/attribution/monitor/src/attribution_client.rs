@@ -239,7 +239,7 @@ impl AttributionClientImpl {
             let attributions = match provider.get().await {
                 Ok(response) => response?,
                 Err(err) => {
-                    if let fidl::Error::ClientChannelClosed { status: _, protocol_name: _ } = err {
+                    if let fidl::Error::ClientChannelClosed { .. } = err {
                         // The server disconnected voluntarily. This is the expected behavior when
                         // a Principal shuts down, so we just need to clean up without throwing an
                         // error.

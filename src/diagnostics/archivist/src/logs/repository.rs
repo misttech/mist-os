@@ -12,9 +12,8 @@ use crate::logs::shared_buffer::SharedBuffer;
 use crate::logs::stats::LogStreamStats;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
-use fidl_fuchsia_diagnostics::{
-    LogInterestSelector, Selector, Severity as FidlSeverity, StreamMode,
-};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode};
+use fidl_fuchsia_diagnostics_types::Severity as FidlSeverity;
 use flyweights::FlyStr;
 use fuchsia_inspect_derive::WithInspect;
 use fuchsia_sync::Mutex;
@@ -175,6 +174,7 @@ impl LogsRepository {
     pub fn logs_cursor_raw(
         &self,
         mode: StreamMode,
+        selectors: Option<Vec<Selector>>,
         parent_trace_id: ftrace::Id,
     ) -> impl Stream<Item = CursorItem> + Send {
         let mut repo = self.mutable_state.lock();
@@ -182,7 +182,7 @@ impl LogsRepository {
             let cursor = c.cursor_raw(mode);
             (Arc::clone(identity), cursor)
         });
-        let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id, None, substreams);
+        let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id, selectors, substreams);
         repo.logs_multiplexers.add(mode, Box::new(mpx_handle));
         merged.set_on_drop_id_sender(repo.logs_multiplexers.cleanup_sender());
         merged
@@ -414,6 +414,7 @@ impl LogsRepositoryState {
                         // Log has no "Fatal" level, so set it to Error
                         // instead.
                         FidlSeverity::Fatal => LevelFilter::Error,
+                        FidlSeverity::__SourceBreaking { .. } => return,
                     },
                 );
             }

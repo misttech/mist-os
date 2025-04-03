@@ -55,6 +55,7 @@ if (is_host) {
       "templates/bits.askama",
       "templates/compat.askama",
       "templates/const.askama",
+      "templates/empty_success_struct.askama",
       "templates/enum.askama",
       "templates/protocol.askama",
       "templates/schema.askama",

@@ -5,17 +5,7 @@
 
 import argparse
 import json
-import os
 import sys
-
-sys.path.append(
-    os.path.join(
-        os.path.dirname(__file__),
-        os.pardir,
-        "cpp",
-    )
-)
-import binaries
 
 
 def main():
@@ -57,13 +47,8 @@ def main():
         required=False,
     )
     parser.add_argument(
-        "--lib-debug-file",
-        help="Path to the source debug version of the library",
-        required=False,
-    )
-    parser.add_argument(
-        "--debug-mapping",
-        help="Path to the file where to write the file mapping for the debug library",
+        "--lib-debug",
+        help="Path to the debug-symbols library in the SDK",
         required=False,
     )
     parser.add_argument(
@@ -89,12 +74,8 @@ def main():
     if args.ifs:
         metadata["ifs"] = args.ifs
 
-    if args.lib_debug_file:
-        # The path of the debug file in the SDK depends on its build id.
-        debug_path = binaries.get_sdk_debug_path(args.lib_debug_file)
-        with open(args.debug_mapping, "w") as mappings_file:
-            mappings_file.write(debug_path + "=" + args.lib_debug_file + "\n")
-        metadata["binaries"][args.arch]["debug"] = debug_path
+    if args.lib_debug:
+        metadata["binaries"][args.arch]["debug"] = args.lib_debug
 
     if args.lib_dist:
         metadata["binaries"][args.arch]["dist"] = args.lib_dist

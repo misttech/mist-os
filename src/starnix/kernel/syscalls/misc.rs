@@ -41,12 +41,56 @@ use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
-    c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname, EFAULT,
+    c_char, errno, error, from_status_like_fdio, perf_event_attr,
+    perf_event_read_format_PERF_FORMAT_GROUP, perf_event_read_format_PERF_FORMAT_ID,
+    perf_event_read_format_PERF_FORMAT_LOST, perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
+    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, pid_t, uapi, utsname, EFAULT,
     GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
     LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
     LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
     LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
 };
+use std::sync::atomic::{AtomicU64, Ordering};
+use zerocopy::{Immutable, IntoBytes};
+
+static READ_FORMAT_ID_GENERATOR: AtomicU64 = AtomicU64::new(0);
+
+uapi::check_arch_independent_layout! {
+    utsname {
+        sysname,
+        nodename,
+        release,
+        version,
+        machine,
+        domainname,
+    }
+    perf_event_attr {
+        type_, // "type" is a reserved keyword so add a trailing underscore.
+        size,
+        config,
+        __bindgen_anon_1,
+        sample_type,
+        read_format,
+        _bitfield_align_1,
+        _bitfield_1,
+        __bindgen_anon_2,
+        bp_type,
+        __bindgen_anon_3,
+        __bindgen_anon_4,
+        branch_sample_type,
+        sample_regs_user,
+        sample_stack_user,
+        clockid,
+        sample_regs_intr,
+        aux_watermark,
+        sample_max_stack,
+        __reserved_2,
+        aux_sample_size,
+        __reserved_3,
+        sig_data,
+        config3,
+    }
+}
 
 pub fn do_uname(
     _locked: &mut Locked<'_, Unlocked>,
@@ -462,9 +506,22 @@ pub fn sys_delete_module(
     error!(ENOENT)
 }
 
+// See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
+#[repr(C)]
+#[derive(IntoBytes, Immutable, Default)]
+pub struct ReadFormatData {
+    value: u64,
+    time_enabled: u64,
+    time_running: u64,
+    id: u64,
+    _lost: u64,
+}
+
 pub struct PerfEventFile {
     _pid: pid_t,
     _cpu: i32,
+    _attr: perf_event_attr,
+    read_format_data: ReadFormatData,
 }
 
 // PerfEventFile object that implements FileOps.
@@ -482,10 +539,22 @@ impl FileOps for PerfEventFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn OutputBuffer,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
-        error!(ENOSYS)
+        // The regular read() call allows the case where the bytes-we-want-to-read-in won't
+        // fit in the output buffer. However, for perf_event_open's read(), "If you attempt to read
+        // into a buffer that is not big enough to hold the data, the error ENOSPC results."
+        if data.available() < std::mem::size_of::<ReadFormatData>() {
+            return error!(ENOSPC);
+        }
+        track_stub!(
+            TODO("https://fxbug.dev/402453955"),
+            "[perf_event_open] implement remaining error handling"
+        );
+
+        let bytes: &[u8; std::mem::size_of::<ReadFormatData>()] =
+            zerocopy::transmute_ref!(&self.read_format_data);
+        data.write(bytes)
     }
 
     fn ioctl(
@@ -496,7 +565,10 @@ impl FileOps for PerfEventFile {
         _request: u32,
         _arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        track_stub!(
+            TODO("https://fxbug.dev/394960158"),
+            "[perf_event_open] implement perf event functions"
+        );
         error!(ENOSYS)
     }
 
@@ -508,7 +580,10 @@ impl FileOps for PerfEventFile {
         _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        track_stub!(
+            TODO("https://fxbug.dev/394960158"),
+            "[perf_event_open] implement perf event functions"
+        );
         error!(ENOSYS)
     }
 }
@@ -516,7 +591,7 @@ impl FileOps for PerfEventFile {
 pub fn sys_perf_event_open(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    _attr: UserRef<perf_event_attr>,
+    attr: UserRef<perf_event_attr>,
     pid: pid_t,
     cpu: i32,
     _group_fd: FdNumber,
@@ -526,9 +601,52 @@ pub fn sys_perf_event_open(
         return error!(EINVAL);
     }
 
-    let file = Box::new(PerfEventFile { _pid: pid, _cpu: cpu });
+    // So far, the implementation only sets the read_data_format according to the "Reading results"
+    // section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html for a single event.
+    // Other features will be added in the future (see below track_stubs).
+    let perf_event_attrs: perf_event_attr = current_task.read_object(attr)?;
+    let read_format = perf_event_attrs.read_format;
+    let mut read_format_data = ReadFormatData::default();
+    track_stub!(
+        TODO("https://fxbug.dev/402938671"),
+        "[perf_event_open] implement read_format value"
+    );
+    read_format_data.value = 1;
+
+    if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED as u64) != 0 {
+        // Total time (ns) the event was enabled and running (currently same as TIME_RUNNING).
+        // Currently this just returns the monotonic time as we don't have a "duration" yet.
+        read_format_data.time_enabled = zx::MonotonicInstant::get().into_nanos() as u64;
+    }
+    if (read_format & perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING as u64) != 0 {
+        // Total time (ns) the event was enabled and running (currently same as TIME_ENABLED).
+        // Currently this just returns the monotonic time as we don't have a "duration" yet.
+        read_format_data.time_running = zx::MonotonicInstant::get().into_nanos() as u64;
+    }
+    if (read_format & perf_event_read_format_PERF_FORMAT_ID as u64) != 0 {
+        // Adds a 64-bit unique value that corresponds to the event group.
+        read_format_data.id = READ_FORMAT_ID_GENERATOR.fetch_add(1, Ordering::Relaxed);
+    }
+    if (read_format & perf_event_read_format_PERF_FORMAT_GROUP as u64) != 0 {
+        track_stub!(
+            TODO("https://fxbug.dev/402238049"),
+            "[perf_event_open] implement read_format group"
+        );
+        return error!(ENOSYS);
+    }
+    if (read_format & perf_event_read_format_PERF_FORMAT_LOST as u64) != 0 {
+        track_stub!(
+            TODO("https://fxbug.dev/402260383"),
+            "[perf_event_open] implement read_format lost"
+        );
+    }
+
+    let perf_event_file =
+        PerfEventFile { _pid: pid, _cpu: cpu, _attr: perf_event_attrs, read_format_data };
+    let file = Box::new(perf_event_file);
+    // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
     let file_handle =
-        Anon::new_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
+        Anon::new_private_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
     let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
 
     Ok(file_descriptor?.into())
@@ -537,42 +655,10 @@ pub fn sys_perf_event_open(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::mm::MemoryAccessorExt;
-    use crate::syscalls::misc::do_uname;
-    use crate::task::CurrentTask;
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::errors::Errno;
-    use starnix_uapi::uapi;
-    use starnix_uapi::user_address::UserRef;
-
-    pub fn sys_arch32_uname(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        name: UserRef<uapi::arch32::oldold_utsname>,
-    ) -> Result<(), Errno> {
-        fn trunc(val64: &[u8; 65], val32: &mut [u8; 9]) {
-            val32.copy_from_slice(&val64[..9]);
-            val32[8] = 0;
-        }
-        let mut new_result = uapi::utsname {
-            sysname: [0; 65],
-            nodename: [0; 65],
-            release: [0; 65],
-            version: [0; 65],
-            machine: [0; 65],
-            domainname: [0; 65],
-        };
-        do_uname(locked, current_task, &mut new_result)?;
-        let mut old_result: uapi::arch32::oldold_utsname = Default::default();
-        trunc(&new_result.sysname, &mut old_result.sysname);
-        trunc(&new_result.nodename, &mut old_result.nodename);
-        trunc(&new_result.release, &mut old_result.release);
-        trunc(&new_result.version, &mut old_result.version);
-        let arch32_mach: &str = "armv7l\0\0\0";
-        old_result.machine.copy_from_slice(arch32_mach.as_bytes());
-        current_task.write_object(name, &old_result)?;
-        Ok(())
-    }
+    pub use super::{
+        sys_perf_event_open as sys_arch32_perf_event_open, sys_reboot as sys_arch32_reboot,
+        sys_uname as sys_arch32_uname,
+    };
 }
 
 #[cfg(feature = "arch32")]

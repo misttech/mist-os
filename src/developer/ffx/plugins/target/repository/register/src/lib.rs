@@ -6,20 +6,18 @@ use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
 use ffx_writer::VerifiedMachineWriter;
-use fho::{
-    bug, return_bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
-};
-use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget, TargetInfo};
-use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositoryTarget as FfxRepositoryTarget};
+use fho::{bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result};
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
+use fidl_fuchsia_pkg_ext::RepositoryTarget;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
-use pkg::config::get_repository;
 use pkg::repo::register_target_with_repo_instance;
-use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
+use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::time::Duration;
-use target_holders::{daemon_protocol, moniker, TargetProxyHolder};
+use target_holders::{moniker, TargetProxyHolder};
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -39,8 +37,6 @@ pub enum CommandStatus {
 pub struct RegisterTool {
     #[command]
     cmd: RegisterCommand,
-    #[with(daemon_protocol())]
-    repos: RepositoryRegistryProxy,
     context: EnvironmentContext,
     target_proxy: TargetProxyHolder,
     #[with(moniker(REPOSITORY_MANAGER_MONIKER))]
@@ -116,34 +112,18 @@ impl RegisterTool {
         }
 
         let repository_target = RepositoryTarget {
-            repo_name: Some(repo_name.clone()),
+            repo_name: repo_name.clone(),
             target_identifier: target_spec.clone(),
-            aliases: Some(self.cmd.alias.clone()),
-            storage_type: self.cmd.storage_type,
-            ..Default::default()
+            aliases: Some(BTreeSet::from_iter(self.cmd.alias.iter().map(|a| a.to_string()))),
+            storage_type: self.cmd.storage_type.clone(),
         };
 
         if let Some(server_info) = pkg_server_info {
-            match server_info.server_mode {
-                ServerMode::Daemon => self.register_daemon(&repo_name, repository_target).await,
-                _ => self.register_standalone(&server_info, repository_target).await,
-            }
+            self.register_standalone(&server_info, repository_target).await
         } else {
-            // This means no running server matches the repo_name. Check if it is a daemon repo that is not running.
-            // If so, treat it as a daemon based repo
-            // with a warning. Once we migrate away from the daemon, it should go back to being an error.
-
-            if get_repository(&repo_name)?.is_some() {
-                tracing::warn!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
-                eprintln!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
-                eprintln!("If \"{repo_name}\" is supposed to be a standalone server, please start it before running this command.");
-
-                self.register_daemon(&repo_name, repository_target).await
-            } else {
-                return_user_error!(
-                    "{repo_name} is not a running repository, nor a daemon based repository."
-                )
-            }
+            return_user_error!(
+                "{repo_name} is not a running repository, nor a daemon based repository."
+            )
         }
     }
 
@@ -160,9 +140,6 @@ impl RegisterTool {
             Some(aliases) => Some(aliases),
         };
 
-        let ffx_repo_target_info =
-            FfxRepositoryTarget::try_from(repo_target_info).map_err(|e| bug!(e))?;
-
         let target_info: TargetInfo = timeout(Duration::from_secs(2), self.target_proxy.identity())
             .await
             .bug_context("Timed out getting target identity")?
@@ -173,60 +150,14 @@ impl RegisterTool {
         register_target_with_repo_instance(
             self.repo_proxy.clone(),
             self.engine_proxy.clone(),
-            &ffx_repo_target_info,
+            &repo_target_info,
             &target_info,
             repo_server_listen_addr,
             &info,
-            self.cmd.alias_conflict_mode.into(),
+            self.cmd.alias_conflict_mode.clone(),
         )
         .await
         .map_err(|e| bug!("Failed to register repository: {:?}", e))
-    }
-
-    async fn register_daemon(
-        &self,
-        repo_name: &str,
-        repo_target_info: RepositoryTarget,
-    ) -> Result<()> {
-        let target_spec = &repo_target_info.target_identifier;
-
-        match self
-            .repos
-            .register_target(&repo_target_info, self.cmd.alias_conflict_mode)
-            .await
-            .bug_context("communicating with daemon")?
-            .map_err(RepositoryError::from)
-        {
-            Ok(()) => Ok(()),
-            Err(err @ RepositoryError::TargetCommunicationFailure) => {
-                return_user_error!(
-                    "Error while registering repository {repo_name} with {target}: {err}\n\
-                                    Ensure that a target is running and connected with:\n\
-                                    $ ffx target list",
-                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
-                )
-            }
-            Err(RepositoryError::ServerNotRunning) => {
-                return_bug!(
-                    "Failed to register repository {repo_name} with {target} {reason:#}",
-                    reason = pkg::config::determine_why_repository_server_is_not_running().await,
-                    target = target_spec.clone().unwrap_or_else(|| "None".to_string())
-                )
-            }
-            Err(err @ RepositoryError::ConflictingRegistration) => {
-                return_user_error!(
-                                    "Error while registering repository: {err:#}\n\
-                                    Repository '{repo_name}' has an alias conflict in its registration.\n\
-                                    Locate and run de-registeration command specified in the Daemon log:\n\
-                                    \n\
-                                    $ ffx daemon log | grep \"Alias conflict found while registering '{repo_name}'\""
-                                )
-            }
-            Err(err) => {
-                return_bug!("Unexpected error. Failed to register repository {repo_name} with {target}: {err}",
-                target=target_spec.clone().unwrap_or_else(|| "None".to_string()))
-            }
-        }
     }
 }
 
@@ -239,12 +170,11 @@ mod test {
     use ffx_config::ConfigLevel;
     use ffx_target::TargetProxy;
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx::{
-        RepositoryError, RepositoryRegistryRequest, RepositoryStorageType, SshHostAddrInfo,
-        TargetRequest,
-    };
+    use fidl_fuchsia_developer_ffx::{SshHostAddrInfo, TargetRequest};
     use fidl_fuchsia_pkg::{MirrorConfig, RepositoryConfig, RepositoryManagerRequest};
-    use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode};
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
     use fidl_fuchsia_pkg_rewrite::{
         EditTransactionRequest, EngineRequest, LiteralRule, Rule, RuleIteratorRequest,
     };
@@ -252,6 +182,7 @@ mod test {
     use fuchsia_url::RepositoryUrl;
     use futures::channel::oneshot::{channel, Receiver};
     use futures::TryStreamExt;
+    use pkg::ServerMode;
     use std::collections::BTreeSet;
     use std::net::IpAddr;
     use target_holders::fake_proxy;
@@ -259,27 +190,9 @@ mod test {
     const REPO_NAME: &str = "some-name";
     const TARGET_NAME: &str = "some-target";
 
-    async fn setup_fake_server() -> (RepositoryRegistryProxy, Receiver<RepositoryTarget>) {
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let repos = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::RegisterTarget {
-                target_info,
-                responder,
-                alias_conflict_mode: _,
-            } => {
-                let mut target_info = target_info.clone();
-                target_info.target_identifier = Some(TARGET_NAME.into());
-                sender.take().unwrap().send(target_info).unwrap();
-                responder.send(Ok(())).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        (repos, receiver)
-    }
-
     async fn setup_fake_repo_proxy(
         expected_config: Option<RepositoryConfig>,
+        return_error: bool,
     ) -> (RepositoryManagerProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
@@ -336,8 +249,12 @@ mod test {
                         return;
                     }
                 }
-
-                responder.send(Ok(())).unwrap();
+                if return_error {
+                    let err: i32 = 2;
+                    responder.send(Err(err)).unwrap();
+                } else {
+                    responder.send(Ok(())).unwrap();
+                }
             }
             other => panic!("Unexpected request: {:?}", other),
         });
@@ -485,72 +402,10 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_register_daemon() {
-        let env = ffx_config::test_init().await.expect("test env");
-
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
-        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
-
-        let aliases = vec![String::from("my-alias")];
-
-        make_server_instance(
-            env.isolate_root.path(),
-            &env.context,
-            ServerMode::Daemon,
-            REPO_NAME,
-            BTreeSet::<String>::new(),
-        )
-        .await
-        .expect("repo server instance");
-
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(TARGET_NAME.into())
-            .await
-            .expect("set default target");
-
-        let tool = RegisterTool {
-            cmd: RegisterCommand {
-                repository: Some(REPO_NAME.to_string()),
-                port: None,
-                alias: aliases.clone(),
-                storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
-            },
-            repos: repos.clone(),
-            context: env.context.clone(),
-            repo_proxy,
-            engine_proxy,
-            target_proxy: target_proxy.into(),
-        };
-        let buffers = TestBuffers::default();
-        let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
-
-        tool.main(writer).await.expect("register ok");
-
-        let got = receiver.await.unwrap();
-        assert_eq!(
-            got,
-            RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NAME.to_string()),
-                aliases: Some(aliases),
-                storage_type: None,
-                ..Default::default()
-            }
-        );
-    }
-
-    #[fuchsia::test]
     async fn test_register_standalone() {
         let env = ffx_config::test_init().await.expect("test env");
 
-        let (repos, _) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -579,10 +434,8 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -621,8 +474,7 @@ mod test {
             path_prefix_replacement: "/".into(),
         });
 
-        let (repos, _) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(Some(expected_config)).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(Some(expected_config), false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(Some(expected_rule)).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -658,10 +510,8 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -699,8 +549,7 @@ mod test {
         .await
         .expect("repo server instance");
 
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -710,10 +559,8 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -723,26 +570,13 @@ mod test {
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
 
         tool.main(writer).await.expect("register ok");
-
-        let got = receiver.await.unwrap();
-        assert_eq!(
-            got,
-            RepositoryTarget {
-                repo_name: Some(default_repo_name.to_string()),
-                target_identifier: Some(TARGET_NAME.into()),
-                aliases: Some(vec![]),
-                storage_type: None,
-                ..Default::default()
-            }
-        );
     }
 
     #[fuchsia::test]
     async fn test_register_storage_type() {
         let env = ffx_config::test_init().await.expect("test env");
 
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -771,10 +605,8 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: Some(RepositoryStorageType::Persistent),
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -784,26 +616,13 @@ mod test {
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
 
         tool.main(writer).await.expect("register ok");
-
-        let got = receiver.await.unwrap();
-        assert_eq!(
-            got,
-            RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NAME.to_string()),
-                aliases: Some(aliases),
-                storage_type: Some(RepositoryStorageType::Persistent),
-                ..Default::default()
-            }
-        );
     }
 
     #[fuchsia::test]
     async fn test_register_empty_aliases() {
         let env = ffx_config::test_init().await.expect("test env");
 
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -830,10 +649,8 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -843,18 +660,6 @@ mod test {
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
 
         tool.main(writer).await.expect("register ok");
-
-        let got = receiver.await.unwrap();
-        assert_eq!(
-            got,
-            RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NAME.to_string()),
-                aliases: Some(vec![]),
-                storage_type: None,
-                ..Default::default()
-            }
-        );
     }
 
     #[fuchsia::test]
@@ -876,17 +681,7 @@ mod test {
         .await
         .expect("repo server instance");
 
-        let repos = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::RegisterTarget {
-                target_info: _,
-                responder,
-                alias_conflict_mode: _,
-            } => {
-                responder.send(Err(RepositoryError::TargetCommunicationFailure)).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, true).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -896,10 +691,8 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos,
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -909,9 +702,7 @@ mod test {
         let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
 
         let err = tool.main(writer).await.expect_err("register error");
-        let want = "Error while registering repository some-name with some-target: \
-        error communicating with target device\n\
-        Ensure that a target is running and connected with:\n$ ffx target list";
+        let want = "BUG: An internal command error occurred.\nError: Failed to register repository: RepositoryManagerError";
         assert_eq!(err.to_string(), want)
     }
 
@@ -928,24 +719,14 @@ mod test {
         make_server_instance(
             env.isolate_root.path(),
             &env.context,
-            ServerMode::Daemon,
+            ServerMode::Foreground,
             REPO_NAME,
             BTreeSet::<String>::new(),
         )
         .await
         .expect("repo server instance");
 
-        let repos = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::RegisterTarget {
-                target_info: _,
-                responder,
-                alias_conflict_mode: _,
-            } => {
-                responder.send(Err(RepositoryError::TargetCommunicationFailure)).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, true).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -955,10 +736,8 @@ mod test {
                 port: None,
                 alias: vec![],
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos,
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -968,9 +747,7 @@ mod test {
         let writer = <RegisterTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
         let res = tool.main(writer).await;
-        let want = "Error while registering repository some-name with some-target: \
-        error communicating with target device\nEnsure that a target is running and connected with:\n\
-        $ ffx target list";
+        let want = "BUG: An internal command error occurred.\nError: Failed to register repository: RepositoryManagerError";
 
         let (stdout, stderr) = buffers.into_strings();
         assert!(res.is_err(), "expected error: {stdout} {stderr}");
@@ -979,15 +756,14 @@ mod test {
         let err = format!("json must adhere to schema: {json}");
         <RegisterTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
 
-        assert_eq!(json, serde_json::json!({"user_error":{"message": want}}));
+        assert_eq!(json, serde_json::json!({"unexpected_error":{"message": want}}));
     }
 
     #[fuchsia::test]
     async fn test_register_machine() {
         let env = ffx_config::test_init().await.expect("test env");
 
-        let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
@@ -1016,10 +792,8 @@ mod test {
                 port: None,
                 alias: aliases.clone(),
                 storage_type: None,
-                alias_conflict_mode:
-                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             },
-            repos: repos.clone(),
             context: env.context.clone(),
             repo_proxy,
             engine_proxy,
@@ -1032,18 +806,6 @@ mod test {
 
         let (stdout, stderr) = buffers.into_strings();
         assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
-
-        let got = receiver.await.unwrap();
-        assert_eq!(
-            got,
-            RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NAME.to_string()),
-                aliases: Some(aliases),
-                storage_type: None,
-                ..Default::default()
-            }
-        );
 
         let err = format!("schema not valid {stdout}");
         let json = serde_json::from_str(&stdout).expect(&err);

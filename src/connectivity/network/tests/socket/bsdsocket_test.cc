@@ -16,9 +16,6 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
 
-#include <future>
-#include <latch>
-
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -1569,29 +1566,15 @@ TEST_P(ReadAfterShutdownTest, Success) {
       }
     } break;
     case ExpectedPostShutdownReadResult::Eagain: {
-      switch (read_type) {
-        case ReadType::Blocking: {
-          timeval tv = {
-              .tv_sec = 4,
-          };
-          EXPECT_EQ(setsockopt(local.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)), 0)
-              << strerror(errno);
-
-          std::latch fut_started(1);
-          const auto fut = std::async(std::launch::async, [&]() {
-            fut_started.count_down();
-
-            EXPECT_EQ(recv(local.get(), &recv_buf, sizeof(recv_buf), flags), -1) << strerror(errno);
-            EXPECT_EQ(errno, EAGAIN);
-          });
-          fut_started.wait();
-          ASSERT_NO_FATAL_FAILURE(AssertBlocked(fut));
-        } break;
-        case ReadType::NonBlocking:
-          EXPECT_EQ(recv(local.get(), &recv_buf, sizeof(recv_buf), flags), -1) << strerror(errno);
-          EXPECT_EQ(errno, EAGAIN);
-          break;
+      if (read_type == ReadType::Blocking) {
+        timeval tv = {
+            .tv_usec = 100000,
+        };
+        EXPECT_EQ(setsockopt(local.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)), 0)
+            << strerror(errno);
       }
+      EXPECT_EQ(recv(local.get(), &recv_buf, sizeof(recv_buf), flags), -1) << strerror(errno);
+      EXPECT_EQ(errno, EAGAIN);
     } break;
   }
 }

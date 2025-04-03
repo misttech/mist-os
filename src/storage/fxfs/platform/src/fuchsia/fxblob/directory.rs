@@ -12,11 +12,10 @@ use crate::fuchsia::fxblob::writer::DeliveryBlobWriter;
 use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::volume::{FxVolume, RootDir};
 use anyhow::{anyhow, ensure, Context as _, Error};
-use async_trait::async_trait;
-use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_request_stream, ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fxfs::{
-    BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
-    BlobWriterMarker, CreateBlobError,
+    BlobCreatorMarker, BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderMarker,
+    BlobReaderRequest, BlobReaderRequestStream, BlobWriterMarker, CreateBlobError,
 };
 use fidl_fuchsia_io::{self as fio, FilesystemInfo, NodeMarker, WatchMask};
 use fuchsia_hash::Hash;
@@ -37,11 +36,13 @@ use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest
 use vfs::directory::entry_container::{
     Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
 };
+use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::mutable::connection::MutableConnection;
+use vfs::directory::simple::Simple;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use vfs::{ObjectRequestRef, ToObjectRequest};
+use vfs::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use zx::Status;
 
 /// A flat directory containing content-addressable blobs (names are their hashes).
@@ -76,7 +77,6 @@ impl From<Hash> for Identifier {
     }
 }
 
-#[async_trait]
 impl RootDir for BlobDirectory {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
         self
@@ -90,40 +90,22 @@ impl RootDir for BlobDirectory {
         self as Arc<dyn FxNode>
     }
 
-    /// Handle fuchsia.fxfs/BlobCreator requests for this [`BlobDirectory`].
-    async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
-        while let Ok(Some(request)) = requests.try_next().await {
-            match request {
-                BlobCreatorRequest::Create { responder, hash, .. } => {
-                    responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
-                        |error| {
-                            log::error!(error:?; "failed to send Create response");
-                        },
-                    );
-                }
-            }
-        }
-    }
-
-    /// Handle fuchsia.fxfs/BlobReader requests for this [`BlobDirectory`].
-    async fn handle_blob_reader_requests(self: Arc<Self>, mut requests: BlobReaderRequestStream) {
-        while let Ok(Some(request)) = requests.try_next().await {
-            match request {
-                BlobReaderRequest::GetVmo { blob_hash, responder } => {
-                    responder
-                        .send(self.get_blob_vmo(blob_hash.into()).await.map_err(map_to_raw_status))
-                        .unwrap_or_else(|error| {
-                            log::error!(error:?; "failed to send GetVmo response");
-                        });
-                }
-            };
-        }
+    fn register_additional_volume_services(self: Arc<Self>, svc_dir: &Simple) -> Result<(), Error> {
+        let this = self.clone();
+        svc_dir.add_entry(
+            BlobCreatorMarker::PROTOCOL_NAME,
+            vfs::service::host(move |r| this.clone().handle_blob_creator_requests(r)),
+        )?;
+        svc_dir.add_entry(
+            BlobReaderMarker::PROTOCOL_NAME,
+            vfs::service::host(move |r| self.clone().handle_blob_reader_requests(r)),
+        )?;
+        Ok(())
     }
 }
 
 impl BlobDirectory {
     fn new(directory: FxDirectory) -> Self {
-        fuchsia_merkle::crypto_library_init();
         Self { directory: Arc::new(directory) }
     }
 
@@ -305,6 +287,54 @@ impl BlobDirectory {
         });
         return Ok(client_end);
     }
+
+    async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
+        while let Ok(Some(request)) = requests.try_next().await {
+            match request {
+                BlobCreatorRequest::Create { responder, hash, .. } => {
+                    responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
+                        |error| {
+                            log::error!(error:?; "failed to send Create response");
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    async fn handle_blob_reader_requests(self: Arc<Self>, mut requests: BlobReaderRequestStream) {
+        while let Ok(Some(request)) = requests.try_next().await {
+            match request {
+                BlobReaderRequest::GetVmo { blob_hash, responder } => {
+                    responder
+                        .send(self.get_blob_vmo(blob_hash.into()).await.map_err(map_to_raw_status))
+                        .unwrap_or_else(|error| {
+                            log::error!(error:?; "failed to send GetVmo response");
+                        });
+                }
+            };
+        }
+    }
+
+    async fn open_impl(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if path.is_empty() {
+            object_request
+                .create_connection::<MutableConnection<_>, _>(
+                    scope,
+                    OpenedNode::new(self).take(),
+                    flags,
+                )
+                .await
+        } else {
+            Err(Status::NOT_SUPPORTED)
+        }
+    }
 }
 
 impl FxNode for BlobDirectory {
@@ -384,18 +414,9 @@ impl VfsDirectory for BlobDirectory {
         path: Path,
         server_end: ServerEnd<NodeMarker>,
     ) {
-        flags.to_object_request(server_end).handle(move |object_request| {
-            if path.is_empty() {
-                object_request.spawn_connection(
-                    scope,
-                    OpenedNode::new(self).take(),
-                    flags,
-                    MutableConnection::create,
-                )
-            } else {
-                Err(Status::NOT_SUPPORTED)
-            }
-        });
+        scope.clone().spawn(flags.to_object_request(server_end).handle_async(
+            async move |object_request| self.open_impl(scope, path, flags, object_request).await,
+        ));
     }
 
     fn open3(
@@ -405,19 +426,20 @@ impl VfsDirectory for BlobDirectory {
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        object_request.take().handle(|object_request| {
-            if path.is_empty() {
-                object_request.spawn_connection(
-                    scope,
-                    OpenedNode::new(self).take(),
-                    flags,
-                    MutableConnection::create,
-                )
-            } else {
-                Err(Status::NOT_SUPPORTED)
-            }
-        });
+        scope.clone().spawn(object_request.take().handle_async(async move |object_request| {
+            self.open_impl(scope, path, flags, object_request).await
+        }));
         Ok(())
+    }
+
+    async fn open3_async(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        self.open_impl(scope, path, flags, object_request).await
     }
 
     async fn read_dirents<'a>(

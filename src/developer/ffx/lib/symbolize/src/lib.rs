@@ -36,9 +36,7 @@ impl Symbolizer {
 
     /// Create a new symbolizer instance with a specific ffx context. Normally only needed in tests.
     pub fn with_context(context: &EnvironmentContext) -> Result<Self, CreateSymbolizerError> {
-        let sdk = context.get_sdk().map_err(CreateSymbolizerError::NoSdkAvailable)?;
-
-        symbol_index::ensure_symbol_index_registered(&sdk)
+        symbol_index::ensure_symbol_index_registered(&context)
             .map_err(CreateSymbolizerError::SymbolIndexRegistration)?;
 
         let _global_init = global_init::GlobalInitHandle::new();
@@ -107,9 +105,6 @@ impl Symbolizer {
     }
 
     /// Resolve a single address.
-    ///
-    /// If you have more than one address to resolve, consider using `resolve_addresses` to batch
-    /// them together since each call spawns a subprocess.
     pub fn resolve_addr(&self, addr: u64) -> Result<Vec<ResolvedLocation>, ResolveError> {
         type LocationCallbackContext = Vec<ResolvedLocation>;
         let mut locations: LocationCallbackContext = vec![];
@@ -178,7 +173,7 @@ pub enum CreateSymbolizerError {
 }
 
 /// Errors that can occur when adding mappings.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum AddMappingError {
     /// A module's mapping information got out of sync in the symbolizer.
     #[error("Provided mapping does not have consistent start/offset.")]
@@ -190,30 +185,12 @@ pub enum AddMappingError {
 }
 
 /// Errors that can occur when resolving addresses.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum ResolveError {
     /// The C++ side did not populate any results at all for an address. Usually caused by an
     /// address not overlapping with any mappings.
     #[error("Provided address does not correspond to a mapped module.")]
     NoOverlappingModule,
-}
-
-/// A resolved address.
-#[derive(Clone, PartialEq)]
-pub struct ResolvedAddress {
-    /// Address for which source locations were resolved.
-    pub addr: u64,
-    /// Source locations found at `addr`.
-    pub locations: Vec<ResolvedLocation>,
-}
-
-impl std::fmt::Debug for ResolvedAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResolvedAddress")
-            .field("addr", &format_args!("0x{:x}", self.addr))
-            .field("lines", &self.locations)
-            .finish()
-    }
 }
 
 /// A single source location resolved from an address.

@@ -25,10 +25,9 @@
 namespace camera {
 
 class ControllerDevice;
-using ControllerDeviceType = ddk::Device<ControllerDevice, ddk::Unbindable,
-                                         ddk::Messageable<fuchsia_hardware_camera::Device>::Mixin>;
+using ControllerDeviceType = ddk::Device<ControllerDevice, ddk::Unbindable>;
 class ControllerDevice : public ControllerDeviceType,
-                         public ddk::EmptyProtocol<ZX_PROTOCOL_CAMERA> {
+                         public fidl::WireServer<fuchsia_hardware_camera::Device> {
  public:
   ~ControllerDevice() override;
 
@@ -67,6 +66,7 @@ class ControllerDevice : public ControllerDeviceType,
 
   // Serves the fuchsia.camera2.debug.Debug protocol
   std::unique_ptr<DebugImpl> debug_;
+  fidl::ServerBindingGroup<fuchsia_hardware_camera::Device> bindings_;
 };
 
 }  // namespace camera

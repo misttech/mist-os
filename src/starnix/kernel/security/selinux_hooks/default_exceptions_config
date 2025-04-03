@@ -24,9 +24,6 @@ todo_deny https://fxbug.dev/392857781 kernel tmpfs dir
 // https://fxbug.dev/391664952 - Some test infra attempts to run commands via "sh" without specifying a security domain to transition to, triggering "execute_no_trans" failures.
 todo_deny https://fxbug.dev/391664952 init shell_exec file
 
-// https://fxbug.dev/375381156 - "add_name" checks for "logd" to itself fail.
-todo_deny https://fxbug.dev/375381156 logd logd dir
-
 // https://fxbug.dev/395085164 - Enabling file_fcntl hook checks leads to failures.
 todo_deny https://fxbug.dev/395085164 init hal_graphics_allocator_default fd
 todo_deny https://fxbug.dev/395085164 gmscore_app hal_bluetooth_default fd
@@ -35,6 +32,15 @@ todo_deny https://fxbug.dev/395085164 gmscore_app hal_bluetooth_default fd
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default fd
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default file
 todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default anon_inode
+
+// https://fxbug.dev/385121365 - Kernel threads perform I/O on "adbd" FDs, failing checks.
+todo_deny https://fxbug.dev/385121365 kernel adbd fd
+
+// https://fxbug.dev/407739795 - "adbd" reciprocates, using FDs created by the kernel.
+todo_deny https://fxbug.dev/407739795 adbd kernel fd
+
+// https://fxbug.dev/408136119 - Missing policy configuration breaks one of the system daemons.
+todo_deny https://fxbug.dev/408136119 init device chr_file
 
 //
 // Exceptions required for the SELinux Test Suite container.
@@ -47,3 +53,6 @@ todo_deny https://fxbug.dev/390739936 test_noioctl_t user_tmp_t file
 // https://fxbug.dev/398246622 - Test apks interacting poorly with fuse.
 todo_deny https://fxbug.dev/390739936 platform_app fuse file
 todo_deny https://fxbug.dev/390739936 platform_app fuse dir
+
+// https://fxbug.dev/404739824 - Fuchsia-space resources are mis-classed and/or mis-labeled.
+todo_deny https://fxbug.dev/404739824 unconfined_t unconfined_t anon_inode

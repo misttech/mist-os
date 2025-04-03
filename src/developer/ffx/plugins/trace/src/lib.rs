@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
+use ffx_trace::SymbolizationMap;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{deferred, FfxMain, FfxTool};
@@ -13,15 +14,9 @@ use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{ProviderInfo, ProviderStats, ProvisionerProxy, TraceConfig};
 use futures::future::{BoxFuture, FutureExt};
-use fxt::{
-    Arg, ArgValue, ParseError, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef,
-    TraceRecord,
-};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs::File;
 use std::future::Future;
-use std::io::{stdin, LineWriter, Stdin, Write};
+use std::io::{stdin, Stdin};
 use std::path::{Component, PathBuf};
 use std::time::Duration;
 use target_holders::{daemon_protocol, moniker};
@@ -30,7 +25,8 @@ use term_grid::Grid;
 use termion::terminal_size;
 use termion::{color, style};
 
-static ORDINAL_ARG_NAME: &str = "ordinal";
+mod process;
+use process::*;
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -88,7 +84,7 @@ fn handle_fidl_error<T>(res: Result<T, fidl::Error>) -> Result<T> {
 
 fn handle_peer_closed(err: fidl::Error) -> errors::FfxError {
     match err {
-        fidl::Error::ClientChannelClosed { status, protocol_name, reason } => {
+        fidl::Error::ClientChannelClosed { status, protocol_name, reason, .. } => {
             errors::ffx_error!("An attempt to access {} resulted in a bad status: {} reason: {}.
 This can happen if tracing is not supported on the product configuration you are running or if it is missing from the base image.", protocol_name, status, reason.as_ref().map(String::as_str).unwrap_or("not given"))
         }
@@ -206,127 +202,10 @@ impl<'a> LineWaiter<'a> for Stdin {
     }
 }
 
-struct TraceProcessor {
-    parser: SessionParser<std::io::Cursor<Vec<u8>>>,
-    symbolizer: Option<Symbolizer>,
-    event_per_category_counter: Option<CategoryCounter>,
-}
-
-impl TraceProcessor {
-    fn new(trace_file: String) -> Result<Self> {
-        let content = match std::fs::read(&trace_file) {
-            Ok(content) => content,
-            Err(e) => ffx_bail!("Failed to read the trace file: {}", e),
-        };
-
-        let parser = SessionParser::new(std::io::Cursor::new(content));
-
-        Ok(Self { parser, symbolizer: None, event_per_category_counter: None })
-    }
-
-    fn with_symbolizer(&mut self, outfile: &str, context: &EnvironmentContext) {
-        self.symbolizer = Some(Symbolizer::new(outfile, &context));
-    }
-
-    fn with_category_check(&mut self, input_categories: Vec<String>) {
-        self.event_per_category_counter = Some(CategoryCounter::new(input_categories));
-    }
-
-    fn check_record(&mut self, record: Result<TraceRecord, ParseError>) -> Result<()> {
-        if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
-            event_per_category_counter.increment_category(&record);
-        }
-
-        if let Some(symbolizer) = &mut self.symbolizer {
-            let parsed_bytes = self.parser.parsed_bytes().to_owned();
-            symbolizer.symbolize_and_write_record(record, parsed_bytes)?;
-        }
-
-        Ok(())
-    }
-
-    fn run(mut self) -> Result<Vec<String>> {
-        let mut warning_list = Vec::new();
-        match self.parser.next() {
-            Some(record) => self.check_record(record)?,
-            None => {
-                if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
-                    ffx_bail!(
-                        "{}WARNING: The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}.{}",
-                        color::Fg(color::Yellow),
-                        event_per_category_counter.input_categories,
-                        style::Reset
-                    );
-                }
-            }
-        }
-
-        while let Some(record) = self.parser.next() {
-            self.check_record(record)?;
-        }
-
-        if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
-            let invalid_category_list = event_per_category_counter.get_invalid_category_list();
-            if !invalid_category_list.is_empty() {
-                warning_list.push(format!(
-                "{}WARNING: Categories {:?} were manually specified, but not found in the resulting trace. Check the spelling of your categories or the status of your trace provider{}",
-                color::Fg(color::Yellow),
-                invalid_category_list,
-                style::Reset
-            ));
-            }
-        }
-        Ok(warning_list)
-    }
-}
-
-fn generate_symbolization_map(ir_files: Vec<String>) -> (HashMap<u64, String>, Vec<String>) {
-    let mut ord_fn_map = HashMap::new();
-    let mut warnings = vec![];
-    // Scan through the list of ir files and look for the provided ordinal in the json contents.
-    for ir_file in ir_files {
-        let json_string = match std::fs::read_to_string(ir_file.clone()) {
-            Ok(content) => content,
-            Err(e) => {
-                warnings.push(format!("WARNING: Failed to read {ir_file}. Reason: {e}"));
-                continue;
-            }
-        };
-        let fidl_json: serde_json::Value = match serde_json::from_str(&json_string) {
-            Ok(serialized_json) => serialized_json,
-            Err(_) => {
-                warnings.push(format!("WARNING: Failed to parse json in IR file {ir_file}"));
-                continue;
-            }
-        };
-        let Some(protocols) = fidl_json["protocol_declarations"].as_array() else {
-            continue;
-        };
-        for protocol in protocols {
-            // Protocol should have a name, but it is missing for some reason.
-            let protocol_name = protocol["name"].as_str().unwrap_or("-");
-            let Some(methods) = protocol["methods"].as_array() else {
-                continue;
-            };
-            for method in methods {
-                let Some(method_ordinal) = method["ordinal"].as_u64() else {
-                    continue;
-                };
-                let method_name = method["name"].as_str().unwrap_or("-");
-                ord_fn_map.insert(method_ordinal, format!("{protocol_name}.{method_name}"));
-            }
-        }
-    }
-    (ord_fn_map, warnings)
-}
-
-fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) -> Result<()> {
-    let (fidl_ordinal_map, warnings) = generate_symbolization_map(ir_files);
-    for warning in warnings {
-        writer.line(warning)?;
-    }
-    if fidl_ordinal_map.contains_key(&ordinal) {
-        writer.line(format!("{} -> {}", ordinal, fidl_ordinal_map[&ordinal]))?;
+fn symbolize_ordinal(ordinal: u64, ordinals: &SymbolizationMap, mut writer: Writer) -> Result<()> {
+    if let Some(name) = ordinals.get(ordinal) {
+        // If the ordinal is present in the symbolization map print the name associated with it.
+        writer.line(format!("{} -> {}", ordinal, name))?;
     } else {
         writer.line(format!(
             "Unable to symbolize ordinal {}. This could be because either:",
@@ -359,112 +238,6 @@ fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
     };
     writer.line(formatted_values)?;
     Ok(())
-}
-
-pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Result<Vec<u8>> {
-    let (_, mut raw_event_record) =
-        RawEventRecord::parse(bytes).expect("Unable to parse event record");
-    let mut new_args = vec![];
-    for arg in &raw_event_record.args {
-        if let &RawArgValue::Unsigned64(arg_value) = &arg.value {
-            if arg_value == ordinal {
-                let symbolized_arg = RawArg {
-                    name: StringRef::Inline("method"),
-                    value: RawArgValue::String(StringRef::Inline(method)),
-                };
-                new_args.push(symbolized_arg);
-            }
-        }
-        new_args.push(arg.clone());
-    }
-
-    raw_event_record.args = new_args;
-    raw_event_record.serialize().map_err(|e| anyhow!(e))
-}
-
-struct Symbolizer {
-    output_file: LineWriter<File>,
-    ord_map: HashMap<u64, String>,
-}
-
-impl Symbolizer {
-    fn new(outfile: &str, context: &EnvironmentContext) -> Self {
-        let file = std::fs::File::create(outfile).unwrap();
-        let output_file = LineWriter::new(file);
-        let (ord_map, _) =
-            generate_symbolization_map(ffx_trace::ir_files_list(context).unwrap_or_default());
-
-        Self { output_file: output_file, ord_map: ord_map }
-    }
-
-    fn symbolize_and_write_record(
-        &mut self,
-        record: Result<TraceRecord, ParseError>,
-        parsed_bytes: Vec<u8>,
-    ) -> Result<()> {
-        let mut parsed_bytes = parsed_bytes;
-        self.output_file.write_all(match record {
-            Ok(fxt::TraceRecord::Event(fxt::EventRecord { category, args, .. }))
-                if category.as_str() == "kernel:ipc" =>
-            {
-                for arg in args {
-                    match arg {
-                        Arg { name, value: ArgValue::Unsigned64(ord) }
-                            if name.as_str() == ORDINAL_ARG_NAME
-                                && self.ord_map.contains_key(&ord) =>
-                        {
-                            parsed_bytes =
-                                symbolize_fidl_call(&parsed_bytes, ord, self.ord_map[&ord].as_str())
-                                    .unwrap_or(parsed_bytes)
-                        }
-                        _ => continue,
-                    }
-                }
-                &parsed_bytes
-            }
-            _ => &parsed_bytes,
-        })?;
-        Ok(())
-    }
-}
-
-impl Drop for Symbolizer {
-    fn drop(&mut self) {
-        let _ = self.output_file.flush();
-    }
-}
-
-struct CategoryCounter {
-    category_counter: HashMap<String, usize>,
-    input_categories: Vec<String>,
-}
-
-impl CategoryCounter {
-    fn new(input_categories: Vec<String>) -> Self {
-        let mut category_counter = HashMap::new();
-        for category in &input_categories {
-            // Skip categories starting with '#' since they represent groups.
-            // We don't check them because it's not explicitly specified.
-            if !category.starts_with("#") {
-                category_counter.insert(category.clone(), 0);
-            }
-        }
-        Self { category_counter, input_categories }
-    }
-
-    fn increment_category(&mut self, record: &Result<TraceRecord, ParseError>) {
-        if let Ok(TraceRecord::Event(fxt::EventRecord { category, .. })) = record {
-            *self.category_counter.entry(category.to_string()).or_insert(0) += 1;
-        }
-    }
-
-    fn get_invalid_category_list(&mut self) -> Vec<String> {
-        self.category_counter
-            .iter()
-            .filter(|(_, &count)| count == 0)
-            .map(|(category, _)| category.clone())
-            .collect()
-    }
 }
 
 type Writer = MachineWriter<TraceOutput>;
@@ -626,22 +399,23 @@ pub async fn trace(
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
                 let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
-                let mut processor = TraceProcessor::new(trace_file)?;
-                processor.with_symbolizer(&outfile, &context);
-                processor.run()?;
+                for warning in process_trace_file(trace_file, &outfile, true, None, &context)? {
+                    writer.line(warning)?;
+                }
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
-                let mut all_ir_files = opts.ir_path.clone();
-                let build_ir_files = match ffx_trace::ir_files_list(&context) {
-                    None => {
-                        writer.line("Unable to read list of FIDL IR files from $FUCHSIA_BUILD_DIR/all_fidl_json.txt.")?;
-                        writer.line("Only input IR files will be searched.")?;
-                        vec![]
+                let mut ordinals = match SymbolizationMap::from_context(&context) {
+                    Ok(ordinals) => ordinals,
+                    Err(err) => {
+                        writer.line(format!("Unable to load FIDL symbolization map: {}", err))?;
+                        SymbolizationMap::default()
                     }
-                    Some(ir_files) => ir_files,
                 };
-                all_ir_files.extend(build_ir_files);
-                symbolize_ordinal(ordinal, all_ir_files, writer)?;
+                for ir_file in opts.ir_path {
+                    ordinals.add_ir_file(ir_file)?;
+                }
+
+                symbolize_ordinal(ordinal, &ordinals, writer)?;
             } else {
                 ffx_bail!("Either ordinal or trace file must be provided to symbolize");
             }
@@ -738,21 +512,15 @@ async fn stop_tracing(
             let skip_symbolization =
                 skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
             if !no_verify_trace || !skip_symbolization {
-                let mut processor = TraceProcessor::new(output_file.clone())?;
-
-                if !no_verify_trace {
-                    processor.with_category_check(categories);
-                }
-
-                if !skip_symbolization {
-                    processor.with_symbolizer(&output_file, context);
-                }
-
-                let warnings = processor.run()?;
-                if !warnings.is_empty() {
-                    for warning in warnings {
-                        writer.line(format!("{}", warning))?;
-                    }
+                let warnings = process_trace_file(
+                    &output_file,
+                    &output_file,
+                    !skip_symbolization,
+                    if no_verify_trace { None } else { Some(categories) },
+                    context,
+                )?;
+                for warning in warnings {
+                    writer.line(format!("{}", warning))?;
                 }
             }
 
@@ -881,6 +649,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use serde_json::json;
+    use std::io::Write;
     use std::matches;
     use target_holders::fake_proxy;
     use tempfile::{Builder, NamedTempFile};
@@ -1122,6 +891,7 @@ mod tests {
                         {
                             "ordinal": 12345678,
                             "name": "fake_method_name",
+                            "is_composed": false,
                         },
                     ],
                 },

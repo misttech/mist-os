@@ -90,8 +90,8 @@ source_set("shared") {
   deps = [
     ":ahci_bind",
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/block/lib/common:common",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]

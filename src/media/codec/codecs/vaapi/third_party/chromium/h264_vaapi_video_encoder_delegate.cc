@@ -14,11 +14,11 @@
 // #include "base/memory/ref_counted_memory.h"
 // #include "build/build_config.h"
 // #include "media/base/media_switches.h"
-#include "media/gpu/gpu_video_encode_accelerator_helpers.h"
+#include "src/media/third_party/chromium_media/media/gpu/gpu_video_encode_accelerator_helpers.h"
 // #include "media/gpu/macros.h"
 // #include "media/gpu/vaapi/vaapi_common.h"
 // #include "media/gpu/vaapi/vaapi_wrapper.h"
-#include "media/video/h264_level_limits.h"
+#include "src/media/third_party/chromium_media/media/video/h264_level_limits.h"
 #include "vaapi_picture.h"
 #include "vaapi_wrapper.h"
 

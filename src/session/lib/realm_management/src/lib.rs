@@ -99,7 +99,8 @@ mod tests {
     use super::{
         create_child_component, destroy_child_component, open_child_component_exposed_dir,
     };
-    use fidl::endpoints::{create_endpoints, create_proxy, spawn_stream_handler};
+    use fidl::endpoints::{create_endpoints, create_proxy};
+    use fidl_test_util::spawn_stream_handler;
     use lazy_static::lazy_static;
     use session_testing::spawn_directory_server;
     use test_util::Counter;
@@ -241,7 +242,7 @@ mod tests {
         }
 
         let directory_request_handler = |directory_request| match directory_request {
-            fio::DirectoryRequest::DeprecatedOpen { path: fake_capability_path, .. } => {
+            fio::DirectoryRequest::Open { path: fake_capability_path, .. } => {
                 CALL_COUNT.inc();
                 assert_eq!(fake_capability_path, "fake_capability_path");
             }

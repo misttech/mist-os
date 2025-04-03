@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
@@ -254,7 +254,7 @@ Reboot the Target to the bootloader and re-run this command."
                         // We take the first address as when a target is in Fastboot mode and over
                         // TCP it only exposes one address
                         if let Some(addr) = addrs.into_iter().take(1).next() {
-                            let target_addr: TargetAddr = addr.into();
+                            let target_addr: TargetIpAddr = addr.into();
                             let socket_addr: SocketAddr = target_addr.into();
                             let target_name = if let Some(nodename) = self.target_info.nodename() {
                                 nodename
@@ -288,7 +288,7 @@ Reboot the Target to the bootloader and re-run this command."
                         // We take the first address as when a target is in Fastboot mode and over
                         // UDP it only exposes one address
                         if let Some(addr) = addrs.into_iter().take(1).next() {
-                            let target_addr: TargetAddr = addr.into();
+                            let target_addr: TargetIpAddr = addr.into();
                             let socket_addr: SocketAddr = target_addr.into();
                             let target_name = if let Some(nodename) = self.target_info.nodename() {
                                 nodename.to_string()

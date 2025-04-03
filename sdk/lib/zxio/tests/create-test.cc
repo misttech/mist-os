@@ -40,8 +40,17 @@ TEST(Create, NotSupported) {
   zx::event event;
   ASSERT_OK(zx::event::create(0u, &event));
   zxio_storage_t storage;
-  ASSERT_STATUS(zxio_create(event.release(), &storage), ZX_ERR_NOT_SUPPORTED);
+  ASSERT_OK(zxio_create(event.release(), &storage));
   zxio_t* io = &storage.io;
+
+  zx_handle_t borrow = ZX_HANDLE_INVALID;
+  ASSERT_OK(zxio_borrow(io, &borrow));
+  EXPECT_NE(borrow, ZX_HANDLE_INVALID);
+
+  zx::handle clone;
+  ASSERT_OK(zxio_clone(io, clone.reset_and_get_address()));
+  EXPECT_TRUE(clone.is_valid());
+
   zx::handle handle;
   ASSERT_OK(zxio_release(io, handle.reset_and_get_address()));
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
@@ -439,7 +448,7 @@ TEST_F(CreateDirectoryTest, DirectoryWithTypeWrapper) {
 using CreateDirectoryWithRepresentationTest = CreateTestBase<SyncNodeServer>;
 
 TEST_F(CreateDirectoryWithRepresentationTest, Directory) {
-  ASSERT_NO_FATAL_FAILURE(SendRepresentation(fuchsia_io::Representation::WithConnector({})));
+  ASSERT_NO_FATAL_FAILURE(SendRepresentation(fuchsia_io::Representation::WithNode({})));
   ASSERT_OK(zxio_create_with_on_representation(TakeClientChannel().release(), nullptr, storage()));
   StartServerThread();
   EXPECT_OK(zxio_sync(zxio()));

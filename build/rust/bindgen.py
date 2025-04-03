@@ -60,6 +60,8 @@ class Bindgen:
         self.raw_lines = ""
         # Whether to generate explicit padding fields in structs.
         self.explicit_padding = True
+        # Whether size_t must be converted to usize
+        self.size_t_is_usize = True
         # Mark types as an an opaque blob of bytes with a size and alignment.
         self.opaque_types = []
         # Clang: Include directories (`-I`)
@@ -142,6 +144,9 @@ class Bindgen:
 
         if self.use_core:
             args.append("--use-core")
+
+        if not self.size_t_is_usize:
+            args.append("--no-size_t-is-usize")
 
         args += ["--allowlist-function=" + x for x in self.function_allowlist]
         args += ["--allowlist-var=" + x for x in self.var_allowlist]

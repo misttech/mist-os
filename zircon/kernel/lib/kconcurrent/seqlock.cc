@@ -4,17 +4,9 @@
 
 #include <lib/arch/intrin.h>
 #include <lib/concurrent/seqlock.inc.h>
+#include <lib/kconcurrent/seqlock.h>
 
 #include <platform/timer.h>
-
-namespace internal {
-
-struct FuchsiaKernelOsal {
-  static zx_instant_mono_t GetClockMonotonic() { return current_mono_time(); }
-  static void ArchYield() { arch::Yield(); }
-};
-
-}  // namespace internal
 
 // Manually expand the SeqLock templates using the Fuchsia user-mode OSAL
 template class ::concurrent::internal::SeqLock<::internal::FuchsiaKernelOsal,

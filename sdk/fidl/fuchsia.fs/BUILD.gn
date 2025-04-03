@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.fs") {
-  sdk_category = "partner_internal"
+  sdk_category = "prebuilt"
   sdk_area = "Unknown"
   stable = true
   sources = [

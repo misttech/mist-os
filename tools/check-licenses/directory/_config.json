@@ -4,6 +4,27 @@
         "skips": [
             {
                 "notes": [
+                    "Files in the rust_crate 'vendor' directory causing issues.",
+                    "See b/404221480 for more information"
+                ],
+                "paths": [
+                    "third_party/rust_crates/vendor/alias_rules.bzl",
+                    "third_party/rust_crates/vendor/defs.bzl",
+                    "third_party/rust_crates/vendor/BUILD.bazel"
+                ]
+            },
+            {
+                "notes": [
+                    "A 'vendor' subdirectory in the examples folder is causing issues.",
+                    "Investigate ways to handle this better, though in this case there are",
+                    "no new licenses under the folder."
+                ],
+                "paths": [
+                    "third_party/bazel_rules_rust/examples"
+                ]
+            },
+            {
+                "notes": [
                     "This directory has a 'vendor' subdirectory that shouldn't",
                     "be processed separately. Skip the directory for now to",
                     "unblock developers, but investigate a better way of ignoring",

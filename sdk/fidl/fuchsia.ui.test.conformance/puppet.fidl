@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 // TODO(https://fxbug.dev/365602422): Either remove the dependency from CTF
 // tests and uncomment this line or make this library stable.
-// @available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.ui.test.conformance;
 
 using fuchsia.math;

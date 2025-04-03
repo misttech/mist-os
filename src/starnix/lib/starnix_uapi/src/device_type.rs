@@ -6,6 +6,7 @@ use std::fmt;
 use std::ops::Range;
 
 pub const MEM_MAJOR: u32 = 1;
+pub const TTY_MAJOR: u32 = 4;
 pub const TTY_ALT_MAJOR: u32 = 5;
 pub const LOOP_MAJOR: u32 = 7;
 pub const MISC_MAJOR: u32 = 10;

@@ -9,6 +9,50 @@ use std::path::PathBuf;
 use thiserror::Error;
 use valico::json_schema::validators::ValidationState;
 
+/// Error encountered while executing test binary
+#[derive(Debug, Error)]
+pub enum TestRunError {
+    #[error("Error launching test binary '{path:?}'")]
+    Spawn {
+        path: std::ffi::OsString,
+        #[source]
+        source: io::Error,
+    },
+
+    #[error("Error reading stdout: {0:?}")]
+    StdoutRead(#[source] io::Error),
+
+    #[error("Error reading stderr: {0:?}")]
+    StderrRead(#[source] io::Error),
+
+    #[error("Error writing stdout: {0:?}")]
+    StdoutWrite(#[source] io::Error),
+
+    #[error("Error writing stderr: {0:?}")]
+    StderrWrite(#[source] io::Error),
+
+    #[error("Error reading output summary file {path}")]
+    OutputSummaryRead {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("Error writing output summary file {path}")]
+    OutputSummaryWrite {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+
+    #[error("Error creating output file {path}")]
+    FailedToCreateFile {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+}
+
 /// Error encountered validating config
 #[derive(Debug, Error)]
 pub enum BuildError {
@@ -143,4 +187,13 @@ pub enum UsageError {
         "Parameters of type array must have simple items in command lines or environment variables"
     )]
     ArrayOfComplexTypeNotAllowed(Name),
+
+    #[error("Expected executable file path for option '{option}', got nonexistent {path:?}")]
+    BinaryDoesNotExist { option: Name, path: PathBuf },
+
+    #[error("Expected executable file path for option '{option}', got directory {path:?}")]
+    BinaryIsNotAFile { option: Name, path: PathBuf },
+
+    #[error("Expected executable file path for option '{option}', got unreadable {path:?}")]
+    BinaryUnreadable { option: Name, path: PathBuf },
 }

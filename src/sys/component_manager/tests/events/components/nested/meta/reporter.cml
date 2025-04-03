@@ -14,19 +14,16 @@
         {
             name: "child_a",
             url: "#meta/stub_component.cm",
-            startup: "eager",
             environment: "#elf-env",
         },
         {
             name: "child_b",
             url: "#meta/stub_component.cm",
-            startup: "eager",
             environment: "#elf-env",
         },
         {
             name: "child_c",
             url: "#meta/stub_component.cm",
-            startup: "eager",
             environment: "#elf-env",
         },
     ],
@@ -34,6 +31,10 @@
         {
             event_stream: "started",
             from: "parent",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
         },
     ],
 }

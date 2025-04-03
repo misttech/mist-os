@@ -2,80 +2,79 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  libs = [
-    # keep-sorted start
-    "addr",
-    "buildid",
-    "compat_info",
-    "daemonize",
-    "discovery",
-    "doctor_utils",
-    "emulator_instance",
-    "errors",
-    "executor",
-    "fastboot",
-    "fastboot_file_discovery",
-    "fho",
-    "fidl-fuchsia-developer-ffx-ext",
-    "isolate",
-    "manual_targets",
-    "mdns_discovery",
-    "metrics",
-    "netext",
-    "pbms",
-    "pkg",
-    "port_picker",
-    "protocols",
-    "rcs",
-    "sdk",
-    "ssh",
-    "stream_util",
-    "symbol-index",
-    "symbolize",
-    "target",
-    "target/connector",
-    "target/holders",
-    "tasks",
-    "testing",
-    "timeout",
-    "usb_fastboot_discovery",
-    "version",
-    "writer",
+assert(is_host, "ffx/lib is for use with the host toolchain only")
 
-    # keep-sorted end
-  ]
+libs = [
+  # keep-sorted start
+  "addr",
+  "buildid",
+  "compat_info",
+  "daemonize",
+  "discovery",
+  "doctor_utils",
+  "emulator_instance",
+  "errors",
+  "executor",
+  "fastboot",
+  "fastboot_file_discovery",
+  "fho",
+  "isolate",
+  "manual_targets",
+  "mdns_discovery",
+  "metrics",
+  "netext",
+  "pbms",
+  "pkg",
+  "port_picker",
+  "protocols",
+  "rcs",
+  "sdk",
+  "ssh",
+  "stream_util",
+  "symbol-index",
+  "symbolize",
+  "target",
+  "target/connector",
+  "target/holders",
+  "tasks",
+  "testing",
+  "timeout",
+  "usb_fastboot_discovery",
+  "version",
+  "writer",
 
-  # The fuchsia-controller library supports end-to-end testing from
-  # Linux hosts, and we don't intend to explicitly support end-to-end
-  # testing from other operating systems at this time.
-  if (is_linux) {
-    libs += [ "fuchsia-controller" ]
+  # keep-sorted end
+]
+
+# The fuchsia-controller library supports end-to-end testing from
+# Linux hosts, and we don't intend to explicitly support end-to-end
+# testing from other operating systems at this time.
+if (is_linux) {
+  libs += [ "fuchsia-controller" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = []
+  foreach(lib, libs) {
+    deps += [ "${lib}:tests" ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    deps = []
-    foreach(lib, libs) {
-      deps += [ "${lib}:tests" ]
-    }
-  }
+group("lib") {
+  testonly = true
 
-  group("lib") {
-    testonly = true
-
-    deps = []
-    foreach(lib, libs) {
-      deps += [ lib ]
-    }
+  deps = []
+  foreach(lib, libs) {
+    deps += [ lib ]
   }
 }
 
 group("host_tests") {
   testonly = true
   deps = [
-    "e2e_emu:host_tests($host_toolchain)",
-    "fuchsia-controller:host_tests($host_toolchain)",
-    "symbolize:host_tests($host_toolchain)",
+    "e2e_emu:host_tests",
+    "fuchsia-controller:host_tests",
+    "symbolize:host_tests",
   ]
 }

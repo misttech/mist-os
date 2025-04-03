@@ -11,7 +11,6 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import json
-import keyword
 import os
 import sys
 import typing
@@ -40,6 +39,7 @@ from ._fidl_common import (
     MethodInfo,
     camel_case_to_snake_case,
     internal_kind_to_type,
+    normalize_identifier,
 )
 from ._server import ServerBase
 
@@ -122,7 +122,7 @@ class Method(dict):
         return self["ordinal"]
 
     def name(self) -> str:
-        return self["name"]
+        return normalize_member_name(self["name"])
 
     def raw_name(self) -> str:
         return self.name()
@@ -393,17 +393,18 @@ def type_annotation(type_ir, root_ir) -> type:
         ty = type_annotation(element_type, root_ir)
         return wrap_optional(Sequence[ty])
     elif kind == "endpoint":
-        # TODO(https://fxbug.dev/383175226): This inconsistency between client
-        # and server may not be correct. Add test coverage for `client_end`.
         if type_ir["role"] == "client":
+            protocol = type_ir["protocol"]
+            module = fidl_ident_to_py_import(protocol)
             return wrap_optional(
-                get_type_by_identifier(type_ir["protocol"], root_ir)
+                f"{fidl_ident_to_py_library_member(protocol)}Client",
+                module=module,
             )
         elif type_ir["role"] == "server":
             protocol = type_ir["protocol"]
             module = fidl_ident_to_py_import(protocol)
             return wrap_optional(
-                f"{fidl_ident_to_py_library_member(protocol)}.Server",
+                f"{fidl_ident_to_py_library_member(protocol)}Server",
                 module=module,
             )
         else:
@@ -432,15 +433,6 @@ def fidl_ident_to_py_import(name: str) -> str:
     """Python import from fidl identifier: foo.bar.baz/Foo would return fidl.foo_bar_baz"""
     fidl_lib = fidl_ident_to_library(name)
     return fidl_library_to_py_module_path(fidl_lib)
-
-
-def fidl_ident_to_marker(name: str) -> str:
-    """Changes a fidl library member to a marker used for protocol lookup.
-
-    Returns: foo.bar.baz/Foo returns foo.bar.baz.Foo
-    """
-    name = normalize_identifier(name)
-    return name.replace("/", ".")
 
 
 def fidl_ident_to_py_library_member(name: str) -> str:
@@ -520,118 +512,121 @@ def enum_type(ir) -> EnumType:
     return bits_or_enum_root_type(ir, "enum")
 
 
-def _union_get_value(self):
-    """Helper function that attempts to get the union value."""
-    items = [
-        m[0].replace("_type", "")
-        for m in inspect.getmembers(self)
-        if m[0].endswith("_type")
-    ]
-    got = None
-    item = None
-    for i in items:
-        got = getattr(self, i)
-        item = i
-        if got is not None:
-            break
-    return item, got
-
-
-def union_repr(self) -> str:
-    """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
-
-    If {value} is not set, will write None."""
-    key, value = _union_get_value(self)
-    string = f"{key}={repr(value)}"
-    if key is None and value is None:
-        string = "None"
-    return f"<'{self.__fidl_type__}' object({string})>"
-
-
-def union_str(self) -> str:
-    """Returns the union string representation, e.g. whatever the union type has been set to."""
-    key, value = _union_get_value(self)
-    string = f"{key}={str(value)}"
-    if key is None and value is None:
-        string = "None"
-    return f"{type(self).__name__}({string})"
-
-
-def union_eq(self, other) -> bool:
-    if not isinstance(other, type(self)):
-        return False
-    items = [
-        m[0].replace("_type", "")
-        for m in inspect.getmembers(self)
-        if m[0].endswith("_type")
-    ]
-    for item in items:
-        if getattr(self, item) == getattr(other, item):
-            return True
-    return False
-
-
 def union_type(ir, root_ir) -> type:
     """Constructs a Python type from a FIDL IR Union declaration."""
+    __annotations__ = {}
+    for variant in ir["members"]:
+        variant_name = f"_{normalize_member_name(variant['name'])}"
+        __annotations__[variant_name] = type_annotation(
+            variant["type"], root_ir
+        )
+
     name = fidl_ident_to_py_library_member(ir.name())
     base = type(
         name,
-        (),
+        (object,),
         {
             "__doc__": docstring(ir),
             "__fidl_kind__": "union",
-            "__repr__": union_repr,
-            "__str__": union_str,
-            "__eq__": union_eq,
             "__fidl_type__": ir.name(),
             "__fidl_raw_type__": ir.raw_name(),
-            "make_default": classmethod(lambda cls: cls()),
+            "__annotations__": __annotations__,
+            "make_default": classmethod(lambda cls: cls(_empty=())),
+            "_is_result": ir["is_result"],
         },
     )
-    # TODO(https://fxbug.dev/42078357): Prevent unions from having more than one value set at the same time.
-    # This is silently allowed during encoding, but should either be prevented during encoding, or
-    # prevented from within the object itself. If it cannot be prevented there should be some hook
-    # that sets the previous union variants to None.
-    for member in ir["members"]:
-        member_name = normalize_member_name(member["name"])
-        member_type_name = member_name + "_type"
-        member_constructor_name = member_name + "_variant"
 
-        @classmethod
-        def ctor(cls, value, member_name=member_name):
-            res = cls()
-            setattr(res, member_name, value)
-            return res
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+        for internal_variant_name in base.__annotations__.keys():
+            if getattr(self, internal_variant_name[1:]) != getattr(
+                other, internal_variant_name[1:]
+            ):
+                return False
+        return True
 
+    base.__eq__ = __eq__
+
+    def __repr__(self):
+        """Returns the union repr in the format <'foo.bar.baz/FooUnion' object({value})>
+
+        If {value} is not set, will write None."""
+        variant = ""
+        for variant_name in base.__annotations__.keys():
+            try:
+                variant = f"{variant_name}={getattr(self, variant_name)!r}"
+                break
+            except AttributeError:
+                pass
+        return f"<'{base.__fidl_type__}' object({variant})>"
+
+    base.__repr__ = __repr__
+
+    def __init__(self, **kwargs):
+        object.__init__(self)
+        if len(kwargs.keys()) == 0:
+            if len(base.__annotations__) > 0:
+                raise TypeError(
+                    f"No variant specified: {base.__fidl_raw_type__}, {kwargs}"
+                )
+            return
+
+        if len(kwargs.keys()) != 1:
+            raise TypeError(
+                f"Exactly one keyword argument must be specified: {base.__fidl_raw_type__}, {kwargs}"
+            )
+
+        variant_name = next(iter(kwargs.keys()))
+        if variant_name == "_empty":
+            return
+
+        internal_variant_name = f"_{variant_name}"
+        if internal_variant_name not in base.__annotations__:
+            raise TypeError(
+                f"Unexpected keyword argument for union: {base.__fidl_raw_type__}, {variant_name}"
+            )
         setattr(
-            base,
-            member_type_name,
-            type_annotation(member["type"], root_ir),
+            self,
+            internal_variant_name,
+            kwargs[variant_name],
         )
-        setattr(ctor, "__doc__", docstring(member))
-        setattr(base, member_constructor_name, ctor)
-        setattr(base, member_name, None)
+
+    base.__init__ = __init__
+
+    # Each Python union object stores each of its variants in an internal attribute to discourage
+    # consumers of the union object from adding multiple variants. The public attribute for each
+    # variant is read-only.
+    for internal_variant_name in base.__annotations__.keys():
+
+        def getter(self, _internal_variant_name=internal_variant_name):
+            return getattr(self, _internal_variant_name, None)
+
+        setattr(base, internal_variant_name[1:], property(getter))
 
     if ir["is_result"]:
 
         def unwrap(self):
             """Returns the response if result does not contain an error. Otherwise, raises an exception."""
             if (
-                hasattr(self, "framework_err")
+                "_framework_err" in base.__annotations__
                 and self.framework_err is not None
             ):
                 raise RuntimeError(
                     f"{self.__fidl_raw_type__} framework error {self.framework_err}"
                 )
-            if hasattr(self, "err") and self.err is not None:
+            if "_err" in base.__annotations__ and self.err is not None:
                 raise RuntimeError(f"{self.__fidl_raw_type__} error {self.err}")
-            if hasattr(self, "response"):
+            if (
+                "_response" in base.__annotations__
+                and self.response is not None
+            ):
                 return self.response
             raise RuntimeError(
                 f"Failed to unwrap {self.__fidl_raw_type__} with no error or response."
             )
 
-        setattr(base, "unwrap", unwrap)
+        base.unwrap = unwrap
 
     return base
 
@@ -639,8 +634,199 @@ def union_type(ir, root_ir) -> type:
 def normalize_member_name(name) -> str:
     """Prevents use of names for struct or table members that are already keywords"""
     name = camel_case_to_snake_case(name)
-    if name in keyword.kwlist:
+    # LINT.IfChange
+    if name in [
+        # fmt: off
+        # keep-sorted start
+        "ArithmeticError",
+        "AssertionError",
+        "AttributeError",
+        "BaseException",
+        "BaseExceptionGroup",
+        "BlockingIOError",
+        "BrokenPipeError",
+        "BufferError",
+        "BytesWarning",
+        "ChildProcessError",
+        "ConnectionAbortedError",
+        "ConnectionError",
+        "ConnectionRefusedError",
+        "ConnectionResetError",
+        "DeprecationWarning",
+        "EOFError",
+        "Ellipsis",
+        "EncodingWarning",
+        "EnvironmentError",
+        "Exception",
+        "ExceptionGroup",
+        "False",
+        "FileExistsError",
+        "FileNotFoundError",
+        "FloatingPointError",
+        "FutureWarning",
+        "GeneratorExit",
+        "IOError",
+        "ImportError",
+        "ImportWarning",
+        "IndentationError",
+        "IndexError",
+        "InterruptedError",
+        "IsADirectoryError",
+        "KeyError",
+        "KeyboardInterrupt",
+        "LookupError",
+        "MemoryError",
+        "ModuleNotFoundError",
+        "NameError",
+        "None",
+        "NotADirectoryError",
+        "NotImplemented",
+        "NotImplementedError",
+        "OSError",
+        "OverflowError",
+        "PendingDeprecationWarning",
+        "PermissionError",
+        "ProcessLookupError",
+        "RecursionError",
+        "ReferenceError",
+        "ResourceWarning",
+        "RuntimeError",
+        "RuntimeWarning",
+        "StopAsyncIteration",
+        "StopIteration",
+        "SyntaxError",
+        "SyntaxWarning",
+        "SystemError",
+        "SystemExit",
+        "TabError",
+        "TimeoutError",
+        "True",
+        "TypeError",
+        "UnboundLocalError",
+        "UnicodeDecodeError",
+        "UnicodeEncodeError",
+        "UnicodeError",
+        "UnicodeTranslateError",
+        "UnicodeWarning",
+        "UserWarning",
+        "ValueError",
+        "Warning",
+        "ZeroDivisionError",
+        "abs",
+        "aiter",
+        "all",
+        "and",
+        "anext",
+        "any",
+        "as",
+        "ascii",
+        "assert",
+        "async",
+        "await",
+        "bin",
+        "bool",
+        "break",
+        "breakpoint",
+        "bytearray",
+        "bytes",
+        "callable",
+        "case",
+        "chr",
+        "class",
+        "classmethod",
+        "compile",
+        "complex",
+        "continue",
+        "copyright",
+        "credits",
+        "def",
+        "del",
+        "delattr",
+        "dict",
+        "dir",
+        "divmod",
+        "elif",
+        "else",
+        "enumerate",
+        "eval",
+        "except",
+        "exec",
+        "exit",
+        "filter",
+        "finally",
+        "float",
+        "for",
+        "format",
+        "from",
+        "frozenset",
+        "getattr",
+        "global",
+        "globals",
+        "hasattr",
+        "hash",
+        "help",
+        "hex",
+        "id",
+        "if",
+        "import",
+        "in",
+        "input",
+        "int",
+        "is",
+        "isinstance",
+        "issubclass",
+        "iter",
+        "lambda",
+        "len",
+        "license",
+        "list",
+        "locals",
+        "map",
+        "match",
+        "max",
+        "memoryview",
+        "min",
+        "next",
+        "nonlocal",
+        "not",
+        "object",
+        "oct",
+        "open",
+        "or",
+        "ord",
+        "pass",
+        "pow",
+        "print",
+        "property",
+        "quit",
+        "raise",
+        "range",
+        "repr",
+        "return",
+        "reversed",
+        "round",
+        "self",
+        "set",
+        "setattr",
+        "slice",
+        "sorted",
+        "staticmethod",
+        "str",
+        "sum",
+        "super",
+        "try",
+        "tuple",
+        "type",
+        "vars",
+        "while",
+        "with",
+        "yield",
+        "zip",
+        # keep-sorted end
+        # fmt: on
+    ]:
         return name + "_"
+    # LINT.ThenChange(//src/developer/ffx/lib/fuchsia-controller/cpp/fidl_codec/utils.h, //src/developer/ffx/lib/fuchsia-controller/python/fidl/_library.py, //tools/fidl/fidlgen_python/codegen/ir.go, //tools/fidl/gidl/backend/fuchsia_controller/conformance.go)
     return name
 
 
@@ -771,6 +957,8 @@ def alias_declaration(ir, root_ir) -> type:
                 base_type.__members_for_aliasing__,
             )
             return ty
+        if base_type == bool:
+            return bool
         base_params = {
             "__doc__": docstring(ir),
             "__fidl_kind__": "alias",
@@ -778,35 +966,6 @@ def alias_declaration(ir, root_ir) -> type:
             "__fidl_raw_type__": ir.raw_name(),
         }
         return type(name, (base_type,), base_params)
-
-
-class ProtocolBase(
-    metaclass=FidlMeta,
-    required_class_variables=[
-        ("Client", FidlMeta),
-        ("Server", FidlMeta),
-        ("EventHandler", FidlMeta),
-        ("MARKER", str),
-    ],
-):
-    ...
-
-
-def protocol_type(ir, root_ir) -> type:
-    """Constructs a Python type from a FIDL IR protocol declaration."""
-    name = fidl_ident_to_py_library_member(ir.name())
-    return type(
-        name,
-        (ProtocolBase,),
-        {
-            "__doc__": docstring(ir),
-            "__fidl_kind__": "protocol",
-            "Client": protocol_client_type(ir, root_ir),
-            "Server": protocol_server_type(ir, root_ir),
-            "EventHandler": protocol_event_handler_type(ir, root_ir),
-            "MARKER": fidl_ident_to_marker(ir.name()),
-        },
-    )
 
 
 def protocol_event_handler_type(ir: IR, root_ir) -> type:
@@ -821,7 +980,7 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         # Methods without a request are event methods.
         if method.has_request():
             continue
-        method_snake_case = camel_case_to_snake_case(method.name())
+        method_snake_case = method.name()
         properties[method_snake_case] = event_method(
             method, root_ir, get_fidl_request_server_lambda
         )
@@ -847,6 +1006,17 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         (EventHandlerBase,),
         properties,
     )
+
+
+class ProtocolMarker(
+    str,
+    metaclass=FidlMeta,
+):
+    ...
+
+
+def protocol_marker(ir: IR, root_ir) -> ProtocolMarker:
+    return ProtocolMarker(normalize_identifier(ir.name().replace("/", ".")))
 
 
 def protocol_server_type(ir: IR, root_ir) -> type:
@@ -898,7 +1068,7 @@ def protocol_client_type(ir: IR, root_ir) -> type:
         if not method.has_request():
             # This is an event. This needs to be handled on its own.
             continue
-        method_snake_case = camel_case_to_snake_case(method.name())
+        method_snake_case = method.name()
         properties[method_snake_case] = protocol_method(
             method, root_ir, get_fidl_request_client_lambda
         )
@@ -954,7 +1124,7 @@ def send_event_lambda(method: Method, root_ir: IR, msg) -> Callable:
 
 
 def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
-    snake_case_name = camel_case_to_snake_case(ir.name())
+    snake_case_name = ir.name()
     if msg:
 
         def server_lambda(self, request):
@@ -971,19 +1141,6 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
             )
 
         return server_lambda
-
-
-def normalize_identifier(identifier: str) -> str:
-    """Takes an identifier and attempts to normalize it.
-
-    For the average identifier this shouldn't do anything. This only applies to result types
-    that have underscores in their names.
-
-    Returns: The normalized identifier string (sans-underscores).
-    """
-    if identifier.endswith("_Result") or identifier.endswith("_Response"):
-        return identifier.replace("_", "")
-    return identifier
 
 
 def event_method(
@@ -1053,7 +1210,7 @@ def create_method(
     elif payload_kind == "table":
         params = [
             inspect.Parameter(
-                member["name"],
+                normalize_member_name(member["name"]),
                 inspect.Parameter.KEYWORD_ONLY,
                 default=None,
                 annotation=type_annotation(member["type"], root_ir),
@@ -1066,8 +1223,8 @@ def create_method(
     elif payload_kind == "union":
         params = [
             inspect.Parameter(
-                member["name"],
-                inspect.Parameter.POSITIONAL_ONLY,
+                normalize_member_name(member["name"]),
+                inspect.Parameter.KEYWORD_ONLY,
                 annotation=type_annotation(member["type"], root_ir),
             )
             for member in payload_ir["members"]
@@ -1161,7 +1318,24 @@ class FIDLLibraryModule(ModuleType):
     def _export_protocols(self) -> None:
         for decl in self.__ir__.protocol_declarations():
             if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
-                self._export_type(protocol_type(decl, self.__ir__))
+                self._export_type(
+                    protocol_client_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+                self._export_type(
+                    protocol_server_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+                self._export_type(
+                    protocol_event_handler_type(decl, self.__ir__),
+                    include_encode=False,
+                )
+
+                protocol_name = fidl_ident_to_py_library_member(decl.name())
+                marker_name = f"{protocol_name}Marker"
+                marker = protocol_marker(decl, self.__ir__)
+                setattr(self, marker_name, marker)
+                self.__all__.append(marker_name)
 
     def _export_structs(self) -> None:
         for decl in self.__ir__.struct_declarations():
@@ -1195,8 +1369,17 @@ class FIDLLibraryModule(ModuleType):
 
     def _export_aliases(self) -> None:
         for decl in self.__ir__.alias_declarations():
-            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
-                self._export_type(alias_declaration(decl, self.__ir__))
+            name = fidl_ident_to_py_library_member(decl.name())
+            if name in self.__all__:
+                continue
+            ty = alias_declaration(decl, self.__ir__)
+            # Python doesn't allow subclassing bool, so this is a special case
+            # to handle an alias for bool.
+            if ty == bool:
+                setattr(self, name, bool)
+                self.__all__.append(name)
+                continue
+            self._export_type(ty)
 
     def _export_unions(self) -> None:
         for decl in self.__ir__.union_declarations():
@@ -1207,28 +1390,25 @@ class FIDLLibraryModule(ModuleType):
         setattr(self, c.name, c.value)
         self.__all__.append(c.name)
 
-    def _export_type(self, t: type) -> None:
-        # TODO(https://fxbug.dev/346628306): Use a type more specific than Any if possible.
-        def encode_func(
-            obj: Any,
-        ) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
-            library = obj.__module__
-            library = library.removeprefix("fidl.")
-            library = library.replace("_", ".")
-            try:
-                type_name = f"{obj.__fidl_raw_type__}"
-            except AttributeError:
-                type_name = f"{library}/{type(obj).__name__}"
-            finally:
-                return encode_fidl_object(obj, library, type_name)
-
+    def _export_type(self, t: type, include_encode: bool = True) -> None:
         setattr(t, "__module__", self.fullname)
-        setattr(t, "encode", encode_func)
+
+        if include_encode:
+
+            def encode_func(
+                # TODO(https://fxbug.dev/346628306): Use a type more specific than Any if possible.
+                obj: Any,
+            ) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
+                library = obj.__module__
+                library = library.removeprefix("fidl.")
+                library = library.replace("_", ".")
+                try:
+                    type_name = f"{obj.__fidl_raw_type__}"
+                except AttributeError:
+                    type_name = f"{library}/{type(obj).__name__}"
+                finally:
+                    return encode_fidl_object(obj, library, type_name)
+
+            setattr(t, "encode", encode_func)
         setattr(self, t.__name__, t)
         self.__all__.append(t.__name__)
-
-        if issubclass(t, ProtocolBase):
-            for nested_class in [t.Client, t.Server, t.EventHandler]:
-                setattr(nested_class, "__module__", self.fullname)
-                setattr(self, nested_class.__name__, nested_class)
-                self.__all__.append(nested_class.__name__)

@@ -13,6 +13,8 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
@@ -31,12 +33,11 @@
 #include <memory>
 #include <optional>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
-#include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 #include <src/devices/temperature/drivers/aml-trip/aml-trip-device.h>
 #include <zxtest/zxtest.h>
 
 #include "../aml-trip-device.h"
+#include "src/devices/lib/mmio/test-helper.h"
 
 namespace temperature {
 
@@ -70,12 +71,12 @@ class FakeSensorMmio {
 
   uint8_t tstat1_ = 0x0;
 
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 class TestEnvironmentWrapper {
  public:
-  fdf::DriverStartArgs Setup(fake_pdev::FakePDevFidl::Config pdev_config) {
+  fdf::DriverStartArgs Setup(fdf_fake::FakePDev::Config pdev_config) {
     zx::result start_args_result = node_.CreateStartArgsAndServe();
     EXPECT_OK(start_args_result.status_value());
 
@@ -104,7 +105,7 @@ class TestEnvironmentWrapper {
  private:
   fdf_testing::TestNode node_{"root"};
   fdf_testing::internal::TestEnvironment env_;
-  fake_pdev::FakePDevFidl pdev_;
+  fdf_fake::FakePDev pdev_;
   compat::DeviceServer compat_server_;
 };
 
@@ -121,7 +122,7 @@ class AmlTripTest : public zxtest::Test {
         test_environment_(env_dispatcher_->async_dispatcher(), std::in_place) {}
 
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config{.use_fake_irq = true};
+    fdf_fake::FakePDev::Config config{.use_fake_irq = true};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
 
     ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_dupe_));
@@ -133,9 +134,9 @@ class AmlTripTest : public zxtest::Test {
     config.mmios[kTrimMmioIndex] =
         fdf_testing::CreateMmioBuffer(kTrimRegSize, ZX_CACHE_POLICY_UNCACHED_DEVICE);
 
-    pdev_device_info_t devinfo;
-    strcpy(devinfo.name, kTestName);
-    config.device_info = devinfo;
+    config.device_info = fdf::PDev::DeviceInfo{
+        .name = kTestName,
+    };
 
     fdf::DriverStartArgs start_args =
         test_environment_.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));

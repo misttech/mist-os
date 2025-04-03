@@ -216,7 +216,7 @@ class TestServiceNodeServer : public fidl::testing::WireTestBase<fuchsia_io::Nod
 TEST(CreateWithAllocator, Node) {
   auto [node_client, node_server] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
-  auto representation = fuchsia_io::wire::Representation::WithConnector({});
+  auto representation = fuchsia_io::wire::Representation::WithNode({});
 
   auto allocator = [](zxio_object_type_t type, zxio_storage_t** out_storage, void** out_context) {
     if (type != ZXIO_OBJECT_TYPE_NODE) {

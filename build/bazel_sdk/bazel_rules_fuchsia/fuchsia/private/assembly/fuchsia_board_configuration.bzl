@@ -12,6 +12,7 @@ load(
     ":providers.bzl",
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
+    "FuchsiaBoardInputBundleSetInfo",
     "FuchsiaPostProcessingScriptInfo",
 )
 load(
@@ -19,7 +20,7 @@ load(
     "LOCAL_ONLY_ACTION_KWARGS",
     "extract_labels",
     "replace_labels_with_files",
-    "select_root_dir",
+    "select_root_dir_with_file",
 )
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
@@ -60,6 +61,15 @@ def _fuchsia_board_configuration_impl(ctx):
         build_id_dirs.extend(bib[FuchsiaBoardInputBundleInfo].build_id_dirs)
     board_config["input_bundles"] = input_bundles
 
+    creation_args = []
+    input_files.extend(ctx.files.board_input_bundle_sets)
+    for bib_set in ctx.attr.board_input_bundle_sets:
+        creation_args += [
+            "--board-input-bundle-sets",
+            bib_set[FuchsiaBoardInputBundleSetInfo].directory,
+        ]
+        build_id_dirs.extend(bib_set[FuchsiaBoardInputBundleSetInfo].build_id_dirs)
+
     if ctx.attr.devicetree:
         input_files.append(ctx.file.devicetree)
         board_config["devicetree"] = ctx.file.devicetree.path
@@ -73,7 +83,18 @@ def _fuchsia_board_configuration_impl(ctx):
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
     board_config["filesystems"] = filesystems
 
-    creation_args = []
+    if ctx.attr.version and ctx.attr.version_file:
+        fail("Only one of \"version\" or \"version_file\" can be set.")
+        # TODO(https://fxbug.dev/397489730):
+        # Make it required to have exactly one of these set
+        # once these changes have rolled into all downstream repositories.
+
+    if ctx.attr.version:
+        creation_args += ["--version", ctx.attr.version]
+    if ctx.file.version_file:
+        creation_args += ["--version-file", ctx.file.version_file.path]
+        input_files.append(ctx.file.version_file)
+
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
 
@@ -153,6 +174,13 @@ _fuchsia_board_configuration = rule(
             doc = "Name of this board.",
             mandatory = True,
         ),
+        "version": attr.string(
+            doc = "Release version of this board.",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
+        ),
         "hardware_info": attr.string(
             doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",
             default = "{}",
@@ -160,7 +188,10 @@ _fuchsia_board_configuration = rule(
         "board_input_bundles": attr.label_list(
             doc = "Board Input Bundles targets to be included into the board.",
             providers = [FuchsiaBoardInputBundleInfo],
-            default = [],
+        ),
+        "board_input_bundle_sets": attr.label_list(
+            doc = "Board Input Bundle Sets to make available in the board.",
+            providers = [FuchsiaBoardInputBundleSetInfo],
         ),
         "provided_features": attr.string_list(
             doc = "The features that this board provides to the product.",
@@ -222,7 +253,7 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
-    directory = select_root_dir(ctx.files.files)
+    directory = select_root_dir_with_file(ctx.files.files, "board_configuration.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardConfigInfo(
@@ -256,26 +287,48 @@ def fuchsia_prebuilt_board_configuration(
 
 def _fuchsia_hybrid_board_configuration_impl(ctx):
     board_config_dir = ctx.actions.declare_directory(ctx.label.name)
+
+    creation_inputs = []
+    creation_args = []
+    build_id_dirs = []
+
     board_config = ctx.attr.board_configuration[FuchsiaBoardConfigInfo]
+    build_id_dirs.extend(board_config.build_id_dirs)
+
+    creation_inputs.extend(ctx.files.replacement_board_input_bundles)
+    if ctx.attr.replacement_board_input_bundles:
+        board = ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo]
+        creation_args += [
+            "--replace-bibs-from-board",
+            board.directory,
+        ]
+        build_id_dirs.extend(board.build_id_dirs)
+
+    creation_inputs.extend(ctx.files.replacement_board_input_bundle_sets)
+    for bib_set in ctx.attr.replacement_board_input_bundle_sets:
+        bib_set = bib_set[FuchsiaBoardInputBundleSetInfo]
+        creation_args += [
+            "--replace-bib-sets",
+            bib_set.directory,
+        ]
+        build_id_dirs.extend(bib_set.build_id_dirs)
+
     args = [
         "hybrid-board",
         "--config",
         board_config.directory,
         "--output",
         board_config_dir.path,
-        "--replace-bibs-from-board",
-        ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].directory,
-    ]
+    ] + creation_args
 
     sdk = get_fuchsia_sdk_toolchain(ctx)
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,
-        inputs = ctx.files.replacement_board_input_bundles + ctx.files.board_configuration,
+        inputs = creation_inputs + ctx.files.board_configuration,
         outputs = [board_config_dir],
     )
 
-    build_id_dirs = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].build_id_dirs + ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].build_id_dirs
     return [
         DefaultInfo(files = depset([board_config_dir])),
         FuchsiaBoardConfigInfo(
@@ -284,7 +337,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
         ),
     ]
 
-_fuchsia_hybrid_board_configuration = rule(
+fuchsia_hybrid_board_configuration = rule(
     doc = "Combine in-tree board input bundles with a board from out-of-tree for hybrid assembly",
     implementation = _fuchsia_hybrid_board_configuration_impl,
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
@@ -298,19 +351,10 @@ _fuchsia_hybrid_board_configuration = rule(
         "replacement_board_input_bundles": attr.label(
             doc = "In-tree board containing input bundles to replace those in `board_configuration`",
             providers = [FuchsiaBoardConfigInfo],
-            mandatory = True,
+        ),
+        "replacement_board_input_bundle_sets": attr.label_list(
+            doc = "Board input bundle sets to replace inside the board",
+            providers = [FuchsiaBoardInputBundleSetInfo],
         ),
     },
 )
-
-def fuchsia_hybrid_board_configuration(
-        name,
-        board_configuration,
-        replacement_board_input_bundles,
-        **kwargs):
-    _fuchsia_hybrid_board_configuration(
-        name = name,
-        board_configuration = board_configuration,
-        replacement_board_input_bundles = replacement_board_input_bundles,
-        **kwargs
-    )

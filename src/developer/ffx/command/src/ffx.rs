@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::metrics::analytics_command;
-use crate::{Format, MetricsSession};
+use crate::{MachineFormat, MetricsSession};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::{bug, return_user_error, user_error, Error, FfxContext as _, Result};
@@ -219,8 +219,8 @@ pub struct Ffx {
 
     #[argh(option)]
     /// produce output for a machine in the specified format; available formats: "json",
-    /// "json-pretty"
-    pub machine: Option<Format>,
+    /// "json-pretty", "raw"
+    pub machine: Option<MachineFormat>,
 
     #[argh(switch)]
     /// produce the JSON schema for the MachineWriter output. The `--machine` option
@@ -295,7 +295,7 @@ enum StrictCheckErrorEnum {
     MustHaveMachineSpecified,
     #[error("ffx strict requires that the target be explicitly specified")]
     MustHaveTarget,
-    #[error("ffx strict requires that the Target be specified by address or serial. Actually passed: \"{}\"", .0)]
+    #[error("ffx strict requires that the Target be specified by address or have the prefix \"serial:\". Actually passed: \"{}\"", .0)]
     TargetMustBeAddressOrSerial(String),
     #[error("ffx strict requires that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
@@ -348,8 +348,7 @@ pub fn check_strict_constraints(ffx: &Ffx, requires_target: bool) -> Result<()> 
             None => errors.push(StrictCheckErrorEnum::MustHaveTarget),
             Some(t) => match netext::parse_address_parts(t.as_str()) {
                 Err(_) => {
-                    let re = regex::Regex::new(r"^\w{14}$").unwrap();
-                    if !re.is_match(t) {
+                    if !t.starts_with("serial:") {
                         errors.push(StrictCheckErrorEnum::TargetMustBeAddressOrSerial(t.clone()));
                     }
                 }
@@ -533,7 +532,7 @@ impl Ffx {
                 }
                 "--machine" => {
                     if let Some(val) = argv_iter.next() {
-                        if let Ok(fmt) = Format::from_str(val) {
+                        if let Ok(fmt) = MachineFormat::from_str(val) {
                             return_val.machine = Some(fmt);
                         }
                     }
@@ -685,6 +684,24 @@ mod test {
                 inputs: vec![
                     "ffx",
                     "--strict",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--target",
+                    "1234567890ABCD",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Target cannot be bare serial".into(),
+                expected_errors: vec![StrictCheckErrorEnum::TargetMustBeAddressOrSerial(
+                    "1234567890ABCD".into(),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--strict",
                     "--isolate-dir",
                     "/tmp/foo",
                     "--machine",
@@ -701,20 +718,45 @@ mod test {
                     PathBuf::from("/tmp/foo"),
                 )],
             },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--strict",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--target",
+                    "serial:1234567890AB",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "serial prefix is okay".into(),
+                expected_errors: vec![],
+            },
         ];
 
         for case in cases {
             let cmd_line =
                 FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
-            let res = check_strict_constraints(&cmd_line.global, true);
-            assert!(res.is_err(), "Test Case {} was not an error", case.name);
-
-            let Error::User(got_err) = res.unwrap_err() else { panic!() };
-            match got_err.downcast_ref::<StrictCheckError>() {
-                Some(StrictCheckError::User(inner_errs)) => {
+            match check_strict_constraints(&cmd_line.global, true) {
+                Err(Error::User(got_err)) => match got_err.downcast_ref::<StrictCheckError>() {
+                    Some(StrictCheckError::User(inner_errs)) => {
+                        assert_eq!(
+                            case.expected_errors, *inner_errs,
+                            "Test Case {} had the wrong errors",
+                            case.name
+                        );
+                    }
+                    _ => {
+                        unreachable!();
+                    }
+                },
+                Ok(_) => {
                     assert_eq!(
-                        case.expected_errors, *inner_errs,
-                        "Test Case {} had the wrong errors",
+                        case.expected_errors,
+                        vec![],
+                        "Test Case {} should not have had an error",
                         case.name
                     );
                 }
@@ -761,7 +803,7 @@ mod test {
             FfxCommandLine::from_args_for_help(&args).expect("Command line should parse");
         assert_eq!(cmd_for_help.ffx_args, vec!["--verbose", "--machine", "json-pretty"]);
         assert!(cmd_for_help.global.verbose);
-        assert!(cmd_for_help.global.machine == Some(Format::JsonPretty));
+        assert!(cmd_for_help.global.machine == Some(MachineFormat::JsonPretty));
     }
 
     /// A subcommand
@@ -954,5 +996,13 @@ mod test {
         let _ffx = Ffx::from_args(&["ffx"], &all_args).expect("parsing all long args");
         let _ffx_for_help = Ffx::from_args_for_help(&all_args).expect("parsing args for help");
         assert_eq!(_ffx, _ffx_for_help);
+    }
+
+    #[test]
+    fn cmd_machine_raw() {
+        let args = ["test/things/ffx", "--machine", "raw"].map(String::from);
+        let cmd_line =
+            FfxCommandLine::new(Some("tools/ffx"), &args).expect("Command line should parse");
+        assert_eq!(cmd_line.global.machine, Some(MachineFormat::Raw));
     }
 }

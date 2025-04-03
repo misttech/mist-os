@@ -11,6 +11,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/mock-mmio/cpp/mock-mmio-reg.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/mock-i2c/mock-i2c.h>
@@ -22,7 +23,6 @@
 #include <zxtest/zxtest.h>
 
 #include "sdk/lib/inspect/testing/cpp/zxtest/inspect.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -456,7 +456,7 @@ TEST_F(Lp8556DeviceTest, Inspect) {
       root_node.get_property<inspect::DoublePropertyValue>("max_absolute_brightness_nits"));
 }
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -472,8 +472,8 @@ TEST_F(Lp8556DeviceTest, GetBackLightPower) {
   async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
                                                                   std::in_place};
-  fake_pdev::FakePDevFidl::Config config;
-  config.board_info = pdev_board_info_t{
+  fdf_fake::FakePDev::Config config;
+  config.board_info = fdf::PDev::BoardInfo{
       .pid = PDEV_PID_NELSON,
   };
 
@@ -530,8 +530,8 @@ TEST_F(Lp8556DeviceTest, GetPowerWatts) {
   async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
                                                                   std::in_place};
-  fake_pdev::FakePDevFidl::Config config;
-  config.board_info = pdev_board_info_t{
+  fdf_fake::FakePDev::Config config;
+  config.board_info = fdf::PDev::BoardInfo{
       .pid = PDEV_PID_NELSON,
   };
 

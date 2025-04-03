@@ -5,6 +5,11 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
+group("tests") {
+  testonly = true
+  deps = [ ":starnix_ebpf_api_tests" ]
+}
+
 rustc_library("ebpf_api") {
   edition = "2021"
 
@@ -12,6 +17,7 @@ rustc_library("ebpf_api") {
     "src/helpers.rs",
     "src/lib.rs",
     "src/maps/array.rs",
+    "src/maps/buffer.rs",
     "src/maps/hashmap.rs",
     "src/maps/mod.rs",
     "src/maps/ring_buffer.rs",
@@ -19,6 +25,7 @@ rustc_library("ebpf_api") {
     "src/program_type.rs",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf_rust",
     "//sdk/rust/zx",
     "//src/lib/dense-map",
     "//src/lib/diagnostics/inspect/contrib/stubs:inspect_stubs",
@@ -33,4 +40,12 @@ rustc_library("ebpf_api") {
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  with_unit_tests = true
+  test_deps = [ "//src/lib/fuchsia" ]
+}
+
+fuchsia_unittest_package("starnix_ebpf_api_tests") {
+  manifest = "meta/ebpf_api_tests.cml"
+  deps = [ ":ebpf_api_test" ]
 }

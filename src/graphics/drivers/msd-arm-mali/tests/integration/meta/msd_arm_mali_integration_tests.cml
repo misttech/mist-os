@@ -13,10 +13,20 @@
     use: [
         {
             // For /dev/class/gpu, /dev/class/gpu-performance-counters.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             rights: [ "r*" ],
             path: "/dev/class",
         },
+        {
+            // This service replaces the directory capability above.
+            service: [
+                "fuchsia.gpu.magma.PerformanceCounterService",
+                "fuchsia.gpu.magma.Service",
+            ],
+        },
+        { service: "fuchsia.hardware.gpu.mali.UtilsService" },
         { protocol: "fuchsia.tracing.provider.Registry" },
         {
             protocol: [

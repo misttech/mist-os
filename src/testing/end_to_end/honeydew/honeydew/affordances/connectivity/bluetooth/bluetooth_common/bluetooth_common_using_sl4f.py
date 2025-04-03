@@ -4,7 +4,7 @@
 """Bluetooth Common affordance implementation using SL4F."""
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Optional
 
 from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
@@ -80,12 +80,14 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
         self,
         input_mode: bluetooth_types.BluetoothAcceptPairing,
         output_mode: bluetooth_types.BluetoothAcceptPairing,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
             input_mode: input mode of device
             output_mode: output mode of device
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -104,12 +106,14 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
         self,
         identifier: str,
         connection_type: bluetooth_types.BluetoothConnectionType,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of bluetooth connection
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -127,11 +131,14 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 f"Failed to complete connect_device SL4F call on {self._name}."
             ) from e
 
-    def forget_device(self, identifier: str) -> None:
+    def forget_device(
+        self, identifier: str, timeout_sec: Optional[int | None] = None
+    ) -> None:
         """Forget device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -146,8 +153,13 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 f"Failed to complete forget_device SL4F call on {self._name}."
             ) from e
 
-    def get_active_adapter_address(self) -> str:
+    def get_active_adapter_address(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> str:
         """Retrieves the active adapter mac address
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Sample result:
             {"result": "[address (public) 20:1F:3B:62:E9:D2]"}
@@ -192,8 +204,12 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
             ) from e
         return connected_devices
 
-    def get_known_remote_devices(self) -> dict[str, Any]:
+    def get_known_remote_devices(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> dict[str, Any]:
         """Retrieves all known remote devices received by device.
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Returns:
             A dict of all known remote devices.
@@ -217,12 +233,14 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
         self,
         identifier: str,
         connection_type: bluetooth_types.BluetoothConnectionType,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of bluetooth connection
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -259,12 +277,15 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 f"Failed to complete request_discovery SL4F call on {self._name}."
             ) from e
 
-    def set_discoverable(self, discoverable: bool) -> None:
+    def set_discoverable(
+        self, discoverable: bool, timeout_sec: Optional[int | None] = None
+    ) -> None:
         """Sets device to be discoverable by others.
 
         Args:
             discoverable: True to be discoverable by others, False to be not
                           discoverable by others.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -279,8 +300,12 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 f"Failed to complete set_discoverable SL4F call on {self._name}."
             ) from e
 
-    def run_pairing_delegate(self) -> None:
+    def run_pairing_delegate(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> None:
         """Function to run pairing delegate server calls.
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Fuchsia Controller only implementation
         """

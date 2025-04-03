@@ -6,6 +6,7 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::create_request_stream;
 use fidl_diagnostics_validate::*;
 use fidl_fuchsia_inspect::TreeMarker;
+use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::hierarchy::*;
 /// Rust Puppet, receiving commands to drive the Rust Inspect library.
@@ -485,6 +486,7 @@ async fn run_driver_service(
     mut publisher: Publisher,
 ) -> Result<(), Error> {
     let mut actor_maybe: Option<Actor> = None;
+    let scope = fasync::Scope::new_with_name("validator puppet service");
     while let Some(event) = stream.try_next().await? {
         match event {
             InspectPuppetRequest::GetConfig { responder, .. } => {
@@ -511,8 +513,8 @@ async fn run_driver_service(
                     actor.inspector.clone(),
                     TreeServerSendPreference::default(),
                     request_stream,
-                )
-                .detach();
+                    &scope,
+                );
                 responder.send(Some(tree), TestResult::Ok)?;
                 actor_maybe = Some(actor);
             }

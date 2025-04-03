@@ -73,19 +73,19 @@ pub fn convert_node_proxy<T: Proxy>(proxy: fio::NodeProxy) -> T {
 }
 
 /// Helper function to open the desired node in the root folder.
-/// Asserts that open_node_status succeeds.
-pub async fn open_node<T: ProtocolMarker>(
+/// Asserts that deprecated_open_node_status succeeds.
+pub async fn deprecated_open_node<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> T::Proxy {
-    open_node_status::<T>(dir, flags, path)
-        .await
-        .unwrap_or_else(|e| panic!("open_node_status failed for {path} (flags={flags:?}): {e:?}"))
+    deprecated_open_node_status::<T>(dir, flags, path).await.unwrap_or_else(|e| {
+        panic!("deprecated_open_node_status failed for {path} (flags={flags:?}): {e:?}")
+    })
 }
 
 /// Helper function to open the desired node in the root folder.
-pub async fn open_node_status<T: ProtocolMarker>(
+pub async fn deprecated_open_node_status<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
@@ -105,28 +105,41 @@ pub async fn open_node_status<T: ProtocolMarker>(
 
 /// Helper function to open a file with the given flags. Only use this if testing something other
 /// than the open call directly.
-pub async fn open_file_with_flags(
+pub async fn deprecated_open_file_with_flags(
     parent_dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> fio::FileProxy {
-    open_node::<fio::FileMarker>(&parent_dir, flags | fio::OpenFlags::NOT_DIRECTORY, path).await
+    deprecated_open_node::<fio::FileMarker>(
+        &parent_dir,
+        flags | fio::OpenFlags::NOT_DIRECTORY,
+        path,
+    )
+    .await
 }
 
 /// Helper function to open a sub-directory with the given flags. Only use this if testing
 /// something other than the open call directly.
-pub async fn open_dir_with_flags(
+pub async fn deprecated_open_dir_with_flags(
     parent_dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open_node::<fio::DirectoryMarker>(&parent_dir, flags | fio::OpenFlags::DIRECTORY, path).await
+    deprecated_open_node::<fio::DirectoryMarker>(
+        &parent_dir,
+        flags | fio::OpenFlags::DIRECTORY,
+        path,
+    )
+    .await
 }
 
 /// Helper function to open a sub-directory as readable and writable. Only use this if testing
 /// something other than the open call directly.
-pub async fn open_rw_dir(parent_dir: &fio::DirectoryProxy, path: &str) -> fio::DirectoryProxy {
-    open_dir_with_flags(
+pub async fn deprecated_open_rw_dir(
+    parent_dir: &fio::DirectoryProxy,
+    path: &str,
+) -> fio::DirectoryProxy {
+    deprecated_open_dir_with_flags(
         parent_dir,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         path,
@@ -145,7 +158,7 @@ pub async fn get_token(dir: &fio::DirectoryProxy) -> fidl::Handle {
 /// Helper function to read a file and return its contents. Only use this if testing something other
 /// than the read call directly.
 pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
-    let file = open_file_with_flags(dir, fio::OpenFlags::RIGHT_READABLE, path).await;
+    let file = deprecated_open_file_with_flags(dir, fio::OpenFlags::RIGHT_READABLE, path).await;
     file.read(100).await.expect("read failed").map_err(zx::Status::from_raw).expect("read error")
 }
 
@@ -215,7 +228,7 @@ pub async fn create_file_and_get_backing_memory(
 ) -> Result<(zx::Vmo, (fio::DirectoryProxy, fio::FileProxy)), zx::Status> {
     let file_path = get_directory_entry_name(&dir_entry);
     let dir_proxy = test_harness.get_directory(vec![dir_entry], file_flags);
-    let file_proxy = dir_proxy.open3_node::<fio::FileMarker>(&file_path, file_flags, None).await?;
+    let file_proxy = dir_proxy.open_node::<fio::FileMarker>(&file_path, file_flags, None).await?;
     let vmo = file_proxy
         .get_backing_memory(vmo_flags)
         .await
@@ -261,18 +274,18 @@ pub trait DirectoryProxyExt {
     ///
     /// Waits for [`fio::NodeEvent::OnRepresentation`] if [`fio::Flags::FLAG_SEND_REPRESENTATION`]
     /// is specified, otherwise calls `fuchsia.io/Node.GetConnectionInfo` to verify the result.
-    async fn open3_node<T: ProtocolMarker>(
+    async fn open_node<T: ProtocolMarker>(
         &self,
         path: &str,
         flags: fio::Flags,
         options: Option<fio::Options>,
     ) -> Result<T::Proxy, zx::Status>;
 
-    /// Similar to [`DirectoryProxyExt::open3_node`], but waits for and returns the
+    /// Similar to [`DirectoryProxyExt::open_node`], but waits for and returns the
     /// [`fio::NodeEvent::OnRepresentation`] event sent when opening a resource.
     ///
     /// Requires [`fio::Flags::FLAG_SEND_REPRESENTATION`] to be specified in `flags`.
-    async fn open3_node_repr<T: ProtocolMarker>(
+    async fn open_node_repr<T: ProtocolMarker>(
         &self,
         path: &str,
         flags: fio::Flags,
@@ -282,16 +295,16 @@ pub trait DirectoryProxyExt {
 
 #[async_trait]
 impl DirectoryProxyExt for fio::DirectoryProxy {
-    async fn open3_node<T: ProtocolMarker>(
+    async fn open_node<T: ProtocolMarker>(
         &self,
         path: &str,
         flags: fio::Flags,
         options: Option<fio::Options>,
     ) -> Result<T::Proxy, zx::Status> {
-        open3_node_impl::<T>(self, path, flags, options).await.map(|(proxy, _representation)| proxy)
+        open_node_impl::<T>(self, path, flags, options).await.map(|(proxy, _representation)| proxy)
     }
 
-    async fn open3_node_repr<T: ProtocolMarker>(
+    async fn open_node_repr<T: ProtocolMarker>(
         &self,
         path: &str,
         flags: fio::Flags,
@@ -301,12 +314,12 @@ impl DirectoryProxyExt for fio::DirectoryProxy {
             flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION),
             "flags must specify the FLAG_SEND_REPRESENTATION flag to use this function!"
         );
-        let (proxy, representation) = open3_node_impl::<T>(self, path, flags, options).await?;
+        let (proxy, representation) = open_node_impl::<T>(self, path, flags, options).await?;
         Ok((proxy, representation.unwrap()))
     }
 }
 
-async fn open3_node_impl<T: ProtocolMarker>(
+async fn open_node_impl<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,

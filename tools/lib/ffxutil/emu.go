@@ -130,14 +130,10 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 		args = append(args, "--engine", engine)
 	}
 	dryRunCommand := append(args, "--dry-run")
-	authKeyPath, err := f.GetSshAuthorizedKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := f.EmuStart(authKeyPath, dryRunCommand...).run(ctx); err != nil {
+	if err := f.EmuStart(dryRunCommand...).run(ctx); err != nil {
 		logger.Debugf(ctx, "failed to run dry-run command: %s", err)
 	}
-	return f.EmuStart(authKeyPath, args...).cmd(), nil
+	return f.EmuStart(args...).cmd(), nil
 }
 
 // EmuStop terminates all emulator instances launched by ffx.

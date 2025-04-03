@@ -177,26 +177,6 @@
     - fidl: 'fuchsia.gpu.magma'
     - fidl: 'fuchsia.ui.gfx'
 
-- name: 'HCI'
-  api_primary: 'neelsa@google.com'
-  api_secondary: 'emircan@google.com'
-  description: |
-    <p>Covers input, accessibility, internationalization.</p>
-    <p>
-      The set of APIs that connect human-computer interaction (HCI) devices
-      starting from drivers, to filtering, semantic understanding, grouping,
-      routing, all the way to delivering these inputs to the <a
-      href="#view-system">View System</a>. This includes APIs associated with
-      touch, mouse, keyboard, text editing and the accessibility framework.
-    </p>
-  examples:
-    - fidl: 'fuchsia.ui.input'
-    - fidl: 'fuchsia.ui.pointer'
-    - fidl: 'fuchsia.ui.input.accessibility'
-    - fidl: 'fuchsia.accessibility.semantics'
-    - description: 'fuchsia.accessibility.*'
-    - description: 'fuchsia.input.*'
-
 - name: 'Identity'
   api_primary: ''
   api_secondary: ''
@@ -332,26 +312,6 @@
     - fidl: 'fuchsia.kms'
     - fidl: 'fuchsia.tee'
 
-- name: 'Sessions'
-  api_primary: 'quiche@google.com'
-  api_secondary: 'neelsa@google.com'
-  description: |
-    <p>
-      A set of APIs to coordinate a product's user experience. Specifically the
-      API contains protocols for communicating with the session component.
-    </p>
-    <p>
-      The session API often makes use of protocols and data structures defined
-      in other areas of the platform. For example,
-      <code>GraphicalPresenter</code> does not define its own view type.
-      Instead, it uses <code>ViewRef</code> from the <a href="#view-system">View
-      System</a> to identify component views.
-    </p>
-  examples:
-    - fidl: 'fuchsia.element'
-    - fidl: 'fuchsia.session'
-    - fidl: 'fuchsia.session.power'
-
 - name: 'Software Delivery'
   api_primary: 'galbanum@google.com'
   api_secondary: 'etryzelaar@google.com'
@@ -425,26 +385,26 @@
   api_primary: 'mcgrathr@google.com'
   api_secondary: 'phosek@google.com'
 
-- name: 'View System'
+- name: 'UI'
   api_primary: 'emircan@google.com'
   api_secondary: 'neelsa@google.com'
   description: |
-    The set of APIs that need to reason about and interact with visual regions
-    ("views") and their lifecycle. They generally are not tied to a particular
-    graphical representation, but some have close ties to graphics APIs. HCI APIs
-    are built on top of the View System.
+    <p>
+      The set of APIs that coordinate a user's interaction with a product,
+      including input (e.g. human-computer interaction (HCI) device drivers,
+      semantic understanding, etc), the view system (e.g. visual regions
+      ("views") and their lifecycle), the application model, and accessibility.
+    </p>
+    <p>
+      This area has close ties to other user-experience-related API areas (e.g.
+      graphics, media). Where they overlap, the more specific API area has
+      ownership.
+    </p>
   examples:
+    - fidl: 'fuchsia.accessibility.semantics'
+    - fidl: 'fuchsia.session'
+    - fidl: 'fuchsia.ui.input'
     - fidl: 'fuchsia.ui.views'
-    - fidl: 'fuchsia.ui.focus'
-    - fidl: 'fuchsia.ui.app'
-      description: |
-        In particular
-        <a href="https://cs.opensource.google/search?q=%22protocol%20ViewProvider%22%20file:.*.fidl&amp;sq=&amp;ss=fuchsia%2Ffuchsia">
-          ViewProvider
-        </a>
-    - fidl: 'fuchsia.ui.policy'
-    - fidl: 'fuchsia.ui.annotation'
-    - description: 'View/scene connection signals in fuchsia.ui.gfx.Event'
 
 - name: 'Virtualization'
   api_primary: ''

@@ -17,6 +17,7 @@ use vfs::file::vmo::read_only;
 use vfs::remote::remote_dir;
 use vfs::service::host;
 use vfs::tree_builder::TreeBuilder;
+use vfs::ToObjectRequest as _;
 
 /// Used to construct and then host an outgoing directory.
 #[derive(Clone)]
@@ -74,15 +75,13 @@ impl OutDir {
 
         // Construct a function. Each time it is invoked, we connect a new Zircon channel
         // `server_end` to the directory.
+        const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_WRITABLE);
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
-            dir.clone().open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
-                vfs::path::Path::dot(),
-                ServerEnd::new(server_end.into_channel()),
-            );
+            let dir = dir.clone();
+            let object_request = FLAGS.to_object_request(server_end.into_channel());
+            object_request.handle(|request| {
+                dir.open3(ExecutionScope::new(), vfs::Path::dot(), FLAGS, request)
+            });
         })
     }
 

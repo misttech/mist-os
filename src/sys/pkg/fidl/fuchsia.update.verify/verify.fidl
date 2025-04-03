@@ -6,38 +6,6 @@ library fuchsia.update.verify;
 
 using zx;
 
-/// An abstract representation of an update verifier, to be used when
-/// verifying if an update should be committed.
-///
-/// This is unrelated to the verification in verified execution.
-closed protocol Verifier {
-    /// Verifies the update we just applied does not compromise an OTA dependency.
-    /// If the verification fails, the [`Verifier`] should log the reason why.
-    ///
-    /// The caller is responsible for setting any timeouts.
-    ///
-    /// + request `options` the configuration to use when verifying.
-    /// * error a value describing the cause of verification failure.
-    strict Verify(struct {
-        options @generated_name("VerifyOptions") table {};
-    }) -> () error @generated_name("VerifyError") flexible enum {
-        /// A problem occurred when doing update verification.
-        INTERNAL = 1;
-    };
-};
-
-/// An update verifier to determine if Blobfs is working as expected.
-@discoverable
-closed protocol BlobfsVerifier {
-    compose Verifier;
-};
-
-/// An update verifier to determine if Netstack is working as expected.
-@discoverable
-closed protocol NetstackVerifier {
-    compose Verifier;
-};
-
 type HealthStatus = strict enum {
     HEALTHY = 1;
     UNHEALTHY = 2;

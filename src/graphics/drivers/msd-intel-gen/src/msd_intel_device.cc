@@ -1107,7 +1107,8 @@ void MsdIntelDevice::QuerySliceInfoGen9(std::shared_ptr<ForceWakeDomain> forcewa
       DLOG("subslice %u eu_disable_mask 0x%x", subslice, eu_disable_mask[subslice]);
 
       DASSERT(eu_disable_mask[subslice] <= std::numeric_limits<uint8_t>::max());
-      uint8_t eu_enable_mask = ~static_cast<uint8_t>(eu_disable_mask[subslice]);
+      uint8_t eu_enable_mask =
+          static_cast<uint8_t>(~static_cast<uint8_t>(eu_disable_mask[subslice]));
       topology_out->mask_data.push_back(eu_enable_mask);
 
       size_t eu_disable_count =

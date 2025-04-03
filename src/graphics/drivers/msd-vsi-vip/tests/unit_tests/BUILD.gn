@@ -21,7 +21,7 @@ cc_test_executable("nonhardware_tests") {
   deps = [
     "//src/devices/testing/no_ddk",
     "//src/graphics/drivers/msd-vsi-vip/src",
-    "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
+    "//src/graphics/magma/lib/magma/platform/zircon:thread_profile_dfv2",
     "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
     "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
     "//src/graphics/magma/lib/magma_service/mock:mmio",

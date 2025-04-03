@@ -33,7 +33,11 @@ pub use diagnostics_log_types_serde::Severity;
 pub use moniker::ExtendedMoniker;
 
 #[cfg(target_os = "fuchsia")]
-mod logs_legacy;
+#[doc(hidden)]
+pub mod logs_legacy;
+
+#[cfg(feature = "json_schema")]
+use schemars::JsonSchema;
 
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
@@ -102,6 +106,7 @@ impl AsRef<str> for InspectHandleName {
 }
 
 /// The source of diagnostics data
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 #[derive(Default, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum DataSource {
     #[default]
@@ -255,8 +260,20 @@ mod host {
         }
     }
 }
+
 #[cfg(not(target_os = "fuchsia"))]
 pub use host::Timestamp;
+
+#[cfg(feature = "json_schema")]
+impl JsonSchema for Timestamp {
+    fn schema_name() -> String {
+        "integer".to_owned()
+    }
+
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        i64::json_schema(generator)
+    }
+}
 
 /// The metadata contained in a `DiagnosticsData` object where the data source is
 /// `DataSource::Inspect`.
@@ -294,6 +311,7 @@ impl InspectMetadata {
 
 /// The metadata contained in a `DiagnosticsData` object where the data source is
 /// `DataSource::Logs`.
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct LogsMetadata {
     // TODO(https://fxbug.dev/42136318) figure out exact spelling of pid/tid context and severity
@@ -310,7 +328,12 @@ pub struct LogsMetadata {
     pub timestamp: Timestamp,
 
     /// Severity of the message.
-    #[serde(with = "diagnostics_log_types_serde::severity")]
+    // For some reason using the `with` field was causing clippy errors, so this manually uses
+    // `serialize_with` and `deserialize_with`
+    #[serde(
+        serialize_with = "diagnostics_log_types_serde::severity::serialize",
+        deserialize_with = "diagnostics_log_types_serde::severity::deserialize"
+    )]
     pub severity: Severity,
 
     /// Raw severity if any. This will typically be unset unless the log message carries a severity
@@ -593,6 +616,20 @@ impl LogsDataBuilder {
         }
     }
 
+    /// Sets the moniker of the message.
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn set_moniker(mut self, value: ExtendedMoniker) -> Self {
+        self.args.moniker = value;
+        self
+    }
+
+    /// Sets the URL of the message.
+    #[must_use = "You must call build on your builder to consume its result"]
+    pub fn set_url(mut self, value: Option<FlyStr>) -> Self {
+        self.args.component_url = value;
+        self
+    }
+
     /// Sets the number of dropped messages.
     /// If value is greater than zero, a DroppedLogs error
     /// will also be added to the list of errors or updated if
@@ -824,6 +861,10 @@ impl Data<Logs> {
             .and_then(|p| p.children.iter().find(|property| property.name.as_str() == "keys"))
     }
 
+    pub fn metadata(&self) -> &LogsMetadata {
+        &self.metadata
+    }
+
     /// Returns an iterator over the payload keys as strings with the format "key=value".
     pub fn payload_keys_strings(&self) -> Box<dyn Iterator<Item = String> + '_> {
         let maybe_iter = self.payload_keys().map(|p| {
@@ -940,7 +981,7 @@ impl Data<Logs> {
         })
     }
 
-    /// Returns the component nam. This only makes sense for v1 components.
+    /// Returns the component name. This only makes sense for v1 components.
     pub fn component_name(&self) -> Cow<'_, str> {
         match &self.moniker {
             ExtendedMoniker::ComponentManager => {
@@ -1336,6 +1377,7 @@ impl FromStr for LogsField {
 
 /// Possible errors that can come in a `DiagnosticsData` object where the data source is
 /// `DataSource::Logs`.
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 #[derive(Clone, Deserialize, Debug, Eq, PartialEq, Serialize)]
 pub enum LogError {
     /// Represents the number of logs that were dropped by the component writing the logs due to an

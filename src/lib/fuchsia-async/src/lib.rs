@@ -42,7 +42,7 @@ pub mod net;
 
 #[cfg(target_os = "fuchsia")]
 pub use self::handle::{
-    fifo::{Fifo, FifoEntry, FifoReadable, FifoWritable, ReadEntries, ReadOne, WriteEntries},
+    fifo::{Fifo, FifoEntry},
     on_signals::OnSignals,
     rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
 };
@@ -51,9 +51,9 @@ pub use self::handle::{
 #[cfg(not(target_os = "fuchsia"))]
 pub mod emulated_handle {
     pub use super::handle::{
-        shut_down_handles, AsHandleRef, Channel, ChannelProxyProtocol, EmulatedHandleRef, Event,
-        EventPair, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef, Koid,
-        MessageBuf, MessageBufEtc, ObjectType, Peered, Rights, Signals, Socket, SocketOpts,
+        shut_down_handles, AsHandleRef, Channel, EmulatedHandleRef, Event, EventPair, Handle,
+        HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef, Koid, MessageBuf,
+        MessageBufEtc, ObjectType, Peered, Rights, Signals, Socket, SocketOpts,
     };
 
     /// Type of raw Zircon handles.

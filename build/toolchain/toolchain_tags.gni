@@ -27,6 +27,9 @@ all_toolchain_tags += [
   # This indicates a toolchain does not provide the Fuchsia Compiler ABI.
   "no-compiler-abi",
 
+  # This indicates a toolchain does not comingle with the basic machine ABI.
+  "custom-abi",
+
   # This indicates a toolchain offers no floating point support.
   "no-floating-point",
 

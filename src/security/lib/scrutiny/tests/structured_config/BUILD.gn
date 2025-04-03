@@ -16,53 +16,9 @@ import("//build/security/verifier/verify_structured_config.gni")
 import("//build/testing/host_test.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 if (is_fuchsia) {
-  # NB: These strings must match the assertions in the python scripts in this directory which test
-  # the configuration values of the assembly we create here.
-  component_name = "component_with_structured_config"
-  package_name = "package_with_structured_config_for_scrutiny_testing"
-  expected_value_in_policy = "check this string!"
-  expected_value_for_dont_check = "don't check this string!"
-
-  fuchsia_component(component_name) {
-    testonly = true
-    manifest = "meta/component_with_structured_config.cml"
-
-    # We don't intend to run this component, just make its config visible to scrutiny.
-    check_references = false
-  }
-
-  fuchsia_structured_config_values("values") {
-    testonly = true
-    cm_label = ":component_with_structured_config_manifest_compile"
-    values = {
-      # NB: If these field names are changed the python scripts must be updated as well.
-      asserted_by_scrutiny_test = expected_value_in_policy
-      verifier_fails_due_to_mutability_parent = expected_value_for_dont_check
-    }
-  }
-
-  fuchsia_package("package") {
-    testonly = true
-    package_name = package_name
-    deps = [
-      ":component_with_structured_config",
-      ":values",
-    ]
-  }
-
-  core_shard("core_shard") {
-    shard_file = "meta/core_shard.cml"
-  }
-
-  core_realm_definition("core_realm") {
-    deps = [ ":core_shard" ]
-  }
-
   files = {
     board_config = "$target_out_dir/fuchsia.board_config.json"
     partitions_config = "$target_out_dir/partitions/partitions_config.json"
@@ -83,6 +39,7 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
     filesystems = {
       fvm = {
         sparse_output = {
@@ -92,9 +49,13 @@ if (is_fuchsia) {
   }
 
   product_assembly_configuration("product_assembly_config") {
+    testonly = true
     platform = {
       build_type = "user"
       feature_set_level = "utility"
+      example_config = {
+        include_example_aib = true
+      }
       storage = {
         filesystems = {
           image_name = "assembly"
@@ -113,20 +74,13 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
-    include_legacy_bundle = true
+    product_assembly_config_label = ":product_assembly_config"
+    board_config_label = ":board_config"
+    enable_example_aib = true
     generate_fvm = true
     generate_fvm_fastboot = false
     generate_vbmeta = false
-    product_assembly_config_label = ":product_assembly_config"
-    board_config_label = ":board_config"
-
-    # Needed for scrutiny to find root.cm and other component config.
-    base_packages = [ ":package" ]
-
     generate_image_metadata = false
-
-    # Needed for scrutiny to find things for the component model.
-    core_realm_definition = ":core_realm"
   }
 
   generated_partitions_config("partitions_config") {
@@ -189,15 +143,11 @@ if (is_host) {
   group("host_tests") {
     testonly = true
 
-    # TODO(https://fxbug.dev/42076896): Support Fxblob in scrutiny
-    if (fxfs_blob) {
-      deps = []
-    } else {
-      deps = [
-        ":check_extracted_config",
-        ":check_failing_policy",
-      ]
-    }
+    deps = [
+      ":check_extracted_config",
+      ":check_failing_policy",
+      ":verifier_pass",
+    ]
   }
 
   labels = {
@@ -250,6 +200,13 @@ if (is_host) {
       ":test_bin",
       "//build/python:interpreter",
     ]
+  }
+
+  verify_assembled_structured_config("verifier_pass") {
+    testonly = true
+    product_bundle_path = files.product_bundle_dir
+    policy = "passing_policy.json5"
+    deps = [ labels.product_bundle ]
   }
 
   python_binary("check_failed_verifier_bin") {

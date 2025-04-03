@@ -794,8 +794,6 @@ async fn dispatch_control_request(
     owns_interface: &mut bool,
     enabled_controller: &enabled::InterfaceEnabledController,
 ) -> Result<ControlRequestResult, fidl::Error> {
-    debug!("serving {:?}", req);
-
     match req {
         fnet_interfaces_admin::ControlRequest::AddAddress {
             address,

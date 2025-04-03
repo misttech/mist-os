@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::mem::needs_drop;
+use core::mem::{needs_drop, MaybeUninit};
 use core::{fmt, slice};
 
 use munge::munge;
@@ -10,13 +10,21 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector,
+    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector, ZeroPadding,
 };
 
 /// An optional FIDL vector
 #[repr(transparent)]
 pub struct WireOptionalVector<T> {
     raw: RawWireVector<T>,
+}
+
+unsafe impl<T> ZeroPadding for WireOptionalVector<T> {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw } = out);
+        RawWireVector::<T>::zero_padding(raw);
+    }
 }
 
 impl<T> Drop for WireOptionalVector<T> {
@@ -31,14 +39,14 @@ impl<T> Drop for WireOptionalVector<T> {
 
 impl<T> WireOptionalVector<T> {
     /// Encodes that a vector is present in a slot.
-    pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
-        munge!(let Self { raw } = slot);
+    pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
+        munge!(let Self { raw } = out);
         RawWireVector::encode_present(raw, len);
     }
 
     /// Encodes that a vector is absent in a slot.
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { raw } = slot);
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw } = out);
         RawWireVector::encode_absent(raw);
     }
 
@@ -113,11 +121,11 @@ impl<T: Encodable> EncodableOption for Vec<T> {
     type EncodedOption = WireOptionalVector<T::Encoded>;
 }
 
-impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
+unsafe impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption>,
+        out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(vec) = this {
             if T::COPY_OPTIMIZATION.is_enabled() {
@@ -128,9 +136,9 @@ impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
             } else {
                 encoder.encode_next_slice(vec.as_mut_slice())?;
             }
-            WireOptionalVector::encode_present(slot, vec.len() as u64);
+            WireOptionalVector::encode_present(out, vec.len() as u64);
         } else {
-            WireOptionalVector::encode_absent(slot);
+            WireOptionalVector::encode_absent(out);
         }
 
         Ok(())

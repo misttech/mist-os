@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{bail, Result};
 use manual_targets::watcher::{ManualTargetEvent, ManualTargetState};
 use std::fmt;
@@ -17,8 +17,8 @@ use fidl_fuchsia_developer_ffx as ffx;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum FastbootConnectionState {
     Usb,
-    Tcp(Vec<TargetAddr>),
-    Udp(Vec<TargetAddr>),
+    Tcp(Vec<TargetIpAddr>),
+    Udp(Vec<TargetIpAddr>),
 }
 
 impl Display for FastbootConnectionState {
@@ -153,11 +153,12 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
     fn try_from(info: ffx::TargetInfo) -> Result<Self, Self::Error> {
         let addresses = info.addresses.unwrap_or_default();
         // Get the TargetAddrs
-        let mut addrs: Vec<_> = addresses.into_iter().map(TargetAddr::from).collect();
+        let mut addrs: Vec<_> =
+            addresses.into_iter().filter_map(|x| TargetIpAddr::try_from(x).ok()).collect();
         // Sorting them this way put ipv6 above ipv4
         addrs.sort_by(|a, b| b.cmp(a));
 
-        fn assert_non_empty_addrs(addrs: &Vec<TargetAddr>) -> Result<(), anyhow::Error> {
+        fn assert_non_empty_addrs(addrs: &Vec<TargetIpAddr>) -> Result<(), anyhow::Error> {
             if addrs.is_empty() {
                 bail!("There must be at least one target address")
             }
@@ -167,7 +168,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
         let state = match info.fastboot_interface {
             None => {
                 assert_non_empty_addrs(&addrs)?;
-                TargetState::Product(addrs)
+                TargetState::Product(addrs.into_iter().map(Into::into).collect())
             }
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or_else(|| "".to_string());
@@ -252,7 +253,7 @@ impl From<fastboot_file_discovery::FastbootEvent> for TargetEvent {
     fn from(fastboot_event: fastboot_file_discovery::FastbootEvent) -> Self {
         match fastboot_event {
             fastboot_file_discovery::FastbootEvent::Discovered(device) => {
-                let address: TargetAddr = device.socket_addr().into();
+                let address: TargetIpAddr = device.socket_addr().into();
                 let connection_state = match device.mode() {
                     fastboot_file_discovery::FastbootMode::UDP => {
                         FastbootConnectionState::Udp(vec![address])
@@ -272,7 +273,7 @@ impl From<fastboot_file_discovery::FastbootEvent> for TargetEvent {
                 TargetEvent::Added(handle)
             }
             fastboot_file_discovery::FastbootEvent::Lost(device) => {
-                let address: TargetAddr = device.socket_addr().into();
+                let address: TargetIpAddr = device.socket_addr().into();
                 let connection_state = match device.mode() {
                     fastboot_file_discovery::FastbootMode::UDP => {
                         FastbootConnectionState::Udp(vec![address])
@@ -374,7 +375,7 @@ mod test {
         }
         {
             let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
+            let addr = TargetIpAddr::from(socket);
             let addr_info: ffx::TargetAddrInfo = addr.into();
             let info = ffx::TargetInfo {
                 nodename: Some("foo".to_string()),
@@ -395,7 +396,7 @@ mod test {
         }
         {
             let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let addr = TargetAddr::from(socket);
+            let addr = TargetIpAddr::from(socket);
             let addr_info: ffx::TargetAddrInfo = addr.into();
             let info = ffx::TargetInfo {
                 nodename: Some("foo".to_string()),

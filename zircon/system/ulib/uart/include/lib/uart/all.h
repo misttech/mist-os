@@ -128,6 +128,12 @@ class Config {
     return *this;
   }
 
+  template <typename T>
+  Config& operator=(const uart::Config<T>& uart_config) {
+    configs_ = uart_config;
+    return *this;
+  }
+
   // Visitor to access the active configuration object.
   template <typename T>
   void Visit(T&& visitor) {
@@ -159,6 +165,13 @@ UartDriver MakeDriver(const uart::all::Config<UartDriver>& config) {
     driver.template emplace<typename T::uart_type>(*uart_config);
   });
   return driver;
+}
+
+template <typename UartDriver = uart::all::Driver>
+uart::all::Config<UartDriver> GetConfig(const uart::all::Driver& driver) {
+  uart::all::Config<UartDriver> cfg;
+  uart::internal::Visit([&cfg](const auto& driver) { cfg = driver; }, driver);
+  return cfg;
 }
 
 // uart::all::KernelDriver is a variant across all the KernelDriver types.
@@ -240,18 +253,6 @@ class KernelDriver {
   template <typename T, typename... Args>
   void Visit(T&& f, Args... args) const {
     internal::Visit(VariantVisitor<T>{std::forward<T>(f)}, variant_, std::forward<Args>(args)...);
-  }
-
-  // Extract the hardware configuration and state.  The return type is const
-  // just to make clear that this never returns a mutable reference like normal
-  // accessors do, it always copies.
-  const uart_type uart() const {
-    uart_type driver;
-    Visit([&driver](auto&& active) {
-      const auto& uart = active.uart();
-      driver.template emplace<std::decay_t<decltype(uart)>>(uart);
-    });
-    return driver;
   }
 
   // Takes ownership of the underlying hardware management and state. This object will be left

@@ -20,24 +20,36 @@
 
 namespace media::audio::drivers::test {
 
+namespace {
+
 constexpr bool kLogGainValues = false;
 void LogGainState(std::string_view prologue,
                   const fuchsia::hardware::audio::GainState& gain_state) {
   if constexpr (kLogGainValues) {
-    FX_LOGS(INFO)
-        << prologue
-        << (gain_state.has_gain_db() ? std::to_string(gain_state.gain_db()) : "UNSPECIFIED")
-        << " dB, muted is "
-        << (gain_state.has_muted() ? (gain_state.muted() ? "true" : "false") : "UNSPECIFIED")
-        << ", AGC is "
-        << (gain_state.has_agc_enabled() ? (gain_state.agc_enabled() ? "enabled" : "disabled")
-                                         : "UNSPECIFIED");
+    const char* mute_state;
+    const char* agc_state;
+    if (gain_state.has_muted()) {
+      mute_state = gain_state.muted() ? "true" : "false";
+    } else {
+      mute_state = "UNSPECIFIED";
+    }
+    if (gain_state.has_muted()) {
+      agc_state = gain_state.has_agc_enabled() ? "enabled" : "disabled";
+    } else {
+      agc_state = "UNSPECIFIED";
+    }
+    FX_LOGS(INFO) << prologue
+                  << (gain_state.has_gain_db() ? std::to_string(gain_state.gain_db())
+                                               : "UNSPECIFIED")
+                  << " dB, muted is " << mute_state << ", AGC is " << agc_state;
   }
 }
 
+}  // namespace
+
 void BasicTest::TearDown() {
   // Restore initial_gain_state_, if we changed the gain in this test case.
-  if (stream_config().is_bound() && initial_gain_state_ && set_gain_state_) {
+  if (stream_config().is_bound() && initial_gain_state_.has_value() && set_gain_state_) {
     LogGainState("Restoring previous gain: ", *initial_gain_state_);
     stream_config()->SetGain(std::move(*initial_gain_state_));
     initial_gain_state_.reset();
@@ -46,198 +58,32 @@ void BasicTest::TearDown() {
   TestBase::TearDown();
 }
 
-// Requests on protocols that are composesd into StreamConfig/Dai/Codec/Composite.
-//
-// fuchsia.hardware.audio.Health
-// We expect a response, and we allow 'healthy' to be either unspecified or TRUE.
-void BasicTest::RequestHealthAndExpectHealthy() {
-  GetHealthState(AddCallback("GetHealthState", [](fuchsia::hardware::audio::HealthState state) {
-    EXPECT_TRUE(!state.has_healthy() || state.healthy());
-  }));
-  ExpectCallbacks();
-}
-
-void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb) {
-  if (device_entry().isCodec()) {
-    codec()->GetHealthState(std::move(cb));
-  } else if (device_entry().isComposite()) {
-    composite()->GetHealthState(std::move(cb));
-  } else if (device_entry().isDai()) {
-    dai()->GetHealthState(std::move(cb));
-  } else if (device_entry().isStreamConfig()) {
-    stream_config()->GetHealthState(std::move(cb));
-  }
-}
-
 // Basic (non-privileged) requests
 //
-// Request properties including unique ID (which should be unique across instances).
-// The FIDL table for properties differs across Codec/Composite/Dai/StreamConfig.
-// Extract these into a common struct so that subsequent code can be shared.
-void BasicTest::RetrieveProperties() {
-  properties_.reset();
-  // TODO(b/315049103): actually ensure that this differs between input and output.
-  if (device_entry().isCodec()) {
-    codec()->GetProperties(AddCallback(
-        "Codec::GetProperties", [this](fuchsia::hardware::audio::CodecProperties props) {
-          properties_ = BaseProperties{};
-          if (props.has_is_input()) {
-            properties_->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties_->unique_id.emplace();
-            std::memcpy(properties_->unique_id->data(), props.unique_id().data(), 16);
-          }
-          if (props.has_manufacturer()) {
-            properties_->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties_->product = props.product();
-          }
-          if (props.has_plug_detect_capabilities()) {
-            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
-          }
-        }));
-  } else if (device_entry().isComposite()) {
-    composite()->GetProperties(AddCallback(
-        "Composite::GetProperties", [this](fuchsia::hardware::audio::CompositeProperties props) {
-          properties_ = BaseProperties{};
-          if (props.has_unique_id()) {
-            properties_->unique_id.emplace(props.unique_id());
-          }
-          if (props.has_manufacturer()) {
-            properties_->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties_->product = props.product();
-          }
-          if (props.has_clock_domain()) {
-            properties_->clock_domain = props.clock_domain();
-          }
-        }));
-  } else if (device_entry().isDai()) {
-    dai()->GetProperties(
-        AddCallback("Dai::GetProperties", [this](fuchsia::hardware::audio::DaiProperties props) {
-          properties_ = BaseProperties{};
-          if (props.has_is_input()) {
-            properties_->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties_->unique_id = props.unique_id();
-          }
-          if (props.has_manufacturer()) {
-            properties_->manufacturer = props.manufacturer();
-          }
-          if (props.has_product_name()) {  // Note: not 'product'
-            properties_->product = props.product_name();
-          }
-          if (props.has_clock_domain()) {
-            properties_->clock_domain = props.clock_domain();
-          }
-        }));
-  } else if (device_entry().isStreamConfig()) {
-    stream_config()->GetProperties(AddCallback(
-        "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties props) {
-          properties_ = BaseProperties{};
-          if (props.has_is_input()) {
-            properties_->is_input = props.is_input();
-          }
-          if (props.has_unique_id()) {
-            properties_->unique_id = props.unique_id();
-          }
-          if (props.has_manufacturer()) {
-            properties_->manufacturer = props.manufacturer();
-          }
-          if (props.has_product()) {
-            properties_->product = props.product();
-          }
-          if (props.has_clock_domain()) {
-            properties_->clock_domain = props.clock_domain();
-          }
-          if (props.has_plug_detect_capabilities()) {
-            properties_->plug_detect_capabilities = props.plug_detect_capabilities();
-          }
-          if (props.has_can_mute()) {
-            properties_->can_mute = props.can_mute();
-          }
-          if (props.has_can_agc()) {
-            properties_->can_agc = props.can_agc();
-          }
-          if (props.has_min_gain_db()) {
-            properties_->min_gain_db = props.min_gain_db();
-          }
-          if (props.has_max_gain_db()) {
-            properties_->max_gain_db = props.max_gain_db();
-          }
-          if (props.has_gain_step_db()) {
-            properties_->gain_step_db = props.gain_step_db();
-          }
-        }));
-  }
-  ExpectCallbacks();
-  EXPECT_TRUE(properties_.has_value()) << "No GetProperties completion was received";
-}
-
-void BasicTest::ValidateProperties() {
-  ASSERT_TRUE(properties_);
-
-  // The following fields are optional, but must be non-empty if they are specified.
-  EXPECT_FALSE(properties_->manufacturer.has_value() && properties_->manufacturer->empty());
-  EXPECT_FALSE(properties_->product.has_value() && properties_->product->empty());
-
-  // Just check that required fields are present
-  if (device_entry().isCodec()) {
-    EXPECT_TRUE(properties_->plug_detect_capabilities.has_value());
-  } else if (device_entry().isComposite()) {
-    EXPECT_TRUE(properties_->clock_domain.has_value());
-  } else if (device_entry().isDai()) {
-    EXPECT_TRUE(properties_->is_input.has_value());
-    EXPECT_TRUE(properties_->clock_domain.has_value());
-  } else if (device_entry().isStreamConfig()) {
-    ASSERT_TRUE(properties_->is_input.has_value());
-    EXPECT_TRUE(properties_->clock_domain.has_value());
-    EXPECT_TRUE(properties_->plug_detect_capabilities.has_value());
-    ASSERT_TRUE(properties_->min_gain_db.has_value());
-    ASSERT_TRUE(properties_->max_gain_db.has_value());
-    ASSERT_TRUE(properties_->gain_step_db.has_value());
-
-    // For StreamConfig, we can do additional data validity/range checks.
-    EXPECT_EQ(*properties_->is_input, driver_type() == DriverType::StreamConfigInput);
-    ASSERT_TRUE(std::isfinite(*properties_->min_gain_db)) << "irregular min_gain_db";
-    ASSERT_TRUE(std::isfinite(*properties_->max_gain_db)) << "irregular max_gain_db";
-    ASSERT_TRUE(std::isfinite(*properties_->gain_step_db)) << "irregular gain_step_db";
-    EXPECT_LE(*properties_->min_gain_db, *properties_->max_gain_db) << "max_gain_db too small";
-    EXPECT_GE(*properties_->gain_step_db, 0.0f) << "gain_step_db too small";
-    EXPECT_LE(*properties_->gain_step_db, *properties_->max_gain_db - *properties_->min_gain_db)
-        << "gain_step_db too large";
-  } else {
-    FAIL() << "Unknown device type";
-  }
-}
-
 // Request that the driver return its gain capabilities and current state, expecting a response.
 // TODO(b/315051281): If possible, combine this with the corresponding check of the signalprocessing
 // gain element, once that test exists.
 void BasicTest::WatchGainStateAndExpectUpdate() {
-  ASSERT_TRUE(properties_);
+  ASSERT_TRUE(properties().has_value());
   ASSERT_TRUE(device_entry().isStreamConfig());
 
   // We reconnect the stream every time we run a test, and by driver interface definition the driver
   // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
   stream_config()->WatchGainState(
       AddCallback("WatchGainState", [this](fuchsia::hardware::audio::GainState gain_state) {
-        LogGainState((initial_gain_state_ ? "Received gain update:  " : "Storing previous gain: "),
+        LogGainState((initial_gain_state_.has_value() ? "Received gain update:  "
+                                                      : "Storing previous gain: "),
                      gain_state);
 
         ASSERT_TRUE(gain_state.has_gain_db());
-        EXPECT_GE(gain_state.gain_db(), *properties_->min_gain_db);
-        EXPECT_LE(gain_state.gain_db(), *properties_->max_gain_db);
+        EXPECT_GE(gain_state.gain_db(), *properties()->min_gain_db);
+        EXPECT_LE(gain_state.gain_db(), *properties()->max_gain_db);
 
         // If we're muted, then we must be capable of muting.
-        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || *properties_->can_mute);
+        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || *properties()->can_mute);
         // If AGC is enabled, then we must be capable of AGC.
         EXPECT_TRUE(!gain_state.has_agc_enabled() || !gain_state.agc_enabled() ||
-                    *properties_->can_agc);
+                    *properties()->can_agc);
         if (!initial_gain_state_.has_value()) {
           initial_gain_state_ = std::move(gain_state);
         }
@@ -263,16 +109,16 @@ void BasicTest::WatchGainStateAndExpectNoUpdate() {
 // gain element, once that test exists.
 void BasicTest::RequestSetGain() {
   ASSERT_TRUE(device_entry().isStreamConfig()) << __func__ << ": device_entry is not StreamConfig";
-  ASSERT_TRUE(properties_);
-  if (*properties_->max_gain_db == *properties_->min_gain_db && !*properties_->can_mute &&
-      !*properties_->can_agc) {
+  ASSERT_TRUE(properties().has_value());
+  if (*properties()->max_gain_db == *properties()->min_gain_db && !*properties()->can_mute &&
+      !*properties()->can_agc) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
                  << initial_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
   }
 
   // Ensure we've retrieved initial gain settings, so we can restore them after this test case.
-  ASSERT_TRUE(initial_gain_state_);
+  ASSERT_TRUE(initial_gain_state_.has_value());
 
   // Base our new gain settings on the old ones, to avoid existing values.
   fuchsia::hardware::audio::GainState gain_state_to_set;
@@ -281,14 +127,14 @@ void BasicTest::RequestSetGain() {
   // If we got this far, we know we can change something (even if it isn't gain_db).
   // Change to a different gain_db.
   *gain_state_to_set.mutable_gain_db() =
-      (initial_gain_state_->gain_db() == *properties_->min_gain_db ? *properties_->max_gain_db
-                                                                   : *properties_->min_gain_db);
+      (initial_gain_state_->gain_db() == *properties()->min_gain_db ? *properties()->max_gain_db
+                                                                    : *properties()->min_gain_db);
   // Toggle muted if we can change it (explicitly set it to false, if we can't).
   *gain_state_to_set.mutable_muted() =
-      *properties_->can_mute && !(gain_state_to_set.has_muted() && gain_state_to_set.muted());
+      *properties()->can_mute && !(gain_state_to_set.has_muted() && gain_state_to_set.muted());
   // Toggle AGC if we can change it (explicitly set it to false, if we can't).
   *gain_state_to_set.mutable_agc_enabled() =
-      *properties_->can_agc &&
+      *properties()->can_agc &&
       !(gain_state_to_set.has_agc_enabled() && gain_state_to_set.agc_enabled());
 
   set_gain_state_ = true;
@@ -301,9 +147,9 @@ void BasicTest::RequestSetGain() {
 void BasicTest::ValidatePlugState(const fuchsia::hardware::audio::PlugState& plug_state) {
   ASSERT_TRUE(plug_state.has_plugged());
   if (!plug_state.plugged()) {
-    ASSERT_TRUE(properties_);
-    ASSERT_TRUE(properties_->plug_detect_capabilities.has_value());
-    EXPECT_NE(*properties_->plug_detect_capabilities,
+    ASSERT_TRUE(properties().has_value());
+    ASSERT_TRUE(properties()->plug_detect_capabilities.has_value());
+    EXPECT_NE(*properties()->plug_detect_capabilities,
               fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED)
         << "Device reported plug capabilities as HARDWIRED, but now reports as unplugged";
   }
@@ -317,7 +163,7 @@ void BasicTest::ValidatePlugState(const fuchsia::hardware::audio::PlugState& plu
 // TODO(b/315051014): If possible, combine this with the corresponding plug check of the
 // signalprocessing endpoint element, once that test exists.
 void BasicTest::WatchPlugStateAndExpectUpdate() {
-  ASSERT_TRUE(properties_);
+  ASSERT_TRUE(properties().has_value());
 
   // Since we reconnect to the audio stream every time we run this test and we are guaranteed by
   // the audio driver interface definition that the driver will reply to the first watch request,
@@ -439,15 +285,6 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   WaitForError();
 });
 
-// Verify that a valid toplogy list is successfully received.
-DEFINE_BASIC_TEST_CLASS(GetTopologies, { RequestTopologies(); });
-
-// Verify that a valid toplogy is successfully received.
-DEFINE_BASIC_TEST_CLASS(GetTopology, {
-  RequestTopologies();
-  RequestTopology();
-});
-
 // Register separate test case instances for each enumerated device
 //
 // See googletest/docs/advanced.md for details
@@ -466,12 +303,7 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else if (device_entry.isComposite()) {
-    REGISTER_BASIC_TEST(Health, device_entry);
-    REGISTER_BASIC_TEST(GetTopologies, device_entry);
-    REGISTER_BASIC_TEST(GetTopology, device_entry);
-    REGISTER_BASIC_TEST(GetProperties, device_entry);
-    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
-    REGISTER_BASIC_TEST(DaiFormats, device_entry);
+    // No test cases here.
   } else if (device_entry.isDai()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(GetProperties, device_entry);

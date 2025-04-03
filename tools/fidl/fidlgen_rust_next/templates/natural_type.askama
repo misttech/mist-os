@@ -28,9 +28,9 @@
         {%- endmatch -%}
         <
             {%- if nullable -%}
-                Option<{{ context.config.resource_bindings.handle.natural_path }}>,
+                Option<{{ context.config.resource_bindings.channel.natural_path }}>,
             {%- else -%}
-                {{ context.config.resource_bindings.handle.natural_path }},
+                {{ context.config.resource_bindings.channel.natural_path }},
             {%- endif -%}
             {{ context.natural_id(protocol) }},
         >

@@ -3,7 +3,6 @@
 
 use crate::PublishOptions;
 use diagnostics_log_types::Severity;
-use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
@@ -11,6 +10,11 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
+use fidl_fuchsia_diagnostics::Interest;
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+use fidl_fuchsia_diagnostics_types::Interest;
 
 mod filter;
 mod sink;

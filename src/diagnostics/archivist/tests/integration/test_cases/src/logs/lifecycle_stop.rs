@@ -6,12 +6,15 @@ use crate::assert::assert_logs_sequence;
 use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use crate::utils::LogSettingsExt;
-use fidl_fuchsia_diagnostics::{self as fdiagnostics, Severity};
+use fidl_fuchsia_diagnostics_types::Severity;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
 use futures::channel::mpsc;
 use futures::StreamExt;
-use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics,
+    fuchsia_async as fasync,
+};
 
 const PUPPET_NAME: &str = "puppet";
 
@@ -38,7 +41,7 @@ async fn embedding_stop_api_for_log_listener() {
     let log_proxy = realm_proxy.connect_to_protocol::<LogMarker>().await.unwrap();
     let task = fasync::Task::spawn(async move {
         let l = Listener { send_logs };
-        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await
+        run_log_listener_with_proxy(&log_proxy, l, Some(&options)).await
     });
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
 

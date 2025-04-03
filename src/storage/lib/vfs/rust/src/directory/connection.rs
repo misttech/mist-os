@@ -281,7 +281,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             #[cfg(fuchsia_api_level_at_least = "NEXT")]
             fio::DirectoryRequest::Open { path, mut flags, options, object, control_handle: _ } => {
                 {
-                    trace::duration!(c"storage", c"Directory::Open3");
                     // Remove POSIX flags when the respective rights are not available.
                     if !self.options.rights.contains(fio::INHERITED_WRITE_PERMISSIONS) {
                         flags &= !fio::Flags::PERM_INHERIT_WRITE;
@@ -291,7 +290,9 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                     }
 
                     ObjectRequest::new(flags, &options, object)
-                        .handle(|req| self.handle_open(path, flags, req));
+                        .handle_async(async |req| self.handle_open(path, flags, req).await)
+                        .trace(trace::trace_future_args!(c"storage", c"Directory::Open3"))
+                        .await;
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
@@ -306,7 +307,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 control_handle: _,
             } => {
                 {
-                    trace::duration!(c"storage", c"Directory::Open3");
                     // Remove POSIX flags when the respective rights are not available.
                     if !self.options.rights.contains(fio::INHERITED_WRITE_PERMISSIONS) {
                         flags &= !fio::Flags::PERM_INHERIT_WRITE;
@@ -316,7 +316,9 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                     }
 
                     ObjectRequest::new(flags, &options, object)
-                        .handle(|req| self.handle_open(path, flags, req));
+                        .handle_async(async |req| self.handle_open(path, flags, req).await)
+                        .trace(trace::trace_future_args!(c"storage", c"Directory::Open3"))
+                        .await;
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
@@ -394,7 +396,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         directory.open(self.scope.clone(), flags, path, server_end);
     }
 
-    fn handle_open(
+    async fn handle_open(
         &self,
         path: String,
         flags: fio::Flags,
@@ -461,16 +463,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         }
 
-        if path.is_dot() && !flags.create_unnamed_temporary_in_directory_path() {
-            if !flags.is_dir_allowed() {
-                return Err(Status::INVALID_ARGS);
-            }
-            if flags.creation_mode() == CreationMode::Always {
-                return Err(Status::ALREADY_EXISTS);
-            }
+        if path.is_dot() && flags.creation_mode() == CreationMode::Always {
+            return Err(Status::ALREADY_EXISTS);
         }
 
-        self.directory.clone().open3(self.scope.clone(), path, flags, object_request)
+        self.directory.clone().open3_async(self.scope.clone(), path, flags, object_request).await
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (Status, Vec<u8>) {

@@ -7,8 +7,9 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/simple-codec/simple-codec-client.h>
@@ -31,7 +32,7 @@ namespace aml_g12 {
 
 class AmlG12TdmStream : public SimpleAudioStream {
  public:
-  AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
+  AmlG12TdmStream(zx_device_t* parent, bool is_input, fdf::PDev pdev,
                   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client,
                   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
                   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client);
@@ -90,7 +91,7 @@ class AmlG12TdmStream : public SimpleAudioStream {
   async::TaskClosureMethod<AmlG12TdmStream, &AmlG12TdmStream::ProcessRingNotification> notify_timer_
       __TA_GUARDED(domain_token()){this};
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
 
   zx::vmo ring_buffer_vmo_;
   fzl::PinnedVmo pinned_ring_buffer_;

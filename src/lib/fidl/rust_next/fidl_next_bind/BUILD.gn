@@ -40,6 +40,11 @@ rustc_library("fidl_next_bind") {
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_rust_next/*",
   ]
+
+  # Enables compatibility impls with the existing Rust bindings.
+  # This can be removed once we no longer require backwards compatibility.
+  features = [ "compat" ]
+  deps += [ "//src/lib/fidl/rust/fidl" ]
 }
 
 fuchsia_unittest_package("fidl_next_bind_test_package") {

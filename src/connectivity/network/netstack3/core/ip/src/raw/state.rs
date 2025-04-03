@@ -7,13 +7,12 @@
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::RwLock;
-use netstack3_base::{IpExt, WeakDeviceIdentifier};
+use netstack3_base::{IpExt, Marks, WeakDeviceIdentifier};
 
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::RawIpSocketsBindingsTypes;
-use crate::internal::routing::rules::Marks;
 use crate::internal::socket::SocketHopLimits;
 
 /// State for a raw IP socket that can be modified, and is lock protected.

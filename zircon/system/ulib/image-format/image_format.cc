@@ -920,6 +920,7 @@ class ArmTELinearFormats : public ImageFormatSet {
       case PixelFormat::kR8G8:
       case PixelFormat::kA2B10G10R10:
       case PixelFormat::kA2R10G10B10:
+      case PixelFormat::kP010:
         return true;
       default:
         return false;

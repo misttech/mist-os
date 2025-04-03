@@ -160,8 +160,10 @@ zx_status_t IntelHDAStreamBase::ProcessRequestStream(const ihda_proto::RequestSt
   fbl::AutoLock obj_lock(&obj_lock_);
   zx_status_t res;
 
-  if (!is_active())
+  if (!is_active()) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   res = SetDMAStreamLocked(resp.stream_id, resp.stream_tag);
   if (res != ZX_OK) {
@@ -176,6 +178,7 @@ zx_status_t IntelHDAStreamBase::ProcessRequestStream(const ihda_proto::RequestSt
     // going to end up being destroyed.  For simple codec driver who never
     // change stream topology, this is probably fine, but for more
     // complicated ones it probably is not.
+    LOG("%s returning error %d\n", __func__, res);
     return res;
   }
 
@@ -185,8 +188,10 @@ zx_status_t IntelHDAStreamBase::ProcessRequestStream(const ihda_proto::RequestSt
 // TODO(johngro) : Refactor this; this sample_format of parameters is 95% the same
 // between both the codec and stream base classes.
 zx_status_t IntelHDAStreamBase::SendCodecCommandLocked(uint16_t nid, CodecVerb verb, Ack do_ack) {
-  if (codec_channel_ == nullptr)
+  if (codec_channel_ == nullptr) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   ihda_codec_send_corb_cmd_req_t cmd;
 
@@ -200,8 +205,10 @@ zx_status_t IntelHDAStreamBase::SendCodecCommandLocked(uint16_t nid, CodecVerb v
 
 zx_status_t IntelHDAStreamBase::SendSetStreamFmtLocked(uint16_t encoded_fmt,
                                                        zx::handle ring_buffer_channel) {
-  if (codec_channel_ == nullptr)
+  if (codec_channel_ == nullptr) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   // Set the format of DMA stream.  This will stop any stream in progress and
   // close any connection to its clients.  At this point, all of our checks
@@ -215,6 +222,7 @@ zx_status_t IntelHDAStreamBase::SendSetStreamFmtLocked(uint16_t encoded_fmt,
   req.format = encoded_fmt;
   zx_status_t res = codec_channel_->Write(&req, sizeof(req), std::move(ring_buffer_channel));
   if (res != ZX_OK) {
+    LOG("%s returning error %d\n", __func__, res);
     return res;
   }
   encoded_fmt_ = encoded_fmt;
@@ -228,6 +236,7 @@ zx_status_t IntelHDAStreamBase::CreateRingBufferLocked(
   // If we don't have a DMA stream assigned to us, or there is already a set
   // format operation in flight, we cannot proceed.
   if (dma_stream_id_ == IHDA_INVALID_STREAM_ID || IsFormatChangeInProgress()) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
   }
 
@@ -262,8 +271,8 @@ zx_status_t IntelHDAStreamBase::CreateRingBufferLocked(
   // better be able to encode it into an IHDA format specifier.
   zx_status_t res = EncodeStreamFormat(fmt, &encoded_fmt);
   if (res != ZX_OK) {
-    DEBUG_LOG("Failed to encode stream format %u:%hu:%s (res %d)\n", fmt.frames_per_second,
-              fmt.channels, audio_proto::SampleFormatToString(fmt.sample_format), res);
+    LOG("Failed to encode stream format %u:%hu:%s (res %d)\n", fmt.frames_per_second, fmt.channels,
+        audio_proto::SampleFormatToString(fmt.sample_format), res);
     return res;
   }
 
@@ -272,16 +281,16 @@ zx_status_t IntelHDAStreamBase::CreateRingBufferLocked(
   // quiesce the converters and amplifiers if it approves of the format.
   res = BeginChangeStreamFormatLocked(fmt);
   if (res != ZX_OK) {
-    DEBUG_LOG("Stream impl rejected stream format %u:%hu:%s (res %d)\n", fmt.frames_per_second,
-              fmt.channels, audio_proto::SampleFormatToString(fmt.sample_format), res);
+    LOG("Stream impl rejected stream format %u:%hu:%s (res %d)\n", fmt.frames_per_second,
+        fmt.channels, audio_proto::SampleFormatToString(fmt.sample_format), res);
     return res;
   }
 
   res = SendSetStreamFmtLocked(encoded_fmt, ring_buffer.TakeChannel());
   if (res != ZX_OK) {
-    DEBUG_LOG("Failed to write set stream format %u:%hu:%s to codec channel (res %d)\n",
-              fmt.frames_per_second, fmt.channels,
-              audio_proto::SampleFormatToString(fmt.sample_format), res);
+    LOG("Failed to write set stream format %u:%hu:%s to codec channel (res %d)\n",
+        fmt.frames_per_second, fmt.channels, audio_proto::SampleFormatToString(fmt.sample_format),
+        res);
     return res;
   }
 
@@ -291,14 +300,17 @@ zx_status_t IntelHDAStreamBase::CreateRingBufferLocked(
 }
 
 zx_status_t IntelHDAStreamBase::SetDMAStreamLocked(uint16_t id, uint8_t tag) {
-  if ((id == IHDA_INVALID_STREAM_ID) || (tag == IHDA_INVALID_STREAM_TAG))
+  if ((id == IHDA_INVALID_STREAM_ID) || (tag == IHDA_INVALID_STREAM_TAG)) {
+    LOG("%s returning ZX_ERR_INVALID_ARGS\n", __func__);
     return ZX_ERR_INVALID_ARGS;
-
+  }
   ZX_DEBUG_ASSERT((dma_stream_id_ == IHDA_INVALID_STREAM_ID) ==
                   (dma_stream_tag_ == IHDA_INVALID_STREAM_TAG));
 
-  if (dma_stream_id_ != IHDA_INVALID_STREAM_ID)
+  if (dma_stream_id_ != IHDA_INVALID_STREAM_ID) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   dma_stream_id_ = id;
   dma_stream_tag_ = tag;
@@ -307,12 +319,15 @@ zx_status_t IntelHDAStreamBase::SetDMAStreamLocked(uint16_t id, uint8_t tag) {
 }
 
 zx_status_t IntelHDAStreamBase::AllocateUnsolTagLocked(uint8_t* out_tag) {
-  if (!parent_codec_)
+  if (!parent_codec_) {
+    LOG("%s returning ZX_ERR_BAD_STATE\n", __func__);
     return ZX_ERR_BAD_STATE;
+  }
 
   zx_status_t res = parent_codec_->AllocateUnsolTag(*this, out_tag);
-  if (res == ZX_OK)
+  if (res == ZX_OK) {
     unsol_tag_count_++;
+  }
 
   return res;
 }
@@ -326,7 +341,7 @@ void IntelHDAStreamBase::ReleaseUnsolTagLocked(uint8_t tag) {
 
 // TODO(johngro) : Move this out to a utils library?
 #define MAKE_RATE(_rate, _base, _mult, _div) \
-  { .rate = _rate, .encoded = (_base << 14) | ((_mult - 1) << 11) | ((_div - 1) << 8) }
+  {.rate = _rate, .encoded = (_base << 14) | ((_mult - 1) << 11) | ((_div - 1) << 8)}
 zx_status_t IntelHDAStreamBase::EncodeStreamFormat(const audio_proto::StreamSetFmtReq& fmt,
                                                    uint16_t* encoded_fmt_out) {
   ZX_DEBUG_ASSERT(encoded_fmt_out != nullptr);

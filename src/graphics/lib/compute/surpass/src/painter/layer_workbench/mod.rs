@@ -213,7 +213,7 @@ impl LayerWorkbench {
         let passes_shared_state = &mut self.passes_shared_state;
 
         passes::tile_unchanged_pass(state, passes_shared_state, context)?;
-        passes::skip_trivial_clips_pass(state, passes_shared_state, context)?;
+        passes::skip_trivial_clips_pass(state, passes_shared_state, context);
         passes::skip_fully_covered_layers_pass(state, passes_shared_state, context)?;
 
         ControlFlow::Continue(())

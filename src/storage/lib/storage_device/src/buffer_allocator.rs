@@ -4,11 +4,11 @@
 
 use crate::buffer::{round_down, round_up, Buffer};
 use event_listener::{Event, EventListener};
+use fuchsia_sync::Mutex;
 use futures::{Future, FutureExt as _};
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::pin::Pin;
-use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 #[cfg(target_os = "fuchsia")]
@@ -251,7 +251,7 @@ impl BufferAllocator {
         if size > self.source.size() {
             panic!("Allocation of {} bytes would exceed limit {}", size, self.source.size());
         }
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let requested_order = order(size, self.block_size());
         assert!(requested_order < inner.free_lists.len());
         // Pick the smallest possible order with a free entry.
@@ -287,7 +287,7 @@ impl BufferAllocator {
     /// Deallocation is O(lg(N) + M), where N = size and M = number of allocations.
     #[doc(hidden)]
     pub(super) fn free_buffer(&self, range: Range<usize>) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let mut offset = range.start;
         let size = inner
             .allocation_map

@@ -9,7 +9,7 @@
 
 // This is in its own source file so it can be unit tested.
 int64_t calculate_utc_time_nsec() {
-  int64_t reference_time = calculate_monotonic_time_nsec();
+  int64_t reference_boot_instant = calculate_boot_time_nsec();
 
   // Boot time to utc transform is read from vvar_data. The data is protected by a seqlock, and so
   // a seqlock reader is implemented
@@ -35,6 +35,6 @@ int64_t calculate_utc_time_nsec() {
   }
 
   affine::Ratio boot_to_utc_ratio(boot_to_utc_synthetic_ticks, boot_to_utc_reference_ticks);
-  return boot_to_utc_ratio.Scale(reference_time - boot_to_utc_reference_offset) +
+  return boot_to_utc_ratio.Scale(reference_boot_instant - boot_to_utc_reference_offset) +
          boot_to_utc_synthetic_offset;
 }

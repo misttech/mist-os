@@ -14,6 +14,7 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.TracingResource",
             ],
             from: "parent",
             to: "#trace_manager",

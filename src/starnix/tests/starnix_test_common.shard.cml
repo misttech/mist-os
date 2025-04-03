@@ -128,6 +128,7 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
@@ -173,7 +174,15 @@
             to: [ "#kernel" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-hrtimer",
+            from: "#fake-hrtimer",
+            to: [ "#timekeeper" ],
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
             from: "#fake-hrtimer",
             to: [ "#timekeeper" ],
         },

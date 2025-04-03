@@ -37,18 +37,6 @@ constexpr size_t kGibibyte = kMebibyte * 1024;
 // TODO: Remove support after July 9th 2021.
 constexpr char kOldEfiName[] = "efi-system";
 
-// Returns the GUID for the given partition, applying EFI-specific mappings.
-Uuid PartitionType(Partition partition, PartitionScheme partition_scheme) {
-  if (partition == Partition::kBootloaderA) {
-    // Special case for the bootloader which must be an ESP.
-    return GUID_BOOTLOADER_VALUE;
-  }
-  std::optional<Uuid> type = PartitionTypeGuid(partition, partition_scheme);
-  // OK to assert; known types for the EfiDevicePartitioner have a GUID
-  ZX_ASSERT(type);
-  return *type;
-}
-
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
@@ -130,10 +118,15 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
     case Partition::kVbMetaB:
     case Partition::kVbMetaR:
     case Partition::kAbrMeta: {
-      const auto filter = [&spec](const GptPartitionMetadata& part) {
+      // New scheme uses name to identify partitions, old uses type GUID.
+      const char* new_name = PartitionName(spec.partition, PartitionScheme::kNew);
+      std::optional<Uuid> legacy_type = PartitionTypeGuid(spec.partition, PartitionScheme::kLegacy);
+      // All supported types for the EfiDevicePartitioner have a known GUID.
+      ZX_ASSERT(legacy_type);
+      const auto filter = [&legacy_type, &new_name](const GptPartitionMetadata& part) {
         // Try find new scheme partitions first, if fails try falling back to legacy scheme.
-        return FilterByType(part, PartitionType(spec.partition, PartitionScheme::kNew)) ||
-               FilterByType(part, PartitionType(spec.partition, PartitionScheme::kLegacy));
+        // This allows us to support existing devices without requiring re-bootstrapping the GPT.
+        return FilterByName(part, new_name) || FilterByType(part, *legacy_type);
       };
       auto status = gpt_->FindPartition(filter);
       if (status.is_error()) {

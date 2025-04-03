@@ -28,9 +28,9 @@
         {%- endmatch -%}
         <
             {%- if nullable -%}
-                {{ context.config.resource_bindings.handle.optional_wire_path }},
+                {{ context.config.resource_bindings.channel.optional_wire_path }},
             {%- else -%}
-                {{ context.config.resource_bindings.handle.wire_path }},
+                {{ context.config.resource_bindings.channel.wire_path }},
             {%- endif -%}
             {{ context.natural_id(protocol) }},
         >

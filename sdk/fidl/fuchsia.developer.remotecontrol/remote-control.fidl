@@ -5,7 +5,9 @@
 library fuchsia.developer.remotecontrol;
 
 using fuchsia.component as component;
+using fuchsia.diagnostics.types as diagnostics_types;
 using fuchsia.diagnostics as diagnostics;
+
 // TODO(https://fxbug.dev/324081103): Remove the dependency on fuchsia.io when the OpenCapability
 // method is removed from the RemoteControl protocol.
 using fuchsia.io as io;
@@ -35,11 +37,19 @@ open protocol RemoteControl {
         response string:255;
     });
 
-    /// Writes a string to the syslog on the device.
+    @available(replaced=NEXT)
     strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
         severity diagnostics.Severity;
+    }) -> ();
+
+    /// Writes a string to the syslog on the device.
+    @available(added=NEXT)
+    strict LogMessage(struct {
+        tag string:MAX;
+        message string:MAX;
+        severity diagnostics_types.Severity;
     }) -> ();
 
     flexible IdentifyHost() -> (struct {

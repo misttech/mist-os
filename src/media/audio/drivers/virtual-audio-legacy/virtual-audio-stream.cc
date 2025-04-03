@@ -9,8 +9,6 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
-#include <cmath>
-
 namespace virtual_audio {
 
 // static
@@ -498,8 +496,9 @@ zx_status_t VirtualAudioStream::ChangeFormat(const audio::audio_proto::StreamSet
 
 zx_status_t VirtualAudioStream::SetGain(const audio::audio_proto::SetGainReq& req) {
   if (req.flags & AUDIO_SGF_GAIN_VALID) {
-    cur_gain_state_.cur_gain =
-        trunc(req.gain / cur_gain_state_.gain_step) * cur_gain_state_.gain_step;
+    // We avoid 'trunc'|'floor', to minimize C-runtime dependencies on new HW targets such as RISCV.
+    int64_t gain_step_count = static_cast<int64_t>(req.gain / cur_gain_state_.gain_step);
+    cur_gain_state_.cur_gain = static_cast<float>(gain_step_count) * cur_gain_state_.gain_step;
   }
 
   if (req.flags & AUDIO_SGF_MUTE_VALID) {

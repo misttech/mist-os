@@ -19,7 +19,7 @@ async fn file_resize_with_sufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         file.resize(0)
             .await
             .expect("resize failed")
@@ -40,7 +40,7 @@ async fn file_resize_with_insufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result = file.resize(0).await.expect("resize failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE));
     }

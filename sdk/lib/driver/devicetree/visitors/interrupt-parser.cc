@@ -42,12 +42,9 @@ zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
 
   // "interrupts-extended" takes precedence over "interrupts". Return if kInterruptsExtended
   // exists.
-  if (interrupt_values->find(kInterruptsExtended) != interrupt_values->end()) {
+  if (interrupt_values->contains(kInterruptsExtended)) {
     return zx::ok(*interrupt_values);
   }
-
-  // Convert "interrupts" property into "interrupts-extended" ReferenceProperty type for ease of
-  // processing it in the interrupt visitor.
 
   // Return early if there are no "interrupts" property for this node.
   auto interrupts_property = node.properties().find(kInterrupts);
@@ -125,7 +122,7 @@ zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
   }
   (*interrupt_values)[kInterruptsExtended] = std::move(interrupt_references);
 
-  if (interrupt_values->find(kInterruptNames) != interrupt_values->end()) {
+  if (interrupt_values->contains(kInterruptNames)) {
     const size_t interrupt_count = (*interrupt_values)[kInterruptsExtended].size();
     const size_t interrupt_name_count = (*interrupt_values)[kInterruptNames].size();
     if (interrupt_count != interrupt_name_count) {

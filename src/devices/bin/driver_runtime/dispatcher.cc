@@ -13,6 +13,7 @@
 #include <lib/async/trap.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdf/dispatcher.h>
+#include <lib/fdf/env.h>
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <lib/zx/clock.h>
@@ -25,6 +26,7 @@
 #include <zircon/listnode.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/system/public/zircon/compiler.h>
 
 #include <memory>
 #include <string>
@@ -1525,6 +1527,28 @@ zx_status_t Dispatcher::ScheduleTokenCallback(fdf_token_t* token, zx_status_t st
   return ZX_OK;
 }
 
+AllowedSchedulerRoles* AllowedSchedulerRoles::Get() {
+  static AllowedSchedulerRoles instance;
+  return &instance;
+}
+
+void AllowedSchedulerRoles::AddForDriver(const void* driver, std::string_view role) {
+  fbl::AutoLock al(&lock_);
+  allowed_roles_.try_emplace(driver);
+  allowed_roles_[driver].emplace(role);
+}
+
+bool g_enforce_allowed_scheduler_roles = false;
+
+bool AllowedSchedulerRoles::IsAllowed(std::string_view role) {
+  if (unlikely(!g_enforce_allowed_scheduler_roles)) {
+    return true;
+  }
+  fbl::AutoLock guard(&lock_);
+  auto iter = allowed_roles_.find(thread_context::GetCurrentDriver());
+  return iter != allowed_roles_.end() && iter->second.contains(std::string(role));
+}
+
 // static
 void DispatcherCoordinator::WaitUntilDispatchersIdle() {
   std::vector<fbl::RefPtr<Dispatcher>> dispatchers;
@@ -1811,7 +1835,8 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   }
 }
 
-zx_status_t DispatcherCoordinator::Start() {
+zx_status_t DispatcherCoordinator::Start(uint32_t options) {
+  g_enforce_allowed_scheduler_roles = options & FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES;
   DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
   fbl::AutoLock lock(&coordinator.lock_);
   auto thread_pool = coordinator.default_thread_pool();
@@ -1847,6 +1872,11 @@ zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::GetOrCreateThreadPool
   if (iter != role_to_thread_pool_.end()) {
     return zx::ok(&(*iter));
   }
+
+  if (!AllowedSchedulerRoles::Get()->IsAllowed(scheduler_role)) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+
   auto thread_pool = std::make_unique<Dispatcher::ThreadPool>(scheduler_role);
   zx_status_t status = thread_pool->AddThread();
   if (status != ZX_OK) {

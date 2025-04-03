@@ -267,7 +267,10 @@ type WlanKeyConfiguration = table {
     2: cipher_oui array<uint8, 3>;
     3: cipher_type uint8;
     /// Whether this key is a pairwise, group or peer key.
+    @available(added=15, replaced=HEAD)
     4: key_type fuchsia.wlan.common.WlanKeyType;
+    @available(added=HEAD)
+    4: key_type ieee80211.KeyType;
     /// The peer MAC address for pairwise and peer keys.
     /// For group keys this value is always the broadcast address.
     5: peer_addr ieee80211.MacAddr;
@@ -616,7 +619,7 @@ closed protocol WlanSoftmacBase {
     @available(added=HEAD)
     @selector("fuchsia.wlan.softmac/WlanSoftmac.QueryDiscoverySupport")
     strict QueryDiscoverySupport() -> (struct {
-        resp fuchsia.wlan.common.DiscoverySupport;
+        resp DiscoverySupport;
     }) error zx.Status;
 
     /// Gets information about the MAC features supported by the device. This

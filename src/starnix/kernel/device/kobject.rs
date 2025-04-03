@@ -256,12 +256,12 @@ pub struct Device {
     pub kobject: Weak<KObject>,
     /// Class kobject that the device belongs to.
     pub class: Class,
-    pub metadata: DeviceMetadata,
+    pub metadata: Option<DeviceMetadata>,
 }
 impl_kobject_based!(Device);
 
 impl Device {
-    pub fn new(kobject: KObjectHandle, class: Class, metadata: DeviceMetadata) -> Self {
+    pub fn new(kobject: KObjectHandle, class: Class, metadata: Option<DeviceMetadata>) -> Self {
         Self { kobject: Arc::downgrade(&kobject), class, metadata }
     }
 }
@@ -332,12 +332,16 @@ impl FileOps for UEventFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let content = format!(
-            "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
-            self.device.metadata.device_type.major(),
-            self.device.metadata.device_type.minor(),
-            self.device.metadata.devname,
-        );
+        let content = if let Some(metadata) = &self.device.metadata {
+            format!(
+                "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
+                metadata.device_type.major(),
+                metadata.device_type.minor(),
+                metadata.devname,
+            )
+        } else {
+            String::new()
+        };
         data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
 

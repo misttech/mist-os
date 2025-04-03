@@ -209,7 +209,7 @@ impl DeviceControl for Registry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
     use fuchsia_audio::dai::{DaiFrameFormat, DaiFrameFormatStandard, DaiSampleFormat};
     use fuchsia_audio::format::{SampleSize, BITS_16, BITS_32};
     use std::sync::{Arc, Mutex};

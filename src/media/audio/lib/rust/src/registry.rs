@@ -432,7 +432,7 @@ async fn watch_topology(
 mod test {
     use super::*;
     use async_utils::hanging_get::server::{HangingGet, Publisher};
-    use fidl::endpoints::spawn_local_stream_handler;
+    use fidl_test_util::spawn_local_stream_handler;
 
     type AddedResponse = fadevice::RegistryWatchDevicesAddedResponse;
     type AddedResponder = fadevice::RegistryWatchDevicesAddedResponder;

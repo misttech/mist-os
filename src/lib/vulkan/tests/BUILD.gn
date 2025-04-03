@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components/fuchsia_test_package.gni")
+import("//build/components.gni")
 import("//build/test.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
@@ -23,7 +23,8 @@ fuchsia_unittest_package("image-pipe-swapchain-tests") {
     "//src/lib/vulkan/validation_layers",
   ]
   test_specs = {
-    environments = vulkan_envs
+    # Disabled on AEMU because of flaky emulator failures.
+    environments = vulkan_envs - [ aemu_env ]
   }
   test_type = "system"
 }
@@ -34,7 +35,6 @@ test("test_image_pipe_swapchain") {
     "test_extensions.cc",
     "test_flatland_view.cc",
     "test_surface.cc",
-    "test_swapchain.cc",
   ]
   deps = [
     "//sdk/lib/fdio",
@@ -51,15 +51,44 @@ test("test_image_pipe_swapchain") {
   ]
 }
 
-test("test_image_pipe_swapchain_hermetic") {
-  output_name = "image-pipe-swapchain-hermetic-tests"
+source_set("test_swapchain_hermetic") {
+  testonly = true
   sources = [
-    "test_hermetic_surface.cc",
-    "test_hermetic_swapchain.cc",
+    "fake_flatland.h",
+    "test_swapchain.cc",
   ]
   deps = [
-    "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fdio",
+    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
+    "//src/lib/vulkan",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+source_set("test_swapchain_hermetic_display") {
+  testonly = true
+  defines = [ "USE_IMAGEPIPE_DISPLAY=1" ]
+  sources = [ "test_swapchain.cc" ]
+  deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fdio",
+    "//src/lib/vulkan",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+test("test_image_pipe_swapchain_hermetic") {
+  output_name = "image-pipe-swapchain-hermetic-tests"
+  sources = [ "test_hermetic_surface.cc" ]
+  deps = [
+    ":test_swapchain_hermetic",
+    ":test_swapchain_hermetic_display",
+    "//sdk/lib/sys/cpp/testing:unit",
+    "//src/lib/debug:backtrace-request",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/vulkan",
@@ -73,6 +102,7 @@ fuchsia_unittest_package("image-pipe-swapchain-hermetic-tests") {
     ":test_image_pipe_swapchain_hermetic",
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_fb_layer",
+    "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
     "//src/lib/vulkan/validation_layers",
   ]
   test_specs = {

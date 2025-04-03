@@ -896,18 +896,41 @@ pub mod options {
         }
     }
 
+    /// Consts for NDP option types.
+    pub mod option_types {
+        /// Prefix Information (https://datatracker.ietf.org/doc/html/rfc4861#section-4.6.2)
+        pub const PREFIX_INFORMATION: u8 = 3;
+
+        /// Recursive DNS Server (https://datatracker.ietf.org/doc/html/rfc8106#section-5.1)
+        pub const RECURSIVE_DNS_SERVER: u8 = 25;
+
+        /// DNS Search List (https://datatracker.ietf.org/doc/html/rfc8106#section-5.2)
+        pub const DNS_SEARCH_LIST: u8 = 31;
+
+        /// 6LoWPAN Context Option (https://datatracker.ietf.org/doc/html/rfc6775#section-4.2)
+        pub const SIXLOWPAN_CONTEXT: u8 = 34;
+
+        /// Captive Portal (https://datatracker.ietf.org/doc/html/rfc8910#section-2.3)
+        pub const CAPTIVE_PORTAL: u8 = 37;
+
+        /// PREF64 (https://datatracker.ietf.org/doc/html/rfc8781#name-option-format)
+        pub const PREF64: u8 = 38;
+    }
+
+    use option_types::{PREFIX_INFORMATION, RECURSIVE_DNS_SERVER};
+
     create_protocol_enum!(
         /// The types of NDP options that may be found in NDP messages.
         #[allow(missing_docs)]
         pub enum NdpOptionType: u8 {
             SourceLinkLayerAddress, 1, "Source Link-Layer Address";
             TargetLinkLayerAddress, 2, "Target Link-Layer Address";
-            PrefixInformation, 3, "Prefix Information";
+            PrefixInformation, PREFIX_INFORMATION, "Prefix Information";
             RedirectedHeader, 4, "Redirected Header";
             Mtu, 5, "MTU";
             Nonce, 14, "Nonce";
             RouteInformation, 24, "Route Information";
-            RecursiveDnsServer, 25, "Recursive DNS Server";
+            RecursiveDnsServer, RECURSIVE_DNS_SERVER, "Recursive DNS Server";
         }
     );
 

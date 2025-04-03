@@ -31,6 +31,12 @@
             path: "/blob",
         },
         {
+            directory: "block",
+            rights: [ "r*" ],
+            path: "/block",
+            availability: "optional",
+        },
+        {
             directory: "boot",
             rights: [ "rx*" ],
             path: "/boot",
@@ -132,6 +138,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",

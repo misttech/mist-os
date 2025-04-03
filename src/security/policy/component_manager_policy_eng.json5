@@ -78,7 +78,6 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
-                    "/core/trace_manager/ktrace_provider",
                 ],
             },
             {
@@ -203,6 +202,16 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.TracingResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/sshd-host/shell:**",
+                    "/core/trace_manager/ktrace_provider",
                 ],
             },
             {

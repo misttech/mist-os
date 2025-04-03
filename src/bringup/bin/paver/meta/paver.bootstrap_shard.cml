@@ -65,7 +65,12 @@
             availability: "optional",
         },
         {
-            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            directory: "block",
+            from: "#fshost",
+            to: "#paver",
+        },
+        {
+            service: "fuchsia.storage.partitions.PartitionService",
             from: "#fshost",
             to: "#paver",
             availability: "optional",

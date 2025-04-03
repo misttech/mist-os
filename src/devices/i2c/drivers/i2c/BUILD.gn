@@ -15,29 +15,37 @@ driver_bind_rules("i2c_bind") {
       [ "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_bindlib" ]
 }
 
-fuchsia_cc_driver("i2c-driver") {
-  output_name = "i2c"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+source_set("common") {
   sources = [
     "i2c-child-server.cc",
+    "i2c-child-server.h",
     "i2c.cc",
+    "i2c.h",
   ]
   deps = [
     ":i2c_bind",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
-    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/metadata/cpp",
+  ]
+}
+
+fuchsia_cc_driver("i2c-driver") {
+  output_name = "i2c"
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("i2c") {
@@ -61,27 +69,18 @@ test("i2c-test-bin") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "fake-i2c-impl.cc",
-    "i2c-child-server.cc",
+    "fake-i2c-impl.h",
+    "i2c-test-env.h",
     "i2c-test.cc",
     "i2c-transaction-test.cc",
-    "i2c.cc",
   ]
   deps = [
-    ":i2c_bind",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
+    ":common",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
-    "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zx",
   ]
 }
 

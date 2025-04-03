@@ -118,12 +118,9 @@ struct PageSourceProperties {
   const bool is_preserving_page_content;
 
   // Iff true, the PageSource (and PageProvider) must be used to allocate all pages.  Pre-allocating
-  // generic pages from the pmm won't work.
+  // generic pages from the pmm won't work. These pages must be specifically returned via
+  // PageSource::FreePages instead of pmm_free.
   const bool is_providing_specific_physical_pages;
-
-  // true - PageSource::FreePages() must be used instead of pmm_free().
-  // false - pmm_free() must be used; PageSource::FreePages() will assert.
-  const bool is_handling_free;
 };
 
 // Interface for providing pages to a VMO through page requests.
@@ -352,6 +349,10 @@ class PageSource final : public PageRequestInterface {
     return detached_;
   }
 
+  // Method for the VmCowPages to retrieve the lock for paged VMOs.
+  // See VmCowPages::DeferredOps.
+  Lock<Mutex>* paged_vmo_lock() { return &paged_vmo_mutex_; }
+
  protected:
   // destructor should only be invoked from RefPtr
   virtual ~PageSource();
@@ -359,6 +360,11 @@ class PageSource final : public PageRequestInterface {
 
  private:
   fbl::Canary<fbl::magic("VMPS")> canary_;
+
+  // Lock used by the VMO to perform synchronization across its hierarchy. This lock does not
+  // strictly belong here, but this is a convenient and efficient place to put it.
+  // See VmCowPages::DeferredOps for more.
+  DECLARE_MUTEX(PageSource) paged_vmo_mutex_;
 
   mutable DECLARE_MUTEX(PageSource) page_source_mtx_;
   bool detached_ TA_GUARDED(page_source_mtx_) = false;

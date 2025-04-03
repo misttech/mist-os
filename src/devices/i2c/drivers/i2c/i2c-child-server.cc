@@ -4,7 +4,6 @@
 
 #include "src/devices/i2c/drivers/i2c/i2c-child-server.h"
 
-#include <lib/ddk/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 
 #include <bind/fuchsia/cpp/bind.h>

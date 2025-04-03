@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/component/config.gni")
 import("//build/components/fuchsia_package.gni")
@@ -71,13 +72,26 @@ if (current_toolchain == default_toolchain) {
     testonly = true
   }
 
+  component_config("config") {
+    testonly = true
+    sources = [ "config.json5" ]
+    dest = "data/component_manager_config"
+  }
+
+  bootfs_files_for_assembly("bootfs") {
+    testonly = true
+    deps = [ ":config" ]
+  }
+
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
   }
 
   img_name = "bootfs_launching_benchmark_test_zbi"
 
   product_assembly_configuration("product_config") {
+    testonly = true
     platform = {
       build_type = "user"
       feature_set_level = "empty"
@@ -88,22 +102,44 @@ if (current_toolchain == default_toolchain) {
         }
       }
     }
+    bootfs_packages = [
+      ":root_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_01:test_component_01_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_02:test_component_02_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_03:test_component_03_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_04:test_component_04_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_05:test_component_05_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_06:test_component_06_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_07:test_component_07_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_08:test_component_08_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_09:test_component_09_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_10:test_component_10_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_11:test_component_11_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_12:test_component_12_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_13:test_component_13_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_14:test_component_14_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_15:test_component_15_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_16:test_component_16_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_17:test_component_17_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_18:test_component_18_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_19:test_component_19_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_20:test_component_20_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_21:test_component_21_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_22:test_component_22_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_23:test_component_23_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_24:test_component_24_package",
+      "//src/sys/component_manager/tests/bootfs_launching_benchmark/test_data/components/test_component_25:test_component_25_package",
+    ]
+    bootfs_files_labels = [ ":bootfs" ]
   }
 
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
-    include_legacy_bundle = true
     image_name = img_name
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = [ ":config" ]
-    bootfs_package_labels = [
-      "test_data/components",
-      ":root_package",
-    ]
-    base_packages = []
   }
 
   output_file = "$target_out_dir/uncompressed_bootfs"
@@ -166,12 +202,6 @@ if (current_toolchain == default_toolchain) {
       product_bundles_barrier = []
       images_barrier = []
     }
-  }
-
-  component_config("config") {
-    testonly = true
-    sources = [ "config.json5" ]
-    dest = "data/component_manager_config"
   }
 }
 

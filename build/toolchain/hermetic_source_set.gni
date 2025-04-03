@@ -2,9 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/$current_cpu/builtins_linkage_symbols.gni")
 import("//build/config/linker.gni")
 import("//build/zircon/c_utils.gni")
 import("ifs_shared_library.gni")
+
+_hermetic_custom_abi = toolchain_variant.tags + [ "custom-abi" ] -
+                       [ "custom-abi" ] != toolchain_variant.tags
 
 # Define a source_set() of hermetically-linked code.
 #
@@ -41,11 +45,19 @@ import("ifs_shared_library.gni")
 #     - Type: list(string)
 #
 #   * undefined_symbols
+
 #     - Optional: The list of linkage symbol names that may be left undefined
-#     in the output.  This can be true instead of list to allow anything.  By
-#     default, on undefined references are allowed.
-#     - Type: list(string) or true
-#     - Default: []
+#     in the output.  This can be true instead of list to allow anything, or
+#     false to allow absolutely nothing.  By default ([], the empty list), no
+#     undefined references are allowed except for a special set listed in
+#     $builtins_linkage_symbols that the compiler generates calls to and that
+#     are generally safe to use from low-level code following the basic machine
+#     ABI.  With a list of symbols, these are always implicitly allowed.  Only
+#     the value false will disallow these (and all others).  **NOTE:** If the
+#     toolchain tags include "custom-abi" (as the kernel environment), then
+#     the default is false rather then [].
+#     - Type: list(string) or bool
+#     - Default: [] or false
 #
 #   * metadata
 #     - Optional: See source_set().  This sets metadata on "$target_name".
@@ -73,9 +85,17 @@ template("hermetic_source_set") {
   link_rspfile = "$target_gen_dir/$link_output_name.rsp"
   hermetic_output_file = "$target_out_dir/$target_name.o"
 
-  undefined_symbols = []
+  if (_hermetic_custom_abi) {
+    undefined_symbols = false
+  } else {
+    undefined_symbols = []
+  }
   if (defined(invoker.undefined_symbols)) {
     undefined_symbols = invoker.undefined_symbols
+  }
+  if (undefined_symbols != true && undefined_symbols != false) {
+    # Some special symbols are always allowed to be undefined.
+    undefined_symbols += builtins_linkage_symbols
   }
 
   if (defined(invoker.allow_init)) {
@@ -181,7 +201,7 @@ template("hermetic_source_set") {
     # check is added below.
     if (undefined_symbols == true) {
       configs -= [ "//build/config:symbol_no_undefined" ]
-    } else if (linker == "") {  # Presumed BFD.
+    } else if (linker == "" && undefined_symbols != false) {  # Presumed BFD.
       # TODO(https://fxbug.dev/343794592): LLD doesn't have this switch yet.
       # Nor does Gold, only BFD.  When LLD gets the switch (if Gold still
       # lacks it), change the check to `linker != "gold"`.
@@ -247,7 +267,7 @@ template("hermetic_source_set") {
       }
       if (undefined_symbols == true) {
         args += [ "--ignore-all-unresolved-symbols" ]
-      } else {
+      } else if (undefined_symbols != true) {
         foreach(symbol, undefined_symbols) {
           args += [ "--ignore-unresolved-symbol=$symbol" ]
         }

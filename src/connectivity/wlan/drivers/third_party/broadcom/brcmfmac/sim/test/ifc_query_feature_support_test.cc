@@ -18,23 +18,6 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 const common::MacAddr kDefaultMac({0x12, 0x34, 0x56, 0x65, 0x43, 0x21});
 
-// Verify that a query for MAC sublayer features support works on a client interface
-TEST_F(SimTest, ClientIfcQueryMacSublayerSupport) {
-  ASSERT_EQ(Init(), ZX_OK);
-
-  SimInterface client_ifc;
-  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
-
-  wlan_common::MacSublayerSupport resp;
-  env_->ScheduleNotification(std::bind(&SimInterface::QueryMacSublayerSupport, &client_ifc, &resp),
-                             zx::sec(1));
-  env_->Run(kSimulatedClockDuration);
-
-  EXPECT_FALSE(resp.rate_selection_offload.supported);
-  EXPECT_EQ(resp.data_plane.data_plane_type, wlan_common::DataPlaneType::kGenericNetworkDevice);
-  EXPECT_EQ(resp.device.mac_implementation_type, wlan_common::MacImplementationType::kFullmac);
-}
-
 // Verify that a query for security features support works on a client interface
 TEST_F(SimTest, ClientIfcQuerySecuritySupport) {
   ASSERT_EQ(Init(), ZX_OK);
@@ -65,6 +48,35 @@ TEST_F(SimTest, ClientIfcQuerySpectrumManagementSupport) {
   env_->Run(kSimulatedClockDuration);
 
   EXPECT_TRUE(resp.dfs.supported);
+}
+
+// Verify that there's no duplicate counter ID or counter name returned in QueryTelemetrySupport
+TEST_F(SimTest, ClientIfcQueryTelemetrySupport_NoDuplicate) {
+  ASSERT_EQ(Init(), ZX_OK);
+
+  SimInterface client_ifc;
+  ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
+
+  fuchsia_wlan_stats::wire::TelemetrySupport resp;
+  env_->ScheduleNotification(std::bind(&SimInterface::QueryTelemetrySupport, &client_ifc, &resp),
+                             zx::sec(1));
+  env_->Run(kSimulatedClockDuration);
+
+  auto counter_configs = resp.inspect_counter_configs();
+  std::set<uint16_t> counter_ids;
+  std::set<std::string> counter_names;
+  for (auto config : counter_configs) {
+    if (counter_ids.contains(config.counter_id())) {
+      ASSERT_TRUE(false, "Duplicate counter id %u", config.counter_id());
+    }
+    counter_ids.insert(config.counter_id());
+
+    std::string counter_name(config.counter_name().get());
+    if (counter_names.contains(counter_name)) {
+      ASSERT_TRUE(false, "Duplicate counter name %s", counter_name.c_str());
+    }
+    counter_names.insert(counter_name);
+  }
 }
 
 }  // namespace wlan::brcmfmac

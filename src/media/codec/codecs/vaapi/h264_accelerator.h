@@ -5,8 +5,8 @@
 #ifndef SRC_MEDIA_CODEC_CODECS_VAAPI_H264_ACCELERATOR_H_
 #define SRC_MEDIA_CODEC_CODECS_VAAPI_H264_ACCELERATOR_H_
 
-#include "media/gpu/h264_decoder.h"
 #include "src/lib/fxl/macros.h"
+#include "src/media/third_party/chromium_media/media/gpu/h264_decoder.h"
 #include "vaapi_utils.h"
 
 class CodecAdapterVaApiDecoder;

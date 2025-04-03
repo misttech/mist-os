@@ -10,14 +10,14 @@ pub(super) mod bpf;
 pub(super) mod file;
 pub(super) mod fs_node;
 pub(super) mod selinuxfs;
+pub(super) mod socket;
 pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
-use crate::task::{CurrentTask, Task};
-use crate::vfs::{DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr};
-use crate::TODO_DENY;
+use crate::task::{CurrentTask, Kernel, Task};
+use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
@@ -74,14 +74,7 @@ fn has_file_permissions(
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
     let file_sid = file.security_state.state.sid;
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || file_sid == SecurityId::initial(InitialSid::Kernel)
-    {
-        track_stub!(
-            TODO("https://fxbug.dev/385121365"),
-            "Enforce fs:use where source or target is the kernel SID?"
-        );
-    } else if subject_sid != file_sid {
+    if subject_sid != file_sid {
         let node = file.node().as_ref().as_ref();
         let audit_context = [audit_context, file.into(), node.into()];
         check_permission(
@@ -112,6 +105,7 @@ fn has_file_permissions(
 /// `permissions` to the underlying [`crate::vfs::FsNode`], with "todo_deny" on denial.
 fn todo_has_file_permissions(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     file: &FileObject,
@@ -121,18 +115,12 @@ fn todo_has_file_permissions(
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
     let file_sid = file.security_state.state.sid;
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || file_sid == SecurityId::initial(InitialSid::Kernel)
-    {
-        track_stub!(
-            TODO("https://fxbug.dev/385121365"),
-            "Enforce fs:use where source or target is the kernel SID?"
-        );
-    } else if subject_sid != file_sid {
+    if subject_sid != file_sid {
         let node = file.node().as_ref().as_ref();
         let audit_context = [audit_context, file.into(), node.into()];
         todo_check_permission(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             file_sid,
@@ -146,6 +134,7 @@ fn todo_has_file_permissions(
         let audit_context = [audit_context, file.into()];
         todo_has_fs_node_permissions(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             file.node(),
@@ -161,18 +150,17 @@ fn todo_has_file_permissions(
 fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    node: &FsNode,
+    fs_node: &FsNode,
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let target = fs_node_effective_sid_and_class(node);
-
-    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
-    if target.class == FileClass::SockFile.into() {
+    if Anon::is_private(fs_node) {
         return Ok(());
     }
 
-    let audit_context = [audit_context, node.into()];
+    let target = fs_node_effective_sid_and_class(fs_node);
+
+    let audit_context = [audit_context, fs_node.into()];
     for permission in permissions {
         check_permission(
             permission_check,
@@ -189,22 +177,23 @@ fn has_fs_node_permissions(
 /// Checks that `current_task` has `permissions` to `node`, with "todo_deny" on denial.
 fn todo_has_fs_node_permissions(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    node: &FsNode,
+    fs_node: &FsNode,
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let target = fs_node_effective_sid_and_class(node);
-
-    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
-    if target.class == FileClass::SockFile.into() {
+    if Anon::is_private(fs_node) {
         return Ok(());
     }
+
+    let target = fs_node_effective_sid_and_class(fs_node);
 
     for permission in permissions {
         todo_check_permission(
             bug.clone(),
+            kernel,
             permission_check,
             subject_sid,
             target.sid,
@@ -250,22 +239,15 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
     }
 
     // We should never reach here, but for now enforce it (see above) in debug builds.
-    let fs_name = fs_node.fs().name();
-    if fs_name == "anon" {
-        track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
-    } else if fs_name == "sockfs" {
-        track_stub!(TODO("https://fxbug.dev/364568517"), "Label socket nodes properly");
-    } else {
-        #[cfg(is_debug)]
-        panic!(
-            "Unlabeled FsNode@{} of class {:?} in {}",
-            fs_node.info().ino,
-            file_class_from_file_mode(fs_node.info().mode),
-            fs_node.fs().name()
-        );
-        #[cfg(not(is_debug))]
-        track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
-    }
+    #[cfg(is_debug)]
+    panic!(
+        "Unlabeled FsNode@{} of class {:?} in {}",
+        fs_node.info().ino,
+        file_class_from_file_mode(fs_node.info().mode),
+        fs_node.fs().name()
+    );
+    #[cfg(not(is_debug))]
+    track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
 
     FsNodeSidAndClass {
         sid: SecurityId::initial(InitialSid::Unlabeled),
@@ -277,27 +259,32 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
 /// the audit output, without actually denying access.
 fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     bug: BugRef,
+    kernel: &Kernel,
     permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
+    if kernel.features.selinux_test_suite {
+        check_permission(permission_check, source_sid, target_sid, permission, audit_context)
+    } else {
+        let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
-    if result.audit {
-        audit_todo_decision(
-            bug,
-            permission_check,
-            result,
-            source_sid,
-            target_sid,
-            permission.into(),
-            audit_context,
-        );
+        if result.audit {
+            audit_todo_decision(
+                bug,
+                permission_check,
+                result,
+                source_sid,
+                target_sid,
+                permission.into(),
+                audit_context,
+            );
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
@@ -308,20 +295,6 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::SockFile.into() {
-        return todo_check_permission(
-            TODO_DENY!(
-                "https://fxbug.dev/364568517",
-                "Re-enable enforcement of FsNode permission checks on sockets"
-            ),
-            permission_check,
-            source_sid,
-            target_sid,
-            permission,
-            audit_context,
-        );
-    }
-
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
@@ -483,6 +456,66 @@ impl FileSystemState {
             }
         }
     }
+
+    /// Writes the Security mount options for the `FileSystemState` into `buf`.
+    /// This is used where the mount options need to be stringified to expose to userspace, as
+    /// is the case for `/proc/mounts`
+    ///
+    /// This function always writes a leading comma because it is only ever called to append to a
+    /// non-empty list of comma-separated values.
+    ///
+    /// Example output:
+    ///     ",context=foo,root_context=bar"
+    fn write_mount_options(
+        &self,
+        security_server: &SecurityServer,
+        buf: &mut impl OutputBuffer,
+    ) -> Result<(), Errno> {
+        let security_state = self.0.lock();
+
+        match *security_state {
+            FileSystemLabelState::Unlabeled { ref mount_options, .. } => {
+                Self::write_mount_options_to_buf(buf, mount_options)
+            }
+            FileSystemLabelState::Labeled { ref label } => {
+                let to_context = |sid| security_server.sid_to_security_context(sid);
+                let mount_options = FileSystemMountOptions {
+                    context: label.mount_sids.context.and_then(to_context),
+                    fs_context: label.mount_sids.fs_context.and_then(to_context),
+                    def_context: label.mount_sids.def_context.and_then(to_context),
+                    root_context: label.mount_sids.root_context.and_then(to_context),
+                };
+
+                // TODO: https://fxbug.dev/357876133 - Fix this to be consistent with observed
+                // behaviour under Linux.
+                let has_configurable_labels =
+                    matches!(label.scheme, FileSystemLabelingScheme::FsUse { .. });
+                if has_configurable_labels {
+                    buf.write_all(b",seclabel").map(|_| ())?;
+                }
+
+                Self::write_mount_options_to_buf(buf, &mount_options)
+            }
+        }
+    }
+
+    /// Writes the supplied `mount_options` to the `OutputBuffer`.
+    fn write_mount_options_to_buf(
+        buf: &mut impl OutputBuffer,
+        mount_options: &FileSystemMountOptions,
+    ) -> Result<(), Errno> {
+        let mut write_option = |prefix: &[u8], option: &Option<Vec<u8>>| -> Result<(), Errno> {
+            let Some(value) = option else {
+                return Ok(());
+            };
+            buf.write_all(prefix).map(|_| ())?;
+            buf.write_all(value).map(|_| ())
+        };
+        write_option(b",context=", &mount_options.context)?;
+        write_option(b",fscontext=", &mount_options.fs_context)?;
+        write_option(b",defcontext=", &mount_options.def_context)?;
+        write_option(b",rootcontext=", &mount_options.root_context)
+    }
 }
 
 /// Holds security state associated with a [`crate::vfs::FsNode`].
@@ -517,6 +550,20 @@ impl FsNodeLabel {
 struct FsNodeSidAndClass {
     sid: SecurityId,
     class: FsNodeClass,
+}
+
+/// Security state for a bpf [`ebpf_api::maps::Map`] instance. This currently just holds the
+/// SID that the [`crate::task::Task`] that created the file object had.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct BpfMapState {
+    sid: SecurityId,
+}
+
+/// Security state for a bpf [`starnix_core::bpf::program::Program`]. instance. This currently just
+/// holds the SID that the [`crate::task::Task`] that created the file object had.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct BpfProgState {
+    sid: SecurityId,
 }
 
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will

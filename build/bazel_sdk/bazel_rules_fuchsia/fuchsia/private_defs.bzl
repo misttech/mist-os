@@ -53,6 +53,7 @@ load(
     "//fuchsia/private/assembly:providers.bzl",
     _FuchsiaBoardConfigInfo = "FuchsiaBoardConfigInfo",
     _FuchsiaBoardInputBundleInfo = "FuchsiaBoardInputBundleInfo",
+    _FuchsiaBoardInputBundleSetInfo = "FuchsiaBoardInputBundleSetInfo",
     _FuchsiaPartitionsConfigInfo = "FuchsiaPartitionsConfigInfo",
     _FuchsiaProductConfigInfo = "FuchsiaProductConfigInfo",
     _FuchsiaVirtualDeviceInfo = "FuchsiaVirtualDeviceInfo",
@@ -66,6 +67,7 @@ load(
 # assembly/providers.bzl
 FuchsiaBoardConfigInfo = _FuchsiaBoardConfigInfo
 FuchsiaBoardInputBundleInfo = _FuchsiaBoardInputBundleInfo
+FuchsiaBoardInputBundleSetInfo = _FuchsiaBoardInputBundleSetInfo
 FuchsiaPartitionsConfigInfo = _FuchsiaPartitionsConfigInfo
 FuchsiaVirtualDeviceInfo = _FuchsiaVirtualDeviceInfo
 

@@ -120,7 +120,8 @@ impl FileLike for BlockFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        FidlIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 

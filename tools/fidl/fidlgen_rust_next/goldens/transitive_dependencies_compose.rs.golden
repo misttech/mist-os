@@ -7,6 +7,13 @@
 pub struct Top;
 
 pub mod top {
+    pub mod prelude {
+        pub use crate::{
+            top, Top, TopClientHandler, TopClientSender, TopServerHandler, TopServerSender,
+        };
+
+        pub use ::fidl_next_test_bottom::BottomGetFooResponse;
+    }
 
     pub struct GetFoo;
 
@@ -61,7 +68,7 @@ where
     ___T: ::fidl_next::Transport,
     ___H: TopClientHandler<___T>,
 
-    ::fidl_next_test_bottom::WireBottomGetFooResponse:
+    <top::GetFoo as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -141,11 +148,6 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{TopClientSender, TopServerSender};
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
@@ -153,4 +155,11 @@ pub mod compat {
     /// An alias for a client sender over `zx::Channel` for the `Top`
     /// protocol.
     pub type TopProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Top>;
+
+    impl ::fidl_next::TakeFrom<crate::Top> for ::fidl_test_transitivedependenciescompose::TopMarker {
+        #[inline]
+        fn take_from(from: &crate::Top) -> Self {
+            Self
+        }
+    }
 }

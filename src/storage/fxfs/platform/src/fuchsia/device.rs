@@ -8,7 +8,6 @@ use anyhow::Error;
 use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block_volume::{self as volume, VolumeMarker, VolumeRequest};
-use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
 use fuchsia_sync::Mutex;
 use futures::stream::TryStreamExt;
 use futures::try_join;
@@ -19,7 +18,7 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use vfs::file::File;
 use vfs::node::Node;
-use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
+use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // Multiple Block I/O request may be sent as a group.
 // Notes:
@@ -322,6 +321,14 @@ impl BlockServer {
                     })
                     .await?;
             }
+            VolumeRequest::OpenSessionWithOffsetMap {
+                session,
+                offset_map: _,
+                initial_mappings: _,
+                control_handle: _,
+            } => {
+                session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
+            }
             // TODO(https://fxbug.dev/293970391)
             VolumeRequest::GetTypeGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
@@ -433,22 +440,30 @@ impl BlockServer {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<(), Error> {
+    pub async fn run(mut self) {
         let server = ServerEnd::<VolumeMarker>::new(self.server_channel.take().unwrap());
 
         // Create a fifo pair
         let (server_fifo, client_fifo) =
-            zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)?;
+            match zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16) {
+                Ok(endpoints) => endpoints,
+                Err(e) => {
+                    log::error!("Failed to create fifo for block requests: {:?}", e);
+                    return;
+                }
+            };
         self.maybe_server_fifo = Mutex::new(Some(client_fifo));
 
         // Handling requests from fifo
         let fifo_future = async {
-            let fifo = fasync::Fifo::from_fifo(server_fifo);
+            let mut fifo = fasync::Fifo::from_fifo(server_fifo);
+            let (mut reader, mut writer) = fifo.async_io();
+            let mut request = BlockFifoRequest::default();
             loop {
-                match fifo.read_entry().await {
-                    Ok(request) => {
+                match reader.read_entries(&mut request).await {
+                    Ok(_) => {
                         if let Some(response) = self.handle_fifo_request(request).await {
-                            fifo.write_entries(std::slice::from_ref(&response)).await?;
+                            writer.write_entries(&response).await?;
                         }
                         // if `self.handle_fifo_request(..)` returns None, then
                         // there's no reply for this request. This occurs for
@@ -469,8 +484,7 @@ impl BlockServer {
             Ok(())
         };
 
-        try_join!(fifo_future, channel_future)?;
-        Ok(())
+        let _ = try_join!(fifo_future, channel_future);
     }
 }
 
@@ -493,8 +507,10 @@ mod tests {
     // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
     // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for BlockConnector {
-        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
-            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+        fn connect_channel_to_volume(
+            &self,
+            server_end: ServerEnd<VolumeMarker>,
+        ) -> Result<(), anyhow::Error> {
             self.0
                 .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
@@ -502,10 +518,10 @@ mod tests {
                         | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
                     self.1,
-                    server.into_channel().into(),
+                    server_end.into_channel().into(),
                 )
                 .expect("open failed");
-            Ok(client)
+            Ok(())
         }
     }
 
@@ -514,17 +530,19 @@ mod tests {
     // TODO(https://fxbug.dev/397501864): Migrate this to the new Open method, and convert this to
     // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for ReadonlyBlockConnector {
-        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
-            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+        fn connect_channel_to_volume(
+            &self,
+            server_end: ServerEnd<VolumeMarker>,
+        ) -> Result<(), anyhow::Error> {
             self.0
                 .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
                     self.1,
-                    server.into_channel().into(),
+                    server_end.into_channel().into(),
                 )
                 .expect("open failed");
-            Ok(client)
+            Ok(())
         }
     }
 

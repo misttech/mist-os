@@ -67,10 +67,7 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ssh_auth_keys, err := ffx.GetSshAuthorizedKeys(ctx)
-	if err != nil {
-		t.Fatalf("Could not get authorized keys: %s", err)
-	}
+	ssh_auth_keys := ffx.GetSshAuthorizedKeys()
 
 	defer func() {
 		// Just log errors since ffx.Stop() is expected to return a DeadlineExceeded

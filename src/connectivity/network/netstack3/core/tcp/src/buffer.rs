@@ -8,13 +8,13 @@
 
 use netstack3_base::{Payload, SackBlock, SackBlocks, SeqNum};
 
-use alloc::vec::Vec;
 use arrayvec::ArrayVec;
 use core::fmt::Debug;
 use core::ops::Range;
 use packet::InnerPacketBuilder;
 
 use crate::internal::base::BufferSizes;
+use crate::internal::seq_ranges::{SeqRange, SeqRanges};
 
 /// Common super trait for both sending and receiving buffer.
 pub trait Buffer: Debug + Sized {
@@ -103,13 +103,6 @@ pub struct BufferLimits {
     pub len: usize,
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-struct OutstandingBlock {
-    range: Range<SeqNum>,
-    generation: usize,
-}
-
 /// Assembler for out-of-order segment data.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
@@ -125,13 +118,14 @@ pub(super) struct Assembler {
     // Holds all the sequence number ranges which we have already received.
     // These ranges are sorted and should have a gap of at least 1 byte
     // between any consecutive two. These ranges should only be after `nxt`.
-    outstanding: Vec<OutstandingBlock>,
+    // Each range is tagged with the generation that last modified it.
+    outstanding: SeqRanges<usize>,
 }
 
 impl Assembler {
     /// Creates a new assembler.
     pub(super) fn new(nxt: SeqNum) -> Self {
-        Self { outstanding: Vec::new(), generation: 0, nxt }
+        Self { outstanding: SeqRanges::default(), generation: 0, nxt }
     }
 
     /// Returns the next sequence number expected to be received.
@@ -162,11 +156,12 @@ impl Assembler {
         if start == end {
             return 0;
         }
-        self.insert_inner(start..end);
 
-        let Self { outstanding, nxt, generation: _ } = self;
-        if outstanding[0].range.start == *nxt {
-            let advanced = outstanding.remove(0);
+        let Self { outstanding, nxt, generation } = self;
+        *generation = *generation + 1;
+        outstanding.insert(start..end, *generation);
+
+        if let Some(advanced) = outstanding.pop_front_if(|r| r.range.start == *nxt) {
             *nxt = advanced.range.end;
             // The following unwrap is safe because it is invalid to have
             // have a range where `end` is before `start`.
@@ -179,89 +174,6 @@ impl Assembler {
     pub(super) fn has_outstanding(&self) -> bool {
         let Self { outstanding, nxt: _, generation: _ } = self;
         !outstanding.is_empty()
-    }
-
-    fn insert_inner(&mut self, Range { mut start, mut end }: Range<SeqNum>) {
-        let Self { outstanding, nxt: _, generation } = self;
-
-        if start == end {
-            return;
-        }
-
-        *generation = *generation + 1;
-
-        if outstanding.is_empty() {
-            outstanding
-                .push(OutstandingBlock { range: Range { start, end }, generation: *generation });
-            return;
-        }
-
-        // Search for the first segment whose `start` is greater.
-        let first_after = {
-            let mut cur = 0;
-            while cur < outstanding.len() {
-                if start.before(outstanding[cur].range.start) {
-                    break;
-                }
-                cur += 1;
-            }
-            cur
-        };
-
-        let mut merge_right = 0;
-        for block in &outstanding[first_after..outstanding.len()] {
-            if end.before(block.range.start) {
-                break;
-            }
-            merge_right += 1;
-            if end.before(block.range.end) {
-                end = block.range.end;
-                break;
-            }
-        }
-
-        let mut merge_left = 0;
-        for block in (&outstanding[0..first_after]).iter().rev() {
-            if start.after(block.range.end) {
-                break;
-            }
-            // There is no guarantee that `end.after(range.end)`, not doing
-            // the following may shrink existing coverage. For example:
-            // range.start = 0, range.end = 10, start = 0, end = 1, will result
-            // in only 0..1 being tracked in the resulting assembler. We didn't
-            // do the symmetrical thing above when merging to the right because
-            // the search guarantees that `start.before(range.start)`, thus the
-            // problem doesn't exist there. The asymmetry rose from the fact
-            // that we used `start` to perform the search.
-            if end.before(block.range.end) {
-                end = block.range.end;
-            }
-            merge_left += 1;
-            if start.after(block.range.start) {
-                start = block.range.start;
-                break;
-            }
-        }
-
-        if merge_left == 0 && merge_right == 0 {
-            // If the new segment cannot merge with any of its neighbors, we
-            // add a new entry for it.
-            outstanding.insert(
-                first_after,
-                OutstandingBlock { range: Range { start, end }, generation: *generation },
-            );
-        } else {
-            // Otherwise, we put the new segment at the left edge of the merge
-            // window and remove all other existing segments.
-            let left_edge = first_after - merge_left;
-            let right_edge = first_after + merge_right;
-            outstanding[left_edge] =
-                OutstandingBlock { range: Range { start, end }, generation: *generation };
-            for i in right_edge..outstanding.len() {
-                outstanding[i - merge_left - merge_right + 1] = outstanding[i].clone();
-            }
-            outstanding.truncate(outstanding.len() - merge_left - merge_right + 1);
-        }
     }
 
     /// Returns the current outstanding selective ack blocks in the assembler.
@@ -286,10 +198,10 @@ impl Assembler {
             return SackBlocks::default();
         }
 
-        let mut heap = ArrayVec::<&OutstandingBlock, { SackBlocks::MAX_BLOCKS }>::new();
-        for block in outstanding {
+        let mut heap = ArrayVec::<&SeqRange<_>, { SackBlocks::MAX_BLOCKS }>::new();
+        for block in outstanding.iter() {
             if heap.is_full() {
-                if heap.last().is_some_and(|l| l.generation < block.generation) {
+                if heap.last().is_some_and(|l| l.meta < block.meta) {
                     // New block is later than the earliest block in the heap.
                     let _: Option<_> = heap.pop();
                 } else {
@@ -301,12 +213,13 @@ impl Assembler {
 
             heap.push(block);
             // Sort heap larger generation to lower.
-            heap.sort_by(|a, b| b.generation.cmp(&a.generation))
+            heap.sort_by(|a, b| b.meta.cmp(&a.meta))
         }
 
-        SackBlocks::from_iter(
-            heap.into_iter().map(|block| SackBlock(block.range.start, block.range.end)),
-        )
+        SackBlocks::from_iter(heap.into_iter().map(|block| {
+            // Assembler is guaranteed to be in order, unwrap is safe.
+            SackBlock::try_new(block.range.start, block.range.end).unwrap()
+        }))
     }
 }
 
@@ -332,6 +245,7 @@ pub(crate) mod testutil {
 
     use alloc::sync::Arc;
     use alloc::vec;
+    use alloc::vec::Vec;
     use core::cmp;
 
     use either::Either;
@@ -762,9 +676,10 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
+    use alloc::vec::Vec;
     use alloc::{format, vec};
 
-    use netstack3_base::{FragmentedPayload, WindowSize};
+    use netstack3_base::FragmentedPayload;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
     use proptest::{prop_assert, prop_assert_eq, proptest};
@@ -782,37 +697,6 @@ mod test {
             ),
             ..Config::default()
         })]
-
-        #[test]
-        fn assembler_insertion(insertions in proptest::collection::vec(assembler::insertions(), 200)) {
-            let mut assembler = Assembler::new(SeqNum::new(0));
-            let mut num_insertions_performed = 0;
-            let mut min_seq = SeqNum::new(WindowSize::MAX.into());
-            let mut max_seq = SeqNum::new(0);
-            for Range { start, end } in insertions {
-                if min_seq.after(start) {
-                    min_seq = start;
-                }
-                if max_seq.before(end) {
-                    max_seq = end;
-                }
-                // assert that it's impossible to have more entries than the
-                // number of insertions performed.
-                prop_assert!(assembler.outstanding.len() <= num_insertions_performed);
-                assembler.insert_inner(start..end);
-                num_insertions_performed += 1;
-
-                // assert that the ranges are sorted and don't overlap with
-                // each other.
-                for i in 1..assembler.outstanding.len() {
-                    prop_assert!(
-                        assembler.outstanding[i-1].range.end.before(assembler.outstanding[i].range.start)
-                    );
-                }
-            }
-            prop_assert_eq!(assembler.outstanding.first().unwrap().range.start, min_seq);
-            prop_assert_eq!(assembler.outstanding.last().unwrap().range.end, max_seq);
-        }
 
         #[test]
         fn ring_buffer_make_readable((mut rb, avail) in ring_buffer::with_written()) {
@@ -916,22 +800,28 @@ mod test {
     }
 
     #[test_case([Range { start: 0, end: 0 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(0), generation: 0 })]
+        => Assembler { outstanding: SeqRanges::default(), nxt: SeqNum::new(0), generation: 0 })]
     #[test_case([Range { start: 0, end: 10 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(10), generation: 1 })]
+        => Assembler { outstanding: SeqRanges::default(), nxt: SeqNum::new(10), generation: 1 })]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }]
         => Assembler {
-            outstanding: vec![
-                OutstandingBlock{ range: Range { start: SeqNum::new(5), end: SeqNum::new(15) }, generation: 2 },
-            ],
+            outstanding: [
+                SeqRange{ range: Range { start: SeqNum::new(5), end: SeqNum::new(15) }, meta: 2 },
+            ].into_iter().collect(),
             nxt: SeqNum::new(0),
             generation: 2,
         })
     ]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 0, end: 5 }, Range { start: 5, end: 10 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(15), generation: 3 })]
+        => Assembler { outstanding: SeqRanges::default(), nxt: SeqNum::new(15), generation: 3 })]
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }, Range { start: 0, end: 5 }]
-        => Assembler { outstanding: vec![], nxt: SeqNum::new(15), generation: 3 })]
+        => Assembler { outstanding: SeqRanges::default(), nxt: SeqNum::new(15), generation: 3 })]
+    #[test_case([Range{ start: 10, end: 15 }, Range { start: 10, end: 15 }, Range { start: 11, end: 12 }]
+        => Assembler {
+             outstanding: [
+                SeqRange{ range: Range { start: SeqNum::new(10), end: SeqNum::new(15) }, meta: 3 }
+            ].into_iter().collect(),
+            nxt: SeqNum::new(0), generation: 3 })]
     fn assembler_examples(ops: impl IntoIterator<Item = Range<u32>>) -> Assembler {
         let mut assembler = Assembler::new(SeqNum::new(0));
         for Range { start, end } in ops.into_iter() {
@@ -956,8 +846,8 @@ mod test {
         }
         assembler
             .sack_blocks()
-            .iter()
-            .map(|SackBlock(start, end)| Range { start: start.into(), end: end.into() })
+            .try_iter()
+            .map(|r| r.expect("invalid block").into_range_u32())
             .collect()
     }
 
@@ -1056,17 +946,6 @@ mod test {
         let () = rb.peek_with(0, |readable| {
             assert_eq!(readable.to_vec(), "llo".as_bytes());
         });
-    }
-
-    mod assembler {
-        use super::*;
-        pub(super) fn insertions() -> impl Strategy<Value = Range<SeqNum>> {
-            (0..u32::from(WindowSize::MAX)).prop_flat_map(|start| {
-                (start + 1..=u32::from(WindowSize::MAX)).prop_flat_map(move |end| {
-                    Just(Range { start: SeqNum::new(start), end: SeqNum::new(end) })
-                })
-            })
-        }
     }
 
     mod ring_buffer {

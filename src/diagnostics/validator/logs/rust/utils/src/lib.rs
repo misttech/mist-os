@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_log_encoding::{Argument, Record, Value};
-use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_validate_logs as fvalidate};
+use {fidl_fuchsia_diagnostics_types as fdiagnostics, fidl_fuchsia_validate_logs as fvalidate};
 
 pub fn record_to_fidl(record: Record<'_>) -> fvalidate::Record {
     fvalidate::Record {

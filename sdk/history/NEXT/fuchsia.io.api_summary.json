@@ -102,16 +102,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.io/ConnectorInfo.attributes",
-        "ordinal": "1",
-        "type": "fuchsia.io/NodeAttributes2"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.io/ConnectorInfo"
-    },
-    {
         "kind": "const",
         "name": "fuchsia.io/DIRECTORY_PROTOCOL_NAME",
         "type": "string",
@@ -2095,6 +2085,16 @@
         "name": "fuchsia.io/NodeGetExtendedAttributeRequest"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.io/NodeInfo.attributes",
+        "ordinal": "1",
+        "type": "fuchsia.io/NodeAttributes2"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.io/NodeInfo"
+    },
+    {
         "kind": "union/member",
         "name": "fuchsia.io/NodeInfoDeprecated.directory",
         "ordinal": "3",
@@ -2502,12 +2502,6 @@
     },
     {
         "kind": "union/member",
-        "name": "fuchsia.io/Representation.connector",
-        "ordinal": "1",
-        "type": "fuchsia.io/ConnectorInfo"
-    },
-    {
-        "kind": "union/member",
         "name": "fuchsia.io/Representation.directory",
         "ordinal": "2",
         "type": "fuchsia.io/DirectoryInfo"
@@ -2517,6 +2511,12 @@
         "name": "fuchsia.io/Representation.file",
         "ordinal": "3",
         "type": "fuchsia.io/FileInfo"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.io/Representation.node",
+        "ordinal": "1",
+        "type": "fuchsia.io/NodeInfo"
     },
     {
         "kind": "union/member",

@@ -13,7 +13,9 @@ use crate::directory::entry_container::MutableDirectory;
 use crate::execution_scope::ExecutionScope;
 use crate::name::validate_name;
 use crate::node::OpenNode;
+use crate::object_request::ConnectionCreator;
 use crate::path::Path;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::token_registry::{TokenInterface, TokenRegistry, Tokenizable};
 use crate::{ObjectRequestRef, ProtocolsExt};
 
@@ -21,39 +23,39 @@ use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl::Handle;
 use fidl_fuchsia_io as fio;
-use futures::{pin_mut, TryStreamExt as _};
-use pin_project::pin_project;
-use std::future::Future;
+use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
 use zx_status::Status;
 
-#[pin_project]
 pub struct MutableConnection<DirectoryType: MutableDirectory> {
     base: BaseConnection<DirectoryType>,
 }
 
 impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
-    pub fn create(
+    /// Creates a new connection to serve the mutable directory. The directory will be served from a
+    /// new async `Task`, not from the current `Task`. Errors in constructing the connection are not
+    /// guaranteed to be returned, they may be sent directly to the client end of the connection.
+    /// This method should be called from within an `ObjectRequest` handler to ensure that errors
+    /// are sent to the client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenNode::new(directory);
 
         let connection = MutableConnection {
-            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope.clone(), directory, protocols.to_directory_options()?),
         };
 
-        let object_request = object_request.take();
-        Ok(async move {
-            if let Ok(requests) = object_request.into_request_stream(&connection.base).await {
-                connection.handle_requests(requests).await
-            }
-        })
+        if let Ok(requests) = object_request.take().into_request_stream(&connection.base).await {
+            scope.spawn(RequestListener::new(requests, Tokenizable::new(connection)));
+        }
+        Ok(())
     }
 
     async fn handle_request(
@@ -62,7 +64,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     ) -> Result<ConnectionState, Error> {
         match request {
             fio::DirectoryRequest::Unlink { name, options, responder } => {
-                let result = this.as_mut().handle_unlink(name, options).await;
+                let result = this.handle_unlink(name, options).await;
                 responder.send(result.map_err(Status::into_raw))?;
             }
             fio::DirectoryRequest::GetToken { responder } => {
@@ -78,7 +80,6 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             }
             fio::DirectoryRequest::SetAttr { flags, attributes, responder } => {
                 let status = match this
-                    .as_mut()
                     .handle_update_attributes(io1_to_io2_attrs(flags, attributes))
                     .await
                 {
@@ -99,8 +100,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
                     responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
                 } else {
                     responder.send(
-                        this.as_mut()
-                            .base
+                        this.base
                             .directory
                             .create_symlink(name, target, connection)
                             .await
@@ -148,10 +148,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
                 async move {
                     responder.send(
-                        this.as_mut()
-                            .handle_update_attributes(payload)
-                            .await
-                            .map_err(Status::into_raw),
+                        this.handle_update_attributes(payload).await.map_err(Status::into_raw),
                     )
                 }
                 .trace(trace::trace_future_args!(c"storage", c"Directory::UpdateAttributes"))
@@ -165,7 +162,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     }
 
     async fn handle_update_attributes(
-        self: Pin<&mut Self>,
+        &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
         if !self.base.options.rights.contains(fio::Operations::UPDATE_ATTRIBUTES) {
@@ -176,11 +173,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         self.base.directory.update_attributes(attributes).await
     }
 
-    async fn handle_unlink(
-        self: Pin<&mut Self>,
-        name: String,
-        options: fio::UnlinkOptions,
-    ) -> Result<(), Status> {
+    async fn handle_unlink(&self, name: String, options: fio::UnlinkOptions) -> Result<(), Status> {
         if !self.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }
@@ -243,10 +236,12 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         let attributes = match self.base.directory.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
+                #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
-                iterator
-                    .close_with_epitaph(status)
-                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
+                iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
+                    #[cfg(any(test, feature = "use_log"))]
+                    log::error!(_error:?; "failed to send epitaph")
+                });
                 return;
             }
         };
@@ -277,18 +272,36 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     async fn handle_remove_extended_attribute(&self, name: Vec<u8>) -> Result<(), Status> {
         self.base.directory.remove_extended_attribute(name).await
     }
+}
 
-    async fn handle_requests(self, mut requests: fio::DirectoryRequestStream) {
-        let this = Tokenizable::new(self);
-        pin_mut!(this);
-        while let Ok(Some(request)) = requests.try_next().await {
-            let _guard = this.base.scope.active_guard();
-            if !matches!(
-                Self::handle_request(Pin::as_mut(&mut this), request).await,
-                Ok(ConnectionState::Alive)
-            ) {
-                break;
+impl<DirectoryType: MutableDirectory> ConnectionCreator<DirectoryType>
+    for MutableConnection<DirectoryType>
+{
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<DirectoryType>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
+    }
+}
+
+impl<DirectoryType: MutableDirectory> RequestHandler
+    for Tokenizable<MutableConnection<DirectoryType>>
+{
+    type Request = Result<fio::DirectoryRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let _guard = self.base.scope.active_guard();
+        match request {
+            Ok(request) => {
+                match MutableConnection::<DirectoryType>::handle_request(self, request).await {
+                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                }
             }
+            Err(_) => ControlFlow::Break(()),
         }
     }
 }
@@ -312,10 +325,11 @@ mod tests {
     use crate::directory::traversal_position::TraversalPosition;
     use crate::node::Node;
     use crate::ToObjectRequest;
+    use fuchsia_sync::Mutex;
     use futures::future::BoxFuture;
     use std::any::Any;
     use std::future::ready;
-    use std::sync::{Mutex, Weak};
+    use std::sync::Weak;
 
     #[derive(Debug, PartialEq)]
     enum MutableDirectoryAction {
@@ -479,7 +493,7 @@ mod tests {
         }
 
         pub fn handle_event(&self, event: MutableDirectoryAction) -> Result<(), Status> {
-            self.events.upgrade().map(|x| x.0.lock().unwrap().push(event));
+            self.events.upgrade().map(|x| x.0.lock().push(event));
             Ok(())
         }
 
@@ -487,18 +501,15 @@ mod tests {
             self: &Arc<Self>,
             flags: fio::OpenFlags,
         ) -> (Arc<MockDirectory>, fio::DirectoryProxy) {
-            let mut cur_id = self.cur_id.lock().unwrap();
+            let mut cur_id = self.cur_id.lock();
             let dir = MockDirectory::new(*cur_id, self.clone());
             *cur_id += 1;
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    self.scope.clone(),
-                    dir.clone(),
-                    flags,
-                    MutableConnection::create,
-                )
-            });
+            flags.to_object_request(server_end).create_connection_sync::<MutableConnection<_>, _>(
+                self.scope.clone(),
+                dir.clone(),
+                flags,
+            );
             (dir, proxy)
         }
     }
@@ -529,7 +540,7 @@ mod tests {
         let status = proxy.rename("src", Event::from(token.unwrap()), "dest").await.unwrap();
         assert!(status.is_ok());
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(
             *events,
             vec![MutableDirectoryAction::Rename {
@@ -561,7 +572,7 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("update attributes failed");
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::UpdateAttributes { id: 0, attributes }]);
     }
 
@@ -581,7 +592,7 @@ mod tests {
 
         let status = proxy.link("src", token.unwrap(), "dest").await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Link { id: 1, path: "dest".to_owned() },]);
     }
 
@@ -597,7 +608,7 @@ mod tests {
             .await
             .expect("fidl call failed")
             .expect("unlink failed");
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(
             *events,
             vec![MutableDirectoryAction::Unlink { id: 0, name: "test".to_string() },]
@@ -612,7 +623,7 @@ mod tests {
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let () = proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Sync]);
     }
 
@@ -624,7 +635,7 @@ mod tests {
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         let () = proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Close]);
     }
 
@@ -639,7 +650,7 @@ mod tests {
         fs.scope.shutdown();
         fs.scope.wait().await;
 
-        let events = events.0.lock().unwrap();
+        let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Close]);
     }
 }

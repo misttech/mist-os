@@ -60,17 +60,21 @@ alias(
 generate_bazel_sdk(
     name = "bazel_in_tree_sdk",
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
-    use_rules_fuchsia = True,
 )
 
 # A target used to force the creation of the @fuchsia_sdk repository,
-# then copy its top-level BUILD.bazel to an output stamp file for
-# a GN target with the same label.
+# by creating a symlink to @fuchsia_sdk//:BUILD.bazel. See the comments
+# for the GN //build/bazel/bazel_sdk:in_tree_fuchsia_sdk target for
+# details.
 genrule(
     name = "in_tree_fuchsia_sdk",
     srcs = ["@fuchsia_sdk//:BUILD.bazel"],
-    outs = ["stamp"],
-    cmd = "cp -f $(SRCS) \"$@\"",
+    outs = ["fuchsia_sdk.stamp"],
+    cmd = "ln -sf $$(realpath $(SRCS)) \"$@\"",
+
+    # This must be local, otherwise the repository might be created
+    # only in a remote sandbox!
+    tags = ["local"],
 )
 
 # Compare the content of the @fuchsia_sdk with the SDK generated
@@ -99,7 +103,6 @@ compare_bazel_sdk_contents(
 generate_bazel_sdk(
     name = "final_fuchsia_in_tree_sdk",
     idk_export_label = "@fuchsia_in_tree_idk//:final_idk",
-    use_rules_fuchsia = True,
 )
 
 # Compare the content of :final_fuchsia_in_tree_sdk with the one generated

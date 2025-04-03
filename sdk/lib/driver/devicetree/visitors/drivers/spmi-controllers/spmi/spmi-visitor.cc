@@ -32,8 +32,8 @@ zx::result<std::pair<uint32_t, uint32_t>> GetAddressAndSizeCells(const T& node) 
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return zx::ok(std::pair<uint32_t, uint32_t>(*address_cells->second.AsUint32(),
-                                              *size_cells->second.AsUint32()));
+  return zx::ok(std::pair<uint32_t, uint32_t>(address_cells->second.AsUint32().value(),
+                                              size_cells->second.AsUint32().value()));
 }
 
 std::vector<std::string_view> GetRegNames(const fdf_devicetree::ChildNode& node) {

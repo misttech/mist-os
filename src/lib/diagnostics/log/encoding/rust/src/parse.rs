@@ -201,7 +201,7 @@ impl From<std::str::Utf8Error> for ParseError {
 mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts};
-    use fidl_fuchsia_diagnostics::Severity;
+    use fidl_fuchsia_diagnostics_types::Severity;
     use std::io::Cursor;
 
     #[fuchsia::test]
@@ -209,7 +209,7 @@ mod tests {
         let expected_timestamp = zx::BootInstant::from_nanos(72);
         let record = Record {
             timestamp: expected_timestamp,
-            severity: Severity::Error as u8,
+            severity: Severity::Error.into_primitive(),
             arguments: vec![],
         };
         let mut buffer = Cursor::new(vec![0u8; 1000]);
@@ -227,7 +227,7 @@ mod tests {
         let expected_timestamp = zx::BootInstant::from_nanos(72);
         let record = Record {
             timestamp: expected_timestamp,
-            severity: Severity::Error as u8,
+            severity: Severity::Error.into_primitive(),
             arguments: vec![],
         };
         let mut buffer = Cursor::new(vec![0u8; 1000]);

@@ -8,6 +8,7 @@
     ],
     program: {
         runner: "starnix_test_runner",
+        test_type: "gtest",
     },
     children: [
         {

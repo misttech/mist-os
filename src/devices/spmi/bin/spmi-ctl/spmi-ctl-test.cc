@@ -120,29 +120,45 @@ TEST_F(SpmiCtlTest, InvalidTarget) {
   EXPECT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "100", "-a", "0x1234", "-r", "4"}), -1);
 }
 
-TEST_F(SpmiCtlTest, ReadWrite) {
-  // Successful.
-  std::vector<uint8_t> kCannedData = {0x12, 0x34, 0x56};
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w", "0x12", "0x34", "0x56"}), 0);
+TEST_F(SpmiCtlTest, ReadWriteSuccess) {
+  std::vector<uint8_t> canned_data;
+  // Write then read 2 bytes.
+  canned_data = {0x12, 0x34};
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w", "0x12", "0x34"}), 0);
   EXPECT_EQ(spmi_->target_id(), 0);
-  EXPECT_TRUE(spmi_->data() == kCannedData);
+  EXPECT_TRUE(spmi_->data() == canned_data);
   EXPECT_EQ(spmi_->address(), 0x1234);
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "11", "-a", "0x1234", "-r", "4"}), 0);
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "11", "-a", "0x1234", "-r", "2"}), 0);
   EXPECT_EQ(spmi_->target_id(), 11);
-  EXPECT_EQ(spmi_->read_size(), 4);
+  EXPECT_EQ(spmi_->read_size(), 2);
   EXPECT_EQ(spmi_->address(), 0x1234);
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-w", "1", "2", "3", "4", "5", "6",
+
+  // Write then read 4 bytes.
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1122", "-w", "11", "22", "33", "44"}), 0);
+  EXPECT_EQ(spmi_->target_id(), 0);
+  canned_data = {0x11, 0x22, 0x33, 0x44};
+  EXPECT_TRUE(spmi_->data() == canned_data);
+  EXPECT_EQ(spmi_->address(), 0x1122);
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1122", "-r", "4"}), 0);
+  EXPECT_EQ(spmi_->target_id(), 0);
+  EXPECT_EQ(spmi_->read_size(), 4);
+  EXPECT_EQ(spmi_->address(), 0x1122);
+
+  // Write then read 9 bytes.
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1111", "-w", "1", "2", "3", "4", "5", "6",
                          "7", "8", "9"}),
             0);
   EXPECT_EQ(spmi_->target_id(), 0);
-  kCannedData = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-  EXPECT_TRUE(spmi_->data() == kCannedData);
-  EXPECT_EQ(spmi_->address(), 0x1234);
-  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1234", "-r", "9"}), 0);
+  canned_data = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+  EXPECT_TRUE(spmi_->data() == canned_data);
+  EXPECT_EQ(spmi_->address(), 0x1111);
+  ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-a", "0x1111", "-r", "9"}), 0);
   EXPECT_EQ(spmi_->target_id(), 0);
   EXPECT_EQ(spmi_->read_size(), 9);
-  EXPECT_EQ(spmi_->address(), 0x1234);
+  EXPECT_EQ(spmi_->address(), 0x1111);
+}
 
+TEST_F(SpmiCtlTest, ReadWriteErrors) {
   // Errors.
   ASSERT_EQ(CallSpmiCtl({"spmi-ctl", "-t", "0", "-w", "0x12", "0x34", "0x56"}),
             -1);  // No address.

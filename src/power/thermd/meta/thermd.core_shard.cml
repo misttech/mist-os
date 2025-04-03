@@ -21,11 +21,19 @@
             to: [ "#thermd" ],
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-thermal",
             to: "#thermd",
             subdir: "thermal",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.thermal.Service",
+            from: "parent",
+            to: "#thermd",
         },
     ],
 }

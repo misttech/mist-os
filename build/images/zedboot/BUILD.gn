@@ -33,12 +33,6 @@ assembled_system("zedboot_assembly") {
   # non-recovery board).
   board_config_label = recovery_board_configuration_label
 
-  # Bazel assembly should not depend on any targets from GN assembly other
-  # than the legacy AIB.
-  include_legacy_bundle = false
-
-  base_packages = []
-
   # zbi arguments
   if (custom_signing_script != "") {
     inputs = custom_signing_script_inputs

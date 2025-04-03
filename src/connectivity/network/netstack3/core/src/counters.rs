@@ -18,8 +18,8 @@ use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
-use netstack3_tcp::{TcpCounters, TcpCountersInner};
-use netstack3_udp::{UdpCounters, UdpCountersInner};
+use netstack3_tcp::{CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket};
+use netstack3_udp::{CombinedUdpCounters, UdpCountersWithSocket, UdpCountersWithoutSocket};
 
 /// An API struct for accessing all stack counters.
 pub struct CountersApi<C>(C);
@@ -39,10 +39,14 @@ where
         + CounterContext<MulticastForwardingCounters<Ipv6>>
         + CounterContext<RawIpSocketCounters<Ipv4>>
         + CounterContext<RawIpSocketCounters<Ipv6>>
-        + CounterContext<UdpCounters<Ipv4>>
-        + CounterContext<UdpCounters<Ipv6>>
-        + CounterContext<TcpCounters<Ipv4>>
-        + CounterContext<TcpCounters<Ipv6>>
+        + CounterContext<UdpCountersWithSocket<Ipv4>>
+        + CounterContext<UdpCountersWithSocket<Ipv6>>
+        + CounterContext<UdpCountersWithoutSocket<Ipv4>>
+        + CounterContext<UdpCountersWithoutSocket<Ipv6>>
+        + CounterContext<TcpCountersWithSocket<Ipv4>>
+        + CounterContext<TcpCountersWithSocket<Ipv6>>
+        + CounterContext<TcpCountersWithoutSocket<Ipv4>>
+        + CounterContext<TcpCountersWithoutSocket<Ipv6>>
         + CounterContext<IcmpRxCounters<Ipv4>>
         + CounterContext<IcmpRxCounters<Ipv6>>
         + CounterContext<IcmpTxCounters<Ipv4>>
@@ -154,18 +158,46 @@ where
         });
         inspector.record_child("UDP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspect_udp_counters::<Ipv4>(inspector, self.core_ctx().counters());
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<UdpCountersWithSocket<Ipv4>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<UdpCountersWithoutSocket<Ipv4>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedUdpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
             inspector.record_child("V6", |inspector| {
-                inspect_udp_counters::<Ipv6>(inspector, self.core_ctx().counters());
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<UdpCountersWithSocket<Ipv6>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<UdpCountersWithoutSocket<Ipv6>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedUdpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
         });
         inspector.record_child("TCP", |inspector| {
             inspector.record_child("V4", |inspector| {
-                inspect_tcp_counters::<Ipv4>(inspector, self.core_ctx().counters());
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<TcpCountersWithSocket<Ipv4>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<TcpCountersWithoutSocket<Ipv4>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedTcpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
             inspector.record_child("V6", |inspector| {
-                inspect_tcp_counters::<Ipv6>(inspector, self.core_ctx().counters());
+                let ctx = self.core_ctx();
+                let with_socket = CounterContext::<TcpCountersWithSocket<Ipv6>>::counters(ctx);
+                let without_socket =
+                    CounterContext::<TcpCountersWithoutSocket<Ipv6>>::counters(ctx);
+                inspector.delegate_inspectable(&CombinedTcpCounters {
+                    with_socket,
+                    without_socket: Some(without_socket),
+                });
             });
         });
     }
@@ -348,102 +380,4 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("ErrorInnerSizeLimitExceeded", error_inner_size_limit_exceeded);
         inspector.record_counter("ErrorFragmentedSerializer", error_fragmented_serializer);
     });
-}
-
-fn inspect_udp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &UdpCounters<I>) {
-    let UdpCountersInner {
-        rx_icmp_error,
-        rx,
-        rx_mapped_addr,
-        rx_unknown_dest_port,
-        rx_malformed,
-        tx,
-        tx_error,
-    } = counters.as_ref();
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("Received", rx);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("MappedAddr", rx_mapped_addr);
-            inspector.record_counter("UnknownDstPort", rx_unknown_dest_port);
-            inspector.record_counter("Malformed", rx_malformed);
-        });
-    });
-    inspector.record_child("Tx", |inspector| {
-        inspector.record_counter("Sent", tx);
-        inspector.record_counter("Errors", tx_error);
-    });
-    inspector.record_counter("IcmpErrors", rx_icmp_error);
-}
-
-fn inspect_tcp_counters<I: Ip>(inspector: &mut impl Inspector, counters: &TcpCounters<I>) {
-    let TcpCountersInner {
-        invalid_ip_addrs_received,
-        invalid_segments_received,
-        valid_segments_received,
-        received_segments_dispatched,
-        received_segments_no_dispatch,
-        listener_queue_overflow,
-        segment_send_errors,
-        segments_sent,
-        passive_open_no_route_errors,
-        passive_connection_openings,
-        active_open_no_route_errors,
-        active_connection_openings,
-        failed_connection_attempts,
-        failed_port_reservations,
-        checksum_errors,
-        resets_received,
-        resets_sent,
-        syns_received,
-        syns_sent,
-        fins_received,
-        fins_sent,
-        timeouts,
-        retransmits,
-        slow_start_retransmits,
-        fast_retransmits,
-        fast_recovery,
-        established_closed,
-        established_resets,
-        established_timedout,
-    } = counters.as_ref();
-    inspector.record_child("Rx", |inspector| {
-        inspector.record_counter("ValidSegmentsReceived", valid_segments_received);
-        inspector.record_counter("ReceivedSegmentsDispatched", received_segments_dispatched);
-        inspector.record_counter("ResetsReceived", resets_received);
-        inspector.record_counter("SynsReceived", syns_received);
-        inspector.record_counter("FinsReceived", fins_received);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("InvalidIpAddrsReceived", invalid_ip_addrs_received);
-            inspector.record_counter("InvalidSegmentsReceived", invalid_segments_received);
-            inspector.record_counter("ReceivedSegmentsNoDispatch", received_segments_no_dispatch);
-            inspector.record_counter("ListenerQueueOverflow", listener_queue_overflow);
-            inspector.record_counter("PassiveOpenNoRouteErrors", passive_open_no_route_errors);
-            inspector.record_counter("ChecksumErrors", checksum_errors);
-        })
-    });
-    inspector.record_child("Tx", |inspector| {
-        inspector.record_counter("SegmentsSent", segments_sent);
-        inspector.record_counter("ResetsSent", resets_sent);
-        inspector.record_counter("SynsSent", syns_sent);
-        inspector.record_counter("FinsSent", fins_sent);
-        inspector.record_counter("Timeouts", timeouts);
-        inspector.record_counter("Retransmits", retransmits);
-        inspector.record_counter("SlowStartRetransmits", slow_start_retransmits);
-        inspector.record_counter("FastRetransmits", fast_retransmits);
-        inspector.record_child("Errors", |inspector| {
-            inspector.record_counter("SegmentSendErrors", segment_send_errors);
-            inspector.record_counter("ActiveOpenNoRouteErrors", active_open_no_route_errors);
-        });
-    });
-    inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
-    inspector.record_counter("ActiveConnectionOpenings", active_connection_openings);
-    inspector.record_counter("FastRecovery", fast_recovery);
-    inspector.record_counter("EstablishedClosed", established_closed);
-    inspector.record_counter("EstablishedResets", established_resets);
-    inspector.record_counter("EstablishedTimedout", established_timedout);
-    inspector.record_child("Errors", |inspector| {
-        inspector.record_counter("FailedConnectionOpenings", failed_connection_attempts);
-        inspector.record_counter("FailedPortReservations", failed_port_reservations);
-    })
 }

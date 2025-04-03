@@ -8,7 +8,7 @@ mod validators;
 use anyhow::{format_err, Error};
 use block_client::BlockClient as _;
 use config::{Config, ConfigContext, FactoryConfig};
-use fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream, ServerEnd};
+use fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream};
 use fidl_fuchsia_boot::FactoryItemsMarker;
 use fidl_fuchsia_factory::{
     AlphaFactoryStoreProviderMarker, AlphaFactoryStoreProviderRequest,
@@ -28,9 +28,7 @@ use futures::lock::Mutex;
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use std::io;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::{self};
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::tree_builder::TreeBuilder;
 use {fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio};
@@ -156,26 +154,17 @@ async fn create_dir_from_context<'a>(
     tree_builder.build()
 }
 
-async fn apply_config(config: Config, dir: Arc<Mutex<fio::DirectoryProxy>>) -> fio::DirectoryProxy {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
-
-    let dir_mtx = dir.clone();
-
+async fn apply_config(
+    config: Config,
+    dir_mtx: Arc<Mutex<fio::DirectoryProxy>>,
+) -> fio::DirectoryProxy {
     // We only want to hold this lock to create `dir` so limit the scope of `dir_ref`.
     let dir = {
         let dir_ref = dir_mtx.lock().await;
         let context = config.into_context().expect("Failed to convert config into context");
         create_dir_from_context(&context, &*dir_ref).await
     };
-
-    dir.open(
-        ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        vfs::path::Path::dot(),
-        ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
-    );
-
-    directory_proxy
+    vfs::directory::serve_read_only(dir)
 }
 
 async fn handle_request_stream<RS, G>(
@@ -202,7 +191,6 @@ where
 }
 
 async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::DirectoryProxy, Error> {
-    let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
     match factory_config {
         FactoryConfig::FactoryItems => {
             log::info!("{}", "Reading from FactoryItems service");
@@ -211,15 +199,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
                     log::error!("Failed to get factory item, returning empty item list: {}", err);
                     directory::immutable::simple()
                 });
-
-            factory_items_directory.open(
-                ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                vfs::path::Path::dot(),
-                ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
-            );
-
-            Ok(directory_proxy)
+            Ok(vfs::directory::serve_read_only(factory_items_directory))
         }
         FactoryConfig::Ext4(partition_path) => {
             log::info!("Reading from EXT4-formatted source: {}", partition_path);
@@ -249,6 +229,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             let ext4_server = fuchsia_component::client::connect_to_protocol::<Server_Marker>()?;
 
             log::info!("Mounting EXT4 VMO");
+            let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
             match ext4_server.mount_vmo(vmo, directory_server_end).await {
                 Ok(MountVmoResult::Success(_)) => Ok(directory_proxy),
                 Ok(MountVmoResult::VmoReadFailure(status)) => {
@@ -263,6 +244,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
         }
         FactoryConfig::FactoryVerity => {
             log::info!("reading from factory verity");
+            let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
             fdio::open("/factory", fio::PERM_READABLE, directory_server_end.into_channel())?;
             Ok(directory_proxy)
         }
@@ -403,7 +385,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::create_endpoints;
+    use fidl::endpoints::Proxy as _;
     use fuchsia_async as fasync;
     use vfs::pseudo_directory;
 
@@ -416,16 +398,9 @@ mod tests {
                 "c" => read_only("c content"),
             },
         };
-        let (dir_client, dir_server) = create_endpoints();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(dir_server.into_channel()),
-        );
+        let dir_proxy = vfs::directory::serve_read_only(dir);
         let ns = fdio::Namespace::installed().unwrap();
-        ns.bind("/factory", dir_client).unwrap();
+        ns.bind("/factory", dir_proxy.into_client_end().unwrap()).unwrap();
 
         let factory_proxy = open_factory_source(FactoryConfig::FactoryVerity).await.unwrap();
 

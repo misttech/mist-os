@@ -131,11 +131,23 @@ void DisplayConfig::DiscardNonLayerDraftConfig() {
   draft_has_layer_list_change_ = false;
   draft_has_layer_list_change_property_.Set(false);
 
+  // TODO(https://fxbug.dev/402804098): Remove this workaround.
+  //
+  // We preserve the draft display mode to work
+  // around a Scenic issue where it forgets to call SetDisplayMode() again after
+  // discarding a draft configuration with a load-bearing SetDisplayMode().
+  const display_mode_t draft_mode = draft_.mode;
+
   draft_ = applied_;
   has_draft_nonlayer_config_change_ = false;
+
+  // TODO(https://fxbug.dev/402804098): Remove this workaround.
+  draft_.mode = draft_mode;
 }
 
 void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::ImportImage");
+
   const display::ImageId image_id = display::ToImageId(request->image_id);
   if (image_id == display::kInvalidImageId) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -216,6 +228,8 @@ zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_me
 
 void Client::ReleaseImage(ReleaseImageRequestView request,
                           ReleaseImageCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::ReleaseImage");
+
   const display::ImageId image_id = display::ToImageId(request->image_id);
   auto image = images_.find(image_id);
   if (image.IsValid()) {
@@ -244,6 +258,8 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
 
 void Client::ImportEvent(ImportEventRequestView request,
                          ImportEventCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::ImportEvent");
+
   const display::EventId event_id = display::ToEventId(request->id);
   if (event_id == display::kInvalidEventId) {
     fdf::error("Cannot import events with an invalid ID #{}", event_id.value());
@@ -261,6 +277,8 @@ void Client::ImportEvent(ImportEventRequestView request,
 
 void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
                                     ImportBufferCollectionCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::ImportBufferCollection");
+
   const display::BufferCollectionId buffer_collection_id =
       display::ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
@@ -287,6 +305,8 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 
 void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
                                      ReleaseBufferCollectionCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::ReleaseBufferCollection");
+
   const display::BufferCollectionId buffer_collection_id =
       display::ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
@@ -307,6 +327,8 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
 void Client::SetBufferCollectionConstraints(
     SetBufferCollectionConstraintsRequestView request,
     SetBufferCollectionConstraintsCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::SetBufferCollectionConstraints");
+
   const display::BufferCollectionId buffer_collection_id =
       display::ToBufferCollectionId(request->buffer_collection_id);
   auto it = collection_map_.find(buffer_collection_id);
@@ -331,6 +353,8 @@ void Client::SetBufferCollectionConstraints(
 
 void Client::ReleaseEvent(ReleaseEventRequestView request,
                           ReleaseEventCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::ReleaseEvent");
+
   const display::EventId event_id = display::ToEventId(request->id);
   // TODO(https://fxbug.dev/42080337): Check if the ID is valid (i.e. imported but not
   // yet released) before calling `ReleaseEvent()`.
@@ -338,6 +362,8 @@ void Client::ReleaseEvent(ReleaseEventRequestView request,
 }
 
 void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::CreateLayer");
+
   // TODO(https://fxbug.dev/42079482): Layer IDs should be client-managed.
 
   if (layers_.size() == kMaxLayers) {
@@ -366,6 +392,8 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
 
 void Client::DestroyLayer(DestroyLayerRequestView request,
                           DestroyLayerCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::DestroyLayer");
+
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
@@ -389,6 +417,8 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
 void Client::SetDisplayMode(SetDisplayModeRequestView request,
                             SetDisplayModeCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetDisplayMode");
+
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
@@ -401,8 +431,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   zx::result<std::span<const display::DisplayTiming>> display_timings_result =
       controller_.GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
-    fdf::error("Failed to get display timings for display #{}: {}", display_id.value(),
-               display_timings_result);
+    fdf::error("SetDisplayMode failed to get display timings for display ID {}: {}",
+               display_id.value(), display_timings_result);
     TearDown(display_timings_result.status_value());
     return;
   }
@@ -426,14 +456,21 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
       });
 
   if (display_timing_it == display_timings.end()) {
-    fdf::error("Display mode not found: ({} x {}) @ {} millihertz", request->mode.active_area.width,
-               request->mode.active_area.height, request->mode.refresh_rate_millihertz);
+    fdf::error("SetDisplayMode failed to find timings compatible with mode: {}x{} @ {}.{:03} Hz",
+               request->mode.active_area.width, request->mode.active_area.height,
+               request->mode.refresh_rate_millihertz / 1000,
+               request->mode.refresh_rate_millihertz % 1000);
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
+  fdf::info("SetDisplayMode found supported display timing for {}x{} @ {}.{:03} Hz",
+            display_timing_it->horizontal_active_px, display_timing_it->vertical_active_lines,
+            display_timing_it->vertical_field_refresh_rate_millihertz() / 1000,
+            display_timing_it->vertical_field_refresh_rate_millihertz() % 1000);
+
   if (display_timings.size() == 1) {
-    fdf::info("Display has only one timing available. Modeset is skipped.");
+    fdf::info("SetDisplayMode skipping modeset, because the display only supports one timing.");
     return;
   }
 
@@ -444,6 +481,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
                                        SetDisplayColorConversionCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetDisplayColorConversion");
+
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
@@ -482,6 +521,8 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
                               SetDisplayLayersCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetDisplayLayers");
+
   if (request->layer_ids.empty()) {
     fdf::error("SetDisplayLayers called with an empty layer list");
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -527,6 +568,8 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
 
 void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
                                    SetLayerPrimaryConfigCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetLayerPrimaryConfig");
+
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
@@ -551,6 +594,8 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
 
 void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
                                      SetLayerPrimaryPositionCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetLayerPrimaryPosition");
+
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
@@ -583,6 +628,8 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
 
 void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                                   SetLayerPrimaryAlphaCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetLayerPrimaryAlpha");
+
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
@@ -613,6 +660,8 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
 
 void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetLayerColorConfig");
+
   display::LayerId layer_id = display::ToLayerId(request->layer_id);
 
   // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
@@ -645,6 +694,8 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
 
 void Client::SetLayerImage2(SetLayerImage2RequestView request,
                             SetLayerImage2Completer::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetLayerImage2");
+
   SetLayerImageImpl(display::ToLayerId(request->layer_id), display::ToImageId(request->image_id),
                     display::ToEventId(request->wait_event_id));
 }
@@ -716,6 +767,8 @@ void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { Disca
 
 void Client::ApplyConfig3(ApplyConfig3RequestView request,
                           ApplyConfig3Completer::Sync& _completer) {
+  TRACE_DURATION("gfx", "Display::Client::ApplyConfig3");
+
   if (!request->has_stamp()) {
     fdf::error("ApplyConfig3: stamp is required; none was provided");
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -821,17 +874,21 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
 }
 
 void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::GetLatestAppliedConfigStamp");
   completer.Reply(ToFidlConfigStamp(latest_config_stamp_));
 }
 
 void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
                                    SetVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetVsyncEventDelivery");
   proxy_->SetVsyncEventDelivery(request->vsync_delivery_enabled);
   // No reply defined.
 }
 
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
+  TRACE_DURATION("gfx", "Display::Client::SetVirtconMode");
+
   if (priority_ != ClientPriority::kVirtcon) {
     fdf::error("SetVirtconMode() called by {} client", DebugStringFromClientPriority(priority_));
     TearDown(ZX_ERR_INVALID_ARGS);
@@ -842,6 +899,7 @@ void Client::SetVirtconMode(SetVirtconModeRequestView request,
 }
 
 void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::IsCaptureSupported");
   completer.ReplySuccess(controller_.supports_capture());
 }
 
@@ -889,6 +947,8 @@ zx_status_t Client::ImportImageForCapture(const display::ImageMetadata& image_me
 }
 
 void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::StartCapture");
+
   // Ensure display driver supports/implements capture.
   if (!controller_.supports_capture()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -935,6 +995,8 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
 
 void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
                            SetMinimumRgbCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::SetMinimumRgb");
+
   if (!is_owner_) {
     completer.ReplyError(ZX_ERR_NOT_CONNECTED);
     return;
@@ -950,6 +1012,8 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Display::Client::SetDisplayPower");
+
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
@@ -968,6 +1032,8 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
 
 bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
                          std::vector<fhd::wire::ClientCompositionOp>* ops) {
+  TRACE_DURATION("gfx", "Display::Client::CheckConfig");
+
   if (res && ops) {
     *res = fhdt::wire::ConfigResult::kOk;
     ops->clear();
@@ -1009,8 +1075,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     const rect_u_t display_area = {
         .x = 0,
         .y = 0,
-        .width = banjo_display_config.mode.h_addressable,
-        .height = banjo_display_config.mode.v_addressable,
+        .width = display_config.draft_.mode.h_addressable,
+        .height = display_config.draft_.mode.v_addressable,
     };
 
     // Normalize the display configuration, and perform Coordinator-level
@@ -1063,6 +1129,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       }
       return false;
     }
+
+    ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
+                        "Draft configuration layer count %zu does not agree with list size %zu",
+                        display_config.draft_.layer_count, banjo_layers_index);
+    banjo_display_config = display_config.draft_;
+    banjo_display_config.layer_list = banjo_layers;
   }
 
   if (banjo_display_config.layer_count == 0) {
@@ -1078,10 +1150,15 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   }
 
   size_t layer_composition_operations_count_actual;
-  config_check_result_t display_cfg_result = controller_.engine_driver_client()->CheckConfiguration(
-      &banjo_display_config, layer_composition_operations,
-      /* layer_composition_operations_count=*/banjo_display_config.layer_count,
-      &layer_composition_operations_count_actual);
+  config_check_result_t display_cfg_result;
+  {
+    TRACE_DURATION("gfx", "Display::Client::CheckConfig engine_driver_client");
+
+    display_cfg_result = controller_.engine_driver_client()->CheckConfiguration(
+        &banjo_display_config, layer_composition_operations,
+        /* layer_composition_operations_count=*/banjo_display_config.layer_count,
+        &layer_composition_operations_count_actual);
+  }
 
   switch (display_cfg_result) {
     case CONFIG_CHECK_RESULT_OK:
@@ -1165,7 +1242,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
 void Client::ApplyConfig() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
-  TRACE_DURATION("gfx", "Display::Client::ApplyConfig");
+  TRACE_DURATION("gfx", "Display::Client::ApplyConfig internal");
 
   if (layers_.is_empty()) {
     FDF_LOG(ERROR, "ApplyConfig() called before SetDisplayLayers()");
@@ -1498,6 +1575,8 @@ void Client::CaptureCompleted() {
 }
 
 void Client::TearDown(zx_status_t epitaph) {
+  TRACE_DURATION("gfx", "Display::Client::TearDown");
+
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   draft_display_config_was_validated_ = false;
 
@@ -1617,6 +1696,8 @@ void Client::SetAllConfigDraftLayersToAppliedLayers() {
 }
 
 void Client::DiscardConfig() {
+  TRACE_DURATION("gfx", "Display::Client::DiscardConfig");
+
   // Go through layers and release any resources claimed by draft configs.
   for (Layer& layer : layers_) {
     layer.DiscardChanges();

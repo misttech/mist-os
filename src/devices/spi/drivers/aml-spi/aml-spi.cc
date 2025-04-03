@@ -548,8 +548,8 @@ void AmlSpi::RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoReque
       };
 
   // RegisterVmo, UnregisterVmo, and ReleaseRegisteredVmos requests are put on the queue as well.
-  // They may reference VMOs used by transfers earlier in the queue, so we have to wait for them to
-  // complete first.
+  // They may reference VMOs used by transfers earlier in the queue, so we have to wait for them
+  // to complete first.
   HandleRequest(SpiRequest{request->chip_select, std::move(complete_cb)});
 }
 
@@ -709,10 +709,10 @@ zx_status_t AmlSpi::ExchangeDma(const uint8_t* txdata, uint8_t* out_rxdata, uint
 
   DmaReg::Get().FromValue(0).WriteTo(&mmio_);
 
-  // The SPI controller issues requests to DDR to fill the TX FIFO/drain the RX FIFO. The reference
-  // driver uses requests up to the FIFO size (16 words) when that many words are remaining, or 2-8
-  // word requests otherwise. 16-word requests didn't seem to work in testing, and only 8-word
-  // requests are used by default here for simplicity.
+  // The SPI controller issues requests to DDR to fill the TX FIFO/drain the RX FIFO. The
+  // reference driver uses requests up to the FIFO size (16 words) when that many words are
+  // remaining, or 2-8 word requests otherwise. 16-word requests didn't seem to work in testing,
+  // and only 8-word requests are used by default here for simplicity.
   for (size_t words_remaining = size / kBytesPerWord; words_remaining > 0;) {
     const size_t transfer_size = DoDmaTransfer(words_remaining);
 
@@ -849,67 +849,70 @@ void AmlSpiDriver::Start(fdf::StartCompleter completer) {
 
   fpromise::bridge<> bridge;
 
-  auto task = compat::GetMetadataAsync<fuchsia_scheduler::RoleName>(
-      fdf::Dispatcher::GetCurrent()->async_dispatcher(), incoming(),
-      DEVICE_METADATA_SCHEDULER_ROLE_NAME,
-      [this, start_completer = std::move(completer), completer = std::move(bridge.completer)](
-          const zx::result<fuchsia_scheduler::RoleName>& result) mutable {
-        OnGetSchedulerRoleName(std::move(start_completer), result);
-        completer.complete_ok();
-      },
-      "pdev");
+  pdev_->GetMetadata(fuchsia_scheduler::RoleName::kSerializableName)
+      .Then([this, start_completer = std::move(completer)](auto& result) mutable {
+        std::optional<fuchsia_scheduler::RoleName> scheduler_role_name;
+        if (!result.ok()) {
+          FDF_LOG(DEBUG, "Failed to send GetMetadata request: %s", result.status_string());
+        } else if (result->is_error()) {
+          if (result->error_value() == ZX_ERR_NOT_FOUND) {
+            FDF_LOG(DEBUG, "Failed to get persisted metadata: %s",
+                    zx_status_get_string(result->error_value()));
+          } else {
+            FDF_LOG(ERROR, "Failed to get persisted metadata: %s",
+                    zx_status_get_string(result->error_value()));
+            start_completer(zx::error(result->error_value()));
+            return;
+          }
+        } else {
+          fit::result unpersisted =
+              fidl::Unpersist<fuchsia_scheduler::RoleName>(result.value()->metadata.get());
+          if (unpersisted.is_error()) {
+            FDF_LOG(ERROR, "Failed to unpersist metadata: %s",
+                    zx_status_get_string(unpersisted.error_value().status()));
+            start_completer(zx::error(unpersisted.error_value().status()));
+            return;
+          }
+          scheduler_role_name.emplace(std::move(unpersisted.value()));
+        }
 
-  auto promise = bridge.consumer.promise().then(
-      [task = std::move(task)](fpromise::result<>& result) mutable {});
-  executor_.schedule_task(std::move(promise));
+        OnGetSchedulerRoleName(std::move(start_completer), scheduler_role_name);
+      });
 }
 
 void AmlSpiDriver::OnGetSchedulerRoleName(
     fdf::StartCompleter completer,
-    const zx::result<fuchsia_scheduler::RoleName>& scheduler_role_name) {
-  std::unordered_set<compat::MetadataKey> forward_metadata({DEVICE_METADATA_SPI_CHANNELS});
+    const std::optional<fuchsia_scheduler::RoleName>& scheduler_role_name) {
+  static const fuchsia_scheduler::RoleName kDefaultSchedulerRoleName{kDefaultRoleName};
 
-  std::vector<uint8_t> role_name;
+  const auto& unwrapped_scheduler_role_name =
+      scheduler_role_name.value_or(kDefaultSchedulerRoleName);
+  if (zx::result result =
+          scheduler_role_name_metadata_server_.SetMetadata(unwrapped_scheduler_role_name);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set scheduler role name metadata: %s", result.status_string());
+    completer(result.take_error());
+    return;
+  }
 
-  // If we have scheduler role metadata, forward it to our child and let them apply it with the
-  // expectation that their calls to us will be inlined. If we don't have scheduler role metadata,
-  // then add the default role name as metadata instead.
-  if (scheduler_role_name.is_ok()) {
-    forward_metadata.emplace(DEVICE_METADATA_SCHEDULER_ROLE_NAME);
-  } else {
-    const fuchsia_scheduler::RoleName role{kDefaultRoleName};
-
-    fit::result result = fidl::Persist(role);
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to persist scheduler role: %s",
-              result.error_value().FormatDescription().c_str());
-      return completer(zx::error(result.error_value().status()));
-    }
-
-    role_name = *std::move(result);
+  if (zx::result result = scheduler_role_name_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve scheduler role name metadata: %s", result.status_string());
+    completer(result.take_error());
+    return;
   }
 
   compat_server_.Begin(
       incoming(), outgoing(), node_name(), component::kDefaultInstance,
-      [this, completer = std::move(completer),
-       role_name = std::move(role_name)](zx::result<> result) mutable {
+      [this, completer = std::move(completer)](zx::result<> result) mutable {
         if (result.is_error()) {
           FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
           return completer(result.take_error());
         }
 
-        if (!role_name.empty()) {
-          zx_status_t status = compat_server_.inner().AddMetadata(
-              DEVICE_METADATA_SCHEDULER_ROLE_NAME, role_name.data(), role_name.size());
-          if (status != ZX_OK) {
-            FDF_LOG(ERROR, "Failed to add role metadata: %s", zx_status_get_string(status));
-            return completer(zx::error(status));
-          }
-        }
-
         OnCompatServerInitialized(std::move(completer));
       },
-      compat::ForwardMetadata::Some(std::move(forward_metadata)));
+      compat::ForwardMetadata::None());
 }
 
 void AmlSpiDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {
@@ -974,12 +977,14 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
                 metadata.error_value().status_string());
         return completer(zx::error(metadata.error_value().status()));
       }
-      if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
+      if (zx::result result = spi_metadata_server_.SetMetadata(metadata.value());
+          result.is_error()) {
         FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
         return completer(result.take_error());
       }
     }
-    if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    if (zx::result result = spi_metadata_server_.Serve(*outgoing(), dispatcher());
+        result.is_error()) {
       FDF_LOG(ERROR, "Failed to serve metadata server: %s", result.status_string());
       return completer(result.take_error());
     }
@@ -1074,7 +1079,8 @@ void AmlSpiDriver::AddNode(fdf::MmioBuffer mmio, const amlogic_spi::amlspi_confi
   std::vector offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
       fdf::MakeOffer2<fuchsia_hardware_spiimpl::Service>(arena, component::kDefaultInstance));
-  offers.push_back(metadata_server_.MakeOffer(arena));
+  offers.push_back(spi_metadata_server_.MakeOffer(arena));
+  offers.push_back(scheduler_role_name_metadata_server_.MakeOffer(arena));
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, devname)
                         .offers2(arena, std::move(offers))
@@ -1173,6 +1179,7 @@ AmlSpiDriver::GetSpiBusMetadata() {
           }
           FDF_LOG(ERROR, "Failed to get metadata: %s", zx_status_get_string(result->error_value()));
           completer.complete_error(result->error_value());
+          return;
         }
 
         auto& metadata = result->value()->metadata;
@@ -1263,8 +1270,8 @@ void AmlSpi::OnAllClientsUnbound() {
     request_queue_.pop();
   }
 
-  // If there's a transfer in progress, stash its registered VMOs to be released after the transfer
-  // completes.
+  // If there's a transfer in progress, stash its registered VMOs to be released after the
+  // transfer completes.
   if (current_request_) {
     current_request_->ReleaseVmosOnComplete(std::move(registered_vmos(current_request_->cs())));
   }

@@ -16,7 +16,7 @@ async fn file_read_with_sufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let _data: Vec<u8> = file
             .read(0)
             .await
@@ -34,7 +34,7 @@ async fn file_read_with_insufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result = file.read(0).await.expect("read failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE))
     }
@@ -51,7 +51,7 @@ async fn file_read_with_max_transfer() {
         let entries = vec![file(TEST_FILE, contents)];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         let len = file
             .read(fio::MAX_TRANSFER_SIZE)
@@ -75,7 +75,7 @@ async fn file_read_over_max_transfer() {
         let entries = vec![file(TEST_FILE, contents)];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         let result = file
             .read(fio::MAX_TRANSFER_SIZE + 1)
@@ -96,7 +96,7 @@ async fn file_read_at_with_sufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let _: Vec<u8> = file
             .read_at(0, 0)
             .await
@@ -114,7 +114,7 @@ async fn file_read_at_with_insufficient_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
         let result =
             file.read_at(0, 0).await.expect("read_at failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE))
@@ -132,7 +132,7 @@ async fn file_read_at_with_max_transfer() {
         let entries = vec![file(TEST_FILE, contents)];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         let len = file
             .read_at(fio::MAX_TRANSFER_SIZE, 0)
@@ -156,7 +156,7 @@ async fn file_read_at_over_max_transfer() {
         let entries = vec![file(TEST_FILE, contents)];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         let result = file
             .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
@@ -177,7 +177,7 @@ async fn file_read_in_subdirectory() {
         let entries = vec![directory("subdir", vec![file("testing.txt", vec![])])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, file_flags, "subdir/testing.txt").await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, "subdir/testing.txt").await;
         let _data: Vec<u8> = file
             .read(0)
             .await

@@ -56,7 +56,7 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
             required=False,
         )
 
-        self.device_monitor_proxy = fidl_svc.DeviceMonitor.Client(
+        self.device_monitor_proxy = fidl_svc.DeviceMonitorClient(
             self.fuchsia_device.honeydew_fd.fuchsia_controller.connect_device_proxy(
                 FidlEndpoint(
                     "core/wlandevicemonitor",
@@ -103,7 +103,7 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
                 sme_server=server.take(),
             )
         ).unwrap()
-        self.client_sme_proxy = fidl_sme.ClientSme.Client(proxy)
+        self.client_sme_proxy = fidl_sme.ClientSmeClient(proxy)
 
         self.access_point().stop_all_aps()
 

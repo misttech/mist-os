@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt};
 use crate::security;
+use crate::syscalls::time::TimeSpecPtr;
 use crate::task::{CurrentTask, IpTables, Task, WaitCallback, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer,
@@ -14,6 +15,8 @@ use crate::vfs::socket::{
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
+use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef};
+use starnix_uapi::user_value::UserValue;
 
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
@@ -27,14 +30,54 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    cmsghdr, errno, error, mmsghdr, msghdr, socklen_t, timespec, MSG_CTRUNC, MSG_DONTWAIT,
-    MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK,
-    UIO_MAXIOV,
+    errno, error, socklen_t, uapi, MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD,
+    SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
 };
-use std::mem::size_of;
+
+uapi::check_arch_independent_layout! {
+    socklen_t {}
+}
+
+pub type MsgHdrPtr = MappingMultiArchUserRef<MsgHdr, uapi::msghdr, uapi::arch32::msghdr>;
+
+pub struct MsgHdr {
+    name: UserAddress,
+    name_len: socklen_t,
+    iov: IOVecPtr,
+    iovlen: UserValue<usize>,
+    control: UserAddress,
+    control_len: usize,
+    flags: u32,
+}
+
+pub type MMsgHdrPtr = MappingMultiArchUserRef<MMsgHdr, uapi::mmsghdr, uapi::arch32::mmsghdr>;
+
+pub struct MMsgHdr {
+    hdr: MsgHdr,
+    len: usize,
+}
+
+uapi::arch_map_data! {
+    BidiTryFrom<MsgHdr, msghdr> {
+        name = msg_name;
+        name_len = msg_namelen;
+        iov = msg_iov;
+        iovlen = msg_iovlen;
+        control = msg_control;
+        control_len = msg_controllen;
+        flags = msg_flags;
+    }
+
+    BidiTryFrom<MMsgHdr, mmsghdr> {
+        hdr = msg_hdr;
+        len = msg_len;
+    }
+}
+
+pub type CMsgHdrPtr = MultiArchUserRef<uapi::cmsghdr, uapi::arch32::cmsghdr>;
 
 pub fn sys_socket(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -46,7 +89,8 @@ pub fn sys_socket(
     // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
-    let socket_file = new_socket_file(current_task, domain, socket_type, open_flags, protocol)?;
+    let socket_file =
+        new_socket_file(locked, current_task, domain, socket_type, open_flags, protocol)?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
     let fd = current_task.add_file(socket_file, fd_flags)?;
@@ -179,6 +223,7 @@ pub fn sys_bind(
                 .map_err(|_| errno!(EACCES))?;
         }
     }
+    security::check_socket_bind_access(current_task, &file.node(), &address)?;
     match address {
         SocketAddress::Unspecified => return error!(EINVAL),
         SocketAddress::Unix(mut name) => {
@@ -276,7 +321,7 @@ pub fn sys_accept4(
     }
 
     let open_flags = socket_flags_to_open_flags(flags);
-    let accepted_socket_file = Socket::new_file(current_task, accepted_socket, open_flags);
+    let accepted_socket_file = Socket::new_file(locked, current_task, accepted_socket, open_flags);
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
@@ -290,6 +335,7 @@ pub fn sys_connect(
     user_address_length: usize,
 ) -> Result<(), Errno> {
     let client_file = current_task.files.get(fd)?;
+    let client_node = client_file.node();
     let client_socket = Socket::get_from_file(&client_file)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
@@ -299,21 +345,26 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
             log_trace!("connect to inet socket named {:?}", addr);
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
-        SocketAddress::Netlink(_) => SocketPeer::Address(address),
+        SocketAddress::Netlink(_) => {
+            security::check_socket_connect_access(current_task, client_node, &address)?;
+            SocketPeer::Address(address)
+        }
         SocketAddress::Packet(ref addr) => {
             log_trace!("connect to packet socket named {:?}", addr);
+            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
     };
-
     let result = client_socket.connect(locked, current_task, peer.clone());
 
     if client_file.is_non_blocking() {
@@ -396,7 +447,7 @@ pub fn sys_getpeername(
 }
 
 pub fn sys_socketpair(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -415,7 +466,8 @@ pub fn sys_socketpair(
     }
     let open_flags = socket_flags_to_open_flags(flags);
 
-    let (left, right) = UnixSocket::new_pair(current_task, domain, socket_type, open_flags)?;
+    let (left, right) =
+        UnixSocket::new_pair(locked, current_task, domain, socket_type, open_flags)?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
     // TODO: Eventually this will need to allocate two fd numbers (each of which could
@@ -433,32 +485,55 @@ pub fn sys_socketpair(
 
 fn read_iovec_from_msghdr(
     current_task: &CurrentTask,
-    message_header: &msghdr,
+    message_header: &MsgHdr,
 ) -> Result<UserBuffers, Errno> {
-    let iovec_count = message_header.msg_iovlen as usize;
+    let iovec_count = message_header.iovlen;
 
     // In `CurrentTask::read_iovec()` the same check fails with `EINVAL`. This works for all
     // syscalls that use `iovec`, except `sendmsg()` and `recvmsg()`, which need to fail with
     // EMSGSIZE.
-    if iovec_count > UIO_MAXIOV as usize {
+    if iovec_count.raw() > UIO_MAXIOV as usize {
         return error!(EMSGSIZE);
     }
 
-    current_task.read_objects_to_smallvec(message_header.msg_iov.into(), iovec_count)
+    current_task.read_iovec(message_header.iov, iovec_count)
 }
 
 fn recvmsg_internal<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let mut message_header = current_task.read_object(user_message_header.clone())?;
+    let mut message_header = current_task.read_multi_arch_object(user_message_header)?;
+    let result = recvmsg_internal_with_header(
+        locked,
+        current_task,
+        file,
+        &mut message_header,
+        flags,
+        deadline,
+    )?;
+    current_task.write_multi_arch_object(user_message_header, message_header)?;
+    Ok(result)
+}
+
+fn recvmsg_internal_with_header<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    file: &FileHandle,
+    message_header: &mut MsgHdr,
+    flags: u32,
+    deadline: Option<zx::MonotonicInstant>,
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
@@ -472,21 +547,21 @@ where
         deadline,
     )?;
 
-    message_header.msg_flags = 0;
+    message_header.flags = 0;
 
-    let cmsg_buffer_size = message_header.msg_controllen;
+    let cmsg_buffer_size = message_header.control_len;
     let mut cmsg_bytes_written = 0;
-    let header_size = size_of::<cmsghdr>();
+    let header_size = CMsgHdrPtr::size_of_object_for(current_task);
 
     for ancillary_data in info.ancillary_data {
-        if ancillary_data.total_size() == 0 {
+        if ancillary_data.total_size(current_task) == 0 {
             // Skip zero-byte ancillary data on the receiving end. Not doing this trips this
             // assert:
             // https://cs.android.com/android/platform/superproject/+/master:system/libbase/cmsg.cpp;l=144;drc=15ec2c7a23cda814351a064a345a8270ed8c83ab
             continue;
         }
 
-        let expected_size = header_size + ancillary_data.total_size();
+        let expected_size = header_size + ancillary_data.total_size(current_task);
         let message_bytes = ancillary_data.into_bytes(
             current_task,
             flags,
@@ -497,7 +572,7 @@ where
         // some of the message is missing.
         let truncated = message_bytes.len() < expected_size;
         if truncated {
-            message_header.msg_flags |= MSG_CTRUNC as u64;
+            message_header.flags |= MSG_CTRUNC;
         }
 
         if message_bytes.len() < header_size {
@@ -507,33 +582,32 @@ where
 
         if !message_bytes.is_empty() {
             current_task
-                .write_memory(message_header.msg_control + cmsg_bytes_written, &message_bytes)?;
+                .write_memory(message_header.control + cmsg_bytes_written, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
-                cmsg_bytes_written = round_up_to_increment(cmsg_bytes_written, size_of::<usize>())?;
+                cmsg_bytes_written = cmsg_align(current_task, cmsg_bytes_written)?;
             }
         }
     }
 
-    message_header.msg_controllen = cmsg_bytes_written;
+    message_header.control_len = cmsg_bytes_written;
 
-    if !message_header.msg_name.is_null() {
-        if message_header.msg_namelen > i32::MAX as u32 {
+    let msg_name = message_header.name;
+    if !msg_name.is_null() {
+        if message_header.name_len > i32::MAX as u32 {
             return error!(EINVAL);
         }
         let bytes = info.address.map(|a| a.to_bytes()).unwrap_or_else(|| vec![]);
-        let num_bytes = std::cmp::min(message_header.msg_namelen as usize, bytes.len());
-        message_header.msg_namelen = bytes.len() as u32;
+        let num_bytes = std::cmp::min(message_header.name_len as usize, bytes.len());
+        message_header.name_len = bytes.len() as u32;
         if num_bytes > 0 {
-            current_task.write_memory(message_header.msg_name, &bytes[..num_bytes])?;
+            current_task.write_memory(msg_name, &bytes[..num_bytes])?;
         }
     }
 
     if info.bytes_read != info.message_length {
-        message_header.msg_flags |= MSG_TRUNC as u64;
+        message_header.flags |= MSG_TRUNC;
     }
-
-    current_task.write_object(user_message_header, &message_header)?;
 
     if flags.contains(SocketMessageFlags::TRUNC) {
         Ok(info.message_length)
@@ -546,7 +620,7 @@ pub fn sys_recvmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
@@ -560,10 +634,10 @@ pub fn sys_recvmmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_mmsgvec: UserRef<mmsghdr>,
+    user_mmsgvec: MMsgHdrPtr,
     vlen: u32,
     mut flags: u32,
-    user_timeout: UserRef<timespec>,
+    user_timeout: TimeSpecPtr,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     if !file.node().is_sock() {
@@ -577,15 +651,22 @@ pub fn sys_recvmmsg(
     let deadline = if user_timeout.is_null() {
         None
     } else {
-        let ts = current_task.read_object(user_timeout)?;
+        let ts = current_task.read_multi_arch_object(user_timeout)?;
         Some(zx::MonotonicInstant::after(duration_from_timespec(ts)?))
     };
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let user_mmsghdr = user_mmsgvec.at(index);
-        let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match recvmsg_internal(locked, current_task, &file, user_msghdr, flags, deadline) {
+        let current_ptr = user_mmsgvec.at(index);
+        let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
+        match recvmsg_internal_with_header(
+            locked,
+            current_task,
+            &file,
+            &mut current_mmsghdr.hdr,
+            flags,
+            deadline,
+        ) {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -593,9 +674,8 @@ pub fn sys_recvmmsg(
                 break;
             }
             Ok(bytes_read) => {
-                let msg_len = bytes_read as u32;
-                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.write_object(user_msg_len, &msg_len)?;
+                current_mmsghdr.len = bytes_read;
+                current_task.write_multi_arch_object(current_ptr, current_mmsghdr)?;
             }
         }
         index += 1;
@@ -648,51 +728,63 @@ fn sendmsg_internal<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let message_header = current_task.read_object(user_message_header)?;
+    let message_header = current_task.read_multi_arch_object(user_message_header)?;
+    sendmsg_internal_with_header(locked, current_task, file, &message_header, flags)
+}
 
-    if message_header.msg_namelen > i32::MAX as u32 {
+fn sendmsg_internal_with_header<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    file: &FileHandle,
+    message_header: &MsgHdr,
+    flags: u32,
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
+    if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);
     }
     let dest_address = maybe_parse_socket_address(
         current_task,
-        message_header.msg_name,
-        message_header.msg_namelen as usize,
+        message_header.name,
+        message_header.name_len as usize,
     )?;
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
-    let mut next_message_offset = 0;
+    let mut next_message_offset: usize = 0;
     let mut ancillary_data = Vec::new();
-    let header_size = size_of::<cmsghdr>();
+    let header_size = CMsgHdrPtr::size_of_object_for(current_task);
     loop {
-        let space = message_header.msg_controllen.saturating_sub(next_message_offset);
+        let space = message_header.control_len.saturating_sub(next_message_offset);
         if space < header_size {
             break;
         }
-        let cmsg_ref = UserRef::<cmsghdr>::from(message_header.msg_control + next_message_offset);
-        let cmsg = current_task.read_object(cmsg_ref)?;
+        let cmsg_ref = CMsgHdrPtr::new(current_task, message_header.control + next_message_offset);
+        let cmsg = current_task.read_multi_arch_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
-        if cmsg.cmsg_len < header_size {
+        if (cmsg.cmsg_len as usize) < header_size {
             return error!(EINVAL);
         }
 
-        let data_size = std::cmp::min(cmsg.cmsg_len - header_size, space);
+        let data_size = std::cmp::min(cmsg.cmsg_len as usize - header_size, space);
         let data = current_task.read_memory_to_vec(
-            message_header.msg_control + next_message_offset + header_size,
+            message_header.control + next_message_offset + header_size,
             data_size,
         )?;
-        next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;
+        next_message_offset += cmsg_align(current_task, header_size + data.len())?;
         let data = AncillaryData::from_cmsg(
             current_task,
             ControlMsg::new(cmsg.cmsg_level, cmsg.cmsg_type, data),
         )?;
-        if data.total_size() == 0 {
+        if data.total_size(current_task) == 0 {
             continue;
         }
         ancillary_data.push(data);
@@ -715,7 +807,7 @@ pub fn sys_sendmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_message_header: UserRef<msghdr>,
+    user_message_header: MsgHdrPtr,
     flags: u32,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
@@ -729,7 +821,7 @@ pub fn sys_sendmmsg(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_mmsgvec: UserRef<mmsghdr>,
+    user_mmsgvec: MMsgHdrPtr,
     mut vlen: u32,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -745,9 +837,10 @@ pub fn sys_sendmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let user_mmsghdr = user_mmsgvec.at(index);
-        let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match sendmsg_internal(locked, current_task, &file, user_msghdr, flags) {
+        let current_ptr = user_mmsgvec.at(index);
+        let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
+        match sendmsg_internal_with_header(locked, current_task, &file, &current_mmsghdr.hdr, flags)
+        {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -755,9 +848,8 @@ pub fn sys_sendmmsg(
                 break;
             }
             Ok(bytes_read) => {
-                let msg_len = bytes_read as u32;
-                let user_msg_len = UserRef::<u32>::new(user_mmsghdr.addr() + size_of::<msghdr>());
-                current_task.write_object(user_msg_len, &msg_len)?;
+                current_mmsghdr.len = bytes_read;
+                current_task.write_multi_arch_object(current_ptr, current_mmsghdr)?;
             }
         }
         index += 1;
@@ -811,7 +903,7 @@ pub fn sys_getsockopt(
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
         current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval)?
     } else {
-        socket.getsockopt(locked, level, optname, optlen)?
+        socket.getsockopt(locked, current_task, level, optname, optlen)?
     };
 
     let actual_optlen = opt_value.len() as socklen_t;
@@ -867,13 +959,68 @@ pub fn sys_shutdown(
     Ok(())
 }
 
+pub fn cmsg_align(current_task: &CurrentTask, value: usize) -> Result<usize, Errno> {
+    let alignment = if current_task.is_arch32() { 4 } else { 8 };
+    round_up_to_increment(value, alignment)
+}
+
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
+    use crate::vfs::{CurrentTask, FdNumber};
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::UserAddress;
+
     pub use super::{
-        sys_recvfrom as sys_arch32_recvfrom, sys_setsockopt as sys_arch32_setsockopt,
+        sys_accept as sys_arch32_accept, sys_bind as sys_arch32_bind,
+        sys_getsockname as sys_arch32_getsockname, sys_getsockopt as sys_arch32_getsockopt,
+        sys_listen as sys_arch32_listen, sys_recvfrom as sys_arch32_recvfrom,
+        sys_recvmmsg as sys_arch32_recvmmsg, sys_recvmsg as sys_arch32_recvmsg,
+        sys_sendmsg as sys_arch32_sendmsg, sys_sendto as sys_arch32_sendto,
+        sys_setsockopt as sys_arch32_setsockopt, sys_shutdown as sys_arch32_shutdown,
         sys_socketpair as sys_arch32_socketpair,
     };
+
+    pub fn sys_arch32_send(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buffer: UserAddress,
+        user_buffer_length: usize,
+        flags: u32,
+    ) -> Result<usize, Errno> {
+        super::sys_sendto(
+            locked,
+            current_task,
+            fd,
+            user_buffer,
+            user_buffer_length,
+            flags,
+            Default::default(),
+            Default::default(),
+        )
+    }
+
+    pub fn sys_arch32_recv(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buffer: UserAddress,
+        buffer_length: usize,
+        flags: u32,
+    ) -> Result<usize, Errno> {
+        super::sys_recvfrom(
+            locked,
+            current_task,
+            fd,
+            user_buffer,
+            buffer_length,
+            flags,
+            Default::default(),
+            Default::default(),
+        )
+    }
 }
 
 #[cfg(feature = "arch32")]

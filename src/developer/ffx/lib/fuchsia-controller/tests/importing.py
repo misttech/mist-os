@@ -32,7 +32,7 @@ class Importing(unittest.TestCase):
         s = mod.Named(s="foobar")
         self.assertEqual(s.s, "foobar")
         _request = mod.FidlCodecXUnionSendAfterMigrationRequest(
-            u=mod.NowAsXUnion.variant_u8_type(5), i=10
+            u=mod.NowAsXUnion(variant_u8=5), i=10
         )
         _request2 = mod.FidlCodecTestProtocolStringRequest(s="foobar")
         _request3 = mod.FidlCodecTestProtocolNullableXUnionRequest(
@@ -41,8 +41,9 @@ class Importing(unittest.TestCase):
 
     def test_encode_union_request(self) -> None:
         mod = importlib.import_module("fidl.test_fidlcodec_examples")
-        isu = mod.IntStructXunion()
-        isu.variant_tss = isu.variant_tss_type(value1="foo", value2="bar")
+        isu = mod.IntStructXunion(
+            variant_tss=mod.TwoStringStruct(value1="foo", value2="bar")
+        )
         request = mod.FidlCodecTestProtocolNullableXUnionRequest(isu=isu, i=10)
         (b, h) = encode_fidl_message(
             object=request,
@@ -62,9 +63,8 @@ class Importing(unittest.TestCase):
     def test_import_cross_library(self) -> None:
         mod = importlib.import_module("fidl.fuchsia_controller_othertest")
         other_mod = importlib.import_module("fidl.fuchsia_controller_test")
-        v = other_mod.NoopUnion()
-        v.union_str = v.union_str_type("foooberdooberdoo")
-        _s = mod.CrossLibraryStruct(value=v)
+        v = other_mod.NoopUnion(union_str="foooberdooberdoo")
+        mod.CrossLibraryStruct(value=v)
 
     def test_encode_decode_enum_message(self) -> None:
         mod = importlib.import_module("fidl.test_fidlcodec_examples")
@@ -106,14 +106,13 @@ class Importing(unittest.TestCase):
         mod = importlib.import_module("fidl.fuchsia_controller_test")
         # Simply setting this should be enough of a test, as it informs that the type was
         # constructed properly.
-        res = mod.ComposerThingReturnPossibleErrorResult()
-        res.err = 5
+        mod.ComposerThingReturnPossibleErrorResult(err=5)
 
     def test_protocol_classes_exist(self) -> None:
         mod = importlib.import_module("fidl.fuchsia_controller_test")
-        self.assertEqual(mod.NoopClient, mod.Noop.Client)
-        self.assertEqual(mod.NoopServer, mod.Noop.Server)
-        self.assertEqual(mod.NoopEventHandler, mod.Noop.EventHandler)
+        self.assertEqual(mod.NoopClient, mod.NoopClient)
+        self.assertEqual(mod.NoopServer, mod.NoopServer)
+        self.assertEqual(mod.NoopEventHandler, mod.NoopEventHandler)
 
     def test_encode_protocol_return_value(self) -> None:
         """This test covers a problem area with naming protocol methods in IR.
@@ -128,8 +127,7 @@ class Importing(unittest.TestCase):
         both things, but it's here for now.
         """
         mod = importlib.import_module("fidl.fuchsia_controller_test")
-        obj = mod.ComposerThingReturnPossibleError2Result()
-        obj.err = obj.err_type(2)
+        obj = mod.ComposerThingReturnPossibleError2Result(err=2)
         (b, h) = obj.encode()
         msg = decode_standalone(
             type_name=obj.__fidl_raw_type__, bytes=b, handles=h

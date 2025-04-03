@@ -41,7 +41,6 @@ template("trace_engine_library") {
     ]
     deps = [
       "//sdk/lib/async:async-cpp",
-      "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
     ]
   }

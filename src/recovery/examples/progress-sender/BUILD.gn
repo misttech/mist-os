@@ -6,7 +6,6 @@
 # is located at `//tools/create/templates/component-default/BUILD.gn.tmpl-rust`.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
 group("progress-sender") {

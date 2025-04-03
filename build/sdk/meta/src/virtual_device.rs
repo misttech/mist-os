@@ -153,7 +153,7 @@ mod tests {
                         },
                         "vsock": {
                             "enabled": false,
-                            "cid": 3
+                            "cid": 0
                         }
                     },
                     "start_up_args_template": "/path/to/args"

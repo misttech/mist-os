@@ -10,8 +10,10 @@ use log::{error, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 use windowed_stats::experimental::clock::Timed;
-use windowed_stats::experimental::series::interpolation::LastSample;
-use windowed_stats::experimental::series::statistic::LatchMax;
+use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
+use windowed_stats::experimental::series::statistic::{
+    ArithmeticMean, Last, LatchMax, Max, Min, Sum,
+};
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
 use windowed_stats::experimental::serve::{InspectSender, InspectedTimeMatrix};
 
@@ -24,26 +26,34 @@ enum IfaceState {
     Created { iface_id: u16, telemetry_proxy: Option<fidl_fuchsia_wlan_sme::TelemetryProxy> },
 }
 
+type CountersTimeSeriesMap = HashMap<u16, InspectedTimeMatrix<u64>>;
+type GaugesTimeSeriesMap = HashMap<u16, Vec<InspectedTimeMatrix<i64>>>;
+
 pub struct ClientIfaceCountersLogger<S> {
     iface_state: Arc<Mutex<IfaceState>>,
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     time_series_stats: IfaceCountersTimeSeries,
-    driver_specific_time_matrix_client: S,
-    driver_counters_time_series: Arc<Mutex<HashMap<u16, InspectedTimeMatrix<u64>>>>,
+    driver_counters_time_matrix_client: S,
+    driver_counters_time_series: Arc<Mutex<CountersTimeSeriesMap>>,
+    driver_gauges_time_matrix_client: S,
+    driver_gauges_time_series: Arc<Mutex<GaugesTimeSeriesMap>>,
 }
 
 impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     pub fn new(
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         time_matrix_client: &S,
-        driver_specific_time_matrix_client: S,
+        driver_counters_time_matrix_client: S,
+        driver_gauges_time_matrix_client: S,
     ) -> Self {
         Self {
             iface_state: Arc::new(Mutex::new(IfaceState::NotAvailable)),
             monitor_svc_proxy,
             time_series_stats: IfaceCountersTimeSeries::new(time_matrix_client),
-            driver_specific_time_matrix_client,
+            driver_counters_time_matrix_client,
             driver_counters_time_series: Arc::new(Mutex::new(HashMap::new())),
+            driver_gauges_time_matrix_client,
+            driver_gauges_time_series: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -52,21 +62,26 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
         let telemetry_proxy = match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await
         {
             Ok(Ok(())) => {
-                let inspect_counter_configs = match proxy.query_telemetry_support().await {
-                    Ok(Ok(support)) => support.inspect_counter_configs,
+                let (inspect_counter_configs, inspect_gauge_configs) = match proxy
+                    .query_telemetry_support()
+                    .await
+                {
+                    Ok(Ok(support)) => {
+                        (support.inspect_counter_configs, support.inspect_gauge_configs)
+                    }
                     Ok(Err(code)) => {
-                        warn!("Failed to query telemetry support with status code {}. No driver-specific counters will be captured", code);
-                        None
+                        warn!("Failed to query telemetry support with status code {}. No driver-specific stats will be captured", code);
+                        (None, None)
                     }
                     Err(e) => {
-                        error!("Failed to query telemetry support with error {}. No driver-specific counters will be captured", e);
-                        None
+                        error!("Failed to query telemetry support with error {}. No driver-specific stats will be captured", e);
+                        (None, None)
                     }
                 };
-                {
+                if let Some(inspect_counter_configs) = &inspect_counter_configs {
                     let mut driver_counters_time_series =
                         self.driver_counters_time_series.lock().await;
-                    for inspect_counter_config in inspect_counter_configs.unwrap_or(vec![]) {
+                    for inspect_counter_config in inspect_counter_configs {
                         if let fidl_stats::InspectCounterConfig {
                             counter_id: Some(counter_id),
                             counter_name: Some(counter_name),
@@ -74,9 +89,9 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                         } = inspect_counter_config
                         {
                             let _time_matrix_ref = driver_counters_time_series
-                                .entry(counter_id)
+                                .entry(*counter_id)
                                 .or_insert_with(|| {
-                                    self.driver_specific_time_matrix_client.inspect_time_matrix(
+                                    self.driver_counters_time_matrix_client.inspect_time_matrix(
                                         counter_name,
                                         TimeMatrix::<LatchMax<u64>, LastSample>::new(
                                             SamplingProfile::balanced(),
@@ -84,6 +99,30 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                                         ),
                                     )
                                 });
+                        }
+                    }
+                }
+                if let Some(inspect_gauge_configs) = &inspect_gauge_configs {
+                    let mut driver_gauges_time_series = self.driver_gauges_time_series.lock().await;
+                    for inspect_gauge_config in inspect_gauge_configs {
+                        if let fidl_stats::InspectGaugeConfig {
+                            gauge_id: Some(gauge_id),
+                            gauge_name: Some(gauge_name),
+                            statistics: Some(statistics),
+                            ..
+                        } = inspect_gauge_config
+                        {
+                            for statistic in statistics {
+                                if let Some(time_matrix) = create_time_series_for_gauge(
+                                    &self.driver_gauges_time_matrix_client,
+                                    gauge_name,
+                                    statistic,
+                                ) {
+                                    let time_matrices =
+                                        driver_gauges_time_series.entry(*gauge_id).or_default();
+                                    time_matrices.push(time_matrix);
+                                }
+                            }
                         }
                     }
                 }
@@ -114,9 +153,9 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
             IfaceState::Created { telemetry_proxy, .. } => {
                 if let Some(telemetry_proxy) = &telemetry_proxy {
                     match telemetry_proxy
-                        .get_counter_stats()
+                        .get_iface_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
-                            warn!("Timed out waiting for counter stats");
+                            warn!("Timed out waiting for iface stats");
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
                         })
                         .await
@@ -127,10 +166,16 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
                                 let time_series = Arc::clone(&self.driver_counters_time_series);
                                 log_driver_specific_counters(&counters[..], time_series).await;
                             }
-                            log_connection_counters(
+                            // Iface-level driver specific gauges
+                            if let Some(gauges) = &stats.driver_specific_gauges {
+                                let time_series = Arc::clone(&self.driver_gauges_time_series);
+                                log_driver_specific_gauges(&gauges[..], time_series).await;
+                            }
+                            log_connection_stats(
                                 &stats,
                                 &self.time_series_stats,
                                 Arc::clone(&self.driver_counters_time_series),
+                                Arc::clone(&self.driver_gauges_time_series),
                             )
                             .await;
                         }
@@ -148,19 +193,56 @@ impl<S: InspectSender> ClientIfaceCountersLogger<S> {
     }
 }
 
-async fn log_connection_counters(
-    stats: &fidl_stats::IfaceCounterStats,
+fn create_time_series_for_gauge<S: InspectSender>(
+    time_matrix_client: &S,
+    gauge_name: &str,
+    statistic: &fidl_stats::GaugeStatistic,
+) -> Option<InspectedTimeMatrix<i64>> {
+    match statistic {
+        fidl_stats::GaugeStatistic::Min => Some(time_matrix_client.inspect_time_matrix(
+            format!("{}.min", gauge_name),
+            TimeMatrix::<Min<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
+        )),
+        fidl_stats::GaugeStatistic::Max => Some(time_matrix_client.inspect_time_matrix(
+            format!("{}.max", gauge_name),
+            TimeMatrix::<Max<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
+        )),
+        fidl_stats::GaugeStatistic::Sum => Some(time_matrix_client.inspect_time_matrix(
+            format!("{}.sum", gauge_name),
+            TimeMatrix::<Sum<i64>, Constant>::new(SamplingProfile::balanced(), Constant::default()),
+        )),
+        fidl_stats::GaugeStatistic::Last => Some(time_matrix_client.inspect_time_matrix(
+            format!("{}.last", gauge_name),
+            TimeMatrix::<Last<i64>, Constant>::new(
+                SamplingProfile::balanced(),
+                Constant::default(),
+            ),
+        )),
+        fidl_stats::GaugeStatistic::Mean => Some(time_matrix_client.inspect_time_matrix(
+            format!("{}.mean", gauge_name),
+            TimeMatrix::<ArithmeticMean<i64>, Constant>::new(
+                SamplingProfile::balanced(),
+                Constant::default(),
+            ),
+        )),
+        _ => None,
+    }
+}
+
+async fn log_connection_stats(
+    stats: &fidl_stats::IfaceStats,
     time_series_stats: &IfaceCountersTimeSeries,
-    driver_counters_time_series: Arc<Mutex<HashMap<u16, InspectedTimeMatrix<u64>>>>,
+    driver_counters_time_series: Arc<Mutex<CountersTimeSeriesMap>>,
+    driver_gauges_time_series: Arc<Mutex<GaugesTimeSeriesMap>>,
 ) {
-    let connection_counters = match &stats.connection_counters {
+    let connection_stats = match &stats.connection_stats {
         Some(counters) => counters,
         None => return,
     };
 
     // `connection_id` field is not used yet, but we check it anyway to
     // enforce that it must be there for us to log driver counters.
-    match &connection_counters.connection_id {
+    match &connection_stats.connection_id {
         Some(_connection_id) => (),
         _ => {
             warn!("connection_id is not present, no connection counters will be logged");
@@ -168,38 +250,56 @@ async fn log_connection_counters(
         }
     }
 
-    if let fidl_stats::ConnectionCounters {
+    if let fidl_stats::ConnectionStats {
         rx_unicast_total: Some(rx_unicast_total),
         rx_unicast_drop: Some(rx_unicast_drop),
         ..
-    } = connection_counters
+    } = connection_stats
     {
         time_series_stats.log_rx_unicast_total(*rx_unicast_total);
         time_series_stats.log_rx_unicast_drop(*rx_unicast_drop);
     }
 
-    if let fidl_stats::ConnectionCounters {
+    if let fidl_stats::ConnectionStats {
         tx_total: Some(tx_total), tx_drop: Some(tx_drop), ..
-    } = connection_counters
+    } = connection_stats
     {
         time_series_stats.log_tx_total(*tx_total);
         time_series_stats.log_tx_drop(*tx_drop);
     }
 
     // Connection-level driver-specific counters
-    if let Some(counters) = &connection_counters.driver_specific_counters {
+    if let Some(counters) = &connection_stats.driver_specific_counters {
         log_driver_specific_counters(&counters[..], driver_counters_time_series).await;
+    }
+    // Connection-level driver-specific gauges
+    if let Some(gauges) = &connection_stats.driver_specific_gauges {
+        log_driver_specific_gauges(&gauges[..], driver_gauges_time_series).await;
     }
 }
 
 async fn log_driver_specific_counters(
     driver_specific_counters: &[fidl_stats::UnnamedCounter],
-    driver_counters_time_series: Arc<Mutex<HashMap<u16, InspectedTimeMatrix<u64>>>>,
+    driver_counters_time_series: Arc<Mutex<CountersTimeSeriesMap>>,
 ) {
     let time_series_map = driver_counters_time_series.lock().await;
     for counter in driver_specific_counters {
         if let Some(ts) = time_series_map.get(&counter.id) {
             ts.fold_or_log_error(Timed::now(counter.count));
+        }
+    }
+}
+
+async fn log_driver_specific_gauges(
+    driver_specific_gauges: &[fidl_stats::UnnamedGauge],
+    driver_gauges_time_series: Arc<Mutex<GaugesTimeSeriesMap>>,
+) {
+    let time_series_map = driver_gauges_time_series.lock().await;
+    for gauge in driver_specific_gauges {
+        if let Some(time_matrices) = time_series_map.get(&gauge.id) {
+            for ts in time_matrices {
+                ts.fold_or_log_error(Timed::now(gauge.value));
+            }
         }
     }
 }
@@ -277,11 +377,13 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_iface_created() {
         let mut test_helper = setup_test();
-        let driver_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
-            driver_mock_matrix_client.clone(),
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
         );
 
         let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
@@ -313,13 +415,15 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_handle_periodic_telemetry_connection_counters() {
+    fn test_handle_periodic_telemetry_connection_stats() {
         let mut test_helper = setup_test();
-        let driver_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
-            driver_mock_matrix_client.clone(),
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
         );
 
         // Transition to IfaceCreated state
@@ -327,8 +431,8 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_stats::IfaceCounterStats {
-            connection_counters: Some(fidl_stats::ConnectionCounters {
+        let iface_stats = fidl_stats::IfaceStats {
+            connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
                 rx_unicast_total: Some(100),
                 rx_unicast_drop: Some(5),
@@ -340,7 +444,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
             Poll::Ready(())
         );
 
@@ -366,11 +470,13 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_periodic_telemetry_driver_specific_counters() {
         let mut test_helper = setup_test();
-        let driver_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
-            driver_mock_matrix_client.clone(),
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
         );
 
         let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
@@ -410,9 +516,9 @@ mod tests {
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
-        let counter_stats = fidl_stats::IfaceCounterStats {
+        let iface_stats = fidl_stats::IfaceStats {
             driver_specific_counters: Some(vec![fidl_stats::UnnamedCounter { id: 1, count: 50 }]),
-            connection_counters: Some(fidl_stats::ConnectionCounters {
+            connection_stats: Some(fidl_stats::ConnectionStats {
                 connection_id: Some(1),
                 driver_specific_counters: Some(vec![
                     fidl_stats::UnnamedCounter { id: 2, count: 100 },
@@ -425,24 +531,133 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            test_helper.run_and_respond_iface_counter_stats_req(&mut test_fut, Ok(&counter_stats)),
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
             Poll::Ready(())
         );
 
         let time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
         assert!(time_matrix_calls.is_empty());
 
-        let mut driver_matrix_calls = driver_mock_matrix_client.drain_calls();
+        let mut driver_counters_matrix_calls = driver_counters_mock_matrix_client.drain_calls();
         assert_eq!(
-            &driver_matrix_calls.drain::<u64>("foo_counter")[..],
+            &driver_counters_matrix_calls.drain::<u64>("foo_counter")[..],
             &[TimeMatrixCall::Fold(Timed::now(50))]
         );
         assert_eq!(
-            &driver_matrix_calls.drain::<u64>("bar_counter")[..],
+            &driver_counters_matrix_calls.drain::<u64>("bar_counter")[..],
             &[TimeMatrixCall::Fold(Timed::now(100))]
         );
         assert_eq!(
-            &driver_matrix_calls.drain::<u64>("baz_counter")[..],
+            &driver_counters_matrix_calls.drain::<u64>("baz_counter")[..],
+            &[TimeMatrixCall::Fold(Timed::now(150))]
+        );
+
+        let driver_gauges_matrix_calls = driver_gauges_mock_matrix_client.drain_calls();
+        assert!(driver_gauges_matrix_calls.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_handle_periodic_telemetry_driver_specific_gauges() {
+        let mut test_helper = setup_test();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
+        let logger = ClientIfaceCountersLogger::new(
+            test_helper.monitor_svc_proxy.clone(),
+            &test_helper.mock_time_matrix_client,
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
+        );
+
+        let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
+        assert_eq!(
+            test_helper.run_and_handle_get_sme_telemetry(&mut handle_iface_created_fut),
+            Poll::Pending
+        );
+
+        let mocked_inspect_configs = vec![
+            fidl_stats::InspectGaugeConfig {
+                gauge_id: Some(1),
+                gauge_name: Some("foo_gauge".to_string()),
+                statistics: Some(vec![
+                    fidl_stats::GaugeStatistic::Mean,
+                    fidl_stats::GaugeStatistic::Last,
+                ]),
+                ..Default::default()
+            },
+            fidl_stats::InspectGaugeConfig {
+                gauge_id: Some(2),
+                gauge_name: Some("bar_gauge".to_string()),
+                statistics: Some(vec![
+                    fidl_stats::GaugeStatistic::Min,
+                    fidl_stats::GaugeStatistic::Sum,
+                ]),
+                ..Default::default()
+            },
+            fidl_stats::InspectGaugeConfig {
+                gauge_id: Some(3),
+                gauge_name: Some("baz_gauge".to_string()),
+                statistics: Some(vec![fidl_stats::GaugeStatistic::Max]),
+                ..Default::default()
+            },
+        ];
+        let telemetry_support = fidl_stats::TelemetrySupport {
+            inspect_gauge_configs: Some(mocked_inspect_configs),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_query_telemetry_support(
+                &mut handle_iface_created_fut,
+                Ok(&telemetry_support)
+            ),
+            Poll::Ready(())
+        );
+
+        let is_connected = true;
+        let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
+        let iface_stats = fidl_stats::IfaceStats {
+            driver_specific_gauges: Some(vec![fidl_stats::UnnamedGauge { id: 1, value: 50 }]),
+            connection_stats: Some(fidl_stats::ConnectionStats {
+                connection_id: Some(1),
+                driver_specific_gauges: Some(vec![
+                    fidl_stats::UnnamedGauge { id: 2, value: 100 },
+                    fidl_stats::UnnamedGauge { id: 3, value: 150 },
+                    // This one is no-op because it's not registered in QueryTelemetrySupport
+                    fidl_stats::UnnamedGauge { id: 4, value: 200 },
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_iface_stats_req(&mut test_fut, Ok(&iface_stats)),
+            Poll::Ready(())
+        );
+
+        let time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
+        assert!(time_matrix_calls.is_empty());
+
+        let driver_counters_matrix_calls = driver_counters_mock_matrix_client.drain_calls();
+        assert!(driver_counters_matrix_calls.is_empty());
+
+        let mut driver_gauges_matrix_calls = driver_gauges_mock_matrix_client.drain_calls();
+        assert_eq!(
+            &driver_gauges_matrix_calls.drain::<i64>("foo_gauge.mean")[..],
+            &[TimeMatrixCall::Fold(Timed::now(50))]
+        );
+        assert_eq!(
+            &driver_gauges_matrix_calls.drain::<i64>("foo_gauge.last")[..],
+            &[TimeMatrixCall::Fold(Timed::now(50))]
+        );
+        assert_eq!(
+            &driver_gauges_matrix_calls.drain::<i64>("bar_gauge.min")[..],
+            &[TimeMatrixCall::Fold(Timed::now(100))]
+        );
+        assert_eq!(
+            &driver_gauges_matrix_calls.drain::<i64>("bar_gauge.sum")[..],
+            &[TimeMatrixCall::Fold(Timed::now(100))]
+        );
+        assert_eq!(
+            &driver_gauges_matrix_calls.drain::<i64>("baz_gauge.max")[..],
             &[TimeMatrixCall::Fold(Timed::now(150))]
         );
     }
@@ -450,11 +665,13 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_iface_destroyed() {
         let mut test_helper = setup_test();
-        let driver_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_counters_mock_matrix_client = MockTimeMatrixClient::new();
+        let driver_gauges_mock_matrix_client = MockTimeMatrixClient::new();
         let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
             &test_helper.mock_time_matrix_client,
-            driver_mock_matrix_client.clone(),
+            driver_counters_mock_matrix_client.clone(),
+            driver_gauges_mock_matrix_client.clone(),
         );
 
         // Transition to IfaceCreated state

@@ -5,7 +5,7 @@
 #include "aml-voltage.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/result.h>
 #include <string.h>
 #include <unistd.h>
@@ -59,17 +59,20 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>> CreateAndEnablePwm(z
 zx_status_t AmlVoltageRegulator::Create(
     zx_device_t* parent, const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
     const aml_thermal_info_t* thermal_info) {
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-voltage: failed to get pdev protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev_device_info_t device_info;
-  if (zx_status_t status = pdev.GetDeviceInfo(&device_info); status != ZX_OK) {
-    zxlogf(ERROR, "aml-voltage: failed to get GetDeviceInfo ");
-    return status;
+  zx::result device_info_result = pdev.GetDeviceInfo();
+  if (device_info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", device_info_result.status_string());
+    return device_info_result.status_value();
   }
+  fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   auto pwm_client = CreateAndEnablePwm(parent, "pwm-a");
   if (pwm_client.is_error()) {

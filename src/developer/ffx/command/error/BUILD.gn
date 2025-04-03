@@ -4,11 +4,25 @@
 
 import("//build/rust/rustc_library.gni")
 
+# This is a cross toolchain lib
+# used by //src/developer/lib/writer
+
 rustc_library("lib") {
   name = "ffx_command_error"
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
+
+  assert_no_deps = [
+    "//src/developer/ffx/config/*",
+    "//src/developer/ffx/daemon/*",
+    "//src/developer/ffx/frontends/*",
+    "//src/developer/ffx/playground/*",
+    "//src/developer/ffx/plugins/*",
+    "//src/developer/ffx/testing",
+    "//src/developer/ffx/tests/*",
+    "//src/developer/ffx/tools/*",
+  ]
 
   deps = [
     "//src/developer/ffx/lib/errors:lib",

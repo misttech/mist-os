@@ -42,6 +42,34 @@ impl<T: Copy + PartialOrd> UserValue<T> {
     }
 }
 
+/// Implements TryFrom for UserValue of specific types
+macro_rules! impl_try_from_user_value {
+    {
+        $(
+            $source:ty => $target:ty
+        ),+
+        $(,)?
+    } => {
+        $(
+            impl TryFrom<$source> for UserValue<$target> {
+                type Error = ();
+
+                fn try_from(u: $source) -> Result<Self, Self::Error> {
+                    let t = u.try_into().map_err(|_| ())?;
+                    Ok(Self::from_raw(t))
+                }
+            }
+        )*
+    }
+}
+
+impl_try_from_user_value! {
+    u32 => usize,
+    u64 => usize,
+    usize => u32,
+    usize => u64,
+}
+
 impl<T: Copy + Eq + IntoBytes + FromBytes + Immutable> From<T> for UserValue<T> {
     fn from(value: T) -> Self {
         Self::from_raw(value)

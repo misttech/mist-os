@@ -13,7 +13,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fidl/cpp/wire/object_view.h>
 #include <stdlib.h>
@@ -30,6 +29,7 @@
 #include <memory>
 #include <vector>
 
+#include <ddktl/metadata_server.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
@@ -199,8 +199,6 @@ zx_status_t IntelI2cController::Init() {
     }
   }
 
-  // We add one device. This device holds DEVICE_METADATA_I2C_CHANNELS
-  // which contains info for each child device.
   // TODO: This should be a composite device that also holds interrupt information.
 
   char name[ZX_DEVICE_NAME_MAX];
@@ -210,13 +208,10 @@ zx_status_t IntelI2cController::Init() {
       ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>::kFidlServiceName,
   };
   std::array<const char*, 1> runtime_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
-  status = DdkAdd(
-      ddk::DeviceAddArgs(name)
-          .set_outgoing_dir(directory_client.TakeChannel())
-          .set_fidl_service_offers(fidl_service_offers)
-          .set_runtime_service_offers(runtime_service_offers)
-          // TODO(b/373918767): Don't forward DEVICE_METADATA_I2C_CHANNELS once no longer retrieved.
-          .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
+  status = DdkAdd(ddk::DeviceAddArgs(name)
+                      .set_outgoing_dir(directory_client.TakeChannel())
+                      .set_fidl_service_offers(fidl_service_offers)
+                      .set_runtime_service_offers(runtime_service_offers));
   if (status < 0) {
     zxlogf(ERROR, "device add failed: %s", zx_status_get_string(status));
     return status;
@@ -831,60 +826,53 @@ zx_status_t IntelI2cController::DeviceSpecificInit(const uint16_t device_id) {
 
 zx_status_t IntelI2cController::AddSubordinates() {
   // Try to fetch our metadata so that we know who is on the bus.
-  size_t metadata_size;
-  zx_status_t status = DdkGetMetadataSize(DEVICE_METADATA_I2C_CHANNELS, &metadata_size);
-
-  if ((status == ZX_ERR_NOT_FOUND) || ((status == ZX_OK) && !metadata_size)) {
-    // No metadata means that there are no devices on this bus.  For now, we do
-    // nothing, but it might be a good idea to (someday) put the hardware into a
-    // low power state if we can, and perhaps even unload the driver at that
-    // point.
-    zxlogf(INFO, "i2c: failed to fetch metadata (%s)", zx_status_get_string(status));
+  zx::result metadata_result =
+      ddk::GetMetadataIfExists<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(parent_);
+  if (metadata_result.is_error()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", metadata_result.status_string());
+    return metadata_result.status_value();
+  }
+  if (!metadata_result.value().has_value()) {
+    zxlogf(INFO, "Failed to get metadata: Does not exist");
     return ZX_OK;
   }
+  const auto& metadata = metadata_result.value().value();
 
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "i2c: failed to fetch metadata size (status %d)", status);
-    return status;
-  }
-
-  auto buffer_deleter = std::make_unique<uint8_t[]>(metadata_size);
-  auto buffer = buffer_deleter.get();
-  size_t actual;
-  status = DdkGetMetadata(DEVICE_METADATA_I2C_CHANNELS, buffer, metadata_size, &actual);
-  if (status != ZX_OK || actual != metadata_size) {
-    zxlogf(ERROR, "%s: device_get_metadata failed %d", __func__, status);
-    return (status == ZX_OK) ? ZX_ERR_INTERNAL : status;
-  }
-
-  auto decoded = fidl::InplaceUnpersist<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-      cpp20::span(buffer, metadata_size));
-  if (!decoded.is_ok()) {
-    zxlogf(ERROR, "%s: Failed to deserialize metadata.", __func__);
-    return decoded.error_value().status();
-  }
-
-  fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata& metadata = *decoded.value();
-  if (!metadata.has_channels()) {
+  if (!metadata.channels().has_value()) {
     // One day we might put the bus in a lower power state.
-    zxlogf(INFO, "%s: no channels supplied.", __func__);
+    zxlogf(INFO, "Metadata missing channels");
     return ZX_OK;
   }
 
   uint32_t bus_speed = 0;
-  for (auto const& child : metadata.channels()) {
+  const auto& channels = metadata.channels().value();
+  for (size_t i = 0; i < channels.size(); ++i) {
+    const auto& child = channels[i];
+
+    if (!child.bus_speed().has_value()) {
+      zxlogf(ERROR, "Channel %lu missing bus speed", i);
+      return ZX_ERR_INTERNAL;
+    }
+    const auto& child_bus_speed = child.bus_speed().value();
+
+    if (!child.address().has_value()) {
+      zxlogf(ERROR, "Channel %lu missing address", i);
+      return ZX_ERR_INTERNAL;
+    }
+    const auto& address = child.address().value();
+
     zxlogf(INFO, "i2c: got child bus_controller=%d ten_bit=%d address=0x%x bus_speed=%u",
-           child.is_bus_controller(), child.is_ten_bit(), child.address(), child.bus_speed());
+           child.is_bus_controller().value(), child.is_ten_bit().value(), address, child_bus_speed);
 
     if (bus_speed && bus_speed != child.bus_speed()) {
       zxlogf(ERROR, "i2c: cannot add devices with different bus speeds (%u, %u)", bus_speed,
-             child.bus_speed());
+             child_bus_speed);
     }
     if (!bus_speed) {
-      SetBusFrequency(child.bus_speed());
-      bus_speed = child.bus_speed();
+      SetBusFrequency(child_bus_speed);
+      bus_speed = child_bus_speed;
     }
-    AddSubordinate(child.is_ten_bit() ? kI2c10BitAddress : kI2c7BitAddress, child.address());
+    AddSubordinate(child.is_ten_bit() ? kI2c10BitAddress : kI2c7BitAddress, address);
   }
 
   return ZX_OK;

@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fidl/cpp/wire/client.h>
@@ -309,48 +310,41 @@ class TestEnvironment : public fdf_testing::Environment {
       return zx::error(status);
     }
 
+    if (zx::result result = spi_metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
+    }
+
+    if (zx::result result = scheduler_role_name_metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
+    }
+
     return to_driver_vfs.AddService<fuchsia_hardware_spiimpl::Service>(
         fuchsia_hardware_spiimpl::Service::InstanceHandler({
             .device = fake_spi_impl_.GetHandler(),
         }));
   }
 
-  void AddSchedulerRoleMetadata(const char* role_name) {
-    fuchsia_scheduler::RoleName role(role_name);
-    const auto result = fidl::Persist(role);
-    ASSERT_TRUE(result.is_ok());
-    zx_status_t status = device_server_.AddMetadata(DEVICE_METADATA_SCHEDULER_ROLE_NAME,
-                                                    result->data(), result->size());
-    EXPECT_OK(status);
+  void SetSchedulerRoleName(std::string role_name) {
+    fuchsia_scheduler::RoleName scheduler_role_name(std::move(role_name));
+    EXPECT_OK(scheduler_role_name_metadata_server_.SetMetadata(scheduler_role_name));
   }
 
   zx::result<> SetSpiChannelCount(uint32_t count) {
-    fidl::Arena arena;
-
-    fidl::VectorView<fuchsia_hardware_spi_businfo::wire::SpiChannel> channels(arena, count);
-    for (uint32_t i = 0; i < channels.count(); i++) {
-      channels[i] = fuchsia_hardware_spi_businfo::wire::SpiChannel::Builder(arena)
-                        .cs(i)
-                        .vid(0)
-                        .pid(0)
-                        .did(0)
-                        .Build();
+    std::vector<fuchsia_hardware_spi_businfo::SpiChannel> channels;
+    for (uint32_t i = 0; i < count; i++) {
+      channels.emplace_back(
+          fuchsia_hardware_spi_businfo::SpiChannel{{.cs = i, .vid = 0, .pid = 0, .did = 0}});
     }
 
-    auto metadata = fuchsia_hardware_spi_businfo::wire::SpiBusMetadata::Builder(arena)
-                        .channels(channels)
-                        .bus_id(0)
-                        .Build();
+    fuchsia_hardware_spi_businfo::SpiBusMetadata metadata{
+        {.channels = std::move(channels), .bus_id = 0}};
 
-    fit::result encoded = fidl::Persist(metadata);
-    if (encoded.is_error()) {
-      return zx::error(encoded.error_value().status());
-    }
-
-    zx_status_t status =
-        device_server_.AddMetadata(DEVICE_METADATA_SPI_CHANNELS, encoded->data(), encoded->size());
-    if (status != ZX_OK) {
-      return zx::error(status);
+    if (zx::result result = spi_metadata_server_.SetMetadata(metadata); result.is_error()) {
+      return result.take_error();
     }
 
     return zx::ok();
@@ -361,6 +355,8 @@ class TestEnvironment : public fdf_testing::Environment {
  private:
   FakeSpiImplServer fake_spi_impl_;
   compat::DeviceServer device_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_spi_businfo::SpiBusMetadata> spi_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_scheduler::RoleName> scheduler_role_name_metadata_server_;
 };
 
 struct FixtureConfig {
@@ -890,7 +886,7 @@ TEST_F(SpiDeviceTest, SchedulerRoleName) {
   // Add scheduler role metadata that will cause the core driver to create a new driver dispatcher.
   // Verify that FIDL calls can still be made.
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& environment) {
-    environment.AddSchedulerRoleMetadata("no.such.scheduler.role");
+    environment.SetSchedulerRoleName("no.such.scheduler.role");
   });
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;

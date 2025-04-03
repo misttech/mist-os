@@ -15,6 +15,7 @@
 
 #include <arch/ops.h>
 #include <fbl/ref_ptr.h>
+#include <object/clock_dispatcher.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
 #include <object/process_dispatcher.h>
@@ -156,6 +157,11 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
     options |= ZX_VM_CAN_MAP_EXECUTE;
   }
 
+  // Allow faults flag must be used if creating a mapping that can fault.
+  if ((options & ZX_VM_FAULT_BEYOND_STREAM_SIZE) && !(options & ZX_VM_ALLOW_FAULTS)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   zx::result<VmAddressRegionDispatcher::MapResult> map_result =
       vmar->Map(vmar_offset, ktl::move(vmo), vmo_offset, len, options);
   if (map_result.is_error()) {
@@ -190,6 +196,7 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
   return ZX_OK;
 }
+
 }  // namespace
 
 // zx_status_t zx_vmar_map
@@ -212,6 +219,14 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
   status = up->handle_table().GetDispatcherAndRights(*up, vmo_handle, &vmo, &vmo_rights);
   if (status != ZX_OK) {
     return status;
+  }
+
+  // Allocate CSM if creating a fault-beyond-stream-size mapping.
+  if (options & ZX_VM_FAULT_BEYOND_STREAM_SIZE) {
+    status = vmo->content_size_manager().status_value();
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
   return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, vmo->vmo(), vmo_offset,
@@ -319,4 +334,68 @@ zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t 
   zx_rights_t region_rights = iobuffer_disp->GetMapRights(iobuffer_rights, region_index);
   return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, ktl::move(*vmo),
                          region_offset, region_rights, region_length, mapped_addr);
+}
+
+zx_status_t sys_vmar_map_clock(zx_handle_t handle, zx_vm_option_t options, uint64_t vmar_offset,
+                               zx_handle_t clock_handle, uint64_t len,
+                               user_out_ptr<zx_vaddr_t> mapped_addr) {
+  // Pretty much all of the options are allowed when attempting to map a clock's
+  // VMO, but not all of them.  Check out the options requested by the user and
+  // reject the call if any of the explicitly disallowed options are present in
+  // the request.  Leave the rest of the option validation logic to the common
+  // map routine.
+  constexpr zx_vm_option_t kDisallowedOptions =
+      ZX_VM_PERM_WRITE | ZX_VM_PERM_EXECUTE | ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED;
+  if ((options & kDisallowedOptions) != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // The length of the requested mapping must be what we expect it to be, in
+  // this case, the value reported by the ZX_INFO_CLOCK_MAPPED_SIZE topic.
+  // Anything else is an error.
+  if (len != ClockDispatcher::kMappedSize) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // lookup the Clock dispatcher from handle
+  auto* up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<ClockDispatcher> clock;
+  zx_rights_t clock_rights;
+  if (zx_status_t status =
+          up->handle_table().GetDispatcherAndRights(*up, clock_handle, &clock, &clock_rights);
+      status != ZX_OK) {
+    return status;
+  }
+
+  // If this is not a mappable clock, then there is no point in proceeding.
+  if (!clock->is_mappable()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // Grab a reference to the internal VMO which we can pass to the common map
+  // routine.  It should be impossible to have successfully created a clock
+  // whose options indicate that it is mappable, but which does not have a valid
+  // underlying VMO.
+  fbl::RefPtr<VmObject> clock_vmo = clock->vmo();
+  DEBUG_ASSERT(clock_vmo.get() != nullptr);
+
+  // lookup the VMAR dispatcher from handle
+  fbl::RefPtr<VmAddressRegionDispatcher> vmar;
+  zx_rights_t vmar_rights;
+  if (zx_status_t status =
+          up->handle_table().GetDispatcherAndRights(*up, handle, &vmar, &vmar_rights);
+      status != ZX_OK) {
+    return status;
+  }
+
+  // In order to map a clock, users must have both the READ and MAP permissions.
+  // Mask out all of the other permissions to act as the "effective" permissions
+  // for the underlying VMO that this clock owns.  We will pass these effective
+  // rights as the VMO rights to the common mapping function.
+  constexpr zx_rights_t kRequiredClockRights = ZX_RIGHT_READ | ZX_RIGHT_MAP;
+  zx_rights_t effective_vmo_rights = clock_rights & kRequiredClockRights;
+
+  // Finally hand off the map operation to the common map routine.
+  return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, ktl::move(clock_vmo),
+                         0, effective_vmo_rights, len, mapped_addr);
 }

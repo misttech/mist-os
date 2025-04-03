@@ -194,11 +194,8 @@ impl RoamMonitorApi for StationaryMonitor {
         }
     }
 
-    fn should_send_roam_request(
-        &self,
-        candidate: types::ScannedCandidate,
-    ) -> Result<bool, anyhow::Error> {
-        if candidate.bss.bssid == self.connection_data.ap_state.original().bssid {
+    fn should_send_roam_request(&self, request: PolicyRoamRequest) -> Result<bool, anyhow::Error> {
+        if request.candidate.bss.bssid == self.connection_data.ap_state.original().bssid {
             info!("Selected roam candidate is the currently connected candidate, ignoring");
             return Ok(false);
         }
@@ -206,12 +203,14 @@ impl RoamMonitorApi for StationaryMonitor {
         // compared to the most up-to-date roaming connection data
         let latest_rssi = self.connection_data.signal_data.ewma_rssi.get();
         let latest_snr = self.connection_data.signal_data.ewma_snr.get();
-        if (candidate.bss.signal.rssi_dbm as f64) < latest_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM
-            && (candidate.bss.signal.snr_db as f64) < latest_snr + MIN_SNR_IMPROVEMENT_TO_ROAM
+        if (request.candidate.bss.signal.rssi_dbm as f64)
+            < latest_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM
+            && (request.candidate.bss.signal.snr_db as f64)
+                < latest_snr + MIN_SNR_IMPROVEMENT_TO_ROAM
         {
             info!(
                 "Selected roam candidate ({:?}) is not enough of an improvement. Ignoring.",
-                candidate.to_string_without_pii()
+                request.candidate.to_string_without_pii()
             );
             return Ok(false);
         }
@@ -770,7 +769,7 @@ mod test {
         };
         assert!(!test_values
             .monitor
-            .should_send_roam_request(candidate)
+            .should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] })
             .expect("failed to check roam request"));
 
         // Verify that a roam recommendation is made if RSSI improvement exceeds threshold
@@ -786,7 +785,7 @@ mod test {
         };
         assert!(test_values
             .monitor
-            .should_send_roam_request(candidate)
+            .should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] })
             .expect("failed to check roam request"));
 
         // Verify that a roam recommendation is made if SNR improvement exceeds threshold.
@@ -802,7 +801,7 @@ mod test {
         };
         assert!(test_values
             .monitor
-            .should_send_roam_request(candidate)
+            .should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] })
             .expect("failed to check roam request"));
 
         // Verify that roam recommendations are blocked if the selected candidate is the currently
@@ -821,7 +820,7 @@ mod test {
         };
         assert!(!test_values
             .monitor
-            .should_send_roam_request(candidate)
+            .should_send_roam_request(PolicyRoamRequest { candidate, reasons: vec![] })
             .expect("failed to check roam reqeust"));
     }
 

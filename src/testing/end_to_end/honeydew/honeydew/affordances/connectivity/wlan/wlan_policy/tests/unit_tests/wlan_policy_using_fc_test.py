@@ -43,14 +43,15 @@ _TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
 _TEST_PASSWORD = "password"
 _TEST_PSK = "c9a68e83bfd123d144ec5256bc45682accfb8e8f0561f39f44dd388cba9e86f2"
 
-_TEST_CREDENTIAL_NONE = f_wlan_policy.Credential()
-_TEST_CREDENTIAL_NONE.none = f_wlan_policy.Empty()
+_TEST_CREDENTIAL_NONE = f_wlan_policy.Credential(none=f_wlan_policy.Empty())
 
-_TEST_CREDENTIAL_PASSWORD = f_wlan_policy.Credential()
-_TEST_CREDENTIAL_PASSWORD.password = list(str.encode(_TEST_PASSWORD))
+_TEST_CREDENTIAL_PASSWORD = f_wlan_policy.Credential(
+    password=list(str.encode(_TEST_PASSWORD))
+)
 
-_TEST_CREDENTIAL_PSK = f_wlan_policy.Credential()
-_TEST_CREDENTIAL_PSK.psk = list(bytes.fromhex(_TEST_PSK))
+_TEST_CREDENTIAL_PSK = f_wlan_policy.Credential(
+    psk=list(bytes.fromhex(_TEST_PSK))
+)
 
 _TEST_NETWORK_CONFIG_NONE = NetworkConfig(
     ssid=_TEST_SSID,
@@ -59,9 +60,9 @@ _TEST_NETWORK_CONFIG_NONE = NetworkConfig(
     credential_value="",
 )
 _TEST_NETWORK_CONFIG_NONE_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.NONE,
+        type_=f_wlan_policy.SecurityType.NONE,
     ),
     credential=_TEST_CREDENTIAL_NONE,
 )
@@ -73,9 +74,9 @@ _TEST_NETWORK_CONFIG_PASSWORD = NetworkConfig(
     credential_value=_TEST_PASSWORD,
 )
 _TEST_NETWORK_CONFIG_PASSWORD_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.WPA2,
+        type_=f_wlan_policy.SecurityType.WPA2,
     ),
     credential=_TEST_CREDENTIAL_PASSWORD,
 )
@@ -87,9 +88,9 @@ _TEST_NETWORK_CONFIG_PSK = NetworkConfig(
     credential_value=_TEST_PSK,
 )
 _TEST_NETWORK_CONFIG_PSK_FIDL = f_wlan_policy.NetworkConfig(
-    id=f_wlan_policy.NetworkIdentifier(
+    id_=f_wlan_policy.NetworkIdentifier(
         ssid=_TEST_SSID_BYTES,
-        type=f_wlan_policy.SecurityType.WPA2,
+        type_=f_wlan_policy.SecurityType.WPA2,
     ),
     credential=_TEST_CREDENTIAL_PSK,
 )
@@ -99,9 +100,9 @@ _TEST_MAC_ADDRESS_BYTES = bytes([1, 35, 69, 103, 137, 171])  # 01:23:45:67:89:ab
 
 def _make_scan_result(ssid: str) -> f_wlan_policy.ScanResult:
     return f_wlan_policy.ScanResult(
-        id=f_wlan_policy.NetworkIdentifier(
+        id_=f_wlan_policy.NetworkIdentifier(
             ssid=list(ssid.encode("utf-8")),
-            type=f_wlan_policy.SecurityType.WPA2,
+            type_=f_wlan_policy.SecurityType.WPA2,
         ),
         entries=[
             f_wlan_policy.Bss(
@@ -179,7 +180,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         # pylint: disable-next=unused-argument
         def get_controller(requests: Channel, updates: Channel) -> None:
             self.client_state_updates_proxy = (
-                f_wlan_policy.ClientStateUpdates.Client(updates)
+                f_wlan_policy.ClientStateUpdatesClient(updates)
             )
 
         self.wlan_policy_obj._client_provider_proxy.get_controller = mock.Mock(
@@ -187,12 +188,12 @@ class WlanPolicyFCTests(unittest.TestCase):
         )
 
         client_controller_proxy = mock.MagicMock(
-            spec=f_wlan_policy.ClientController.Client
+            spec=f_wlan_policy.ClientControllerClient
         )
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientController", autospec=True
+            "fidl.fuchsia_wlan_policy.ClientControllerClient", autospec=True
         ) as f_client_controller:
-            f_client_controller.Client.return_value = client_controller_proxy
+            f_client_controller.return_value = client_controller_proxy
             yield client_controller_proxy
 
     @contextmanager
@@ -200,21 +201,21 @@ class WlanPolicyFCTests(unittest.TestCase):
         """Mock the creation of a fuchsia.wlan.policy/ClientListener."""
 
         client_listener_proxy = mock.MagicMock(
-            spec=f_wlan_policy.ClientListener.Client
+            spec=f_wlan_policy.ClientListenerClient
         )
 
         # Create a FIDL client to the ClientListener server.
         def get_listener(updates: Channel) -> None:
             self.client_state_updates_proxy = (
-                f_wlan_policy.ClientStateUpdates.Client(updates)
+                f_wlan_policy.ClientStateUpdatesClient(updates)
             )
 
         client_listener_proxy.get_listener = mock.Mock(wraps=get_listener)
 
         with mock.patch(
-            "fidl.fuchsia_wlan_policy.ClientListener", autospec=True
+            "fidl.fuchsia_wlan_policy.ClientListenerClient", autospec=True
         ) as f_client_listener:
-            f_client_listener.Client.return_value = client_listener_proxy
+            f_client_listener.return_value = client_listener_proxy
             yield client_listener_proxy
 
     def test_verify_supported(self) -> None:
@@ -403,9 +404,9 @@ class WlanPolicyFCTests(unittest.TestCase):
                         state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
                         networks=[
                             f_wlan_policy.NetworkState(
-                                id=f_wlan_policy.NetworkIdentifier(
+                                id_=f_wlan_policy.NetworkIdentifier(
                                     ssid=list(b"Google Guest"),
-                                    type=f_wlan_policy.SecurityType.WPA2,
+                                    type_=f_wlan_policy.SecurityType.WPA2,
                                 ),
                                 state=f_wlan_policy.ConnectionState.CONNECTING,
                                 status=None,
@@ -475,8 +476,9 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             # Mock remove_network, which should be called once for each saved
             # network.
-            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult(
+                response=f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            )
             client_controller.remove_network.side_effect = [
                 _async_response(res),
                 _async_response(res),
@@ -502,8 +504,9 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller() as client_controller:
             self.wlan_policy_obj.create_client_controller()
 
-            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult(
+                response=f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            )
             client_controller.remove_network.return_value = _async_response(res)
 
             self.wlan_policy_obj.remove_network(
@@ -519,9 +522,10 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.create_client_controller()
 
             with self.subTest(msg="NetworkConfigChangeError"):
-                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-                res.err = int(
-                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult(
+                    err=int(
+                        f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                    )
                 )
                 client_controller.remove_network.return_value = _async_response(
                     res
@@ -534,9 +538,10 @@ class WlanPolicyFCTests(unittest.TestCase):
                 client_controller.remove_network.assert_called_once()
 
             with self.subTest(msg="ZxStatus"):
-                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-                res.err = int(
-                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult(
+                    err=int(
+                        f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                    )
                 )
                 client_controller.remove_network.reset_mock()
                 client_controller.remove_network.return_value = _async_error(
@@ -554,8 +559,9 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller() as client_controller:
             self.wlan_policy_obj.create_client_controller()
 
-            res = f_wlan_policy.ClientControllerSaveNetworkResult()
-            res.response = f_wlan_policy.ClientControllerSaveNetworkResponse()
+            res = f_wlan_policy.ClientControllerSaveNetworkResult(
+                response=f_wlan_policy.ClientControllerSaveNetworkResponse()
+            )
             client_controller.save_network.return_value = _async_response(res)
 
             self.wlan_policy_obj.save_network(
@@ -569,9 +575,10 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.create_client_controller()
 
             with self.subTest(msg="NetworkConfigChangeError"):
-                res = f_wlan_policy.ClientControllerSaveNetworkResult()
-                res.err = int(
-                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                res = f_wlan_policy.ClientControllerSaveNetworkResult(
+                    err=int(
+                        f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                    )
                 )
                 client_controller.save_network.return_value = _async_response(
                     res
@@ -584,9 +591,10 @@ class WlanPolicyFCTests(unittest.TestCase):
                 client_controller.save_network.assert_called_once()
 
             with self.subTest(msg="ZxStatus"):
-                res = f_wlan_policy.ClientControllerSaveNetworkResult()
-                res.err = int(
-                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                res = f_wlan_policy.ClientControllerSaveNetworkResult(
+                    err=int(
+                        f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                    )
                 )
                 client_controller.save_network.reset_mock()
                 client_controller.save_network.return_value = _async_error(
@@ -825,7 +833,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.stop_client_connections()
 
 
-class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
+class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIteratorServer):
     """Iterator for scan results."""
 
     def __init__(self, server: Channel, items: list[list[str]]) -> None:
@@ -843,7 +851,7 @@ class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
         )
 
 
-class TestNetworkConfigIteratorImpl(f_wlan_policy.NetworkConfigIterator.Server):
+class TestNetworkConfigIteratorImpl(f_wlan_policy.NetworkConfigIteratorServer):
     """Iterator for NetworkConfig results."""
 
     def __init__(

@@ -16,7 +16,7 @@ use fidl_fuchsia_ui_pointer::{
     {self as fuipointer},
 };
 use futures::StreamExt as _;
-use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
+use starnix_core::power::create_proxy_for_wake_events_counter;
 use starnix_core::task::Kernel;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
@@ -186,17 +186,17 @@ impl InputEventsRelay {
                 open_files: default_touch_device_opened_files,
                 inspect_status: device_inspect_status,
             };
-            let (touch_source_proxy, resume_event) = match event_proxy_mode {
+            let (touch_source_proxy, message_counter) = match event_proxy_mode {
                 EventProxyMode::WakeContainer => {
                     // Proxy the touch events through the Starnix runner. This allows touch events to
                     // wake the container when it is suspended.
-                    let (touch_source_channel, resume_event) =
-                    create_proxy_for_wake_events(touch_source_client_end.into_channel(), "touch".to_string());
+                    let (touch_source_channel, message_counter) =
+                    create_proxy_for_wake_events_counter(touch_source_client_end.into_channel(), "touch".to_string());
                     (
                         fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
                             touch_source_channel,
                         )),
-                        Some(resume_event),
+                        Some(message_counter),
                     )
                 }
                 EventProxyMode::None => (
@@ -210,9 +210,9 @@ impl InputEventsRelay {
                 // it...
                 let watch_future = touch_source_proxy.watch(&previous_event_disposition);
 
-                // .. until the event that we passed to the runner has been cleared. This prevents
+                // .. until the counter that we passed to the runner has been decremented. This prevents
                 // the container from suspending between calls to `watch`.
-                resume_event.as_ref().map(clear_wake_proxy_signal);
+                message_counter.as_ref().map(|c| c.add(-1));
 
                 match watch_future.await {
                     Ok(touch_events) => {
@@ -398,9 +398,9 @@ impl InputEventsRelay {
                     return;
                 }
 
-                let (local_listener_stream, local_resume_event) = match event_proxy_mode {
+                let (local_listener_stream, message_counter) = match event_proxy_mode {
                     EventProxyMode::WakeContainer => {
-                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
+                        let (local_channel, message_counter) = create_proxy_for_wake_events_counter(
                             remote_server.into_channel(),
                             "buttons".to_string(),
                         );
@@ -408,7 +408,7 @@ impl InputEventsRelay {
                             fuipolicy::MediaButtonsListenerRequestStream::from_channel(
                                 fidl::AsyncChannel::from_channel(local_channel),
                             );
-                        (local_listener_stream, Some(local_resume_event))
+                        (local_listener_stream, Some(message_counter))
                     }
                     EventProxyMode::None => (remote_server.into_stream(), None),
                 };
@@ -416,7 +416,7 @@ impl InputEventsRelay {
                     local_listener_stream,
                     default_keyboard_device_opened_files,
                     device_inspect_status,
-                    local_resume_event,
+                    message_counter,
                 )
                 .await;
             })
@@ -428,7 +428,7 @@ impl InputEventsRelay {
         mut local_listener_stream: fuipolicy::MediaButtonsListenerRequestStream,
         default_keyboard_device_opened_files: OpenedFiles,
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
-        local_resume_event: Option<zx::EventPair>,
+        message_counter: Option<zx::Counter>,
     ) {
         let mut power_was_pressed = false;
         let mut function_was_pressed = false;
@@ -442,7 +442,8 @@ impl InputEventsRelay {
         loop {
             let next_event_future = local_listener_stream.next();
 
-            local_resume_event.as_ref().map(clear_wake_proxy_signal);
+            // The previous hanging get has been handled, so decrement the unhandled message counter.
+            message_counter.as_ref().map(|c| c.add(-1));
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
@@ -569,11 +570,11 @@ impl InputEventsRelay {
             open_files: default_mouse_device_opened_files,
             inspect_status: device_inspect_status,
         };
-        let (mouse_source_proxy, resume_event) = match event_proxy_mode {
+        let (mouse_source_proxy, message_counter) = match event_proxy_mode {
             EventProxyMode::WakeContainer => {
                 // Proxy the mouse events through the Starnix runner. This allows mouse events to
                 // wake the container when it is suspended.
-                let (mouse_source_channel, resume_event) = create_proxy_for_wake_events(
+                let (mouse_source_channel, resume_event) = create_proxy_for_wake_events_counter(
                     mouse_source_client_end.into_channel(),
                     "mouse".to_string(),
                 );
@@ -591,9 +592,9 @@ impl InputEventsRelay {
             // it...
             let event_future = mouse_source_proxy.watch();
 
-            // .. until the event that we passed to the runner has been cleared. This prevents
+            // .. until the message counter has been decremented. This prevents
             // the container from suspending between calls to `watch`.
-            resume_event.as_ref().map(clear_wake_proxy_signal);
+            message_counter.as_ref().map(|c| c.add(-1));
 
             match event_future.await {
                 Ok(mouse_events) => {

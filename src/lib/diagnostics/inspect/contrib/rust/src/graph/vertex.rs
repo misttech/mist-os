@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use super::edge::WeakEdgeRef;
-use super::events::GraphObjectEventTracker;
-use super::types::VertexMarker;
-use super::{Edge, Metadata, VertexGraphMetadata, VertexId};
+use super::{Edge, EdgeMetadata, VertexId};
 use fuchsia_inspect as inspect;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -13,38 +11,41 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// A vertex of the graph. When this is dropped, all the outgoing edges and metadata fields will
 /// removed from Inspect.
 #[derive(Debug)]
-pub struct Vertex<I: VertexId> {
+pub struct Vertex<M: VertexMetadata> {
     _node: inspect::Node,
-    metadata: VertexGraphMetadata<I>,
-    incoming_edges: BTreeMap<u64, WeakEdgeRef>,
-    outgoing_edges: BTreeMap<u64, WeakEdgeRef>,
+    id: M::Id,
+    metadata: M,
+    incoming_edges: BTreeMap<u64, WeakEdgeRef<M::EdgeMeta>>,
+    outgoing_edges: BTreeMap<u64, WeakEdgeRef<M::EdgeMeta>>,
     pub(crate) outgoing_edges_node: inspect::Node,
     internal_id: u64,
 }
 
+/// Trait implemented by types that hold a vertex metadata.
+pub trait VertexMetadata {
+    type Id: VertexId;
+    type EdgeMeta: EdgeMetadata;
+}
+
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-impl<I> Vertex<I>
+impl<M: VertexMetadata> Vertex<M>
 where
-    I: VertexId,
+    <M as VertexMetadata>::Id: VertexId,
 {
-    pub(crate) fn new<'a, M>(
-        id: I,
+    pub(crate) fn new(
+        id: M::Id,
         parent: &inspect::Node,
-        initial_metadata: M,
-        events_tracker: Option<GraphObjectEventTracker<VertexMarker<I>>>,
-    ) -> Self
-    where
-        M: IntoIterator<Item = Metadata<'a>>,
-    {
+        init_metadata: impl FnOnce(inspect::Node) -> M,
+    ) -> Self {
         let internal_id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        let metadata_iterator = initial_metadata.into_iter();
         parent.atomic_update(|parent| {
             let id_str = id.get_id();
             let node = parent.create_child(id_str.as_ref());
             let outgoing_edges_node = node.create_child("relationships");
-            let metadata = VertexGraphMetadata::new(&node, id, metadata_iterator, events_tracker);
+            let metadata = init_metadata(node.create_child("meta"));
             Vertex {
+                id,
                 internal_id,
                 _node: node,
                 outgoing_edges_node,
@@ -57,16 +58,12 @@ where
 
     /// Add a new edge to the graph originating at this vertex and going to the vertex `to` with the
     /// given metadata.
-    pub fn add_edge<'a, M>(&mut self, to: &mut Vertex<I>, initial_metadata: M) -> Edge
-    where
-        M: IntoIterator<Item = Metadata<'a>>,
-    {
-        let edge = Edge::new(
-            self,
-            to,
-            initial_metadata,
-            self.metadata.events_tracker().map(|e| e.for_edge()),
-        );
+    pub fn add_edge(
+        &mut self,
+        to: &mut Vertex<M>,
+        init_metadata: impl FnOnce(inspect::Node) -> M::EdgeMeta,
+    ) -> Edge<M::EdgeMeta> {
+        let edge = Edge::new(self, to, init_metadata);
 
         let weak_ref = edge.weak_ref();
 
@@ -79,24 +76,21 @@ where
     }
 
     /// Get an exclusive reference to the metadata to modify it.
-    pub fn meta(&mut self) -> &mut VertexGraphMetadata<I> {
+    pub fn meta(&mut self) -> &mut M {
         &mut self.metadata
     }
 
-    pub(crate) fn id(&self) -> &I {
-        self.metadata.id()
+    pub(crate) fn id(&self) -> &M::Id {
+        &self.id
     }
 }
 
-impl<I> Drop for Vertex<I>
+impl<M> Drop for Vertex<M>
 where
-    I: VertexId,
+    M: VertexMetadata,
 {
     fn drop(&mut self) {
         self.outgoing_edges.iter().for_each(|(_, n)| n.mark_as_gone());
         self.incoming_edges.iter().for_each(|(_, n)| n.mark_as_gone());
-        if let Some(events_tracker) = self.metadata.events_tracker() {
-            events_tracker.record_removed(self.id().get_id().as_ref())
-        }
     }
 }

@@ -106,7 +106,7 @@ impl Control {
 async fn main() -> Result<(), Error> {
     log::info!("Started");
 
-    let backlight = Backlight::without_display_power()?;
+    let backlight = Backlight::without_display_power().await?;
     let mut leds = Led::new().await?;
     let sensor = Sensor::new().await;
 

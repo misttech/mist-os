@@ -9,7 +9,8 @@ use super::arrays::{
     FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
     InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
     RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
-    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
+    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY, XPERMS_TYPE_IOCTL_PREFIXES,
+    XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES,
 };
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
@@ -21,8 +22,8 @@ use super::symbols::{
     MlsLevel, Role, Sensitivity, SymbolList, Type, User,
 };
 use super::{
-    AccessDecision, AccessVector, CategoryId, ClassId, Parse, RoleId, SensitivityId, TypeId,
-    UserId, Validate, SELINUX_AVD_FLAGS_PERMISSIVE,
+    AccessDecision, AccessVector, CategoryId, ClassId, IoctlAccessDecision, Parse, RoleId,
+    SensitivityId, TypeId, UserId, Validate, XpermsBitmap, SELINUX_AVD_FLAGS_PERMISSIVE,
 };
 
 use anyhow::Context as _;
@@ -290,6 +291,107 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             self.compute_denied_by_constraints(source_context, target_context, target_class)
         } else {
             AccessVector::NONE
+        }
+    }
+
+    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
+    /// audited when denied, for a given source context, target context, target class, and ioctl
+    /// prefix byte.
+    ///
+    /// If there is an `allowxperm` rule for a particular source, target, and class, then only the
+    /// named xperms should be allowed for that tuple. If there is no such `allowxperm` rule, then
+    /// all xperms should be allowed for that tuple. (In both cases, the allow is conditional on the
+    /// `ioctl` permission being allowed, but that should be checked separately before calling this
+    /// function.)
+    pub(super) fn compute_ioctl_access_decision(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class: &Class<PS>,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        let target_class_id = target_class.id();
+
+        let mut explicit_allow: Option<XpermsBitmap> = None;
+        let mut auditallow = XpermsBitmap::NONE;
+        let mut auditdeny = XpermsBitmap::ALL;
+
+        for access_vector_rule in self.access_vector_rules.data.iter() {
+            if !access_vector_rule.is_allowxperm()
+                && !access_vector_rule.is_auditallowxperm()
+                && !access_vector_rule.is_dontauditxperm()
+            {
+                continue;
+            }
+            if access_vector_rule.target_class() != target_class_id {
+                continue;
+            }
+            let source_attribute_bitmap: &ExtensibleBitmap<PS> =
+                &self.attribute_maps[(source_context.type_().0.get() - 1) as usize];
+            if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
+                continue;
+            }
+            let target_attribute_bitmap: &ExtensibleBitmap<PS> =
+                &self.attribute_maps[(target_context.type_().0.get() - 1) as usize];
+            if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
+                continue;
+            }
+
+            if let Some(xperms) = access_vector_rule.extended_permissions() {
+                // Only filter ioctls if there is at least one `allowxperm` rule for any ioctl
+                // prefix.
+                if access_vector_rule.is_allowxperm() {
+                    explicit_allow.get_or_insert(XpermsBitmap::NONE);
+                }
+                // If the rule applies to ioctls with prefix `ioctl_prefix`, get a bitmap
+                // of the ioctl postfixes named in the rule.
+                let bitmap_if_prefix_matches = match xperms.xperms_type {
+                    XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES => (xperms.xperms_optional_prefix
+                        == ioctl_prefix)
+                        .then_some(&xperms.xperms_bitmap),
+                    XPERMS_TYPE_IOCTL_PREFIXES => {
+                        xperms.xperms_bitmap.contains(ioctl_prefix).then_some(&XpermsBitmap::ALL)
+                    }
+                    _ => unreachable!("invalid xperms_type in validated ExtendedPermissions"),
+                };
+                let Some(xperms_bitmap) = bitmap_if_prefix_matches else {
+                    continue;
+                };
+                if access_vector_rule.is_allowxperm() {
+                    (*explicit_allow.get_or_insert(XpermsBitmap::NONE)) |= xperms_bitmap;
+                }
+                if access_vector_rule.is_auditallowxperm() {
+                    auditallow |= xperms_bitmap;
+                }
+                if access_vector_rule.is_dontauditxperm() {
+                    auditdeny -= xperms_bitmap;
+                }
+            }
+        }
+        let allow = explicit_allow.unwrap_or(XpermsBitmap::ALL);
+        IoctlAccessDecision { allow, auditallow, auditdeny }
+    }
+
+    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
+    /// audited when denied, for a given source context, target context, target class, and ioctl
+    /// prefix byte. This is the "custom" version because `target_class_name` is associated with a
+    /// [`crate::AbstractObjectClass::Custom`] value.
+    pub(super) fn compute_ioctl_access_decision_custom(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class_name: &str,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
+            self.compute_ioctl_access_decision(
+                source_context,
+                target_context,
+                target_class,
+                ioctl_prefix,
+            )
+        } else {
+            IoctlAccessDecision::ALLOW_ALL
         }
     }
 

@@ -23,7 +23,6 @@ bin/ping
 bin/ps
 bin/sh
 bin/signal
-bin/storage-metrics
 bin/threads
 bin/top
 bin/usbctl
@@ -61,5 +60,4 @@ lib/libsvc.so
 lib/libtrace-engine.so
 lib/libunwind.so.1
 lib/libusb-peripheral-utils.so
-lib/libvfs_internal.so
 lib/libvfs_rust.so

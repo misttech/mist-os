@@ -67,6 +67,13 @@ open protocol Manager {
         iterator server_end:CompositeInfoIterator;
     });
 
+
+    /// Returns a list of all driver hosts that are known to the system.
+    @available(added=NEXT)
+    flexible GetDriverHostInfo(resource struct {
+        iterator server_end:DriverHostInfoIterator;
+    });
+
     /// Restarts all driver hosts containing the driver specified by the `driver_url`,
     /// and returns the number of driver hosts that were restarted.
     /// The |rematch_flags| will be used to decide for which restarting nodes the existing driver
@@ -133,6 +140,18 @@ open protocol Manager {
         /// The caller should keep this handle alive while the modified drivers are needed.
         /// Releasing this will reset the operation.
         release_fence zx.Handle:EVENTPAIR;
+    }) error zx.Status;
+
+    /// Rebinds any composites and composite specs that have the given driver_url. This means the
+    /// spec is rematched with possibly another driver, or none if the only matching driver is
+    /// disabled, and any active nodes created from this spec are removed and re-bound.
+    ///
+    /// Returns the number of affected composite nodes.
+    @available(added=NEXT)
+    strict RebindCompositesWithDriver(struct {
+        driver_url fuchsia.url.Url;
+    }) -> (struct {
+        count uint32;
     }) error zx.Status;
 };
 

@@ -30,9 +30,6 @@
 
 #include <ktl/enforce.h>
 
-// The global ktrace state.
-internal::KTraceState KTRACE_STATE;
-
 namespace {
 
 using fxt::operator""_category;
@@ -65,32 +62,26 @@ void SetupCategoryBits() {
               entry.category.string(), (1u << entry.category.index()));
     }
   }
+  // If debug assertions are enabled, validate that all interned categories have been initialized.
+  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
+    for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+      DEBUG_ASSERT_MSG(category.index() != fxt::InternedCategory::kInvalidIndex,
+                       "Interned category %s was not initialized\n", category.string());
+    }
+  }
 }
 
-// TODO(https://fxbug.dev/42064084)
 void ktrace_report_cpu_pseudo_threads() {
   const uint max_cpus = arch_max_num_cpus();
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    KTRACE_KERNEL_OBJECT_ALWAYS(ktrace::CpuContextMap::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD, name,
-                                ("process", kNoProcess));
+    KTRACE_KERNEL_OBJECT_ALWAYS(KTrace::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD, name,
+                                ("process", KTrace::kNoProcess));
   }
 }
 
 }  // namespace
-
-namespace ktrace {
-
-zx_koid_t CpuContextMap::cpu_koid_base_{ZX_KOID_INVALID};
-
-void CpuContextMap::Init() {
-  if (cpu_koid_base_ == ZX_KOID_INVALID) {
-    cpu_koid_base_ = KernelObjectId::GenerateRange(arch_max_num_cpus());
-  }
-}
-
-}  // namespace ktrace
 
 namespace internal {
 
@@ -186,7 +177,7 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   DiagsPrintf(INFO, "Trace category states:\n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
     DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
-                ktrace_category_enabled(category) ? "enabled" : "disabled");
+                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
   }
 
   return ZX_OK;
@@ -594,24 +585,24 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 }  // namespace internal
 
-zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
+// The global ktrace state.
+KTrace KTrace::instance_;
+
+zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
   using StartMode = ::internal::KTraceState::StartMode;
   switch (action) {
     case KTRACE_ACTION_START:
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return KTRACE_STATE.Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return internal_state_.Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
-      return KTRACE_STATE.Stop();
+      return internal_state_.Stop();
 
     case KTRACE_ACTION_REWIND:
-      return KTRACE_STATE.Rewind();
-
-    case KTRACE_ACTION_NEW_PROBE:
-      return ZX_ERR_NOT_SUPPORTED;
+      return internal_state_.Rewind();
 
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -619,50 +610,42 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
   return ZX_OK;
 }
 
-static void ktrace_init(unsigned level) {
-  // There's no utility in setting up the singleton ktrace instance if there are
-  // no syscalls to access it. See zircon/kernel/syscalls/debug.cc for the
-  // corresponding syscalls. Note that because KTRACE_STATE grpmask starts at 0
-  // and will not be changed, the other functions in this file need not check
-  // for enabled-ness manually.
-  const bool syscalls_enabled = gBootOptions->enable_debugging_syscalls;
-  const uint32_t bufsize = syscalls_enabled ? (gBootOptions->ktrace_bufsize << 20) : 0;
+void KTrace::InitHook(unsigned) {
+  const uint32_t bufsize = gBootOptions->ktrace_bufsize << 20;
   const uint32_t initial_grpmask = gBootOptions->ktrace_grpmask;
 
-  dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
-          bufsize, initial_grpmask);
-
-  // Coerce the category ids to match the pre-defined bit mapptings of aged ktrace interface.
-  // TODO(eieio): Remove this when kernel migrates to IOB-based tracing with extensible categories.
-  SetupCategoryBits();
-
-  // Set the callback to emit fxt string records for the set of interned strings when
-  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
-  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
-  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
-    fxt_string_record(interned_string.id(), interned_string.string(),
-                      strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
-  });
+  dprintf(INFO, "ktrace_init: bufsize=%u grpmask=%x\n", bufsize, initial_grpmask);
 
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");
     return;
   }
 
-  // Allocate koids for each CPU.
-  ktrace::CpuContextMap::Init();
+  // Coerce the category ids to match the pre-defined bit mappings of aged ktrace interface.
+  // TODO(eieio): Remove this when kernel migrates to IOB-based tracing with extensible categories.
+  SetupCategoryBits();
 
   dprintf(INFO, "Trace categories: \n");
   for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
     dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.index()));
   }
 
-  KTRACE_STATE.Init(bufsize, initial_grpmask);
-
   if (!initial_grpmask) {
     dprintf(INFO, "ktrace: delaying buffer allocation\n");
   }
+
+  // Set the callback to emit fxt string records for the set of interned strings when
+  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
+  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
+  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
+    fxt::WriteStringRecord(
+        &GetInstance(), interned_string.id(), interned_string.string(),
+        strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
+  });
+
+  // Initialize the singleton data structures.
+  GetInstance().Init(bufsize, initial_grpmask);
 }
 
 // Finish initialization before starting userspace (i.e. before debug syscalls can occur).
-LK_INIT_HOOK(ktrace, ktrace_init, LK_INIT_LEVEL_USER - 1)
+LK_INIT_HOOK(ktrace, KTrace::InitHook, LK_INIT_LEVEL_USER - 1)

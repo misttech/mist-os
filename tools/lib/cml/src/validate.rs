@@ -988,9 +988,9 @@ which is almost certainly a mistake: {}",
                                 | CapabilityId::Dictionary(_)
                                 | CapabilityId::Runner(_)
                                 | CapabilityId::Resolver(_)
+                                | CapabilityId::Service(_)
                                 | CapabilityId::Configuration(_) => {}
                                 CapabilityId::Directory(_)
-                                | CapabilityId::Service(_)
                                 | CapabilityId::Storage(_)
                                 | CapabilityId::EventStream(_) => {
                                     let type_name = id.type_str();

@@ -5,16 +5,31 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::check_self_permission;
+use super::{check_permission, check_self_permission, BpfMapState, BpfProgState};
 
+use crate::bpf::program::Program;
+use crate::bpf::BpfMap;
+use crate::security::PermissionFlags;
 use crate::task::CurrentTask;
 use selinux::{BpfPermission, SecurityId, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_cmd, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_RUN};
 use zerocopy::FromBytes;
 
+/// Returns the security state to be assigned to a BPF map. This is defined as the security
+/// context of the creating task.
+pub(in crate::security) fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
+    BpfMapState { sid: current_task.security_state.lock().current_sid }
+}
+
+/// Returns the security state to be assigned to a BPF program. This is defined as the
+/// security context of the creating task.
+pub(in crate::security) fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
+    BpfProgState { sid: current_task.security_state.lock().current_sid }
+}
+
 /// Returns whether `current_task` can perform the bpf `cmd`.
-pub fn check_bpf_access<Attr: FromBytes>(
+pub(in crate::security) fn check_bpf_access<Attr: FromBytes>(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
@@ -31,4 +46,53 @@ pub fn check_bpf_access<Attr: FromBytes>(
         _ => return Ok(()),
     };
     check_self_permission(&security_server.as_permission_check(), sid, permission, audit_context)
+}
+
+/// Performs necessary checks when the kernel generates and returns a file descriptor for BPF
+/// maps.
+pub(in crate::security) fn check_bpf_map_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    bpf_map: &BpfMap,
+    flags: PermissionFlags,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let mut permissions = Vec::new();
+    if flags.contains(PermissionFlags::READ) {
+        permissions.push(BpfPermission::MapRead);
+    }
+    if flags.contains(PermissionFlags::WRITE) {
+        permissions.push(BpfPermission::MapWrite);
+    }
+    for permission in permissions {
+        check_permission(
+            &security_server.as_permission_check(),
+            subject_sid,
+            bpf_map.security_state.state.sid,
+            permission,
+            audit_context,
+        )?;
+    }
+    Ok(())
+}
+
+/// Performs necessary checks when the kernel generates and returns a file descriptor for BPF
+/// programs.
+pub fn check_bpf_prog_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    bpf_program: &Program,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
+    let subject_sid = current_task.security_state.lock().current_sid;
+    check_permission(
+        &security_server.as_permission_check(),
+        subject_sid,
+        bpf_program.security_state.state.sid,
+        BpfPermission::ProgRun,
+        audit_context,
+    )
 }

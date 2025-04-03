@@ -418,7 +418,7 @@ pub struct AttributionData {
     pub attributions: Vec<Attribution>,
 }
 
-pub trait AttributionDataProvider: Send + Sync {
+pub trait AttributionDataProvider: Send + Sync + 'static {
     fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>>;
 }
 

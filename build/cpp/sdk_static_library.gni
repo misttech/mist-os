@@ -37,10 +37,8 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     "none" or "static".
 #     Defaults to "none".
 #
-#   sdk_name (required for non-internal libraries)
+#   sdk_name (required)
 #     Name of the library in the SDK.
-#     For internal libraries, defaults to ${fully_qualified_target_path}_${target_name}.
-#     e.g. (target) //src/lib/fxl:fxl -> (default sdk_name) //src/lib/fxl_fxl
 #
 #   include_base (optional)
 #     Path to the root directory for includes.
@@ -73,11 +71,11 @@ template("sdk_static_library") {
          "Libraries are always stable (except internal).")
   assert(defined(invoker.category), "Must define an SDK category")
 
-  # Only categories that are included in an IDK makes sense.
   valid_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
     # "compat_test" is only for ABI compatibility and thus not applicable.
-    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    # "host_tool" is only for ABI compatibility and thus not applicable.
+    # "prebuilt" is only for ABI compatibility and thus not applicable.
     "partner",
   ]
 
@@ -95,10 +93,7 @@ template("sdk_static_library") {
   assert(
       !is_internal ||
           # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
-          target_name == "devicetree" ||
-          # TODO(https://fxbug.dev/366517646): Remove these once all uses of
-          # `fake-bti` are migrated to the //sdk target.
-          target_name == "fake-bti" || target_name == "fake-object",
+          target_name == "devicetree",
       "Do not add more internal static libraries.")
 
   output_name = target_name
@@ -109,31 +104,17 @@ template("sdk_static_library") {
     output_name = invoker.output_name
   }
 
-  # Though internal libraries specify sdk_name, it is overridden below.
   assert(
       defined(invoker.sdk_name),
       "Libraries in the IDK must specify a name that is meaningful in that context.")
-
-  if (is_internal) {
-    # If not defined by the invoker, the sdk_name is the fully qualified target name with some tweaks. For example:
-    #    //src/lib/fxl:fxl            sdk_name = //src/lib/fxl_fxl          sdk_root_path= src/lib/fxl_fxl
-    #    //src/lib/fxl:functional     sdk_name = //src/lib/fxl_functional   sdk_root_path= src/lib/fxl_functional
-    #    //src/lib/fxl/files:files    sdk_name = //src/lib/fxl/files_files  sdk_root_path= src/lib/fxl/files_files
-    full_label = get_label_info(":${target_name}", "label_no_toolchain")
-    path = get_label_info(full_label, "dir")
-    path = "${path}_${invoker.target_name}"
-    sdk_name = path
-    sdk_root_path = string_replace(sdk_name, "//", "")
-  } else {
-    sdk_name = invoker.sdk_name
-    sdk_root_path = "pkg/${sdk_name}"
-  }
+  sdk_name = invoker.sdk_name
+  sdk_root_path = "pkg/${sdk_name}"
   sdk_id = "sdk://${sdk_root_path}"
 
   main_target_name = target_name
-  metadata_target_name = "${target_name}_sdk_metadata"
-  manifest_target_name = "${target_name}_sdk_manifest"
-  sdk_target_name = "${target_name}_sdk"
+  metadata_target_name = "${main_target_name}_sdk_metadata"
+  manifest_target_name = "${main_target_name}_sdk_manifest"
+  sdk_target_name = "${main_target_name}_sdk"
 
   # This is subtle: If one of the dependencies is listed in runtime_deps
   # with an _sdk suffix, assume it is a shared_library() target, and ensure
@@ -248,7 +229,6 @@ template("sdk_static_library") {
     sdk_metas += [ "$gen_dir/$name.meta.json" ]
   }
 
-  include_dest = "${sdk_root_path}/include"
   sdk_header_files = []
   sdk_metadata_headers = []
 
@@ -295,19 +275,18 @@ template("sdk_static_library") {
     ]
   }
 
-  verify_public_headers_target = "$target_name.verify_public_headers"
-  verify_public_headers(verify_public_headers_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    target_label = ":${target_name}"
-    headers = all_headers
-  }
-
   # Add binaries.
+  #
+  # Use the binary from the shared library toolchain to allow the static
+  # libraries shipped in the IDK to be linked into shared libraries See
+  # https://fxbug.dev/404169865.
+  static_lib_target = ":${main_target_name}(${shlib_toolchain})"
+  static_out_dir = get_label_info(static_lib_target, "target_out_dir")
   lib_name = "lib${output_name}.a"
 
   # If output_name already starts with `lib`, GN won't prepend lib to it.
   #
-  # E.g. the following target/ouput name yileds the corresponding lib file:
+  # E.g. the following target/output name yields the corresponding lib file:
   #  ngunwind -> libngunwind.a
   #  libngunwind -> libngunwind.a
   #
@@ -320,7 +299,7 @@ template("sdk_static_library") {
   link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
   sdk_files = sdk_header_files + [
                 {
-                  source = "${target_out_dir}/${lib_name}"
+                  source = "${static_out_dir}/${lib_name}"
                   dest = link_lib
                 },
               ]
@@ -351,10 +330,7 @@ template("sdk_static_library") {
     forward_variables_from(invoker, [ "testonly" ])
     script = "//build/cpp/gen_sdk_prebuilt_meta_file.py"
 
-    inputs = sdk_metas + [
-               "//build/cpp/binaries.py",
-               "//build/images/elfinfo.py",
-             ]
+    inputs = sdk_metas
 
     outputs = [ metadata_file ]
 
@@ -383,16 +359,23 @@ template("sdk_static_library") {
       ]
     }
 
-    deps = sdk_deps + [ ":${main_target_name}" ]
+    deps = sdk_deps + [ static_lib_target ]
   }
 
   # Exempt internal libraries from pragma verification.
   should_verify_pragma = !is_internal
   if (should_verify_pragma) {
-    verify_pragma_target_name = "${target_name}_sdk_pragma"
+    verify_pragma_target_name = "${main_target_name}_sdk_pragma"
     verify_pragma_once(verify_pragma_target_name) {
       headers = all_headers
     }
+  }
+
+  verify_public_headers_target = "${main_target_name}.verify_public_headers"
+  verify_public_headers(verify_public_headers_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target_label = static_lib_target
+    headers = all_headers
   }
 
   sdk_atom(manifest_target_name) {
@@ -431,8 +414,8 @@ template("sdk_static_library") {
     deps = sdk_deps
 
     non_sdk_deps = [
-      ":${main_target_name}",
       ":${metadata_target_name}",
+      static_lib_target,
     ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":${verify_pragma_target_name}" ]
@@ -452,7 +435,7 @@ template("sdk_static_library") {
   verify_runtime_deps_target = "${target_name}_verify_runtime_deps"
 
   sdk_verify_runtime_deps(verify_runtime_deps_target) {
-    atom_target = ":$main_target_name"
+    atom_target = static_lib_target
     manifest_file = sdk_manifest_file
     manifest_target = ":$manifest_target_name"
   }

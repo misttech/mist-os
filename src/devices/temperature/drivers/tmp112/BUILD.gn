@@ -27,7 +27,6 @@ fuchsia_cc_driver("tmp112-driver") {
   deps = [
     ":tmp112-bind",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
@@ -54,10 +53,11 @@ test("tmp112-test-bin") {
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/zxtest",
   ]
 }

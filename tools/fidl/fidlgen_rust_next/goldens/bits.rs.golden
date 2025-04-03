@@ -20,7 +20,7 @@ impl ::fidl_next::Encodable for EmptyBits {
     type Encoded = WireEmptyBits;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EmptyBits
+unsafe impl<___E> ::fidl_next::Encode<___E> for EmptyBits
 where
     ___E: ?Sized,
 {
@@ -28,10 +28,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireEmptyBits { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(self.bits());
+        ::fidl_next::munge!(let WireEmptyBits { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(self.bits()));
         Ok(())
     }
 }
@@ -54,6 +54,13 @@ impl ::fidl_next::TakeFrom<WireEmptyBits> for EmptyBits {
 #[repr(transparent)]
 pub struct WireEmptyBits {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEmptyBits {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyBits
@@ -94,7 +101,7 @@ impl ::fidl_next::Encodable for FlexibleBits {
     type Encoded = WireFlexibleBits;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for FlexibleBits
+unsafe impl<___E> ::fidl_next::Encode<___E> for FlexibleBits
 where
     ___E: ?Sized,
 {
@@ -102,10 +109,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireFlexibleBits { mut value } = slot);
-        *value = ::fidl_next::WireU64::from(self.bits());
+        ::fidl_next::munge!(let WireFlexibleBits { value } = out);
+        let _ = value.write(::fidl_next::WireU64::from(self.bits()));
         Ok(())
     }
 }
@@ -128,6 +135,13 @@ impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
 #[repr(transparent)]
 pub struct WireFlexibleBits {
     value: ::fidl_next::WireU64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireFlexibleBits {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleBits
@@ -169,7 +183,7 @@ impl ::fidl_next::Encodable for MyBits {
     type Encoded = WireMyBits;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for MyBits
+unsafe impl<___E> ::fidl_next::Encode<___E> for MyBits
 where
     ___E: ?Sized,
 {
@@ -177,10 +191,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMyBits { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(self.bits());
+        ::fidl_next::munge!(let WireMyBits { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(self.bits()));
         Ok(())
     }
 }
@@ -203,6 +217,13 @@ impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
 #[repr(transparent)]
 pub struct WireMyBits {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireMyBits {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyBits
@@ -252,7 +273,7 @@ impl ::fidl_next::Encodable for StrictBits {
     type Encoded = WireStrictBits;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for StrictBits
+unsafe impl<___E> ::fidl_next::Encode<___E> for StrictBits
 where
     ___E: ?Sized,
 {
@@ -260,10 +281,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireStrictBits { mut value } = slot);
-        *value = ::fidl_next::WireU64::from(self.bits());
+        ::fidl_next::munge!(let WireStrictBits { value } = out);
+        let _ = value.write(::fidl_next::WireU64::from(self.bits()));
         Ok(())
     }
 }
@@ -286,6 +307,13 @@ impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
 #[repr(transparent)]
 pub struct WireStrictBits {
     value: ::fidl_next::WireU64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStrictBits {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictBits
@@ -315,8 +343,34 @@ impl ::core::convert::From<StrictBits> for WireStrictBits {
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireEmptyBits> for ::fidl_test_bits::EmptyBits {
+        #[inline]
+        fn take_from(from: &crate::WireEmptyBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireFlexibleBits> for ::fidl_test_bits::FlexibleBits {
+        #[inline]
+        fn take_from(from: &crate::WireFlexibleBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireMyBits> for ::fidl_test_bits::MyBits {
+        #[inline]
+        fn take_from(from: &crate::WireMyBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStrictBits> for ::fidl_test_bits::StrictBits {
+        #[inline]
+        fn take_from(from: &crate::WireStrictBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+}

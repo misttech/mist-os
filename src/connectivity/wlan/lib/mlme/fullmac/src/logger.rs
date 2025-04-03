@@ -13,13 +13,14 @@ pub fn init() {
     // a shared `Once::call_once()`.
     LOGGER_ONCE.call_once(|| {
         // Initialize logging with a tag that can be used to filter for forwarding to console
-        // Crash instead of proceeding without logging
-        #[expect(clippy::expect_used)]
-        diagnostics_log::initialize(
+        // Ignore failures as they might occur due to previously installed logger by the driver
+        // host.
+        if let Err(e) = diagnostics_log::initialize(
             PublishOptions::default()
                 .tags(&["wlan"])
                 .enable_metatag(diagnostics_log::Metatag::Target),
-        )
-        .expect("initialize logging should succeed")
+        ) {
+            eprintln!("Error initializing logging at driver startup: {e}");
+        }
     });
 }

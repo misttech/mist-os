@@ -463,13 +463,10 @@ mod test {
     use maplit::hashmap;
     #[cfg(target_os = "fuchsia")]
     use {
-        fidl::endpoints::ServerEnd,
+        fidl::endpoints::Proxy as _,
         fidl_fuchsia_io as fio,
         futures::future::join3,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
+        vfs::{file::vmo::read_only, pseudo_directory},
         zx,
     };
 
@@ -679,17 +676,9 @@ mod test {
             "test_file.txt" => read_only("Hello, World!"),
         };
 
-        let (directory_client, directory_service) =
-            fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(directory_service.into_channel()),
-        );
+        let directory_proxy = vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
+        let directory_client =
+            fidl::endpoints::ClientEnd::new(directory_proxy.into_channel().unwrap().into());
 
         let (_pair_1, pair_2) = zx::EventPair::create();
 

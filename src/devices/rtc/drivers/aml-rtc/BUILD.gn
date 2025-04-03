@@ -25,7 +25,7 @@ fuchsia_cc_driver("aml-rtc-driver") {
   deps = [
     ":aml_rtc_bind",
     "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/rtc/lib/rtc:rtc_llcpp",

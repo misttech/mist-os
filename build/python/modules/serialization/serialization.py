@@ -22,12 +22,12 @@ Example:
     class Child:
         name: str
         height: Optional[int] = None
-        interests: List[str] = field(default_factory=list)
+        interests: list[str] = field(default_factory=list)
 
     @dataclass
     class Parent:
         name: str
-        children: List[Child] = field(default_factory=list)
+        children: list[Child] = field(default_factory=list)
 
     parent = Parent("Some Person")
     parent.children.append(Child("A Child", 130, ["reading", "cats"]))
@@ -91,21 +91,12 @@ to print:
 import dataclasses
 import functools
 import inspect
+import io
 import json
 import types
 import typing
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Set,
-    Type,
-    TypeVar,
-    Union,
-    get_type_hints,
-)
+from collections.abc import Callable
+from typing import Any, Optional, TypeVar, Union, get_type_hints
 
 __all__ = [
     "instance_from_dict",
@@ -129,7 +120,7 @@ C = TypeVar("C")
 #
 
 
-def instance_from_dict(cls: Type[C], a_dict: Dict[str, Any]) -> C:
+def instance_from_dict(cls: type[C], a_dict: dict[str, Any]) -> C:
     """Instantiate an object from a dictionary of its field values.
 
     The default strategy is to instantiate a default instance of the class, and
@@ -146,20 +137,15 @@ def instance_from_dict(cls: Type[C], a_dict: Dict[str, Any]) -> C:
 
     # Strip the fields that were provided via the constructor.
     fields_to_read = {
-        name: field_types[name]
-        for name in field_types.keys()
+        name: field_type
+        for name, field_type in field_types.items()
         if name not in init_param_types
     }
-
-    # Get the values to create the instance with.
-    named_values = _get_named_values_from(a_dict, fields_to_read, cls)
 
     # Now, validate that the dict doesn't contain anything extraneous by taking
     # the set of keys in the supplied dictionary, and removing from it the names
     # of all the fields, and if any keys are left, then error out.
-    supplied_names = set(a_dict.keys())
-    for key in field_types.keys():
-        supplied_names.discard(key)
+    supplied_names = set(a_dict.keys()) - set(field_types.keys())
     if len(supplied_names) != 0:
         raise KeyError(
             f"Unknown fields found when deserializing {cls.__name__}: {', '.join(supplied_names)}"
@@ -168,13 +154,14 @@ def instance_from_dict(cls: Type[C], a_dict: Dict[str, Any]) -> C:
     # If any fields weren't set via the constructor, set those attributes on the
     # class directly.  For classes that use @dataclass, this is likely to be
     # empty.
-    for field_name, value in named_values:
+    named_values = _get_named_values_from(a_dict, fields_to_read, cls)
+    for field_name, value in named_values.items():
         setattr(instance, field_name, value)
 
     return instance
 
 
-def _get_fn_param_types(cls: Type[Any], fn_name: str) -> Dict[str, Type[Any]]:
+def _get_fn_param_types(cls: type[Any], fn_name: str) -> dict[str, type[Any]]:
     """Get the names and types of the parameters of the fn with the given name
     for the given class.
 
@@ -189,10 +176,10 @@ def _get_fn_param_types(cls: Type[Any], fn_name: str) -> Dict[str, Type[Any]]:
 
 
 def _get_named_values_from(
-    entries: Dict[str, Any],
-    names_and_types: Dict[str, Type[Any]],
-    for_cls: Type[Any],
-) -> Dict[str, Any]:
+    entries: dict[str, Any],
+    names_and_types: dict[str, type[Any]],
+    for_cls: type[Any],
+) -> dict[str, Any]:
     """Take a Dict of name:value, and a dict of name:types, and return a dict of
     name to instantiated-type-for-value, for the class given by `for_cls`.
 
@@ -201,12 +188,12 @@ def _get_named_values_from(
 
     Example::
         >>> entry = { "my_int": "42", "some_vals": [ "1", "2", "3" ]}
-        >>> names_and_types = { "my_int":"int", "some_vals": "List[int]", "has_a_default": "int" }
+        >>> names_and_types = { "my_int":"int", "some_vals": "list[int]", "has_a_default": "int" }
         >>> get_named_values_from(entry, names_and_types, my_class)
         {"my_int":42, "some_vals":[1, 2, 3]}
 
     """
-    values = {}
+    values: dict[str, Any] = {}
     for name, cls in names_and_types.items():
         if name in entries:
             values[name] = _parse_value_into(entries[name], cls)
@@ -222,17 +209,15 @@ def _get_named_values_from(
     return values
 
 
-def _has_default_value(cls: Type[Any], field: str) -> Any:
+def _has_default_value(cls: type[Any], field: str) -> Any:
     """Returns if the given field of a class has a default value (requires a
     @dataclass-based class, others will silently return 'False')
     """
-    dataclass_fields: Optional[Dict] = getattr(
+    dataclass_fields: Optional[dict[str, Any]] = getattr(
         cls, "__dataclass_fields__", None
     )
     if dataclass_fields:
-        field_entry: Optional[dataclasses.Field] = dataclass_fields.get(
-            field, None
-        )
+        field_entry = dataclass_fields.get(field, None)
         if field_entry:
             has_value = field_entry.default is not dataclasses.MISSING
             has_factory = field_entry.default_factory is not dataclasses.MISSING
@@ -242,8 +227,8 @@ def _has_default_value(cls: Type[Any], field: str) -> Any:
 
 def _parse_value_into(
     value: Any,
-    cls: Type[Union[Dict, List, Set, C]],
-) -> Union[Dict, List, Set, C]:
+    cls: type[Any],
+) -> dict[str, Any] | list[Any] | set[Any] | C | None:
     """For a class, attempt to parse it from the value."""
     if value is None:
         return None
@@ -258,7 +243,7 @@ def _parse_value_into(
 
         # value also has to be a dict
         if type(value) is dict:
-            result = dict()
+            result: dict[str, Any] = {}
             for key, dict_value in value.items():
                 key = _parse_value_into(key, dict_key_type)
                 result[key] = _parse_value_into(dict_value, dict_value_type)
@@ -302,7 +287,7 @@ def _parse_value_into(
     ):
         # Unions are special, because we don't know what value we can make, so
         # just try them all, in order, until we get one that works.
-        errors = []
+        errors: list[BaseException] = []
         type_options = [*typing.get_args(cls)]
 
         # Strip the Nonetype
@@ -351,7 +336,7 @@ def _parse_value_into(
         return cls(value)
 
 
-def _has_field_types(cls: Type[Any]) -> bool:
+def _has_field_types(cls: type[Any]) -> bool:
     """Returns True if the class in question has member field type annotations.
 
     This is akin to [`typing.get_type_hints()`], except that this doesn't raise
@@ -369,7 +354,7 @@ def _has_field_types(cls: Type[Any]) -> bool:
 #
 
 
-def instance_to_dict(instance: Any) -> Dict[str, Any]:
+def instance_to_dict(instance: Any) -> dict[str, Any]:
     """Convert the object to a dictionary of its fields, ready for serialization
     into JSON.
 
@@ -395,10 +380,10 @@ def instance_to_dict(instance: Any) -> Dict[str, Any]:
         if value is not None:
             # If a serializer fn was added via metadata, use that. Otherwise use
             # the "default" handler
-            metadata: Optional[Dict] = getattr(
+            metadata: Optional[dict[str, Any]] = getattr(
                 instance.__class__, "__SERIALIZE_AS__", None
             )
-            serializer: Optional[Callable] = None
+            serializer: Optional[Callable[[Any], Any]] = None
             if metadata:
                 serializer = metadata.get(name)
             if serializer:
@@ -409,7 +394,7 @@ def instance_to_dict(instance: Any) -> Dict[str, Any]:
     return result
 
 
-def make_dict_value_for(obj: Any) -> Union[Dict, List, str, int]:
+def make_dict_value_for(obj: Any) -> dict[str, Any] | list[Any] | str | int:
     """Create the value to put into a dictionary for the given object."""
     if isinstance(obj, dict):
         # Dicts are special, and need to be treated individually.
@@ -447,7 +432,7 @@ def make_dict_value_for(obj: Any) -> Union[Dict, List, str, int]:
 #
 
 
-def json_loads(cls: Type[C], s: str) -> C:
+def json_loads(cls: type[C], s: str) -> C:
     """Deserialize an instance of type 'cls' from JSON in the string 's'.
 
     This supports classes that use PEP-526 type annotations, and is meant to
@@ -464,7 +449,7 @@ def json_loads(cls: Type[C], s: str) -> C:
     return instance_from_dict(cls, json.loads(s))
 
 
-def json_load(cls: Type[C], fp) -> C:
+def json_load(cls: type[C], fp: io.IOBase) -> C:
     """Deserialize an instance of type 'cls' from JSON read from a read()-
     supporting object.
 
@@ -488,7 +473,7 @@ def json_load(cls: Type[C], fp) -> C:
 #
 
 
-def json_dump(instance: Any, fp, **kwargs) -> None:
+def json_dump(instance: Any, fp: io.IOBase, **kwargs: Any) -> None:
     """Serialize an object into json written to a write()-supporting object.
 
     This supports classes that use PEP-526 type annotations, and is meant to
@@ -505,7 +490,7 @@ def json_dump(instance: Any, fp, **kwargs) -> None:
     json.dump(instance_to_dict(instance), fp, **kwargs)
 
 
-def json_dumps(instance: Any, **kwargs) -> str:
+def json_dumps(instance: Any, **kwargs: Any) -> str:
     """Serialize an object into json written to a string.
 
     This supports classes that use PEP-526 type annotations, and is meant to
@@ -528,7 +513,7 @@ def json_dumps(instance: Any, **kwargs) -> str:
 #
 
 
-def serialize_dict(cls: Type[C]) -> Type[C]:
+def serialize_dict(cls: type[C]) -> type[C]:
     """A decorator that adds dictionary-based serialization and deserialization
     fns to the class, which operate using the type annotations for the class's
     members and the params of the __init__() fn.
@@ -548,7 +533,7 @@ def serialize_dict(cls: Type[C]) -> Type[C]:
     This decorator adds the following functions to the class definition:
     ```
     @classfunction
-    def from_dict(cls: Type[Self], value: Dict) -> Self:
+    def from_dict(cls: type[Self], value: Dict) -> Self:
       return serialization.instance_from_dict(cls, value)
 
     def to_dict(self) -> Dict:
@@ -560,7 +545,7 @@ def serialize_dict(cls: Type[C]) -> Type[C]:
     when used.
     """
 
-    def wrap(cls: Type[C]) -> Type[C]:
+    def wrap(cls: type[C]) -> type[C]:
         _bind_class_fn(cls, instance_from_dict, "from_dict")
         _bind_instance_fn(cls, instance_to_dict, "to_dict")
         return cls
@@ -568,7 +553,7 @@ def serialize_dict(cls: Type[C]) -> Type[C]:
     return wrap(cls)
 
 
-def serialize_json(cls: Type[C]) -> Type[C]:
+def serialize_json(cls: type[C]) -> type[C]:
     """A decorator that adds JSON serialization and deserialization fns to the
     class, which follow the [`json.load()`], [`json.dumps()`], etc. functions.
     They operate using the type annotations for the class's members and the
@@ -589,11 +574,11 @@ def serialize_json(cls: Type[C]) -> Type[C]:
     This decorator adds the following functions to the class definition:
     ```
     @classfunction
-    def json_loads(cls: Type[Self], value: str) -> Self:
+    def json_loads(cls: type[Self], value: str) -> Self:
       return serialization.json_loads(cls, value)
 
     @classfunction
-    def json_load(cls: Type[Self], fp: SupportsRead) -> Self:
+    def json_load(cls: type[Self], fp: SupportsRead) -> Self:
       return serialization.json_load(cls, fp)
 
     def json_dumps(self, **kwargs) -> str:
@@ -608,7 +593,7 @@ def serialize_json(cls: Type[C]) -> Type[C]:
     when used.
     """
 
-    def wrap(cls: Type[C]) -> Type[C]:
+    def wrap(cls: type[C]) -> type[C]:
         _bind_class_fn(cls, json_load)
         _bind_class_fn(cls, json_loads)
         _bind_instance_fn(cls, json_dump)
@@ -618,7 +603,7 @@ def serialize_json(cls: Type[C]) -> Type[C]:
     return wrap(cls)
 
 
-def serialize_fields_as(**kwargs) -> Callable[[Type[C]], Type[C]]:
+def serialize_fields_as(**kwargs: Any) -> Callable[[type[C]], type[C]]:
     """Adds serialization metadata to the class, which is used to augment the
     PEP 526 __annotations__ to determine how to serialize the fields of the
     given class.
@@ -646,7 +631,7 @@ def serialize_fields_as(**kwargs) -> Callable[[Type[C]], Type[C]]:
     ```
     """
 
-    def wrap(cls: Type[C]) -> Type[C]:
+    def wrap(cls: type[C]) -> type[C]:
         return _process_metadata(cls, **kwargs)
 
     return wrap
@@ -658,7 +643,7 @@ def serialize_fields_as(**kwargs) -> Callable[[Type[C]], Type[C]]:
 #
 
 
-def _bind_class_fn(cls: Type[C], fn: Callable, name: Optional[str] = None):
+def _bind_class_fn(cls: type[C], fn: Any, name: Optional[str] = None) -> None:
     """Creates a class-fn for a class by binding the passed-in class as the first
     param of the passed-in function, and then adding it as a callable attribute
     to the class.
@@ -668,7 +653,9 @@ def _bind_class_fn(cls: Type[C], fn: Callable, name: Optional[str] = None):
     setattr(cls, name, functools.partial(fn, cls))
 
 
-def _bind_instance_fn(cls: Type[C], fn: Callable, name: Optional[str] = None):
+def _bind_instance_fn(
+    cls: type[C], fn: Any, name: Optional[str] = None
+) -> None:
     """Creates an instance-fn for a class by adding it as a callable attribute
     of the class.
     """
@@ -677,7 +664,7 @@ def _bind_instance_fn(cls: Type[C], fn: Callable, name: Optional[str] = None):
     setattr(cls, name, fn)
 
 
-def _process_metadata(cls: Type[C], **kwargs) -> Type[C]:
+def _process_metadata(cls: type[C], **kwargs: Any) -> type[C]:
     for name in kwargs.keys():
         if not hasattr(cls, name):
             annotations = get_type_hints(cls)

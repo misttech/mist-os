@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <cinttypes>
 #include <sstream>
 
 #include <fbl/string_buffer.h>
@@ -18,7 +19,7 @@ namespace zxtest::internal {
 namespace {
 
 fbl::String FormatTimeMs(uint64_t time_ms) {
-  return fbl::StringPrintf("%lu.%03lus", time_ms / 1000, time_ms % 1000);
+  return fbl::StringPrintf("%" PRIu64 ".%03" PRIu64 "s", time_ms / 1000, time_ms % 1000);
 }
 
 class CustomFileSinkWriter {

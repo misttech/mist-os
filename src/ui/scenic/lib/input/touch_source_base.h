@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_INPUT_TOUCH_SOURCE_BASE_H_
 #define SRC_UI_SCENIC_LIB_INPUT_TOUCH_SOURCE_BASE_H_
 
+#include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/status.h>

@@ -5,6 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.test.context") {
+  testonly = true
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "UI"
+
   # DO NOT CHANGE
   sources = [ "context.fidl" ]
 

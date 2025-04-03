@@ -55,17 +55,16 @@ function needs-update {
 }
 
 function target-using-omaha-client {
-  [[ "$(ffx component capability fuchsia.update.Manager)" == *"/core/system-update/omaha-client-service"* ]]
+  [[ "$(ffx component capability fuchsia.update.Manager)" == *"core/system-update/omaha-client-service"* ]]
 }
 
 function main {
   local build=false
-  local build_targets=("updates")
+  local build_targets=("//build/images/updates")
   if is_feature_enabled "incremental"; then
     # In incremental workflows, these defaults have changed.
     # Keep old behavior if incremental is not enabled.
     build=true
-    build_targets=("build/images/updates")
   fi
   while (( $# )); do
     case "$1" in

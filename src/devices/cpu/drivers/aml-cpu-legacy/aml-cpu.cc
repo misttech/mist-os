@@ -9,7 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/errors.h>
@@ -132,17 +132,20 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   // Look up the CPU version.
   uint32_t cpu_version_packed = 0;
   {
-    ddk::PDevFidl pdev_client = ddk::PDevFidl::FromFragment(parent);
-    if (!pdev_client.is_valid()) {
-      return ZX_ERR_INTERNAL;
+    zx::result pdev_client_end =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent,
+                                                                                          "pdev");
+    if (pdev_client_end.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+      return pdev_client_end.status_value();
     }
+    fdf::PDev pdev{std::move(pdev_client_end.value())};
 
     // Map AOBUS registers
-    std::optional<fdf::MmioBuffer> mmio_buffer;
-
-    if ((status = pdev_client.MapMmio(0, &mmio_buffer)) != ZX_OK) {
-      zxlogf(ERROR, "aml-cpu: Failed to map mmio, st = %d", status);
-      return status;
+    zx::result mmio_buffer = pdev.MapMmio(0);
+    if (mmio_buffer.is_error()) {
+      zxlogf(ERROR, "Failed to map mmio: %s", mmio_buffer.status_string());
+      return mmio_buffer.status_value();
     }
 
     cpu_version_packed = mmio_buffer->Read32(kCpuVersionOffset);

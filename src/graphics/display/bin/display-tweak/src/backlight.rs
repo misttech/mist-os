@@ -5,17 +5,22 @@
 use anyhow::{Context as _, Error};
 use argh::FromArgs;
 use fidl_fuchsia_hardware_backlight as backlight;
+use fuchsia_component::client::Service;
 
 use crate::utils::{self, on_off_to_bool};
 
 /// Obtains a handle to the backlight service at the default hard-coded path.
-fn open_backlight() -> Result<backlight::DeviceProxy, Error> {
+async fn open_backlight() -> Result<backlight::DeviceProxy, Error> {
     log::trace!("Opening backlight device");
-    let (proxy, server) = fidl::endpoints::create_proxy::<backlight::DeviceMarker>();
-    fdio::service_connect("/dev/class/backlight/000", server.into_channel())
-        .context("Failed to connect to default backlight service")?;
-
-    Ok(proxy)
+    let device = Service::open(backlight::ServiceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to find instance")?
+        .connect_to_backlight()
+        .context("Failed to connect to backlight service")?;
+    log::info!("Opening backlight");
+    Ok(device)
 }
 
 #[derive(Debug)]
@@ -37,8 +42,8 @@ pub struct BacklightCmd {
 }
 
 impl Backlight {
-    pub fn new() -> Result<Backlight, Error> {
-        let device = open_backlight()?;
+    pub async fn new() -> Result<Backlight, Error> {
+        let device = open_backlight().await?;
         Ok(Backlight { device })
     }
 
@@ -72,7 +77,7 @@ impl Backlight {
 
 impl BacklightCmd {
     pub async fn exec(&self) -> Result<(), Error> {
-        let mut backlight = Backlight::new()?;
+        let mut backlight = Backlight::new().await?;
         backlight.read_and_modify_state(self).await
     }
 }

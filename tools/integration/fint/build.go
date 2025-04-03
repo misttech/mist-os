@@ -15,6 +15,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -762,7 +763,7 @@ func constructNinjaTargets(
 				"archive", // Images and scripts for paving/netbooting.
 			}
 			for _, archive := range modules.Archives() {
-				if contains(archivesToBuild, archive.Name) && archive.Type == "tgz" {
+				if slices.Contains(archivesToBuild, archive.Name) && archive.Type == "tgz" {
 					targets = append(targets, archive.Path)
 					archiveStruct, err := toStructPB(archive)
 					if err != nil {
@@ -782,7 +783,7 @@ func constructNinjaTargets(
 			// Clang-Tidy should be integrated into the build system so that the
 			// necessary generated files are built automatically when Clang-Tidy
 			// is run.
-			if contains([]string{".cc", ".h"}, filepath.Ext(f)) {
+			if slices.Contains([]string{".cc", ".h"}, filepath.Ext(f)) {
 				targets = append(targets, f)
 			}
 		}
@@ -830,7 +831,7 @@ func isTestingImage(image build.Image, pave bool) bool {
 		return true
 	case !pave && len(image.NetbootArgs) != 0: // Used for netboot.
 		return true
-	case contains(qemuImageNames, image.Name): // Used for QEMU.
+	case slices.Contains(qemuImageNames, image.Name): // Used for QEMU.
 		return true
 	case image.Name == "uefi-disk": // Used for GCE.
 		return true

@@ -5,6 +5,11 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+group("tests") {
+  testonly = true
+  deps = [ ":starnix-nanohub-tests" ]
+}
+
 fuchsia_package_with_single_component("sockettunnel") {
   manifest = "meta/sockettunnel.cml"
 }
@@ -18,22 +23,45 @@ rustc_library("nanohub") {
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
+  with_unit_tests = true
+
+  # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
 
   sources = [
     "lib.rs",
     "nanohub.rs",
     "nanohub_comms_directory.rs",
+    "nanohub_firmware_file.rs",
     "nanohub_socket_file.rs",
     "socket_tunnel_file.rs",
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.google.nanohub:fuchsia.hardware.google.nanohub_rust",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",
     "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_rust",
     "//sdk/rust/zx",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",
+    "//third_party/rust_crates:futures",
   ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+}
+
+fuchsia_unittest_package("starnix-nanohub-tests") {
+  manifest = "meta/starnix_nanohub_tests.cml"
+  deps = [ ":nanohub_test" ]
+  test_type = "starnix"
 }

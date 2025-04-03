@@ -1,0 +1,59 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    use: [
+        {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            key: "extra_features",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            default: [],
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.starnix.config.container.MlockAlwaysOnFault",
+            key: "mlock_always_onfault",
+            type: "bool",
+            default: true,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.starnix.config.container.MlockPinFlavor",
+            key: "mlock_pin_flavor",
+            type: "string",
+            max_size: 100,
+            default: "noop",
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.time.config.WritableUTCTime",
+            key: "enable_utc_time_adjustment",
+            type: "bool",
+            default: false,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            key: "ui_visual_debugging_level",
+            type: "uint8",
+            default: 0,
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+    ],
+}

@@ -8,6 +8,8 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -17,15 +19,14 @@
 
 #include <vector>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
 #include "../audio-stream.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+
 namespace audio::aml_g12 {
 
 namespace audio_fidl = fuchsia_hardware_audio;
@@ -144,7 +145,7 @@ class StreamTest : public zxtest::Test {
     auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     auto controller =
         audio::SimpleAudioStream::Create<T>(fake_parent_.get(), std::move(codec), mmio_reg_region,
-                                            ddk::PDevFidl(), std::move(enable_gpio_client));
+                                            fdf::PDev(), std::move(enable_gpio_client));
     VerifyGpioAfterCreate();
     return controller;
   }
@@ -155,7 +156,7 @@ class StreamTest : public zxtest::Test {
       std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codecs) {
     auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     auto controller = audio::SimpleAudioStream::Create<T>(
-        fake_parent_.get(), std::move(codecs), mmio_reg_region, ddk::PDevFidl(),
+        fake_parent_.get(), std::move(codecs), mmio_reg_region, fdf::PDev(),
         std::move(enable_gpio_client), fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
         fidl::WireSyncClient<fuchsia_hardware_clock::Clock>());
     VerifyGpioAfterCreate();
@@ -166,7 +167,7 @@ class StreamTest : public zxtest::Test {
   fbl::RefPtr<T> CreateController(ddk_mock::MockMmioRegRegion& mmio_reg_region) {
     auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     auto controller = audio::SimpleAudioStream::Create<T>(
-        fake_parent_.get(), mmio_reg_region, ddk::PDevFidl(), std::move(enable_gpio_client));
+        fake_parent_.get(), mmio_reg_region, fdf::PDev(), std::move(enable_gpio_client));
     VerifyGpioAfterCreate();
     return controller;
   }
@@ -303,7 +304,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
   }
   AmlG12I2sOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
-                   ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                   ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
@@ -321,7 +322,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
   }
   AmlG12I2sOutTest(zx_device_t* parent,
                    std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends,
-                   ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                   ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio,
                    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
                    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
@@ -420,7 +421,7 @@ TEST_F(StreamTest, InitializeI2sOut) {
 struct AmlG12PcmOutTest : public AmlG12I2sOutTest {
   AmlG12PcmOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
-                   ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                   ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
@@ -476,7 +477,7 @@ TEST_F(StreamTest, InitializePcmOut) {
 struct AmlG12LjtOutTest : public AmlG12I2sOutTest {
   AmlG12LjtOutTest(zx_device_t* parent,
                    fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
-                   ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                   ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
@@ -526,7 +527,7 @@ TEST_F(StreamTest, InitializeLeftJustifiedOut) {
 struct AmlG12Tdm1OutTest : public AmlG12I2sOutTest {
   AmlG12Tdm1OutTest(zx_device_t* parent,
                     fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
-                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                    ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                     fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                          std::move(enable_gpio)) {
@@ -1493,7 +1494,7 @@ TEST_F(StreamTest, EnableAndMuteChannelsTdm2Lanes) {
   struct AmlG12Tdm2LanesOutMuteTest : public AmlG12I2sOutTest {
     AmlG12Tdm2LanesOutMuteTest(zx_device_t* parent,
                                fidl::ClientEnd<fuchsia_hardware_audio::Codec> codec_client_end,
-                               ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+                               ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
         : AmlG12I2sOutTest(parent, std::move(codec_client_end), region, std::move(pdev),
                            std::move(enable_gpio)) {
@@ -1636,7 +1637,7 @@ TEST_F(StreamTest, EnableAndMuteChannelsTdm1Lane) {
 }
 
 struct AmlG12I2sInTest : public AmlG12TdmStream {
-  AmlG12I2sInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+  AmlG12I2sInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, true, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
@@ -1685,7 +1686,7 @@ struct AmlG12I2sInTest : public AmlG12TdmStream {
 };
 
 struct AmlG12PcmInTest : public AmlG12I2sInTest {
-  AmlG12PcmInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
+  AmlG12PcmInTest(zx_device_t* parent, ddk_mock::MockMmioRegRegion& region, fdf::PDev pdev,
                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12I2sInTest(parent, region, std::move(pdev), std::move(enable_gpio)) {
     metadata_.ring_buffer.number_of_channels = 1;
@@ -1756,22 +1757,22 @@ class FakeMmio {
   FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {}
 
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
-  ddk_fake::FakeMmioReg& AtIndex(size_t ix) { return mmio_[ix * sizeof(uint32_t)]; }
+  fake_mmio::FakeMmioReg& AtIndex(size_t ix) { return mmio_[ix * sizeof(uint32_t)]; }
 
  private:
   static constexpr size_t kRegCount =
       S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
 class TestAmlG12TdmStream : public AmlG12TdmStream {
  public:
-  explicit TestAmlG12TdmStream(zx_device_t* parent, ddk::PDevFidl pdev,
+  explicit TestAmlG12TdmStream(zx_device_t* parent, fdf::PDev pdev,
                                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
@@ -1804,7 +1805,7 @@ class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
     fake_parent_ = MockDevice::FakeRootParent();
   }
 
-  zx::result<ddk::PDevFidl> StartPDev() {
+  zx::result<fdf::PDev> StartPDev() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
     if (endpoints.is_error()) {
       return endpoints.take_error();
@@ -1815,7 +1816,7 @@ class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
       return zx::error(status);
     }
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.mmios[0] = mmio_.mmio();
     config.use_fake_bti = true;
     zx::interrupt irq;
@@ -1830,7 +1831,7 @@ class AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
       infra->pdev_server.SetConfig(std::move(config));
       infra->pdev_server.Connect(std::move(server));
     });
-    return zx::ok(ddk::PDevFidl(std::move(endpoints->client)));
+    return zx::ok(fdf::PDev(std::move(endpoints->client)));
   }
 
   void CreateRingBuffer() {
@@ -2085,7 +2086,7 @@ TEST_F(PowerManagementTest, ClockGating) {
   auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   auto device = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
       fake_parent_.get(), std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>>{},
-      unused_mock, ddk::PDevFidl(), std::move(enable_gpio_client), std::move(clock_gate_client_),
+      unused_mock, fdf::PDev(), std::move(enable_gpio_client), std::move(clock_gate_client_),
       std::move(pll_client_));
   auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);

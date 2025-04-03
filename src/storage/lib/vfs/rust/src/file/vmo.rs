@@ -102,7 +102,8 @@ impl FileLike for VmoFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        StreamIoConnection::spawn(scope, self, options, object_request)
+        StreamIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 

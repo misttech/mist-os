@@ -114,7 +114,6 @@
                 "mincore02",
                 "mincore03",
                 "mincore04",
-                "mlock02",
                 "mlock201",
                 "mlock203",
                 "mlockall01",
@@ -129,7 +128,6 @@
                 "mprotect05",
                 "msync03",
                 "msync04",
-                "munlock02",
                 "munlockall01",
                 "perf_event_open01",
 

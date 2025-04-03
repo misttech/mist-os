@@ -108,6 +108,7 @@
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.StallResource",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.process.Launcher",
@@ -160,12 +161,19 @@
             from: "#bootstrap",
             to: "#core",
         },
+        {
+            directory: "debug_block",
+            from: "#bootstrap",
+            to: "#core",
+            availability: "optional",
+        },
 
         // Non-zircon services for bootstrap
         {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.LogSettings",
+                "fuchsia.driver.crash.CrashIntrospect",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.fshost.Admin",
@@ -193,7 +201,6 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
-                "fuchsia.update.verify.BlobfsVerifier",
             ],
             from: "#bootstrap",
             to: "#core",
@@ -310,7 +317,7 @@
                 "fuchsia.hardware.goldfish.ControllerService",
                 "fuchsia.hardware.goldfish.ControlService",
                 "fuchsia.hardware.goldfish.SyncService",
-                "fuchsia.hardware.gpu.mali.Service",
+                "fuchsia.hardware.gpu.mali.UtilsService",
                 "fuchsia.hardware.hrtimer.Service",
                 "fuchsia.hardware.i2c.Service",
                 "fuchsia.hardware.input.Service",
@@ -327,7 +334,7 @@
                 "fuchsia.hardware.registers.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sdio.DriverService",
-                "fuchsia.hardware.Serial.ProxyService",
+                "fuchsia.hardware.serial.Service",
                 "fuchsia.hardware.skipblock.Service",
                 "fuchsia.hardware.spi.ControllerService",
                 "fuchsia.hardware.tee.Service",

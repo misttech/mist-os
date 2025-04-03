@@ -11,7 +11,9 @@ use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
 };
-use netstack_testing_common::wait_for_component_stopped;
+use netstack_testing_common::{
+    get_component_stopped_event_stream, wait_for_component_stopped_with_stream,
+};
 
 const IPERF_URL: &str = "#meta/iperf.cm";
 const NAME_PROVIDER_URL: &str = "#meta/device-name-provider.cm";
@@ -80,12 +82,14 @@ fn device_name_provider_component() -> fnetemul::ChildDef {
 }
 
 async fn watch_for_exit(
+    event_stream: &mut component_events::events::EventStream,
     realm: &netemul::TestRealm<'_>,
     component_moniker: &str,
 ) -> component_events::events::ExitStatus {
-    let event = wait_for_component_stopped(&realm, component_moniker, None)
-        .await
-        .expect("observe stopped event");
+    let event =
+        wait_for_component_stopped_with_stream(event_stream, &realm, component_moniker, None)
+            .await
+            .expect("observe stopped event");
     let component_events::events::StoppedPayload { status, .. } =
         event.result().expect("extract event payload");
     *status
@@ -239,17 +243,23 @@ async fn bench<N: Netstack, I: TestIpExt>(
 
     // Start the iPerf client until a successful run is observed.
     let realm_ref = &realm;
-    let mut servers = futures::future::select_all(
-        (0..flows)
-            .map(|i| Box::pin(async move { watch_for_exit(realm_ref, &server_moniker(i)).await })),
-    )
+    let mut servers = futures::future::select_all((0..flows).map(|i| {
+        Box::pin(async move {
+            let mut stream = get_component_stopped_event_stream().await.expect("get event stream");
+            watch_for_exit(&mut stream, realm_ref, &server_moniker(i)).await
+        })
+    }))
     .fuse();
     let mut clients = futures::future::join_all((0..flows).map(|i| async move {
         loop {
+            // Create an event stream watcher before starting the client so we're sure to
+            // observe its stopped event.
+            let mut stream = get_component_stopped_event_stream().await.expect("get event stream");
+
             realm_ref.start_child_component(&client_moniker(i)).await.expect("start client");
-            if watch_for_exit(realm_ref, &client_moniker(i)).await
-                == component_events::events::ExitStatus::Clean
-            {
+
+            let status = watch_for_exit(&mut stream, realm_ref, &client_moniker(i)).await;
+            if status == component_events::events::ExitStatus::Clean {
                 return;
             }
         }
@@ -277,12 +287,7 @@ mod test {
 
     use super::*;
 
-    async fn wait_for_log(
-        stream: diagnostics_reader::Subscription<
-            diagnostics_reader::Data<diagnostics_reader::Logs>,
-        >,
-        log: &str,
-    ) {
+    async fn wait_for_log(stream: diagnostics_reader::Subscription, log: &str) {
         stream
             .filter_map(|data| {
                 futures::future::ready(
@@ -303,6 +308,11 @@ mod test {
     async fn version<N: Netstack>(name: &str) {
         let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
+        // Create an event stream watcher before starting iPerf so we're sure to observe
+        // its stopped event.
+        let mut component_stopped_event_stream =
+            get_component_stopped_event_stream().await.expect("get event stream");
+
         const IPERF_MONIKER: &str = "iperf";
         let realm = sandbox
             .create_netstack_realm_with::<N, _, _>(
@@ -322,17 +332,14 @@ mod test {
             .expect("subscribe to logs");
 
         let watch_exit_fut = async move {
-            log::info!("waiting for {:?} to exit", IPERF_MONIKER);
-            let status = watch_for_exit(&realm, IPERF_MONIKER).await;
-            log::info!("observed {:?} exit", IPERF_MONIKER);
+            let status =
+                watch_for_exit(&mut component_stopped_event_stream, &realm, IPERF_MONIKER).await;
             assert_eq!(status, component_events::events::ExitStatus::Clean);
         };
 
         let watch_log_fut = async move {
             const WAIT_FOR_LOG: &str = "iperf 3.7-FUCHSIA";
-            log::info!("waiting for log {:?}", WAIT_FOR_LOG);
             wait_for_log(stream, WAIT_FOR_LOG).await;
-            log::info!("observed log {:?}", WAIT_FOR_LOG);
         };
 
         let ((), ()) = futures::future::join(watch_exit_fut, watch_log_fut).await;

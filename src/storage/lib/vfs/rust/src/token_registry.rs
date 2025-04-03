@@ -6,11 +6,12 @@
 
 use crate::directory::entry_container::MutableDirectory;
 use fidl::{Event, Handle, HandleBased, Rights};
+use fuchsia_sync::Mutex;
 use pin_project::{pin_project, pinned_drop};
 use std::collections::hash_map::{Entry, HashMap};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zx_status::Status;
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -56,7 +57,7 @@ impl TokenRegistry {
     /// automatically removed when Tokenizable is dropped.
     pub fn get_token<T: TokenInterface>(owner: Pin<&Tokenizable<T>>) -> Result<Handle, Status> {
         let ptr = owner.get_ref() as *const _ as *const ();
-        let mut this = owner.token_registry().inner.lock().unwrap();
+        let mut this = owner.token_registry().inner.lock();
         let Inner { owner_to_token, token_to_owner, .. } = &mut *this;
         match owner_to_token.entry(ptr) {
             Entry::Occupied(o) => o.into_mut(),
@@ -77,7 +78,7 @@ impl TokenRegistry {
     /// no such token exists (perhaps because the owner has been dropped).
     pub fn get_owner(&self, token: Handle) -> Result<Option<Arc<dyn MutableDirectory>>, Status> {
         let koid = token.get_koid()?;
-        let this = self.inner.lock().unwrap();
+        let this = self.inner.lock();
 
         match this.token_to_owner.get(&koid) {
             Some(owner) => {
@@ -92,7 +93,7 @@ impl TokenRegistry {
     // Unregisters the token. This is done automatically by Tokenizable below.
     fn unregister<T: TokenInterface>(&self, owner: &Tokenizable<T>) {
         let ptr = owner as *const _ as *const ();
-        let mut this = self.inner.lock().unwrap();
+        let mut this = self.inner.lock();
 
         if let Some(handle) = this.owner_to_token.remove(&ptr) {
             this.token_to_owner.remove(&handle.get_koid().unwrap()).unwrap();

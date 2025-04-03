@@ -8,7 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 #include <threads.h>
 #include <zircon/errors.h>
@@ -24,24 +24,27 @@
 namespace thermal {
 
 zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
-  ddk::PDevFidl pdev{device};
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "Failed to get platform device");
-    return ZX_ERR_INTERNAL;
+  zx::result pdev_client_end =
+      DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(device);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
-  pdev_device_info_t device_info{};
-  zx_status_t status = pdev.GetDeviceInfo(&device_info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get thermal config metadata: %s", zx_status_get_string(status));
-    return status;
+  zx::result device_info_result = pdev.GetDeviceInfo();
+  if (device_info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", device_info_result.status_string());
+    return device_info_result.status_value();
   }
+  fdf::PDev::DeviceInfo device_info = std::move(device_info_result.value());
 
   // Get the thermal policy metadata.
   size_t actual;
   fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config;
-  status = device_get_metadata(device, DEVICE_METADATA_THERMAL_CONFIG, &thermal_config,
-                               sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo), &actual);
+  zx_status_t status =
+      device_get_metadata(device, DEVICE_METADATA_THERMAL_CONFIG, &thermal_config,
+                          sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo), &actual);
   if (status != ZX_OK || actual != sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo)) {
     zxlogf(ERROR, "aml-thermal: Could not get thermal config metadata %d", status);
     return status;

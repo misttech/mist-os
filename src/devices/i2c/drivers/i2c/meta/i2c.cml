@@ -19,6 +19,7 @@
         { service: 'fuchsia.hardware.i2c.Service' },
     ],
     use: [
+        { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
         { service: "fuchsia.hardware.i2cimpl.Service" },
     ],
     expose: [

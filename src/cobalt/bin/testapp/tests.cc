@@ -153,6 +153,9 @@ bool TestLogInteger(CobaltTestAppLogger* logger, SystemClockInterface* clock,
       {{cobalt_registry::kUpdateDurationNewMetricId,
         cobalt_registry::kUpdateDurationNewUpdateDurationTimingStatsReportId},
        1},
+      {{cobalt_registry::kUpdateDurationNewMetricId,
+        cobalt_registry::kUpdateDurationNewDeviceHistogramsWithImpossibleBucketReportId},
+       1},
       {{cobalt_registry::kStreamingTimeNewMetricId,
         cobalt_registry::kStreamingTimeNewStreamingTimePerDeviceTotalReportId},
        1},
@@ -170,6 +173,9 @@ bool TestLogInteger(CobaltTestAppLogger* logger, SystemClockInterface* clock,
   std::map<std::pair<uint32_t, uint32_t>, uint64_t> expect_no_obs = {
       {{cobalt_registry::kUpdateDurationNewMetricId,
         cobalt_registry::kUpdateDurationNewUpdateDurationTimingStatsReportId},
+       0},
+      {{cobalt_registry::kUpdateDurationNewMetricId,
+        cobalt_registry::kUpdateDurationNewDeviceHistogramsWithImpossibleBucketReportId},
        0},
       {{cobalt_registry::kStreamingTimeNewMetricId,
         cobalt_registry::kStreamingTimeNewStreamingTimePerDeviceTotalReportId},
@@ -412,7 +418,8 @@ bool TestLogOccurrence(CobaltTestAppLogger* logger, SystemClockInterface* clock,
   return SendAndCheckSuccess("TestLogOccurrence", logger);
 }
 
-// power_usage_new and bandwidth_usage_new using INTEGER_HISTOGRAM metric.
+// power_usage_new, bandwidth_usage_new and data_usage_with_impossible_bucket using
+// INTEGER_HISTOGRAM metric.
 //
 // For each event vector, log one observation in each histogram bucket, using
 // decreasing values per bucket.
@@ -431,6 +438,9 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
       {{cobalt_registry::kBandwidthUsageNewMetricId,
         cobalt_registry::kBandwidthUsageNewBandwidthUsageHistogramsReportId},
        1},
+      {{cobalt_registry::kDataUsageWithImpossibleBucketMetricId,
+        cobalt_registry::kDataUsageWithImpossibleBucketFleetwideHistogramsReportId},
+       1},
   };
   std::map<std::pair<uint32_t, uint32_t>, uint64_t> expect_no_obs = {
       {{cobalt_registry::kPowerUsageNewMetricId,
@@ -438,6 +448,9 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
        0},
       {{cobalt_registry::kBandwidthUsageNewMetricId,
         cobalt_registry::kBandwidthUsageNewBandwidthUsageHistogramsReportId},
+       0},
+      {{cobalt_registry::kDataUsageWithImpossibleBucketMetricId,
+        cobalt_registry::kDataUsageWithImpossibleBucketFleetwideHistogramsReportId},
        0},
   };
 
@@ -481,6 +494,63 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
     }
   }
 
+  histogram.clear();
+
+  // Set up and send valid data_usage_with_impossible_bucket histograms.
+  for (uint32_t bucket : kDataUsageWithImpossibleBucketValidBucketIndices) {
+    histogram[bucket] = bucket + 1;
+  }
+  for (uint32_t state_index : kDataUsageWithImpossibleBucketApplicationStateIndices) {
+    for (uint32_t app_name_index : kDataUsageWithImpossibleBucketApplicationNameIndices) {
+      if (!logger->LogIntegerHistogram(cobalt_registry::kDataUsageWithImpossibleBucketMetricId,
+                                       {state_index, app_name_index}, histogram)) {
+        std::ostringstream test_failure_message_oss;
+        test_failure_message_oss << "LogIntegerHistogram("
+                                 << cobalt_registry::kDataUsageWithImpossibleBucketMetricId
+                                 << ", { application_state: " << state_index
+                                 << ", application_name: " << app_name_index << " }, buckets[";
+        for (uint32_t i = 0; i < kDataUsageWithImpossibleBucketValidBuckets - 1; i++) {
+          test_failure_message_oss << kDataUsageWithImpossibleBucketValidBucketIndices[i] << ", ";
+        }
+        test_failure_message_oss << kDataUsageWithImpossibleBucketValidBucketIndices
+                                        [kDataUsageWithImpossibleBucketValidBuckets - 1]
+                                 << "])";
+        FX_LOGS(INFO) << test_failure_message_oss.str();
+        FX_LOGS(INFO) << "TestLogIntegerHistogram : FAIL";
+        return false;
+      }
+    }
+  }
+
+  histogram.clear();
+
+  // Set up and log invalid data_usage_with_impossible_bucket histograms with logging to impossible
+  // bucket.
+  for (uint32_t bucket : kDataUsageWithImpossibleBucketInvalidBucketIndices) {
+    histogram[bucket] = bucket + 1;
+  }
+  for (uint32_t state_index : kDataUsageWithImpossibleBucketApplicationStateIndices) {
+    for (uint32_t app_name_index : kDataUsageWithImpossibleBucketApplicationNameIndices) {
+      if (logger->LogIntegerHistogram(cobalt_registry::kDataUsageWithImpossibleBucketMetricId,
+                                      {state_index, app_name_index}, histogram)) {
+        std::ostringstream test_failure_message_oss;
+        test_failure_message_oss << "LogIntegerHistogram("
+                                 << cobalt_registry::kDataUsageWithImpossibleBucketMetricId
+                                 << ", { application_state: " << state_index
+                                 << ", application_name: " << app_name_index << " }, buckets[";
+        for (uint32_t i = 0; i < kDataUsageWithImpossibleBucketInvalidBuckets - 1; i++) {
+          test_failure_message_oss << kDataUsageWithImpossibleBucketInvalidBucketIndices[i] << ", ";
+        }
+        test_failure_message_oss << kDataUsageWithImpossibleBucketInvalidBucketIndices
+                                        [kDataUsageWithImpossibleBucketInvalidBuckets - 1]
+                                 << "])";
+        FX_LOGS(INFO) << test_failure_message_oss.str();
+        FX_LOGS(INFO) << "TestLogIntegerHistogram : FAIL";
+        return false;
+      }
+    }
+  }
+
   if (CurrentDayIndex(clock) != day_index) {
     // TODO(b/278930366) The date has changed mid-test. We are currently unable to
     // deal with this so we fail this test and our caller may try again.
@@ -500,7 +570,10 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
                         (std::size(kPowerUsageNewApplicationStateIndices) *
                          std::size(kPowerUsageNewApplicationNameIndices)) +
                             (std::size(kBandwidthUsageNewApplicationStateIndices) *
-                             std::size(kBandwidthUsageNewApplicationNameIndices)),
+                             std::size(kBandwidthUsageNewApplicationNameIndices)) +
+                            (std::size(kDataUsageWithImpossibleBucketApplicationStateIndices) *
+                             std::size(kDataUsageWithImpossibleBucketApplicationNameIndices)) *
+                                2,
                         expected_num_obs)) {
     FX_LOGS(INFO) << "TestLogIntegerHistogram : FAIL";
     return false;

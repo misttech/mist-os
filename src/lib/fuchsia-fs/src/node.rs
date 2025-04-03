@@ -176,7 +176,6 @@ impl Kind {
 
     pub(crate) fn kind_of2(representation: &fio::Representation) -> Kind {
         match representation {
-            fio::Representation::Connector(_) => Kind::Service,
             fio::Representation::Directory(_) => Kind::Directory,
             fio::Representation::File(_) => Kind::File,
             fio::Representation::Symlink(_) => Kind::Symlink,

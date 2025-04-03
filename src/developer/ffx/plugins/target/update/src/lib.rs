@@ -7,15 +7,17 @@ use ffx_config::EnvironmentContext;
 use ffx_update_args::ForceInstall;
 use ffx_writer::SimpleWriter;
 use fho::{bug, deferred, return_user_error, Deferred, FfxContext, FfxMain, FfxTool, Result};
+use fidl::Signals;
 use fidl_fuchsia_update::{
-    CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
+    CheckOptions, CommitStatusProviderProxy, Initiator, ManagerProxy, MonitorMarker,
+    MonitorRequest, MonitorRequestStream,
 };
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use fidl_fuchsia_update_ext::State;
 use fidl_fuchsia_update_installer::{self as finstaller, InstallerProxy};
 use fuchsia_async::Timer;
 use fuchsia_url::AbsolutePackageUrl;
-use futures::future::FutureExt as _;
+use futures::future::{FusedFuture as _, FutureExt as _};
 use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -24,6 +26,8 @@ use target_holders::{moniker, RemoteControlProxyHolder, TargetProxyHolder};
 use {ffx_update_args as args, fidl_fuchsia_update_installer_ext as installer};
 
 mod server;
+
+const WARNING_DURATION: Duration = Duration::from_secs(30);
 
 #[derive(FfxTool)]
 pub struct UpdateTool {
@@ -36,6 +40,8 @@ pub struct UpdateTool {
     channel_control_proxy: ChannelControlProxy,
     #[with(deferred(moniker("/core/system-update/system-updater")))]
     installer_proxy: Deferred<InstallerProxy>,
+    #[with(moniker("/core/system-update"))]
+    commit_status_provider_proxy: CommitStatusProviderProxy,
     target_proxy_connector: Connector<TargetProxyHolder>,
     rcs_proxy_connector: Connector<RemoteControlProxyHolder>,
 }
@@ -59,6 +65,14 @@ impl FfxMain for UpdateTool {
             }
             args::Command::ForceInstall(ref args) => {
                 Box::pin(self.handle_force_install_cmd(args, &mut writer)).await?;
+            }
+            args::Command::WaitForCommit(_args) => {
+                handle_wait_for_commit(
+                    &self.commit_status_provider_proxy,
+                    &mut Printer { writer, warning_duration: WARNING_DURATION },
+                    WARNING_DURATION,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -510,6 +524,79 @@ async fn monitor_state<W: std::io::Write>(
     Ok(())
 }
 
+/// The set of events associated with the `wait-for-commit` path.
+#[derive(Debug, PartialEq)]
+enum CommitEvent {
+    Begin,
+    Warning,
+    End,
+}
+
+/// An observer of `update wait-for-commit`.
+trait CommitObserver {
+    fn on_event(&mut self, event: CommitEvent) -> std::io::Result<()>;
+}
+
+/// A `CommitObserver` that forwards the events to writer.
+struct Printer<W: std::io::Write> {
+    writer: W,
+    warning_duration: Duration,
+}
+
+impl<W: std::io::Write> CommitObserver for Printer<W> {
+    fn on_event(&mut self, event: CommitEvent) -> std::io::Result<()> {
+        match event {
+            CommitEvent::Begin => writeln!(&mut self.writer, "Waiting for commit."),
+            CommitEvent::Warning => writeln!(
+                &mut self.writer,
+                "It's been {} seconds. Something may be wrong.",
+                self.warning_duration.as_secs(),
+            ),
+            CommitEvent::End => writeln!(&mut self.writer, "Committed!"),
+        }
+    }
+}
+
+/// Waits for the system to commit (e.g. when the EventPair observes a signal).
+async fn wait_for_commit(proxy: &CommitStatusProviderProxy) -> Result<()> {
+    let p = proxy.is_current_system_committed().await.bug_context("while obtaining EventPair")?;
+    fuchsia_async::OnSignalsRef::new(&p, Signals::USER_0)
+        .await
+        .bug_context("while waiting for the commit")?;
+    Ok(())
+}
+
+/// Waits for the commit and sends updates to the observer. This is abstracted from the regular
+/// `handle_wait_for_commit` fn so we can test events without having to wait the `warning_duration`.
+/// The [testability rubric](https://fuchsia.dev/fuchsia-src/concepts/testing/testability_rubric)
+/// exempts logs from testing, but in this case we test them anyway because of the additional layer
+/// of complexity that the warning timeout introduces.
+async fn handle_wait_for_commit(
+    proxy: &CommitStatusProviderProxy,
+    observer: &mut impl CommitObserver,
+    warning_duration: Duration,
+) -> Result<()> {
+    observer.on_event(CommitEvent::Begin).bug_context("while handling a begin event")?;
+
+    let commit_fut = wait_for_commit(proxy).fuse();
+    futures::pin_mut!(commit_fut);
+    let mut timer_fut = fuchsia_async::Timer::new(warning_duration).fuse();
+
+    // Send a warning after the WARNING_DURATION.
+    let () = futures::select! {
+        commit_res = commit_fut => commit_res?,
+        _ = timer_fut => observer.on_event(CommitEvent::Warning).bug_context("while handling a warning event")?,
+    };
+
+    // If we timed out on WARNING_DURATION, try again.
+    if !commit_fut.is_terminated() {
+        let () = commit_fut.await.bug_context("while calling wait_for_commit second")?;
+    }
+
+    let () = observer.on_event(CommitEvent::End).bug_context("while handling a end event")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,13 +606,14 @@ mod tests {
     use ffx_writer::TestBuffers;
     use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
+    use fidl::{EventPair, Peered, Signals};
     use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-    use fidl_fuchsia_update::ManagerRequest;
+    use fidl_fuchsia_update::{CommitStatusProviderRequest, ManagerRequest};
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
     use futures::prelude::*;
     use mock_installer::MockUpdateInstallerService;
     use std::sync::Arc;
-    use target_holders::{fake_proxy, FakeInjector};
+    use target_holders::{fake_async_proxy, fake_proxy, FakeInjector};
 
     async fn perform_channel_control_test<V, O>(
         argument: args::channel::Command,
@@ -640,6 +728,8 @@ mod tests {
         })));
         let fake_channel_control_proxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_commit_status_provider_proxy =
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_target_proxy: TargetProxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_rcs_proxy: RemoteControlProxy =
@@ -682,6 +772,7 @@ mod tests {
             update_manager_proxy: fake_update_manager_proxy,
             channel_control_proxy: fake_channel_control_proxy,
             installer_proxy: fake_installer_proxy,
+            commit_status_provider_proxy: fake_commit_status_provider_proxy,
             target_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make target proxy test connector"),
@@ -737,6 +828,8 @@ mod tests {
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_channel_control_proxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
+        let fake_commit_status_provider_proxy =
+            fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_target_proxy: TargetProxy =
             fake_proxy(move |req| panic!("Unexpected request: {:?}", req));
         let fake_rcs_proxy: RemoteControlProxy =
@@ -763,6 +856,7 @@ mod tests {
             update_manager_proxy: fake_update_manager_proxy,
             channel_control_proxy: fake_channel_control_proxy,
             installer_proxy: Deferred::from_output(Ok(fake_installer_proxy)),
+            commit_status_provider_proxy: fake_commit_status_provider_proxy,
             target_proxy_connector: Connector::try_from_env(&fho_env)
                 .await
                 .expect("Could not make target proxy test connector"),
@@ -786,5 +880,50 @@ mod tests {
             for more detail on the progress of update-related downloads.\n\n\n\
             Starting install\n0.0 0/? Preparing\n0.0 0/1000 Fetching\n\
             50.0 500/1000 Staging\n100.0 1000/1000 Waiting to Reboot\n\n");
+    }
+
+    struct TestCommitObserver {
+        events: Vec<CommitEvent>,
+    }
+    impl TestCommitObserver {
+        fn new() -> Self {
+            Self { events: vec![] }
+        }
+        fn take_events(&mut self) -> Vec<CommitEvent> {
+            self.events.drain(..).collect()
+        }
+    }
+    impl CommitObserver for TestCommitObserver {
+        fn on_event(&mut self, event: CommitEvent) -> std::io::Result<()> {
+            self.events.push(event);
+            Ok(())
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_wait_for_commit() {
+        let proxy = fake_async_proxy(async move |req| {
+            let CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } = req;
+
+            let (lhs, rhs) = EventPair::create();
+            let () = responder.send(lhs).unwrap();
+
+            fuchsia_async::Timer::new(Duration::from_millis(500)).await;
+
+            let () = rhs.signal_peer(Signals::NONE, Signals::USER_0).unwrap();
+
+            ()
+        });
+
+        let mut observer = TestCommitObserver::new();
+
+        handle_wait_for_commit(&proxy, &mut observer, Duration::from_millis(1000)).await.unwrap();
+        assert_eq!(observer.take_events(), &[CommitEvent::Begin, CommitEvent::End]);
+
+        handle_wait_for_commit(&proxy, &mut observer, Duration::from_millis(50)).await.unwrap();
+        assert_eq!(
+            observer.take_events(),
+            &[CommitEvent::Begin, CommitEvent::Warning, CommitEvent::End]
+        );
     }
 }

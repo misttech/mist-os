@@ -11,6 +11,7 @@ rustc_library("fidl_next_codec") {
   edition = "2021"
   sources = [
     "src/chunk.rs",
+    "src/compat.rs",
     "src/decode/error.rs",
     "src/decode/mod.rs",
     "src/decoder.rs",
@@ -27,6 +28,7 @@ rustc_library("fidl_next_codec") {
     "src/wire/envelope.rs",
     "src/wire/mod.rs",
     "src/wire/ptr.rs",
+    "src/wire/result.rs",
     "src/wire/string/mod.rs",
     "src/wire/string/optional.rs",
     "src/wire/string/required.rs",
@@ -62,6 +64,11 @@ rustc_library("fidl_next_codec") {
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_rust_next/*",
   ]
+
+  # Enables compatibility impls with the existing Rust bindings.
+  # This can be removed once we no longer require backwards compatibility.
+  features = [ "compat" ]
+  deps += [ "//src/lib/fidl/rust/fidl" ]
 }
 
 fuchsia_unittest_package("fidl_next_codec_test_package") {

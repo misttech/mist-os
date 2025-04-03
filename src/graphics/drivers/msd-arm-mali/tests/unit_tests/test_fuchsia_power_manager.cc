@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -14,7 +15,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/graphics/drivers/msd-arm-mali/src/fuchsia_power_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device_dfv2.h"
 #include "src/graphics/drivers/msd-arm-mali/tests/unit_tests/driver_logger_harness.h"
@@ -286,7 +286,7 @@ struct IncomingNamespace {
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
@@ -344,7 +344,7 @@ TEST(FuchsiaPowerManager, Basic) {
       env_dispatcher->async_dispatcher(), std::in_place);
   incoming.SyncCall([&](IncomingNamespace* incoming) mutable {
     EXPECT_TRUE(incoming->env.Initialize(std::move(incoming_directory_endpoints->server)).is_ok());
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.use_fake_irq = true;
     config.power_elements = std::vector{hardware_power_config()};
     incoming->pdev_server.SetConfig(std::move(config));

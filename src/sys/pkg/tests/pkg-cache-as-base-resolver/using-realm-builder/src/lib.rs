@@ -11,6 +11,7 @@ use futures::stream::TryStreamExt as _;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest as _;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
@@ -28,6 +29,9 @@ static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation = blobfs_ramdisk::Imp
 #[cfg(not(feature = "use_fxblob"))]
 static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
     blobfs_ramdisk::Implementation::CppBlobfs;
+
+const OUT_DIR_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 trait BootArgumentsStreamHandler: Send + Sync {
     fn handle_stream(&self, stream: fboot::ArgumentsRequestStream) -> BoxFuture<'static, ()>;
@@ -147,14 +151,9 @@ impl TestEnvBuilder {
                         },
                     };
                     let scope = ExecutionScope::new();
-                    let () = out_dir.open(
-                        scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
-                    );
+                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
+                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
+                    });
                     async move { Ok(scope.wait().await) }.boxed()
                 },
                 ChildOptions::new(),
@@ -182,13 +181,15 @@ impl TestEnvBuilder {
                                 "blob-svc" => svc_dir.clone(),
                             };
                             let scope = vfs::execution_scope::ExecutionScope::new();
-                            let () = out_dir.open(
-                                scope.clone(),
-                                fio::OpenFlags::RIGHT_READABLE
-                                    | fio::OpenFlags::RIGHT_WRITABLE
-                                    | fio::OpenFlags::RIGHT_EXECUTABLE,
-                                vfs::path::Path::dot(),
-                                handles.outgoing_dir.into_channel().into(),
+                            OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(
+                                |request| {
+                                    out_dir.open3(
+                                        scope.clone(),
+                                        vfs::Path::dot(),
+                                        OUT_DIR_FLAGS,
+                                        request,
+                                    )
+                                },
                             );
                             async move {
                                 scope.wait().await;

@@ -13,7 +13,7 @@ use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr
 use net_types::{MulticastAddr, SpecifiedAddr};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, ResourceCounterContext, TokenBucket,
+    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, Marks, ResourceCounterContext, TokenBucket,
     WeakDeviceIdentifier,
 };
 use netstack3_datagram as datagram;
@@ -34,7 +34,7 @@ use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpDeviceContext, IpHeaderInfo, IpLayerBindingsContext,
     IpLayerIpExt, IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext,
-    IpStateInner, IpTransportContext, IpTransportDispatchContext, LocalDeliveryPacketInfo, Marks,
+    IpStateInner, IpTransportContext, IpTransportDispatchContext, LocalDeliveryPacketInfo,
     MulticastMembershipHandler, PmtuCache, PmtuContext, ResolveRouteError, ResolvedRoute,
     RoutingTable, RoutingTableId, RulesTable, TransportReceiveError,
 };

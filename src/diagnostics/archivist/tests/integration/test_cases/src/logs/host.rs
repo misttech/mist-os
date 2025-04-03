@@ -6,7 +6,10 @@ use crate::puppet::PuppetProxyExt;
 use crate::{test_topology, utils};
 use diagnostics_data::{LogsData, Severity};
 use futures::AsyncReadExt;
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
+use {
+    fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics,
+    fidl_fuchsia_diagnostics_types as fdiagnostics_types,
+};
 
 const PUPPET_NAME: &str = "puppet";
 
@@ -20,8 +23,8 @@ async fn can_read_using_the_host_accessor() {
     .expect("create realm");
 
     let messages = vec![
-        (fdiagnostics::Severity::Info, "my msg: 10"),
-        (fdiagnostics::Severity::Warn, "my other msg: 20"),
+        (fdiagnostics_types::Severity::Info, "my msg: 10"),
+        (fdiagnostics_types::Severity::Warn, "my other msg: 20"),
     ];
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
     puppet.log_messages(messages.clone()).await;

@@ -157,7 +157,7 @@ async fn make_test_package() -> Package {
         // `MAX_BUF` bytes worth of directory entries.
         //
         // Through math, we determine that we can achieve this overflow with 31 files whose names
-        // are length `MAX_FILENAME`. Here is this math:
+        // are length `MAX_NAME_LENGTH`. Here is this math:
         /*
            ReadDirents -> vector<uint8>:MAX_BUF
 
@@ -175,7 +175,7 @@ async fn make_test_package() -> Package {
             char name[0];
            }
 
-           sizeof(dirent) if name is MAX_FILENAME = 255 bytes long = 8 + 1 + 1 + 255 = 265 bytes
+           sizeof(dirent) if name is MAX_NAME_LENGTH = 255 bytes long = 8 + 1 + 1 + 255 = 265 bytes
 
            8192 / 265 ~= 30.9
 
@@ -183,7 +183,7 @@ async fn make_test_package() -> Package {
         */
         for seed in ('a'..='z').chain('A'..='E') {
             builder = builder.add_resource_at(
-                format!("{}{}", base, repeat_by_n(seed, fio::MAX_FILENAME.try_into().unwrap())),
+                format!("{}{}", base, repeat_by_n(seed, fio::MAX_NAME_LENGTH.try_into().unwrap())),
                 &b""[..],
             )
         }

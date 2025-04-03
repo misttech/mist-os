@@ -40,6 +40,8 @@ void TreeWalk(const std::unordered_map<zx_koid_t, ViewNode>& view_tree, zx_koid_
 }
 
 bool ValidateSnapshot(const Snapshot& snapshot) {
+  TRACE_DURATION("gfx", "ViewTreeSnapshotter::ValidateSnapshot");
+
   const auto& [root, view_tree, unconnected_views, hit_testers] = snapshot;
   if (view_tree.empty() && root == ZX_KOID_INVALID) {
     return true;
@@ -70,6 +72,8 @@ bool ValidateSnapshot(const Snapshot& snapshot) {
 }
 
 bool ValidateSubtree(const SubtreeSnapshot& subtree) {
+  TRACE_DURATION("gfx", "ViewTreeSnapshotter::ValidateSubtree");
+
   const auto& [root, view_tree, unconnected_views, hit_tester, tree_boundaries] = subtree;
   if (view_tree.empty() && root == ZX_KOID_INVALID) {
     return true;
@@ -115,8 +119,8 @@ ViewTreeSnapshotter::ViewTreeSnapshotter(std::vector<SubtreeSnapshotGenerator> s
     : subtree_generators_(std::move(subtree_generators)) {
   for (auto& [subscriber_callback, dispatcher] : subscribers) {
     FX_DCHECK(dispatcher);
-    // TODO(https://fxbug.dev/42155704): We save the callback directly and ignore the dispatcher as a
-    // workaround to avoid flakes. Rework this after deciding on a new synchronization mechanism.
+    // TODO(https://fxbug.dev/42155704): We save the callback directly and ignore the dispatcher as
+    // a workaround to avoid flakes. Rework this after deciding on a new synchronization mechanism.
     subscriber_callbacks_.emplace_back(std::move(subscriber_callback));
   }
 }
@@ -129,9 +133,15 @@ void ViewTreeSnapshotter::UpdateSnapshot() const {
 
   // Merge subtrees.
   for (auto& generate_subtrees : subtree_generators_) {
-    auto subtree = generate_subtrees();
+    SubtreeSnapshot subtree;
+    {
+      TRACE_DURATION("gfx", "ViewTreeSnapshotter::UpdateSnapshot [generate]");
+      subtree = generate_subtrees();
+    }
     FX_DCHECK(ValidateSubtree(subtree));
     auto& [root, view_tree, unconnected_views, hit_tester, subtree_boundaries] = subtree;
+
+    TRACE_DURATION("gfx", "ViewTreeSnapshotter::UpdateSnapshot [merge]");
 
     if (new_snapshot->root == ZX_KOID_INVALID) {
       new_snapshot->root = root;
@@ -177,6 +187,7 @@ void ViewTreeSnapshotter::UpdateSnapshot() const {
 
   // Update all subscribers with the new snapshot.
   for (const auto& subscriber_callback : subscriber_callbacks_) {
+    TRACE_DURATION("gfx", "ViewTreeSnapshotter::UpdateSnapshot [subscriber]");
     subscriber_callback(new_snapshot);
   }
 }

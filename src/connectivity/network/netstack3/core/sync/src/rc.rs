@@ -19,6 +19,7 @@ use core::panic::Location;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use derivative::Derivative;
+use netstack3_trace::TraceResourceId;
 
 mod caller {
     //! Provides tracking of instances via tracked caller location.
@@ -120,6 +121,7 @@ mod caller {
 
 mod debug_id {
     use core::sync::atomic::{AtomicU64, Ordering};
+    use netstack3_trace::TraceResourceId;
 
     /// An opaque token to be used for debugging.
     ///
@@ -148,6 +150,13 @@ mod debug_id {
             // counter is valid for > 500 years). Spare the CPU cycles and don't
             // bother attempting to detect/handle overflow.
             DebugToken(NEXT_TOKEN.fetch_add(1, Ordering::Relaxed))
+        }
+    }
+
+    impl DebugToken {
+        pub(super) fn trace_id(&self) -> TraceResourceId<'_> {
+            let Self(inner) = self;
+            TraceResourceId::new(*inner)
         }
     }
 
@@ -548,6 +557,12 @@ impl<T> Strong<T> {
             ptr: alloc::sync::Arc::as_ptr(inner),
             token: inner.debug_token.clone(),
         }
+    }
+
+    /// Returns a [`TraceResourceId`] that can be used to identify this
+    /// reference in tracing events.
+    pub fn trace_id(&self) -> TraceResourceId<'_> {
+        self.inner.debug_token.trace_id()
     }
 
     /// Returns true if the inner value has since been marked for destruction.

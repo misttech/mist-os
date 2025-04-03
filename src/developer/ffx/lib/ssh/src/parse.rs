@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use compat_info::{CompatibilityInfo, ConnectionInfo};
+use compat_info::{ConnectionInfo, DeviceConnectionInfo};
 use ffx_config::logging::LogDirHandling;
 use ffx_config::EnvironmentContext;
 use fuchsia_async::TimeoutExt;
@@ -110,7 +110,7 @@ async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
 
 fn parse_ssh_connection_legacy(
     line: &str,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
+) -> std::result::Result<(String, Option<DeviceConnectionInfo>), ParseSshConnectionError> {
     let mut parts = line.split(" ");
     // The first part should be our anchor.
     match parts.next() {
@@ -178,7 +178,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     stdout: &mut R,
     verbose: bool,
     ctx: &EnvironmentContext,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
+) -> std::result::Result<(String, Option<DeviceConnectionInfo>), ParseSshConnectionError> {
     let line = read_ssh_line_with_timeouts(stdout).await?;
     if line.is_empty() {
         tracing::error!("Failed to read first line from stdout");
@@ -240,12 +240,17 @@ pub async fn parse_ssh_output(
     stderr: &mut BufReader<ChildStderr>,
     verbose_ssh: bool,
     ctx: &EnvironmentContext,
-) -> std::result::Result<(HostAddr, Option<CompatibilityInfo>), PipeError> {
+) -> std::result::Result<(HostAddr, Option<DeviceConnectionInfo>), PipeError> {
     let res = match parse_ssh_connection(stdout, verbose_ssh, ctx)
         .await
         .context("reading ssh connection")
     {
-        Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
+        Ok((addr, connection_info)) => {
+            if connection_info.as_ref().map(|dci| dci.overnet_id).is_none() {
+                tracing::info!("Did not receive overnet_id from remote host, presumably it is an old device. Warning: without the overnet_id we cannot determine whether this connection is to an already-known target");
+            }
+            (Some(HostAddr(addr)), connection_info)
+        }
         Err(e) => {
             let error_message = format!("Failed to read ssh client address: {e:?}");
             tracing::error!("{error_message}");
@@ -315,7 +320,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
 
 fn parse_ssh_connection_with_info(
     line: &str,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
+) -> std::result::Result<(String, Option<DeviceConnectionInfo>), ParseSshConnectionError> {
     let connection_info: ConnectionInfo =
         serde_json::from_str(&line).map_err(|e| ParseSshConnectionError::Parse(e.to_string()))?;
     let mut parts = connection_info.ssh_connection.split(" ");
@@ -323,7 +328,7 @@ fn parse_ssh_connection_with_info(
     // The variable contains four space-separated values: client IP address,
     // client port number, server IP address, and server port number.
     if let Some(client_address) = parts.nth(0) {
-        Ok((client_address.to_string(), Some(connection_info.compatibility)))
+        Ok((client_address.to_string(), Some(connection_info.connect_info)))
     } else {
         Err(ParseSshConnectionError::Parse(line.into()))
     }
@@ -355,6 +360,7 @@ pub async fn write_ssh_log(prefix: &str, line: &String, ctx: &EnvironmentContext
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+    use compat_info::CompatibilityState;
 
     #[fuchsia::test]
     async fn test_parse_ssh_output_doesnt_fail_with_debug2() {
@@ -449,6 +455,44 @@ mod test {
         match read_ssh_line(&mut lb, &mut input2.as_bytes()).await {
             Ok(s) => assert_eq!(s, String::from("foobar\n")),
             res => panic!("unexpected result: {res:?}"),
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_compat_works_without_overnet_id() {
+        let env = ffx_config::test_init().await.expect("test env init");
+        let line = &"{\"ssh_connection\":\"10.0.2.2 34502 10.0.2.15 22\",\"compatibility\":{\"status\":\"supported\",\"platform_abi\":12345,\"message\":\"foo\"}}\n"[..];
+        let dci = DeviceConnectionInfo {
+            status: CompatibilityState::Supported,
+            platform_abi: 12345,
+            message: String::from("foo"),
+            overnet_id: None,
+        };
+        let expected = ("10.0.2.2".to_string(), Some(dci));
+        match parse_ssh_connection(&mut line.as_bytes(), false, &env.context).await {
+            Ok(actual) => assert_eq!(expected, actual),
+            res => {
+                panic!("unexpected result for {:?}: expected {:?}, got {:?}", line, expected, res)
+            }
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_compat_works_with_overnet_id() {
+        let env = ffx_config::test_init().await.expect("test env init");
+        let line = &"{\"ssh_connection\":\"10.0.2.2 34502 10.0.2.15 22\",\"compatibility\":{\"status\":\"supported\",\"platform_abi\":12345,\"message\":\"foo\", \"overnet_id\": 6789}}\n"[..];
+        let dci = DeviceConnectionInfo {
+            status: CompatibilityState::Supported,
+            platform_abi: 12345,
+            message: String::from("foo"),
+            overnet_id: Some(6789),
+        };
+        let expected = ("10.0.2.2".to_string(), Some(dci));
+        match parse_ssh_connection(&mut line.as_bytes(), false, &env.context).await {
+            Ok(actual) => assert_eq!(expected, actual),
+            res => {
+                panic!("unexpected result for {:?}: expected {:?}, got {:?}", line, expected, res)
+            }
         }
     }
 }

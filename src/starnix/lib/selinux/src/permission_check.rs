@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{FifoCache, Locked, Query};
+use crate::access_vector_cache::{FifoQueryCache, Locked, Query};
 use crate::policy::{AccessVector, AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, FileClass, NullessByteStr, Permission, SecurityId};
+use crate::{ClassPermission, FsNodeClass, NullessByteStr, Permission, SecurityId};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
@@ -35,13 +35,13 @@ pub struct PermissionCheckResult {
 // TODO: https://fxbug.dev/362699811 - Revise the traits to avoid direct dependencies on `SecurityServer`.
 pub struct PermissionCheck<'a> {
     security_server: &'a SecurityServer,
-    access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
+    access_vector_cache: &'a Locked<FifoQueryCache<Weak<SecurityServer>>>,
 }
 
 impl<'a> PermissionCheck<'a> {
     pub(crate) fn new(
         security_server: &'a SecurityServer,
-        access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
+        access_vector_cache: &'a Locked<FifoQueryCache<Weak<SecurityServer>>>,
     ) -> Self {
         Self { security_server, access_vector_cache }
     }
@@ -65,6 +65,36 @@ impl<'a> PermissionCheck<'a> {
         )
     }
 
+    /// Returns whether the `source_sid` has both the `ioctl` permission and the specified extended
+    /// permission on `target_sid`, and whether the decision should be audited.
+    ///
+    /// A request is allowed if the ioctl permission is `allow`ed and either the numeric ioctl
+    /// extended permission is `allowxperm`, or ioctl extended permissions are not filtered for this
+    /// domain.
+    ///
+    /// A granted request is audited if the ioctl permission is `auditallow` and the numeric ioctl
+    /// extended permission is `auditallowxperm`.
+    ///
+    /// A denied request is audited if the ioctl permission is `dontaudit` or the numeric ioctl
+    /// extended permission is `dontauditxperm`.
+    pub fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        permission: P,
+        ioctl: u16,
+    ) -> PermissionCheckResult {
+        has_ioctl_permission(
+            self.security_server.is_enforcing(),
+            self.access_vector_cache,
+            self.security_server,
+            source_sid,
+            target_sid,
+            permission,
+            ioctl,
+        )
+    }
+
     // TODO: https://fxbug.dev/362699811 - Remove this once `SecurityServer` APIs such as `sid_to_security_context()`
     // are exposed via a trait rather than directly by that implementation.
     pub fn security_server(&self) -> &SecurityServer {
@@ -73,25 +103,27 @@ impl<'a> PermissionCheck<'a> {
 
     /// Returns the SID with which to label a new `file_class` instance created by `subject_sid`, with `target_sid`
     /// as its parent, taking into account role & type transition rules, and filename-transition rules.
-    /// If a filename-transition rule matches the `file_name` then that will be used, otherwise the
+    /// If a filename-transition rule matches the `fs_node_name` then that will be used, otherwise the
     /// filename-independent computation will be applied.
-    pub fn compute_new_file_sid(
+    pub fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
         // TODO: https://fxbug.dev/385075470 - Stop skipping empty name lookups once by-name lookup is better optimized.
-        if !file_name.as_bytes().is_empty() {
-            if let Some(sid) = self
-                .access_vector_cache
-                .compute_new_file_sid_with_name(source_sid, target_sid, file_class, file_name)
-            {
+        if !fs_node_name.as_bytes().is_empty() {
+            if let Some(sid) = self.access_vector_cache.compute_new_fs_node_sid_with_name(
+                source_sid,
+                target_sid,
+                fs_node_class,
+                fs_node_name,
+            ) {
                 return Ok(sid);
             }
         }
-        self.access_vector_cache.compute_new_file_sid(source_sid, target_sid, file_class)
+        self.access_vector_cache.compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
 }
 
@@ -108,13 +140,12 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     profile_duration!("libselinux.check_permission");
     let target_class = permission.class();
 
-    let decision = query.query(source_sid, target_sid, target_class.into());
+    let decision = query.compute_access_decision(source_sid, target_sid, target_class.into());
 
     let mut result = if let Some(permission_access_vector) =
         access_vector_computer.access_vector_from_permissions(&[permission])
     {
         let permit = permission_access_vector & decision.allow == permission_access_vector;
-
         let audit = if permit {
             permission_access_vector & decision.auditallow != AccessVector::NONE
         } else {
@@ -144,15 +175,88 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     result
 }
 
+fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    is_enforcing: bool,
+    query: &impl Query,
+    access_vector_computer: &impl AccessVectorComputer,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: P,
+    ioctl: u16,
+) -> PermissionCheckResult {
+    let target_class = permission.class();
+
+    let permission_decision =
+        query.compute_access_decision(source_sid, target_sid, target_class.into());
+
+    let [ioctl_postfix, ioctl_prefix] = ioctl.to_le_bytes();
+    let xperm_decision = query.compute_ioctl_access_decision(
+        source_sid,
+        target_sid,
+        target_class.into(),
+        ioctl_prefix,
+    );
+
+    let permission_result = if let Some(permission_access_vector) =
+        access_vector_computer.access_vector_from_permissions(&[permission])
+    {
+        let permit =
+            permission_access_vector & permission_decision.allow == permission_access_vector;
+        let audit = if permit {
+            permission_access_vector & permission_decision.auditallow != AccessVector::NONE
+        } else {
+            permission_access_vector & permission_decision.auditdeny != AccessVector::NONE
+        };
+        println!("permission_access_vector is some; permit: {}, audit: {}", permit, audit);
+        PermissionCheckResult { permit, audit, todo_bug: None }
+    } else {
+        PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+    };
+
+    let xperm_result = {
+        let permit = xperm_decision.allow.contains(ioctl_postfix);
+        let audit = if permit {
+            xperm_decision.auditallow.contains(ioctl_postfix)
+        } else {
+            xperm_decision.auditdeny.contains(ioctl_postfix)
+        };
+        println!("xperm result: permit: {}, audit: {}", permit, audit);
+        PermissionCheckResult { permit, audit, todo_bug: None }
+    };
+
+    let mut result = PermissionCheckResult {
+        permit: permission_result.permit && xperm_result.permit,
+        audit: permission_result.audit && xperm_result.audit,
+        todo_bug: None,
+    };
+
+    if !result.permit {
+        if !is_enforcing {
+            result.permit = true;
+        } else if permission_decision.flags & SELINUX_AVD_FLAGS_PERMISSIVE != 0 {
+            result.permit = true;
+        } else if permission_decision.todo_bug.is_some() {
+            // Currently we can make an exception for the overall `ioctl` permission,
+            // but not for specific ioctl xperms.
+            result.permit = true;
+            result.todo_bug = permission_decision.todo_bug;
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use crate::policy::{AccessDecision, AccessVector};
-    use crate::{AbstractObjectClass, ProcessPermission};
+    use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
+    use crate::{
+        AbstractObjectClass, CommonFilePermission, CommonFsNodePermission, FileClass,
+        FilePermission, ProcessPermission,
+    };
 
-    use std::any::Any;
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::LazyLock;
@@ -169,15 +273,14 @@ mod tests {
     fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
         permission: P,
     ) -> AccessVector {
-        let any = &permission as &dyn Any;
-        let permission_ref = match any.downcast_ref::<ProcessPermission>() {
-            Some(permission_ref) => permission_ref,
-            None => return AccessVector::NONE,
-        };
-
-        match permission_ref {
-            ProcessPermission::Fork => ACCESS_VECTOR_0001,
-            ProcessPermission::Transition => ACCESS_VECTOR_0010,
+        match permission.into() {
+            // Process class permissions
+            Permission::Process(ProcessPermission::Fork) => ACCESS_VECTOR_0001,
+            Permission::Process(ProcessPermission::Transition) => ACCESS_VECTOR_0010,
+            // File class permissions
+            Permission::File(FilePermission::Common(CommonFilePermission::Common(
+                CommonFsNodePermission::Ioctl,
+            ))) => ACCESS_VECTOR_0001,
             _ => AccessVector::NONE,
         }
     }
@@ -199,32 +302,42 @@ mod tests {
     pub struct DenyAllPermissions(DenyAll);
 
     impl Query for DenyAllPermissions {
-        fn query(
+        fn compute_access_decision(
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
             target_class: AbstractObjectClass,
         ) -> AccessDecision {
-            self.0.query(source_sid, target_sid, target_class)
+            self.0.compute_access_decision(source_sid, target_sid, target_class)
         }
 
-        fn compute_new_file_sid(
+        fn compute_new_fs_node_sid(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
+            _fs_node_class: FsNodeClass,
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!();
         }
 
-        fn compute_new_file_sid_with_name(
+        fn compute_new_fs_node_sid_with_name(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
-            _file_name: NullessByteStr<'_>,
+            _fs_node_class: FsNodeClass,
+            _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!();
+        }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            source_sid: SecurityId,
+            target_sid: SecurityId,
+            target_class: AbstractObjectClass,
+            ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            self.0.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
         }
     }
 
@@ -244,7 +357,7 @@ mod tests {
     struct AllowAllPermissions;
 
     impl Query for AllowAllPermissions {
-        fn query(
+        fn compute_access_decision(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
@@ -253,23 +366,33 @@ mod tests {
             AccessDecision::allow(AccessVector::ALL)
         }
 
-        fn compute_new_file_sid(
+        fn compute_new_fs_node_sid(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
+            _fs_node_class: FsNodeClass,
         ) -> Result<SecurityId, anyhow::Error> {
             unreachable!();
         }
 
-        fn compute_new_file_sid_with_name(
+        fn compute_new_fs_node_sid_with_name(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _file_class: FileClass,
-            _file_name: NullessByteStr<'_>,
+            _fs_node_class: FsNodeClass,
+            _fs_node_name: NullessByteStr<'_>,
         ) -> Option<SecurityId> {
             unreachable!();
+        }
+
+        fn compute_ioctl_access_decision(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: AbstractObjectClass,
+            _ioctl_prefix: u8,
+        ) -> IoctlAccessDecision {
+            IoctlAccessDecision::ALLOW_ALL
         }
     }
 
@@ -318,5 +441,60 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn has_ioctl_permission_enforcing() {
+        let deny_all: DenyAllPermissions = Default::default();
+        let allow_all: AllowAllPermissions = Default::default();
+        let permission = CommonFsNodePermission::Ioctl.for_class(FileClass::File);
+
+        // DenyAllPermissions denies.
+        assert_eq!(
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ true,
+                &deny_all,
+                &deny_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission.clone(),
+                0xabcd
+            )
+        );
+        // AllowAllPermissions allows.
+        assert_eq!(
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ true,
+                &allow_all,
+                &allow_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission,
+                0xabcd
+            )
+        );
+    }
+
+    #[test]
+    fn has_ioctl_permission_not_enforcing() {
+        let deny_all: DenyAllPermissions = Default::default();
+        let permission = CommonFsNodePermission::Ioctl.for_class(FileClass::File);
+
+        // DenyAllPermissions denies, but the permission is allowed when the security server
+        // is not in enforcing mode. The decision should still be audited.
+        assert_eq!(
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None },
+            has_ioctl_permission(
+                /*is_enforcing=*/ false,
+                &deny_all,
+                &deny_all,
+                *A_TEST_SID,
+                *A_TEST_SID,
+                permission,
+                0xabcd
+            )
+        );
     }
 }

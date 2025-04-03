@@ -61,14 +61,14 @@ async fn open_service_as_node() {
         fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_SERVICE | fio::Flags::PROTOCOL_FILE,
     ] {
         let (proxy, representation) = svc_dir
-            .open3_node_repr::<fio::NodeMarker>(
+            .open_node_repr::<fio::NodeMarker>(
                 EchoMarker::PROTOCOL_NAME,
                 flags | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::FLAG_SEND_REPRESENTATION,
                 None,
             )
             .await
             .unwrap();
-        assert_matches!(representation, fio::Representation::Connector(_));
+        assert_matches!(representation, fio::Representation::Node(_));
         let (_, attrs) = proxy
             .get_attributes(fio::NodeAttributesQuery::PROTOCOLS)
             .await
@@ -95,7 +95,7 @@ async fn open_service_with_wrong_protocol() {
         (fio::Flags::PROTOCOL_SYMLINK, Status::WRONG_TYPE),
     ] {
         let status = svc_dir
-            .open3_node::<fio::NodeMarker>(
+            .open_node::<fio::NodeMarker>(
                 EchoMarker::PROTOCOL_NAME,
                 flags | fio::Flags::PERM_GET_ATTRIBUTES,
                 None,
@@ -148,7 +148,7 @@ async fn open_service_with_other_flags_should_fail() {
 
 /// Opening a service node without any flags should connect the channel to the service.
 #[fuchsia::test]
-async fn open_deprecated_service() {
+async fn deprecated_open_service() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_services {
         return;
@@ -169,7 +169,7 @@ async fn open_deprecated_service() {
 
 /// Opening a service node with [`fio::OpenFlags::NODE_REFERENCE`] should open the underlying node.
 #[fuchsia::test]
-async fn open_deprecated_service_node_reference() {
+async fn deprecated_open_service_node_reference() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_services {
         return;

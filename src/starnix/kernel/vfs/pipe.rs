@@ -402,7 +402,7 @@ pub fn new_pipe(
         info.blksize = ATOMIC_IO_BYTES.into();
         info
     });
-    let pipe = node.fifo.as_ref().unwrap();
+    let pipe = node.fifo().unwrap();
     {
         let mut state = pipe.lock();
         state.add_reader();

@@ -57,11 +57,14 @@ def run_product_assembly(
         board_info,
         "--input-bundles-dir",
         input_bundles,
-        "--legacy-bundle",
-        legacy_bundle,
         "--outdir",
         outdir,
     ]
+    if legacy_bundle:
+        args += [
+            "--legacy-bundle",
+            legacy_bundle,
+        ]
 
     if suppress_overrides_warning:
         args += ["--suppress-overrides-warning"]

@@ -100,7 +100,7 @@ if (!sdk_inside_sub_build) {
 
       # Ensure that the host tools in-tree developers expect are always built
       # in a default build regardless of which IDK is built.
-      ":non_build_host_tools($host_toolchain)",
+      ":idk_host_tools_collection($host_toolchain)",
     ]
 
     # Ensure the full IDK collection build is not accidentally a dependency.
@@ -157,7 +157,7 @@ group("final_fuchsia_idk") {
   ]
   testonly = true
 
-  # Ensure the non-in-tree IDK does not depend on the legadcy "core" target.
+  # Ensure the non-in-tree IDK does not depend on the legacy "core" target.
   # TODO(https://fxbug.dev/317385989): Remove when deleting "core" target.
   assert_no_deps = [ ":core" ]
 }
@@ -234,7 +234,6 @@ run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
 generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
   idk_export_target = "//sdk:final_fuchsia_idk.exported"
   idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
-  use_rules_fuchsia = true
 }
 
 # Verify the content of the final_fuchsia_sdk target by running
@@ -332,12 +331,22 @@ if (!is_host) {
       if (current_build_target_api_level != "PLATFORM") {
         deps = [ ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level" ]
       } else if (!sdk_inside_sub_build) {
-        # While atoms included in the IDK only at specific API levels should not
-        # be built or included at PLATFORM, the main build must have a non-SDK
-        # deps on them to ensure accurate dependency change checking for the
-        # sub-builds. See the comment for "${main_target_name}_for_subbuilds".
-        non_sdk_deps =
-            [ ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level" ]
+        # Add non-SDK deps in the case of the main build to ensure accurate
+        # dependency change checking for the sub-builds. See the comment for
+        # "${main_target_name}_for_subbuilds".
+        non_sdk_deps = [
+          # While atoms included in the IDK only at specific API levels should not
+          # be built or included at PLATFORM, the main build must have a deps.
+          ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level",
+
+          # Though the FIDL artifacts are not produced by sub-builds, changes to
+          # the FIDL files could affect sub-builds. Take a dependency here in the
+          # main build so that changes to FIDL files in the IDK will cause the
+          # sub-builds to be re-evaluated. This is relevant in cases where FIDL
+          # files are modified in ways that affect individual API levels but not
+          # the output when fidlc is targeting "PLATFORM".
+          "//sdk/fidl",
+        ]
       }
     }
 
@@ -396,7 +405,7 @@ if (!is_host) {
         deps = invoker.atoms_to_include_in_deprecated_arch_directory
 
         # While the Vulkan layers support being built at individual API levels,
-        # the SDK atom is not aware of API levels so each subbuilds would be
+        # the SDK atom is not aware of API levels so each sub-build would be
         # written to the same path in the IDK, clobbering all but one for each
         # CPU architecture.
         # TODO(https://fxbug.dev/327223536): Make an SDK atom for loadable
@@ -488,9 +497,6 @@ if (!is_host) {
             # Dependencies related to template sub-targets.
             ":${main_target_name}.fuchsia_idk_atoms_built_in_main_platform_build_only",
             ":${main_target_name}.fuchsia_idk_atoms_built_in_main_platform_build_only.validate",
-
-            # TODO(https://fxbug.dev/317385989): Remove when removing target.
-            ":core_molecule.manifest",
           ]
           category = "partner"
 
@@ -706,10 +712,10 @@ if (!is_host) {
   # In-tree, ffx plugins/tools and tests depend on the existence of a
   # collection (not IDK) manifest at "$OUT_DIR/sdk/manifest/core" and/or
   # associated directory at "$OUT_DIR/sdk/exported/core" to determine the
-  # location of tools. Create a collection that produces those paths using
-  # molecules from the "in_tree_collection".
+  # location of tools. Create a collection that generates a manifest with the
+  # necessary paths.
   # TODO(https://fxbug.dev/317385989): Remove once these legacy dependencies
-  # on the internals of the IDK build is eliminated.
+  # on the internals of the IDK build are eliminated.
   sdk_collection("core") {
     visibility = []
     visibility = [
@@ -721,18 +727,8 @@ if (!is_host) {
     id = sdk_id
 
     deps = [
-      ":in_tree_collection.fuchsia_idk_atoms_built_in_main_platform_build_only",
-
-      # The ffx tests also depend on these tools.
-      "//src/developer/ffx/plugins/emulator:uefi_internal_x64($host_toolchain)",
-      "//src/developer/ffx/plugins/profile:sdk($host_toolchain)",
-
-      # `ffx emu start --engine qemu` requires `qemu_internal` in the manifest.
-      "//src/developer/ffx/plugins/emulator:qemu_internal($host_toolchain)",
-
-      # For completeness.
-      "//src/developer/ffx/plugins/emulator:crosvm_internal($host_toolchain)",
-      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64($host_toolchain)",
+      # Include all tools in the full IDK and only tools.
+      ":host_tools_for_single_toolchain($host_toolchain)",
     ]
   }
 
@@ -883,7 +879,7 @@ sdk_documentation("sdk_notice") {
 # and properly populated, see [1] for all details. Also, some third-party repos
 # build or reference building this rule [2].
 #
-# Note that //zircon/public/sysroot/sdk:sysroot_sdk is already
+# Note that //zircon/public/sysroot_sdk is already
 # a transitive dependency of //sdk:in_tree_collection, so using the content of
 # $OUTPUT_DIR/sdk/exported/in_tree_collection/ would be equivalent, except that
 # this directory is much longer to build (since it contains host tools).
@@ -898,13 +894,12 @@ sdk_collection("zircon_sysroot") {
   # sdk_* templates.
   category = "internal"
 
-  deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+  deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
 if (is_host) {
   # Tools and data used on a host development machine (usually Linux or macOS).
   sdk_molecule("host_tools_for_single_toolchain") {
-    visibility += [ "//tools/docsgen:invoke_clidoc" ]
     category = "partner"
     deps = [
       ":build_host_tools",
@@ -941,7 +936,6 @@ if (is_host) {
       "//src/sys/pkg/bin/far:bin_sdk",
       "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
       "//tools/fidlcat:fidlcat_sdk",
-      "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
       "//tools/net/device-finder:device-finder_sdk",
 
       # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
@@ -1164,6 +1158,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-bti/cpp:cpp_sdk",
+    "//sdk/lib/driver/fake-gpio/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-mmio-reg/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-object/cpp:cpp_sdk",
     "//sdk/lib/driver/fake-platform-device/cpp:cpp_sdk",
@@ -1207,7 +1202,7 @@ sdk_molecule("core_cc_source_libraries") {
 
 sdk_molecule("core_sysroot") {
   category = "partner"
-  deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
+  deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
 # License/copyright files for the SDK.
@@ -1347,10 +1342,6 @@ if (current_toolchain == default_toolchain) {
       "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
       "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
 
-      # TODO(https://fxbug.dev/366517646): Remove once all uses of `fake-bti`
-      # are migrated to the //sdk target.
-      "//src/devices/testing/fake-bti:fake-bti_sdk",
-
       # TODO(https://fxbug.dev/333907192): Eliminate vendor dependencies on fzl
       # or promote it to "partner".
       "//zircon/system/ulib/fzl:fzl_sdk",
@@ -1426,7 +1417,6 @@ if (current_toolchain == default_toolchain) {
         "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_emulator_data",
-        "//tools/fuchsia-sdk-run:sdk_exported",
         "//vendor/*",
       ]
 
@@ -1436,6 +1426,26 @@ if (current_toolchain == default_toolchain) {
 }  # current_toolchain == default_toolchain
 
 if (is_host) {
+  # A collection of all host tools in the IDK for the current (host) toolchain.
+  # This must contain exactly the set of host tools (for a single CPI
+  # architecture) included in ":final_fuchsia_idk". It is used to generate
+  # documentation for the tools.
+  # Its "SDK root" is at:
+  # `get_label_info("//sdk:idk_host_tools_collection", "root_out_dir") + "/sdk/exported/idk_host_tools_collection"`
+  sdk_collection("idk_host_tools_collection") {
+    visibility = []
+    visibility = [
+      ":sdk",
+      "//tools/docsgen:invoke_clidoc",
+    ]
+
+    # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
+    # sdk_* templates.
+    category = "internal"
+
+    deps = [ ":host_tools_for_single_toolchain" ]
+  }
+
   # A collection that only contains host tools that are used by the Fuchsia
   # build when running ffx tools via the `ffx_action()` template. This allows
   # "ffx-assembly" to find the tools it needs via an IDK manifest just as it

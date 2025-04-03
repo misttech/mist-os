@@ -21,6 +21,7 @@ using OwnedCompositeParents = std::vector<fuchsia_driver_framework::CompositePar
 class DriverRunner;
 
 struct BindRequest {
+  std::string node_moniker;
   std::weak_ptr<Node> node;
   std::string driver_url_suffix;
   std::shared_ptr<BindResultTracker> tracker;

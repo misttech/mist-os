@@ -9,6 +9,7 @@ using fuchsia.io;
 using fuchsia.component.resolution;
 using fuchsia.component.test;
 using fuchsia.diagnostics;
+using fuchsia.diagnostics.types;
 
 /// A driver name is the name defined in ZIRCON_DRIVER_BEGIN begin macro
 /// for a specific driver.
@@ -17,9 +18,16 @@ alias DriverName = string:MAX;
 @available(added=HEAD)
 const MAX_SOFTWARE_DEVICES uint32 = 20;
 
+@available(replaced=NEXT)
 type DriverLog = struct {
     name DriverName;
     log_level fuchsia.diagnostics.Severity;
+};
+
+@available(added=NEXT)
+type DriverLog = struct {
+    name DriverName;
+    log_level fuchsia.diagnostics.types.Severity;
 };
 
 @available(added=HEAD)
@@ -171,6 +179,18 @@ type RealmArgs = resource table {
     /// Default: empty
     @available(added=24)
     19: boot_driver_components vector<string:MAX>:MAX;
+
+    /// Devicetree blob that should be handed to the board driver.
+    @available(added=NEXT)
+    20: devicetree zx.Handle:VMO;
+
+    /// Platform Vendor ID which should be specified to the platform bus driver.
+    @available(added=NEXT)
+    21: platform_vid uint32;
+
+    /// Platform ID which should be specified to the platform bus driver.
+    @available(added=NEXT)
+    22: platform_pid uint32;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

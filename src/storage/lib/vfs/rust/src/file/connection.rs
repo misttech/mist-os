@@ -11,17 +11,20 @@ use crate::file::common::new_connection_validate_options;
 use crate::file::{File, FileIo, FileOptions, RawFileIoConnection, SyncMode};
 use crate::name::parse_name;
 use crate::node::OpenNode;
-use crate::object_request::Representation;
+use crate::object_request::{
+    run_synchronous_future_or_spawn, ConnectionCreator, ObjectRequest, Representation,
+};
 use crate::protocols::ToFileOptions;
+use crate::request_handler::{RequestHandler, RequestListener};
 use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
-use futures::stream::StreamExt;
 use static_assertions::assert_eq_size;
 use std::convert::TryInto as _;
 use std::future::Future;
-use std::ops::{Deref, DerefMut};
+use std::ops::{ControlFlow, Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::Arc;
 use storage_trace::{self as trace, TraceFutureExt};
 use zx_status::Status;
@@ -35,36 +38,27 @@ use {
 };
 
 /// Initializes a file connection and returns a future which will process the connection.
-fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>(
+async fn create_connection<
+    T: 'static + File,
+    U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin,
+>(
     scope: ExecutionScope,
     file: U,
     options: FileOptions,
     object_request: ObjectRequestRef<'_>,
-) -> Result<impl Future<Output = ()>, Status> {
+) -> Result<(), Status> {
     new_connection_validate_options(&options, file.readable(), file.writable(), file.executable())?;
 
-    let object_request = object_request.take();
-    Ok(async move {
-        if let Err(s) = (|| async {
-            file.open_file(&options).await?;
+    file.open_file(&options).await?;
+    if object_request.truncate {
+        file.truncate(0).await?;
+    }
 
-            if object_request.truncate {
-                file.truncate(0).await?;
-            }
-
-            Ok(())
-        })()
-        .await
-        {
-            object_request.shutdown(s);
-            return;
-        }
-
-        let connection = FileConnection { scope: scope.clone(), file, options };
-        if let Ok(requests) = object_request.into_request_stream(&connection).await {
-            connection.handle_requests(requests).await
-        }
-    })
+    let connection = FileConnection { scope: scope.clone(), file, options };
+    if let Ok(requests) = object_request.take().into_request_stream(&connection).await {
+        scope.spawn(RequestListener::new(requests, Some(connection)));
+    }
+    Ok(())
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests.
@@ -149,13 +143,17 @@ impl<T: 'static + File> DerefMut for FidlIoConnection<T> {
 }
 
 impl<T: 'static + File + FileIo> FidlIoConnection<T> {
-    /// Creates a connection to a file that uses FIDL for all IO.
-    pub fn create(
+    /// Creates a new connection to serve the file that uses FIDL for all IO. The file will be
+    /// served from a new async `Task`, not from the current `Task`. Errors in constructing the
+    /// connection are not guaranteed to be returned, they may be sent directly to the client end of
+    /// the connection. This method should be called from within an `ObjectRequest` handler to
+    /// ensure that errors are sent to the client end of the connection.
+    pub async fn create(
         scope: ExecutionScope,
         file: Arc<T>,
         options: impl ToFileOptions,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         let file = OpenNode::new(file);
         let options = options.to_file_options()?;
         create_connection(
@@ -164,19 +162,34 @@ impl<T: 'static + File + FileIo> FidlIoConnection<T> {
             options,
             object_request,
         )
+        .await
     }
 
-    /// Like create, but spawns a task to run the connection.
-    pub fn spawn(
+    /// Similar to `create` but optimized for files whose implementation is synchronous and
+    /// creating the connection is being done from a non-async context.
+    pub fn create_sync(
         scope: ExecutionScope,
         file: Arc<T>,
-        options: FileOptions,
-        object_request: ObjectRequestRef<'_>,
+        options: impl ToFileOptions,
+        object_request: ObjectRequest,
+    ) {
+        run_synchronous_future_or_spawn(
+            scope.clone(),
+            object_request.handle_async(async |object_request| {
+                Self::create(scope, file, options, object_request).await
+            }),
+        )
+    }
+}
+
+impl<T: 'static + File + FileIo> ConnectionCreator<T> for FidlIoConnection<T> {
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
     ) -> Result<(), Status> {
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move { Ok(Self::create(scope, file, options, object_request)?) })
-        });
-        Ok(())
+        Self::create(scope, node, protocols, object_request).await
     }
 }
 
@@ -258,19 +271,31 @@ pub struct RawIoConnection<T: 'static + File> {
 }
 
 impl<T: 'static + File + RawFileIoConnection> RawIoConnection<T> {
-    pub fn create(
+    pub async fn create(
         scope: ExecutionScope,
         file: Arc<T>,
-        protocols: impl ProtocolsExt,
+        options: impl ToFileOptions,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<impl Future<Output = ()>, Status> {
+    ) -> Result<(), Status> {
         let file = OpenNode::new(file);
         create_connection(
             scope,
             RawIoConnection { file },
-            protocols.to_file_options()?,
+            options.to_file_options()?,
             object_request,
         )
+        .await
+    }
+}
+
+impl<T: 'static + File + RawFileIoConnection> ConnectionCreator<T> for RawIoConnection<T> {
+    async fn create<'a>(
+        scope: ExecutionScope,
+        node: Arc<T>,
+        protocols: impl crate::ProtocolsExt,
+        object_request: ObjectRequestRef<'a>,
+    ) -> Result<(), Status> {
+        Self::create(scope, node, protocols, object_request).await
     }
 }
 
@@ -368,12 +393,12 @@ mod stream_io {
         /// clients that can be used for issuing read, write, and seek calls. Any read, write, and seek
         /// calls that continue to come in over FIDL will be forwarded to `stream` instead of being sent
         /// to `file`.
-        pub fn create(
+        pub async fn create(
             scope: ExecutionScope,
             file: Arc<T>,
             options: impl ToFileOptions,
             object_request: ObjectRequestRef<'_>,
-        ) -> Result<impl Future<Output = ()>, Status> {
+        ) -> Result<(), Status> {
             let file = OpenNode::new(file);
             let options = options.to_file_options()?;
             let stream = TempClonable::new(zx::Stream::create(
@@ -382,19 +407,23 @@ mod stream_io {
                 0,
             )?);
             create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
+                .await
         }
 
-        /// Like create, but spawns a task to run the connection.
-        pub fn spawn(
+        /// Similar to `create` but optimized for files whose implementation is synchronous and
+        /// creating the connection is being done from a non-async context.
+        pub fn create_sync(
             scope: ExecutionScope,
             file: Arc<T>,
-            options: FileOptions,
-            object_request: ObjectRequestRef<'_>,
-        ) -> Result<(), Status> {
-            object_request.take().spawn(&scope.clone(), move |object_request| {
-                Box::pin(async move { Ok(Self::create(scope, file, options, object_request)?) })
-            });
-            Ok(())
+            options: impl ToFileOptions,
+            object_request: ObjectRequest,
+        ) {
+            run_synchronous_future_or_spawn(
+                scope.clone(),
+                object_request.handle_async(async |object_request| {
+                    Self::create(scope, file, options, object_request).await
+                }),
+            )
         }
 
         async fn maybe_unblock<F, R>(&self, f: F) -> R
@@ -408,6 +437,17 @@ mod stream_io {
             } else {
                 f(&*self.stream)
             }
+        }
+    }
+
+    impl<T: 'static + File + GetVmo> ConnectionCreator<T> for StreamIoConnection<T> {
+        async fn create<'a>(
+            scope: ExecutionScope,
+            node: Arc<T>,
+            protocols: impl crate::ProtocolsExt,
+            object_request: ObjectRequestRef<'a>,
+        ) -> Result<(), Status> {
+            Self::create(scope, node, protocols, object_request).await
         }
     }
 
@@ -505,63 +545,9 @@ struct FileConnection<U> {
     options: FileOptions,
 }
 
-impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler> FileConnection<U> {
-    async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
-        while let Some(request) = requests.next().await {
-            let _guard = self.scope.active_guard();
-
-            let state = match request {
-                Err(_) => {
-                    // FIDL level error, such as invalid message format and alike.  Close the
-                    // connection on any unexpected error.
-                    // TODO: Send an epitaph.
-                    ConnectionState::Dropped
-                }
-                Ok(request) => {
-                    self.handle_request(request)
-                        .await
-                        // Protocol level error.  Close the connection on any unexpected error.
-                        // TODO: Send an epitaph.
-                        .unwrap_or(ConnectionState::Dropped)
-                }
-            };
-
-            match state {
-                ConnectionState::Alive => (),
-                ConnectionState::Closed(responder) => {
-                    async move {
-                        let _ = responder.send({
-                            let result = if self.options.rights.intersects(
-                                fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
-                            ) {
-                                self.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
-                            } else {
-                                Ok(())
-                            };
-                            // The file gets closed when we drop `self`, so we should do that before
-                            // sending the response.
-                            std::mem::drop(self);
-                            result
-                        });
-                    }
-                    .trace(trace::trace_future_args!(c"storage", c"File::Close"))
-                    .await;
-                    return;
-                }
-                ConnectionState::Dropped => break,
-            }
-        }
-
-        if self
-            .options
-            .rights
-            .intersects(fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES)
-        {
-            let _guard = self.scope.active_guard();
-            let _ = self.file.sync(SyncMode::PreClose).await;
-        }
-    }
-
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin>
+    FileConnection<U>
+{
     /// Handle a [`FileRequest`]. This function is responsible for handing all the file operations
     /// that operate on the connection-specific buffer.
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
@@ -569,12 +555,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::FileRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::DeprecatedClone");
-                self.handle_deprecated_clone(flags, object);
+                self.handle_deprecated_clone(flags, object).await;
             }
             #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone");
-                self.handle_deprecated_clone(flags, object);
+                self.handle_deprecated_clone(flags, object).await;
             }
             #[cfg(fuchsia_api_level_at_least = "26")]
             fio::FileRequest::Clone { request, control_handle: _ } => {
@@ -869,30 +855,28 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_deprecated_clone(
+    async fn handle_deprecated_clone(
         &mut self,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        flags.to_object_request(server_end).handle(|object_request| {
-            let options =
-                inherit_rights_for_clone(self.options.to_io1(), flags)?.to_file_options()?;
+        flags
+            .to_object_request(server_end)
+            .handle_async(async |object_request| {
+                let options =
+                    inherit_rights_for_clone(self.options.to_io1(), flags)?.to_file_options()?;
 
-            let connection = Self {
-                scope: self.scope.clone(),
-                file: self.file.clone_connection(options)?,
-                options,
-            };
+                let connection = Self {
+                    scope: self.scope.clone(),
+                    file: self.file.clone_connection(options)?,
+                    options,
+                };
 
-            object_request.take().spawn(&self.scope, |object_request| {
-                Box::pin(async move {
-                    let requests = object_request.take().into_request_stream(&connection).await?;
-                    Ok(connection.handle_requests(requests))
-                })
-            });
-
-            Ok(())
-        });
+                let requests = object_request.take().into_request_stream(&connection).await?;
+                self.scope.spawn(RequestListener::new(requests, Some(connection)));
+                Ok(())
+            })
+            .await;
     }
 
     fn handle_clone(&mut self, server_end: ServerEnd<fio::FileMarker>) {
@@ -903,10 +887,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 return;
             }
         };
-        self.scope.spawn(async move {
-            let requests = server_end.into_stream();
-            connection.handle_requests(requests).await;
-        });
+        self.scope.spawn(RequestListener::new(server_end.into_stream(), Some(connection)));
     }
 
     async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
@@ -993,10 +974,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         let attributes = match self.file.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
+                #[cfg(any(test, feature = "use_log"))]
                 log::error!(status:?; "list extended attributes failed");
-                iterator
-                    .close_with_epitaph(status)
-                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
+                iterator.close_with_epitaph(status).unwrap_or_else(|_error| {
+                    #[cfg(any(test, feature = "use_log"))]
+                    log::error!(_error:?; "failed to send epitaph")
+                });
                 return;
             }
         };
@@ -1067,6 +1050,77 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     ) -> Result<(), Status> {
         self.file.allocate(offset, length, mode).await
     }
+
+    fn should_sync_before_close(&self) -> bool {
+        self.options
+            .rights
+            .intersects(fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES)
+    }
+}
+
+// The `FileConnection` is wrapped in an `Option` so it can be dropped before responding to a Close
+// request.
+impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler + Unpin>
+    RequestHandler for Option<FileConnection<U>>
+{
+    type Request = Result<fio::FileRequest, fidl::Error>;
+
+    async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
+        let option_this = self.get_mut();
+        let this = option_this.as_mut().unwrap();
+        let _guard = this.scope.active_guard();
+        let state = match request {
+            Ok(request) => {
+                this.handle_request(request)
+                    .await
+                    // Protocol level error.  Close the connection on any unexpected error.
+                    // TODO: Send an epitaph.
+                    .unwrap_or(ConnectionState::Dropped)
+            }
+            Err(_) => {
+                // FIDL level error, such as invalid message format and alike.  Close the
+                // connection on any unexpected error.
+                // TODO: Send an epitaph.
+                ConnectionState::Dropped
+            }
+        };
+        match state {
+            ConnectionState::Alive => ControlFlow::Continue(()),
+            ConnectionState::Dropped => {
+                if this.should_sync_before_close() {
+                    let _ = this.file.sync(SyncMode::PreClose).await;
+                }
+                ControlFlow::Break(())
+            }
+            ConnectionState::Closed(responder) => {
+                async move {
+                    let this = option_this.as_mut().unwrap();
+                    let _ = responder.send({
+                        let result = if this.should_sync_before_close() {
+                            this.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
+                        } else {
+                            Ok(())
+                        };
+                        // The file gets closed when we drop the connection, so we should do that
+                        // before sending the response.
+                        std::mem::drop(option_this.take());
+                        result
+                    });
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::Close"))
+                .await;
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    async fn stream_closed(self: Pin<&mut Self>) {
+        let this = self.get_mut().as_mut().unwrap();
+        if this.should_sync_before_close() {
+            let _guard = this.scope.active_guard();
+            let _ = this.file.sync(SyncMode::PreClose).await;
+        }
+    }
 }
 
 impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representation
@@ -1110,8 +1164,8 @@ mod tests {
     use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::node::Node;
     use assert_matches::assert_matches;
+    use fuchsia_sync::Mutex;
     use futures::prelude::*;
-    use std::sync::Mutex;
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);
@@ -1199,7 +1253,7 @@ mod tests {
 
         fn handle_operation(&self, operation: FileOperation) -> Result<(), Status> {
             let result = (self.callback)(&operation);
-            self.operations.lock().unwrap().push(operation);
+            self.operations.lock().push(operation);
             match result {
                 Status::OK => Ok(()),
                 err => Err(err),
@@ -1337,14 +1391,11 @@ mod tests {
 
         let scope = ExecutionScope::new();
 
-        flags.to_object_request(server_end).handle(|object_request| {
-            object_request.spawn_connection(
-                scope.clone(),
-                file.clone(),
-                flags,
-                FidlIoConnection::create,
-            )
-        });
+        flags.to_object_request(server_end).create_connection_sync::<FidlIoConnection<_>, _>(
+            scope.clone(),
+            file.clone(),
+            flags,
+        );
 
         TestEnv { file, proxy, scope }
     }
@@ -1357,7 +1408,7 @@ mod tests {
         );
         // Do a no-op sync() to make sure that the open has finished.
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1394,7 +1445,7 @@ mod tests {
         // Read from original proxy.
         let _: Vec<u8> = env.proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         // Each connection should have an independent seek.
         assert_eq!(
             *events,
@@ -1414,7 +1465,7 @@ mod tests {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
         let () = env.proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1435,7 +1486,7 @@ mod tests {
         let status = env.proxy.close().await.unwrap().map_err(Status::from_raw);
         assert_eq!(status, Err(Status::IO));
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1455,7 +1506,7 @@ mod tests {
         std::mem::drop(env.proxy);
         env.scope.shutdown();
         env.scope.wait().await;
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1506,7 +1557,7 @@ mod tests {
         assert_eq!(mutable_attributes, expected.mutable_attributes);
         assert_eq!(immutable_attributes, expected.immutable_attributes);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1532,7 +1583,7 @@ mod tests {
             .unwrap()
             .map_err(Status::from_raw);
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1559,7 +1610,7 @@ mod tests {
         assert_eq!(result, Err(Status::ACCESS_DENIED));
         #[cfg(not(target_os = "fuchsia"))]
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1586,7 +1637,7 @@ mod tests {
         assert_eq!(result, Err(Status::ACCESS_DENIED));
         #[cfg(not(target_os = "fuchsia"))]
         assert_eq!(result, Err(Status::NOT_SUPPORTED));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1607,7 +1658,7 @@ mod tests {
         assert_eq!(Status::from_raw(status), Status::OK);
         // OPEN_FLAG_TRUNCATE should get stripped because it only applies at open time.
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1641,7 +1692,7 @@ mod tests {
             }
             e => panic!("Expected OnOpen event with fio::NodeInfoDeprecated::File, got {:?}", e),
         }
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1656,7 +1707,7 @@ mod tests {
         let data = env.proxy.read(10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1689,7 +1740,7 @@ mod tests {
         let data = env.proxy.read_at(5, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10, 11, 12, 13, 14]);
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1727,7 +1778,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1762,7 +1813,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![8]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1796,7 +1847,7 @@ mod tests {
 
         let data = env.proxy.read(1).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![(offset % 256) as u8]);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1826,7 +1877,7 @@ mod tests {
             .map_err(Status::from_raw)
             .unwrap();
 
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1852,7 +1903,7 @@ mod tests {
     async fn test_sync() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![
@@ -1872,7 +1923,7 @@ mod tests {
     async fn test_resize() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
         let () = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw).unwrap();
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -1889,7 +1940,7 @@ mod tests {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
         let result = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1904,7 +1955,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -1927,7 +1978,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let result = env.proxy.write(data).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_eq!(
             *events,
             vec![FileOperation::Init {
@@ -1942,7 +1993,7 @@ mod tests {
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write_at(data, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -1976,7 +2027,7 @@ mod tests {
             .map_err(Status::from_raw)
             .unwrap();
         assert_eq!(offset, MOCK_FILE_SIZE + data.len() as u64);
-        let events = env.file.operations.lock().unwrap();
+        let events = env.file.operations.lock();
         assert_matches!(
             &events[..],
             [
@@ -2005,14 +2056,12 @@ mod tests {
 
             let cloned_file = file.clone();
             let cloned_scope = scope.clone();
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(
-                    cloned_scope,
-                    cloned_file,
-                    flags,
-                    StreamIoConnection::create,
-                )
-            });
+
+            flags.to_object_request(server_end).create_connection_sync::<StreamIoConnection<_>, _>(
+                cloned_scope,
+                cloned_file,
+                flags,
+            );
 
             TestEnv { file, proxy, scope }
         }
@@ -2051,7 +2100,7 @@ mod tests {
                 .unwrap();
             assert_eq!(data, vmo_contents);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2078,7 +2127,7 @@ mod tests {
                 .unwrap();
             assert_eq!(data, vmo_contents[OFFSET as usize..]);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2104,7 +2153,7 @@ mod tests {
             vmo.read(&mut vmo_contents, 0).unwrap();
             assert_eq!(vmo_contents, data);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {
@@ -2132,7 +2181,7 @@ mod tests {
             vmo.read(&mut vmo_contents, OFFSET).unwrap();
             assert_eq!(vmo_contents, data);
 
-            let events = env.file.operations.lock().unwrap();
+            let events = env.file.operations.lock();
             assert_eq!(
                 *events,
                 [FileOperation::Init {

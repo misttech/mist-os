@@ -20,7 +20,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
-if ! which socat > /dev/null 2>&1; then
+if ! which socat >/dev/null 2>&1; then
   fx-error "The command \`socat\` was not found!"
   if [[ "$(uname)" == "Linux" ]]; then
     fx-error "  maybe \`apt install socat\`"
@@ -30,18 +30,34 @@ if ! which socat > /dev/null 2>&1; then
   exit 1
 fi
 
+pontis_message=""
+if [[ -e "$(find_executable "pontis-pts")" ]]; then
+  if pontis_serials="$(fx-command-run pontis-pts)"; then
+    pontis_message="\nNo serial devices found on pontis"
+    while IFS= read -r pontis_serial; do
+      pontis_options+=("$pontis_serial")
+    done <<<"$pontis_serials"
+  fi
+fi
+
 DEVICE="$1"
 if [[ -z "$DEVICE" ]]; then
   options=($(find /dev -maxdepth 1 -name ttyUSB\* -or -name tty.SLAB_USBtoUART\* -or -name tty.usbserial\* | sort))
+  options+=("${pontis_options[@]}")
   if [[ "${#options}" = 0 ]]; then
-    fx-error "No known serial devices found, specify one exactly."
+    fx-error "No ttyUSB*, tty.SLAB_USBtoUSART* or tty.usbserial* found in /dev${pontis_message}\nPlease specify any known path exactly."
     exit 1
   fi
-  echo >&2 "Select a serial device from the following list:"
-  select device in "${options[@]}"; do
-    DEVICE="$device"
-    break
-  done
+  if [[ "${#options[@]}" -eq 1 ]]; then
+    echo >&2 "Found one device at ${options[0]}"
+    DEVICE="${options[0]}"
+  elif [[ "${#options}" -gt 1 ]]; then
+    echo >&2 "Select a serial device from the following list:"
+    select device in "${options[@]}"; do
+      DEVICE="$device"
+      break
+    done
+  fi
 fi
 
 if [[ ! -e "$DEVICE" ]]; then
@@ -70,7 +86,7 @@ echo >&2 "SERIAL: Run: \`export TERM=xterm; /boot/bin/sh\` for improved key bind
 
 # This is the method recommended in the socat manual to detect the presence /
 # omission of this feature.
-if $(socat -hh |grep ' b[1-9]' > /dev/null); then
+if $(socat -hh | grep ' b[1-9]' >/dev/null); then
   speed="b115200"
 else
   speed="ospeed=115200,ispeed=115200"

@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include <array>
+#include <cstdint>
 #include <random>
 
 #include <zxtest/zxtest.h>
@@ -36,7 +37,7 @@ class ConcurrentCopyFixture : public zxtest::Test {
 
     for (size_t i = 0; i < dst_.size(); ++i) {
       dst_[i] = static_cast<uint8_t>(dist(generator_));
-      src_[i] = ~dst_[i];
+      src_[i] = static_cast<uint8_t>(~dst_[i]);
     }
   }
 

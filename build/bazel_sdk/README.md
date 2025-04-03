@@ -67,17 +67,17 @@ It can be helpful to put the path in an environment variable and create an alias
 since this needs to be pass to each invocation of bazel.
 
 ```bash
-$ export FUCHSIA_SDK_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print bazel_sdk_info | fx jq -r '.[] .location')"
-$ export RULES_FUCHSIA_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print rules_fuchsia_info | fx jq -r '.[] .location')"
-$ export SDK_OVERRIDE="--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH --override_repository=rules_fuchsia=$RULES_FUCHSIA_PATH"
+export FUCHSIA_SDK_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print bazel_sdk_info | fx jq -r '.[] .location')"
+export RULES_FUCHSIA_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print rules_fuchsia_info | fx jq -r '.[] .location')"
+export SDK_OVERRIDE=("--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH" "--override_repository=rules_fuchsia=$RULES_FUCHSIA_PATH")
 ```
 
 Then you can use the $SDK_OVERRIDE variable in all of your subsequent bazel
 invocations
 
 ```bash
-$ bazel build $SDK_OVERRIDE //foo:pkg
-$ bazel test $SDK_OVERRIDE //foo:test
+bazel build "${SDK_OVERRIDE[@]}" //foo:pkg
+bazel test "${SDK_OVERRIDE[@]}" //foo:test
 ```
 
 ### Iterating on build rules

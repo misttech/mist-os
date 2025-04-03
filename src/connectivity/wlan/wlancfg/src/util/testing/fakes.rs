@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
+use crate::client::roaming::lib::{PolicyRoamRequest, RoamTriggerData, RoamTriggerDataOutcome};
 use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::{scan, types as client_types};
 use crate::config_management::{
@@ -427,10 +427,7 @@ impl RoamMonitorApi for FakeRoamMonitor {
         self.trigger_data_queue.push_back(data);
         Ok(self.response_to_should_roam_scan.clone())
     }
-    fn should_send_roam_request(
-        &self,
-        _candidate: client_types::ScannedCandidate,
-    ) -> Result<bool, anyhow::Error> {
+    fn should_send_roam_request(&self, _request: PolicyRoamRequest) -> Result<bool, anyhow::Error> {
         Ok(self.response_to_should_send_roam_request)
     }
 }

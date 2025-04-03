@@ -5,6 +5,7 @@
 mod boxed;
 mod envelope;
 mod ptr;
+mod result;
 mod string;
 mod table;
 mod union;
@@ -13,6 +14,7 @@ mod vec;
 pub use self::boxed::*;
 pub use self::envelope::*;
 pub use self::ptr::*;
+pub use self::result::*;
 pub use self::string::*;
 pub use self::table::*;
 pub use self::union::*;

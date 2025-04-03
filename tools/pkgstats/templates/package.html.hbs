@@ -21,13 +21,13 @@ found in the LICENSE file. }}
           {{#each this.exposed_from_self}}
           <li>
             {{ capability_str this }} (exposed)
-            {{{ capability_target_list this @root.[2] }}}
+            {{{ capability_target_list this @root.[2] @root.[3] }}}
           </li>
           {{/each}}
           {{#each this.offered_from_self}}
           <li>
             {{ capability_str this }} (offered)
-            {{{ capability_target_list this @root.[2] }}}
+            {{{ capability_target_list this @root.[2] @root.[3]}}}
           </li>
           {{/each}}
         </ul>

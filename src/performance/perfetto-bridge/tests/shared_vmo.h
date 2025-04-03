@@ -27,7 +27,7 @@ class SharedVmo : public perfetto::SharedMemory {
   // The transport layer is expected to tear down the resource associated to
   // this object region when destroyed.
   ~SharedVmo() override;
-  void* start() const override;
+  const void* start() const override;
   size_t size() const override;
 
  private:

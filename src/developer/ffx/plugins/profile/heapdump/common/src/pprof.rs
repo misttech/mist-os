@@ -26,8 +26,14 @@ fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile>
         let mut builder = pprof::ModuleMapBuilder::default();
         for (address, info) in &snapshot.executable_regions {
             let limit = *address + info.size;
+            let filename_string_index = st.intern(&info.name);
             let build_id_string_index = st.intern_build_id(&info.build_id);
-            builder.add_mapping(*address..limit, info.file_offset, build_id_string_index)?;
+            builder.add_mapping(
+                *address..limit,
+                info.file_offset,
+                filename_string_index,
+                build_id_string_index,
+            )?;
         }
         let (mappings, resolver) = builder.build();
         pprof.mapping = mappings;
@@ -143,12 +149,16 @@ mod tests {
 
     // Placeholder mappings for the fake profile:
     const MAP_1_ADDRESS: u64 = 0x2000;
+    const MAP_1_NAME: &str = "map-1";
     const MAP_1_SIZE: u64 = 0x1000;
     const MAP_1_FILE_OFFSET: u64 = 0x1000;
+    const MAP_1_VADDR: u64 = 0x2000;
     const MAP_1_BUILD_ID: &str = "112233441122334411223344";
     const MAP_2_ADDRESS: u64 = 0x8000;
+    const MAP_2_NAME: &str = "map-2";
     const MAP_2_SIZE: u64 = 0x2000;
     const MAP_2_FILE_OFFSET: u64 = 0;
+    const MAP_2_VADDR: u64 = 0x3000;
     const MAP_2_BUILD_ID: &str = "556677885566778855667788";
 
     // Placeholder code locations (program addresses) for the fake profile:
@@ -221,13 +231,17 @@ mod tests {
             ],
             executable_regions: hashmap![
                 MAP_1_ADDRESS => ExecutableRegion {
+                    name: MAP_1_NAME.to_string(),
                     size: MAP_1_SIZE,
                     file_offset: MAP_1_FILE_OFFSET,
+                    vaddr: Some(MAP_1_VADDR),
                     build_id: hex::decode(MAP_1_BUILD_ID).unwrap(),
                 },
                 MAP_2_ADDRESS => ExecutableRegion {
+                    name: MAP_2_NAME.to_string(),
                     size: MAP_2_SIZE,
                     file_offset: MAP_2_FILE_OFFSET,
+                    vaddr: Some(MAP_2_VADDR),
                     build_id: hex::decode(MAP_2_BUILD_ID).unwrap(),
                 },
             ],
@@ -332,10 +346,12 @@ mod tests {
         let mapping1 = profile.mapping.iter().find(|m| m.memory_start == MAP_1_ADDRESS).unwrap();
         assert_eq!(mapping1.memory_limit, MAP_1_ADDRESS + MAP_1_SIZE);
         assert_eq!(mapping1.file_offset, MAP_1_FILE_OFFSET);
+        assert_eq!(st(mapping1.filename), MAP_1_NAME);
         assert_eq!(st(mapping1.build_id), MAP_1_BUILD_ID);
         let mapping2 = profile.mapping.iter().find(|m| m.memory_start == MAP_2_ADDRESS).unwrap();
         assert_eq!(mapping2.memory_limit, MAP_2_ADDRESS + MAP_2_SIZE);
         assert_eq!(mapping2.file_offset, MAP_2_FILE_OFFSET);
+        assert_eq!(st(mapping2.filename), MAP_2_NAME);
         assert_eq!(st(mapping2.build_id), MAP_2_BUILD_ID);
 
         // Identify the locations from their addresses and verify them.

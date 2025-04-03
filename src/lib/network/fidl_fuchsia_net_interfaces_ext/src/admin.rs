@@ -246,6 +246,7 @@ where
                         protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                         #[cfg(not(target_os = "fuchsia"))]
                         reason: None,
+                        epitaph: None,
                     })),
                 }
             }
@@ -388,6 +389,7 @@ impl Control {
                 protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                 #[cfg(not(target_os = "fuchsia"))]
                 reason: None,
+                epitaph: None,
             }),
             Err(e) => TerminalError::Fidl(e),
         }
@@ -547,9 +549,9 @@ mod test {
                 .as_slice(),
             [Err(AddressStateProviderError::Fidl(fidl::Error::ClientChannelClosed {
                 status: fidl::Status::INTERNAL,
-                protocol_name: _,
                 #[cfg(not(target_os = "fuchsia"))]
-                reason: None
+                reason: None,
+                ..
             }))]
         );
     }
@@ -650,7 +652,8 @@ mod test {
                         status: zx::Status::PEER_CLOSED,
                         protocol_name: fidl_fuchsia_net_interfaces_admin::ControlMarker::DEBUG_NAME,
                         #[cfg(not(target_os = "fuchsia"))]
-                        reason: None
+                        reason: None,
+                        ..
                     }))
                 );
             },
@@ -698,6 +701,7 @@ mod test {
             control.or_terminal_event_no_return(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::PEER_CLOSED,
                 protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                epitaph: None,
             })),
             Err(super::TerminalError::Terminal(CLOSE_REASON))
         );
@@ -762,6 +766,7 @@ mod test {
             protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
             #[cfg(not(target_os = "fuchsia"))]
             reason: None,
+            epitaph: None,
         }),
         Ok(Some(InterfaceRemovedReason::User)),
         Err(TerminalError::Terminal(InterfaceRemovedReason::User));
@@ -773,6 +778,7 @@ mod test {
             protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
             #[cfg(not(target_os = "fuchsia"))]
             reason: None,
+            epitaph: None,
         }),
         Ok(None),
         Err(TerminalError::Fidl(
@@ -781,6 +787,7 @@ mod test {
                 protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                 #[cfg(not(target_os = "fuchsia"))]
                 reason: None,
+                epitaph: None,
             }
         ));
         "returns query error when no terminal error"
@@ -791,6 +798,7 @@ mod test {
             protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
             #[cfg(not(target_os = "fuchsia"))]
             reason: None,
+            epitaph: None,
         }),
         Err(fidl::Error::InvalidHeader),
         Err(TerminalError::Fidl(
@@ -799,6 +807,7 @@ mod test {
                 protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
                 #[cfg(not(target_os = "fuchsia"))]
                 reason: None,
+                epitaph: None,
             }
         ));
         "returns query error when terminal event returns a fidl error"

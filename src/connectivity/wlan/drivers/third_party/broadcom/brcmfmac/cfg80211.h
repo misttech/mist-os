@@ -79,7 +79,7 @@ namespace fuchsia_wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 // WME error threshold to trigger a deauth.
 #define BRCMF_WME_BAD_PKT_THRESHOLD       (0.4)   // 40% of rx packets.
-// WME error threshold to trigger logging error counter 
+// WME error threshold to trigger logging error counter
 #define BRCMF_WME_BAD_PKT_LOG_THRESHOLD       (0.1)   // 10% of rx packets.
 
 #define WL_ESCAN_ACTION_START      1
@@ -659,9 +659,9 @@ std::vector<zx_status_t> brcmf_if_set_keys_req(
 void brcmf_if_eapol_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req);
 void brcmf_if_stats_query_req(net_device* ndev);
-zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
-                                             fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
-                                             fidl::AnyArena& arena);
+zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
+                                     fuchsia_wlan_stats::wire::IfaceStats* out_stats,
+                                     fidl::AnyArena& arena);
 zx_status_t brcmf_if_get_iface_histogram_stats(
     net_device* ndev, fuchsia_wlan_stats::wire::IfaceHistogramStats* out_stats,
     fidl::AnyArena& arena);

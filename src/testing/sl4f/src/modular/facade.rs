@@ -138,7 +138,7 @@ mod tests {
     use crate::modular::types::{BasemgrResult, KillSessionResult, RestartSessionResult};
     use anyhow::Error;
     use assert_matches::assert_matches;
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
     use futures::Future;
     use lazy_static::lazy_static;
     use serde_json::json;

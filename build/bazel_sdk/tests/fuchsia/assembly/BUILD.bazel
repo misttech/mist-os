@@ -8,6 +8,7 @@ load(
     "SLOT",
     "fuchsia_board_configuration",
     "fuchsia_board_input_bundle",
+    "fuchsia_board_input_bundle_set",
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
     "fuchsia_gen_android_starnix_container",
@@ -75,6 +76,7 @@ fuchsia_board_input_bundle(
     ],
     cpu_manager_config = "test_data/config_data.json",
     thread_roles = [],
+    version = "fake_version_123",
 )
 
 filegroup(
@@ -87,6 +89,13 @@ fuchsia_prebuilt_board_input_bundle(
     files = ":empty_bib_files",
 )
 
+fuchsia_board_input_bundle_set(
+    name = "testing_bib_set",
+    board_input_bundles = [
+        ":testing_board_input_bundle",
+    ],
+)
+
 fuchsia_board_input_bundle_test(
     name = "board_input_bundle_golden_test",
     board_input_bundle = ":testing_board_input_bundle",
@@ -96,6 +105,7 @@ fuchsia_board_input_bundle_test(
 
 fuchsia_board_configuration(
     name = "testing_board_configuration",
+    board_input_bundle_sets = [":testing_bib_set"],
     board_input_bundles = [
         ":testing_board_input_bundle",
         ":testing_prebuilt_board_input_bundle",
@@ -169,6 +179,23 @@ fuchsia_prebuilt_board_configuration(
 )
 
 filegroup(
+    name = "prebuilt_nested_board_config_files",
+    srcs = glob(["test_data/prebuilt_nested_board_config/**/*"]),
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "prebuilt_nested_board_config",
+    files = ":prebuilt_nested_board_config_files",
+)
+
+fuchsia_board_configuration_test(
+    name = "nested_board_configuration_test",
+    board_config = ":prebuilt_nested_board_config",
+    golden_file = ":test_data/prebuilt_nested_board_config/nested/board_configuration.json",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "prebuilt_replacement_board_config_files",
     srcs = glob(["test_data/prebuilt_replacement_board_config/**/*"]),
 )
@@ -181,6 +208,9 @@ fuchsia_prebuilt_board_configuration(
 fuchsia_hybrid_board_configuration(
     name = "test_hybrid_board_config",
     board_configuration = ":prebuilt_board_config",
+    replacement_board_input_bundle_sets = [
+        ":testing_bib_set",
+    ],
     replacement_board_input_bundles = ":prebuilt_replacement_board_config",
 )
 
@@ -188,6 +218,15 @@ fuchsia_hybrid_board_configuration_test(
     name = "hybrid_board_configuration_golden_test",
     golden_bib = ":test_data/prebuilt_replacement_board_config/input_bundles/bib/board_input_bundle.json",
     hybrid_board_config = ":test_hybrid_board_config",
+    relative_path_of_board_input_bundle = "input_bundles/bib",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_hybrid_board_configuration_test(
+    name = "hybrid_board_configuration_with_set_golden_test",
+    golden_bib = ":test_data/board_input_bundle_from_hybrid_golden_file.json",
+    hybrid_board_config = ":test_hybrid_board_config",
+    relative_path_of_board_input_bundle = "input_bundles/testing_bib_set/testing_board_input_bundle",
     visibility = ["//visibility:public"],
 )
 

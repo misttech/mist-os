@@ -91,42 +91,32 @@ zx_status_t CreateGpioHPlatformDevice(
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO),   DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK),   DECL_GPIO_PIN(GPIO_SOC_SELINA_OSC_EN)};
 
-  const fuchsia_scheduler::RoleName kRole{kGpioHSchedulerRole};
+  const fuchsia_scheduler::RoleName kRoleName{kGpioHSchedulerRole};
 
-  fit::result role_metadata = fidl::Persist(kRole);
-  if (role_metadata.is_error()) {
-    zxlogf(ERROR, "Failed to persist scheduler role: %s",
-           role_metadata.error_value().FormatDescription().c_str());
-    return role_metadata.error_value().status();
+  fit::result persisted_role_name = fidl::Persist(kRoleName);
+  if (persisted_role_name.is_error()) {
+    zxlogf(ERROR, "Failed to persist scheduler role name: %s",
+           persisted_role_name.error_value().FormatDescription().c_str());
+    return persisted_role_name.error_value().status();
   }
 
   fuchsia_hardware_pinimpl::Metadata pin_metadata{{.pins = kGpioHPins}};
 
-  fit::result encoded_pin_metadata = fidl::Persist(pin_metadata);
-  if (!encoded_pin_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
-           encoded_pin_metadata.error_value().FormatDescription().c_str());
-    return encoded_pin_metadata.error_value().status();
+  fit::result persisted_pin_metadata = fidl::Persist(pin_metadata);
+  if (!persisted_pin_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist pin metadata: %s",
+           persisted_pin_metadata.error_value().FormatDescription().c_str());
+    return persisted_pin_metadata.error_value().status();
   }
 
   std::vector<fpbus::Metadata> gpio_h_metadata{
-      // TODO(b/388305889): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-          .data = encoded_pin_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
-          .data = std::move(encoded_pin_metadata.value()),
-      }},
-      // TODO(b/395140408): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
-          .data = role_metadata.value(),
+          .data = std::move(persisted_pin_metadata.value()),
       }},
       {{
           .id = fuchsia_scheduler::RoleName::kSerializableName,
-          .data = std::move(role_metadata.value()),
+          .data = std::move(persisted_role_name.value()),
       }},
   };
 
@@ -166,22 +156,17 @@ zx_status_t CreateGpioCPlatformDevice(
 
   const fuchsia_hardware_pinimpl::Metadata kMetadata{{.pins = kGpioCPins}};
 
-  fit::result encoded_metadata = fidl::Persist(kMetadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  fit::result persisted_metadata = fidl::Persist(kMetadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist pin metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   std::vector<fpbus::Metadata> gpio_c_metadata{
-      // TODO(b/388305889): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-          .data = encoded_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
-          .data = std::move(encoded_metadata.value()),
+          .data = std::move(persisted_metadata.value()),
       }},
   };
 
@@ -222,22 +207,17 @@ zx_status_t CreateTestGpioPlatformDevice(
 
   const fuchsia_hardware_pinimpl::Metadata kMetadata{{.pins = kTestGpioPins}};
 
-  fit::result encoded_metadata = fidl::Persist(kMetadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  fit::result persisted_metadata = fidl::Persist(kMetadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist pin metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   std::vector<fpbus::Metadata> gpio_metadata{
-      // TODO(b/388305889): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-          .data = encoded_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
-          .data = std::move(encoded_metadata.value()),
+          .data = std::move(persisted_metadata.value()),
       }},
   };
 
@@ -369,22 +349,17 @@ zx_status_t Nelson::CreateGpioPlatformDevice() {
       {.init_steps = std::move(gpio_init_steps_), .pins = kGpioPins}};
   gpio_init_steps_.clear();
 
-  fit::result encoded_metadata = fidl::Persist(metadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  fit::result persisted_metadata = fidl::Persist(metadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist pin metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   std::vector<fpbus::Metadata> gpio_metadata{
-      // TODO(b/388305889): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-          .data = encoded_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
-          .data = std::move(encoded_metadata.value()),
+          .data = std::move(persisted_metadata.value()),
       }},
   };
 

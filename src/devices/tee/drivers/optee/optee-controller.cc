@@ -220,11 +220,12 @@ zx_status_t OpteeController::InitializeSharedMemory() {
   // used as the shared memory. The rest of the TEE's memory region is secure.
 
   static constexpr uint32_t kTeeBtiIndex = 0;
-  zx_status_t status = pdev_.GetBti(kTeeBtiIndex, &bti_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "unable to get bti");
-    return status;
+  zx::result bti = pdev_.GetBti(kTeeBtiIndex);
+  if (bti.is_error()) {
+    LOG(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
   // The TEE BTI will be pinned to get the physical address of the shared memory region between the
   // Rich OS and the Trusted OS. This memory region is not used for DMA and only used for message
@@ -238,7 +239,7 @@ zx_status_t OpteeController::InitializeSharedMemory() {
   //
   // As the Trusted OS cannot be actively accessing this memory region, it is safe to release from
   // quarantine.
-  status = bti_.release_quarantine();
+  zx_status_t status = bti_.release_quarantine();
   if (status != ZX_OK) {
     LOG(ERROR, "could not release quarantine bti - %d", status);
     return status;
@@ -247,12 +248,12 @@ zx_status_t OpteeController::InitializeSharedMemory() {
   // The Secure World memory is located at a fixed physical address in RAM, so we have to request
   // the platform device map the physical vmo for us.
   static constexpr uint32_t kSecureWorldMemoryMmioIndex = 0;
-  pdev_mmio_t mmio_dev;
-  status = pdev_.GetMmio(kSecureWorldMemoryMmioIndex, &mmio_dev);
-  if (status != ZX_OK) {
-    LOG(ERROR, "unable to get secure world mmio");
-    return status;
+  zx::result mmio_dev_result = pdev_.GetMmio(kSecureWorldMemoryMmioIndex);
+  if (mmio_dev_result.is_error()) {
+    LOG(ERROR, "Failed to get secure world mmio: %s", mmio_dev_result.status_string());
+    return mmio_dev_result.status_value();
   }
+  auto mmio_dev = std::move(mmio_dev_result.value());
 
   // Briefly pin the first page of this VMO to determine the secure world's base physical address.
   zx_paddr_t mmio_vmo_paddr;
@@ -290,7 +291,7 @@ zx_status_t OpteeController::InitializeSharedMemory() {
   // Map and pin the just the shared memory region of the secure world memory.
   zx_off_t shared_mem_offset = shared_mem_paddr - mmio_vmo_paddr;
   zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(
-      shared_mem_offset, shared_mem_size, zx::vmo(mmio_dev.vmo), ZX_CACHE_POLICY_CACHED);
+      shared_mem_offset, shared_mem_size, std::move(mmio_dev.vmo), ZX_CACHE_POLICY_CACHED);
   if (mmio.is_error()) {
     LOG(ERROR, "unable to map secure world memory: %s", mmio.status_string());
     return mmio.status_value();
@@ -464,11 +465,14 @@ zx_status_t OpteeController::InitThreadPools() {
 zx_status_t OpteeController::Bind() {
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  pdev_ = ddk::PDevFidl::FromFragment(parent());
-  if (!pdev_.is_valid()) {
-    LOG(ERROR, "unable to get pdev protocol");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent(),
+                                                                                        "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  pdev_ = fdf::PDev{std::move(pdev_client_end.value())};
 
   status = InitThreadPools();
   if (status != ZX_OK) {
@@ -476,13 +480,15 @@ zx_status_t OpteeController::Bind() {
   }
 
   static constexpr uint32_t kTrustedOsSmcIndex = 0;
-  status = pdev_.GetSmc(kTrustedOsSmcIndex, &secure_monitor_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "unable to get secure monitor handle");
-    return status;
+  zx::result secure_monitor = pdev_.GetSmc(kTrustedOsSmcIndex);
+  if (secure_monitor.is_error()) {
+    LOG(ERROR, "Failed to get secure monitor handle: %s", secure_monitor.status_string());
+    return secure_monitor.status_value();
   }
+  secure_monitor_ = std::move(secure_monitor.value());
 
-  // TODO(https://fxbug.dev/42084132): Remove this once we have a tee core driver that will discover the TEE OS
+  // TODO(https://fxbug.dev/42084132): Remove this once we have a tee core driver that will discover
+  // the TEE OS
   status = ValidateApiUid();
   if (status != ZX_OK) {
     LOG(ERROR, "API UID does not match");

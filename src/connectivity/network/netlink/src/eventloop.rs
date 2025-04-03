@@ -12,21 +12,24 @@ use derivative::Derivative;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::BoxStream;
 use futures::{FutureExt as _, StreamExt as _};
+use linux_uapi::rtnetlink_groups_RTNLGRP_ND_USEROPT;
 use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_ndp as fnet_ndp,
+    fidl_fuchsia_net_root as fnet_root, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
-use crate::client::ClientTable;
+use crate::client::{AsyncWorkItem, ClientTable};
 use crate::logging::{log_debug, log_info};
 use crate::messaging::Sender;
+use crate::multicast_groups::ModernGroup;
 use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
-use crate::{interfaces, route_tables, routes, rules};
+use crate::{interfaces, route_tables, routes, rules, FeatureFlags, NetlinkRouteNotifiedGroup};
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -91,9 +94,13 @@ pub(crate) struct EventLoop<
     pub(crate) v6_route_table_provider: fnet_routes_admin::RouteTableProviderV6Proxy,
     pub(crate) v4_rule_table: fnet_routes_admin::RuleTableV4Proxy,
     pub(crate) v6_rule_table: fnet_routes_admin::RuleTableV6Proxy,
+    pub(crate) ndp_option_watcher_provider: fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
     pub(crate) interfaces_handler: H,
     pub(crate) route_clients: ClientTable<NetlinkRoute, S>,
+    pub(crate) async_work_receiver:
+        futures::channel::mpsc::UnboundedReceiver<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
+    pub(crate) feature_flags: FeatureFlags,
 }
 
 /// The types that implement this trait ([`Optional`] and [`Required`]) are used to signify whether
@@ -157,6 +164,13 @@ impl<T, E: EventLoopOptionality> EventLoopComponent<T, E> {
             EventLoopComponent::Absent(_) => None,
         }
     }
+
+    fn present_mut(&mut self) -> Option<&mut T> {
+        match self {
+            EventLoopComponent::Present(t) => Some(t),
+            EventLoopComponent::Absent(_) => None,
+        }
+    }
 }
 
 pub(crate) trait EventLoopSpec {
@@ -176,6 +190,7 @@ pub(crate) trait EventLoopSpec {
     type InterfacesWorker: EventLoopOptionality;
     type RuleV4Worker: EventLoopOptionality;
     type RuleV6Worker: EventLoopOptionality;
+    type NduseroptWorker: EventLoopOptionality;
 }
 
 pub(crate) struct IncludedWorkers<E: EventLoopSpec> {
@@ -184,6 +199,7 @@ pub(crate) struct IncludedWorkers<E: EventLoopSpec> {
     pub(crate) interfaces: EventLoopComponent<(), E::InterfacesWorker>,
     pub(crate) rules_v4: EventLoopComponent<(), E::RuleV4Worker>,
     pub(crate) rules_v6: EventLoopComponent<(), E::RuleV6Worker>,
+    pub(crate) nduseropt: EventLoopComponent<(), E::NduseroptWorker>,
 }
 
 enum AllWorkers {}
@@ -204,6 +220,7 @@ impl EventLoopSpec for AllWorkers {
     type InterfacesWorker = Required;
     type RuleV4Worker = Required;
     type RuleV6Worker = Required;
+    type NduseroptWorker = Required;
 }
 
 pub(crate) struct EventLoopInputs<
@@ -228,10 +245,18 @@ pub(crate) struct EventLoopInputs<
         EventLoopComponent<fnet_routes_admin::RuleTableV4Proxy, E::RuleV4Worker>,
     pub(crate) v6_rule_table:
         EventLoopComponent<fnet_routes_admin::RuleTableV6Proxy, E::RuleV6Worker>,
+    pub(crate) ndp_option_watcher_provider: EventLoopComponent<
+        fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
+        E::NduseroptWorker,
+    >,
     pub(crate) interfaces_handler: EventLoopComponent<H, E::InterfacesHandler>,
     pub(crate) route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
+    pub(crate) async_work_receiver:
+        futures::channel::mpsc::UnboundedReceiver<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
 
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
+
+    pub(crate) feature_flags: FeatureFlags,
 }
 
 impl<
@@ -258,9 +283,12 @@ impl<
             v6_route_table_provider,
             v4_rule_table,
             v6_rule_table,
+            ndp_option_watcher_provider,
             interfaces_handler,
             route_clients,
+            async_work_receiver,
             unified_request_stream,
+            feature_flags,
         } = self;
         let (routes_v4_result, routes_v6_result, interfaces_result) = futures::join!(
             async {
@@ -358,6 +386,12 @@ impl<
             }
             EventLoopComponent::Absent(omitted) => EventLoopComponent::Absent(omitted),
         };
+        let nduseropt_worker = match included_workers.nduseropt {
+            EventLoopComponent::Present(()) => EventLoopComponent::Present(
+                crate::nduseropt::NduseroptWorker::new(ndp_option_watcher_provider.get()),
+            ),
+            EventLoopComponent::Absent(omitted) => EventLoopComponent::Absent(omitted),
+        };
 
         let unified_event_stream = futures::stream_select!(
             v4_route_event_stream
@@ -397,13 +431,16 @@ impl<
             interfaces_worker,
             rules_v4_worker,
             rules_v6_worker,
+            nduseropt_worker,
             unified_pending_request: None,
             unified_event_stream,
             route_clients,
             interfaces_proxy,
             v4_route_table_map,
             v6_route_table_map,
+            async_work_receiver,
             unified_request_stream,
+            feature_flags,
         })
     }
 }
@@ -443,15 +480,20 @@ pub(crate) struct EventLoopState<
         EventLoopComponent<interfaces::InterfacesWorkerState<H, S>, E::InterfacesWorker>,
     rules_v4_worker: EventLoopComponent<rules::RulesWorker<Ipv4>, E::RuleV4Worker>,
     rules_v6_worker: EventLoopComponent<rules::RulesWorker<Ipv6>, E::RuleV6Worker>,
+    nduseropt_worker: EventLoopComponent<crate::nduseropt::NduseroptWorker, E::NduseroptWorker>,
 
     route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
     interfaces_proxy: EventLoopComponent<fnet_root::InterfacesProxy, E::InterfacesProxy>,
+    async_work_receiver:
+        futures::channel::mpsc::UnboundedReceiver<AsyncWorkItem<NetlinkRouteNotifiedGroup>>,
 
     v4_route_table_map: EventLoopComponent<route_tables::RouteTableMap<Ipv4>, E::RoutesV4Worker>,
     v6_route_table_map: EventLoopComponent<route_tables::RouteTableMap<Ipv6>, E::RoutesV6Worker>,
     unified_pending_request: Option<UnifiedPendingRequest<S>>,
     unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
     unified_event_stream: futures::stream::Fuse<BoxStream<'static, Result<UnifiedEvent, Error>>>,
+
+    feature_flags: FeatureFlags,
 }
 
 impl<
@@ -492,13 +534,16 @@ impl<
             interfaces_worker,
             rules_v4_worker,
             rules_v6_worker,
+            nduseropt_worker,
             unified_pending_request,
             unified_request_stream,
             unified_event_stream,
             route_clients,
             interfaces_proxy,
+            async_work_receiver,
             v4_route_table_map,
             v6_route_table_map,
+            feature_flags,
         } = self;
 
         let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
@@ -515,7 +560,74 @@ impl<
         .fuse();
         let mut request_fut = pin!(request_fut);
 
-        let cleanup = futures::select! {
+        let cleanup = futures::select_biased! {
+            nduseropt_message = nduseropt_worker.present_mut()
+                    .map(|worker| worker.select_next_message().fuse().left_future())
+                    .unwrap_or_else(|| futures::future::pending().right_future()) => {
+
+                if feature_flags.use_ndp_watcher_instead_of_nduseropt_stub {
+                    route_clients.get_ref().send_message_to_group(
+                        nduseropt_message,
+                        ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
+                    );
+                }
+                Cleanup::None
+            }
+            async_work = async_work_receiver.select_next_some() => {
+                match async_work {
+                    AsyncWorkItem::OnJoinMulticastGroup(
+                            NetlinkRouteNotifiedGroup::Nduseropt, sender) => {
+                        nduseropt_worker.get_mut().increment_clients_count().await;
+                        sender.send(());
+                    }
+                    AsyncWorkItem::OnLeaveMulticastGroup(groups) => {
+                        for group in groups.into_iter() {
+                            match group {
+                                NetlinkRouteNotifiedGroup::Nduseropt => {
+                                    // NB: `groups` is a set, so each group only
+                                    // occurs once.
+                                    nduseropt_worker.get_mut().decrement_clients_count();
+                                }
+                            }
+                        }
+                    }
+                    AsyncWorkItem::OnSetMulticastGroups { joined, left, complete } => {
+                        match joined {
+                            Some(groups) => {
+                                for group in groups.into_iter() {
+                                    match group {
+                                        NetlinkRouteNotifiedGroup::Nduseropt => {
+                                            // NB: `groups` is a set, so each group only
+                                            // occurs once.
+                                            nduseropt_worker.get_mut().increment_clients_count()
+                                            .await;
+                                        }
+                                    }
+                                }
+                            }
+                            None => (),
+                        }
+                        match left {
+                            Some(groups) => {
+                                for group in groups.into_iter() {
+                                    match group {
+                                        NetlinkRouteNotifiedGroup::Nduseropt => {
+                                            // NB: `groups` is a set, so each group only
+                                            // occurs once.
+                                            nduseropt_worker.get_mut().decrement_clients_count();
+                                        }
+                                    }
+                                }
+                            }
+                            None => (),
+                        }
+                        if let Some(complete) = complete {
+                            complete.send(());
+                        }
+                    }
+                }
+                Cleanup::None
+            }
             event = unified_event_stream.next() => {
                 match event
                     .expect("event stream cannot end without error")? {
@@ -550,7 +662,7 @@ impl<
                         .context("handle v6 routes event")?
                     },
                     UnifiedEvent::InterfacesEvent(event) => interfaces_worker.get_mut()
-                        .handle_interface_watcher_event(event).await
+                        .handle_interface_watcher_event(event, feature_flags).await
                         .map_err(Error::new)
                         .map(|()| Cleanup::None)
                         .context("handle interfaces event")?,
@@ -794,9 +906,12 @@ impl<
             v6_route_table_provider,
             v4_rule_table,
             v6_rule_table,
+            ndp_option_watcher_provider,
             interfaces_handler,
             route_clients,
+            async_work_receiver,
             unified_request_stream,
+            feature_flags,
         } = self;
 
         let state = EventLoopInputs::<_, _, AllWorkers> {
@@ -810,9 +925,12 @@ impl<
             v6_route_table_provider: EventLoopComponent::Present(v6_route_table_provider),
             v4_rule_table: EventLoopComponent::Present(v4_rule_table),
             v6_rule_table: EventLoopComponent::Present(v6_rule_table),
+            ndp_option_watcher_provider: EventLoopComponent::Present(ndp_option_watcher_provider),
             interfaces_handler: EventLoopComponent::Present(interfaces_handler),
             route_clients: EventLoopComponent::Present(route_clients),
+            async_work_receiver,
             unified_request_stream,
+            feature_flags,
         }
         .initialize(IncludedWorkers {
             routes_v4: EventLoopComponent::Present(()),
@@ -820,6 +938,7 @@ impl<
             interfaces: EventLoopComponent::Present(()),
             rules_v4: EventLoopComponent::Present(()),
             rules_v6: EventLoopComponent::Present(()),
+            nduseropt: EventLoopComponent::Present(()),
         })
         .await?;
 

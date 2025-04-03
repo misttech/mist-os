@@ -6,6 +6,7 @@ library fuchsia.logger;
 
 using zx;
 using fuchsia.diagnostics;
+using fuchsia.diagnostics.types;
 
 /// Log levels used with log related filtering.
 /// Filtering uses a heuristic based on a threshold of
@@ -104,6 +105,7 @@ closed protocol Log {
 
     /// Dumps all cached logs by calling LogMany() followed by Done() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
+    @available(removed=NEXT)
     strict DumpLogsSafe(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -111,6 +113,7 @@ closed protocol Log {
 
     /// Listens to new log entries by calling Log() on `log_listener`.
     /// A null `options` indicates no filtering is requested.
+    @available(removed=NEXT)
     strict ListenSafeWithSelectors(resource struct {
         log_listener client_end:LogListenerSafe;
         options box<LogFilterOptions>;
@@ -138,6 +141,11 @@ closed(removed=26) open(added=26) protocol LogSink {
         socket zx.Handle:SOCKET;
     });
 
+    @available(replaced=NEXT)
+    strict WaitForInterestChange() -> (struct {
+        data fuchsia.diagnostics.Interest;
+    }) error InterestChangeError;
+
     /// LogSink implementers will return to this hanging-get whenever the scope of
     /// their interest changes. Clients are expected to emit messages based on
     /// the registered Interest. In the event that an empty interest is
@@ -145,8 +153,9 @@ closed(removed=26) open(added=26) protocol LogSink {
     /// e.g. compile time configuration. Each client may only poll this once at a time.
     /// Invoking WaitForInterestChange a second time before the first call returns will
     /// result in an error being returned.
+    @available(added=NEXT)
     strict WaitForInterestChange() -> (struct {
-        data fuchsia.diagnostics.Interest;
+        data fuchsia.diagnostics.types.Interest;
     }) error InterestChangeError;
 
     /// Send this socket to be drained, using the structured logs format.

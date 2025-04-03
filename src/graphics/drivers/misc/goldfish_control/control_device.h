@@ -56,14 +56,6 @@ class Control : public ControlType {
   void CreateColorBuffer2(CreateColorBuffer2RequestView request,
                           CreateColorBuffer2Completer::Sync& completer) override;
 
-  using CreateBuffer2Result =
-      fpromise::result<fuchsia_hardware_goldfish::wire::ControlDeviceCreateBuffer2Result,
-                       zx_status_t>;
-
-  CreateBuffer2Result CreateBuffer2(
-      fidl::AnyArena& allocator, const zx::vmo& vmo, BufferKey buffer_key,
-      fuchsia_hardware_goldfish::wire::CreateBuffer2Params create_params);
-
   // |fidl::WireServer<fuchsia_hardware_goldfish::ControlDevice>|
   void CreateBuffer2(CreateBuffer2RequestView request,
                      CreateBuffer2Completer::Sync& completer) override;
@@ -106,8 +98,6 @@ class Control : public ControlType {
     return ReadResultLocked(result, sizeof(uint32_t));
   }
   zx_status_t ExecuteCommandLocked(uint32_t cmd_size, uint32_t* result) TA_REQ(lock_);
-  zx_status_t CreateBuffer2Locked(uint64_t size, uint32_t memory_property, uint32_t* id)
-      TA_REQ(lock_);
   zx_status_t CreateColorBufferLocked(uint32_t width, uint32_t height, uint32_t format,
                                       uint32_t* id) TA_REQ(lock_);
   void CloseBufferOrColorBufferLocked(uint32_t id) TA_REQ(lock_);

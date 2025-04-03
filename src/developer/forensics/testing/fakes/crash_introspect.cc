@@ -16,4 +16,13 @@ void CrashIntrospect::FindComponentByThreadKoid(
   completer.Reply(fit::ok(info));
 }
 
+void CrashIntrospect::FindDriverCrash(FindDriverCrashRequest& request,
+                                      FindDriverCrashCompleter::Sync& completer) {
+  fuchsia_driver_crash::DriverCrashInfo info;
+  info.node_moniker("test-moniker");
+  info.url("test-url");
+
+  completer.Reply(fit::ok(info));
+}
+
 }  // namespace forensics::fakes

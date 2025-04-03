@@ -5,6 +5,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use crate::nanohub_firmware_file::NanohubFirmwareFile;
 use crate::nanohub_socket_file::NanohubSocketFile;
 use fidl_fuchsia_hardware_sockettunnel::{DeviceMarker, DeviceRegisterSocketRequest};
 use starnix_core::device::kobject::Device;
@@ -28,6 +29,8 @@ pub struct SocketTunnelFile {
 pub struct SocketTunnelSysfsFile {
     socket_label: Arc<FsString>,
 }
+#[derive(Clone)]
+pub struct FirmwareFile {}
 
 impl SocketTunnelFile {
     pub fn new(socket_label: FsString) -> SocketTunnelFile {
@@ -37,6 +40,26 @@ impl SocketTunnelFile {
 impl SocketTunnelSysfsFile {
     pub fn new(socket_label: FsString) -> SocketTunnelSysfsFile {
         SocketTunnelSysfsFile { socket_label: Arc::new(socket_label) }
+    }
+}
+
+impl FirmwareFile {
+    pub fn new() -> FirmwareFile {
+        FirmwareFile {}
+    }
+}
+
+impl FsNodeOps for FirmwareFile {
+    fs_node_impl_not_dir!();
+
+    fn create_file_ops(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(NanohubFirmwareFile::new())
     }
 }
 

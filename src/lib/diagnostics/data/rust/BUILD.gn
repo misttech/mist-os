@@ -53,6 +53,11 @@ rustc_library("lib") {
     sources += [ "src/logs_legacy.rs" ]
   }
 
+  if (is_host) {
+    deps += [ "//third_party/rust_crates:schemars" ]
+    features = [ "json_schema" ]
+  }
+
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 

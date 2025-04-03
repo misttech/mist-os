@@ -19,9 +19,11 @@
     capabilities: [
         { service: "fuchsia.hardware.bluetooth.HciService" },
         { service: "fuchsia.hardware.serialimpl.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
     use: [
         { service: "fuchsia.hardware.serialimpl.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
     expose: [
         {
@@ -30,6 +32,10 @@
         },
         {
             service: "fuchsia.hardware.serialimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.boot.metadata.MacAddressMetadata",
             from: "self",
         },
     ],

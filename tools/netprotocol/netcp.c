@@ -163,16 +163,19 @@ static int transport_recv(void* data, size_t len, bool block, void* transport_co
     memcpy(&transport_info->target_addr, &connection_addr, sizeof(transport_info->target_addr));
     transport_info->connected = true;
   }
-  return recv_result;
+  return (int)recv_result;
 }
 
 static int transport_timeout_set(uint32_t timeout_ms, void* transport_cookie) {
   transport_info_t* transport_info = transport_cookie;
   if (transport_info->previous_timeout_ms != timeout_ms && timeout_ms > 0) {
     transport_info->previous_timeout_ms = timeout_ms;
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = 1000 * (timeout_ms - 1000 * tv.tv_sec);
+    uint32_t sec = timeout_ms / 1000;
+    uint32_t usec = 1000 * (timeout_ms - 1000 * sec);
+    struct timeval tv = {
+      .tv_sec = sec,
+      .tv_usec = usec,
+    };
     return setsockopt(transport_info->socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   }
   return 0;

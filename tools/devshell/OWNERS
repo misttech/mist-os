@@ -28,8 +28,6 @@ per-file             testgen = crjohns@google.com,kjharland@google.com
 
 per-file go = olivernewman@google.com
 
-per-file symbolize = dangyi@google.com,frousseau@google.com
-
 per-file cmc.fx = file: /tools/cmc/OWNERS
 
 per-file create.fx = file: /tools/create/OWNERS

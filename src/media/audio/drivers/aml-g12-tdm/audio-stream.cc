@@ -25,7 +25,7 @@ namespace audio {
 namespace aml_g12 {
 
 AmlG12TdmStream::AmlG12TdmStream(
-    zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
+    zx_device_t* parent, bool is_input, fdf::PDev pdev,
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
@@ -125,11 +125,12 @@ zx_status_t AmlG12TdmStream::InitPDev() {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not obtain bti - %d", status);
-    return status;
+  zx::result bti = pdev_.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
   ZX_ASSERT(metadata_.codecs.number_of_codecs <= 8);
   codecs_.reserve(metadata_.codecs.number_of_codecs);
@@ -150,18 +151,15 @@ zx_status_t AmlG12TdmStream::InitPDev() {
     }
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev_.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not get mmio %d", status);
-    return status;
+  zx::result mmio = pdev_.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
-  status = pdev_.GetInterrupt(0, 0, &irq_);
-  if (status != ZX_ERR_OUT_OF_RANGE) {  // Not specified in the board file.
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "could not get IRQ %d", status);
-      return status;
-    }
+
+  zx::result irq = pdev_.GetInterrupt(0);
+  if (irq.is_ok()) {
+    irq_ = std::move(irq.value());
     auto irq_thread = [](void* arg) -> int {
       return reinterpret_cast<AmlG12TdmStream*>(arg)->Thread();
     };
@@ -171,6 +169,9 @@ zx_status_t AmlG12TdmStream::InitPDev() {
       zxlogf(ERROR, "could not create thread %d", rc);
       return status;
     }
+  } else if (irq.status_value() != ZX_ERR_OUT_OF_RANGE) {  // Not specified in the board file.
+    zxlogf(ERROR, "Failed to get interrupt: %s", irq.status_string());
+    return irq.status_value();
   }
 
   aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, *std::move(mmio));
@@ -870,9 +871,17 @@ static zx_status_t audio_bind(void* ctx, zx_device_t* device) {
   } else {
     pll_client.Bind(std::move(pll.value()));
   }
+
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(device, "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
+  }
+
   auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmStream>(
-      device, metadata.is_input, ddk::PDevFidl::FromFragment(device), std::move(gpio_enable_client),
-      std::move(clock_gate_client), std::move(pll_client));
+      device, metadata.is_input, fdf::PDev{std::move(pdev_client_end.value())},
+      std::move(gpio_enable_client), std::move(clock_gate_client), std::move(pll_client));
   if (stream == nullptr) {
     zxlogf(ERROR, "Could not create aml-g12-tdm driver");
     return ZX_ERR_NO_MEMORY;

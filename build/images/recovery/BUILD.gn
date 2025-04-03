@@ -4,7 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
-import("//build/assembly/sshd_config.gni")
+
 import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/paths.gni")
@@ -13,8 +13,6 @@ import("//build/info/info.gni")
 import("//build/product.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core.gni")
-
 if (is_host) {
   host_test_data("test_data") {
     out_dir = get_label_info(":anything($target_toolchain)", "target_out_dir")

@@ -22,6 +22,7 @@ pub mod node;
 pub mod object_request;
 mod protocols;
 pub mod remote;
+mod request_handler;
 pub mod service;
 pub mod symlink;
 pub mod temp_clone;
@@ -72,8 +73,9 @@ pub mod pseudo_directory;
 /// ```
 pub use vfs_macros::pseudo_directory;
 
-pub use crate::common::CreationMode;
+pub use common::CreationMode;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
+pub use path::Path;
 pub use protocols::ProtocolsExt;
 
 // This allows the pseudo_directory! macro to use absolute paths within this crate to refer to the
@@ -81,3 +83,40 @@ pub use protocols::ProtocolsExt;
 // export above.
 #[cfg(test)]
 extern crate self as vfs;
+
+use directory::entry_container::Directory;
+use execution_scope::ExecutionScope;
+use fidl_fuchsia_io as fio;
+use std::sync::Arc;
+
+/// Helper function to serve a new connection to the directory at `path` under `root` with `flags`.
+/// Errors will be communicated via epitaph on the returned proxy. A new [`ExecutionScope`] will be
+/// created for the request.
+///
+/// To serve `root` itself, use [`crate::directory::serve`] or set `path` to [`Path::dot`].
+pub fn serve_directory<D: Directory + ?Sized>(
+    root: Arc<D>,
+    path: Path,
+    flags: fio::Flags,
+) -> fio::DirectoryProxy {
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    let request = flags.to_object_request(server);
+    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
+    proxy
+}
+
+/// Helper function to serve a new connection to the file at `path` under `root` with `flags`.
+/// Errors will be communicated via epitaph on the returned proxy. A new [`ExecutionScope`] will be
+/// created for the request.
+///
+/// To serve an object that implements [`crate::file::File`], use [`crate::file::serve`].
+pub fn serve_file<D: Directory + ?Sized>(
+    root: Arc<D>,
+    path: Path,
+    flags: fio::Flags,
+) -> fio::FileProxy {
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    let request = flags.to_object_request(server);
+    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
+    proxy
+}

@@ -173,6 +173,12 @@
         "type": "uint32"
     },
     {
+        "kind": "const",
+        "name": "fuchsia.hardware.gpio/SIGNAL_ACK_INTERRUPT",
+        "type": "uint32",
+        "value": "16777216"
+    },
+    {
         "kind": "library",
         "name": "fuchsia.hardware.gpio"
     }

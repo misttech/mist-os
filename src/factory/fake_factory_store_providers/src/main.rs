@@ -21,8 +21,6 @@ use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
 use structopt::StructOpt;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::tree_builder::TreeBuilder;
 
@@ -37,9 +35,9 @@ enum IncomingServices {
     WidevineFactoryStoreProvider(WidevineFactoryStoreProviderRequestStream),
 }
 
-fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
+fn start_test_dir(config_path: &str) -> fio::DirectoryProxy {
     let files: HashMap<String, String> = match File::open(&config_path) {
-        Ok(file) => from_reader(file)?,
+        Ok(file) => from_reader(file).unwrap(),
         Err(err) => {
             log::warn!("publishing empty directory for {} due to error: {:?}", &config_path, err);
             HashMap::new()
@@ -55,17 +53,7 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
     }
 
     let test_dir = tree.build();
-
-    let (test_dir_proxy, test_dir_service) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    test_dir.open(
-        ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-        vfs::path::Path::dot(),
-        test_dir_service.into_channel().into(),
-    );
-
-    Ok(test_dir_proxy)
+    vfs::directory::serve_read_only(test_dir)
 }
 
 async fn run_server(req: IncomingServices, dir_mtx: LockedDirectoryProxy) -> Result<(), Error> {
@@ -160,7 +148,7 @@ struct Flags {
 #[fuchsia::main(logging_tags = ["fake_factory_store_providers"])]
 async fn main() -> Result<(), Error> {
     let flags = Flags::from_args();
-    let dir = Arc::new(Mutex::new(start_test_dir(&flags.config)?));
+    let dir = Arc::new(Mutex::new(start_test_dir(&flags.config)));
 
     let mut fs = ServiceFs::new_local();
     let mut fs_dir = fs.dir("svc");

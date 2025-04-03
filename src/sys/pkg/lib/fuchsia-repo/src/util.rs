@@ -5,14 +5,12 @@
 use anyhow::{Context as _, Result};
 use bytes::{Bytes, BytesMut};
 use camino::{Utf8Path, Utf8PathBuf};
-use futures::{Stream, TryStreamExt as _};
+use futures::{stream, Stream, TryStreamExt as _};
 use std::cmp::min;
 use std::fs::{copy, create_dir_all};
-use std::hash::Hasher as _;
 use std::io;
 use std::path::Path;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::Poll;
 use walkdir::WalkDir;
 
 /// Read files in chunks of this size off the local storage.
@@ -43,50 +41,28 @@ fn path_nlink(_path: &Utf8Path) -> Option<usize> {
 
 /// Read a file up to `len` bytes in batches of [CHUNK_SIZE], and return a stream of [Bytes].
 ///
-/// The stream will return an error if the file changed size during streaming.
-pub(crate) struct FileStream<R: io::Read + Unpin> {
+/// This will return an error if the file changed size during streaming.
+pub(super) fn file_stream(
     expected_len: u64,
-    reader: R,
+    mut file: impl io::Read,
     path: Option<Utf8PathBuf>,
-    buf: BytesMut,
-    remaining_len: u64,
-    crc32: crc::crc32::Digest,
-}
+) -> impl Stream<Item = io::Result<Bytes>> {
+    let mut buf = BytesMut::new();
+    let mut remaining_len = expected_len;
 
-impl<R: io::Read + Unpin> FileStream<R> {
-    pub(crate) fn new(expected_len: u64, reader: R, path: Option<Utf8PathBuf>) -> Self {
-        FileStream {
-            expected_len,
-            reader,
-            path,
-            buf: BytesMut::new(),
-            remaining_len: expected_len,
-            crc32: crc::crc32::Digest::new(crc::crc32::IEEE),
-        }
-    }
-
-    // Need this separate function because can't borrow fields individually when self is a Pin.
-    fn read_next_chunk(&mut self) -> io::Result<usize> {
-        self.buf.resize(min(CHUNK_SIZE, self.remaining_len.try_into().unwrap_or(usize::MAX)), 0);
-
-        self.reader.read(&mut self.buf)
-    }
-}
-
-impl<R: io::Read + Unpin> Stream for FileStream<R> {
-    type Item = io::Result<Bytes>;
-
-    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.remaining_len == 0 {
+    stream::poll_fn(move |_cx| {
+        if remaining_len == 0 {
             return Poll::Ready(None);
         }
+
+        buf.resize(min(CHUNK_SIZE, remaining_len as usize), 0);
 
         // Read a chunk from the file.
         // FIXME(https://fxbug.dev/42079310): We should figure out why we were occasionally getting
         // zero-sized reads from async IO, even though we knew there were more bytes available in
         // the file. Once that bug is fixed, we should switch back to async IO to avoid stalling
         // the executor.
-        let n = match self.read_next_chunk() {
+        let n = match file.read(&mut buf) {
             Ok(n) => n as u64,
             Err(err) => {
                 return Poll::Ready(Some(Err(err)));
@@ -95,57 +71,48 @@ impl<R: io::Read + Unpin> Stream for FileStream<R> {
 
         // If we read zero bytes, then the file changed size while we were streaming it.
         if n == 0 {
-            let msg = if let Some(path) = &self.path {
+            let msg = if let Some(path) = &path {
                 if let Some(nlink) = path_nlink(path) {
                     format!(
                         "file {} truncated: only read {} out of {} bytes: nlink: {}",
                         path,
-                        self.expected_len - self.remaining_len,
-                        self.expected_len,
+                        expected_len - remaining_len,
+                        expected_len,
                         nlink,
                     )
                 } else {
                     format!(
                         "file {} truncated: only read {} out of {} bytes",
                         path,
-                        self.expected_len - self.remaining_len,
-                        self.expected_len,
+                        expected_len - remaining_len,
+                        expected_len,
                     )
                 }
             } else {
                 format!(
                     "file truncated: only read {} out of {} bytes",
-                    self.expected_len - self.remaining_len,
-                    self.expected_len,
+                    expected_len - remaining_len,
+                    expected_len,
                 )
             };
             // Clear out the remaining_len so we'll return None next time we're polled.
-            self.remaining_len = 0;
+            remaining_len = 0;
             return Poll::Ready(Some(Err(io::Error::other(msg))));
         }
 
-        let chunk = self.buf.split_to(n as usize).freeze();
-        self.remaining_len -= n;
-
-        self.crc32.write(&chunk);
+        // Return the chunk read from the file. The file may have changed size during streaming, so
+        // it's possible we could have read more than expected. If so, truncate the result to the
+        // limited size.
+        let mut chunk = buf.split_to(n as usize).freeze();
+        if n > remaining_len {
+            chunk = chunk.split_to(remaining_len as usize);
+            remaining_len = 0;
+        } else {
+            remaining_len -= n;
+        }
 
         Poll::Ready(Some(Ok(chunk)))
-    }
-}
-
-impl<R: io::Read + Unpin> Drop for FileStream<R> {
-    fn drop(&mut self) {
-        // In some code path we only read delivery blob header, don't warn in that case.
-        if self.remaining_len > 0 && self.expected_len - self.remaining_len > 65536 {
-            log::warn!(
-                "file stream of {} dropped: only read {} out of {} bytes, CRC32 = {:08x}",
-                self.path.as_deref().unwrap_or_else(|| "unknown path".into()),
-                self.expected_len - self.remaining_len,
-                self.expected_len,
-                self.crc32.finish(),
-            );
-        }
-    }
+    })
 }
 
 pub fn copy_dir(from: &Path, to: &Path) -> Result<()> {
@@ -177,7 +144,7 @@ mod tests {
     async fn test_file_stream() {
         for size in [0, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1, CHUNK_SIZE * 2 + 1] {
             let expected = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
-            let stream = FileStream::new(size as u64, &*expected, None);
+            let stream = file_stream(size as u64, &*expected, None);
 
             let mut actual = vec![];
             read_stream_to_end(stream, &mut actual).await.unwrap();
@@ -190,7 +157,7 @@ mod tests {
         let size = CHUNK_SIZE * 3 + 10;
 
         let expected = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
-        let mut stream = FileStream::new(size as u64, &*expected, None);
+        let mut stream = file_stream(size as u64, &*expected, None);
 
         let mut expected_chunks = expected.chunks(CHUNK_SIZE).map(Bytes::copy_from_slice);
 
@@ -200,7 +167,6 @@ mod tests {
         assert_eq!(stream.try_next().await.unwrap(), expected_chunks.next());
         assert_eq!(stream.try_next().await.unwrap(), None);
         assert_eq!(expected_chunks.next(), None);
-        assert_eq!(stream.crc32.finish() as u32, crc::crc32::checksum_ieee(&expected));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -209,7 +175,7 @@ mod tests {
         let long_len = CHUNK_SIZE * 3;
 
         let truncated_buf = vec![0; len];
-        let stream = FileStream::new(long_len as u64, truncated_buf.as_slice(), None);
+        let stream = file_stream(long_len as u64, truncated_buf.as_slice(), None);
 
         let mut actual = vec![];
         assert_eq!(
@@ -224,7 +190,7 @@ mod tests {
         let short_len = CHUNK_SIZE * 2;
 
         let buf = (0..u8::MAX).cycle().take(len).collect::<Vec<_>>();
-        let stream = FileStream::new(short_len as u64, buf.as_slice(), None);
+        let stream = file_stream(short_len as u64, buf.as_slice(), None);
 
         let mut actual = vec![];
         read_stream_to_end(stream, &mut actual).await.unwrap();
@@ -237,7 +203,7 @@ mod tests {
             let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
                 let expected = (0..u8::MAX).cycle().take(len).collect::<Vec<_>>();
-                let stream = FileStream::new(expected.len() as u64, expected.as_slice(), None);
+                let stream = file_stream(expected.len() as u64, expected.as_slice(), None);
 
                 let mut actual = vec![];
                 read_stream_to_end(stream, &mut actual).await.unwrap();

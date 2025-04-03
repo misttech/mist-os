@@ -56,7 +56,10 @@ void RingBufferRecorder::RecordStartTime(const zx::time& started_at) {
   running_intervals_.emplace_back(std::move(running_interval));
 }
 void RingBufferRecorder::RecordStopTime(const zx::time& stopped_at) {
-  running_intervals_.rbegin()->RecordStopTime(stopped_at);
+  // It's pointless for clients to call Stop before Start, but we shouldn't crash if they do.
+  if (!running_intervals_.empty()) {
+    running_intervals_.rbegin()->RecordStopTime(stopped_at);
+  }
 }
 
 void RingBufferRecorder::RecordActiveChannelsCall(uint64_t active_channels_bitmask,

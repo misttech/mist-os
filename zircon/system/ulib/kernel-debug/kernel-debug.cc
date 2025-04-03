@@ -11,13 +11,13 @@ namespace {
 
 class DebugBroker : public fidl::WireServer<fuchsia_kernel::DebugBroker> {
  public:
-  explicit DebugBroker(zx::unowned_resource debug_resource)
-      : debug_resource_(std::move(debug_resource)) {}
+  explicit DebugBroker(zx::unowned_resource tracing_resource)
+      : tracing_resource_(std::move(tracing_resource)) {}
 
  private:
   void SendDebugCommand(SendDebugCommandRequestView request,
                         SendDebugCommandCompleter::Sync& completer) override {
-    completer.Reply(zx_debug_send_command(debug_resource_->get(), request->command.data(),
+    completer.Reply(zx_debug_send_command(tracing_resource_->get(), request->command.data(),
                                           request->command.size()));
   }
 
@@ -26,17 +26,17 @@ class DebugBroker : public fidl::WireServer<fuchsia_kernel::DebugBroker> {
     zx_status_t status;
     if (request->enabled) {
       status =
-          zx_ktrace_control(debug_resource_->get(), KTRACE_ACTION_START, KTRACE_GRP_ALL, nullptr);
+          zx_ktrace_control(tracing_resource_->get(), KTRACE_ACTION_START, KTRACE_GRP_ALL, nullptr);
     } else {
-      status = zx_ktrace_control(debug_resource_->get(), KTRACE_ACTION_STOP, 0, nullptr);
+      status = zx_ktrace_control(tracing_resource_->get(), KTRACE_ACTION_STOP, 0, nullptr);
       if (status == ZX_OK) {
-        status = zx_ktrace_control(debug_resource_->get(), KTRACE_ACTION_REWIND, 0, nullptr);
+        status = zx_ktrace_control(tracing_resource_->get(), KTRACE_ACTION_REWIND, 0, nullptr);
       }
     }
     completer.Reply(status);
   }
 
-  const zx::unowned_resource debug_resource_;
+  const zx::unowned_resource tracing_resource_;
 };
 
 zx_status_t Connect(void* ctx, async_dispatcher_t* dispatcher, const char* service_name,

@@ -10,7 +10,6 @@ use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_input_interaction::{
     NotifierRequest, NotifierRequestStream, NotifierWatchStateResponder, State,
 };
-use fidl_fuchsia_input_interaction_observation::{AggregatorRequest, AggregatorRequestStream};
 use fidl_fuchsia_power_system::{ActivityGovernorMarker, ActivityGovernorProxy};
 use fuchsia_async::{Task, Timer};
 use fuchsia_component::client::connect_to_protocol;
@@ -244,31 +243,6 @@ impl InteractionStateHandler {
 
         false
     }
-}
-
-/// Handles the request stream for
-/// fuchsia.input.interaction.observation.Aggregator.
-///
-/// # Parameters
-/// `stream`: The `AggregatorRequestStream` to be handled.
-pub async fn handle_interaction_aggregator_request_stream(
-    mut stream: AggregatorRequestStream,
-) -> Result<(), Error> {
-    while let Some(aggregator_request) = stream.next().await {
-        match aggregator_request {
-            Ok(AggregatorRequest::ReportDiscreteActivity { event_time: _, responder }) => {
-                let _: Result<(), fidl::Error> = responder.send();
-            }
-            Err(e) => {
-                log::warn!(
-                    "Error serving fuchsia.input.interaction.observation.Aggregator: {:?}",
-                    e
-                );
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Handles the request stream for fuchsia.input.interaction.Notifier.

@@ -6,10 +6,11 @@
 #### CATEGORY=Source tree
 ### Syncs BUILD.gn and BUILD.bazel for targets that are dual-building in both.
 
-## usage: fx bazel2gn [-h|--help] [--no-build]
+## usage: fx bazel2gn [-d|--directory <path/to/dir>]... [-h|--help] [--no-build]
 ##
-##   -h|--help     Print out this message.
-##   --no-build    Skip building required dependencies.
+##   -h|--help       Print out this message.
+##   -d|--directory  Directory to sync, repeatable.
+##   --no-build      Skip building required dependencies.
 ##
 ## Updates BUILD.gn listed in this script based on the BUILD.bazel files in
 ## their directories.
@@ -21,29 +22,17 @@ fx-config-read
 
 declare -r BAZEL2GN_TARGET="host-tools/bazel2gn"
 declare -r BAZEL2GN_BIN="${FUCHSIA_BUILD_DIR}/host-tools/bazel2gn"
-
-# TODO(jayzhuang): Detect this list instead of hardcoding.
-declare -r DIRS_TO_SYNC=(
-  'build/tools/bazel2gn'
-  'tools/fidl/fidlgen_cpp'
-  'tools/fidl/fidlgen_cpp/codegen'
-  'tools/fidl/fidlgen_hlcpp'
-  'tools/fidl/fidlgen_hlcpp/codegen'
-  'tools/fidl/fidlgen_hlcpp/coding_tables'
-  'tools/fidl/lib/fidlgen'
-  'tools/fidl/lib/fidlgen_cpp'
-  'tools/lib/color'
-  'tools/lib/isatty'
-  'tools/lib/logger'
-  'tools/net/device-finder'
-  'tools/net/mdns'
-  'tools/net/netboot'
-)
+declare -r BAZEL2GN_DIR_LIST="${FUCHSIA_BUILD_DIR}/bazel2gn_dir_list"
 
 function main {
   local build=true
+  local directories=()
   while [[ "${#}" -ge 1 ]]; do
     case "${1}" in
+      -d|--directory)
+        shift
+        directories+=("${1}")
+        ;;
       -h|--help)
         fx-command-help
         exit 0
@@ -59,12 +48,19 @@ function main {
     shift
   done
 
+  # If no directories are provided by user, sync all known directories.
+  # Read known directories to sync from $BAZEL2GN_DIR_LIST.
+  if [[ -z "${directories}" ]]; then
+    while IFS= read -r dir; do
+      directories+=("${dir}")
+    done < "${BAZEL2GN_DIR_LIST}"
+  fi
+
   if [[ "${build}" == "true" ]]; then
     fx-run-ninja false "${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" "${BAZEL2GN_TARGET}"
   fi
 
-  for dir in "${DIRS_TO_SYNC[@]}"
-  do
+  for dir in "${directories[@]}"; do
     build_gn="${FUCHSIA_DIR}/${dir}/BUILD.gn"
     "${BAZEL2GN_BIN}" \
       --bazel_input_path "${FUCHSIA_DIR}/${dir}/BUILD.bazel" \

@@ -7,18 +7,17 @@
 
 #include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/device-protocol/pci.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
@@ -330,7 +329,7 @@ class UsbXhci : public fdf::DriverBase,
   ddk::Pci pci_;
 
   // PDev (if ARM)
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
 
   // MMIO buffer for communicating with the physical hardware
   // Must be optional to allow for asynchronous initialization,

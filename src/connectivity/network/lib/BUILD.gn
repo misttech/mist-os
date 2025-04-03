@@ -9,6 +9,7 @@ group("tests") {
     "dns_server_watcher:tests",
     "net_interfaces:tests",
     "netfilter:tests",
+    "oneshot-sync:tests",
     "sockaddr:tests",
     "todo_unused:tests",
   ]

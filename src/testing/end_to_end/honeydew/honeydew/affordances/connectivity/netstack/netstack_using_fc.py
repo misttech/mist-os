@@ -96,10 +96,10 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
 
     def _connect_proxy(self) -> None:
         """Re-initializes connection to the WLAN stack."""
-        self._state_proxy = f_net_interfaces.State.Client(
+        self._state_proxy = f_net_interfaces.StateClient(
             self._fc_transport.connect_device_proxy(_STATE_PROXY)
         )
-        self._interfaces_proxy = f_net_root.Interfaces.Client(
+        self._interfaces_proxy = f_net_root.InterfacesClient(
             self._fc_transport.connect_device_proxy(_INTERFACES_PROXY)
         )
 
@@ -116,7 +116,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
             TypeError: Received invalid Watcher events from netstack.
         """
         client, server = Channel.create()
-        watcher = f_net_interfaces.Watcher.Client(client.take())
+        watcher = f_net_interfaces.WatcherClient(client.take())
 
         try:
             self._state_proxy.get_watcher(
@@ -145,7 +145,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
             if event.existing:
                 try:
                     res = await self._interfaces_proxy.get_mac(
-                        id=event.existing.id
+                        id_=event.existing.id_
                     )
 
                     if res.err:
@@ -153,7 +153,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
                             'Failed to find the MAC of interface "%s" (%s); '
                             "it no longer exists",
                             event.existing.name,
-                            event.existing.id,
+                            event.existing.id_,
                         )
                         continue  # this is fine and sometimes even expected
 

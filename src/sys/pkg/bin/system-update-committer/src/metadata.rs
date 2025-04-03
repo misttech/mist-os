@@ -7,12 +7,12 @@
 use commit::do_commit;
 use errors::MetadataError;
 use fidl_fuchsia_update_verify::HealthVerificationProxy;
+use fuchsia_async::TimeoutExt as _;
 use futures::channel::oneshot;
-use inspect::write_to_inspect;
 use policy::PolicyEngine;
 use std::time::Instant;
-use zx::{self as zx, EventPair, Peered};
-use {fidl_fuchsia_paver as paver, fuchsia_inspect as finspect};
+use zx::{EventPair, Peered};
+use {fidl_fuchsia_paver as fpaver, fuchsia_inspect as finspect};
 
 mod commit;
 mod configuration_without_recovery;
@@ -33,11 +33,40 @@ mod policy;
 /// it should be rebooted. Rebooting will hopefully either fix the issue or decrement the boot
 /// counter, eventually leading to a rollback.
 pub async fn put_metadata_in_happy_state(
-    boot_manager: &paver::BootManagerProxy,
+    boot_manager: &fpaver::BootManagerProxy,
     p_internal: &EventPair,
     unblocker: oneshot::Sender<()>,
     health_verification: &HealthVerificationProxy,
+    commit_timeout: zx::MonotonicDuration,
     node: &finspect::Node,
+    commit_inspect: &CommitInspect,
+) -> Result<CommitResult, MetadataError> {
+    let start_time = Instant::now();
+    let res = put_metadata_in_happy_state_impl(
+        boot_manager,
+        p_internal,
+        unblocker,
+        health_verification,
+        commit_inspect,
+    )
+    .on_timeout(commit_timeout, || Err(MetadataError::Timeout))
+    .await;
+
+    match &res {
+        Ok(CommitResult::CommitNotNecessary) => (),
+        Ok(CommitResult::CommittedSystem) | Err(_) => {
+            inspect::write_to_inspect(node, res.as_ref().map(|_| ()), start_time.elapsed())
+        }
+    }
+
+    res
+}
+
+async fn put_metadata_in_happy_state_impl(
+    boot_manager: &fpaver::BootManagerProxy,
+    p_internal: &EventPair,
+    unblocker: oneshot::Sender<()>,
+    health_verification: &HealthVerificationProxy,
     commit_inspect: &CommitInspect,
 ) -> Result<CommitResult, MetadataError> {
     let mut unblocker = Some(unblocker);
@@ -47,17 +76,13 @@ pub async fn put_metadata_in_happy_state(
             // At this point, the FIDL server should start responding to requests so that clients
             // can find out that the health verification is underway.
             unblocker = unblock_fidl_server(unblocker)?;
-            let start_time = Instant::now();
-            let res_status =
-                health_verification.query_health_checks().await.map(zx::Status::from_raw);
-            let () = write_to_inspect(node, &res_status, start_time.elapsed());
-            let status = res_status.map_err(|e| {
-                MetadataError::HealthVerification(errors::HealthVerificationError::Fidl(e))
-            })?;
-            let () = Result::from(status).map_err(|e| {
-                MetadataError::HealthVerification(errors::HealthVerificationError::Unhealthy(e))
-            })?;
-
+            let () =
+                zx::Status::ok(health_verification.query_health_checks().await.map_err(|e| {
+                    MetadataError::HealthVerification(errors::HealthVerificationError::Fidl(e))
+                })?)
+                .map_err(|e| {
+                    MetadataError::HealthVerification(errors::HealthVerificationError::Unhealthy(e))
+                })?;
             let () =
                 do_commit(boot_manager, current_config).await.map_err(MetadataError::Commit)?;
             let () = commit_inspect.record_boot_attempts(boot_attempts);
@@ -164,12 +189,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::OK);
 
-        put_metadata_in_happy_state(
+        put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await
@@ -190,8 +214,8 @@ mod tests {
     async fn test_does_not_change_metadata_when_device_in_recovery() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .current_config(paver::Configuration::Recovery)
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .current_config(fpaver::Configuration::Recovery)
+                .insert_hook(mphooks::config_status(|_| Ok(fpaver::ConfigurationStatus::Healthy)))
                 .build(),
         );
         let (p_internal, p_external) = EventPair::create();
@@ -199,12 +223,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::OK);
 
-        put_metadata_in_happy_state(
+        put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await
@@ -228,7 +251,7 @@ mod tests {
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
-                    Ok((paver::ConfigurationStatus::Healthy, None))
+                    Ok((fpaver::ConfigurationStatus::Healthy, None))
                 }))
                 .build(),
         );
@@ -237,12 +260,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::OK);
 
-        put_metadata_in_happy_state(
+        put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await
@@ -285,7 +307,7 @@ mod tests {
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
-                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                    Ok((fpaver::ConfigurationStatus::Pending, Some(1)))
                 }))
                 .build(),
         );
@@ -294,12 +316,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::OK);
 
-        put_metadata_in_happy_state(
+        put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await
@@ -339,9 +360,9 @@ mod tests {
     async fn test_commits_when_failed_verification_ignored() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .current_config(paver::Configuration::Recovery)
+                .current_config(fpaver::Configuration::Recovery)
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
-                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                    Ok((fpaver::ConfigurationStatus::Pending, Some(1)))
                 }))
                 .build(),
         );
@@ -350,12 +371,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::INTERNAL);
 
-        put_metadata_in_happy_state(
+        put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await
@@ -375,7 +395,7 @@ mod tests {
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
-                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                    Ok((fpaver::ConfigurationStatus::Pending, Some(1)))
                 }))
                 .build(),
         );
@@ -384,12 +404,11 @@ mod tests {
         let (health_verification, health_verification_call_count) =
             health_verification_and_call_count(zx::Status::INTERNAL);
 
-        let result = put_metadata_in_happy_state(
+        let result = put_metadata_in_happy_state_impl(
             &paver.spawn_boot_manager_service(),
             &p_internal,
             unblocker,
             &health_verification,
-            &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
         )
         .await;

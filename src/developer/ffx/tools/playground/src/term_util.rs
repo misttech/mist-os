@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use vte::{Params, Parser};
+
 /// Get the length of a string when printed to the terminal (ignoring control
 /// sequences).
 ///
@@ -15,17 +17,17 @@ pub fn printed_length(s: &str) -> usize {
             self.0 += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
         }
         fn execute(&mut self, _: u8) {}
-        fn hook(&mut self, _: &[i64], _: &[u8], _: bool) {}
+        fn hook(&mut self, _: &Params, _: &[u8], _: bool, _: char) {}
         fn put(&mut self, _: u8) {}
         fn unhook(&mut self) {}
-        fn osc_dispatch(&mut self, _: &[&[u8]]) {}
-        fn csi_dispatch(&mut self, _: &[i64], _: &[u8], _: bool, _: char) {}
-        fn esc_dispatch(&mut self, _: &[i64], _: &[u8], _: bool, _: u8) {}
+        fn osc_dispatch(&mut self, _: &[&[u8]], _: bool) {}
+        fn csi_dispatch(&mut self, _: &Params, _: &[u8], _: bool, _: char) {}
+        fn esc_dispatch(&mut self, _: &[u8], _: bool, _: u8) {}
     }
 
     let mut counter = VteCounter(0);
-    let mut parser = vte::Parser::new();
-    s.as_bytes().iter().copied().for_each(|x| parser.advance(&mut counter, x));
+    let mut parser = Parser::new();
+    parser.advance(&mut counter, &s.as_bytes());
 
     counter.0
 }

@@ -78,9 +78,36 @@ impl FxSymlink {
                 sub_dirs: 0,
                 posix_attributes,
                 casefold: false,
-                // TODO: https://fxbug.dev/360171961: Add fscrypt support for symlinks
                 wrapping_key_id: None,
             }),
+            ObjectValue::Object {
+                kind: ObjectKind::EncryptedSymlink { refs, link },
+                attributes:
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        access_time,
+                        change_time,
+                        ..
+                    },
+            } => {
+                let link_len = store.read_encrypted_symlink(self.object_id(), link).await?.len();
+                Ok(ObjectProperties {
+                    refs,
+                    allocated_size: 0,
+                    // For POSIX compatibility we report the target length as file size.
+                    data_attribute_size: link_len as u64,
+                    creation_time,
+                    modification_time,
+                    access_time,
+                    change_time,
+                    sub_dirs: 0,
+                    posix_attributes,
+                    casefold: false,
+                    wrapping_key_id: None,
+                })
+            }
             ObjectValue::None => Err(FxfsError::NotFound.into()),
             _ => Err(FxfsError::NotFile.into()),
         }
@@ -122,12 +149,22 @@ impl Node for FxSymlink {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let mut props = self.get_properties().await.map_err(map_to_status)?;
+
+        if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
+            self.handle
+                .store()
+                .update_access_time(self.object_id(), &mut props)
+                .await
+                .map_err(map_to_status)?;
+        }
+
         Ok(attributes!(
             requested_attributes,
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
+                access_time: props.access_time.as_nanos(),
                 mode: props.posix_attributes.map(|a| a.mode),
                 uid: props.posix_attributes.map(|a| a.uid),
                 gid: props.posix_attributes.map(|a| a.gid),
@@ -156,10 +193,6 @@ impl Node for FxSymlink {
         name: Name,
     ) -> Result<(), zx::Status> {
         let dir = destination_dir.into_any().downcast::<FxDirectory>().unwrap();
-        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
-        if dir.directory().wrapping_key_id().is_some() {
-            return Err(zx::Status::INVALID_ARGS);
-        }
         let store = self.handle.store();
         let transaction = store
             .filesystem()

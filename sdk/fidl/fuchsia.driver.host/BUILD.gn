@@ -9,7 +9,9 @@ fidl("fuchsia.driver.host") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework",
+    "//sdk/fidl/fuchsia.driver.loader",
     "//sdk/fidl/fuchsia.ldsvc",
+    "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
   enable_hlcpp = true

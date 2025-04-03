@@ -21,7 +21,7 @@ namespace paver {
 class VolumeConnector {
  public:
   virtual zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const = 0;
-  // This method will assert if called on a non-PathBasedVolumeConnector.
+  // This method will assert if called on a non-PartitionServiceBasedVolumeConnector.
   virtual zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
       const = 0;
   // The following two methods will assert if called on a non-DevfsVolumeConnector.
@@ -47,12 +47,11 @@ class DevfsVolumeConnector : public VolumeConnector {
   fidl::WireSyncClient<fuchsia_device::Controller> controller_;
 };
 
-// A VolumeConnector backed by a service node relative to a directory (see fdio_service_connect_at).
-// It's expected that the service node at `path` has two nodes, "volume" and "partition".  See
-// fuchsia.storage.partitions.PartitionService.
-class ServiceBasedVolumeConnector : public VolumeConnector {
+// A VolumeConnector backed by a directory which contains a node to vend connections to
+// fuchsia.hardware.block.volume.Volume.
+class DirBasedVolumeConnector : public VolumeConnector {
  public:
-  explicit ServiceBasedVolumeConnector(fbl::unique_fd service_dir);
+  DirBasedVolumeConnector(fbl::unique_fd dir, std::string volume_connector_path);
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>> Connect() const override;
   zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
@@ -60,8 +59,21 @@ class ServiceBasedVolumeConnector : public VolumeConnector {
   fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const override;
   fidl::ClientEnd<fuchsia_device::Controller> TakeController() override;
 
+ protected:
+  fbl::unique_fd dir_;
+
  private:
-  fbl::unique_fd service_dir_;
+  std::string volume_connector_path_;
+};
+
+// Like `DirBasedVolumeConnector`, but the service has an additional "partition" node for connecting
+// to fuchsia.storage.partitions.Partition instances.
+class PartitionServiceBasedVolumeConnector : public DirBasedVolumeConnector {
+ public:
+  explicit PartitionServiceBasedVolumeConnector(fbl::unique_fd service_dir);
+
+  zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>> PartitionManagement()
+      const override;
 };
 
 // An abstraction for accessing block devices, either via devfs or
@@ -73,8 +85,14 @@ class BlockDevices {
   // /dev.
   static zx::result<BlockDevices> CreateDevfs(fbl::unique_fd devfs_root = {});
 
-  // Creates an instance that searches for devices as instances of PartitionService.
-  // `service_root` should contain the `fuchsia.storage.partitions.PartitionService` service.
+  // Creates an instance that searches for devices from fshost's /block.
+  // Note that fshost will forward GPT-managed partitions as instances of the PartitionService
+  // instead; see CreateFromPartitionService.  Only non-GPT devices will be published here.
+  // `block_dir` can be injected for testing.  If unspecified, /block will be opened.
+  static zx::result<BlockDevices> CreateFromFshostBlockDir(fbl::unique_fd block_dir = {});
+
+  // Creates an instance that searches for GPT-managed devices as instances of PartitionService.
+  // `svc_root` should contain the `fuchsia.storage.partitions.PartitionService` service.
   static zx::result<BlockDevices> CreateFromPartitionService(
       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
 
@@ -93,7 +111,10 @@ class BlockDevices {
   // operations.
   BlockDevices Duplicate() const;
 
-  const fbl::unique_fd& devfs_root() const { return devfs_root_; }
+  const fbl::unique_fd& devfs_root() const {
+    ZX_ASSERT(variant_ == Variant::kDevfs);
+    return root_;
+  }
 
   bool IsStorageHost() const;
 
@@ -115,13 +136,19 @@ class BlockDevices {
       const char* devfs_suffix = "class/block") const;
 
  private:
-  BlockDevices(fbl::unique_fd devfs_root, fbl::unique_fd partitions_root);
+  enum Variant : uint8_t {
+    kDevfs,
+    kFshostBlockDir,
+    kPartitionService,
+  };
+
+  BlockDevices(fbl::unique_fd root, Variant variant);
 
   zx::result<std::vector<std::unique_ptr<VolumeConnector>>> OpenAllPartitionsInner(
       fit::function<bool(const zx::channel&)> filter, size_t limit) const;
 
-  fbl::unique_fd devfs_root_;
-  fbl::unique_fd partitions_root_;
+  fbl::unique_fd root_;
+  Variant variant_;
 };
 
 }  // namespace paver

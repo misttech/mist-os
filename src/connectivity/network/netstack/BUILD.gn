@@ -158,6 +158,7 @@ go_library("lib") {
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_go($go_toolchain)",
+    "//sdk/fidl/fuchsia.net.ndp:fuchsia.net.ndp_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_go($go_toolchain)",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_go($go_toolchain)",

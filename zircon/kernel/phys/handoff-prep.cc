@@ -20,7 +20,6 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/tuple.h>
-#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>
@@ -129,30 +128,15 @@ void HandoffPrep::SetInstrumentation() {
   }
 }
 
-void HandoffPrep::PublishExtraVmo(PhysVmo&& vmo) {
-  fbl::AllocChecker ac;
-  HandoffVmo* handoff_vmo = new (gPhysNew<memalloc::Type::kPhysScratch>, ac) HandoffVmo;
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu scratch bytes for HandoffVmo",
-                sizeof(*handoff_vmo));
+void HandoffPrep::PublishExtraVmo(PhysVmo&& vmo) { extra_vmos_.push_front(HandoffVmo::New(vmo)); }
 
-  handoff_vmo->vmo = ktl::move(vmo);
-  extra_vmos_.push_front(handoff_vmo);
-}
-
-void HandoffPrep::FinishExtraVmos() {
+void HandoffPrep::FinishVmObjects() {
   ZX_ASSERT_MSG(extra_vmos_.size() <= PhysVmo::kMaxExtraHandoffPhysVmos,
                 "Too many phys VMOs in hand-off! %zu > max %zu", extra_vmos_.size(),
                 PhysVmo::kMaxExtraHandoffPhysVmos);
 
-  fbl::AllocChecker ac;
-  ktl::span extra_phys_vmos = New(handoff()->extra_vmos, ac, extra_vmos_.size());
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", extra_vmos_.size(),
-                sizeof(PhysVmo));
-  ZX_DEBUG_ASSERT(extra_phys_vmos.size() == extra_vmos_.size());
-
-  for (PhysVmo& phys_vmo : extra_phys_vmos) {
-    phys_vmo = ktl::move(extra_vmos_.pop_front()->vmo);
-  }
+  NewFromList(handoff()->vmars, ktl::move(vmars_));
+  NewFromList(handoff()->extra_vmos, ktl::move(extra_vmos_));
 }
 
 void HandoffPrep::SetMemory() {
@@ -160,13 +144,11 @@ void HandoffPrep::SetMemory() {
   // providing a PERIPHERAL range that already covers UART MMIO, but there is
   // currently a gap in that coverage.
   if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    uart::internal::Visit(
-        [&](auto& driver) {
-          if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
-          }
-        },
-        gBootOptions->serial);
+    GetUartDriver().Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
+      if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
+        ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
+      }
+    });
   }
 
   // Normalizes types so that only those that are of interest to the kernel
@@ -339,23 +321,6 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   }
 }
 
-void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
-  // TODO(https://fxbug.dev/42164859): Reframe this logic into something that
-  // also tracks other metadata we'll need for the final form of the handoff
-  // (e.g., for VM init).
-
-  // Construct the physmap.
-  constexpr AddressSpace::MapSettings kRwRam{
-      .access = {.readable = true, .writable = true},
-      .memory = kArchNormalMemoryType,
-  };
-  AddressSpace::PanicIfError(
-      gAddressSpace->Map(kArchPhysmapVirtualBase, kArchPhysmapSize, 0, kRwRam));
-
-  // Construct the kernel's mapping.
-  AddressSpace::PanicIfError(kernel.MapInto(*gAddressSpace));
-}
-
 [[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,
                                          ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
@@ -382,15 +347,16 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
   // TODO(mcgrathr): Rename to physboot.log with some prefix.
   PublishLog("i/logs/physboot", ktl::move(*ktl::exchange(gLog, nullptr)));
 
-  // Finalize the published VMOs, including the log just published above.
-  FinishExtraVmos();
-
   // Now that all time samples have been collected, copy gBootTimes into the
   // hand-off.
   handoff()->times = gBootTimes;
 
   handoff()->kernel_physical_load_address = kernel.physical_load_address();
   ConstructKernelAddressSpace(kernel);
+
+  // Finalize the published VMOs (e.g., the log published just above), VMARs,
+  // and mappings.
+  FinishVmObjects();
 
   // This must be called last, as this finalizes the state of memory to hand off
   // to the kernel, which is affected by other set-up routines.

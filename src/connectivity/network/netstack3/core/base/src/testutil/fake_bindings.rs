@@ -16,7 +16,6 @@ use crate::testutil::{
 use crate::{
     ContextProvider, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
     InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
-    TracingContext,
 };
 
 /// A test helper used to provide an implementation of a bindings context.
@@ -138,14 +137,6 @@ impl<Id, Event: Debug, State, FrameMeta> EventContext<Event>
     fn on_event(&mut self, event: Event) {
         self.events.on_event(event)
     }
-}
-
-impl<Id, Event: Debug, State, FrameMeta> TracingContext
-    for FakeBindingsCtx<Id, Event, State, FrameMeta>
-{
-    type DurationScope = ();
-
-    fn duration(&self, _: &'static core::ffi::CStr) {}
 }
 
 impl<Id, Event: Debug, State, FrameMeta> ReferenceNotifiers

@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Slot, TakeFrom,
+    Slot, TakeFrom, ZeroPadding,
 };
 
 macro_rules! endpoint {
@@ -20,6 +21,14 @@ macro_rules! endpoint {
         pub struct $name<T, P> {
             transport: T,
             _protocol: PhantomData<P>,
+        }
+
+        unsafe impl<T: ZeroPadding, P> ZeroPadding for $name<T, P> {
+            #[inline]
+            fn zero_padding(out: &mut MaybeUninit<Self>) {
+                munge!(let Self { transport, _protocol: _ } = out);
+                T::zero_padding(transport);
+            }
         }
 
         impl<T, P> $name<T, P> {
@@ -59,7 +68,7 @@ macro_rules! endpoint {
             type EncodedOption = $name<T::EncodedOption, P>;
         }
 
-        impl<E, T, P> Encode<E> for $name<T, P>
+        unsafe impl<E, T, P> Encode<E> for $name<T, P>
         where
             E: ?Sized,
             T: Encode<E>,
@@ -67,14 +76,14 @@ macro_rules! endpoint {
             fn encode(
                 &mut self,
                 encoder: &mut E,
-                slot: Slot<'_, Self::Encoded>,
+                out: &mut MaybeUninit<Self::Encoded>,
             ) -> Result<(), EncodeError> {
-                munge!(let Self::Encoded { transport, _protocol: _ } = slot);
+                munge!(let Self::Encoded { transport, _protocol: _ } = out);
                 self.transport.encode(encoder, transport)
             }
         }
 
-        impl<E, T, P> EncodeOption<E> for $name<T, P>
+        unsafe impl<E, T, P> EncodeOption<E> for $name<T, P>
         where
             E: ?Sized,
             T: EncodeOption<E>,
@@ -82,9 +91,9 @@ macro_rules! endpoint {
             fn encode_option(
                 this: Option<&mut Self>,
                 encoder: &mut E,
-                slot: Slot<'_, Self::EncodedOption>,
+                out: &mut MaybeUninit<Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
-                munge!(let Self::EncodedOption { transport, _protocol: _ } = slot);
+                munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
                 T::encode_option(this.map(|this| &mut this.transport), encoder, transport)
             }
         }
@@ -95,6 +104,39 @@ macro_rules! endpoint {
         {
             fn take_from(from: &$name<U, P>) -> Self {
                 Self { transport: T::take_from(&from.transport), _protocol: PhantomData }
+            }
+        }
+
+        impl<T, P, U> TakeFrom<$name<U, P>> for Option<$name<T, P>>
+        where
+            Option<T>: TakeFrom<U>,
+        {
+            fn take_from(from: &$name<U, P>) -> Self {
+                Option::<T>::take_from(&from.transport)
+                    .map(|transport| $name { transport, _protocol: PhantomData })
+            }
+        }
+
+        #[cfg(feature = "compat")]
+        impl<T, P1, P2> TakeFrom<$name<T, P1>> for ::fidl::endpoints::$name<P2>
+        where
+            ::fidl::Channel: TakeFrom<T>,
+            P2: TakeFrom<P1>,
+        {
+            fn take_from(from: &$name<T, P1>) -> Self {
+                Self::new(::fidl::Channel::take_from(&from.transport))
+            }
+        }
+
+        #[cfg(feature = "compat")]
+        impl<T, P1, P2> TakeFrom<$name<T, P1>> for Option<::fidl::endpoints::$name<P2>>
+        where
+            Option<::fidl::Channel>: TakeFrom<T>,
+            P2: TakeFrom<P1>,
+        {
+            fn take_from(from: &$name<T, P1>) -> Self {
+                Option::<::fidl::Channel>::take_from(&from.transport)
+                    .map(::fidl::endpoints::$name::new)
             }
         }
     };

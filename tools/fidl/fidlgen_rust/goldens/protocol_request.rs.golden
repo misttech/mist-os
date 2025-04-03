@@ -105,6 +105,20 @@ impl ChildSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<ChildSynchronousProxy> for zx::Handle {
+    fn from(value: ChildSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ChildSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ChildProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -440,6 +454,20 @@ impl ParentSynchronousProxy {
             0x2063f76b1bb45f87,
             fidl::encoding::DynamicFlags::empty(),
         )
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<ParentSynchronousProxy> for zx::Handle {
+    fn from(value: ParentSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ParentSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 

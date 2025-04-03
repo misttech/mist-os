@@ -11,9 +11,8 @@ use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
-use fidl_fuchsia_diagnostics::{
-    Interest as FidlInterest, LogInterestSelector, Severity as FidlSeverity, StreamMode,
-};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, StreamMode};
+use fidl_fuchsia_diagnostics_types::{Interest as FidlInterest, Severity as FidlSeverity};
 use fidl_fuchsia_logger::{LogSinkRequest, LogSinkRequestStream};
 use fuchsia_async::condition::Condition;
 use futures::future::{Fuse, FusedFuture};
@@ -521,7 +520,8 @@ impl PartialOrd for Interest {
 mod tests {
     use super::*;
     use crate::logs::shared_buffer::SharedBuffer;
-    use fidl_fuchsia_diagnostics::{ComponentSelector, Severity, StringSelector};
+    use fidl_fuchsia_diagnostics::{ComponentSelector, StringSelector};
+    use fidl_fuchsia_diagnostics_types::Severity;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
     use fuchsia_async::{Task, TestExecutor};
     use fuchsia_inspect as inspect;

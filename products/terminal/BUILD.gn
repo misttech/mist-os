@@ -14,7 +14,6 @@ assert(
 bazel_inputs = [
   "//src/fonts/asset_providers:open-fonts-collection-bazel",
   "//build/images/flash:esp.bazel_input",
-  "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
 
   # Cache packages.
   "//src/ui/bin/terminal:terminal.bazel_input",
@@ -51,6 +50,7 @@ if (board_configuration_label != false &&
 if (target_cpu == "x64") {
   bazel_product_bundle("product_bundle.x64") {
     testonly = true
+    product_bundle_name = "terminal.x64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.x64"
     bazel_product_image_target = ":image.x64"
@@ -61,6 +61,7 @@ if (target_cpu == "x64") {
 
   bazel_product_bundle("product_bundle.x64_reduced_perf_variation") {
     testonly = true
+    product_bundle_name = "terminal.x64-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.x64_reduced_perf_variation"
     bazel_product_image_target = ":image.x64_reduced_perf_variation"
@@ -72,6 +73,7 @@ if (target_cpu == "x64") {
 
   bazel_product_bundle("product_bundle_with_netstack2.x64") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.x64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle_with_netstack2.x64"
     bazel_product_image_target = ":image_with_netstack2.x64"
@@ -83,6 +85,7 @@ if (target_cpu == "x64") {
   bazel_product_bundle(
       "product_bundle_with_netstack2.x64_reduced_perf_variation") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.x64-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target =
         ":product_bundle_with_netstack2.x64_reduced_perf_variation"
@@ -99,6 +102,7 @@ if (target_cpu == "x64") {
 if (target_cpu == "arm64") {
   bazel_product_bundle("product_bundle.arm64") {
     testonly = true
+    product_bundle_name = "terminal.arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.arm64"
     bazel_product_image_target = ":image.arm64"
@@ -109,6 +113,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.qemu-arm64") {
     testonly = true
+    product_bundle_name = "terminal.qemu-arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.qemu-arm64"
     bazel_product_image_target = ":image.qemu-arm64"
@@ -119,6 +124,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.vim3") {
     testonly = true
+    product_bundle_name = "terminal.vim3"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.vim3"
     bazel_product_image_target = ":image.vim3"
@@ -129,6 +135,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle.vim3_reduced_perf_variation") {
     testonly = true
+    product_bundle_name = "terminal.vim3-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.vim3_reduced_perf_variation"
     bazel_product_image_target = ":image.vim3_reduced_perf_variation"
@@ -140,6 +147,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle_with_netstack2.arm64") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle_with_netstack2.arm64"
     bazel_product_image_target = ":image_with_netstack2.arm64"
@@ -150,6 +158,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle_with_netstack2.qemu-arm64") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.qemu-arm64"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
     bazel_product_image_target = ":image.qemu-arm64"
@@ -160,6 +169,7 @@ if (target_cpu == "arm64") {
 
   bazel_product_bundle("product_bundle_with_netstack2.vim3") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.vim3"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle_with_netstack2.vim3"
     bazel_product_image_target = ":image_with_netstack2.vim3"
@@ -171,6 +181,7 @@ if (target_cpu == "arm64") {
   bazel_product_bundle(
       "product_bundle_with_netstack2.vim3_reduced_perf_variation") {
     testonly = true
+    product_bundle_name = "terminal_with_netstack2.vim3-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target =
         ":product_bundle_with_netstack2.vim3_reduced_perf_variation"

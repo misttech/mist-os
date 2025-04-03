@@ -1480,38 +1480,47 @@ impl std::fmt::Debug for ComponentInstance {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::model::events::stream::EventStream;
-
+    use fidl_fuchsia_component as fcomponent;
     use hooks::EventType;
-    use moniker::Moniker;
 
     pub async fn wait_until_event_get_timestamp(
-        event_stream: &mut EventStream,
+        event_stream: &fcomponent::EventStreamProxy,
         event_type: EventType,
     ) -> zx::BootInstant {
-        event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
+        let mut events = event_stream.get_next().await.unwrap();
+        let next_event = events.remove(0);
+        if !events.is_empty() {
+            // We'll need to discard events if we receive too many, but test logic might depend on
+            // those events. To make this issue happen as early as possible, panic here.
+            panic!("got too many events at once")
+        }
+        assert_eq!(
+            next_event.header.as_ref().unwrap().event_type,
+            Some(event_type.into()),
+            "wrong event type observed!"
+        );
+        next_event.header.as_ref().unwrap().timestamp.unwrap()
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::testing::wait_until_event_get_timestamp;
     use super::*;
     use crate::model::actions::test_utils::is_discovered;
     use crate::model::actions::{shutdown, StopAction};
-    use crate::model::events::registry::EventSubscription;
     use crate::model::testing::mocks::ControllerActionResponse;
     use crate::model::testing::out_dir::OutDir;
     use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
     use crate::model::testing::test_helpers::{
-        component_decl_with_test_runner, ActionsTest, ComponentInfo,
+        assert_event_type_and_moniker, component_decl_with_test_runner, get_n_events, ActionsTest,
+        ComponentInfo,
     };
     use ::routing::bedrock::structured_dict::ComponentInput;
     use ::routing::resolving::ComponentAddress;
     use assert_matches::assert_matches;
     use cm_rust::{
         Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
-        OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
+        OfferSource, OfferTarget,
     };
     use cm_rust_testing::*;
     use errors::{AddChildError, DynamicCapabilityError};
@@ -1530,35 +1539,20 @@ pub mod tests {
     use zx::{self as zx, AsHandleRef};
     use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
+    const FLAGS: fio::Flags = fio::PERM_READABLE;
+
     #[fuchsia::test]
     async fn started_event_timestamp_matches_component() {
         let test =
             RoutingTest::new("root", vec![("root", ComponentDeclBuilder::new().build())]).await;
 
-        let mut event_source =
-            test.builtin_environment.event_source_factory.create_for_above_root();
-        let mut event_stream = event_source
-            .subscribe(
-                vec![
-                    EventType::Resolved.into(),
-                    EventType::Started.into(),
-                    EventType::DebugStarted.into(),
-                ]
-                .into_iter()
-                .map(|event: Name| {
-                    EventSubscription::new(UseEventStreamDecl {
-                        source_name: event,
-                        source: UseSource::Parent,
-                        scope: None,
-                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                        filter: None,
-                        availability: Availability::Required,
-                    })
-                })
-                .collect(),
-            )
-            .await
-            .expect("subscribe to event stream");
+        let event_stream = test
+            .new_event_stream(vec![
+                EventType::Resolved,
+                EventType::Started,
+                EventType::DebugStarted,
+            ])
+            .await;
 
         let root = test.model.root().clone();
         let (f, bind_handle) = async move {
@@ -1566,12 +1560,14 @@ pub mod tests {
         }
         .remote_handle();
         fasync::Task::spawn(f).detach();
-        let resolved_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Resolved).await;
-        let started_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::Started).await;
-        let debug_started_timestamp =
-            wait_until_event_get_timestamp(&mut event_stream, EventType::DebugStarted).await;
+        let events = get_n_events(&event_stream, 3).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, ".");
+        assert_event_type_and_moniker(&events[1], fcomponent::EventType::Started, ".");
+        assert_event_type_and_moniker(&events[2], fcomponent::EventType::DebugStarted, ".");
+        let get_timestamp = |e: &fcomponent::Event| e.header.as_ref().unwrap().timestamp.unwrap();
+        let resolved_timestamp = get_timestamp(&events[0]);
+        let started_timestamp = get_timestamp(&events[1]);
+        let debug_started_timestamp = get_timestamp(&events[2]);
 
         assert!(resolved_timestamp < started_timestamp);
         assert!(started_timestamp == debug_started_timestamp);
@@ -1603,19 +1599,7 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
 
-        let mut event_source =
-            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
-        let mut stop_event_stream = event_source
-            .subscribe(vec![EventSubscription::new(UseEventStreamDecl {
-                source_name: EventType::Stopped.into(),
-                source: UseSource::Parent,
-                scope: None,
-                target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                filter: None,
-                availability: Availability::Required,
-            })])
-            .await
-            .expect("couldn't susbscribe to event stream");
+        let stop_event_stream = test.new_event_stream(vec![EventType::Stopped]).await;
 
         let a_moniker: Moniker = vec!["a"].try_into().unwrap();
         let b_moniker: Moniker = vec!["a", "b"].try_into().unwrap();
@@ -1644,12 +1628,8 @@ pub mod tests {
 
         // Verify that we get a stop event as a result of the controller
         // channel close being observed.
-        let stop_event = stop_event_stream
-            .wait_until(EventType::Stopped, b_moniker.clone())
-            .await
-            .unwrap()
-            .event;
-        assert_eq!(stop_event.target_moniker, b_moniker.clone().into());
+        let stop_event = stop_event_stream.get_next().await.unwrap();
+        assert_eq!(stop_event[0].header.as_ref().unwrap().moniker, Some(b_moniker.to_string()));
 
         // Verify that a parent of the exited component can still be stopped
         // properly.
@@ -1660,12 +1640,8 @@ pub mod tests {
         .await
         .expect("Couldn't trigger shutdown");
         // Check that we get a stop even which corresponds to the parent.
-        let parent_stop = stop_event_stream
-            .wait_until(EventType::Stopped, a_moniker.clone())
-            .await
-            .unwrap()
-            .event;
-        assert_eq!(parent_stop.target_moniker, a_moniker.clone().into());
+        let stop_event_2 = stop_event_stream.get_next().await.unwrap();
+        assert_eq!(stop_event_2[0].header.as_ref().unwrap().moniker, Some(a_moniker.to_string()));
     }
 
     #[fuchsia::test]
@@ -2628,10 +2604,10 @@ pub mod tests {
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         root.open_outgoing(OpenRequest::new(
             execution_scope.clone(),
-            fio::OpenFlags::empty(),
+            fio::Flags::PROTOCOL_SERVICE,
             "svc/foo".try_into().unwrap(),
             &mut object_request,
         ))
@@ -2670,11 +2646,11 @@ pub mod tests {
         let (client_end, server_end) = zx::Channel::create();
 
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 execution_scope.clone(),
-                fio::OpenFlags::empty(),
+                fio::Flags::PROTOCOL_SERVICE,
                 "svc/foo".try_into().unwrap(),
                 &mut object_request,
             ))
@@ -2733,11 +2709,11 @@ pub mod tests {
         // Open the outgoing directory. This should not block.
         let (_, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = FLAGS.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 VfsPath::dot(),
                 &mut object_request
             ))
@@ -2752,11 +2728,11 @@ pub mod tests {
         // Open the outgoing directory. This should still not block.
         let (_, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = FLAGS.to_object_request(server_end);
         assert_matches!(
             root.open_outgoing(OpenRequest::new(
                 scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 VfsPath::dot(),
                 &mut object_request
             ))

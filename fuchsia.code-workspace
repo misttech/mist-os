@@ -135,8 +135,7 @@
     // Dart
     //
 
-    "[linux].dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
-    "[mac].dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/mac-arm64",
+    "dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
 
     ////////
     // Rust
@@ -150,12 +149,8 @@
     "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust-analyzer/rust-analyzer",
 
     // Use Fuchsia's config and vendored rustfmt.
-    "[linux].rust-analyzer.rustfmt.overrideCommand": [
+    "rust-analyzer.rustfmt.overrideCommand": [
       "${workspaceFolder}/prebuilt/third_party/rust/linux-x64/bin/rustfmt",
-      "--config-path=${workspaceFolder}/rustfmt.toml"
-    ],
-    "[mac].rust-analyzer.rustfmt.overrideCommand": [
-      "${workspaceFolder}/prebuilt/third_party/rust/mac-arm64/bin/rustfmt",
       "--config-path=${workspaceFolder}/rustfmt.toml"
     ],
 
@@ -171,7 +166,7 @@
     // Remap the diagnostics results from RA to handle the change in working dir
     // from the workspace root to the root_build_dir in GN/Ninja.
     "rust-analyzer.diagnostics.remapPrefix": {
-      "../../": "${workspaceFolder}",
+      "../../": "${workspaceFolder}/",
     },
 
     ////////
@@ -182,8 +177,7 @@
         "--background-index",
         "--header-insertion=never"
     ],
-    "[linux].clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
-    "[mac].clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/mac-arm64/bin/clangd",
+    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
 
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
@@ -194,8 +188,7 @@
     ////////
     // Go
 
-    "[linux].go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
-    "[mac].go.goroot": "${workspaceFolder}/prebuilt/third_party/go/mac-arm64",
+    "go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
 
     "gopls": {
       // Restrict directories that gopls will search in, otherwise it can fail
@@ -416,6 +409,7 @@
     // Disable task auto-detection for supported project configuration files
     // (e.g. NPM's project.json). This significantly speeds up task running.
     "task.autoDetect": "off",
+    "rust-analyzer.runnables.command": null,
   },
 
   // Tasks run with the "Tasks: Run Task" command (bind a shortcut!).

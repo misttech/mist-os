@@ -588,6 +588,35 @@ static bool deadline_after() {
   END_TEST;
 }
 
+static bool test_timer_current_mono_and_boot_ticks() {
+  BEGIN_TEST;
+
+  // Get the current monotonic and boot ticks. This should occur prior to our observation of both
+  // below, providing us with a lower bound on those values.
+  zx_instant_boot_ticks_t boot_before = timer_current_boot_ticks();
+  zx_instant_mono_ticks_t mono_before = timer_current_mono_ticks();
+
+  // Perform a synchronized read of the monotonic and boot ticks.
+  CurrentTicksObservation obs = timer_current_mono_and_boot_ticks();
+
+  // Get the current monotonic and boot ticks. This should occur after our observation of both
+  // above, providing us with an upper bound on those values.
+  zx_instant_mono_ticks_t mono_after = timer_current_mono_ticks();
+  zx_instant_boot_ticks_t boot_after = timer_current_boot_ticks();
+
+  // Ensure that the monotonic ticks are less than or equal to the boot ticks.
+  ASSERT_LE(obs.mono_now, obs.boot_now);
+
+  // Ensure that our observations are monotonic, meaning that they are greater than or equal to our
+  // before observations and less than or equal to our after observations.
+  ASSERT_GE(obs.mono_now, mono_before);
+  ASSERT_GE(obs.boot_now, boot_before);
+  ASSERT_LE(obs.mono_now, mono_after);
+  ASSERT_LE(obs.boot_now, boot_after);
+
+  END_TEST;
+}
+
 static bool mono_to_raw_ticks_overflow() {
   BEGIN_TEST;
 
@@ -643,4 +672,5 @@ UNITTEST("print_timer_queue", print_timer_queues)
 UNITTEST("Deadline::after", deadline_after)
 UNITTEST("mono_to_raw_ticks_overflow", mono_to_raw_ticks_overflow)
 UNITTEST("boot_timer", boot_timer)
+UNITTEST("test_timer_current_mono_and_boot_ticks", test_timer_current_mono_and_boot_ticks)
 UNITTEST_END_TESTCASE(timer_tests, "timer", "timer tests")

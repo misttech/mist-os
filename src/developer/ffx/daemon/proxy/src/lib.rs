@@ -14,7 +14,6 @@ use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
-use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
@@ -283,27 +282,6 @@ impl Injector for Injection {
                 _ => timeout_error,
             }
         })?;
-
-        if let Ok(proxy) = proxy.as_ref() {
-            let proto_fut = proxy.as_channel().get_channel_proxy_protocol();
-            let proto_timeout = std::time::Duration::from_millis(500);
-
-            match timeout(proto_timeout, proto_fut).await {
-                Ok(Some(proto)) => {
-                    let proto = proto.as_str();
-                    if let Err(e) = add_ffx_rcs_protocol_event(proto).await {
-                        tracing::warn!(error = ?e, "Problem sending protocol metrics");
-                    }
-                }
-                // Peer seems to have closed. That'll be handled up the stack.
-                Ok(None) => (),
-                Err(_) => {
-                    // This can happen if for some reason this channel isn't proxied by Overnet.
-                    // That shouldn't ever happen but it's worth avoiding a hang.
-                    tracing::warn!("Timed out waiting for protocol report from Overnet");
-                }
-            }
-        }
 
         proxy
     }

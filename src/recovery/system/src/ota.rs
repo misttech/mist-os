@@ -17,9 +17,12 @@ use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple::Simple;
+use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const PATH_TO_CONFIGS_DIR: &'static str = "/config/data/ota-configs";
+const SERVE_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 enum OtaType {
     /// Ota from a devhost.
@@ -246,7 +249,7 @@ impl OtaEnv {
 /// Run an OTA from a development host. Returns when the system and SSH keys have been installed.
 pub async fn run_devhost_ota(
     cfg: DevhostConfig,
-    out_dir: ServerEnd<fio::NodeMarker>,
+    out_dir: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42064284, b/255340851): deduplicate this spinup code with the code in
     // ota_main.rs. To do that, we'll need to remove the run_devhost_ota call
@@ -255,14 +258,9 @@ pub async fn run_devhost_ota(
     let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    outgoing_dir_vfs.clone().open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
-        out_dir,
-    );
+    SERVE_FLAGS.to_object_request(out_dir.into_channel()).handle(|request| {
+        outgoing_dir_vfs.clone().open3(scope.clone(), vfs::Path::dot(), SERVE_FLAGS, request)
+    });
     fasync::Task::local(async move { scope.wait().await }).detach();
 
     let ota_env = OtaEnvBuilder::new(outgoing_dir_vfs)
@@ -536,18 +534,18 @@ mod tests {
 
             let directory_handle = take_startup_handle(HandleType::DirectoryRequest.into())
                 .expect("cannot take startup handle");
-            let outgoing_dir = zx::Channel::from(directory_handle).into();
+            let outgoing_dir = zx::Channel::from(directory_handle);
             let outgoing_dir_vfs = vfs::pseudo_directory! {};
 
             let scope = vfs::execution_scope::ExecutionScope::new();
-            outgoing_dir_vfs.clone().open(
-                scope.clone(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE,
-                vfs::path::Path::dot(),
-                outgoing_dir,
-            );
+            SERVE_FLAGS.to_object_request(outgoing_dir).handle(|request| {
+                outgoing_dir_vfs.clone().open3(
+                    scope.clone(),
+                    vfs::Path::dot(),
+                    SERVE_FLAGS,
+                    request,
+                )
+            });
             fasync::Task::local(async move { scope.wait().await }).detach();
 
             let blobfs_proxy = self.storage.blobfs_root()?;

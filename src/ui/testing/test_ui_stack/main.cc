@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
 #include <fidl/fuchsia.element/cpp/fidl.h>
-#include <fidl/fuchsia.input.interaction.observation/cpp/fidl.h>
 #include <fidl/fuchsia.input.interaction/cpp/fidl.h>
 #include <fidl/fuchsia.input.virtualkeyboard/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
@@ -72,8 +71,6 @@ int run_test_ui_stack(int argc, const char** argv) {
                                                         realm_exposed_services.get());
   AddPublicService<fuchsia_input_interaction::Notifier>(context.get(),
                                                         realm_exposed_services.get());
-  AddPublicService<fuchsia_input_interaction_observation::Aggregator>(context.get(),
-                                                                      realm_exposed_services.get());
   AddPublicService<fuchsia_ui_composition::Allocator>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_composition::Flatland>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_focus::FocusChainListenerRegistry>(context.get(),

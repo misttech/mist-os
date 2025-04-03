@@ -43,10 +43,6 @@ func LogListenerWithArgs(args ...string) []string {
 	return append([]string{LogListener, "--no-color"}, args...)
 }
 
-func ffxLogWithArgs(args ...string) []string {
-	return []string{"log", "--no-color", "--symbolize", "off"}
-}
-
 // NewSyslogger creates a new Syslogger, given an SSH session with a Fuchsia instance.
 func NewSyslogger(client *sshutil.Client) *Syslogger {
 	return &Syslogger{
@@ -86,22 +82,18 @@ func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-c
 		errs <- err
 	}
 	var cmd []string
-	if s.ffx != nil {
-		cmd = ffxLogWithArgs()
-	} else {
+	if s.ffx == nil {
 		cmd = LogListenerWithArgs()
 	}
 
+	ffxLogAdditionalArgs := []string{}
 	s.running = true
 	go func() {
 		for {
 			var err error
 			if s.ffx != nil {
-				command, err := s.ffx.CommandWithTarget(cmd...)
-				if err == nil {
-					command.Stdout = output
-					err = s.ffx.RunCommand(ctx, command)
-				}
+				args := append([]string{"--no-color", "--symbolize", "off"}, ffxLogAdditionalArgs...)
+				err = s.ffx.Log(ctx, &output, args...)
 			} else if s.client != nil {
 				// Note: Fuchsia's log_listener does not write to stderr.
 				err = s.client.Run(ctx, cmd, output, nil)
@@ -121,7 +113,7 @@ func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-c
 					// Don't stream from the beginning of the system's uptime, since
 					// that would include logs that we've already streamed.
 					if s.ffx != nil {
-						cmd = ffxLogWithArgs("--since", "now")
+						ffxLogAdditionalArgs = []string{"--since", "now"}
 					} else {
 						cmd = LogListenerWithArgs("--since_now", "yes")
 					}
@@ -166,7 +158,7 @@ func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-c
 			// Start streaming from the beginning of the system's uptime again now that
 			// we're rebooting.
 			if s.ffx != nil {
-				cmd = ffxLogWithArgs()
+				ffxLogAdditionalArgs = []string{}
 			} else {
 				cmd = LogListenerWithArgs()
 			}

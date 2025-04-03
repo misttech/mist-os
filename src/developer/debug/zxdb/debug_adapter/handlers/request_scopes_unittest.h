@@ -21,7 +21,7 @@ class RequestScopesTest : public DebugAdapterContextTest {
     DebugAdapterContextTest::SetUp();
     InitializeDebugging();
 
-    process_ = InjectProcess(kProcessKoid);
+    process_ = InjectProcessWithModule(kProcessKoid, 0x1000);
     // Run client to receive process started event.
     RunClient();
     thread_ = InjectThread(kProcessKoid, kThreadKoid);

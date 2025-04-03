@@ -27,7 +27,7 @@ The following is a simple example of `StringRef` in action:
 
 template <typename Op, typename... Args>
 inline DoSomething(Op&& op, Args&&... args) {
-    ktrace_probe(TraceAlways, TraceContext::Thread, "DoSomething"_stringref);
+    KTrace::Probe(TraceContext::Thread, "DoSomething"_stringref);
     // ...
 }
 ```

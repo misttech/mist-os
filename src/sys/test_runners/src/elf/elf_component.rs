@@ -28,6 +28,7 @@ use thiserror::Error;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
+use vfs::object_request::ToObjectRequest;
 use vfs::tree_builder::TreeBuilder;
 use zx::{self as zx, AsHandleRef, HandleBased, Task};
 use {
@@ -512,12 +513,16 @@ where
     runtime_dir_builder
         .add_entry(&["elf", "job_id"], read_only(job_id.to_string()))
         .map_err(|e| ComponentError::ServeRuntimeDir(anyhow!("cannot add elf/job_id: {}", e)))?;
-    runtime_dir_builder.build().open(
-        ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::<fio::NodeMarker>::new(runtime_dir.into_channel()),
-    );
+    let object_request = fio::PERM_READABLE.to_object_request(runtime_dir.into_channel());
+    object_request.handle(|request| {
+        runtime_dir_builder.build().open3(
+            ExecutionScope::new(),
+            vfs::path::Path::dot(),
+            fio::PERM_READABLE,
+            request,
+        )
+    });
+
     // 2. Wait on `break_on_start` before spawning any processes.
     if let Some(break_on_start) = break_on_start {
         fasync::OnSignals::new(&break_on_start, zx::Signals::OBJECT_PEER_CLOSED)

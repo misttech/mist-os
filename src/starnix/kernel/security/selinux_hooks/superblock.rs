@@ -10,7 +10,7 @@ use super::{
 
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode};
+use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode, OutputBuffer};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
@@ -37,7 +37,7 @@ fn fs_sid(fs: &FileSystem) -> Result<SecurityId, Errno> {
 }
 
 /// Returns security state to associate with a filesystem based on the supplied mount options.
-pub fn file_system_init_security(
+pub(in crate::security) fn file_system_init_security(
     name: &'static FsStr,
     mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
@@ -45,7 +45,7 @@ pub fn file_system_init_security(
 }
 
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
-pub fn file_system_resolve_security<L>(
+pub(in crate::security) fn file_system_resolve_security<L>(
     locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -128,7 +128,9 @@ pub(super) fn label_from_mount_options_and_name(
 
 /// Consumes the SELinux mount options from the supplied `MountParams` and returns the security
 /// mount options for the given `MountParams`.
-pub fn sb_eat_lsm_opts(mount_params: &mut MountParams) -> Result<FileSystemMountOptions, Errno> {
+pub(in crate::security) fn sb_eat_lsm_opts(
+    mount_params: &mut MountParams,
+) -> Result<FileSystemMountOptions, Errno> {
     let context = mount_params.remove(FsStr::new(b"context"));
     let def_context = mount_params.remove(FsStr::new(b"defcontext"));
     let fs_context = mount_params.remove(FsStr::new(b"fscontext"));
@@ -148,7 +150,7 @@ pub fn sb_eat_lsm_opts(mount_params: &mut MountParams) -> Result<FileSystemMount
 }
 
 /// Checks if `current_task` has the permission to mount `fs`.
-pub fn sb_kern_mount(
+pub(in crate::security) fn sb_kern_mount(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     fs: &FileSystem,
@@ -166,7 +168,7 @@ pub fn sb_kern_mount(
 }
 
 /// Checks if `current_task` has the permission to mount at `path` with the mounting flags `flags`.
-pub fn sb_mount(
+pub(in crate::security) fn sb_mount(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     path: &NamespaceNode,
@@ -195,6 +197,7 @@ pub fn sb_mount(
         let audit_context = [current_task.into(), node.into()];
         todo_check_permission(
             TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
+            &current_task.kernel(),
             permission_check,
             source_sid,
             target_sid,
@@ -205,7 +208,7 @@ pub fn sb_mount(
 }
 
 /// Checks that `mount` is getting remounted with the same security state as before.
-pub fn sb_remount(
+pub(in crate::security) fn sb_remount(
     security_server: &SecurityServer,
     mount: &Mount,
     new_mount_options: FileSystemMountOptions,
@@ -221,8 +224,17 @@ pub fn sb_remount(
     Ok(())
 }
 
+/// Writes the LSM mount options of `mount` to `buf`.
+pub(in crate::security) fn sb_show_options(
+    security_server: &SecurityServer,
+    buf: &mut impl OutputBuffer,
+    mount: &Mount,
+) -> Result<(), Errno> {
+    mount.security_state().state.write_mount_options(security_server, buf)
+}
+
 /// Checks if `current_task` has the permission to get information on `fs`.
-pub fn sb_statfs(
+pub(in crate::security) fn sb_statfs(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     fs: &FileSystem,
@@ -241,7 +253,7 @@ pub fn sb_statfs(
 
 /// Checks if `current_task` has the permission to unmount the filesystem mounted on
 /// `node` using the unmount flags `_flags`.
-pub fn sb_umount(
+pub(in crate::security) fn sb_umount(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     node: &NamespaceNode,

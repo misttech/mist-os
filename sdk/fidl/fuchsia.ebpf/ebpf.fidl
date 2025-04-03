@@ -1,0 +1,98 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.ebpf;
+
+using zx;
+
+/// Type of an eBPF maps.
+type MapType = strict enum {
+    /// An array map. Equivalent to `BPF_MAP_TYPE_ARRAY`.
+    ARRAY = 1;
+
+    /// A hash map. Equivalent to `BPF_MAP_TYPE_HASH`.
+    HASH_MAP = 2;
+
+    /// A hash map. Equivalent to `BPF_MAP_TYPE_RINGBUF`.
+    RING_BUFFER = 3;
+
+    /// A per-CPU array. Equivalent to `BPF_MAP_TYPE_PERCPU_ARRAY`.
+    PERCPU_ARRAY = 4;
+
+    /// A device-map that holds references to network devices. Equivalent to
+    /// `BPF_MAP_TYPE_DEVMAP`.
+    DEVMAP_HASH = 5;
+
+    /// A longest prefix match trie. Equivalent to `BPF_MAP_TYPE_LPM_TRIE`.
+    LPM_TRIE = 6;
+};
+
+/// Schema of an eBPF map.
+type MapSchema = struct {
+    /// Map type.
+    type MapType;
+
+    /// Key size in bytes.
+    key_size uint32;
+
+    /// Value size in bytes.
+    value_size uint32;
+
+    /// Maximum number of entries in the map.
+    max_entries uint32;
+};
+
+/// A representation of eBPF map that can be shared between processes.
+type Map = resource table {
+    /// Map schema.
+    1: schema MapSchema;
+
+    /// VMO used to store the map data. The layout of the data stored in the
+    /// VMO depends on the `schema` as defined in the `ebpf_api` create.
+    2: vmo zx.Handle:<VMO, zx.Rights.READ | zx.Rights.WRITE | zx.Rights.MAP>;
+};
+
+/// Describes location of an instruction that accesses a struct field.
+///
+/// This is used as auxiliary information passed from the verifier to the
+/// linker. The linker may update these instructions.
+type StructAccess = struct {
+    /// Index of the instruction in the program.
+    pc uint32;
+
+    /// Id of the struct being accessed.
+    struct_memory_id uint64;
+
+    /// Offset of the field being accessed.
+    field_offset uint32;
+
+    /// Indicates that the instruction loads a 32-bit pointer field. These
+    /// loads must be remapped to 64-bit fields.
+    is_32_bit_ptr_load bool;
+};
+
+/// Maximum allowed number of instructions in an eBPF program.
+const MAX_PROGRAM_INSTRUCTIONS uint32 = 4096;
+
+/// Maximum number of maps an eBPF program can use.
+const MAX_PROGRAM_MAPS uint32 = 4096;
+
+/// A verified eBPF program.
+//
+// TODO(https://fxbug.dev/399946028): Currently a process that receives a
+// `VerifiedProgram` has to trust the sender that the program was actually
+// verified, i.e. it can be safe only if the receiver can make assumptions
+// about the client. A separate BPF service responsible for program
+// verification will allow to remove this restriction.
+type VerifiedProgram = resource table {
+    /// Program instructions.
+    1: code vector<uint64>:MAX_PROGRAM_INSTRUCTIONS;
+
+    /// List of instructions accessing struct fields.
+    2: struct_access_instructions vector<StructAccess>:MAX_PROGRAM_INSTRUCTIONS;
+
+    /// List of the maps used by the program. `code` may reference these maps
+    /// by their index in this array.
+    3: maps vector<Map>:MAX_PROGRAM_MAPS;
+};

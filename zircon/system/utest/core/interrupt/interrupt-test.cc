@@ -7,6 +7,7 @@
 #include <lib/zx/port.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vcpu.h>
 #include <lib/zx/vmar.h>
 #include <zircon/errors.h>
@@ -286,6 +287,24 @@ TEST_F(InterruptTest, NullOutputTimestamp) {
   ASSERT_OK(interrupt.trigger(0, kSignaledTimeStamp1));
 
   ASSERT_OK(interrupt.wait(nullptr));
+}
+
+// Tests that user signals work on interrupt objects.
+TEST_F(InterruptTest, UserSignals) {
+  zx::interrupt interrupt;
+
+  ASSERT_OK(zx::interrupt::create(*irq_resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
+
+  ASSERT_OK(interrupt.signal(0, ZX_USER_SIGNAL_0));
+
+  zx_signals_t pending = 0;
+  EXPECT_EQ(interrupt.wait_one(0, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(pending, ZX_USER_SIGNAL_0);
+
+  ASSERT_OK(interrupt.signal(ZX_USER_SIGNAL_0, 0));
+
+  EXPECT_EQ(interrupt.wait_one(0, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(pending, 0);
 }
 
 }  // namespace

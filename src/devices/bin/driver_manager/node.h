@@ -25,7 +25,9 @@
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/inspect.h"
-#include "src/devices/bin/driver_manager/shutdown/shutdown_helper.h"
+#include "src/devices/bin/driver_manager/node_types.h"
+#include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
+#include "src/devices/bin/driver_manager/shutdown/node_shutdown_coordinator.h"
 
 namespace driver_manager {
 
@@ -45,6 +47,7 @@ std::optional<fuchsia_component_decl::wire::Offer> CreateCompositeServiceOffer(
     std::string_view parents_name, bool primary_parent);
 
 class Node;
+struct NodeInfo;
 class NodeRemovalTracker;
 
 using AddNodeResultCallback = fit::callback<void(
@@ -99,27 +102,6 @@ class NodeManager {
   virtual std::weak_ptr<std::mt19937> GetShutdownTestRng() const {
     return std::weak_ptr<std::mt19937>();
   }
-};
-
-enum class Collection : uint8_t {
-  kNone,
-  // Collection for boot drivers.
-  kBoot,
-  // Collection for package drivers.
-  kPackage,
-  // Collection for universe package drivers.
-  kFullPackage,
-};
-
-enum class NodeType {
-  kNormal,     // Normal non-composite node.
-  kComposite,  // Composite node created from composite node specs.
-};
-
-enum class DriverState : uint8_t {
-  kStopped,  // Driver is not running.
-  kBinding,  // Driver's bind hook is scheduled and running.
-  kRunning,  // Driver finished binding and is running.
 };
 
 class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
@@ -249,9 +231,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // requests that may have originated from the node.
   void CompleteBind(zx::result<> result);
 
-  ShutdownHelper& GetShutdownHelper();
+  NodeShutdownCoordinator& GetNodeShutdownCoordinator();
 
-  NodeState GetNodeState() { return GetShutdownHelper().node_state(); }
+  NodeState GetNodeState() { return GetNodeShutdownCoordinator().node_state(); }
 
   const std::string& name() const { return name_; }
 
@@ -337,7 +319,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   }
   std::vector<fuchsia_driver_framework::BusInfo> GetBusTopology() const;
 
-  ShutdownIntent shutdown_intent() { return GetShutdownHelper().shutdown_intent(); }
+  ShutdownIntent shutdown_intent() { return GetNodeShutdownCoordinator().shutdown_intent(); }
 
  private:
   struct DriverComponent {
@@ -393,7 +375,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // NodeShutdownBridge
-  std::pair<std::string, Collection> GetRemovalTrackerInfo() override;
+  NodeInfo GetRemovalTrackerInfo() override;
   void StopDriver() override;
   void StopDriverComponent() override;
   void FinishShutdown(fit::callback<void()> shutdown_callback) override;
@@ -525,10 +507,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
 
+  bool owned_by_parent_ = true;
+
   // The device's inspect information.
   DeviceInspect inspect_;
 
-  std::unique_ptr<ShutdownHelper> shutdown_helper_;
+  std::unique_ptr<NodeShutdownCoordinator> node_shutdown_coordinator_;
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;

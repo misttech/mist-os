@@ -16,52 +16,13 @@
 #include <zircon/availability.h>
 #include <zircon/errors.h>
 
-#include "private.h"
+#include "sdk/lib/zxio/handle_holder.h"
+#include "sdk/lib/zxio/private.h"
 
 namespace fio = fuchsia_io;
 namespace funknown = fuchsia_unknown;
 
 namespace {
-
-// A zxio_handle_holder is a zxio object instance that holds on to a handle and
-// allows it to be closed or released via zxio_close() / zxio_release(). It is
-// useful for wrapping objects that zxio does not understand.
-struct zxio_handle_holder {
-  zxio_t io;
-  zx::handle handle;
-};
-
-static_assert(sizeof(zxio_handle_holder) <= sizeof(zxio_storage_t),
-              "zxio_handle_holder must fit inside zxio_storage_t.");
-
-zxio_handle_holder& zxio_get_handle_holder(zxio_t* io) {
-  return *reinterpret_cast<zxio_handle_holder*>(io);
-}
-
-constexpr zxio_ops_t zxio_handle_holder_ops = []() {
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io, const bool should_wait) {
-    zxio_get_handle_holder(io).~zxio_handle_holder();
-    return ZX_OK;
-  };
-
-  ops.release = [](zxio_t* io, zx_handle_t* out_handle) {
-    const zx_handle_t handle = zxio_get_handle_holder(io).handle.release();
-    if (handle == ZX_HANDLE_INVALID) {
-      return ZX_ERR_BAD_HANDLE;
-    }
-    *out_handle = handle;
-    return ZX_OK;
-  };
-  return ops;
-}();
-
-void zxio_handle_holder_init(zxio_storage_t* storage, zx::handle handle) {
-  auto holder = new (storage) zxio_handle_holder{
-      .handle = std::move(handle),
-  };
-  zxio_init(&holder->io, &zxio_handle_holder_ops);
-}
 
 class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventHandler<fio::Node> {
  public:
@@ -196,6 +157,7 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
   if (!handle.is_valid() || storage == nullptr || handle_info == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
+  // If the handle is valid, we'll always successfully wrap it.
   switch (handle_info->type) {
     case ZX_OBJ_TYPE_CHANNEL: {
       fidl::ClientEnd<funknown::Queryable> queryable(zx::channel(std::move(handle)));
@@ -348,7 +310,11 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
               fidl::ClientEnd<fuchsia_posix_socket_raw::Socket>(queryable.TakeChannel()));
         }
         case ZXIO_OBJECT_TYPE_NONE: {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+          auto representation = fio::wire::Representation::WithNode({});
+#else
           auto representation = fio::wire::Representation::WithConnector({});
+#endif
           return zxio_create_with_representation(
               fidl::ClientEnd<fio::Node>{queryable.TakeChannel()}, representation, nullptr,
               storage);
@@ -359,8 +325,7 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
       }
     }
     case ZX_OBJ_TYPE_LOG: {
-      zxio_debuglog_init(storage, zx::debuglog(std::move(handle)));
-      return ZX_OK;
+      return zxio_debuglog_init(storage, zx::debuglog(std::move(handle)));
     }
     case ZX_OBJ_TYPE_SOCKET: {
       zx::socket socket(std::move(handle));
@@ -408,8 +373,8 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
       return zxio_vmo_init(storage, std::move(vmo), std::move(stream));
     }
     default: {
-      zxio_handle_holder_init(storage, std::move(handle));
-      return ZX_ERR_NOT_SUPPORTED;
+      zxio::handle_holder_init(storage, std::move(handle));
+      return ZX_OK;
     }
   }
 }
@@ -454,6 +419,18 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
                                             fio::wire::Representation& representation,
                                             zxio_node_attributes_t* attr, zxio_storage_t* storage) {
   switch (representation.Which()) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    case fio::wire::Representation::Tag::kNode: {
+      if (attr) {
+        fio::wire::NodeInfo& node_info = representation.node();
+        if (!node_info.has_attributes())
+          return ZX_ERR_INVALID_ARGS;
+        if (zx_status_t status = zxio_attr_from_wire(node_info.attributes(), attr); status != ZX_OK)
+          return status;
+      }
+      return zxio_node_init(storage, std::move(node));
+    }
+#else
     case fio::wire::Representation::Tag::kConnector: {
       if (attr) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
@@ -468,6 +445,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
       }
       return zxio_node_init(storage, std::move(node));
     }
+#endif
     case fio::wire::Representation::Tag::kDirectory: {
       if (attr) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)

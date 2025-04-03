@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
-#include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/driver/logging/cpp/logger.h>

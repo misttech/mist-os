@@ -521,12 +521,20 @@ async fn create_config_with_capabilities(
         // If developer overrides have been set for this field, use the override value.
         let value = if let Some(v) = overrides.remove(&field.key) { v } else { value };
 
-        fields.fields.push(config_encoder::ConfigField {
-            key: field.key.clone(),
-            value: value,
-            mutability: Default::default(),
-        });
+        let field = config_encoder::ConfigField::resolve(value, field).map_err(|e| {
+            StartActionError::StructuredConfigError {
+                moniker: component.moniker.clone(),
+                err: StructuredConfigError::ConfigResolutionFailed(
+                    config_encoder::ResolutionError::InvalidValue {
+                        key: field.key.clone(),
+                        source: e,
+                    },
+                ),
+            }
+        })?;
+        fields.fields.push(field);
     }
+
     Ok(Some(fields))
 }
 
@@ -625,11 +633,11 @@ async fn create_scoped_logger(
         .try_into_directory_entry(component.execution_scope.clone())
         .context("LogSink could not convert to DirEntry?")?;
     let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>();
-    let flags = fio::OpenFlags::empty();
-    flags.to_object_request(server.into_channel()).handle(|object_request| {
+    const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+    FLAGS.to_object_request(server.into_channel()).handle(|object_request| {
         dir_entry.clone().open_entry(OpenRequest::new(
             component.execution_scope.clone(),
-            flags,
+            FLAGS,
             vfs::path::Path::dot(),
             object_request,
         ))
@@ -856,6 +864,86 @@ mod tests {
 
         continue_tx.send(()).unwrap();
         stop_fut.await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn start_type_checks_config_capabilities() {
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .child_default(TEST_CHILD_NAME)
+                    .capability(
+                        cm_rust_testing::CapabilityBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .value(cm_rust::ConfigSingleValue::Bool(false).into()),
+                    )
+                    .offer(
+                        cm_rust_testing::OfferBuilder::config()
+                            .name("fuchsia.MyConfig")
+                            .source(cm_rust::OfferSource::Self_)
+                            .target(cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                name: TEST_CHILD_NAME.parse().unwrap(),
+                                collection: None,
+                            })),
+                    )
+                    .build(),
+            ),
+            (
+                TEST_CHILD_NAME,
+                ComponentDeclBuilder::new()
+                    .config(cm_rust::ConfigDecl {
+                        fields: vec![cm_rust::ConfigField {
+                            key: "my_config".into(),
+                            type_: cm_rust::ConfigValueType::Int8,
+                            mutability: Default::default(),
+                        }],
+                        checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(
+                            cm_rust::ConfigSourceCapabilities {},
+                        ),
+                    })
+                    .use_(
+                        cm_rust_testing::UseBuilder::config()
+                            .source(cm_rust::UseSource::Parent)
+                            .name("fuchsia.MyConfig")
+                            .target_name("my_config")
+                            .config_type(cm_rust::ConfigValueType::Int8),
+                    )
+                    .build(),
+            ),
+        ];
+
+        let test_topology = ActionsTest::new(components[0].0, components, None).await;
+        let child = test_topology.look_up(vec![TEST_CHILD_NAME].try_into().unwrap()).await;
+
+        assert_matches!(
+            ActionsManager::register(
+                child.clone(),
+                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
+            ).await,
+            Err(
+                ActionError::StartError{
+                    err: StartActionError::StructuredConfigError{
+                        moniker,
+                        err: StructuredConfigError::ConfigResolutionFailed (
+                            config_encoder::ResolutionError::InvalidValue {
+                                key,
+                                source: config_encoder::ValueError::TypeMismatch{
+                                    expected,
+                                    received,
+                                }
+                            }
+
+                        )
+                    }
+                }
+            )
+            if moniker == "child".parse().unwrap()
+                && key == "my_config"
+                && expected == "Int8"
+                && received == "Single(Bool(false))"
+        );
     }
 
     #[fuchsia::test]

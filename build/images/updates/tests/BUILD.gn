@@ -20,8 +20,8 @@ if (is_fuchsia) {
   import("//build/assembly/product_assembly_configuration.gni")
   import("//build/bazel/assembly/bazel_product_bundle.gni")
   import("//build/images/paths.gni")
+  import("//build/info/info.gni")
   import("//build/product.gni")
-  import("//src/sys/core/build/core.gni")
 
   product_assembly_configuration("product_assembly_config") {
     testonly = true
@@ -50,6 +50,7 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
     filesystems = {
       fvm = {
         sparse_output = {
@@ -67,6 +68,7 @@ if (is_fuchsia) {
 
   bazel_product_bundle("bazel_pb") {
     testonly = true
+    product_bundle_name = "updates_test.fake_board"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":fake_bundle"
     bazel_product_image_target = "//build/images/updates/tests:fake_product"

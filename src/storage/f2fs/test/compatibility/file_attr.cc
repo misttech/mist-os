@@ -31,7 +31,7 @@ TEST_F(FileAttrCompatibilityTest, VerifyAttributesLinuxToFuchsia) {
 
       testfile->Fchmod(mode);
 
-      struct stat file_stat {};
+      struct stat file_stat{};
       ASSERT_EQ(testfile->Fstat(file_stat), 0);
 
       test_set.push_back({filename, file_stat});
@@ -49,7 +49,7 @@ TEST_F(FileAttrCompatibilityTest, VerifyAttributesLinuxToFuchsia) {
       auto child_file = GetEnclosedGuest().GetFuchsiaOperator().Open(name, O_RDONLY, 0644);
       ASSERT_TRUE(child_file->IsValid());
 
-      struct stat child_stat {};
+      struct stat child_stat{};
       ASSERT_EQ(child_file->Fstat(child_stat), 0);
       CompareStat(child_stat, stat_from_linux);
     }
@@ -63,10 +63,10 @@ char GetRandomFileNameChar() {
 }
 
 std::vector<std::string> GetRandomFileNameSet() {
-  constexpr int kMaxFilenameLength = 255;
+  constexpr int kMaxNameLength = 255;
   std::vector<std::string> file_name_set;
 
-  for (int len = 1; len <= kMaxFilenameLength; len += rand() % 20 + 1) {
+  for (int len = 1; len <= kMaxNameLength; len += rand() % 20 + 1) {
     std::string file_name = "/";
     for (int i = 0; i < len; ++i) {
       file_name.push_back(GetRandomFileNameChar());

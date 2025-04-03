@@ -31,6 +31,20 @@ pub async fn disable(
         }
     }
 
+    let rebind_result = driver_development_proxy.rebind_composites_with_driver(&cmd.url).await?;
+    match rebind_result {
+        Ok(count) => {
+            if count > 0 {
+                writeln!(writer, "Rebound {count} composites successfully.")?;
+            } else {
+                writeln!(writer, "No composites affected in this operation.")?;
+            }
+        }
+        Err(e) => {
+            writeln!(writer, "Unexpected error from rebind: {}", e)?;
+        }
+    }
+
     let restart_result = driver_development_proxy
         .restart_driver_hosts(
             cmd.url.as_str(),
@@ -43,11 +57,11 @@ pub async fn disable(
             if count > 0 {
                 writeln!(
                     writer,
-                    "Successfully restarted and rematching {} driver hosts with the driver.",
+                    "Successfully restarted. Rematched {} driver hosts that had the disabled driver.",
                     count
                 )?;
             } else {
-                writeln!(writer, "{}", "There are no existing driver hosts with this driver.")?;
+                writeln!(writer, "{}", "Successfully restarted.")?;
             }
         }
         Err(err) => {

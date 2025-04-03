@@ -8,7 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -23,22 +23,25 @@
 namespace rtc {
 
 zx_status_t Pl031::Bind(void* /*unused*/, zx_device_t* dev) {
-  ddk::PDevFidl pdev(dev);
-  if (!pdev.is_valid()) {
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end =
+      DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(dev);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Carve out some address space for this device.
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s failed to map mmio: %s", __func__, zx_status_get_string(status));
-    return status;
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
 
   auto pl031_device = std::make_unique<Pl031>(dev, *std::move(mmio));
 
-  status = pl031_device->DdkAdd(ddk::DeviceAddArgs("rtc").set_proto_id(ZX_PROTOCOL_RTC));
+  zx_status_t status =
+      pl031_device->DdkAdd(ddk::DeviceAddArgs("rtc").set_proto_id(ZX_PROTOCOL_RTC));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s error adding device: %s", __func__, zx_status_get_string(status));
     return status;

@@ -47,8 +47,10 @@ pub fn convert_connect_request(
         auth_type: Some(convert_auth_type(req.auth_type)),
         sae_password: Some(req.sae_password),
 
-        wep_key: req.wep_key.map(|key| convert_set_key_descriptor(&key)),
+        // NOTE: Provide both wep_key and wep_key_desc until v/g is updated to use fuchsia.wlan.ieee80211/SetKeyDescriptor.
+        wep_key: req.wep_key.clone().map(|key| convert_set_key_descriptor_legacy(&key)),
         security_ie: Some(req.security_ie),
+        wep_key_desc: req.wep_key.map(|key| convert_set_key_descriptor(&key)),
         ..Default::default()
     }
 }
@@ -203,9 +205,14 @@ pub fn convert_set_keys_request(
             MAX_NUM_KEYS
         );
     }
-    let keylist: Vec<_> = req.keylist.iter().map(convert_set_key_descriptor).collect();
+    let keylist: Vec<_> = req.keylist.iter().map(convert_set_key_descriptor_legacy).collect();
+    let key_descriptors: Vec<_> = req.keylist.iter().map(convert_set_key_descriptor).collect();
 
-    Ok(fidl_fullmac::WlanFullmacImplSetKeysRequest { keylist: Some(keylist), ..Default::default() })
+    Ok(fidl_fullmac::WlanFullmacImplSetKeysRequest {
+        keylist: Some(keylist),
+        key_descriptors: Some(key_descriptors),
+        ..Default::default()
+    })
 }
 
 pub fn convert_eapol_request(
@@ -255,6 +262,20 @@ fn convert_auth_type(mlme_auth: fidl_mlme::AuthenticationTypes) -> fidl_fullmac:
 }
 fn convert_set_key_descriptor(
     mlme_key: &fidl_mlme::SetKeyDescriptor,
+) -> fidl_ieee80211::SetKeyDescriptor {
+    fidl_ieee80211::SetKeyDescriptor {
+        cipher_oui: Some(mlme_key.cipher_suite_oui.clone()),
+        cipher_type: Some(mlme_key.cipher_suite_type),
+        key_type: Some(convert_key_type(mlme_key.key_type)),
+        peer_addr: Some(mlme_key.address.clone()),
+        key_id: Some(mlme_key.key_id),
+        key: Some(mlme_key.key.clone()),
+        rsc: Some(mlme_key.rsc),
+        ..Default::default()
+    }
+}
+fn convert_set_key_descriptor_legacy(
+    mlme_key: &fidl_mlme::SetKeyDescriptor,
 ) -> fidl_common::WlanKeyConfig {
     fidl_common::WlanKeyConfig {
         // TODO(https://fxbug.dev/301104836): This is always set to RxTx. Consider removing if it's
@@ -262,7 +283,7 @@ fn convert_set_key_descriptor(
         protection: Some(fidl_common::WlanProtection::RxTx),
         cipher_oui: Some(mlme_key.cipher_suite_oui.clone()),
         cipher_type: Some(mlme_key.cipher_suite_type),
-        key_type: Some(convert_key_type(mlme_key.key_type)),
+        key_type: Some(convert_key_type_legacy(mlme_key.key_type)),
         peer_addr: Some(mlme_key.address.clone()),
         key_idx: Some(mlme_key.key_id as u8),
         key: Some(mlme_key.key.clone()),
@@ -270,7 +291,17 @@ fn convert_set_key_descriptor(
         ..Default::default()
     }
 }
-fn convert_key_type(mlme_key_type: fidl_mlme::KeyType) -> fidl_common::WlanKeyType {
+
+fn convert_key_type(mlme_key_type: fidl_mlme::KeyType) -> fidl_ieee80211::KeyType {
+    match mlme_key_type {
+        fidl_mlme::KeyType::Group => fidl_ieee80211::KeyType::Group,
+        fidl_mlme::KeyType::Pairwise => fidl_ieee80211::KeyType::Pairwise,
+        fidl_mlme::KeyType::PeerKey => fidl_ieee80211::KeyType::Peer,
+        fidl_mlme::KeyType::Igtk => fidl_ieee80211::KeyType::Igtk,
+    }
+}
+
+fn convert_key_type_legacy(mlme_key_type: fidl_mlme::KeyType) -> fidl_common::WlanKeyType {
     match mlme_key_type {
         fidl_mlme::KeyType::Group => fidl_common::WlanKeyType::Group,
         fidl_mlme::KeyType::Pairwise => fidl_common::WlanKeyType::Pairwise,
@@ -282,6 +313,7 @@ fn convert_key_type(mlme_key_type: fidl_mlme::KeyType) -> fidl_common::WlanKeyTy
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_wlan_common as fidl_common;
 
     fn fake_bss_description() -> fidl_common::BssDescription {
         fidl_common::BssDescription {
@@ -438,6 +470,11 @@ mod tests {
         assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
         let keylist = fullmac.keylist.unwrap();
         for key in &keylist[0..2] {
+            assert_eq!(key, &convert_set_key_descriptor_legacy(&fake_set_key_descriptor()));
+        }
+
+        let key_descriptors = fullmac.key_descriptors.unwrap();
+        for key in &key_descriptors[0..2] {
             assert_eq!(key, &convert_set_key_descriptor(&fake_set_key_descriptor()));
         }
     }
@@ -470,37 +507,16 @@ mod tests {
 
         assert_eq!(
             convert_set_key_descriptor(&mlme),
-            fidl_common::WlanKeyConfig {
-                protection: Some(fidl_common::WlanProtection::RxTx),
+            fidl_ieee80211::SetKeyDescriptor {
                 cipher_oui: Some([4, 3, 2]),
                 cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
-                key_type: Some(fidl_common::WlanKeyType::Group),
+                key_type: Some(fidl_ieee80211::KeyType::Group),
                 peer_addr: Some([3; 6]),
-                key_idx: Some(123),
+                key_id: Some(123),
                 key: Some(vec![1, 2, 3]),
                 rsc: Some(1234567),
                 ..Default::default()
             }
         );
-    }
-
-    // In MLME FIDL, key_id is a u16 but in Fullmac it's a u8.
-    // This tests the behavior when MLME uses a value that doesn't fit into a u8.
-    #[test]
-    fn test_convert_set_key_descriptor_truncates_key_id_if_too_large() {
-        let mlme = fidl_mlme::SetKeyDescriptor {
-            key: vec![1, 2, 3],
-            key_id: 0xAABB,
-            key_type: fidl_mlme::KeyType::Group,
-            address: [3; 6],
-            rsc: 1234567,
-            cipher_suite_oui: [4, 3, 2],
-            cipher_suite_type: fidl_ieee80211::CipherSuiteType::Ccmp128,
-        };
-
-        let fullmac = convert_set_key_descriptor(&mlme);
-
-        // key_idx becomes the bottom 8 bits of mlme.key_id
-        assert_eq!(fullmac.key_idx.unwrap(), 0xBBu8);
     }
 }

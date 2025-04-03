@@ -3575,7 +3575,7 @@ mod tests {
                 protection: Some(fidl_softmac::WlanProtection::RxTx),
                 cipher_oui: Some([1, 2, 3]),
                 cipher_type: Some(4),
-                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                key_type: Some(fidl_ieee80211::KeyType::Pairwise),
                 peer_addr: Some((*BSSID).to_array()),
                 key_idx: Some(6),
                 key: Some(vec![1, 2, 3, 4, 5, 6, 7]),

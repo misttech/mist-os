@@ -481,7 +481,7 @@ pub mod testutil {
                                         // error, simply end the stream.
                                         Error::Fidl(fidl::Error::ClientChannelClosed {
                                             status: zx::Status::PEER_CLOSED,
-                                            protocol_name: _,
+                                            ..
                                         }) => None,
                                         Error::Fidl(_)
                                         | Error::ApiViolation(_)

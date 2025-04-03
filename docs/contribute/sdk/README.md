@@ -40,26 +40,29 @@ following:
   you're modifying. For a list of API council members and their areas of focus,
   see [Membership][membership] in the Fuchsia API Council Charter.
 
-## Promoting an API to the `partner_internal` category
 
-For an API to be included in the Fuchsia SDK in the `partner_internal`
-[SDK category][sdk-category], it must follow the
-[API evolution guidelines][evolve-gracefully] which is focused on enabling API
+<a id="promoting-to-host-tool"></a> {#  A second anchor for this section. #}
+## Promoting an API to the `prebuilt` or `host_tool` category {:#promoting-to-prebuilt}
+
+For an API to be usable by prebuilt binaries or host tools in the Fuchsia SDK,
+it must be in the `prebuilt` or `host_tool` [SDK category][sdk-category],
+respectively. The API must follow the
+[API evolution guidelines][evolve-gracefully] which are focused on enabling API
 evolution while maintaining compatibility.
 
-Keep in mind that there are additional considerations when promoting an API to
-partner, which may reveal tradeoff decisions between compatibility and long term
-usability.
+Keep in mind that there are additional considerations when
+[promoting an API to `partner`](#promoting-to-partner), which may reveal
+tradeoff decisions between compatibility and long term usability.
 
 Once the API is ready for review, request an API Calibration by filling out this
 form: [goto.google.com/fuchsia-api-calibration-request][calibration-form]
-indicating that this API is targeting the `partner_internal` category.
+indicating that this API is targeting the new category.
 
 If you don't have access to that form, send an email to
 api-council@fuchsia.dev indicating the specific library or libraries you'd
 like to promote, and the API council will follow up with next steps.
 
-## Promoting an API to the `partner` category
+## Promoting an API to the `partner` category {:#promoting-to-partner}
 
 For an API to be included in the Fuchsia SDK in the `partner`, or `public`
 [SDK category][sdk-category], it must clear two hurdles: there must be a ready

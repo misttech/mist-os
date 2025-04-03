@@ -30,9 +30,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
             raise ValueError(f"Device: {self.device.target} has no context")
         # [START reboot_example]
         ch = self.device.ctx.connect_device_proxy(
-            "bootstrap/shutdown_shim", power_statecontrol.Admin.MARKER
+            "bootstrap/shutdown_shim", power_statecontrol.AdminMarker
         )
-        admin = power_statecontrol.Admin.Client(ch)
+        admin = power_statecontrol.AdminClient(ch)
         # Makes a coroutine to ensure that a PEER_CLOSED isn't received from attempting
         # to write to the channel.
         coro = admin.reboot(reason=power_statecontrol.RebootReason.USER_REQUEST)

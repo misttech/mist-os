@@ -24,10 +24,16 @@ mod root_dir_cache;
 pub use root_dir::{PathError, ReadFileError, RootDir, SubpackagesError};
 pub use root_dir_cache::RootDirCache;
 pub use vfs::execution_scope::ExecutionScope;
-pub use vfs::path::Path as VfsPath;
 
 pub(crate) const DIRECTORY_ABILITIES: fio::Abilities =
     fio::Abilities::GET_ATTRIBUTES.union(fio::Abilities::ENUMERATE).union(fio::Abilities::TRAVERSE);
+
+pub(crate) const ALLOWED_FLAGS: fio::Flags = fio::Flags::empty()
+    .union(fio::MASK_KNOWN_PROTOCOLS)
+    .union(fio::PERM_READABLE)
+    .union(fio::PERM_EXECUTABLE)
+    .union(fio::Flags::PERM_INHERIT_EXECUTE)
+    .union(fio::Flags::FLAG_SEND_REPRESENTATION);
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -153,7 +159,7 @@ impl NonMetaStorage for blobfs::Client {
         scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), NonMetaStorageError> {
-        self.open_blob_for_read(blob, flags, scope, server_end).map_err(|e| {
+        self.deprecated_open_blob_for_read(blob, flags, scope, server_end).map_err(|e| {
             NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e))
         })
     }
@@ -165,7 +171,7 @@ impl NonMetaStorage for blobfs::Client {
         scope: ExecutionScope,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        self.open3_blob_for_read(blob, flags, scope, object_request)
+        self.open_blob_for_read(blob, flags, scope, object_request)
     }
 
     async fn get_blob_vmo(
@@ -257,7 +263,7 @@ pub fn serve(
         non_meta_storage,
         meta_far,
         flags,
-        VfsPath::dot(),
+        vfs::Path::dot(),
         server_end.into_channel().into(),
     )
 }
@@ -273,7 +279,7 @@ pub async fn serve_path(
     non_meta_storage: impl NonMetaStorage,
     meta_far: fuchsia_hash::Hash,
     flags: fio::Flags,
-    path: VfsPath,
+    path: vfs::Path,
     server_end: ServerEnd<fio::NodeMarker>,
 ) -> Result<(), Error> {
     let root_dir = match RootDir::new(non_meta_storage, meta_far).await {
@@ -365,9 +371,6 @@ mod tests {
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
     use futures::StreamExt;
-    use std::any::Any;
-    use std::sync::Arc;
-    use vfs::directory::dirents_sink::{self, AppendResult, Sealed, Sink};
     use vfs::directory::helper::DirectlyMutable;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -410,7 +413,7 @@ mod tests {
             blobfs_client,
             metafar_blob.merkle,
             fio::PERM_READABLE,
-            VfsPath::validate_and_split(".").unwrap(),
+            vfs::Path::validate_and_split(".").unwrap(),
             server_end.into_channel().into(),
         )
         .await
@@ -438,7 +441,7 @@ mod tests {
             blobfs_client,
             metafar_blob.merkle,
             fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
-            VfsPath::validate_and_split("meta").unwrap(),
+            vfs::Path::validate_and_split("meta").unwrap(),
             server_end.into_channel().into(),
         )
         .await
@@ -464,7 +467,7 @@ mod tests {
                 blobfs_client,
                 metafar_blob.merkle,
                 fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
-                VfsPath::validate_and_split("not-present").unwrap(),
+                vfs::Path::validate_and_split("not-present").unwrap(),
                 server_end.into_channel().into(),
             )
             .await,
@@ -487,7 +490,7 @@ mod tests {
                 blobfs_client,
                 Hash::from([0u8; 32]),
                 fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
-                VfsPath::validate_and_split(".").unwrap(),
+                vfs::Path::validate_and_split(".").unwrap(),
                 server_end.into_channel().into(),
             )
             .await,
@@ -561,77 +564,17 @@ mod tests {
         assert_eq!(get_dir_children(["a/b/c/d"], "a/"), vec![(dir(), "b".to_string())]);
     }
 
-    /// Implementation of vfs::directory::dirents_sink::Sink.
-    /// Sink::append begins to fail (returns Sealed) after `max_entries` entries have been appended.
-    #[derive(Clone)]
-    pub(crate) struct FakeSink {
-        max_entries: usize,
-        pub(crate) entries: Vec<(String, EntryInfo)>,
-        sealed: bool,
-    }
-
-    impl FakeSink {
-        pub(crate) fn new(max_entries: usize) -> Self {
-            FakeSink { max_entries, entries: Vec::with_capacity(max_entries), sealed: false }
-        }
-
-        pub(crate) fn from_sealed(sealed: Box<dyn dirents_sink::Sealed>) -> Box<FakeSink> {
-            sealed.into()
-        }
-    }
-
-    impl From<Box<dyn dirents_sink::Sealed>> for Box<FakeSink> {
-        fn from(sealed: Box<dyn dirents_sink::Sealed>) -> Self {
-            sealed.open().downcast::<FakeSink>().unwrap()
-        }
-    }
-
-    impl Sink for FakeSink {
-        fn append(mut self: Box<Self>, entry: &EntryInfo, name: &str) -> AppendResult {
-            assert!(!self.sealed);
-            if self.entries.len() == self.max_entries {
-                AppendResult::Sealed(self.seal())
-            } else {
-                self.entries.push((name.to_owned(), entry.clone()));
-                AppendResult::Ok(self)
-            }
-        }
-
-        fn seal(mut self: Box<Self>) -> Box<dyn Sealed> {
-            self.sealed = true;
-            self
-        }
-    }
-
-    impl Sealed for FakeSink {
-        fn open(self: Box<Self>) -> Box<dyn Any> {
-            self
-        }
-    }
-
     const BLOB_CONTENTS: &[u8] = b"blob-contents";
 
     fn blob_contents_hash() -> Hash {
         fuchsia_merkle::from_slice(BLOB_CONTENTS).root()
     }
 
-    fn serve_directory(directory: Arc<vfs::directory::immutable::Simple>) -> fio::DirectoryProxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        vfs::directory::entry_container::Directory::open(
-            directory,
-            vfs::execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(server_end.into_channel()),
-        );
-        proxy
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn bootfs_get_vmo_blob() {
         let directory = vfs::directory::immutable::simple();
         directory.add_entry(blob_contents_hash(), vfs::file::read_only(BLOB_CONTENTS)).unwrap();
-        let proxy = serve_directory(directory);
+        let proxy = vfs::directory::serve_read_only(directory);
 
         let vmo = proxy.get_blob_vmo(&blob_contents_hash()).await.unwrap();
         assert_eq!(vmo.read_to_vec(0, BLOB_CONTENTS.len() as u64).unwrap(), BLOB_CONTENTS);
@@ -641,7 +584,7 @@ mod tests {
     async fn bootfs_read_blob() {
         let directory = vfs::directory::immutable::simple();
         directory.add_entry(blob_contents_hash(), vfs::file::read_only(BLOB_CONTENTS)).unwrap();
-        let proxy = serve_directory(directory);
+        let proxy = vfs::directory::serve_read_only(directory);
 
         assert_eq!(proxy.read_blob(&blob_contents_hash()).await.unwrap(), BLOB_CONTENTS);
     }
@@ -649,7 +592,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn bootfs_get_vmo_blob_missing_blob() {
         let directory = vfs::directory::immutable::simple();
-        let proxy = serve_directory(directory);
+        let proxy = vfs::directory::serve_read_only(directory);
 
         let result = proxy.get_blob_vmo(&blob_contents_hash()).await;
         assert_matches!(result, Err(NonMetaStorageError::OpenBlob(e)) if e.is_not_found_error());
@@ -658,7 +601,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn bootfs_read_blob_missing_blob() {
         let directory = vfs::directory::immutable::simple();
-        let proxy = serve_directory(directory);
+        let proxy = vfs::directory::serve_read_only(directory);
 
         let result = proxy.read_blob(&blob_contents_hash()).await;
         assert_matches!(result, Err(NonMetaStorageError::ReadBlob(e)) if e.is_not_found_error());

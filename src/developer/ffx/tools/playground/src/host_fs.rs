@@ -100,7 +100,8 @@ impl FileLike for HostFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        FidlIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 
@@ -264,19 +265,9 @@ impl HostDirectory {
             Err(Status::NOT_FOUND)
         } else if path.is_dir() {
             let directory = Arc::new(HostDirectory(path));
-
-            let conn_scope = scope.clone();
-            if protocols.is_node() {
-                scope.spawn(
-                    vfs::node::Connection::create(conn_scope, directory, protocols, object_request)
-                        .expect("Couldn't create new directory connection"),
-                );
-            } else {
-                scope.spawn(
-                    MutableConnection::create(conn_scope, directory, protocols, object_request)
-                        .expect("Couldn't create new directory connection"),
-                );
-            }
+            object_request
+                .take()
+                .create_connection_sync::<MutableConnection<_>, _>(scope, directory, protocols);
             Ok(())
         } else {
             let file = Arc::new(HostFile { file: Mutex::new(None), path });
@@ -514,7 +505,7 @@ mod test {
         let _ = std::fs::File::create(tmp_dir.path().join("A")).unwrap();
         let _ = std::fs::File::create(tmp_dir.path().join("B")).unwrap();
         let _ = std::fs::File::create(tmp_dir.path().join("C")).unwrap();
-        let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
+        let client = vfs::directory::serve_read_only(HostDirectory::new(tmp_dir.path()));
         let mut dirs: Vec<_> = fuchsia_fs::directory::readdir(&client)
             .await
             .unwrap()
@@ -533,7 +524,7 @@ mod test {
         let _ = std::fs::File::create(sub_path.join("A")).unwrap();
         let _ = std::fs::File::create(sub_path.join("B")).unwrap();
         let _ = std::fs::File::create(sub_path.join("C")).unwrap();
-        let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
+        let client = vfs::directory::serve_read_only(HostDirectory::new(tmp_dir.path()));
         let sub_dir = fuchsia_fs::directory::open_directory(&client, "subdir", fio::PERM_READABLE)
             .await
             .unwrap();
@@ -554,7 +545,7 @@ mod test {
         let test_str =
             b"I literally can't leave this room, so I'm just going to ignore my feelings.";
         f.write_all(test_str).unwrap();
-        let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
+        let client = vfs::directory::serve_read_only(HostDirectory::new(tmp_dir.path()));
         let file =
             fuchsia_fs::directory::open_file(&client, "A", fio::PERM_READABLE).await.unwrap();
 
@@ -569,7 +560,7 @@ mod test {
         let test_str =
             b"I literally can't leave this room, so I'm just going to ignore my feelings.";
         f.write_all(test_str).unwrap();
-        let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
+        let client = vfs::directory::serve_read_only(HostDirectory::new(tmp_dir.path()));
         let file =
             fuchsia_fs::directory::open_file(&client, "A", fio::PERM_READABLE).await.unwrap();
 

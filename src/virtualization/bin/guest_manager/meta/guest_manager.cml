@@ -68,18 +68,5 @@
             to: "#vmm",
             availability: "optional",
         },
-        {
-            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
-            // been migrated to services. The service capability has been added below.
-            directory: "dev-gpu",
-            from: "parent",
-            to: "#vmm",
-        },
-        {
-            // This service replaces the directory capability above.
-            service: "fuchsia.gpu.magma.Service",
-            from: "parent",
-            to: "#vmm",
-        },
     ],
 }

@@ -8,7 +8,9 @@ use http::Uri;
 use http_uri_ext::HttpUriExt as _;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::{fmt, mem};
+use thiserror::Error;
 
 /// Convenience wrapper for the FIDL RepositoryStorageType.
 #[derive(
@@ -255,6 +257,68 @@ impl From<RepositoryStorageType> for fidl::RepositoryStorageType {
             RepositoryStorageType::Persistent => fidl::RepositoryStorageType::Persistent,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepositoryTarget {
+    pub repo_name: String,
+    pub target_identifier: Option<String>,
+    pub aliases: Option<BTreeSet<String>>,
+    pub storage_type: Option<RepositoryStorageType>,
+}
+
+#[derive(Debug, Error)]
+pub enum RepositoryError {
+    #[error("the repository name is missing")]
+    MissingRepositoryName,
+
+    #[error("repository does not exist")]
+    NoMatchingRepository,
+
+    #[error("error communicating with target device")]
+    TargetCommunicationFailure,
+
+    #[error("error interacting with the target's RepositoryManager")]
+    RepositoryManagerError,
+
+    #[error("error iteracting with the target's RewriteEngine")]
+    RewriteEngineError,
+
+    #[error("unknown repository spec type")]
+    UnknownRepositorySpec,
+
+    #[error("repository spec is missing a required field")]
+    MissingRepositorySpecField,
+
+    #[error("some unspecified error during I/O")]
+    IoError,
+
+    #[error("some unspecified internal error")]
+    InternalError,
+
+    #[error("repository metadata is expired")]
+    ExpiredRepositoryMetadata,
+
+    #[error("repository registration does not exist")]
+    NoMatchingRegistration,
+
+    #[error("repository server is not running")]
+    ServerNotRunning,
+
+    #[error("invalid url")]
+    InvalidUrl,
+
+    #[error("repository server address already in use")]
+    ServerAddressAlreadyInUse,
+
+    #[error("package does not exist")]
+    NoMatchingPackage,
+
+    #[error("repository registration conflict")]
+    ConflictingRegistration,
+
+    #[error("repository metadata cannot be found")]
+    NoRepositoryMetadata,
 }
 
 fn blob_mirror_url_from_mirror_url(mirror_url: &http::Uri) -> http::Uri {

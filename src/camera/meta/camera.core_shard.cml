@@ -30,11 +30,9 @@
             dependency: "weak",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.camera.Service",
             from: "parent",
-            as: "dev-camera",
             to: "#camera_device_watcher",
-            subdir: "camera",
         },
     ],
 }

@@ -19,7 +19,7 @@ macro_rules! block_until_power_elements_match {
         let mut reader = ArchiveReader::inspect();
 
         reader
-            .select_all_for_moniker($moniker)
+            .select_all_for_component($moniker.to_string())
             .with_minimum_schema_count(1);
 
         let mut tree_assertions = Vec::new();

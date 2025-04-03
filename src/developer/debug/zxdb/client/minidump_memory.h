@@ -10,7 +10,7 @@
 #include <utility>
 
 #include "src/developer/debug/ipc/records.h"
-#include "src/developer/debug/zxdb/client/file_memory_region.h"
+#include "src/developer/debug/zxdb/client/elf_memory_region.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
@@ -62,7 +62,11 @@ class MinidumpMemory {
   std::vector<std::tuple<uint64_t, uint64_t, std::shared_ptr<Region>>> regions_;
 
   // debug_modules_ are used to provide the unwinder modules for the unwinder.
-  std::map<uint64_t, FileMemoryRegion> debug_modules_;
+  struct Entry {
+    std::optional<ElfMemoryRegion> binary;
+    std::optional<ElfMemoryRegion> debug_info;
+  };
+  std::map<uint64_t, Entry> debug_modules_;
 };
 
 // Helper to get BuildID from a minidump module.

@@ -24,6 +24,7 @@
 #include "src/ui/scenic/lib/screen_capture/screen_capture_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/screenshot/screenshot_manager.h"
 #include "src/ui/scenic/lib/screenshot/tests/mock_image_compression.h"
+#include "src/ui/scenic/lib/utils/helpers.h"
 
 using allocation::BufferCollectionImporter;
 using fuchsia::ui::compression::internal::ImageCompressorEncodePngRequest;

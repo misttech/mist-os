@@ -452,7 +452,7 @@ class RemoteAbi {
         std::ignore = this;  // Optimized out if NDEBUG.
         std::ignore = &module;
         assert(module_heap_names_[module.module().symbolizer_modid].empty());
-        assert(!module.name().str().empty());
+        assert(!module.name().empty());
       };
 
       if (module.loaded_by_modid()) {
@@ -462,7 +462,7 @@ class RemoteAbi {
         if (!transcribe_name(name_context, module.name())) [[unlikely]] {
           return false;
         }
-      } else if (!module.name().str().empty() && module.name() == module.soname()) {
+      } else if (!module.name().empty() && module.name() == module.soname()) {
         // The name string can point into the module's own DT_SONAME string,
         // even if that's not where the module.name() pointer came from.
         no_heap_name();

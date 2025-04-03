@@ -271,7 +271,71 @@ closed protocol Clockfuncs {
 
     /// ## Summary
     ///
-    /// Fetch all of the low level details of the clock's current status.
+    /// Perform a basic read of a mapped clock's state. Behaves identically to a call to
+    /// [`zx_clock_read()`], however it operates on a mapped clock's state instead of a clock
+    /// handle, and may offer performance benefits as it usually does not need to enter the Zircon
+    /// kernel in order to perform the read. See [mappable clocks] for more details.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_status_t zx_clock_read_mapped(const void* clock_addr, zx_time_t* now);
+    /// ```
+    ///
+    /// ## Rights
+    ///
+    /// No handle is needed in order to perform a successful read, therefore no specific handle
+    /// rights are needed either. Instead, the user must provide the virtual address of a currently
+    /// valid clock state mapping, established using [`zx_vmar_map_clock()`]
+    ///
+    /// ## Description
+    ///
+    /// Perform a basic read of the clock's mapped state, and return its current time in the
+    /// *now* out parameter.
+    ///
+    /// ## Return value
+    ///
+    /// On success, returns `ZX_OK` along with the clock's current time in the *now* output
+    /// parameter.
+    ///
+    /// ## Errors
+    ///
+    /// Any attempt to pass a virtual pointer for `clock_addr` which was:
+    ///
+    ///  - Not the value returned by the original call to `zx_clock_map()`.
+    ///  - A pointer to clock state which has been either partially, or completely, unmapped.
+    ///
+    /// Will result in undefined behavior.
+    ///
+    /// ## See also
+    ///
+    ///  - [clocks]
+    ///  - [mappable clocks]
+    ///  - [`zx_clock_create()`]
+    ///  - [`zx_clock_read()`]
+    ///  - [`zx_clock_get_details_mapped()`]
+    ///  - [`zx_vmar_map_clock()`]
+    ///
+    /// [clocks]: /docs/reference/kernel_objects/clock.md
+    /// [mappable clocks]: /docs/reference/kernel_objects/clock.md#mappable_clocks
+    /// [`zx_clock_create()`]: clock_create.md
+    /// [`zx_clock_read()`]: clock_read.md
+    /// [`zx_clock_get_details_mapped()`]: clock_get_details_mapped.md
+    /// [`zx_vmar_map_clock()`]: vmar_map_clock.md
+    // @available(added=NEXT)
+    @vdsocall
+    strict ClockReadMapped(struct {
+        @voidptr
+        clock_addr experimental_pointer<byte>;
+    }) -> (struct {
+        now Time;
+    }) error Status;
+
+    /// ## Summary
+    ///
+    /// Fetch all of the low level details of the clock's current state.
     ///
     /// ## Declaration
     ///
@@ -340,6 +404,77 @@ closed protocol Clockfuncs {
     /// [`zx_clock_update()`]: clock_update.md
     strict ClockGetDetails(resource struct {
         handle Handle;
+        options uint64;
+    }) -> (struct {
+        @voidptr
+        details experimental_pointer<byte>;
+    }) error Status;
+
+    /// ## Summary
+    ///
+    /// Fetch all of the low level details of a mapped clock's current state. Behaves identically to
+    /// a call to [`zx_clock_get_details()`], however it operates on a mapped clock's state
+    /// instead of a clock handle, and may offer performance benefits as it usually does not need to
+    /// enter the Zircon kernel in order to perform the observation. See [mappable clocks] for more
+    /// details.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_status_t zx_clock_get_details_mapped(const void* clock_addr,
+    ///                                         uint64_t options,
+    ///                                         void* details);
+    /// ```
+    ///
+    /// ## Rights
+    ///
+    /// No handle is needed in order to perform a successful observation, therefore no specific
+    /// handle rights are needed either. Instead, the user must provide the virtual address of a
+    /// currently valid clock state mapping, established using [`zx_vmar_map_clock()`]
+    ///
+    /// ## Description
+    ///
+    /// Fetches the fine grained details of the mapped clock's state. See
+    /// [clocks](/docs/reference/kernel_objects/clock.md) Please refer to the
+    /// [current description of `zx_clock_get_details()`](clock_get_details.md#Description)
+    /// for more information, including an example.
+    ///
+    /// ## Return value
+    ///
+    /// On success, returns `ZX_OK` along with clock details stored in the *details*
+    /// out parameter.
+    ///
+    /// ## Errors
+    ///
+    /// Any attempt to pass a virtual pointer for `clock_addr` which was:
+    ///
+    ///  - Not the value returned by the original call to `zx_clock_map()`.
+    ///  - A pointer to clock state which has been either partially, or completely, unmapped.
+    ///
+    /// Will result in undefined behavior.
+    ///
+    /// ## See also
+    ///
+    ///  - [clock transformations]
+    ///  - [clocks]
+    ///  - [mappable clocks]
+    ///  - [`zx_clock_create()`]
+    ///  - [`zx_clock_get_details()`]
+    ///  - [`zx_vmar_map_clock()`]
+    ///
+    /// [clock transformations]: /docs/concepts/kernel/clock_transformations.md
+    /// [clocks]: /docs/reference/kernel_objects/clock.md
+    /// [mappable clocks]: /docs/reference/kernel_objects/clock.md#mappable_clocks
+    /// [`zx_clock_create()`]: clock_create.md
+    /// [`zx_clock_get_details()`]: clock_get_details.md
+    /// [`zx_vmar_map_clock()`]: vmar_map_clock.md
+    // @available(added=NEXT)
+    @vdsocall
+    strict ClockGetDetailsMapped(struct {
+        @voidptr
+        clock_addr experimental_pointer<byte>;
         options uint64;
     }) -> (struct {
         @voidptr

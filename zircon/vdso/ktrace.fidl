@@ -36,7 +36,7 @@ closed protocol Ktrace {
     /// ## Rights
     ///
     /// *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base
-    /// `ZX_RSRC_SYSTEM_DEBUG_BASE`.
+    /// `ZX_RSRC_SYSTEM_TRACING_BASE`.
     ///
     /// ## Return value
     ///
@@ -87,7 +87,7 @@ closed protocol Ktrace {
     /// ## Rights
     ///
     /// *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base
-    /// `ZX_RSRC_SYSTEM_DEBUG_BASE`.
+    /// `ZX_RSRC_SYSTEM_TRACING_BASE`.
     ///
     /// ## Return value
     ///
@@ -108,51 +108,5 @@ closed protocol Ktrace {
         @inout
         @voidptr
         ptr experimental_pointer<byte>;
-    }) -> () error Status;
-
-    /// ## Summary
-    ///
-    /// TODO(https://fxbug.dev/42108078)
-    ///
-    /// ## Declaration
-    ///
-    /// ```c
-    /// #include <zircon/syscalls.h>
-    ///
-    /// zx_status_t zx_ktrace_write(zx_handle_t handle,
-    ///                             uint32_t id,
-    ///                             uint32_t arg0,
-    ///                             uint32_t arg1);
-    /// ```
-    ///
-    /// ## Description
-    ///
-    /// To use the `zx_ktrace_write()` function, you must specify
-    /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
-    /// the function returns `ZX_ERR_NOT_SUPPORTED`.
-    ///
-    /// TODO(https://fxbug.dev/42108078)
-    ///
-    /// ## Rights
-    ///
-    /// *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base
-    /// `ZX_RSRC_SYSTEM_DEBUG_BASE`.
-    ///
-    /// ## Return value
-    ///
-    /// TODO(https://fxbug.dev/42108078)
-    ///
-    /// ## Errors
-    ///
-    /// TODO(https://fxbug.dev/42108078)
-    ///
-    /// ## See also
-    ///
-    /// TODO(https://fxbug.dev/42108078)
-    strict Write(resource struct {
-        handle Handle:RESOURCE;
-        id uint32;
-        arg0 uint32;
-        arg1 uint32;
     }) -> () error Status;
 };

@@ -5,8 +5,8 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
     FaultRegisterMode, FutexTable, InflightVmsplicedPayloads, Mapping, MappingBacking,
-    MappingFlags, MappingName, PrivateFutexKey, UserFault, UserFaultRegistration, VmsplicePayload,
-    VmsplicePayloadSegment, VMEX_RESOURCE,
+    MappingFlags, MappingName, MlockPinFlavor, MlockShadowProcess, PrivateFutexKey, UserFault,
+    UserFaultRegistration, VmsplicePayload, VmsplicePayloadSegment, VMEX_RESOURCE,
 };
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
@@ -27,9 +27,10 @@ use starnix_logging::{
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
-use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::math::{round_down_to_system_page_size, round_up_to_system_page_size};
 use starnix_types::ownership::WeakRef;
 use starnix_types::user_buffer::{UserBuffer, UserBuffers, UserBuffers32};
+use starnix_uapi::auth::CAP_IPC_LOCK;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::Access;
 use starnix_uapi::range_ext::RangeExt;
@@ -40,7 +41,8 @@ use starnix_uapi::restricted_aspace::{
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{
-    ArchSpecific, MultiArchUserRef, UserAddress, UserAddress32, UserCString, UserRef,
+    ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef, UserAddress, UserAddress32,
+    UserCString, UserRef,
 };
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
@@ -48,6 +50,7 @@ use starnix_uapi::{
     MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
     MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
+use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::CStr;
@@ -1528,6 +1531,9 @@ impl MemoryManagerState {
                         );
                         return error!(EINVAL);
                     }
+                    MADV_DONTNEED if mapping.flags().contains(MappingFlags::LOCKED) => {
+                        return error!(EINVAL);
+                    }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
                     MADV_WILLNEED => {
                         if mapping.flags().contains(MappingFlags::WRITE) {
@@ -1562,6 +1568,200 @@ impl MemoryManagerState {
             self.mappings.insert(range, mapping);
         }
         Ok(())
+    }
+
+    pub fn mlock(
+        &mut self,
+        current_task: &CurrentTask,
+        desired_addr: UserAddress,
+        desired_length: usize,
+        on_fault: bool,
+    ) -> Result<(), Errno> {
+        let desired_end_addr =
+            desired_addr.checked_add(desired_length).ok_or_else(|| errno!(EINVAL))?;
+        let start_addr = round_down_to_system_page_size(desired_addr)?;
+        let end_addr = round_up_to_system_page_size(desired_end_addr)?;
+
+        let mut updates = vec![];
+        let mut bytes_mapped_in_range = 0;
+        let mut num_new_locked_bytes = 0;
+        let mut failed_to_lock = false;
+        for (range, mapping) in self.mappings.intersection(start_addr..end_addr) {
+            let mut range = range.clone();
+            let mut mapping = mapping.clone();
+
+            // Handle mappings that start before the region to be locked.
+            if range.start < start_addr {
+                // Mappings know about their starting location within the backing memory, so
+                // clamping the range isn't enough.
+                mapping.split_prefix_off(range.start, (start_addr - range.start) as u64);
+                range.start = start_addr;
+            }
+            // Handle mappings that extend past the region to be locked.
+            range.end = std::cmp::min(range.end, end_addr);
+
+            bytes_mapped_in_range += (range.end - range.start) as u64;
+
+            // PROT_NONE mappings generate ENOMEM but are left locked.
+            if !mapping
+                .flags()
+                .intersects(MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC)
+            {
+                failed_to_lock = true;
+            }
+
+            if !mapping.flags().contains(MappingFlags::LOCKED) {
+                num_new_locked_bytes += (range.end - range.start) as u64;
+                let mlock_mapping = match current_task.kernel().features.mlock_pin_flavor {
+                    // Pin the memory by mapping the backing memory into the high priority vmar.
+                    MlockPinFlavor::ShadowProcess => {
+                        let shadow_process = current_task
+                            .kernel()
+                            .expando
+                            .get_or_try_init(|| MlockShadowProcess::new())?;
+
+                        let (vmo, offset) = match mapping.backing() {
+                            MappingBacking::Memory(m) => (
+                                m.memory().as_vmo().ok_or_else(|| errno!(ENOMEM))?,
+                                m.memory_offset(),
+                            ),
+                            #[cfg(feature = "alternate_anon_allocs")]
+                            MappingBacking::PrivateAnonymous => (
+                                self.private_anonymous
+                                    .backing
+                                    .as_vmo()
+                                    .ok_or_else(|| errno!(ENOMEM))?,
+                                range.start.ptr() as u64,
+                            ),
+                        };
+                        Some(shadow_process.lock_pages(vmo, offset, range.end - range.start)?)
+                    }
+
+                    // Relying on VMAR-level operations means just flags are set per-mapping.
+                    MlockPinFlavor::Noop | MlockPinFlavor::VmarAlwaysNeed => None,
+                };
+                mapping.set_mlock(mlock_mapping);
+                updates.push((range, mapping));
+            }
+        }
+
+        if bytes_mapped_in_range as usize != end_addr - start_addr {
+            return error!(ENOMEM);
+        }
+
+        let memlock_rlimit = current_task.thread_group.get_rlimit(Resource::MEMLOCK);
+        if self.total_locked_bytes() + num_new_locked_bytes > memlock_rlimit {
+            if crate::security::check_task_capable(current_task, CAP_IPC_LOCK).is_err() {
+                let code = if memlock_rlimit > 0 { errno!(ENOMEM) } else { errno!(EPERM) };
+                return Err(code);
+            }
+        }
+
+        let op_range_status_to_errno = |e| match e {
+            zx::Status::BAD_STATE | zx::Status::NOT_SUPPORTED => errno!(ENOMEM),
+            zx::Status::INVALID_ARGS | zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+            zx::Status::ACCESS_DENIED => {
+                unreachable!("user vmar should always have needed rights")
+            }
+            zx::Status::BAD_HANDLE => {
+                unreachable!("user vmar should always be a valid handle")
+            }
+            zx::Status::WRONG_TYPE => unreachable!("user vmar handle should be a vmar"),
+            _ => unreachable!("unknown error from op_range on user vmar for mlock: {e}"),
+        };
+
+        if !on_fault && !current_task.kernel().features.mlock_always_onfault {
+            self.user_vmar
+                .op_range(zx::VmarOp::PREFETCH, start_addr.ptr(), end_addr - start_addr)
+                .map_err(op_range_status_to_errno)?;
+        }
+
+        match current_task.kernel().features.mlock_pin_flavor {
+            MlockPinFlavor::VmarAlwaysNeed => {
+                self.user_vmar
+                    .op_range(zx::VmarOp::ALWAYS_NEED, start_addr.ptr(), end_addr - start_addr)
+                    .map_err(op_range_status_to_errno)?;
+            }
+            // The shadow process doesn't use any vmar-level operations to pin memory.
+            MlockPinFlavor::Noop | MlockPinFlavor::ShadowProcess => (),
+        }
+
+        for (range, mapping) in updates {
+            self.mappings.insert(range, mapping);
+        }
+
+        if failed_to_lock {
+            error!(ENOMEM)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn munlock(
+        &mut self,
+        _current_task: &CurrentTask,
+        desired_addr: UserAddress,
+        desired_length: usize,
+    ) -> Result<(), Errno> {
+        let desired_end_addr =
+            desired_addr.checked_add(desired_length).ok_or_else(|| errno!(EINVAL))?;
+        let start_addr = round_down_to_system_page_size(desired_addr)?;
+        let end_addr = round_up_to_system_page_size(desired_end_addr)?;
+
+        let mut updates = vec![];
+        let mut bytes_mapped_in_range = 0;
+        for (range, mapping) in self.mappings.intersection(start_addr..end_addr) {
+            let mut range = range.clone();
+            let mut mapping = mapping.clone();
+
+            // Handle mappings that start before the region to be locked.
+            if range.start < start_addr {
+                // Mappings know about their starting location within the backing memory, so
+                // clamping the range isn't enough.
+                mapping.split_prefix_off(range.start, (start_addr - range.start) as u64);
+                range.start = start_addr;
+            }
+            // Handle mappings that extend past the region to be locked.
+            range.end = std::cmp::min(range.end, end_addr);
+
+            bytes_mapped_in_range += (range.end - range.start) as u64;
+
+            if mapping.flags().contains(MappingFlags::LOCKED) {
+                // This clears the locking for the shadow process pin flavor. It's not currently
+                // possible to actually unlock pages that were locked with the
+                // ZX_VMAR_OP_ALWAYS_NEED pin flavor.
+                mapping.clear_mlock();
+                updates.push((range, mapping));
+            }
+        }
+
+        if bytes_mapped_in_range as usize != end_addr - start_addr {
+            return error!(ENOMEM);
+        }
+
+        for (range, mapping) in updates {
+            self.mappings.insert(range, mapping);
+        }
+
+        Ok(())
+    }
+
+    pub fn total_locked_bytes(&self) -> u64 {
+        self.num_locked_bytes(
+            UserAddress::from(self.user_vmar_info.base as u64)
+                ..UserAddress::from((self.user_vmar_info.base + self.user_vmar_info.len) as u64),
+        )
+    }
+
+    pub fn num_locked_bytes<R>(&self, range: R) -> u64
+    where
+        R: Borrow<Range<UserAddress>>,
+    {
+        self.mappings
+            .intersection(range)
+            .filter(|(_, mapping)| mapping.flags().contains(MappingFlags::LOCKED))
+            .map(|(range, _)| (range.end - range.start) as u64)
+            .sum()
     }
 
     fn max_address(&self) -> UserAddress {
@@ -2315,13 +2515,43 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T64 from `user` where the object has a different representation in 32
     /// and 64 bits.
-    fn read_multi_arch_object<T64: FromBytes, T32: FromBytes + Into<T64>>(
+    fn read_multi_arch_object<T, T64: FromBytes + TryInto<T>, T32: FromBytes + TryInto<T>>(
         &self,
-        user: MultiArchUserRef<T64, T32>,
-    ) -> Result<T64, Errno> {
+        user: MappingMultiArchUserRef<T, T64, T32>,
+    ) -> Result<T, Errno> {
         match user {
-            MultiArchUserRef::<T64, T32>::Arch64(user) => self.read_object(user),
-            MultiArchUserRef::<T64, T32>::Arch32(user) => self.read_object(user).map(T32::into),
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => {
+                self.read_object(user)?.try_into().map_err(|_| errno!(EINVAL))
+            }
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => {
+                self.read_object(user)?.try_into().map_err(|_| errno!(EINVAL))
+            }
+        }
+    }
+
+    /// Read exactly `len` objects from `user`, returning them as a Vec.
+    fn read_multi_arch_objects_to_vec<
+        T,
+        T64: FromBytes + TryInto<T>,
+        T32: FromBytes + TryInto<T>,
+    >(
+        &self,
+        user: MappingMultiArchUserRef<T, T64, T32>,
+        len: usize,
+    ) -> Result<Vec<T>, Errno> {
+        match user {
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => self
+                .read_objects_to_vec(user, len)?
+                .into_iter()
+                .map(TryInto::<T>::try_into)
+                .collect::<Result<Vec<T>, _>>()
+                .map_err(|_| errno!(EINVAL)),
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => self
+                .read_objects_to_vec(user, len)?
+                .into_iter()
+                .map(TryInto::<T>::try_into)
+                .collect::<Result<Vec<T>, _>>()
+                .map_err(|_| errno!(EINVAL)),
         }
     }
 
@@ -2384,7 +2614,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     /// Read exactly `len` objects from `user`, returning them as a Vec.
-    fn read_objects_to_vec<T: Clone + FromBytes>(
+    fn read_objects_to_vec<T: FromBytes>(
         &self,
         user: UserRef<T>,
         len: usize,
@@ -2444,12 +2674,12 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
     ///
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    fn read_iovec(
+    fn read_iovec<T: Copy + Eq + IntoBytes + FromBytes + Immutable + TryInto<usize>>(
         &self,
         iovec_addr: IOVecPtr,
-        iovec_count: UserValue<i32>,
+        iovec_count: UserValue<T>,
     ) -> Result<UserBuffers, Errno> {
-        let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
+        let iovec_count = iovec_count.raw().try_into().map_err(|_| errno!(EINVAL))?;
         if iovec_count > UIO_MAXIOV as usize {
             return error!(EINVAL);
         }
@@ -2607,16 +2837,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     fn write_multi_arch_object<
-        T64: IntoBytes + Immutable,
-        T32: IntoBytes + Immutable + TryFrom<T64>,
+        T,
+        T64: IntoBytes + Immutable + TryFrom<T>,
+        T32: IntoBytes + Immutable + TryFrom<T>,
     >(
         &self,
-        user: MultiArchUserRef<T64, T32>,
-        object: T64,
+        user: MappingMultiArchUserRef<T, T64, T32>,
+        object: T,
     ) -> Result<usize, Errno> {
         match user {
-            MultiArchUserRef::<T64, T32>::Arch64(user) => self.write_object(user, &object),
-            MultiArchUserRef::<T64, T32>::Arch32(user) => {
+            MappingMultiArchUserRef::<T, T64, T32>::Arch64(user, _) => {
+                self.write_object(user, &T64::try_from(object).map_err(|_| errno!(EINVAL))?)
+            }
+            MappingMultiArchUserRef::<T, T64, T32>::Arch32(user) => {
                 self.write_object(user, &T32::try_from(object).map_err(|_| errno!(EINVAL))?)
             }
         }
@@ -3214,7 +3447,8 @@ impl MemoryManager {
                         target_memory,
                         memory_offset,
                         length,
-                        mapping.flags(),
+                        // Locking is not inherited when forking.
+                        mapping.flags().difference(MappingFlags::LOCKED),
                         mapping.max_access(),
                         false,
                         mapping.name().clone(),
@@ -3335,7 +3569,7 @@ impl MemoryManager {
         if base.checked_add(length).ok_or_else(|| errno!(EINVAL))? <= state.mmap_top.ptr() {
             Ok(UserAddress::from_ptr(base))
         } else {
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         }
     }
     pub fn executable_node(&self) -> Option<NamespaceNode> {
@@ -3869,6 +4103,10 @@ impl MemoryManager {
                 stats.rss_file += zx_details.committed_bytes;
             }
 
+            if mm_mapping.flags().contains(MappingFlags::LOCKED) {
+                stats.vm_lck += zx_details.committed_bytes;
+            }
+
             if mm_mapping.flags().contains(MappingFlags::ELF_BINARY)
                 && mm_mapping.flags().contains(MappingFlags::WRITE)
             {
@@ -4059,6 +4297,7 @@ pub struct MemoryStats {
     pub vm_stack: usize,
     pub vm_exe: usize,
     pub vm_swap: usize,
+    pub vm_lck: usize,
 }
 
 #[derive(Clone)]
@@ -4159,6 +4398,9 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(sink, "Anonymous:      {anonymous_kb:>8} kB")?;
             writeln!(sink, "KernelPageSize: {page_size_kb:>8} kB")?;
             writeln!(sink, "MMUPageSize:    {page_size_kb:>8} kB")?;
+
+            let locked_kb = if map.flags().contains(MappingFlags::LOCKED) { rss_kb } else { 0 };
+            writeln!(sink, "Locked:         {locked_kb:>8} kB")?;
             writeln!(sink, "VmFlags: {}", map.vm_flags())?;
 
             track_stub!(TODO("https://fxbug.dev/297444691"), "optional smaps fields");
@@ -5616,7 +5858,7 @@ mod tests {
                 2 * *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(ENOMEM))
+            error!(ENOMEM)
         );
 
         // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
@@ -5654,7 +5896,7 @@ mod tests {
                 2 * *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(ENOMEM))
+            error!(ENOMEM)
         );
 
         // Unlike a range which starts within a mapping and extends past the end, this should not assign

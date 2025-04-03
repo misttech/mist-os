@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/result.h>
 #include <threads.h>
 

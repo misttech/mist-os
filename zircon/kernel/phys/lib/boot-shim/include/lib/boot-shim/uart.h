@@ -16,50 +16,49 @@
 namespace boot_shim {
 
 // This can supply a ZBI_TYPE_KERNEL_DRIVER item based on the UART driver configuration.
-template <typename AllDrivers = uart::all::Driver>
+template <typename AllConfigs = uart::all::Config<>>
 class UartItem : public boot_shim::ItemBase {
  public:
-  void Init(const AllDrivers& uart) { driver_ = uart; }
+  void Init(const AllConfigs& config) { config_ = config; }
+
+  // TODO(https://fxbug.dev/407766571): Remove after soft-migration.
+  template <typename AllDrivers = uart::all::Driver>
+  void Init(const AllDrivers& driver) {
+    config_ = uart::all::GetConfig(driver);
+  }
 
   constexpr size_t size_bytes() const { return ItemSize(zbi_dcfg_size()); }
 
   fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
     fit::result<UartItem::DataZbi::Error> result = fit::ok();
-    uart::internal::Visit(
-        [&zbi, &result]<typename UartType>(const UartType& driver) {
-          if constexpr (std::is_same_v<uart::null::Driver, UartType>) {
-            result = fit::ok();
-          } else {
-            if (auto append_result = zbi.Append({
-                    .type = UartType::kType,
-                    .length = static_cast<uint32_t>(sizeof(typename UartType::config_type)),
-                    .extra = UartType::kExtra,
-                });
-                append_result.is_ok()) {
-              auto& [header, payload] = *append_result.value();
-              driver.FillItem(payload.data());
-              result = fit::ok();
-            } else {
-              result = append_result.take_error();
-            }
-          }
-        },
-        driver_);
+    config_.Visit([&]<typename UartDriver>(const uart::Config<UartDriver>& config) {
+      using config_type = typename UartDriver::config_type;
+      if constexpr (!std::is_same_v<uart::StubConfig, config_type>) {
+        if (auto append_result = zbi.Append(
+                {
+                    .type = UartDriver::kType,
+                    .length = static_cast<uint32_t>(sizeof(config_type)),
+                    .extra = UartDriver::kExtra,
+                },
+                config.as_bytes());
+            append_result.is_error()) {
+          result = append_result.take_error();
+        }
+      }
+    });
     return result;
   }
 
  private:
   constexpr size_t zbi_dcfg_size() const {
     size_t size = 0;
-    uart::internal::Visit(
-        [&]<typename UartType>(const UartType& driver) {
-          size = sizeof(typename UartType::config_type);
-        },
-        driver_);
+    config_.Visit([&]<typename UartDriver>(const uart::Config<UartDriver>& config) {
+      size = sizeof(typename UartDriver::config_type);
+    });
     return size;
   }
 
-  AllDrivers driver_;
+  AllConfigs config_;
 };
 
 }  // namespace boot_shim

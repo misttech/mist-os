@@ -20,6 +20,10 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/dart_
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/host_symbolizer.sh || exit $?
 fx-config-read
 
+# Set an envrionment variable so that child processes can know they were invoked (directly or
+# indirectly) by fx test. For example, build metrics need this information.
+export FUCHSIA_FX_TEST_RUN=1
+
 # These pre-parsed properties of the command line can be used to skip expensive operations.
 info_only=false
 has_e2e=false

@@ -25,6 +25,11 @@ load(
     _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_board_input_bundle_set.bzl",
+    _fuchsia_board_input_bundle_set = "fuchsia_board_input_bundle_set",
+    _fuchsia_prebuilt_board_input_bundle_set = "fuchsia_prebuilt_board_input_bundle_set",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_bootloader_partition.bzl",
     _fuchsia_bootloader_partition = "fuchsia_bootloader_partition",
 )
@@ -39,10 +44,6 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_gen_android_starnix_container.bzl",
     _fuchsia_gen_android_starnix_container = "fuchsia_gen_android_starnix_container",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_legacy_bundle.bzl",
-    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_package_directory.bzl",
@@ -132,7 +133,6 @@ load(
 # Rules
 fuchsia_prebuilt_assembly_developer_overrides = _fuchsia_prebuilt_assembly_developer_overrides
 fuchsia_assembly_developer_overrides_list = _fuchsia_assembly_developer_overrides_list
-fuchsia_legacy_bundle = _fuchsia_legacy_bundle
 fuchsia_gen_android_starnix_container = _fuchsia_gen_android_starnix_container
 fuchsia_platform_artifacts = _fuchsia_platform_artifacts
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
@@ -145,6 +145,8 @@ fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
+fuchsia_board_input_bundle_set = _fuchsia_board_input_bundle_set
+fuchsia_prebuilt_board_input_bundle_set = _fuchsia_prebuilt_board_input_bundle_set
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_hybrid_board_configuration = _fuchsia_hybrid_board_configuration
 fuchsia_hybrid_product_configuration = _fuchsia_hybrid_product_configuration

@@ -10,7 +10,8 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 
 #include <algorithm>
 #include <memory>
@@ -18,13 +19,11 @@
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <fbl/array.h>
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_cpu {
@@ -46,7 +45,7 @@ class FakeMmio {
   // AmlCpu calls FakeMmioRegRegion::Read32.
   constexpr static uint64_t kCpuVersion = 43;
 
-  ddk_fake::FakeMmioRegRegion mmio_;
+  fake_mmio::FakeMmioRegRegion mmio_;
 };
 
 using CpuCtrlSyncClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
@@ -266,7 +265,7 @@ class FakeThermalDevice : public ddk::ThermalProtocol<FakeThermalDevice, ddk::ba
 };
 
 struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake::FakePDev pdev_server;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -278,7 +277,7 @@ class AmlCpuBindingTest : public zxtest::Test {
 
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.mmios[0] = mmio_.mmio();
     auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](

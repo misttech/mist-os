@@ -6,12 +6,12 @@ use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use derivative::Derivative;
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_hardware_backlight::{
-    DeviceMarker as BacklightMarker, DeviceProxy as BacklightProxy, State as BacklightCommand,
-};
+use fidl_fuchsia_hardware_backlight as backlight;
+
+use fidl_fuchsia_hardware_backlight::{DeviceProxy as BacklightProxy, State as BacklightCommand};
 use fidl_fuchsia_ui_display_singleton::{DisplayPowerMarker, DisplayPowerProxy};
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, Service};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use std::sync::Arc;
@@ -21,13 +21,17 @@ const MIN_REGULATED_BRIGHTNESS: f64 = 0.0004;
 /// The maximum brightness that can be sent to the backlight service.
 const MAX_REGULATED_BRIGHTNESS: f64 = 1.0;
 
-fn open_backlight() -> Result<BacklightProxy, Error> {
+async fn open_backlight() -> Result<BacklightProxy, Error> {
+    log::trace!("Opening backlight device");
+    let device = Service::open(backlight::ServiceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to find instance")?
+        .connect_to_backlight()
+        .context("Failed to connect to backlight service")?;
     log::info!("Opening backlight");
-    let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>();
-    // TODO(kpt): Don't hardcode this path b/138666351
-    fdio::service_connect("/dev/class/backlight/000", server.into_channel())
-        .context("Failed to connect built-in service")?;
-    Ok(proxy)
+    Ok(device)
 }
 
 fn open_display_power_service() -> Result<DisplayPowerProxy, Error> {
@@ -85,8 +89,8 @@ pub struct Backlight {
 impl Backlight {
     /// Creates a simple `Backlight` control, for devices on which DDIC power cannot be switched
     /// off and on.
-    pub fn without_display_power() -> Result<Self, Error> {
-        let backlight_proxy = open_backlight()?;
+    pub async fn without_display_power() -> Result<Self, Error> {
+        let backlight_proxy = open_backlight().await?;
         Self::without_display_power_internal(backlight_proxy)
     }
 
@@ -101,7 +105,7 @@ impl Backlight {
         power_off_delay_millis: u16,
         power_on_delay_millis: u16,
     ) -> Result<Self, Error> {
-        let backlight_proxy = open_backlight()?;
+        let backlight_proxy = open_backlight().await?;
         let display_power_proxy = open_display_power_service()?;
         Self::with_display_power_internal(
             backlight_proxy,
@@ -433,7 +437,9 @@ impl BacklightControl for Backlight {
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
+    use fidl_fuchsia_hardware_backlight::{
+        DeviceMarker as BacklightMarker, DeviceRequestStream as BacklightRequestStream,
+    };
     use fuchsia_async::{self as fasync};
     use futures::join;
     use futures::prelude::future;
@@ -582,7 +588,9 @@ mod dual_state_tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
+    use fidl_fuchsia_hardware_backlight::{
+        DeviceMarker as BacklightMarker, DeviceRequestStream as BacklightRequestStream,
+    };
     use fidl_fuchsia_ui_display_singleton::{DisplayPowerRequest, DisplayPowerRequestStream};
     use fuchsia_async::{self as fasync, Task};
     use futures::prelude::future;

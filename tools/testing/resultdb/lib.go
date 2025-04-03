@@ -23,11 +23,13 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
-// Test name is limited to 512 bytes max.
-// https://source.chromium.org/chromium/infra/infra/+/main:go/src/go.chromium.org/luci/resultdb/pbutil/test_result.go;l=44;drc=910bdba5763842c67a81741b7cb26e7f7d2793fc
 const (
-	MAX_TEST_ID_SIZE_BYTES     = 512
-	MAX_FAIL_REASON_SIZE_BYTES = 1024
+	// Test ID is limited to 512 bytes.
+	// https://source.chromium.org/chromium/infra/infra_superproject/+/main:infra/go/src/go.chromium.org/luci/resultdb/pbutil/test_id.go;l=508;drc=14e57c2183912ea2a9c93cd19dbe6eb7347283e8
+	MaxTestIDLength = 512
+	// Failure reason is limited to 1024 bytes.
+	// https://source.chromium.org/chromium/infra/infra_superproject/+/main:infra/go/src/go.chromium.org/luci/resultdb/pbutil/test_result.go;l=44;drc=bfb50731e1b97d7ca771fb2d31dc7338c3db40f5
+	MaxFailureReasonLength = 1024
 )
 
 // ParseSummary unmarshals the summary.json file content into runtests.TestSummary struct.
@@ -135,12 +137,15 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 
 	for _, testCase := range testCases {
 		testID := fmt.Sprintf("%s/%s:%s", testDetail.Name, testCase.SuiteName, testCase.CaseName)
-		if len(testID) > MAX_TEST_ID_SIZE_BYTES {
-			log.Printf("[ERROR] Skip uploading to ResultDB due to test_id exceeding %d bytes max limit: %q", MAX_TEST_ID_SIZE_BYTES, testID)
+		if len(testID) > MaxTestIDLength {
+			log.Printf("[ERROR] Skip uploading to ResultDB due to test_id exceeding %d bytes max limit: %q", MaxTestIDLength, testID)
 			testsSkipped = append(testsSkipped, testID)
 			continue
 		}
-		testCaseTags := append([]*resultpb.StringPair{{Key: "format", Value: testCase.Format}}, tags...)
+		testCaseTags := append([]*resultpb.StringPair{
+			{Key: "format", Value: testCase.Format},
+			{Key: "is_test_case", Value: "true"},
+		}, tags...)
 		for _, tag := range testCase.Tags {
 			testCaseTags = append(testCaseTags, &resultpb.StringPair{
 				Key: tag.Key, Value: tag.Value,
@@ -156,7 +161,7 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 			continue
 		}
 		if testCase.FailReason != "" {
-			r.FailureReason = &resultpb.FailureReason{PrimaryErrorMessage: truncateString(testCase.FailReason, MAX_FAIL_REASON_SIZE_BYTES)}
+			r.FailureReason = &resultpb.FailureReason{PrimaryErrorMessage: truncateString(testCase.FailReason, MaxFailureReasonLength)}
 		}
 		r.Status = testCaseStatus
 		r.StartTime = timestamppb.New(testDetail.StartTime)
@@ -186,15 +191,16 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 // result_sink.Status
 func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.TestDetails, outputRoot string) (*sinkpb.TestResult, []string, error) {
 	var testsSkipped []string
-	if len(testDetail.Name) > MAX_TEST_ID_SIZE_BYTES {
+	if len(testDetail.Name) > MaxTestIDLength {
 		testsSkipped = append(testsSkipped, testDetail.Name)
-		log.Printf("[ERROR] Skip uploading to ResultDB due to test_id exceeding %d bytes max limit: %q", MAX_TEST_ID_SIZE_BYTES, testDetail.Name)
-		return nil, testsSkipped, fmt.Errorf("The test name exceeds %d bytes max limit: %q ", MAX_TEST_ID_SIZE_BYTES, testDetail.Name)
+		log.Printf("[ERROR] Skip uploading to ResultDB due to test_id exceeding %d bytes max limit: %q", MaxTestIDLength, testDetail.Name)
+		return nil, testsSkipped, fmt.Errorf("The test name exceeds %d bytes max limit: %q ", MaxTestIDLength, testDetail.Name)
 	}
 	testTags := append([]*resultpb.StringPair{
 		{Key: "gn_label", Value: testDetail.GNLabel},
 		{Key: "test_case_count", Value: strconv.Itoa(len(testDetail.Cases))},
 		{Key: "affected", Value: strconv.FormatBool(testDetail.Affected)},
+		{Key: "is_top_level_test", Value: "true"},
 	}, tags...)
 	for _, tag := range testDetail.Tags {
 		testTags = append(testTags, &resultpb.StringPair{
@@ -231,11 +237,23 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 	r.Expected = determineExpected(testStatus, resultpb.TestStatus_STATUS_UNSPECIFIED)
 	if testDetail.FailureReason != "" {
 		r.FailureReason = &resultpb.FailureReason{
-			PrimaryErrorMessage: testDetail.FailureReason,
+			PrimaryErrorMessage: truncateString(testDetail.FailureReason, MaxFailureReasonLength),
 		}
 	} else if hasFailedTest(testDetail) {
 		r.FailureReason = &resultpb.FailureReason{
 			PrimaryErrorMessage: createDefaultTopLevelFailureReason(testDetail),
+		}
+	}
+	if testDetail.Metadata.ComponentID > 0 {
+		r.TestMetadata = &resultpb.TestMetadata{
+			Name: testDetail.Name,
+			BugComponent: &resultpb.BugComponent{
+				System: &resultpb.BugComponent_IssueTracker{
+					IssueTracker: &resultpb.IssueTrackerComponent{
+						ComponentId: int64(testDetail.Metadata.ComponentID),
+					},
+				},
+			},
 		}
 	}
 	return &r, testsSkipped, nil
@@ -259,11 +277,11 @@ func createDefaultTopLevelFailureReason(topLevelTest *runtests.TestDetails) stri
 				builder.WriteString("\n")
 			}
 			builder.WriteString(fmt.Sprintf("%s: test case failed", testCase.CaseName))
-			failedTestCaseCount += 1
+			failedTestCaseCount++
 		}
 	}
 	failureReason := builder.String()
-	if len(failureReason) > MAX_FAIL_REASON_SIZE_BYTES {
+	if len(failureReason) > MaxFailureReasonLength {
 		failureReason = fmt.Sprintf("%d test cases failed", failedTestCaseCount)
 	}
 	return failureReason

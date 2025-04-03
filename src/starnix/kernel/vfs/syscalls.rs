@@ -4,7 +4,7 @@
 
 use crate::mm::{IOVecPtr, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-use crate::syscalls::time::ITimerSpecPtr;
+use crate::syscalls::time::{ITimerSpecPtr, TimeSpecPtr, TimeValPtr};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
@@ -58,21 +58,21 @@ use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
     io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
     io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, off_t,
-    pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, AT_EACCESS,
+    pid_t, pollfd, pselect6_sigmask, sigset_t, statx, timespec, uapi, uid_t, AT_EACCESS,
     AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
     CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
     EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX, F_ADD_SEALS,
-    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX,
-    F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID,
-    F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC,
-    IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
-    MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE,
-    PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM,
-    POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
-    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
-    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX,
-    XATTR_REPLACE,
+    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETLK64, F_GETOWN,
+    F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
+    F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLK64, F_SETLKW, F_SETLKW64, F_SETOWN,
+    F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC,
+    MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT,
+    O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
+    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
+    POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
+    POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
+    TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -80,6 +80,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::{atomic, Arc};
 use std::usize;
+use zerocopy::{Immutable, IntoBytes};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -294,9 +295,19 @@ pub fn sys_fcntl(
             file.update_file_flags(requested_flags, settable_flags);
             Ok(SUCCESS)
         }
-        F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
+        F_SETLK | F_SETLKW | F_GETLK => {
             let flock_ref =
                 MultiArchUserRef::<uapi::flock, uapi::arch32::flock>::new(current_task, arg);
+            let flock = current_task.read_multi_arch_object(flock_ref)?;
+            let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
+            if let Some(flock) = file.record_lock(locked, current_task, cmd, flock)? {
+                current_task.write_multi_arch_object(flock_ref, flock)?;
+            }
+            Ok(SUCCESS)
+        }
+        F_SETLK64 | F_SETLKW64 | F_GETLK64 | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
+            let flock_ref =
+                MultiArchUserRef::<uapi::flock, uapi::arch32::flock64>::new(current_task, arg);
             let flock = current_task.read_multi_arch_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
             if let Some(flock) = file.record_lock(locked, current_task, cmd, flock)? {
@@ -510,13 +521,13 @@ pub fn sys_pwritev2(
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, offset, flags)
 }
 
-type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
+type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs>;
 
-pub fn sys_fstatfs(
+pub fn fstatfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
-    user_buf: StatFsPtr,
+    user_buf: MultiArchUserRef<uapi::statfs, T32>,
 ) -> Result<(), Errno> {
     // O_PATH allowed for:
     //
@@ -530,20 +541,37 @@ pub fn sys_fstatfs(
     Ok(())
 }
 
-pub fn sys_statfs(
+pub fn sys_fstatfs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    user_buf: StatFsPtr,
+) -> Result<(), Errno> {
+    fstatfs(locked, current_task, fd, user_buf)
+}
+
+fn statfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
-    user_buf: UserRef<statfs>,
+    user_buf: MultiArchUserRef<uapi::statfs, T32>,
 ) -> Result<(), Errno> {
     let name =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     let fs = name.entry.node.fs();
     let mut stat = fs.statfs(locked, current_task)?;
     stat.f_flags |= name.mount.flags().bits() as i64;
-    current_task.write_object(user_buf, &stat)?;
-
+    current_task.write_multi_arch_object(user_buf, stat)?;
     Ok(())
+}
+
+pub fn sys_statfs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_path: UserCString,
+    user_buf: StatFsPtr,
+) -> Result<(), Errno> {
+    statfs(locked, current_task, user_path, user_buf)
 }
 
 pub fn sys_sendfile(
@@ -1571,7 +1599,6 @@ pub fn sys_ioctl(
         }
         _ => {
             let file = current_task.files.get(fd)?;
-            security::check_file_ioctl_access(current_task, &file, request)?;
             file.ioctl(locked, current_task, request, arg)
         }
     }
@@ -2059,6 +2086,20 @@ pub fn sys_timerfd_settime(
     Ok(())
 }
 
+fn deadline_after_timespec(
+    current_task: &CurrentTask,
+    user_timespec: TimeSpecPtr,
+) -> Result<zx::MonotonicInstant, Errno> {
+    if user_timespec.is_null() {
+        Ok(zx::MonotonicInstant::INFINITE)
+    } else {
+        let timespec = current_task.read_multi_arch_object(user_timespec)?;
+        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
+    }
+}
+
+static_assertions::assert_eq_size!(uapi::__kernel_fd_set, uapi::arch32::__kernel_fd_set);
+
 fn select(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2178,18 +2219,6 @@ fn select(
     Ok(num_fds)
 }
 
-fn deadline_after_timespec(
-    current_task: &CurrentTask,
-    user_timespec: UserRef<timespec>,
-) -> Result<zx::MonotonicInstant, Errno> {
-    if user_timespec.is_null() {
-        Ok(zx::MonotonicInstant::INFINITE)
-    } else {
-        let timespec = current_task.read_object(user_timespec)?;
-        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
-    }
-}
-
 pub fn sys_pselect6(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2197,7 +2226,7 @@ pub fn sys_pselect6(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<timespec>,
+    timeout_addr: TimeSpecPtr,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
     let deadline = deadline_after_timespec(current_task, timeout_addr)?;
@@ -2218,13 +2247,12 @@ pub fn sys_pselect6(
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
-        current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
+        current_task.write_multi_arch_object(timeout_addr, timespec_from_duration(remaining))?;
     }
 
     Ok(num_fds)
 }
 
-#[cfg(target_arch = "x86_64")]
 pub fn sys_select(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2232,14 +2260,14 @@ pub fn sys_select(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<starnix_uapi::timeval>,
+    timeout_addr: TimeValPtr,
 ) -> Result<i32, Errno> {
     let start_time = zx::MonotonicInstant::get();
 
     let deadline = if timeout_addr.is_null() {
         zx::MonotonicInstant::INFINITE
     } else {
-        let timeval = current_task.read_object(timeout_addr)?;
+        let timeval = current_task.read_multi_arch_object(timeout_addr)?;
         start_time + starnix_types::time::duration_from_timeval(timeval)?
     };
 
@@ -2259,8 +2287,10 @@ pub fn sys_select(
     {
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
-        current_task
-            .write_object(timeout_addr, &starnix_types::time::timeval_from_duration(remaining))?;
+        current_task.write_multi_arch_object(
+            timeout_addr,
+            starnix_types::time::timeval_from_duration(remaining),
+        )?;
     }
 
     Ok(num_fds)
@@ -2391,7 +2421,7 @@ pub fn sys_epoll_pwait2(
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     max_events: i32,
-    user_timespec: UserRef<timespec>,
+    user_timespec: TimeSpecPtr,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let deadline = deadline_after_timespec(current_task, user_timespec)?;
@@ -2804,14 +2834,14 @@ pub fn sys_utimensat(
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    user_times: UserRef<[timespec; 2]>,
+    user_times: TimeSpecPtr,
     flags: u32,
 ) -> Result<(), Errno> {
     let (atime, mtime) = if user_times.addr().is_null() {
         // If user_times is null, the timestamps are updated to the current time.
         (TimeUpdateType::Now, TimeUpdateType::Now)
     } else {
-        let ts: [timespec; 2] = current_task.read_object(user_times)?;
+        let ts = current_task.read_multi_arch_objects_to_vec(user_times, 2)?;
         let atime = ts[0];
         let mtime = ts[1];
         let parse_timespec = |spec: timespec| match spec.tv_nsec {
@@ -2993,7 +3023,7 @@ pub fn sys_io_getevents(
     min_nr: i64,
     nr: i64,
     events_ref: UserRef<io_event>,
-    user_timeout: UserRef<timespec>,
+    user_timeout: TimeSpecPtr,
 ) -> Result<i32, Errno> {
     if min_nr < 0 || min_nr > nr || nr < 0 {
         return error!(EINVAL);
@@ -3152,7 +3182,7 @@ mod arch32 {
     use crate::mm::MemoryAccessorExt;
     use crate::vfs::syscalls::{
         lookup_at, sys_dup3, sys_faccessat, sys_lseek, sys_mkdirat, sys_openat, sys_readlinkat,
-        sys_unlinkat, LookupFlags, OpenFlags, StatFsPtr,
+        sys_unlinkat, LookupFlags, OpenFlags,
     };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
@@ -3162,9 +3192,11 @@ mod arch32 {
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::signals::SigSet;
-    use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+    use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
     use starnix_uapi::vfs::EpollEvent;
-    use starnix_uapi::{error, uapi, AT_REMOVEDIR};
+    use starnix_uapi::{errno, error, uapi, AT_REMOVEDIR};
+
+    type StatFs64Ptr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3191,7 +3223,7 @@ mod arch32 {
         arch32_stat_buf: UserRef<uapi::arch32::stat64>,
     ) -> Result<(), Errno> {
         let stat_buffer = node.stat(locked, current_task)?;
-        let result: uapi::arch32::stat64 = stat_buffer.into();
+        let result: uapi::arch32::stat64 = stat_buffer.try_into().map_err(|_| errno!(EINVAL))?;
         // Now we copy to the arch32 version and write.
         current_task.write_object(arch32_stat_buf, &result)?;
         Ok(())
@@ -3284,19 +3316,6 @@ mod arch32 {
         user_path: UserCString,
     ) -> Result<(), Errno> {
         sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, 0)
-    }
-
-    pub fn sys_arch32_fstatfs64(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        fd: FdNumber,
-        user_buf_len: u32,
-        user_buf: StatFsPtr,
-    ) -> Result<(), Errno> {
-        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
-            return error!(EINVAL);
-        }
-        super::sys_fstatfs(locked, current_task, fd, user_buf)
     }
 
     pub fn sys_arch32_pread64(
@@ -3455,14 +3474,83 @@ mod arch32 {
         super::sys_symlinkat(locked, current_task, user_target, FdNumber::AT_FDCWD, user_path)
     }
 
+    pub fn sys_arch32_eventfd(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        value: u32,
+    ) -> Result<FdNumber, Errno> {
+        super::sys_eventfd2(locked, current_task, value, 0)
+    }
+
+    pub fn sys_arch32_inotify_init(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+    ) -> Result<FdNumber, Errno> {
+        super::sys_inotify_init1(locked, current_task, 0)
+    }
+
+    pub fn sys_arch32_link(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        old_user_path: UserCString,
+        new_user_path: UserCString,
+    ) -> Result<(), Errno> {
+        super::sys_linkat(
+            locked,
+            current_task,
+            FdNumber::AT_FDCWD,
+            old_user_path,
+            FdNumber::AT_FDCWD,
+            new_user_path,
+            0,
+        )
+    }
+
+    pub fn sys_arch32_fstatfs64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        user_buf_len: u32,
+        user_buf: StatFs64Ptr,
+    ) -> Result<(), Errno> {
+        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
+            return error!(EINVAL);
+        }
+        super::fstatfs(locked, current_task, fd, user_buf)
+    }
+
+    pub fn sys_arch32_statfs64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        user_buf_len: u32,
+        user_buf: StatFs64Ptr,
+    ) -> Result<(), Errno> {
+        if (user_buf_len as usize) < std::mem::size_of::<uapi::arch32::statfs64>() {
+            return error!(EINVAL);
+        }
+        super::statfs(locked, current_task, user_path, user_buf)
+    }
+
     pub use super::{
-        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_fchmod as sys_arch32_fchmod,
-        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
-        sys_fstatat64 as sys_arch32_fstatat64, sys_ftruncate as sys_arch32_ftruncate,
-        sys_mknodat as sys_arch32_mknodat, sys_preadv as sys_arch32_preadv,
-        sys_renameat2 as sys_arch32_renameat2, sys_splice as sys_arch32_splice,
+        sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
+        sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
+        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_epoll_pwait as sys_arch32_epoll_pwait,
+        sys_epoll_pwait2 as sys_arch32_epoll_pwait2, sys_eventfd2 as sys_arch32_eventfd2,
+        sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
+        sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
+        sys_fstatfs as sys_arch32_fstatfs, sys_ftruncate as sys_arch32_ftruncate,
+        sys_inotify_add_watch as sys_arch32_inotify_add_watch,
+        sys_inotify_init1 as sys_arch32_inotify_init1,
+        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,
+        sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
+        sys_pidfd_open as sys_arch32_pidfd_open, sys_preadv as sys_arch32_preadv,
+        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
+        sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
+        sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
         sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
+        sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
     };
 }
@@ -3606,7 +3694,7 @@ mod tests {
 
         let user_path = UserCString::new(&current_task, path_addr);
 
-        assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat), Ok(()));
+        assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat.into()), Ok(()));
 
         let returned_stat = current_task.read_object(user_stat).expect("failed to read struct");
         assert_eq!(

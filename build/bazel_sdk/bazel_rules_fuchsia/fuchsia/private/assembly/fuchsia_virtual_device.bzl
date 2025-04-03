@@ -116,8 +116,8 @@ fuchsia_virtual_device = rule(
             default = False,
         ),
         "vsock_cid": attr.int(
-            doc = "The context id the guest vsock should. Only used if vsock_enable = true.",
-            default = 3,
+            doc = "The context id the guest vsock should. Only used if vsock_enable = true and a value of zero indicates that a value should be generated",
+            default = 0,
         ),
         "audio_model": attr.string(
             doc = "The audio device model that should be emulated.",

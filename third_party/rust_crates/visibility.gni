@@ -207,6 +207,7 @@ once_cell_visibility = [
   "//src/starnix/modules/ashmem:*",
   "//src/starnix/modules/ext4:*",
   "//src/starnix/modules/overlayfs:*",
+  "//src/starnix/modules/thermal:*",
   "//src/starnix_lite/kernel:*",
   "//src/starnix_lite/lib/extended_pstate:*",
   "//src/starnix_lite/lib/selinux/core:*",

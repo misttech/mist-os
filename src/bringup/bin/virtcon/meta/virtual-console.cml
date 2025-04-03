@@ -72,6 +72,13 @@
             default: "16.0",
         },
         {
+            config: "fuchsia.virtcon.ShowLogo",
+            key: "show_logo",
+            availability: "optional",
+            type: "bool",
+            default: false,
+        },
+        {
             config: "fuchsia.virtcon.KeepLogVisible",
             key: "keep_log_visible",
             availability: "optional",

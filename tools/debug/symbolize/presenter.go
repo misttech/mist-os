@@ -98,15 +98,6 @@ func printLine(line LogLine, fmtStr string, args ...interface{}) OutputLine {
 	return OutputLine{LogLine: line, line: []Node{&node}}
 }
 
-// Because apparently this is the world we live in, I have to write my own
-// min/max function.
-func min(x, y uint64) uint64 {
-	if x < y {
-		return x
-	}
-	return y
-}
-
 type dsoInfo struct {
 	id    uint64
 	name  string
@@ -186,8 +177,7 @@ func (c ContextPresenter) Process(line OutputLine, out chan<- OutputLine) {
 
 // OptimizeColor attempts to transform output elements to use as few color
 // transisitions as is possible
-type OptimizeColor struct {
-}
+type OptimizeColor struct{}
 
 func (o *OptimizeColor) Process(line OutputLine, out chan<- OutputLine) {
 	// Maintain a current simulated color state

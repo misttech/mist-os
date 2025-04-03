@@ -205,7 +205,7 @@ async fn main_inner() -> Result<(), Error> {
         Arc::new(upgradable_packages::UpgradablePackages::new(Arc::clone(&cache_packages)))
     });
 
-    // Use VFS to serve the out dir because ServiceFs does not support OPEN_RIGHT_EXECUTABLE and
+    // Use VFS to serve the out dir because ServiceFs does not support PERM_EXECUTABLE and
     // pkgfs/{packages|system} require it.
     let svc_dir = vfs::pseudo_directory! {};
     let cache_inspect_node = inspector.root().create_child("fuchsia.pkg.PackageCache");

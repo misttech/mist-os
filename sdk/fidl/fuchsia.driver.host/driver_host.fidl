@@ -5,7 +5,9 @@
 library fuchsia.driver.host;
 
 using fuchsia.driver.framework;
+using fuchsia.driver.loader;
 using fuchsia.ldsvc;
+using fuchsia.url;
 using zx;
 
 /// Protocol through which a driver's lifecycle can be managed.
@@ -32,10 +34,34 @@ closed protocol Driver {
     strict Stop();
 };
 
+/// Information about the driver host's threads. Used for debugging.
+type DispatcherInfo = struct {
+    driver string:MAX;
+    name string:MAX;
+    options uint32;
+    scheduler_role string:MAX;
+};
+
+/// Information about the driver host's threads. Used for debugging.
+type ThreadInfo = struct {
+    koid uint64;
+    name string:MAX;
+    scheduler_role string:MAX;
+};
+
 /// Information about the driver host. Used for debugging.
 type ProcessInfo = struct {
     job_koid uint64;
     process_koid uint64;
+    main_thread_koid uint64;
+    threads vector<ThreadInfo>:MAX;
+    dispatchers vector<DispatcherInfo>:MAX;
+};
+
+/// Information stored when a thread crashes.
+type DriverCrashInfo = resource table {
+    1: url string:fuchsia.url.MAX_URL_LENGTH;
+    2: node_token zx.Handle:EVENT;
 };
 
 /// Protocol through which a driver host can be managed.
@@ -47,6 +73,13 @@ closed protocol DriverHost {
         driver server_end:Driver;
     }) -> () error zx.Status;
 
+    /// Start a driver that's been loaded via an out of process dynamic linker.
+    strict StartLoadedDriver(resource struct {
+        start_args fuchsia.driver.framework.DriverStartArgs;
+        dynamic_linking_abi fuchsia.driver.loader.DynamicLinkingPassiveAbi;
+        driver server_end:Driver;
+    }) -> () error zx.Status;
+
     /// Returns the job and process KOIDs of the driver host.
     strict GetProcessInfo() -> (ProcessInfo) error zx.Status;
 
@@ -55,4 +88,11 @@ closed protocol DriverHost {
     strict InstallLoader(resource struct {
         loader client_end:fuchsia.ldsvc.Loader;
     });
+
+    /// Returns the driver crash information if the thread specified by |thread_koid|
+    /// exists in this driver host and it has ran into an exception.
+    /// Otherwise returns ZX_ERR_NOT_FOUND.
+    strict FindDriverCrashInfoByThreadKoid(resource struct {
+        thread_koid zx.Koid;
+    }) -> (DriverCrashInfo) error zx.Status;
 };

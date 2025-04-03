@@ -68,7 +68,7 @@ class UserInputFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        f_test_input.Registry.Client,
+        f_test_input.RegistryClient,
         "register_touch_screen",
     )
     def test_create_touch_device(self, register_touch_screen) -> None:  # type: ignore[no-untyped-def]
@@ -171,7 +171,7 @@ class UserInputFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        f_test_input.Registry.Client,
+        f_test_input.RegistryClient,
         "register_keyboard",
     )
     def test_create_keyboard_device(self, register_keyboard) -> None:  # type: ignore[no-untyped-def]

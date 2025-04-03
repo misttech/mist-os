@@ -9,20 +9,18 @@ use crate::container_namespace::ContainerNamespace;
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::binder::BinderDevice;
-#[cfg(not(feature = "starnix_lite"))]
-use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
-use crate::fs::nmfs::NetworkManagerHandle;
+use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
-use crate::mm::{FutexTable, MappingSummary, SharedFutexKey};
+use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
-    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Cgroups, CurrentTask,
-    HrTimerManager, HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
+    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, NetstackDevices,
     PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
     UtsNamespaceHandle,
 };
@@ -45,6 +43,7 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
+use fidl_fuchsia_time_external::AdjustSynchronousProxy;
 use futures::FutureExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
@@ -94,14 +93,16 @@ pub struct KernelFeatures {
     /// is requested but cannot be enacted because the kernel lacks the relevant capabilities.
     pub error_on_failed_reboot: bool,
 
-    /// This controls whether or not the default framebuffer background is black or colorful, to
-    /// aid debugging.
-    pub enable_visual_debugging: bool,
-
     /// The default seclabel that is applied to components that are run in this kernel.
     ///
     /// Components can override this by setting the `seclabel` field in their program block.
     pub default_seclabel: Option<String>,
+
+    /// Whether the kernel is being used to run the SELinux Test Suite.
+    ///
+    /// TODO: https://fxbug.dev/388077431 - remove this once we no longer need workarounds for the
+    /// SELinux Test Suite.
+    pub selinux_test_suite: bool,
 
     /// The default mount options to use when mounting directories from a component's namespace.
     ///
@@ -113,6 +114,15 @@ pub struct KernelFeatures {
     ///
     /// Components can override this by setting the `uid` field in their program block.
     pub default_uid: u32,
+
+    /// mlock() never prefaults pages.
+    pub mlock_always_onfault: bool,
+
+    /// Implementation of mlock() to use for this kernel instance.
+    pub mlock_pin_flavor: MlockPinFlavor,
+
+    /// Allows the netstack to mark packets/sockets.
+    pub netstack_mark: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -189,14 +199,6 @@ pub struct Kernel {
     /// Note that this might never be initialized (if the "misc" device never gets registered).
     #[cfg(not(feature = "starnix_lite"))]
     pub bootloader_message_store: OnceLock<AndroidBootloaderMessageStore>,
-
-    /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
-    /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
-    ///
-    /// When a component is run in that container and also specifies the `framebuffer` feature, the
-    /// framebuffer will be served as the view of the component.
-    #[cfg(not(feature = "starnix_lite"))]
-    pub framebuffer: Arc<Framebuffer>,
 
     /// The binder driver registered for this container, indexed by their device type.
     #[cfg(not(feature = "starnix_lite"))]
@@ -316,6 +318,16 @@ pub struct Kernel {
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
 
+    /// True to disable syslog access to unprivileged callers.  This also controls whether read
+    /// access to /dev/kmsg requires privileged capabilities.
+    pub restrict_dmesg: AtomicBool,
+
+    /// Determines whether unprivileged BPF is permitted, or can be re-enabled.
+    ///   0 - Unprivileged BPF is permitted.
+    ///   1 - Unprivileged BPF is not permitted, and cannot be enabled.
+    ///   2 - Unprivileged BPF is not permitted, but can be enabled by a privileged task.
+    pub disable_unprivileged_bpf: AtomicU8,
+
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
@@ -325,7 +337,11 @@ pub struct Kernel {
     pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
 
     /// Cgroups of the kernel.
-    pub cgroups: Cgroups,
+    pub cgroups: KernelCgroups,
+
+    /// Used to communicate requests to adjust system time from within a Starnix
+    /// container. Used from syscalls.
+    pub time_adjustment_proxy: Option<AdjustSynchronousProxy>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -385,21 +401,19 @@ impl Kernel {
         scheduler: SchedulerManager,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
-        #[cfg(not(feature = "starnix_lite"))] framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_state: security::KernelState,
         procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+        time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
-        #[cfg(not(feature = "starnix_lite"))]
-        let framebuffer =
-            Framebuffer::new(framebuffer_aspect_ratio, features.enable_visual_debugging)
-                .expect("Failed to create framebuffer");
 
         let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
         let hrtimer_manager = HrTimerManager::new(&inspect_node);
+
+        let iptables = OrderedRwLock::new(IpTables::new(features.netstack_mark));
 
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
@@ -417,11 +431,8 @@ impl Kernel {
             remote_block_device_registry: Default::default(),
             #[cfg(not(feature = "starnix_lite"))]
             bootloader_message_store: OnceLock::new(),
-            #[cfg(not(feature = "starnix_lite"))]
-            framebuffer,
-            #[cfg(not(feature = "starnix_lite"))]
             binders: Default::default(),
-            iptables: OrderedRwLock::new(IpTables::new()),
+            iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             #[cfg(not(feature = "starnix_lite"))]
@@ -442,6 +453,8 @@ impl Kernel {
             next_file_object_id: Default::default(),
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
+            restrict_dmesg: AtomicBool::new(true),
+            disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),
@@ -457,7 +470,8 @@ impl Kernel {
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
             root_cgroup_ebpf_programs: Default::default(),
-            cgroups: Cgroups::new(kernel.clone()),
+            cgroups: KernelCgroups::new(kernel.clone()),
+            time_adjustment_proxy,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -494,10 +508,11 @@ impl Kernel {
     /// 1. Disable launching new processes
     /// 2. Shut down individual ThreadGroups until only the init and system tasks remain
     /// 3. Repeat the above for the init task
-    /// 4. Ensure this process is the only one running in the kernel job.
-    /// 5. Unmounts the kernel's mounts' FileSystems.
-    /// 6. Tell CF the container component has stopped
-    /// 7. Exit this process
+    /// 4. Clean up kernel-internal structures that can hold processes alive
+    /// 5. Ensure this process is the only one running in the kernel job.
+    /// 6. Unmounts the kernel's mounts' FileSystems.
+    /// 7. Tell CF the container component has stopped
+    /// 8. Exit this process
     ///
     /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
     /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
@@ -561,7 +576,10 @@ impl Kernel {
             log_debug!("init already terminated");
         }
 
-        // Step 4: Make sure this is the only process running in the job. We already should have
+        // Step 4: Clean up any structures that can keep non-Linux processes live in our job.
+        self.expando.remove::<MlockShadowProcess>();
+
+        // Step 5: Make sure this is the only process running in the job. We already should have
         // cleared up all processes other than the system task at this point, but wait on any that
         // might be around for good measure.
         //
@@ -573,25 +591,26 @@ impl Kernel {
 
         log_debug!("waiting for this to be the only process in the job");
         loop {
-            let remaining_processes = kernel_job.processes().unwrap();
-            if remaining_processes.len() == 1 && remaining_processes[0] == own_koid {
+            let mut remaining_processes = kernel_job
+                .processes()
+                .unwrap()
+                .into_iter()
+                // Don't wait for ourselves to exit.
+                .filter(|pid| pid != &own_koid)
+                .peekable();
+            if remaining_processes.peek().is_none() {
                 log_debug!("No stray Zircon processes.");
                 break;
             }
 
             let mut terminated_signals = vec![];
-            for koid in remaining_processes {
-                // Don't wait for ourselves to exit.
-                if koid == own_koid {
-                    continue;
-                }
-                let handle = match kernel_job.get_child(
-                    &koid,
-                    zx::Rights::BASIC | zx::Rights::PROPERTY | zx::Rights::DESTROY,
-                ) {
+            for pid in remaining_processes {
+                let handle = match kernel_job
+                    .get_child(&pid, zx::Rights::BASIC | zx::Rights::PROPERTY | zx::Rights::DESTROY)
+                {
                     Ok(h) => h,
                     Err(e) => {
-                        log_debug!(koid:?, e:?; "failed to get child process from job");
+                        log_debug!(pid:?, e:?; "failed to get child process from job");
                         continue;
                     }
                 };
@@ -602,10 +621,10 @@ impl Kernel {
             futures::future::join_all(terminated_signals).await;
         }
 
-        // Step 5: Forcibly unmounts the mounts' FileSystems.
+        // Step 6: Forcibly unmounts the mounts' FileSystems.
         self.mounts.clear();
 
-        // Step 6: Tell CF the container stopped.
+        // Step 7: Tell CF the container stopped.
         log_debug!("all non-root processes killed, notifying CF container is stopped");
         if let Some(control_handle) = self.container_control_handle.lock().take() {
             log_debug!("Notifying CF that the container has stopped.");
@@ -621,7 +640,7 @@ impl Kernel {
             log_warn!("Shutdown invoked without a container controller control handle.");
         }
 
-        // Step 7: exiting this process.
+        // Step 8: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
         std::process::exit(0);
     }
@@ -669,8 +688,10 @@ impl Kernel {
         self: &'a Arc<Self>,
     ) -> &'a Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
-            let (network_netlink, network_netlink_async_worker) =
-                Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
+            let (network_netlink, network_netlink_async_worker) = Netlink::new(
+                InterfacesHandlerImpl(Arc::downgrade(self)),
+                netlink::FeatureFlags::prod(),
+            );
             self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");

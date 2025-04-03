@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
+use vfs::ToObjectRequest as _;
 use zx::{self as zx, Status};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
@@ -53,6 +54,9 @@ static SHELL_COMMANDS_BIN_PATH: &str = "shell-commands-bin";
 // Sleep duration while waiting for pkg-cache to update inspect state. Chosen arbitrarily.
 // Do not just sleep once and assume good, loop until expected state occurs.
 const INSPECT_WAIT: std::time::Duration = std::time::Duration::from_millis(10);
+
+const OUT_DIR_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 #[derive(Debug)]
 enum WriteBlobError {
@@ -722,14 +726,14 @@ where
                         .take()
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let () = local_child_out_dir.open(
-                        scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
-                    );
+                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
+                        local_child_out_dir.open3(
+                            scope.clone(),
+                            vfs::Path::dot(),
+                            OUT_DIR_FLAGS,
+                            request,
+                        )
+                    });
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -816,7 +820,7 @@ where
                     name: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis"
                         .parse()
                         .unwrap(),
-                    value: (-1).into(),
+                    value: (-1i64).into(),
                 }
                 .into(),
             )
@@ -827,6 +831,27 @@ where
                 Route::new()
                     .capability(Capability::configuration(
                         "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
+                    ))
+                    .from(Ref::self_())
+                    .to(&system_update_committer),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_capability(
+                cm_rust::ConfigurationDecl {
+                    name: "fuchsia.system-update-committer.CommitTimeoutSeconds".parse().unwrap(),
+                    value: (-1i64).into(),
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration(
+                        "fuchsia.system-update-committer.CommitTimeoutSeconds",
                     ))
                     .from(Ref::self_())
                     .to(&system_update_committer),

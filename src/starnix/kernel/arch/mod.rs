@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_uapi::user_address::MultiArchUserRef;
+
+pub type LongPtr = MultiArchUserRef<u64, u32>;
+
 #[cfg(target_arch = "aarch64")]
 mod arm64;
 

@@ -9,6 +9,11 @@ script="$0"
 script_dir="$(dirname "$script")"
 project_root="$(readlink -f "$script_dir"/../../..)"
 
+# relative to $project_root:
+readonly PROTOBUF_SRC=third_party/protobuf/src
+# This is where the prebuilt protobuf python wheel is installed.
+readonly PROTOBUF_WHEEL=prebuilt/third_party/protobuf-py3
+
 function usage() {
   cat <<EOF
 Usage: $0 [options]
@@ -98,6 +103,36 @@ test "$yes_to_all" = 1 || {
 # and pull instead of re-cloning every time.
 tmpdir="$(mktemp -d -t rbe_proto_refresh.XXXX)"
 
+# Some of the symlinks used in this flow are relative to $project_root,
+# so we forcibly cd there first, and then all commands that follow
+# can assume the same root-relative paths.
+cd "$project_root"
+
+readonly any_protobuf_wheel_file=google/protobuf/descriptor_pb2.py
+# Fetch the protobuf-py3 wheel if it is not already in prebuilt.
+[[ -f "$PROTOBUF_WHEEL/$any_protobuf_wheel_file" ]] || {
+  echo "Installing protobuf-py3 (cipd) to $PROTOBUF_WHEEL."
+  # package is a zipped .whl file
+  # TODO(b/399960746): remove this workaround once jiri supports unzipping
+  # .whl files and the package lands in prebuilt.  See also b/400779719.
+  rm -rf "$PROTOBUF_WHEEL"
+  mkdir -p "$PROTOBUF_WHEEL"
+  # Download to $tmpdir outside of the $project_root site root.
+  rm -f "$tmpdir"/*.whl
+  cipd install "infra/python/wheels/protobuf-py3" "latest" -root "$tmpdir"
+  # The .whl file may actually be a symlink to a package cache dir,
+  # relative to $project_root, so need to resolve an absolute path first.
+  _real_wheel="$(readlink -f "$tmpdir"/*.whl)"
+  (
+    cd "$PROTOBUF_WHEEL"
+    unzip "$_real_wheel"
+    [[ -f "$any_protobuf_wheel_file" ]] || {
+      echo "Expecting a $any_protobuf_wheel_file to be unpacked, but is missing."
+      exit 1
+    }
+  ) || exit 1
+}
+
 # If reclient-srcdir is not provided, checkout in a tempdir
 test -n "$RECLIENT_SRCDIR" || {
   echo "Fetching re-client source."
@@ -155,11 +190,6 @@ protoc=(env FX_REMOTE_BUILD_METRICS=0 fx host-tool protoc)
 echo "Compiling protobufs with protoc: ${protoc[@]}"
 # Caveat: if fx build-metrics is already enabled with RBE, this fx build may
 # attempt to process and upload metrics before it is ready, and fail.
-
-# relative to $project_root:
-readonly PROTOBUF_SRC=third_party/protobuf/src
-# This is where the prebuilt protobuf python wheel is installed.
-readonly PROTOBUF_WHEEL=prebuilt/third_party/protobuf-py3
 
 # Walk the proto imports recursively to find what needs to be compiled.
 function walk_proto_imports() {

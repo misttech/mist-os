@@ -8,7 +8,12 @@
         binary: "bin/cache_manager",
     },
     use: [
-        { protocol: "fuchsia.sys2.StorageAdmin" },
+        {
+            protocol: [
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.sys2.StorageAdmin",
+            ],
+        },
     ],
     config: {
         // The threshold of storage utilization at which point cache is cleared.

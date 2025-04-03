@@ -5,6 +5,10 @@
 Launched Process 1 state=Running koid=?? name=async_rust.cm component=async_rust.cm
 🛑
 
+# TODO(jruthe): undo this once we can download symbols.
+[zxdb] frame --force-remote-unwind
+0
+
 [zxdb] abt
 Task(id = 0)
 └─ async_rust::main::func • select_mod.rs:??

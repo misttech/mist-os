@@ -56,11 +56,10 @@ def main():
         for fidl_library in json.load(args.sdk_fidl_json)
         if (
             fidl_library["category"] == "partner"
-            or (args.include_all)
-            and (
-                fidl_library["category"] == "partner_internal"
-                or fidl_library["category"] == "compat_test"
-            )
+            or args.include_all
+            # TODO(https://fxbug.dev/372986936): Remove `and` condition when "internal" is removed.
+            and fidl_library["category"]
+            in ("prebuilt", "host_tool", "compat_test")
         )
     ]
 

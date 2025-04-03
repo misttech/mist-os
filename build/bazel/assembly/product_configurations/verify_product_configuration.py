@@ -207,7 +207,7 @@ def normalize_product(
 
     if "packages" in product:
         packages = product["packages"]
-        for pkg_set in ["base", "cache"]:
+        for pkg_set in ["bootfs", "base", "cache"]:
             if pkg_set not in packages:
                 continue
 

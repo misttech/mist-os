@@ -19,7 +19,6 @@
 
 // See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
-#include <openssl/crypto.h>
 #include <openssl/mem.h>
 
 #include "src/security/lib/fcrypto/secret.h"
@@ -30,7 +29,7 @@ namespace crypto {
 
 // Public methods
 
-Secret::Secret() : buf_(nullptr), len_(0) { CRYPTO_library_init(); }
+Secret::Secret() : buf_(nullptr), len_(0) {}
 
 Secret::~Secret() { Clear(); }
 

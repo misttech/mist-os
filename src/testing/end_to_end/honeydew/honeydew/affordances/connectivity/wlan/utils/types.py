@@ -408,7 +408,7 @@ class NetworkConfig:
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkConfig) -> "NetworkConfig":
         """Parse from a fuchsia.wlan.policy/NetworkConfig."""
-        identifier = NetworkIdentifier.from_fidl(fidl.id)
+        identifier = NetworkIdentifier.from_fidl(fidl.id_)
         credential = Credential.from_fidl(fidl.credential)
         return NetworkConfig(
             ssid=identifier.ssid,
@@ -420,7 +420,7 @@ class NetworkConfig:
     def to_fidl(self) -> f_wlan_policy.NetworkConfig:
         """Convert to equivalent FIDL."""
         return f_wlan_policy.NetworkConfig(
-            id=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
+            id_=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
             credential=Credential.from_password(
                 self.credential_value
             ).to_fidl(),
@@ -447,14 +447,14 @@ class NetworkIdentifier:
 
         return NetworkIdentifier(
             ssid=bytes(fidl.ssid).decode("utf-8"),
-            security_type=SecurityType.from_fidl(fidl.type),
+            security_type=SecurityType.from_fidl(fidl.type_),
         )
 
     def to_fidl(self) -> f_wlan_policy.NetworkIdentifier:
         """Convert to a fuchsia.wlan.policy/NetworkIdentifier."""
         return f_wlan_policy.NetworkIdentifier(
             ssid=list(self.ssid.encode("utf-8")),
-            type=self.security_type.to_fidl(),
+            type_=self.security_type.to_fidl(),
         )
 
     def __lt__(self, other: NetworkIdentifier) -> bool:
@@ -515,8 +515,7 @@ class CredentialNone(Credential):
         return ""
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.none = f_wlan_policy.Empty()
+        cred = f_wlan_policy.Credential(none=f_wlan_policy.Empty())
         return cred
 
 
@@ -534,8 +533,9 @@ class CredentialPassword(Credential):
         return self.password
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.password = list(self.password.encode("utf-8"))
+        cred = f_wlan_policy.Credential(
+            password=list(self.password.encode("utf-8"))
+        )
         return cred
 
 
@@ -553,8 +553,7 @@ class CredentialPsk(Credential):
         return self.psk
 
     def to_fidl(self) -> f_wlan_policy.Credential:
-        cred = f_wlan_policy.Credential()
-        cred.psk = list(bytes.fromhex(self.psk))
+        cred = f_wlan_policy.Credential(psk=list(bytes.fromhex(self.psk)))
         return cred
 
 
@@ -573,7 +572,7 @@ class NetworkState:
     def from_fidl(fidl: f_wlan_policy.NetworkState) -> "NetworkState":
         """Parse from a fuchsia.wlan.policy/NetworkState."""
         return NetworkState(
-            network_identifier=NetworkIdentifier.from_fidl(fidl.id),
+            network_identifier=NetworkIdentifier.from_fidl(fidl.id_),
             connection_state=ConnectionState.from_fidl(fidl.state),
             disconnect_status=(
                 DisconnectStatus.from_fidl(fidl.status) if fidl.status else None
@@ -652,7 +651,7 @@ class QueryIfaceResponse:
     """
 
     role: WlanMacRole
-    id: int
+    id_: int
     phy_id: int
     phy_assigned_id: int
     sta_addr: list[int]
@@ -664,7 +663,7 @@ class QueryIfaceResponse:
         """Parse from a fuchsia.wlan.device.service/QueryIfaceResponse."""
         return QueryIfaceResponse(
             role=WlanMacRole.from_fidl(fidl.role),
-            id=fidl.id,
+            id_=fidl.id_,
             phy_id=fidl.phy_id,
             phy_assigned_id=fidl.phy_assigned_id,
             sta_addr=list(fidl.sta_addr),
@@ -831,11 +830,11 @@ class WepCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wep = f_wlan_common_security.WepCredentials(
-            key=list(self.key.encode("utf-8"))
+        return f_wlan_common_security.Credentials(
+            wep=f_wlan_common_security.WepCredentials(
+                key=list(self.key.encode("utf-8"))
+            )
         )
-        return credentials
 
 
 @dataclass(frozen=True)
@@ -852,10 +851,9 @@ class WpaPskCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wpa = f_wlan_common_security.WpaCredentials()
-        credentials.wpa.psk = list(self.psk)
-        return credentials
+        return f_wlan_common_security.Credentials(
+            wpa=f_wlan_common_security.WpaCredentials(psk=list(self.psk))
+        )
 
 
 @dataclass(frozen=True)
@@ -873,10 +871,11 @@ class WpaPassphraseCredentials(Credentials):
 
     def to_fidl(self) -> f_wlan_common_security.Credentials:
         """Convert to a fuchsia.wlan.common.security/Credentials."""
-        credentials = f_wlan_common_security.Credentials()
-        credentials.wpa = f_wlan_common_security.WpaCredentials()
-        credentials.wpa.passphrase = list(self.passphrase.encode("utf-8"))
-        return credentials
+        return f_wlan_common_security.Credentials(
+            wpa=f_wlan_common_security.WpaCredentials(
+                passphrase=list(self.passphrase.encode("utf-8"))
+            )
+        )
 
 
 # TODO(http://b/346424966): Only necessary because Python does not have static
@@ -1105,7 +1104,7 @@ class AccessPointState:
     clients: ConnectedClientInformation | None
     """Information about connected clients."""
 
-    id: NetworkIdentifier
+    id_: NetworkIdentifier
     """Identifying information of the access point whose state has changed."""
 
     @staticmethod
@@ -1123,7 +1122,7 @@ class AccessPointState:
                 if fidl.clients
                 else None
             ),
-            id=NetworkIdentifier.from_fidl(fidl.id),
+            id_=NetworkIdentifier.from_fidl(fidl.id_),
         )
 
 

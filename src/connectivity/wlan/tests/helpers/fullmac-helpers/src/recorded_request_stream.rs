@@ -8,7 +8,6 @@ use futures::StreamExt;
 #[derive(Clone, Debug, PartialEq)]
 pub enum FullmacRequest {
     Query,
-    QueryMacSublayerSupport,
     QuerySecuritySupport,
     StartScan(fidl_fullmac::WlanFullmacImplStartScanRequest),
     Connect(fidl_fullmac::WlanFullmacImplConnectRequest),
@@ -21,7 +20,7 @@ pub enum FullmacRequest {
     StopBss(fidl_fullmac::WlanFullmacImplStopBssRequest),
     SetKeys(fidl_fullmac::WlanFullmacImplSetKeysRequest),
     EapolTx(fidl_fullmac::WlanFullmacImplEapolTxRequest),
-    GetIfaceCounterStats,
+    GetIfaceStats,
     GetIfaceHistogramStats,
     SaeHandshakeResp(fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest),
     SaeFrameTx(fidl_fullmac::SaeFrame),
@@ -66,9 +65,6 @@ impl RecordedRequestStream {
             .expect("Could not get next request in fullmac request stream");
         match &request {
             WlanFullmacImpl_Request::Query { .. } => self.history.push(FullmacRequest::Query),
-            WlanFullmacImpl_Request::QueryMacSublayerSupport { .. } => {
-                self.history.push(FullmacRequest::QueryMacSublayerSupport)
-            }
             WlanFullmacImpl_Request::QuerySecuritySupport { .. } => {
                 self.history.push(FullmacRequest::QuerySecuritySupport)
             }
@@ -105,8 +101,8 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::EapolTx { payload, .. } => {
                 self.history.push(FullmacRequest::EapolTx(payload.clone()))
             }
-            WlanFullmacImpl_Request::GetIfaceCounterStats { .. } => {
-                self.history.push(FullmacRequest::GetIfaceCounterStats)
+            WlanFullmacImpl_Request::GetIfaceStats { .. } => {
+                self.history.push(FullmacRequest::GetIfaceStats)
             }
             WlanFullmacImpl_Request::GetIfaceHistogramStats { .. } => {
                 self.history.push(FullmacRequest::GetIfaceHistogramStats)

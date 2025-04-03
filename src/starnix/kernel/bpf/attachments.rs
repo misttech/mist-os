@@ -5,7 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::fs::get_bpf_object;
+use crate::bpf::fs::{get_bpf_object, BpfHandle};
 use crate::task::CurrentTask;
 use crate::vfs::socket::{SocketAddress, SocketDomain, SocketProtocol, SocketType};
 use crate::vfs::FdNumber;
@@ -64,7 +64,12 @@ pub fn bpf_prog_attach(
 ) -> Result<SyscallResult, Errno> {
     // SAFETY: reading i32 field from a union is always safe.
     let bpf_fd = FdNumber::from_raw(attr.attach_bpf_fd as i32);
-    let program = get_bpf_object(current_task, bpf_fd)?.as_program()?.clone();
+    let object = get_bpf_object(current_task, bpf_fd)?;
+    if matches!(object, BpfHandle::ProgramStub(_)) {
+        log_warn!("Stub program. Faking successful attach");
+        return Ok(SUCCESS);
+    }
+    let program = object.as_program()?.clone();
     let attach_type = AttachType::from(attr.attach_type);
 
     let program_type = program.info.program_type;

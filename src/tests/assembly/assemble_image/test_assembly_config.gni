@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/python/python_action.gni")
 import("//build/python/python_binary.gni")
@@ -131,24 +130,16 @@ template("test_assembly_config") {
                                "platform",
                                "base_driver_packages",
                              ])
-    }
-
-    # NOTE: target named this way for legacy_assembly_input_bundle's label inference
-    #
-    # NOTE: This action should only be performed in the target toolchain
-    outdir = "$target_out_dir/outdir"
-
-    # NOTE: This action should only be performed in the target toolchain
-    legacy_assembly_input_bundle("input_bundle") {
-      testonly = true
-      bundles_dir = outdir
-      include_config_data = false
-
-      supports_blobs = true
-      base_packages = base_packages_param
-      cache_packages = []
-      additional_boot_args = []
-      bootfs_labels = []
+      if (base_packages_param != []) {
+        base_packages = []
+        foreach(package, base_packages_param) {
+          base_packages += [
+            {
+              package_target = package
+            },
+          ]
+        }
+      }
     }
 
     # This is an action rather than a host test because enumerating all the inputs to assembly
@@ -180,8 +171,6 @@ template("test_assembly_config") {
                rebase_path(fuchsia_files.assembly_config, root_build_dir),
                "--board-information",
                rebase_path(fuchsia_files.board_config, root_build_dir),
-               "--legacy-bundle",
-               rebase_path("$outdir/legacy", root_build_dir),
                "--input-bundles-dir",
                rebase_path(platform_bundles_dir, root_build_dir),
                "--outdir",
@@ -192,7 +181,6 @@ template("test_assembly_config") {
       deps += [
                 ":${fuchsia_labels.board_config}",
                 ":${product_config_label}",
-                ":input_bundle",
                 labels.ffx_tool,
                 platform_bundles_target,
               ] + additional_deps_param

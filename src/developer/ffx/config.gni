@@ -31,6 +31,10 @@ required_ffx_plugins = [
   "//src/developer/ffx/plugins/version:ffx_version",
   "//src/developer/ffx/plugins/platform:ffx_platform",
   "//src/developer/ffx/plugins/sdk:ffx_sdk",
+
+  # TODO(402497848): Remove these once MOS has been updated.
+  "//src/developer/ffx/plugins/package:ffx_package",
+  "//src/developer/ffx/plugins/product:ffx_product",
 ]
 
 # The list of ffx plugins that we currently build as part of the 'main' ffx
@@ -60,7 +64,9 @@ dual_mode_plugins = [
 # the build.
 dual_mode_defaults = [
   "//src/developer/ffx/plugins/emulator/data/config.json",
-  "//src/developer/ffx/plugins/product/data/config.json",
+
+  # TODO(402497848): uncomment when ready to be standalone again..
+  #  "//src/developer/ffx/plugins/product/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
 ]
 

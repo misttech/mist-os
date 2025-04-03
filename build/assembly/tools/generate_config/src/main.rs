@@ -8,6 +8,8 @@
 
 mod board_config;
 mod board_input_bundle;
+mod board_input_bundle_set;
+mod common;
 mod product_config;
 
 use anyhow::Result;
@@ -35,6 +37,9 @@ enum Subcommand {
 
     /// generate a board input bundle.
     BoardInputBundle(BoardInputBundleArgs),
+
+    /// generate a board input bundle set.
+    BoardInputBundleSet(BoardInputBundleSetArgs),
 
     /// generate a board config.
     Board(BoardArgs),
@@ -154,13 +159,21 @@ struct BoardInputBundleArgs {
     #[argh(option)]
     sysmem_format_costs_config: Vec<Utf8PathBuf>,
 
+    /// release version that this BIB corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this BIB matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
+
     /// a depfile to write.
     #[argh(option)]
     depfile: Option<Utf8PathBuf>,
 }
 
 /// Arguments to generate a board config.
-#[derive(FromArgs)]
+#[derive(FromArgs, Default)]
 #[argh(subcommand, name = "board")]
 struct BoardArgs {
     /// the input board config with absolute paths.
@@ -170,6 +183,47 @@ struct BoardArgs {
     /// paths to board input bundles to include.
     #[argh(option)]
     board_input_bundles: Vec<Utf8PathBuf>,
+
+    /// paths to board input bundle sets to make available.
+    #[argh(option)]
+    board_input_bundle_sets: Vec<Utf8PathBuf>,
+
+    /// the directory to write the board config to.
+    #[argh(option)]
+    output: Utf8PathBuf,
+
+    /// release version that this board config corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this config matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
+/// Arguments to generate a board input bundle set.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "board-input-bundle-set")]
+struct BoardInputBundleSetArgs {
+    /// the name of the set.
+    #[argh(option)]
+    name: String,
+
+    /// paths to board input bundles to include.
+    #[argh(option)]
+    board_input_bundles: Vec<Utf8PathBuf>,
+
+    /// release version that this BIB corresponds to.
+    #[argh(option)]
+    version: Option<String>,
+
+    /// path to a file containing the release version that this BIB matches.
+    #[argh(option)]
+    version_file: Option<Utf8PathBuf>,
 
     /// the directory to write the board config to.
     #[argh(option)]
@@ -194,7 +248,11 @@ struct HybridBoardArgs {
 
     /// a board that contains BIBs that should be added to `config`.
     #[argh(option)]
-    replace_bibs_from_board: Utf8PathBuf,
+    replace_bibs_from_board: Option<Utf8PathBuf>,
+
+    /// replace all the bibs from these sets that are found in `config`.
+    #[argh(option)]
+    replace_bib_sets: Vec<Utf8PathBuf>,
 
     /// a depfile to write.
     #[argh(option)]
@@ -207,6 +265,7 @@ fn main() -> Result<()> {
         Subcommand::Product(args) => product_config::new(&args),
         Subcommand::HybridProduct(args) => product_config::hybrid(&args),
         Subcommand::BoardInputBundle(args) => board_input_bundle::new(&args),
+        Subcommand::BoardInputBundleSet(args) => board_input_bundle_set::new(&args),
         Subcommand::Board(args) => board_config::new(&args),
         Subcommand::HybridBoard(args) => board_config::hybrid(&args),
     }

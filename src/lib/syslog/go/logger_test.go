@@ -19,7 +19,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"fidl/fuchsia/diagnostics"
+	"fidl/fuchsia/diagnostics/types"
 	"fidl/fuchsia/logger"
 
 	"go.fuchsia.dev/fuchsia/src/lib/component"
@@ -301,7 +301,7 @@ func TestLoggerSeverity(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	log.SetSeverity(diagnostics.Severity(syslog.WarningLevel))
+	log.SetSeverity(types.Severity(syslog.WarningLevel))
 	if err := log.Infof(format, 10); err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ func TestLoggerRegisterInterest(t *testing.T) {
 		}
 	}()
 
-	registerInterest := func(interest diagnostics.Interest) {
+	registerInterest := func(interest types.Interest) {
 		t.Helper()
 
 		ch <- logger.LogSinkWaitForInterestChangeResultWithResponse(logger.LogSinkWaitForInterestChangeResponse{
@@ -373,8 +373,8 @@ func TestLoggerRegisterInterest(t *testing.T) {
 
 	// Register interest and observe that the log is emitted.
 	{
-		var interest diagnostics.Interest
-		interest.SetMinSeverity(diagnostics.SeverityDebug)
+		var interest types.Interest
+		interest.SetMinSeverity(types.SeverityDebug)
 		registerInterest(interest)
 	}
 	if err := log.VLogf(syslog.DebugVerbosity, format, 10); err != nil {
@@ -384,7 +384,7 @@ func TestLoggerRegisterInterest(t *testing.T) {
 	checkoutput(t, sin, expectedMsg, syslog.InfoLevel-1)
 
 	// Register empty interest and observe that severity resets to initial.
-	registerInterest(diagnostics.Interest{})
+	registerInterest(types.Interest{})
 	if err := log.VLogf(syslog.DebugVerbosity, format, 10); err != nil {
 		t.Fatal(err)
 	}

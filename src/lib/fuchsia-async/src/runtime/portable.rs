@@ -181,9 +181,12 @@ pub mod executor {
 
     use crate::runtime::WakeupTime;
     use crate::Timer;
+    use futures::future::BoxFuture;
     use std::future::Future;
     use std::ops::{Deref, DerefMut};
+    use std::pin::Pin;
     use std::rc::Rc;
+    use std::task::{Context, Poll};
 
     pub use std::time::Duration as MonotonicDuration;
     /// A time relative to the executor's clock.
@@ -299,6 +302,25 @@ pub mod executor {
     impl DerefMut for TestExecutor {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.executor
+        }
+    }
+
+    /// On portable runtimes, SpawnableFuture is the same as a boxed future and lacks any memory
+    /// saving optimisations.
+    pub struct SpawnableFuture<'a, O>(BoxFuture<'a, O>);
+
+    impl<'a, O> SpawnableFuture<'a, O> {
+        /// Returns a new SpawnableFuture.
+        pub fn new(future: impl Future<Output = O> + Send + 'a) -> Self {
+            Self(Box::pin(future))
+        }
+    }
+
+    impl<O> Future for SpawnableFuture<'_, O> {
+        type Output = O;
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            Pin::new(&mut self.0).poll(cx)
         }
     }
 }

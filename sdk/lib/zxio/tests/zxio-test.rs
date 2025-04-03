@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl::endpoints::{Proxy, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
 use fxfs_testing::TestFixture;
 use std::mem::MaybeUninit;
@@ -13,14 +13,13 @@ use syncio::{
     SelinuxContextAttr, XattrSetMode, Zxio, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
-use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
 use vfs::path::Path;
 use vfs::remote::RemoteLike;
 use vfs::symlink::Symlink;
-use vfs::{pseudo_directory, ObjectRequest, ObjectRequestRef, ToObjectRequest};
+use vfs::{pseudo_directory, ObjectRequestRef};
 use zx::{self as zx, HandleBased, Status};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -223,23 +222,12 @@ async fn test_read_link_error() {
     impl RemoteLike for ErrorSymlink {
         fn open(
             self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
-            path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
+            _path: Path,
+            _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                if !path.is_empty() {
-                    return Err(Status::NOT_DIR);
-                }
-                scope.spawn(vfs::symlink::Connection::create(
-                    scope.clone(),
-                    self,
-                    &flags,
-                    object_request,
-                )?);
-                Ok(())
-            });
+            panic!("fuchsia.io/Directory.DeprecatedOpen should not be used in these tests.")
         }
 
         fn open3(
@@ -252,12 +240,9 @@ async fn test_read_link_error() {
             if !path.is_empty() {
                 return Err(Status::NOT_DIR);
             }
-            scope.spawn(vfs::symlink::Connection::create(
-                scope.clone(),
-                self,
-                &flags,
-                object_request,
-            )?);
+            object_request
+                .take()
+                .create_connection_sync::<vfs::symlink::Connection<_>, _>(scope, self, flags);
             Ok(())
         }
     }
@@ -278,15 +263,10 @@ async fn test_read_link_error() {
         "error_symlink" => Arc::new(ErrorSymlink),
     };
 
-    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
-    let scope = ExecutionScope::new();
-    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
-        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
-
+    let dir_proxy = vfs::directory::serve_read_only(dir);
     fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
+        let handle = dir_proxy.into_channel().unwrap().into_zx_channel().into_handle();
+        let dir_zxio = Zxio::create(handle).expect("create failed");
 
         assert_eq!(
             dir_zxio
@@ -554,7 +534,8 @@ impl FileLike for AllocateFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        FidlIoConnection::create_sync(scope, self, options, object_request.take());
+        Ok(())
     }
 }
 
@@ -563,15 +544,11 @@ async fn test_allocate_file() {
     let dir = pseudo_directory! {
         "foo" => AllocateFile::new(Ok(())),
     };
-    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
-    let scope = ExecutionScope::new();
-    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE;
-    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
-        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
+    let dir_proxy = vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
+        let handle = dir_proxy.into_channel().unwrap().into_zx_channel().into_handle();
+        let dir_zxio = Zxio::create(handle).expect("create failed");
         let foo_zxio = dir_zxio
             .open("foo", fio::PERM_READABLE | fio::PERM_WRITABLE, Default::default())
             .expect("open failed");
@@ -588,15 +565,11 @@ async fn test_allocate_file_not_sup() {
     let dir = pseudo_directory! {
         "foo" => AllocateFile::new(Err(Status::NOT_SUPPORTED)),
     };
-    let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
-    let scope = ExecutionScope::new();
-    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
-        .handle(|request| dir.open3(scope, Path::dot(), flags, request));
+    let dir_proxy = vfs::directory::serve(dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
 
     fasync::unblock(|| {
-        let dir_zxio =
-            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
+        let handle = dir_proxy.into_channel().unwrap().into_zx_channel().into_handle();
+        let dir_zxio = Zxio::create(handle).expect("create failed");
         let foo_zxio = dir_zxio
             .open("foo", fio::PERM_READABLE | fio::PERM_WRITABLE, Default::default())
             .expect("open failed");

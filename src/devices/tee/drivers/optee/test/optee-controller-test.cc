@@ -9,8 +9,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/fake-bti/bti.h>
-#include <lib/fake-resource/resource.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/fake-resource/cpp/fake-resource.h>
 #include <lib/fdf/env.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -27,7 +28,6 @@
 
 #include "../optee-smc.h"
 #include "../tee-smc.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 struct SharedMemoryInfo {
@@ -131,10 +131,10 @@ class IncomingNamespace {
     return std::move(endpoints.client);
   }
 
-  fake_pdev::FakePDevFidl& pdev() { return pdev_; }
+  fdf_fake::FakePDev& pdev() { return pdev_; }
 
  private:
-  fake_pdev::FakePDevFidl pdev_;
+  fdf_fake::FakePDev pdev_;
   component::OutgoingDirectory outgoing_;
 };
 
@@ -187,11 +187,13 @@ class FakeDdkOptee : public zxtest::Test {
   }
 
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.smcs[0] = {};
     ASSERT_OK(fake_root_resource_create(config.smcs[0].reset_and_get_address()));
     config.btis[0] = {};
-    ASSERT_OK(fake_bti_create(config.btis[0].reset_and_get_address()));
+    zx::result bti = fake_bti::CreateFakeBti();
+    ASSERT_OK(bti);
+    config.btis[0] = std::move(bti.value());
     config.mmios[0] = CreateMmio(config.btis[0].borrow());
     incoming_.SyncCall([config = std::move(config)](IncomingNamespace* incoming) mutable {
       incoming->pdev().SetConfig(std::move(config));
@@ -229,7 +231,7 @@ class FakeDdkOptee : public zxtest::Test {
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get()));
   }
 
-  static fake_pdev::MmioInfo CreateMmio(const zx::unowned_bti& fake_bti) {
+  static fdf::PDev::MmioInfo CreateMmio(const zx::unowned_bti& fake_bti) {
     constexpr size_t kSecureWorldMemorySize = 0x20000;
 
     zx::vmo fake_vmo;
@@ -245,10 +247,10 @@ class FakeDdkOptee : public zxtest::Test {
     gSharedMemory.size = kSecureWorldMemorySize / 2;
     EXPECT_OK(pmt.unpin());
 
-    return fake_pdev::MmioInfo{
-        .vmo = std::move(fake_vmo),
+    return fdf::PDev::MmioInfo{
         .offset = 0,
         .size = kSecureWorldMemorySize,
+        .vmo = std::move(fake_vmo),
     };
   }
 

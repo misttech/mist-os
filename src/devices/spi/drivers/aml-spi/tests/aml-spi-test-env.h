@@ -251,6 +251,8 @@ class BaseTestEnvironment : public fdf_testing::Environment,
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
+  fdf_fake::FakePDev& pdev_server() { return pdev_server_; }
+
  private:
   fdf_fake::FakePDev pdev_server_;
   zx::interrupt interrupt_;

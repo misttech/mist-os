@@ -21,6 +21,4 @@ fidl("fuchsia.hardware.bluetooth") {
     "//sdk/fidl/fuchsia.bluetooth.bredr",
     "//zircon/vdso/zx",
   ]
-
-  enable_hlcpp = true
 }

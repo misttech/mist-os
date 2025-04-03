@@ -35,8 +35,6 @@ pub fn hybrid(args: &HybridProductArgs) -> Result<()> {
         let package_name = package_manifest.name();
         if let Some(path) = find_package_in_product(&mut config, &package_name) {
             *path = package_manifest_path.clone();
-        } else {
-            anyhow::bail!("Could not find package to replace: {}", &package_name);
         }
     }
     config.write_to_dir(&args.output, args.depfile.as_ref())?;

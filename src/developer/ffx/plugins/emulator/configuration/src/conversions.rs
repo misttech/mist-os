@@ -156,7 +156,7 @@ mod tests {
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
-                vsock: VsockDevice { enabled: false, cid: 3 },
+                vsock: VsockDevice { enabled: false, cid: 0 },
             },
             ports: None,
         };
@@ -206,7 +206,7 @@ mod tests {
             inputs: InputDevice { pointing_device: PointingDevice::Touch },
             memory: DataAmount { quantity: 2048, units: DataUnits::Megabytes },
             window_size: Screen { height: 1024, width: 1280, units: ScreenUnits::Pixels },
-            vsock: VsockDevice { enabled: false, cid: 3 },
+            vsock: VsockDevice { enabled: false, cid: 0 },
         };
 
         let mut ports = HashMap::new();
@@ -292,7 +292,7 @@ mod tests {
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
-                vsock: VsockDevice { enabled: false, cid: 3 },
+                vsock: VsockDevice { enabled: false, cid: 0 },
             },
             ports: None,
         };
@@ -368,7 +368,7 @@ mod tests {
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
-                vsock: VsockDevice { enabled: false, cid: 3 },
+                vsock: VsockDevice { enabled: false, cid: 0 },
             },
             ports: None,
         };
@@ -426,7 +426,7 @@ mod tests {
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
-                vsock: VsockDevice { enabled: false, cid: 3 },
+                vsock: VsockDevice { enabled: false, cid: 0 },
             },
             ports: None,
         };

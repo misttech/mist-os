@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_to_protocol;
 use indexmap::IndexMap;
@@ -10,7 +9,6 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::simple::Simple as PseudoDirectory;
 use vfs::file::vmo;
@@ -241,16 +239,6 @@ fn make_executable_vmo_file(
     Ok(exec_file)
 }
 
-// Return a proxy to the given directory, first opening it as executable.
-fn directory_to_proxy(dir: Arc<PseudoDirectory>) -> Result<fio::DirectoryProxy, LauncherError> {
-    let (client, server) = create_proxy::<fio::DirectoryMarker>();
-    let scope = vfs::execution_scope::ExecutionScope::new();
-    let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
-    vfs::ObjectRequest::new(flags, &fio::Options::default(), server.into_channel())
-        .handle(|request| dir.open3(scope.clone(), vfs::path::Path::dot(), flags, request));
-    Ok(client)
-}
-
 // Given a list of package trampoline specifications, create the executable files and add them into
 // a new directory. Give each package its own subdirectory based on the package name, preventing
 // binary name collisions. Binary names can repeat if they are found in different packages. However,
@@ -270,8 +258,8 @@ async fn make_trampoline_vfs(
     }
     let resource = create_vmex_resource().await?;
     let (tools_dir, path) = trampolines.make_tools_dir(resource)?;
-    // Return it as an executable directory.
-    let dir = directory_to_proxy(tools_dir)?;
+    // Serve directory with execute rights.
+    let dir = vfs::directory::serve(tools_dir, fio::PERM_READABLE | fio::PERM_EXECUTABLE);
     Ok((Some(dir), Some(path)))
 }
 
@@ -306,7 +294,6 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use futures::StreamExt;
     use std::fmt;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use {fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync};
 
@@ -387,13 +374,9 @@ mod tests {
 
     async fn make_pkg(url: &str, name: &str, root: &Arc<PseudoDirectory>) -> PkgDir {
         let (url, resource) = parse_url(url).unwrap();
-        let (dir, server) = create_proxy::<fio::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let path = vfs::path::Path::validate_and_split(name).unwrap();
-        let root = root.clone();
-        vfs::ObjectRequest::new(flags, &fio::Options::default(), server.into_channel())
-            .handle(|request| root.open3(scope.clone(), path, flags, request));
+        let dir =
+            vfs::serve_directory(root.clone(), path, fio::PERM_READABLE | fio::PERM_EXECUTABLE);
         PkgDir { url, dir, resource }
     }
 

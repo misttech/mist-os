@@ -21,6 +21,7 @@ use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
@@ -170,7 +171,10 @@ impl FileLike for InternalFile {
         options: FileOptions,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        FidlIoConnection::spawn(scope, self, options, object_request)
+        scope.clone().spawn(object_request.take().handle_async(async move |object_request| {
+            FidlIoConnection::create(scope, self, options, object_request).await
+        }));
+        Ok(())
     }
 }
 
@@ -327,12 +331,12 @@ impl Directory for ObjectDirectory {
                         object_request,
                     )
                 }
-                (_, None) => object_request.spawn_connection(
-                    scope,
-                    self,
-                    flags,
-                    vfs::directory::immutable::connection::ImmutableConnection::create,
-                ),
+                (_, None) => {
+                    object_request
+                        .take()
+                        .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+                    Ok(())
+                }
             }
         });
     }
@@ -344,28 +348,25 @@ impl Directory for ObjectDirectory {
         flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        object_request.take().handle(|object_request| {
-            match path.next_with_ref() {
-                (_, Some(name)) => {
-                    // Lookup an object by id and return it.
-                    let name = name.to_owned();
-                    let object_id = name.parse().unwrap_or(INVALID_OBJECT_ID);
-                    vfs::file::serve(
-                        InternalFile::new(object_id, self.store.clone()),
-                        scope,
-                        &flags,
-                        object_request,
-                    )
-                }
-                (_, None) => object_request.spawn_connection(
+        match path.next_with_ref() {
+            (_, Some(name)) => {
+                // Lookup an object by id and return it.
+                let name = name.to_owned();
+                let object_id = name.parse().unwrap_or(INVALID_OBJECT_ID);
+                vfs::file::serve(
+                    InternalFile::new(object_id, self.store.clone()),
                     scope,
-                    self,
-                    flags,
-                    vfs::directory::immutable::connection::ImmutableConnection::create,
-                ),
+                    &flags,
+                    object_request,
+                )
             }
-        });
-        Ok(())
+            (_, None) => {
+                object_request
+                    .take()
+                    .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
+                Ok(())
+            }
+        }
     }
 
     /// Reads directory entries starting from `pos` by adding them to `sink`.

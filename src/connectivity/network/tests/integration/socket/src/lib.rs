@@ -15,8 +15,7 @@ use std::task::Poll;
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
-use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
+use fidl_fuchsia_net_ext::{IntoExt as _, IpExt as _};
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use futures::future::{self, LocalBoxFuture};
@@ -27,7 +26,6 @@ use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet, net_ip_v4,
     net_ip_v6, net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
-use net_types::ethernet::Mac;
 use net_types::ip::{
     AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
@@ -46,38 +44,42 @@ use netstack_testing_common::{
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet::{ParsablePacket as _, Serializer as _};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
     ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
-use packet_formats::icmp::ndp::NeighborAdvertisement;
 use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpTimeExceeded,
     IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem,
     Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
-    Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
+    Icmpv6PacketTooBig, Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+    MessageBody,
 };
 use packet_formats::igmp::messages::IgmpPacket;
 use packet_formats::ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
-use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilder};
+use packet_formats::tcp::options::TcpOption;
+use packet_formats::tcp::{
+    TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions,
+};
 use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::{test_case, test_matrix};
-use zx::{self as zx, AsHandleRef as _};
+use test_util::assert_gt;
+use zx::AsHandleRef as _;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_tun as fnet_tun, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_packet as fpacket,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fpacket,
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
@@ -3695,67 +3697,27 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
-    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
 
-    let server_mac = Mac::new(SERVER_MAC.octets);
     let fake_ep_loop = async move {
         fake_ep
             .frame_stream()
             .map(|r| r.expect("failed to read frame"))
-            .for_each(|(frame, _dropped)| async move {
-                let mut frame = &frame[..];
-                let eth = packet_formats::ethernet::EthernetFrame::parse(
-                    &mut frame,
-                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
-                )
-                .expect("error parsing ethernet frame");
+            .for_each(|(frame, dropped)| async move {
+                assert_eq!(dropped, 0);
 
-                let mut frame_body = eth.body();
-                let ip = match I::Packet::parse(&mut frame_body, ()) {
-                    Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
-                    _ => {
-                        let confirmation = I::map_ip_in(
-                            (I::CLIENT_ADDR, I::SERVER_ADDR),
-                            |(client_addr, server_addr)| {
-                                ArpPacketBuilder::<_, Ipv4Addr>::new(
-                                    ArpOp::Response,
-                                    server_mac,
-                                    server_addr,
-                                    eth.src_mac(),
-                                    client_addr,
-                                )
-                                .into_serializer()
-                                .encapsulate(EthernetFrameBuilder::new(
-                                    server_mac,
-                                    eth.src_mac(),
-                                    EtherType::Arp,
-                                    ETHERNET_MIN_BODY_LEN_NO_TAG,
-                                ))
-                                .serialize_vec_outer()
-                                .expect("serialize ARP response")
-                                .unwrap_b()
-                            },
-                            |(client_addr, server_addr)| {
-                                ndp::create_message(
-                                    server_mac,
-                                    eth.src_mac(),
-                                    server_addr,
-                                    client_addr,
-                                    NeighborAdvertisement::new(false, true, false, server_addr),
-                                    &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
-                                )
-                                .expect("serialize NDP message")
-                            },
-                        );
-                        fake_ep
-                            .write(confirmation.as_ref())
-                            .await
-                            .expect("failed to write ARP response");
-                        return;
-                    }
+                let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                    .expect("valid ethernet frame");
+                let Ok(ip) = I::Packet::parse(&mut eth.body(), ()) else {
+                    return;
                 };
-                let mut body = eth.body().to_vec();
-                let icmp_error = packet::Buf::new(&mut body, ..)
+                if ip.proto() != IpProto::Tcp.into() {
+                    return;
+                }
+                let icmp_error = packet::Buf::new(&mut eth.body().to_vec(), ..)
                     .encapsulate(IcmpPacketBuilder::<I, _>::new(
                         ip.dst_ip(),
                         ip.src_ip(),
@@ -3771,7 +3733,7 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
                     .encapsulate(EthernetFrameBuilder::new(
                         eth.dst_mac(),
                         eth.src_mac(),
-                        I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
+                        EtherType::from_ip_version(I::VERSION),
                         ETHERNET_MIN_BODY_LEN_NO_TAG,
                     ))
                     .serialize_vec_outer()
@@ -3950,13 +3912,13 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         .add_address_and_subnet_route(I::CLIENT_SUBNET)
         .await
         .expect("configure address");
-    client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-
-    let server_mac = Mac::new(SERVER_MAC.octets);
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
 
     // Filter frames observed on the fake endpoint to just those containing a TCP
-    // segment in an IP packet, responding to other frames with neighbor
-    // confirmations to allow neighbor resolution to succeed.
+    // segment in an IP packet.
     let fake_ep = &fake_ep;
     let mut frames = fake_ep.frame_stream().filter_map(|result| {
         Box::pin(async {
@@ -3965,52 +3927,10 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
 
             let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
                 .expect("valid ethernet frame");
-            let ip = match I::Packet::parse(&mut eth.body(), ()) {
-                Ok(ip) if ip.proto() == IpProto::Tcp.into() => ip,
-                _ => {
-                    let confirmation = I::map_ip_in(
-                        (I::CLIENT_ADDR, I::SERVER_ADDR),
-                        |(client_addr, server_addr)| {
-                            ArpPacketBuilder::<_, Ipv4Addr>::new(
-                                ArpOp::Response,
-                                server_mac,
-                                server_addr,
-                                eth.src_mac(),
-                                client_addr,
-                            )
-                            .into_serializer()
-                            .encapsulate(EthernetFrameBuilder::new(
-                                server_mac,
-                                eth.src_mac(),
-                                EtherType::Arp,
-                                ETHERNET_MIN_BODY_LEN_NO_TAG,
-                            ))
-                            .serialize_vec_outer()
-                            .expect("serialize ARP response")
-                            .unwrap_b()
-                        },
-                        |(client_addr, server_addr)| {
-                            ndp::create_message(
-                                server_mac,
-                                eth.src_mac(),
-                                server_addr,
-                                client_addr,
-                                NeighborAdvertisement::new(false, true, false, server_addr),
-                                &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)],
-                            )
-                            .expect("serialize NDP message")
-                        },
-                    );
-                    fake_ep
-                        .write(confirmation.as_ref())
-                        .await
-                        .expect("failed to write ARP response");
-                    return None;
-                }
-            };
+            let ip = I::Packet::parse(&mut eth.body(), ()).ok()?;
             let tcp =
                 TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
-                    .expect("valid TCP segment");
+                    .ok()?;
 
             Some((
                 eth.builder(),
@@ -4029,7 +3949,7 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         let ethernet_builder = EthernetFrameBuilder::new(
             eth.dst_mac(),
             eth.src_mac(),
-            I::map_ip_in((), |()| EtherType::Ipv4, |()| EtherType::Ipv6),
+            EtherType::from_ip_version(I::VERSION),
             ETHERNET_MIN_BODY_LEN_NO_TAG,
         );
         let mut syn_ack = TcpSegmentBuilder::new(
@@ -4060,13 +3980,9 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         // Now that the connection is established, respond to the next packet with an
         // ICMP error to cause a soft error on the connection.
         let (_eth, ip, tcp) = frames.next().await.unwrap();
-        let mut body = packet::Buf::new([], ..)
+        let icmp_error = packet::Buf::new([], ..)
             .encapsulate(tcp)
             .encapsulate(ip.clone())
-            .serialize_vec_outer()
-            .expect("serialize IP packet")
-            .unwrap_b();
-        let icmp_error = packet::Buf::new(&mut body, ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
             .encapsulate(I::PacketBuilder::new(
                 ip.dst_ip(),
@@ -4116,6 +4032,205 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
 
     let (error, ()) = future::join(client, server).await;
     error
+}
+
+trait TestPmtuIpExt: TestIpExt {
+    type Message: IcmpMessage<Self> + Debug;
+
+    fn packet_too_big() -> (Self::Message, <Self::Message as IcmpMessage<Self>>::Code);
+}
+
+impl TestPmtuIpExt for Ipv4 {
+    type Message = IcmpDestUnreachable;
+
+    fn packet_too_big() -> (IcmpDestUnreachable, Icmpv4DestUnreachableCode) {
+        let lowered_mtu =
+            NonZeroU16::new(Self::MINIMUM_LINK_MTU.get().try_into().unwrap()).unwrap();
+        (
+            IcmpDestUnreachable::new_for_frag_req(lowered_mtu),
+            Icmpv4DestUnreachableCode::FragmentationRequired,
+        )
+    }
+}
+
+impl TestPmtuIpExt for Ipv6 {
+    type Message = Icmpv6PacketTooBig;
+
+    fn packet_too_big() -> (Icmpv6PacketTooBig, IcmpZeroCode) {
+        (Icmpv6PacketTooBig::new(Self::MINIMUM_LINK_MTU.get()), IcmpZeroCode)
+    }
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
+    use packet_formats::ip::IpPacket as _;
+
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let net = sandbox.create_network("net").await.expect("failed to create network");
+    let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
+    let client =
+        sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
+    let client_interface =
+        client.join_network(&net, "ep").await.expect("failed to join network in realm");
+    client_interface
+        .add_address_and_subnet_route(I::CLIENT_SUBNET)
+        .await
+        .expect("configure address");
+    client
+        .add_neighbor_entry(client_interface.id(), I::SERVER_SUBNET.addr, SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
+
+    // Filter frames observed on the fake endpoint to just those containing a TCP
+    // segment in an IP packet.
+    let fake_ep = &fake_ep;
+    let mut frames = fake_ep.frame_stream().filter_map(|result| {
+        Box::pin(async {
+            let (frame, dropped) = result.unwrap();
+            assert_eq!(dropped, 0);
+
+            let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                .expect("valid ethernet frame");
+            let ip = I::Packet::parse(&mut eth.body(), ()).ok()?;
+            let tcp =
+                TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                    .ok()?;
+
+            let (eth, ip_builder, tcp) = (
+                eth.builder(),
+                ip.builder(),
+                tcp.builder(ip.src_ip(), ip.dst_ip()).prefix_builder().clone(),
+            );
+            drop(ip);
+
+            Some((eth, ip_builder, tcp, frame))
+        })
+    });
+
+    let server = async {
+        // Wait for an incoming TCP connection.
+        let (eth, ip, tcp, _frame) = frames.next().await.unwrap();
+        assert!(tcp.syn_set());
+
+        // Send a SYN/ACK in response, and wait for the ACK response.
+        let ethernet_builder = EthernetFrameBuilder::new(
+            eth.dst_mac(),
+            eth.src_mac(),
+            EtherType::from_ip_version(I::VERSION),
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        );
+
+        let mut syn_ack = TcpSegmentBuilder::new(
+            ip.dst_ip(),
+            ip.src_ip(),
+            tcp.dst_port().unwrap(),
+            tcp.src_port().unwrap(),
+            tcp.seq_num(),
+            Some(tcp.seq_num() + 1),
+            tcp.window_size(),
+        );
+        syn_ack.syn(true);
+        let frame = packet::Buf::new([], ..)
+            .encapsulate(
+                // Advertise an initial MSS that is large enough to fit the sender's payload in
+                // a single segment.
+                TcpSegmentBuilderWithOptions::new(syn_ack, [TcpOption::Mss(1500)]).unwrap(),
+            )
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                IpProto::Tcp.into(),
+            ))
+            .encapsulate(ethernet_builder.clone())
+            .serialize_vec_outer()
+            .expect("serialize SYN/ACK")
+            .unwrap_b();
+        fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
+        let _ack = frames.next().await.unwrap();
+
+        // Now that the connection is established, respond to the next packet with an
+        // ICMP error indicating the packet was too big and providing a lower MTU.
+        let (_eth, ip, tcp, too_large_frame) = frames.next().await.unwrap();
+
+        // Ensure that the initial frame sent was larger than the updated PMTU we
+        // provided, so that we can be sure we're actually exercising a reduction in the
+        // PMTU.
+        let too_large_frame =
+            EthernetFrame::parse(&mut &too_large_frame[..], EthernetFrameLengthCheck::NoCheck)
+                .expect("valid ethernet frame");
+        assert_gt!(too_large_frame.body().len(), usize::try_from(I::MINIMUM_LINK_MTU).unwrap());
+
+        let (message, code) = I::packet_too_big();
+        let icmp_error = packet::Buf::new([], ..)
+            .encapsulate(tcp)
+            .encapsulate(ip.clone())
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
+            .encapsulate(I::PacketBuilder::new(
+                ip.dst_ip(),
+                ip.src_ip(),
+                u8::MAX,
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
+            ))
+            .encapsulate(ethernet_builder)
+            .serialize_vec_outer()
+            .expect("serialize ICMP error")
+            .unwrap_b();
+        fake_ep.write(icmp_error.as_ref()).await.expect("write ICMP error");
+
+        // The initial segment should be retransmitted in smaller pieces, respecting the
+        // reduced PMTU.
+        let retransmitted_segment = async {
+            loop {
+                let (_eth, _ip, _tcp, frame) = frames.next().await.unwrap();
+                let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                    .expect("valid ethernet frame");
+
+                // It's possible the PMTU update wasn't processed by the netstack before the
+                // retransmission timer fired, in which case we'd see the original segment
+                // again.
+                if eth.body().len() != usize::try_from(I::MINIMUM_LINK_MTU).unwrap() {
+                    continue;
+                }
+
+                let ip = I::Packet::parse(&mut eth.body(), ()).expect("valid IP packet");
+                let tcp =
+                    TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                        .expect("valid TCP segment");
+                break tcp.body().to_vec();
+            }
+        }
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to observe segment with reduced MSS")
+        })
+        .await;
+
+        let ip = I::Packet::parse(&mut too_large_frame.body(), ()).expect("valid IP packet");
+        let too_large_segment =
+            TcpSegment::parse(&mut ip.body(), TcpParseArgs::new(ip.src_ip(), ip.dst_ip()))
+                .expect("valid TCP segment");
+        assert_eq!(retransmitted_segment, &too_large_segment.body()[..retransmitted_segment.len()]);
+    };
+
+    let client = async {
+        let server_addr: net_types::ip::IpAddr = I::SERVER_ADDR.into();
+        let server_addr = std::net::SocketAddr::new(server_addr.into(), 8080);
+        let mut socket = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+            .await
+            .expect("connect to server");
+
+        // Send a payload that will not fit in a single segment. (The PMTU is updated to
+        // `I::MINIMUM_LINK_MTU`, which is too small due to the need to also fit the TCP
+        // and IP headers).
+        let len = usize::try_from(I::MINIMUM_LINK_MTU).unwrap();
+        let payload = vec![0xFF; len];
+        socket.write_all(&payload[..]).await.unwrap();
+        socket
+    };
+
+    let (_socket, ()) = future::join(client, server).await;
 }
 
 /// Tests that a connection pending in an accept queue can be accepted and

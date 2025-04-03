@@ -4,11 +4,11 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 #include <usb/usb.h>
 
@@ -232,7 +232,7 @@ class EventRingHarness : public ::testing::Test {
   CommandRing command_ring_;
   uint64_t dcbaa_[128];
   uint64_t erdp_;
-  std::optional<ddk_fake::FakeMmioRegRegion> region_;
+  std::optional<fake_mmio::FakeMmioRegRegion> region_;
 };
 
 // UsbXhci Methods

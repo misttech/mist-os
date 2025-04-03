@@ -22,6 +22,7 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
@@ -61,6 +62,12 @@
             from: "#network",
             as: "fuchsia.net.root.Interfaces",
             to: "#starnix_runner",
+        },
+        {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            from: "#network",
+            to: "#starnix_runner",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.posix.socket.packet.Provider_OnlyForStarnix" ],
@@ -143,6 +150,20 @@
             subdir: "gpu",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-serial",
+            to: [ "#starnix_runner" ],
+            subdir: "serial",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-trippoint",
+            to: [ "#starnix_runner" ],
+            subdir: "trippoint",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             from: "parent",
@@ -184,6 +205,11 @@
         },
         {
             config: "fuchsia.starnix.runner.EnableDataCollection",
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
+            config: "fuchsia.time.config.WritableUTCTime",
             from: "parent",
             to: "#starnix_runner",
         },

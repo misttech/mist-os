@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -52,6 +53,9 @@ type TestResult struct {
 
 	// Tags contain test metadata.
 	Tags []build.TestTag
+
+	// Test metadata
+	Metadata metadata.TestMetadata
 }
 
 // Passed indicates whether the test completed successfully. This will be false

@@ -7,6 +7,7 @@ use fuchsia_inspect::{ArrayProperty, Inspector};
 use futures::FutureExt;
 use inspect_runtime::PublishedInspectController;
 use log::debug;
+use stalls::StallProvider;
 use std::sync::Arc;
 use {fidl_fuchsia_kernel as fkernel, fuchsia_inspect as _, inspect_runtime as _};
 
@@ -19,8 +20,9 @@ pub struct ServiceTask {
 /// Begins to serve the inspect tree, and returns an object holding the server's resources.
 /// Dropping the `ServiceTask` stops the service.
 pub fn start_service(
-    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
+    stall_provider: Arc<impl StallProvider>,
 ) -> Result<ServiceTask> {
     debug!("Start serving inspect tree.");
 
@@ -33,14 +35,15 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(attribution_data_service, kernel_stats_proxy, inspector);
+    build_inspect_tree(attribution_data_service, kernel_stats_proxy, stall_provider, inspector);
 
     Ok(ServiceTask { _inspect_controller: inspect_controller })
 }
 
 fn build_inspect_tree(
-    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
+    stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
 ) {
     // Lazy evaluation is unregistered when the `LazyNode` is dropped.
@@ -179,6 +182,27 @@ fn build_inspect_tree(
             .boxed()
         });
     }
+
+    {
+        inspector.root().record_lazy_child("stalls", move || {
+            let stall_info = stall_provider.get_stall_info().unwrap();
+            let stall_rate_opt = stall_provider.get_stall_rate();
+            async move {
+                let inspector = Inspector::default();
+                inspector.root().record_int("current_some", stall_info.stall_time_some);
+                inspector.root().record_int("current_full", stall_info.stall_time_full);
+                if let Some(stall_rate) = stall_rate_opt {
+                    inspector
+                        .root()
+                        .record_int("rate_interval_s", stall_rate.interval.into_seconds());
+                    inspector.root().record_int("rate_some", stall_rate.rate_some);
+                    inspector.root().record_int("rate_full", stall_rate.rate_full);
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        });
+    }
 }
 
 #[cfg(test)]
@@ -312,7 +336,27 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
 
-        build_inspect_tree(data_provider, stats_provider, &inspector);
+        struct FakeStallProvider {}
+        impl StallProvider for FakeStallProvider {
+            fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
+                Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
+            }
+
+            fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
+                Some(stalls::MemoryStallRate {
+                    interval: fasync::MonotonicDuration::from_seconds(60),
+                    rate_some: 1,
+                    rate_full: 2,
+                })
+            }
+        }
+
+        build_inspect_tree(
+            data_provider,
+            stats_provider,
+            Arc::new(FakeStallProvider {}),
+            &inspector,
+        );
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
@@ -367,6 +411,13 @@ mod tests {
                         pages_decompressed_within_log_time: vec![
                             40u64, 41u64, 42u64, 43u64, 44u64, 45u64, 46u64, 47u64,
                         ]
+                    },
+                    stalls: {
+                        current_some: 10i64,
+                        current_full: 20i64,
+                        rate_some: 1i64,
+                        rate_full: 2i64,
+                        rate_interval_s: 60i64
                     }
                 });
     }

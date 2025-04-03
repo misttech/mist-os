@@ -13,6 +13,7 @@
 #include <zircon/types.h>
 
 #include <memory>
+#include <utility>
 
 #include <explicit-memory/bytes.h>
 #include <fbl/algorithm.h>
@@ -21,9 +22,6 @@
 
 // See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
-#include <utility>
-
-#include <openssl/crypto.h>
 #include <openssl/mem.h>
 
 #include "src/security/lib/fcrypto/bytes.h"
@@ -35,7 +33,7 @@ namespace crypto {
 
 // Public methods
 
-Bytes::Bytes() : buf_(nullptr), len_(0) { CRYPTO_library_init(); }
+Bytes::Bytes() : buf_(nullptr), len_(0) {}
 Bytes::~Bytes() { Clear(); }
 
 Bytes::Bytes(Bytes&& o) noexcept : buf_(std::move(o.buf_)), len_(o.len_) {

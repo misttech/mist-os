@@ -116,6 +116,7 @@ async fn main_inner() -> Result<(), Error> {
     let policy_config = policy_engine.get_config();
     let _policy_config_node =
         inspect::PolicyConfigNode::new(root.create_child("policy_config"), policy_config);
+    let valid_service_url = !platform_config.service_url.is_empty();
 
     // StateMachine
     let (state_machine_control, state_machine) = StateMachineBuilder::new(
@@ -144,6 +145,7 @@ async fn main_inner() -> Result<(), Error> {
         channel_configs,
         Box::new(api_metrics_reporter),
         channel_data.name,
+        valid_service_url,
     );
     let fidl = Rc::new(RefCell::new(fidl));
 

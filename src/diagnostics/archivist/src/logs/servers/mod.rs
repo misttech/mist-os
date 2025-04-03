@@ -9,3 +9,4 @@ mod log_stream;
 pub use log::LogServer;
 pub use log_settings::LogSettingsServer;
 pub use log_stream::LogStreamServer;
+pub(crate) use log_stream::{extend_fxt_record, ExtendRecordOpts};

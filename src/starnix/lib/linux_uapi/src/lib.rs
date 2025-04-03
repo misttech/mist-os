@@ -11,6 +11,8 @@ pub use types::*;
 mod manual;
 pub use manual::*;
 
+pub mod macros;
+
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 

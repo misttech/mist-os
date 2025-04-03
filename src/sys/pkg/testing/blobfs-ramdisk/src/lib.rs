@@ -316,13 +316,11 @@ impl BlobfsRamdisk {
     /// Returns a new connection to blobfs's root directory as a raw zircon channel.
     pub fn root_dir_handle(&self) -> Result<ClientEnd<fio::DirectoryMarker>, Error> {
         let (root_clone, server_end) = zx::Channel::create();
-        self.fs.exposed_dir()?.deprecated_open(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_WRITABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE,
-            fio::ModeType::empty(),
+        self.fs.exposed_dir()?.open(
             self.fs.blob_dir_name(),
-            server_end.into(),
+            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_EXECUTE,
+            &Default::default(),
+            server_end,
         )?;
         Ok(root_clone.into())
     }

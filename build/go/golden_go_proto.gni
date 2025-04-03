@@ -87,6 +87,7 @@ template("golden_go_proto") {
                              "generate_descriptor_set",
                              "import_protobuf_full",
                              "sources",
+                             "import_dirs",
                            ])
     generate_cc = false
     if (_generate_go_grpc) {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{deserialize_from, Chunk, Reader, SparseHeader};
+use crate::{deserialize_from, Chunk, SparseHeader};
 use anyhow::{ensure, Context, Result};
 use byteorder::{ByteOrder as _, LE};
 use std::io::{Read, Seek, SeekFrom};
@@ -11,8 +11,8 @@ use std::io::{Read, Seek, SeekFrom};
 /// sparse image as it is read.
 /// If random access reads are not required, it is more performant to use `unsparse` to completely
 /// unpack a sparse image.
-pub struct SparseReader {
-    reader: Box<dyn Reader + Send + Sync>,
+pub struct SparseReader<R> {
+    reader: R,
     // Offset into the logical (unsparsed) image.
     offset: u64,
     // Size of the logical (unsparsed) image.
@@ -22,10 +22,10 @@ pub struct SparseReader {
     chunks: Vec<(Chunk, Option<u64>)>,
 }
 
-impl SparseReader {
+impl<R: Read + Seek> SparseReader<R> {
     /// Attempts to create a SparseReader from the given image.  Returns failure if the image is
     /// malformed.
-    pub fn new(mut reader: Box<dyn Reader + Send + Sync>) -> Result<Self> {
+    pub fn new(mut reader: R) -> Result<Self> {
         let header: SparseHeader =
             deserialize_from(&mut reader).context("Failed to read header")?;
         ensure!(header.valid(), "Invalid header");
@@ -65,12 +65,17 @@ impl SparseReader {
         }
         None
     }
+
+    #[cfg(test)]
+    pub(crate) fn chunks(self) -> Vec<(Chunk, Option<u64>)> {
+        self.chunks
+    }
 }
 
 // It's assumed that `reader` already points at the right offset to read from the chunk, and `buf`
 // won't read past the end of the chunk.
 // `output_offset` is the logical position in the output stream.
-fn read_from_chunk<R: Reader>(
+fn read_from_chunk<R: Read + Seek>(
     reader: &mut R,
     chunk: &Chunk,
     output_offset: u64,
@@ -98,7 +103,7 @@ fn read_from_chunk<R: Reader>(
     }
 }
 
-impl Read for SparseReader {
+impl<R: Read + Seek> Read for SparseReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut bytes_read = 0;
         while bytes_read < buf.len() {
@@ -111,7 +116,7 @@ impl Read for SparseReader {
             debug_assert!(offset_in_chunk < current_chunk.output_size() as u64);
             let to_read = std::cmp::min(
                 buf.len() - bytes_read,
-                current_chunk.output_size() - offset_in_chunk as usize,
+                current_chunk.output_size() as usize - offset_in_chunk as usize,
             );
             if let Some(offset) = chunk_start_offset {
                 self.reader.seek(SeekFrom::Start(*offset + offset_in_chunk))?;
@@ -129,7 +134,7 @@ impl Read for SparseReader {
     }
 }
 
-impl Seek for SparseReader {
+impl<R: Read + Seek> Seek for SparseReader<R> {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         self.offset = match pos {
             SeekFrom::Start(pos) => pos,
@@ -267,7 +272,7 @@ mod test {
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
             .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader(Box::new(file)))
+            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
             .add_chunk(DataSource::Skip(16384))
             .add_chunk(DataSource::Fill(0xaaaa_aaaau32, 1024))
             .add_chunk(DataSource::Skip(4096))
@@ -312,7 +317,7 @@ mod test {
         let mut sparse_file = NamedTempFile::new_in(&tmpdir).unwrap().into_file();
         SparseImageBuilder::new()
             .add_chunk(DataSource::Buffer(Box::new([0xffu8; 8192])))
-            .add_chunk(DataSource::Reader(Box::new(file)))
+            .add_chunk(DataSource::Reader { reader: Box::new(file), size: content_size as u64 })
             .add_chunk(DataSource::Skip(16384))
             .add_chunk(DataSource::Fill(0x0102_0304u32, 1024))
             .add_chunk(DataSource::Skip(4096))

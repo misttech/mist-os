@@ -19,6 +19,7 @@ use crate::vfs::{
     FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
     FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
+use starnix_uapi::user_address::MultiArchUserRef;
 
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -34,7 +35,7 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::Releasable;
 use starnix_uapi::as_any::AsAny;
-use starnix_uapi::auth::CAP_FOWNER;
+use starnix_uapi::auth::{CAP_FOWNER, CAP_SYS_RAWIO};
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
 use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::Access;
@@ -44,10 +45,10 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIGETBSZ,
-    FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER,
-    FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_ENABLE_VERITY,
-    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
+    errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIBMAP,
+    FIGETBSZ, FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE,
+    FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY,
+    FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_MEASURE_VERITY,
     FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS,
     FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
     TCGETS,
@@ -704,9 +705,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             &$self,
             locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &FileObject,
-            current_task: &starnix_core::task::CurrentTask,
+            current_task: &$crate::task::CurrentTask,
             offset: usize,
-            data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
+            data: &mut dyn $crate::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             $delegate.read(locked, file, current_task, offset, data)
         }
@@ -715,9 +716,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             &$self,
         locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &FileObject,
-            current_task: &starnix_core::task::CurrentTask,
+            current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
-            target: starnix_core::vfs::SeekTarget,
+            target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             $delegate.seek(locked, file, current_task, current_offset, target)
         }
@@ -735,13 +736,13 @@ macro_rules! fileops_impl_seekable {
         fn seek(
             &self,
             locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            file: &starnix_core::vfs::FileObject,
-            current_task: &starnix_core::task::CurrentTask,
+            file: &$crate::vfs::FileObject,
+            current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
-            target: starnix_core::vfs::SeekTarget,
+            target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-            starnix_core::vfs::default_seek(current_offset, target, |offset| {
-                let eof_offset = starnix_core::vfs::default_eof_offset(locked, file, current_task)?;
+            $crate::vfs::default_seek(current_offset, target, |offset| {
+                let eof_offset = $crate::vfs::default_eof_offset(locked, file, current_task)?;
                 offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
             })
         }
@@ -759,10 +760,10 @@ macro_rules! fileops_impl_nonseekable {
         fn seek(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: starnix_core::vfs::SeekTarget,
+            _target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ESPIPE)
         }
@@ -785,10 +786,10 @@ macro_rules! fileops_impl_seekless {
         fn seek(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: starnix_core::vfs::SeekTarget,
+            _target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             Ok(0)
         }
@@ -801,10 +802,10 @@ macro_rules! fileops_impl_dataless {
         fn write(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn starnix_core::vfs::buffers::InputBuffer,
+            _data: &mut dyn $crate::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
@@ -812,10 +813,10 @@ macro_rules! fileops_impl_dataless {
         fn read(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
+            _data: &mut dyn $crate::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
@@ -834,10 +835,10 @@ macro_rules! fileops_impl_directory {
         fn read(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
+            _data: &mut dyn $crate::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EISDIR)
         }
@@ -845,10 +846,10 @@ macro_rules! fileops_impl_directory {
         fn write(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn starnix_core::vfs::buffers::InputBuffer,
+            _data: &mut dyn $crate::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EISDIR)
         }
@@ -860,8 +861,8 @@ macro_rules! fileops_impl_noop_sync {
     () => {
         fn sync(
             &self,
-            file: &starnix_core::vfs::FileObject,
-            _current_task: &starnix_core::task::CurrentTask,
+            file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             if !file.node().is_reg() && !file.node().is_dir() {
                 return starnix_uapi::error!(EINVAL);
@@ -954,9 +955,10 @@ pub fn default_ioctl(
             let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
-        FS_IOC_GETFLAGS => {
+        #[allow(unreachable_patterns)]
+        uapi::FS_IOC_GETFLAGS | uapi::arch32::FS_IOC_GETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322874935"), "FS_IOC_GETFLAGS");
-            let arg = UserAddress::from(arg).into();
+            let arg = MultiArchUserRef::<u64, u32>::new(current_task, arg);
             let mut flags: u32 = 0;
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
@@ -964,7 +966,7 @@ pub fn default_ioctl(
             if file.node().info().casefold {
                 flags |= FS_CASEFOLD_FL;
             }
-            current_task.write_object(arg, &flags)?;
+            current_task.write_multi_arch_object(arg, flags.into())?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
@@ -1083,7 +1085,7 @@ pub fn default_ioctl(
             let attributes = file.node().ops().get_attr(has)?;
             if attributes.has.wrapping_key_id {
                 if attributes.wrapping_key_id != policy.master_key_identifier {
-                    return Err(errno!(EEXIST));
+                    return error!(EEXIST);
                 }
             } else {
                 file.node().update_info(|info| {
@@ -1917,6 +1919,20 @@ impl FileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        security::check_file_ioctl_access(current_task, &self, request)?;
+
+        if request == FIBMAP {
+            security::check_task_capable(current_task, CAP_SYS_RAWIO)?;
+
+            // TODO: https://fxbug.dev/404795644 - eliminate this phoney response when the SELinux
+            // Test Suite no longer requires it.
+            if current_task.kernel().features.selinux_test_suite {
+                let phoney_block = 0xbadf000du32;
+                current_task.write_object(arg.into(), &phoney_block)?;
+                return Ok(SUCCESS);
+            }
+        }
+
         self.ops().ioctl(locked, self, current_task, request, arg)
     }
 

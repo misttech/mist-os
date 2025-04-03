@@ -6,6 +6,8 @@ import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
 import("//build/bazel/assembly/bazel_board_configuration.gni")
 import("//build/bazel/assembly/bazel_board_input_bundle.gni")
+import("//build/bazel/assembly/bazel_board_input_bundle_set.gni")
+import("//build/info/info.gni")
 
 assert(current_toolchain == default_toolchain,
        "The vim3 board can only be defined in the default toolchain.")
@@ -166,6 +168,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/libmsd_vsi.cm" ]
     },
   ]
+  version = build_info_version
 }
 
 board_input_bundle("devicetree_board_driver") {
@@ -181,11 +184,13 @@ board_input_bundle("devicetree_board_driver") {
     ]
   }
   drivers = []
+  version = build_info_version
 }
 
 board_input_bundle("vulkan_arm_mali") {
   base_packages =
       [ "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0" ]
+  version = build_info_version
 }
 
 board_input_bundle("rtc_driver") {
@@ -196,15 +201,22 @@ board_input_bundle("rtc_driver") {
       driver_components = [ "meta/pcf8563.cm" ]
     },
   ]
+  version = build_info_version
 }
 
 board_input_bundle("paver") {
   bootfs_packages = [ "//src/bringup/bin/paver:package-vim3" ]
+  version = build_info_version
 }
 
 # TODO(jayzhuang): Remove after vim3-vg is migrated.
 bazel_board_input_bundle("bazel_drivers") {
   bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
+}
+
+bazel_board_input_bundle_set("vim3_bibs") {
+  bazel_board_input_bundle_set_target = "//boards/vim3:vim3_bibs"
+  deps = [ ":bazel_inputs" ]
 }
 
 bazel_board_configuration("vim3") {
@@ -213,7 +225,7 @@ bazel_board_configuration("vim3") {
 }
 
 bazel_board_configuration("reduced_perf_variation") {
-  board_name = "vim3"
+  name = "vim3"
   bazel_board_configuration_target = "//boards/vim3:reduced_perf_variation"
   deps = [ ":bazel_inputs" ]
 }

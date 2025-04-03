@@ -4,20 +4,23 @@
 
 use assert_matches::assert_matches;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
-use fidl::endpoints::create_proxy;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _};
 use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
 use fidl_fuchsia_fshost::AdminMarker;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
+use fidl_fuchsia_update_verify::HealthStatus;
 use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
-use fshost_test_fixture::disk_builder::{DataSpec, VolumesSpec, FVM_SLICE_SIZE};
+use fshost_test_fixture::disk_builder::{
+    DataSpec, VolumesSpec, FVM_SLICE_SIZE, TEST_DISK_BLOCK_SIZE,
+};
 use fshost_test_fixture::{
     round_down, TestFixture, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS,
     VFS_TYPE_MINFS,
 };
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use futures::FutureExt;
+use futures::FutureExt as _;
 use regex::Regex;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -27,7 +30,6 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_fshost::StarnixVolumeProviderMarker,
     fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker},
-    fidl_fuchsia_update_verify::{BlobfsVerifierMarker, VerifyOptions},
     fshost_test_fixture::STARNIX_VOLUME_NAME,
 };
 
@@ -378,7 +380,7 @@ async fn set_volume_limit() {
 
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
-async fn mount_and_unmount_starnix_volume() {
+async fn create_unmount_and_remount_starnix_volume() {
     let mut builder = new_builder();
     builder
         .fshost()
@@ -390,8 +392,6 @@ async fn mount_and_unmount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
-    // starnix volume.
     let volume_provider = fixture
         .realm
         .root
@@ -401,10 +401,10 @@ async fn mount_and_unmount_starnix_volume() {
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     volume_provider
-        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .create(crypt.into_client_end().unwrap(), exposed_dir_server)
         .await
         .expect("fidl transport error")
-        .expect("mount failed");
+        .expect("create failed");
 
     let starnix_volume_root_dir = fuchsia_fs::directory::open_directory(
         &exposed_dir_proxy,
@@ -435,8 +435,6 @@ async fn mount_and_unmount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
-    // starnix volume.
     let volume_provider = fixture
         .realm
         .root
@@ -461,6 +459,92 @@ async fn mount_and_unmount_starnix_volume() {
             .await
             .expect("Failed to create file in starnix volume");
     assert_eq!(&fuchsia_fs::file::read(&starnix_volume_file).await.unwrap()[..], b"file contents!");
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn create_starnix_volume_wipes_previous_volume() {
+    let mut builder = new_builder();
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder.with_disk().format_volumes(volumes_spec());
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let volume_provider = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
+    let (exposed_dir_proxy, exposed_dir_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    volume_provider
+        .create(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .await
+        .expect("fidl transport error")
+        .expect("create failed");
+
+    let starnix_volume_root_dir = fuchsia_fs::directory::open_directory(
+        &exposed_dir_proxy,
+        "root",
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
+    )
+    .await
+    .expect("Failed to open the root dir of the starnix volume");
+
+    let starnix_volume_file = fuchsia_fs::directory::open_file(
+        &starnix_volume_root_dir,
+        "file",
+        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+    )
+    .await
+    .expect("Failed to create file in starnix volume");
+    fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
+    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    let disk = fixture.tear_down().await.unwrap();
+    let mut builder = new_builder().with_disk_from(disk);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let volume_provider = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
+    let (exposed_dir_proxy, exposed_dir_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    volume_provider
+        .create(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .await
+        .expect("fidl transport error")
+        .expect("create failed");
+
+    let starnix_volume_root_dir =
+        fuchsia_fs::directory::open_directory(&exposed_dir_proxy, "root", fio::PERM_READABLE)
+            .await
+            .expect("Failed to open the root dir of the starnix volume");
+
+    assert_matches!(
+        fuchsia_fs::directory::open_file(&starnix_volume_root_dir, "file", fio::PERM_READABLE)
+            .await
+            .expect_err("StarnixVolumeProvider.Create should wipe the Starnix volume if it exists"),
+        fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
+    );
 
     fixture.tear_down().await;
 }
@@ -704,10 +788,10 @@ async fn shred_data_deletes_starnix_volume() {
     let (_exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     volume_provider
-        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .create(crypt.into_client_end().unwrap(), exposed_dir_server)
         .await
         .expect("fidl transport error")
-        .expect("mount failed");
+        .expect("create failed");
 
     let admin = fixture
         .realm
@@ -1072,21 +1156,18 @@ async fn migration_to_minfs() {
 
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
-async fn verify_blobs() {
+async fn health_check_blobs() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    let blobfs_verifier = fixture
+    let blobfs_health_check = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobfsVerifierMarker>()
+        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker>()
         .expect("connect_to_protcol_at_exposed_dir failed");
-    blobfs_verifier
-        .verify(&VerifyOptions::default())
-        .await
-        .expect("FIDL failure")
-        .expect("verify failure");
+    let status = blobfs_health_check.get_health_status().await.expect("FIDL failure");
+    assert_eq!(status, HealthStatus::Healthy);
 
     fixture.tear_down().await;
 }
@@ -1347,20 +1428,91 @@ async fn reset_initialized_gpt() {
 }
 
 #[fuchsia::test]
-async fn blobfs_verifier_service() {
+async fn health_check_service() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     let proxy = fuchsia_component::client::connect_to_protocol_at_dir_root::<
-        fidl_fuchsia_update_verify::BlobfsVerifierMarker,
+        fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker,
     >(fixture.exposed_dir())
     .unwrap();
-    proxy
-        .verify(&fidl_fuchsia_update_verify::VerifyOptions::default())
-        .await
-        .expect("FIDL error")
-        .expect("Verify failed");
+    let status = proxy.get_health_status().await.expect("FIDL error");
+    assert_eq!(status, HealthStatus::Healthy);
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn debug_block_directory() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    // Make sure the filesystems are enumerated before trying to access the block devices. The
+    // debug directory is populated as the devices are emitted by the watcher.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let block = fuchsia_fs::directory::open_directory(
+        fixture.exposed_dir(),
+        "debug_block",
+        fio::PERM_READABLE,
+    )
+    .await
+    .unwrap();
+
+    // Check that the block directory contains some of the required things for the shell tools
+    let source =
+        fuchsia_fs::directory::open_file(&block, "000/source", fio::PERM_READABLE).await.unwrap();
+    // This is a smoke check - we can't check for a concrete source because it's different (and
+    // potentially unstable) depending on the configuration, and it's not that useful to be a
+    // change detector.
+    assert!(fuchsia_fs::file::read_to_string(&source).await.unwrap().len() > 0);
+
+    let volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+        &block,
+        "000/fuchsia.hardware.block.volume.Volume",
+    )
+    .unwrap();
+    assert_eq!(
+        volume.get_info().await.unwrap().map_err(zx::Status::from_raw).unwrap().block_size,
+        512,
+    );
+
+    fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/399197713): Enable this test when extra disks don't flake
+#[ignore]
+#[fuchsia::test]
+async fn expose_unmanaged_block_devices() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk().set_uninitialized().size(8192);
+    let fixture = builder.build().await;
+
+    // Make sure the filesystems are enumerated before trying to access the block devices. The block
+    // directory is populated as the devices are emitted by the watcher.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let block_dir =
+        fuchsia_fs::directory::open_directory(fixture.exposed_dir(), "block", fio::PERM_READABLE)
+            .await
+            .unwrap();
+    let mut dirents = fuchsia_fs::directory::readdir(&block_dir).await.expect("readdir failed");
+    let device_path = dirents.pop().unwrap().name;
+    assert!(dirents.is_empty(), "Multiple devices published");
+
+    let path = format!("{}/{}", &device_path, VolumeMarker::PROTOCOL_NAME);
+    let volume = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+        &block_dir, &path,
+    )
+    .unwrap();
+    let metadata =
+        volume.get_metadata().await.expect("FIDL error").expect("Failed to get metadata");
+    assert_eq!(metadata.num_blocks, Some(8192 / TEST_DISK_BLOCK_SIZE as u64));
 
     fixture.tear_down().await;
 }

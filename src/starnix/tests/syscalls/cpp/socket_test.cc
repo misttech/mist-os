@@ -742,7 +742,16 @@ TEST_P(SndRcvBufSockOpt, DoubledOnGet) {
   ASSERT_EQ(new_buf_size, 2 * buf_size);
 }
 
-INSTANTIATE_TEST_SUITE_P(SndRcvBufSockOpt, SndRcvBufSockOpt, testing::Values(SO_SNDBUF, SO_RCVBUF));
+INSTANTIATE_TEST_SUITE_P(SndRcvBufSockOpt, SndRcvBufSockOpt, testing::Values(SO_SNDBUF, SO_RCVBUF),
+                         [](const testing::TestParamInfo<int>& info) {
+                           switch (info.param) {
+                             case SO_SNDBUF:
+                               return std::string("SO_SNDBUF");
+                             case SO_RCVBUF:
+                               return std::string("SO_RCVBUF");
+                           }
+                           return std::string("UNKNOWN(") + std::to_string(info.param) + ")";
+                         });
 
 class SocketMarkSockOpt : public testing::TestWithParam<std::tuple<int, int>> {};
 

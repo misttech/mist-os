@@ -9,6 +9,13 @@
             url: "#meta/realm_builder_server.cm",
         },
     ],
+    collections: [
+        {
+            name: "realm_builder",
+            environment: "#realm_builder_env",
+            durability: "transient",
+        },
+    ],
     offer: [
         // These protocols are used by any nested component managers to
         // proxy resolve and runner requests to realm builder

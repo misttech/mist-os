@@ -50,7 +50,7 @@ SECTIONS {
    * by the linker.
    */
   .interp : { *(.interp) }
-  .dynamic : { *(.dynamic) }
+  .dynamic : ONLY_IF_RO { *(.dynamic) }
   .hash : { *(.hash) }
   .gnu.hash : { *(.gnu.hash) }
   .dynsym : { *(.dynsym) }
@@ -58,8 +58,8 @@ SECTIONS {
   .relr.auth.dyn : { *(.relr.auth.dyn) }
   ASSERT(SIZEOF(.relr.auth.dyn) == 0, ".relr.auth.dyn is not supported")
   .relr.dyn : { *(.relr.dyn) }
-  .rela.dyn : { *(.rela*) }
-  .rel.dyn : { *(.rel*) }
+  .rela.dyn : { *(.rela.*) }
+  .rel.dyn : { *(.rel.*) }
 
   /*
    * These boundary symbols are used by lib/version/version.cc to find
@@ -132,7 +132,15 @@ SECTIONS {
 
   PROVIDE_HIDDEN(__code_end = .);
 
+  /*
+   * The DATA_SEGMENT_ALIGN doesn't really do anything special here in terms of
+   * the . setting.  But GNU ld requires it and the corresponding uses of
+   * DATA_SEGMENT_RELRO_END and DATA_SEGMENT_END to generate PT_GNU_RELRO.
+   */
+  . = DATA_SEGMENT_ALIGN(CONSTANT(MAXPAGESIZE), CONSTANT(COMMONPAGESIZE));
   . = ALIGN(CONSTANT(MAXPAGESIZE));
+  ASSERT(. % CONSTANT(MAXPAGESIZE) == 0, "unexpected misalignment")
+
   PROVIDE_HIDDEN(__relro_start = .);
 
   /*
@@ -140,6 +148,8 @@ SECTIONS {
    * to be writable until after dynamic relocation.  In the kernel, these
    * things all just form another read-only segment.
    */
+
+  .dynamic : ONLY_IF_RW { *(.dynamic) }
 
   .init_array : {
     PROVIDE_HIDDEN(__init_array_start = .);
@@ -196,6 +206,11 @@ SECTIONS {
     . = ALIGN(CONSTANT(MAXPAGESIZE));
     PROVIDE_HIDDEN(__relro_end = .);
   }
+
+  /*
+   * This is a no-op for . but GNU ld requires it to generate PT_GNU_RELRO.
+   */
+   . = DATA_SEGMENT_RELRO_END(0, .);
 
   .data : ALIGN(CONSTANT(MAXPAGESIZE)) {
     PROVIDE_HIDDEN(__data_start = .);
@@ -263,5 +278,11 @@ SECTIONS {
    */
 
   . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+  /*
+   * This is a no-op for . but GNU ld requires it to generate PT_GNU_RELRO.
+   */
+  . = DATA_SEGMENT_END(.);
+
   PROVIDE_HIDDEN(_end = .);
 }

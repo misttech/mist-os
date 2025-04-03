@@ -5,9 +5,11 @@
 #include "src/storage/lib/paver/paver.h"
 
 #include <dirent.h>
+#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/abr/data.h>
 #include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -427,18 +429,35 @@ WriteFirmwareResult CreateWriteFirmwareResult(std::variant<zx_status_t, bool>* v
 }  // namespace
 
 zx::result<std::unique_ptr<Paver>> Paver::Create(fbl::unique_fd devfs_root) {
-  zx::result devices = BlockDevices::CreateDevfs(std::move(devfs_root));
-  if (devices.is_error()) {
-    return devices.take_error();
-  }
-  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto [svc, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   if (zx_status_t status =
           fdio_open3("/svc", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
                      server.TakeChannel().release());
       status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(client)));
+  zx::result admin = component::ConnectAt<fuchsia_fshost::Admin>(svc);
+  if (admin.is_error()) {
+    ERROR("Failed to connect to fshost admin service: %s\n", admin.status_string());
+    return admin.take_error();
+  }
+  bool storage_host_enabled = false;
+  {
+    fidl::WireResult storage_host = fidl::WireCall(*admin)->StorageHostEnabled();
+    if (!storage_host.ok()) {
+      ERROR("Failed to query fshost for storage-host config: %s\n",
+            storage_host.FormatDescription().c_str());
+    } else {
+      storage_host_enabled = storage_host->enabled;
+    }
+  }
+  zx::result devices = storage_host_enabled ? BlockDevices::CreateFromFshostBlockDir()
+                                            : BlockDevices::CreateDevfs(std::move(devfs_root));
+  if (devices.is_error()) {
+    ERROR("Failed to open device source: %s\n", devices.status_string());
+    return devices.take_error();
+  }
+  return zx::ok(std::make_unique<Paver>(std::move(*devices), std::move(svc)));
 }
 
 void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter::Sync& _completer) {

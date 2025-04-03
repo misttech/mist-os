@@ -712,6 +712,16 @@ impl HostDispatcher {
         }
     }
 
+    pub async fn set_connectable(&self, connectable: bool) -> types::Result<()> {
+        match self.active_host().await {
+            Some(host) => {
+                host.set_connectable(connectable).await?;
+                Ok(())
+            }
+            None => Err(types::Error::no_host()),
+        }
+    }
+
     fn stash(&self) -> Stash {
         self.state.read().stash.clone()
     }

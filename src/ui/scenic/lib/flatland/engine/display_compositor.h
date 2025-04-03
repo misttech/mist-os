@@ -293,6 +293,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Maps a buffer collection ID to a collection pixel format struct.
   // TODO(https://fxbug.dev/42150686): Delete after we don't need the pixel format anymore.
+  // TODO(https://fxbug.dev/406066267): We never clear values added to this map.  Until we can
+  // delete this, we might want to add them to a separate map scoped to individual images, rather
+  // than to the buffer collection.
   std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::images2::PixelFormatModifier>
       buffer_collection_pixel_format_modifier_ FXL_GUARDED_BY(lock_);
 

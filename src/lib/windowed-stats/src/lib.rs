@@ -98,18 +98,18 @@ impl WindowedStats<SumAndCount> {
 /// Given `timestamp`, return the start bound of its enclosing window with the specified
 /// `granularity`.
 fn get_start_bound(
-    timestamp: fasync::MonotonicInstant,
-    granularity: zx::MonotonicDuration,
-) -> fasync::MonotonicInstant {
-    timestamp - zx::MonotonicDuration::from_nanos(timestamp.into_nanos() % granularity.into_nanos())
+    timestamp: fasync::BootInstant,
+    granularity: zx::BootDuration,
+) -> fasync::BootInstant {
+    timestamp - zx::BootDuration::from_nanos(timestamp.into_nanos() % granularity.into_nanos())
 }
 
 /// Given the `prev` and `current` timestamps, return how many windows need to be slided
 /// for if each window has the specified `granularity`.
 fn get_num_slides_needed(
-    prev: fasync::MonotonicInstant,
-    current: fasync::MonotonicInstant,
-    granularity: zx::MonotonicDuration,
+    prev: fasync::BootInstant,
+    current: fasync::BootInstant,
+    granularity: zx::BootDuration,
 ) -> usize {
     let prev_start_bound = get_start_bound(prev, granularity);
     let current_start_bound = get_start_bound(current, granularity);
@@ -127,9 +127,9 @@ pub struct TimeSeries<T> {
     fifteen_minutely: WindowedStats<T>,
     hourly: WindowedStats<T>,
     /// Time time when the `TimeSeries` was first created
-    created_timestamp: fasync::MonotonicInstant,
+    created_timestamp: fasync::BootInstant,
     /// The time when data in the current `TimeSeries` was last updated
-    last_timestamp: fasync::MonotonicInstant,
+    last_timestamp: fasync::BootInstant,
 }
 
 impl<T: Debug> Debug for TimeSeries<T> {
@@ -160,7 +160,7 @@ impl<T: Default> TimeSeries<T> {
         hourly_windows: HourlyWindows,
         create_aggregation_fn: impl Fn() -> Box<dyn Fn(&T, &T) -> T + Send>,
     ) -> Self {
-        let now = fasync::MonotonicInstant::now();
+        let now = fasync::BootInstant::now();
         Self {
             minutely: WindowedStats::new(minutely_windows.0, create_aggregation_fn()),
             fifteen_minutely: WindowedStats::new(
@@ -176,23 +176,19 @@ impl<T: Default> TimeSeries<T> {
     /// Check whether the current time has exceeded the bound of the existing windows. If yes
     /// then slide windows as many times as required until the window encompasses the current time.
     pub fn update_windows(&mut self) {
-        let now = fasync::MonotonicInstant::now();
-        for _i in 0..get_num_slides_needed(
-            self.last_timestamp,
-            now,
-            zx::MonotonicDuration::from_minutes(1),
-        ) {
+        let now = fasync::BootInstant::now();
+        for _i in
+            0..get_num_slides_needed(self.last_timestamp, now, zx::BootDuration::from_minutes(1))
+        {
             self.minutely.slide_window();
         }
-        for _i in 0..get_num_slides_needed(
-            self.last_timestamp,
-            now,
-            zx::MonotonicDuration::from_minutes(15),
-        ) {
+        for _i in
+            0..get_num_slides_needed(self.last_timestamp, now, zx::BootDuration::from_minutes(15))
+        {
             self.fifteen_minutely.slide_window();
         }
         for _i in
-            0..get_num_slides_needed(self.last_timestamp, now, zx::MonotonicDuration::from_hours(1))
+            0..get_num_slides_needed(self.last_timestamp, now, zx::BootDuration::from_hours(1))
         {
             self.hourly.slide_window();
         }

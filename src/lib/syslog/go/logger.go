@@ -20,7 +20,7 @@ import (
 	"syscall/zx"
 	"unicode/utf8"
 
-	"fidl/fuchsia/diagnostics"
+	"fidl/fuchsia/diagnostics/types"
 	"fidl/fuchsia/logger"
 )
 
@@ -215,7 +215,7 @@ func NewLogger(options LogInitOptions) (*Logger, error) {
 						_ = l.InfoTf(tag, "fuchsia.logger/LogSink.WaitForInterestChange({MinSeverity: %s})", minSeverity)
 					} else {
 						_ = l.InfoTf(tag, "fuchsia.logger/LogSink.WaitForInterestChange({})")
-						l.SetSeverity(diagnostics.Severity(initLevel))
+						l.SetSeverity(types.Severity(initLevel))
 					}
 				case logger.LogSinkWaitForInterestChangeResultErr:
 					_ = l.ErrorTf(tag, "fuchsia.logger/LogSink.WaitForInterestChange(): %s", interest.Err)
@@ -403,7 +403,7 @@ func (l *Logger) logf(callDepth int, logLevel LogLevel, tag string, format strin
 	return l.logToWriter(l.options.Writer, time, logLevel, tag, msg)
 }
 
-func (l *Logger) SetSeverity(severity diagnostics.Severity) {
+func (l *Logger) SetSeverity(severity types.Severity) {
 	atomic.StoreInt32(&l.level, int32(severity))
 }
 

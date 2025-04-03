@@ -34,3 +34,11 @@ closed protocol NodeInfoIterator {
         nodes vector<NodeInfo>:MAX;
     });
 };
+
+@available(added=NEXT)
+closed protocol DriverHostInfoIterator {
+    /// Returns empty when no more entries left.
+    strict GetNext() -> (struct {
+        driver_hosts vector<DriverHostInfo>:MAX;
+    });
+};

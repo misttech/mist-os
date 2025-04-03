@@ -7,12 +7,13 @@
 mod error;
 
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::ptr::copy_nonoverlapping;
 
 pub use self::error::EncodeError;
 
 use crate::{
-    Encoder, EncoderExt as _, Slot, WireBox, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16,
+    Encoder, EncoderExt as _, WireBox, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16,
     WireU32, WireU64,
 };
 
@@ -50,6 +51,50 @@ impl<T: ?Sized> CopyOptimization<T> {
     }
 }
 
+/// Zeroes the padding of this type.
+///
+/// # Safety
+///
+/// `zero_padding` must write zeroes to at least the padding bytes of the pointed-to memory.
+pub unsafe trait ZeroPadding: Sized {
+    /// Writes zeroes to the padding for this type, if any.
+    fn zero_padding(out: &mut MaybeUninit<Self>);
+}
+
+unsafe impl<T: ZeroPadding, const N: usize> ZeroPadding for [T; N] {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        for i in 0..N {
+            let out_i = unsafe { &mut *out.as_mut_ptr().cast::<MaybeUninit<T>>().add(i) };
+            T::zero_padding(out_i);
+        }
+    }
+}
+
+macro_rules! impl_zero_padding_for_primitive {
+    ($ty:ty) => {
+        unsafe impl ZeroPadding for $ty {
+            #[inline]
+            fn zero_padding(_: &mut MaybeUninit<Self>) {}
+        }
+    };
+}
+
+macro_rules! impl_zero_padding_for_primitives {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl_zero_padding_for_primitive!($ty);
+        )*
+    }
+}
+
+impl_zero_padding_for_primitives! {
+    (), bool, i8, u8,
+    WireI16, WireI32, WireI64,
+    WireU16, WireU32, WireU64,
+    WireF32, WireF64,
+}
+
 /// A type which can be encoded as FIDL.
 pub trait Encodable {
     /// An optimization flag that allows the bytes of this type to be copied directly during
@@ -61,33 +106,44 @@ pub trait Encodable {
     const COPY_OPTIMIZATION: CopyOptimization<Self> = CopyOptimization::disable();
 
     /// The wire type for the value.
-    type Encoded;
+    type Encoded: ZeroPadding;
 }
 
 /// Encodes a value.
-pub trait Encode<E: ?Sized>: Encodable {
-    /// Encodes this value into an encoder and slot.
-    fn encode(&mut self, encoder: &mut E, slot: Slot<'_, Self::Encoded>)
-        -> Result<(), EncodeError>;
+///
+/// # Safety
+///
+/// `encode` must initialize all non-padding bytes of `out`.
+pub unsafe trait Encode<E: ?Sized>: Encodable {
+    /// Encodes this value into an encoder and output.
+    fn encode(
+        &mut self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError>;
 }
 
 /// A type which can be encoded as FIDL when optional.
 pub trait EncodableOption {
     /// The wire type for the optional value.
-    type EncodedOption;
+    type EncodedOption: ZeroPadding;
 }
 
 /// Encodes an optional value.
-pub trait EncodeOption<E: ?Sized>: EncodableOption {
-    /// Encodes this optional value into an encoder and slot.
+///
+/// # Safety
+///
+/// `encode_option` must initialize all non-padding bytes of `out`.
+pub unsafe trait EncodeOption<E: ?Sized>: EncodableOption {
+    /// Encodes this optional value into an encoder and output.
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption>,
+        out: &mut MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), EncodeError>;
 }
 
-macro_rules! impl_primitive {
+macro_rules! impl_encode_for_primitive {
     ($ty:ty, $enc:ty) => {
         impl Encodable for $ty {
             // Copy optimization for primitives is enabled if their size is <= 1 or the target is
@@ -101,14 +157,14 @@ macro_rules! impl_primitive {
             type Encoded = $enc;
         }
 
-        impl<E: ?Sized> Encode<E> for $ty {
+        unsafe impl<E: ?Sized> Encode<E> for $ty {
             #[inline]
             fn encode(
                 &mut self,
                 _: &mut E,
-                mut slot: Slot<'_, Self::Encoded>,
+                out: &mut MaybeUninit<Self::Encoded>,
             ) -> Result<(), EncodeError> {
-                slot.write(<$enc>::from(*self));
+                out.write(<$enc>::from(*self));
                 Ok(())
             }
         }
@@ -117,18 +173,18 @@ macro_rules! impl_primitive {
             type EncodedOption = WireBox<$enc>;
         }
 
-        impl<E: Encoder + ?Sized> EncodeOption<E> for $ty {
+        unsafe impl<E: Encoder + ?Sized> EncodeOption<E> for $ty {
             #[inline]
             fn encode_option(
                 this: Option<&mut Self>,
                 encoder: &mut E,
-                slot: Slot<'_, Self::EncodedOption>,
+                out: &mut MaybeUninit<Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
                 if let Some(value) = this {
                     encoder.encode_next(value)?;
-                    WireBox::encode_present(slot);
+                    WireBox::encode_present(out);
                 } else {
-                    WireBox::encode_absent(slot);
+                    WireBox::encode_absent(out);
                 }
 
                 Ok(())
@@ -137,15 +193,15 @@ macro_rules! impl_primitive {
     };
 }
 
-macro_rules! impl_primitives {
+macro_rules! impl_encode_for_primitives {
     ($($ty:ty, $enc:ty);* $(;)?) => {
         $(
-            impl_primitive!($ty, $enc);
+            impl_encode_for_primitive!($ty, $enc);
         )*
     }
 }
 
-impl_primitives! {
+impl_encode_for_primitives! {
     (), (); bool, bool; i8, i8; u8, u8;
 
     i16, WireI16; i32, WireI32; i64, WireI64;
@@ -164,20 +220,22 @@ impl<T: Encodable, const N: usize> Encodable for [T; N] {
     type Encoded = [T::Encoded; N];
 }
 
-impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
+unsafe impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
     fn encode(
         &mut self,
         encoder: &mut E,
-        mut slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         if T::COPY_OPTIMIZATION.is_enabled() {
             // SAFETY: `T` has copy optimization enabled and so is safe to copy to the output.
             unsafe {
-                copy_nonoverlapping(self.as_ptr().cast(), slot.as_mut_ptr(), 1);
+                copy_nonoverlapping(self.as_ptr().cast(), out.as_mut_ptr(), 1);
             }
         } else {
             for (i, item) in self.iter_mut().enumerate() {
-                item.encode(encoder, slot.index(i))?;
+                let out_i =
+                    unsafe { &mut *out.as_mut_ptr().cast::<MaybeUninit<T::Encoded>>().add(i) };
+                item.encode(encoder, out_i)?;
             }
         }
         Ok(())
@@ -188,13 +246,13 @@ impl<T: Encodable> Encodable for Box<T> {
     type Encoded = T::Encoded;
 }
 
-impl<E: ?Sized, T: Encode<E>> Encode<E> for Box<T> {
+unsafe impl<E: ?Sized, T: Encode<E>> Encode<E> for Box<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        T::encode(self, encoder, slot)
+        T::encode(self, encoder, out)
     }
 }
 

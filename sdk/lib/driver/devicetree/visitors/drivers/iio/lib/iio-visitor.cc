@@ -32,8 +32,8 @@ bool IioVisitor::is_match(fdf_devicetree::Node& node) {
 zx::result<> IioVisitor::Visit(fdf_devicetree::Node& node,
                                const devicetree::PropertyDecoder& decoder) {
   auto iio_props = iio_parser_->Parse(node);
-  if (iio_props->find(kIioChannelReference) != iio_props->end()) {
-    if (iio_props->find(kIioChannelNames) == iio_props->end() ||
+  if (iio_props->contains(kIioChannelReference)) {
+    if (!iio_props->contains(kIioChannelNames) ||
         (*iio_props)[kIioChannelNames].size() != (*iio_props)[kIioChannelReference].size()) {
       // We need a iio names to generate bind rules.
       FDF_LOG(ERROR, "IIO reference '%s' does not have valid IIO names field.",
@@ -45,7 +45,7 @@ zx::result<> IioVisitor::Visit(fdf_devicetree::Node& node,
       auto reference = (*iio_props)[kIioChannelReference][index].AsReference();
       if (reference && is_match(reference->first)) {
         auto result = ParseReferenceChild(node, reference->first, reference->second,
-                                          (*iio_props)[kIioChannelNames][index].AsString());
+                                          (*iio_props)[kIioChannelNames][index].AsString().value());
         if (result.is_error()) {
           return result.take_error();
         }

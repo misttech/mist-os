@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use core::fmt;
+use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 
 use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Slot, TakeFrom, WirePointer,
+    EncodeOption, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A boxed (optional) FIDL value.
@@ -35,16 +36,23 @@ impl<T> Drop for WireBox<T> {
     }
 }
 
+unsafe impl<T> ZeroPadding for WireBox<T> {
+    #[inline]
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
+        // Wire boxes have no padding
+    }
+}
+
 impl<T> WireBox<T> {
-    /// Encodes that a value is present in a slot.
-    pub fn encode_present(slot: Slot<'_, Self>) {
-        munge!(let Self { ptr } = slot);
+    /// Encodes that a value is present in an output.
+    pub fn encode_present(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { ptr } = out);
         WirePointer::encode_present(ptr);
     }
 
     /// Encodes that a value is absent in a slot.
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { ptr } = slot);
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { ptr } = out);
         WirePointer::encode_absent(ptr);
     }
 
@@ -87,13 +95,13 @@ impl<T: EncodableOption> Encodable for Option<T> {
     type Encoded = T::EncodedOption;
 }
 
-impl<E: ?Sized, T: EncodeOption<E>> Encode<E> for Option<T> {
+unsafe impl<E: ?Sized, T: EncodeOption<E>> Encode<E> for Option<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        T::encode_option(self.as_mut(), encoder, slot)
+        T::encode_option(self.as_mut(), encoder, out)
     }
 }
 

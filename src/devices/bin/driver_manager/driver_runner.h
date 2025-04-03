@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_RUNNER_H_
 
 #include <fidl/fuchsia.component/cpp/wire.h>
+#include <fidl/fuchsia.driver.crash/cpp/wire.h>
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
@@ -44,6 +45,7 @@ namespace driver_manager {
 
 class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public fidl::WireServer<fuchsia_driver_index::DriverNotifier>,
+                     public fidl::WireServer<fuchsia_driver_crash::CrashIntrospect>,
                      public fidl::Server<fuchsia_driver_token::NodeBusTopology>,
                      public BindManagerBridge,
                      public CompositeManagerBridge,
@@ -75,6 +77,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // fidl::WireServer<fuchsia_driver_index::DriverNotifier>
   void NewDriverAvailable(NewDriverAvailableCompleter::Sync& completer) override;
+
+  // fidl::WireServer<fuchsia_driver_crash::CrashIntrospect>
+  void FindDriverCrash(FindDriverCrashRequestView request,
+                       FindDriverCrashCompleter::Sync& completer) override;
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
@@ -114,6 +120,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   void RebindComposite(std::string spec, std::optional<std::string> driver_url,
                        fit::callback<void(zx::result<>)> callback) override;
+
+  void RebindCompositesWithDriver(const std::string& url,
+                                  fit::callback<void(size_t)> complete_callback);
 
   bool IsTestShutdownDelayEnabled() const override { return enable_test_shutdown_delays_; }
   std::weak_ptr<std::mt19937> GetShutdownTestRng() const override {
@@ -170,6 +179,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                                             : nullptr;
   }
 
+  const fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>& driver_hosts() const {
+    return driver_hosts_;
+  }
+
  private:
   // NodeManager interface.
   // Attempt to bind `node`. A nullptr for result_tracker is acceptable if the caller doesn't intend
@@ -212,6 +225,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   uint64_t cap_id_ = 0;
   LoaderServiceFactory loader_service_factory_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_crash::CrashIntrospect> crash_introspect_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_token::NodeBusTopology> bus_topo_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_index::DriverNotifier> driver_notifier_bindings_;
   async_dispatcher_t* const dispatcher_;

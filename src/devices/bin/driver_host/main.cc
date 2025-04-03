@@ -36,7 +36,8 @@ int main(int argc, char** argv) {
               "Failed to redirect stdout to debuglog, assuming test environment and continuing");
   }
 
-  if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
+  if (zx_status_t status = fdf_env_start(FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES);
+      status != ZX_OK) {
     FX_LOG_KV(ERROR, "Failed to create the initial dispatcher thread");
     return status;
   }

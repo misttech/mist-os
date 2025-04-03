@@ -134,11 +134,6 @@ zx_status_t AddI2cBus(const I2cBus& bus,
   }
 
   std::vector<fpbus::Metadata> metadata{
-      // TODO(b/385164506): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
-          .data = encoded_i2c_metadata.value(),
-      }},
       {{
           .id = fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata::kSerializableName,
           .data = std::move(encoded_i2c_metadata.value()),

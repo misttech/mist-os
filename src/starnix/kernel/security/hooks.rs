@@ -2,13 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, FileObjectState, FileSystemState, ResolvedElfState, TaskState};
+use super::{
+    selinux_hooks, BpfMapState, BpfProgState, FileObjectState, FileSystemState, ResolvedElfState,
+    TaskState,
+};
+use crate::bpf::program::Program;
+use crate::bpf::BpfMap;
+use crate::mm::{MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
+use crate::vfs::socket::{Socket, SocketAddress};
 use crate::vfs::{
     DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    Mount, NamespaceNode, ValueOrSize, XattrOp,
+    Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
@@ -24,7 +31,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{bpf_cmd, errno, error};
+use starnix_uapi::{bpf_cmd, errno, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -78,6 +85,18 @@ impl From<OpenFlags> for PermissionFlags {
             permissions |= PermissionFlags::APPEND;
         }
         permissions
+    }
+}
+
+impl PermissionFlags {
+    pub fn from_bpf_flags(bpf_flags: u32) -> Self {
+        if bpf_flags & BPF_F_RDONLY == BPF_F_RDONLY {
+            PermissionFlags::READ
+        } else if bpf_flags & BPF_F_WRONLY == BPF_F_WRONLY {
+            PermissionFlags::WRITE
+        } else {
+            PermissionFlags::READ | PermissionFlags::WRITE
+        }
     }
 }
 
@@ -222,6 +241,27 @@ pub struct FsNodeSecurityXattr {
     pub value: FsString,
 }
 
+/// Checks whether the `current_task` is allowed to mmap `file` or memory using the given
+/// [`ProtectionFlags`] and [`MappingOptions`].
+/// Corresponds to the `mmap_file()` LSM hook.
+pub fn mmap_file(
+    current_task: &CurrentTask,
+    file: &Option<FileHandle>,
+    protection_flags: ProtectionFlags,
+    options: MappingOptions,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.mmap_file");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file::mmap_file(
+            security_server,
+            current_task,
+            file,
+            protection_flags,
+            options,
+        )
+    })
+}
+
 /// Checks whether the `current_task` has the specified `permission_flags` to the `file`.
 /// Corresponds to the `file_permission()` LSM hook.
 pub fn file_permission(
@@ -344,18 +384,9 @@ pub fn fs_node_init_on_create(
 /// hook rather than `fs_node_init_on_create()` above.
 pub fn fs_node_init_anon(current_task: &CurrentTask, new_node: &FsNode, node_type: &str) {
     track_hook_duration!(c"security.hooks.fs_node_init_anon");
-    if_selinux_else(
-        current_task,
-        |security_server| {
-            selinux_hooks::fs_node::fs_node_init_anon(
-                security_server,
-                current_task,
-                new_node,
-                node_type,
-            )
-        },
-        || (),
-    )
+    if let Some(state) = current_task.kernel().security_state.state.as_ref() {
+        selinux_hooks::fs_node::fs_node_init_anon(&state.server, current_task, new_node, node_type)
+    }
 }
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
@@ -574,6 +605,22 @@ pub fn file_receive(current_task: &CurrentTask, file: &FileObject) -> Result<(),
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     track_hook_duration!(c"security.hooks.file_alloc_security");
     FileObjectState { state: selinux_hooks::file::file_alloc_security(current_task) }
+}
+
+/// Returns the security context to be assigned to a BPM map object, based on the task that
+/// creates it.
+/// Corresponds to the `bpf_map_alloc_security()` LSM hook.
+pub fn bpf_map_alloc(current_task: &CurrentTask) -> BpfMapState {
+    track_hook_duration!(c"security.hooks.bpf_map_alloc");
+    BpfMapState { state: selinux_hooks::bpf::bpf_map_alloc(current_task) }
+}
+
+/// Returns the security context to be assigned to a BPM program object, based on the task
+/// that creates it.
+/// Corresponds to the `bpf_prog_alloc_security()` LSM hook.
+pub fn bpf_prog_alloc(current_task: &CurrentTask) -> BpfProgState {
+    track_hook_duration!(c"security.hooks.bpf_prog_alloc");
+    BpfProgState { state: selinux_hooks::bpf::bpf_prog_alloc(current_task) }
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
@@ -799,8 +846,51 @@ pub fn check_exec_access(
     )
 }
 
+/// Computes and updates the socket security class for the `FsNode` associated with a new socket.
+/// Corresponds to the `socket_post_create()` LSM hooks.
+pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
+    profile_duration!("security.hooks.socket_post_create");
+    selinux_hooks::socket::socket_post_create(socket, socket_node);
+}
+
+/// Checks if the `current_task` is allowed to perform a bind operation for this `socket_node`.
+/// Corresponds to the `socket_bind()` LSM hook.
+pub fn check_socket_bind_access(
+    current_task: &CurrentTask,
+    socket_node: &FsNode,
+    socket_address: &SocketAddress,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_bind_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_bind_access(
+            &security_server,
+            current_task,
+            socket_node,
+            socket_address,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to initiate a connection with `socket_node`.
+/// Corresponds to the `socket_connect()` LSM hook.
+pub fn check_socket_connect_access(
+    current_task: &CurrentTask,
+    socket_node: &FsNode,
+    socket_address: &SocketAddress,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_connect_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_connect_access(
+            &security_server,
+            current_task,
+            socket_node,
+            socket_address,
+        )
+    })
+}
+
 /// Updates the SELinux thread group state on exec.
-/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` hooks.
+/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
     track_hook_duration!(c"security.hooks.update_state_on_exec");
     if_selinux_else(
@@ -946,6 +1036,26 @@ pub fn task_prlimit(
     })
 }
 
+/// Called before `source` sets the resource limits of `target` from `old_limit` to `new_limit`.
+/// Corresponds to the `security_task_setrlimit` hook.
+pub fn task_setrlimit(
+    source: &CurrentTask,
+    target: &Task,
+    old_limit: rlimit,
+    new_limit: rlimit,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.task_setrlimit");
+    if_selinux_else_default_ok(source, |security_server| {
+        selinux_hooks::task::task_setrlimit(
+            &security_server.as_permission_check(),
+            &source,
+            &target,
+            old_limit,
+            new_limit,
+        )
+    })
+}
+
 /// Check permission before mounting `fs`.
 /// Corresponds to the `sb_kern_mount()` LSM hook.
 pub fn sb_kern_mount(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
@@ -989,6 +1099,22 @@ pub fn sb_remount(
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_options)
     })
+}
+
+/// Writes the LSM mount options of `mount` into `buf`.
+/// Corresponds to the `sb_show_options` LSM hook.
+pub fn sb_show_options(
+    kernel: &Kernel,
+    buf: &mut impl OutputBuffer,
+    mount: &Mount,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_show_options");
+    if let Some(state) = &kernel.security_state.state {
+        if state.server.has_policy() {
+            selinux_hooks::superblock::sb_show_options(&state.server, buf, mount)?;
+        }
+    }
+    Ok(())
 }
 
 /// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.
@@ -1219,7 +1345,7 @@ where
                     op,
                 )
             } else {
-                Err(errno!(EPERM))
+                error!(EPERM)
             }
         },
     )
@@ -1237,6 +1363,34 @@ pub fn check_bpf_access<Attr: FromBytes>(
     profile_duration!("security.hooks.check_bpf_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::bpf::check_bpf_access(security_server, current_task, cmd, attr, attr_size)
+    })
+}
+
+/// Checks whether `current_task` can create a bpf_map. This hook is called from the
+/// `sys_bpf()` syscall when the kernel tries to generate and return a file descriptor for maps.
+/// Corresponds to the `bpf_map()` LSM hook.
+pub fn check_bpf_map_access(
+    current_task: &CurrentTask,
+    bpf_map: &BpfMap,
+    flags: PermissionFlags,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_bpf_map_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::bpf::check_bpf_map_access(security_server, current_task, bpf_map, flags)
+    })
+}
+
+/// Checks whether `current_task` can create a bpf_program. This hook is called from the
+/// `sys_bpf()` syscall when the kernel tries to generate and return a file descriptor for
+/// programs.
+/// Corresponds to the `bpf_prog()` LSM hook.
+pub fn check_bpf_prog_access(
+    current_task: &CurrentTask,
+    bpf_program: &Program,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_bpf_prog_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::bpf::check_bpf_prog_access(security_server, current_task, bpf_program)
     })
 }
 

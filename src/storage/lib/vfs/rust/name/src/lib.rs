@@ -146,13 +146,15 @@ mod tests {
         assert_matches!(parse_name("a".repeat(1000)), Err(ParseNameError::TooLong(_)));
         assert_matches!(
             parse_name(
-                std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap().to_string()
+                std::str::from_utf8(&vec![65; fio::MAX_NAME_LENGTH as usize + 1])
+                    .unwrap()
+                    .to_string()
             ),
             Err(ParseNameError::TooLong(_))
         );
         assert_matches!(
             parse_name(
-                std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap().to_string()
+                std::str::from_utf8(&vec![65; fio::MAX_NAME_LENGTH as usize]).unwrap().to_string()
             ),
             Ok(_)
         );
@@ -170,11 +172,13 @@ mod tests {
     fn test_validate_name() {
         assert_matches!(validate_name(&"a".repeat(1000)), Err(ParseNameError::TooLong(_)));
         assert_matches!(
-            validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap()),
+            validate_name(
+                std::str::from_utf8(&vec![65; fio::MAX_NAME_LENGTH as usize + 1]).unwrap()
+            ),
             Err(ParseNameError::TooLong(_))
         );
         assert_matches!(
-            validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap()),
+            validate_name(std::str::from_utf8(&vec![65; fio::MAX_NAME_LENGTH as usize]).unwrap()),
             Ok(())
         );
         assert_matches!(validate_name(""), Err(ParseNameError::Empty));

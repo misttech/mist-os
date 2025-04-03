@@ -47,7 +47,7 @@ zx::result<> PowerDomainVisitor::Visit(fdf_devicetree::Node& node,
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kPowerDomains) == parser_output->end()) {
+  if (!parser_output->contains(kPowerDomains)) {
     return zx::ok();
   }
 

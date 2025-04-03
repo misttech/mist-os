@@ -10,7 +10,7 @@
 #include <fidl/fuchsia.tee.manager/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
@@ -181,7 +181,7 @@ class OpteeController : public OpteeControllerBase,
       Uuid application_uuid, fidl::ClientEnd<fuchsia_tee_manager::Provider> service_provider,
       fidl::ServerEnd<fuchsia_tee::Application> application_request);
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
   async::Loop loop_;
   std::list<async::Loop> custom_loops_;
   std::map<Uuid, std::list<async::Loop>::iterator> uuid_config_;

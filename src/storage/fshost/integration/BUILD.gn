@@ -127,12 +127,6 @@ template("fshost_integration_test_component") {
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
-
-    # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-    exclude_toolchain_tags = [ "profile" ]
-    if (defined(invoker.exclude_toolchain_tags)) {
-      exclude_toolchain_tags += invoker.exclude_toolchain_tags
-    }
   }
 
   _shard_target = "${target_name}-shard"
@@ -424,6 +418,7 @@ template("fshost_integration_test_package") {
 fshost_integration_test_package("fshost_integration_tests_fxfs") {
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
+  allow_error_severity_logs = true
   options = {
   }
   extra_deps = [

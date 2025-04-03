@@ -19,7 +19,7 @@ use self::stub as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{
-    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, TestExecutor,
+    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, SpawnableFuture, TestExecutor,
 };
 pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
@@ -43,7 +43,7 @@ pub mod scope {
     pub use super::implementation::scope::{Scope, ScopeHandle};
 
     #[cfg(target_os = "fuchsia")]
-    pub use super::implementation::scope::Join;
+    pub use super::implementation::scope::{Join, ScopeStream, Spawnable};
 }
 
 pub use scope::{Scope, ScopeHandle};

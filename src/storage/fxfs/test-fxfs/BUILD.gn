@@ -8,7 +8,6 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("bin") {
   edition = "2021"
   output_name = "test-fxfs"
-  with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -18,10 +17,13 @@ rustc_binary("bin") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/storage/fxfs:lib",
     "//src/storage/fxfs/crypto",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/fxfs/platform",
+    "//src/storage/fxfs/test-fxfs/fidl/fuchsia.test.fxfs:fuchsia.test.fxfs_rust",
     "//src/storage/lib/storage_device",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
@@ -29,11 +31,13 @@ rustc_binary("bin") {
     "//third_party/rust_crates:log",
   ]
   sources = [ "src/main.rs" ]
+  testonly = true
 }
 
 fuchsia_component("test-fxfs") {
   manifest = "meta/test-fxfs.cml"
   deps = [ ":bin" ]
+  testonly = true
 }
 
 fuchsia_package("test-fxfs-package") {
@@ -42,4 +46,5 @@ fuchsia_package("test-fxfs-package") {
     ":test-fxfs",
     "//src/storage/crypt/fxfs",
   ]
+  testonly = true
 }

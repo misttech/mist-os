@@ -15,9 +15,10 @@ use core::ops::RangeInclusive;
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
-use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _};
+use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _, MarkDomain};
 use packet_formats::ip::IpExt;
 
+use crate::actions::MarkAction;
 use crate::conntrack::{self, ConnectionDirection};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes};
 use crate::logic::nat::NatConfig;
@@ -121,6 +122,23 @@ pub enum Action<I: IpExt, DeviceClass, RuleInfo> {
         /// range of possible values to which the source port can be rewritten.
         src_port: Option<RangeInclusive<NonZeroU16>>,
     },
+    /// Applies the mark action to the given mark domain.
+    ///
+    /// This is a non-terminal action for both routines and hooks. This is also
+    /// only available in [`IpRoutines`] because [`NatRoutines`] only runs on
+    /// the first packet in a connection and it is likely a misconfiguration
+    /// that packets after the first are marked differently or unmarked.
+    ///
+    /// Note: If we find use cases that justify this being in [`NatRoutines`] we
+    /// should relax this limitation and support it.
+    ///
+    /// This is analogous to the `mark` statement in Netfilter.
+    Mark {
+        /// The domain to apply the mark action.
+        domain: MarkDomain,
+        /// The action to apply.
+        action: MarkAction,
+    },
 }
 
 /// Transparently intercept the packet and deliver it to a local socket without
@@ -149,7 +167,8 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for Action<I, DeviceClass, ()> {
             | Self::Return
             | Self::TransparentProxy(_)
             | Self::Redirect { .. }
-            | Self::Masquerade { .. } => {
+            | Self::Masquerade { .. }
+            | Self::Mark { .. } => {
                 format!("{self:?}")
             }
             Self::Jump(UninstalledRoutine { routine: _, id }) => {
@@ -484,7 +503,7 @@ impl<I: IpExt, A: InspectableValue, BT: FilterBindingsTypes> Inspectable for Sta
 
 /// A trait for interacting with the pieces of packet metadata that are
 /// important for filtering.
-pub trait FilterIpMetadata<I: IpExt, A, BT: FilterBindingsTypes> {
+pub trait FilterIpMetadata<I: IpExt, A, BT: FilterBindingsTypes>: FilterMarkMetadata {
     /// Removes the conntrack connection and packet direction, if they exist.
     fn take_connection_and_direction(
         &mut self,
@@ -497,4 +516,16 @@ pub trait FilterIpMetadata<I: IpExt, A, BT: FilterBindingsTypes> {
         conn: conntrack::Connection<I, NatConfig<I, A>, BT>,
         direction: ConnectionDirection,
     ) -> Option<conntrack::Connection<I, NatConfig<I, A>, BT>>;
+}
+
+/// A trait for interacting with packet mark metadata.
+//
+// The reason why we split this trait from the `FilterIpMetadata` is to avoid
+// introducing trait bounds and type parameters into methods that only need
+// to change the mark, for example, all the `check_routine*` methods. Those
+// methods does not need the ability to take conntrack related information. This
+// becomes a meaningful simplification for those cases.
+pub trait FilterMarkMetadata {
+    /// Applies the mark action to the metadata.
+    fn apply_mark_action(&mut self, domain: MarkDomain, action: MarkAction);
 }

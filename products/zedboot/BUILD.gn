@@ -87,3 +87,18 @@ product_assembly_configuration("zedboot_with_minfs") {
   product = {
   }
 }
+
+product_assembly_configuration("zedboot_with_storage_host") {
+  platform = {
+    forward_variables_from(zedboot_platform_base, "*")
+    storage = {
+      storage_host_enabled = true
+      filesystems = {
+        image_name = "zedboot"
+        image_mode = "no_image"
+      }
+    }
+  }
+  product = {
+  }
+}

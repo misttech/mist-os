@@ -14,9 +14,18 @@
 #include <linux/fs.h>
 #include <linux/fsverity.h>
 
+#include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+constexpr uint32_t kMinfs = 0x6e694d21;
+
+#if !defined(__arm__)
+// fidl doesn't compile to arch32. Check that the previous constant has the
+// correct value
 #include "fidl/fuchsia.fs/cpp/common_types.h"
 #include "fidl/fuchsia.fs/cpp/wire.h"
-#include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+static_assert(kMinfs == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs));
+#endif
 
 #ifndef FS_VERITY_METADATA_TYPE_MERKLE_TREE
 
@@ -211,8 +220,8 @@ TEST_F(FsverityTest, MeasureVerityOverflowDigestSize) {
   bool is_minfs;
   {
     struct statfs64 fs;
-    ASSERT_EQ(statfs64(fname(), &fs), 0);
-    is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
+    SAFE_SYSCALL(statfs64(fname(), &fs));
+    is_minfs = fs.f_type == kMinfs;
   }
 
   // Valid enable request, no salt, no sig.
@@ -251,7 +260,7 @@ TEST_F(FsverityTest, MeasureVeritySetDigestAlgorithm) {
   {
     struct statfs64 fs;
     ASSERT_EQ(statfs64(fname(), &fs), 0);
-    is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
+    is_minfs = fs.f_type == kMinfs;
   }
 
   // Valid enable request, no salt, no sig.
@@ -311,8 +320,8 @@ TEST_F(FsverityTest, EnableVerity) {
   bool is_minfs;
   {
     struct statfs64 fs;
-    ASSERT_EQ(statfs64(fname(), &fs), 0);
-    is_minfs = fs.f_type == static_cast<uint32_t>(fuchsia_fs::VfsType::kMinfs);
+    SAFE_SYSCALL(statfs64(fname(), &fs));
+    is_minfs = fs.f_type == kMinfs;
   }
 
   // Enabling when there is an open write handle should fail with ETXTBSY
@@ -447,7 +456,7 @@ TEST_F(FsverityTest, EnableVerity) {
   // Test FS_IOC_GETFLAGS for FS_VERITY_FL.
   {
     __u32 flags = 0;
-    ASSERT_EQ(ioctl(fd, FS_IOC_GETFLAGS, &flags), 0);
+    SAFE_SYSCALL(ioctl(fd, FS_IOC_GETFLAGS, &flags));
     ASSERT_TRUE(flags | FS_VERITY_FL);
   }
   close(fd);

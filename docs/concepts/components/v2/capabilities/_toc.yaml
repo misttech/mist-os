@@ -24,7 +24,6 @@ toc:
   path: /docs/concepts/components/v2/capabilities/runner.md
 - title: "Service capabilities"
   path: /docs/concepts/components/v2/capabilities/service.md
-  status: experimental
 - title: "Storage capabilities"
   path: /docs/concepts/components/v2/capabilities/storage.md
 - title: "Life of a protocol open"

@@ -63,7 +63,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
       boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::NvramItem,
       boot_shim::DevicetreeSerialNumberItem, boot_shim::ArmDevicetreePsciItem,
       boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
-      boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
+      boot_shim::GenericWatchdogItem<WatchdogMmioHelper>, boot_shim::ArmDevicetreeCpuTopologyItem,
+      boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
     auto& pool = Allocation::GetPool();
@@ -100,10 +101,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
                uart_mmio->addr, uart_mmio->end());
       }
     }
-    // TODO(https://fxbug.dev/42084617): To be removed when driver state handed over switches do
-    // `uart::all::Config` as we work to remove `uart()` accessor.
-    shim.Get<boot_shim::UartItem<>>().Init(typename KernelDriver::uart_type(driver.config()));
   });
+  shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().config());
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());

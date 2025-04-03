@@ -98,6 +98,7 @@ rustc_library_with_features("netstack3-core") {
   deps = [
     "lock-order",
     "macros:netstack3-macros",
+    "trace:netstack3-trace",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/lib/network/packet",

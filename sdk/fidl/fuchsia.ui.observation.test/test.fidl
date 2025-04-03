@@ -1,13 +1,7 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// This library is used by CTF tests so it cannot be made versioned at HEAD.
-// For now, that line is disabled and it continues to be unversioned and
-// unverified by fidlc.
-// TODO(https://fxbug.dev/365602422): Make this library stable, possibly in a
-// way that does not imply use outside fuchsia.git.
-// @available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.ui.observation.test;
 
 using fuchsia.ui.observation.geometry;

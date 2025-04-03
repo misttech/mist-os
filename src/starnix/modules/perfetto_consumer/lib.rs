@@ -13,7 +13,7 @@ use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::errno;
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, OnceLock};
@@ -288,7 +288,7 @@ pub fn start_perfetto_consumer_thread(
     // when the trace is changed.
     TRACE_STATE_SENDER.set(sender).or_else(|e| {
         log_error!("Failed to set perfetto_consumer trace state sender: {:?}", e);
-        Err(errno!(EINVAL))
+        error!(EINVAL)
     })?;
     fuchsia_trace_observer::start_trace_observer(c_callback);
     Ok(())

@@ -20,6 +20,7 @@ if (is_host) {
       "//third_party/rust_crates:cfg-if",
       "//third_party/rust_crates:mockall",
       "//third_party/rust_crates:nix",
+      "//third_party/rust_crates:rand",
       "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:signal-hook",
     ]

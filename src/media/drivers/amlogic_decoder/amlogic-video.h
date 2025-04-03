@@ -13,7 +13,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/thread.h>
 #include <zircon/errors.h>
@@ -227,7 +226,6 @@ class AmlogicVideo final : public VideoDecoder::Owner,
 
   Owner* owner_ = nullptr;
   zx_device_t* parent_ = nullptr;
-  ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
 

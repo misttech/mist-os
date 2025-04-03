@@ -106,6 +106,14 @@ type ExecutableRegion = table {
 
     /// The build ID of the ELF file.
     4: build_id BuildId;
+
+    /// The address of the memory region relative to the file's load address.
+    @available(added=NEXT)
+    5: vaddr uint64;
+
+    /// Description of the memory region (e.g. ELF soname or VMO name).
+    @available(added=NEXT)
+    6: name string:MAX;
 };
 
 /// The contents of an allocated memory block.

@@ -6,6 +6,7 @@ library fuchsia.wlan.tap;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.device;
+using fuchsia.wlan.softmac;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
@@ -20,7 +21,7 @@ type WlantapPhyConfig = struct {
     bands vector<fuchsia.wlan.device.BandInfo>:8;
     name string:32; // Arbitrary maximum size of 32 chosen to satisfy FidlLint
     quiet bool;
-    discovery_support fuchsia.wlan.common.DiscoverySupport;
+    discovery_support fuchsia.wlan.softmac.DiscoverySupport;
     mac_sublayer_support fuchsia.wlan.common.MacSublayerSupport;
     security_support fuchsia.wlan.common.SecuritySupport;
     spectrum_management_support fuchsia.wlan.common.SpectrumManagementSupport;

@@ -326,6 +326,10 @@ zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverMod
     fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules) {
   auto diag = MakeDiagnostics();
 
+  if (driver_name == "compat.so") {
+    driver_name = "libdriver.so";
+  }
+
   Linker::Soname root_module_name{driver_name};
 
   Linker linker;
@@ -346,7 +350,7 @@ zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverMod
   // We need to keep these strings alive for |Linker.Init|.
   std::vector<std::string> additional_root_modules_names;
   for (auto& module : additional_root_modules) {
-    additional_root_modules_names.emplace_back(std::string(module.name().get()));
+    additional_root_modules_names.emplace_back(module.name().get());
     Linker::Soname name{additional_root_modules_names.back()};
     Linker::Module::DecodedPtr decoded_module =
         Linker::Module::Decoded::Create(diag, std::move(module.binary()), kPageSize);

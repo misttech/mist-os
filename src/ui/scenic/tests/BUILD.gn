@@ -38,28 +38,13 @@ group("tests") {
 group("ctf-tests") {
   testonly = true
   deps = [
-    # TODO(https://fxbug.dev/362762825): Re-enable these tests following API stabilization.  They
-    # rely on various internal/unstable FIDL libraries.  On a case-by-case basis, we need to decide
-    # whether to:
-    #    - stabilize the FIDL library in question
-    #    - break the dependency chain to that FIDL library
-    # To see the dependency chains, uncomment the test targets below, and they try to find a GN path
-    # between the test and the internal/unstable FIDL library.  For example:
-    #    ```
-    #    fx gn path $BUILD_DIR "//src/ui/scenic/tests:ctf-tests" \
-    #                          "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp"
-    #    ```
-    # The libraries in question currently include:
-    #    - fuchsia.ui.composition.internal
-    #    - fuchsia.ui.focus
-    #    - fuchsia.ui.observation.scope
-    #    - fuchsia.ui.observation.test
-    #    - fuchsia.ui.pointer.augment
-    #
-    # ":flatland-focus-integration-test-suite_archive",
-    # ":flatland-touch-integration-test-suite_archive",
-    # ":observer-registry-integration-test-suite_archive",
-    # ":scoped-observer-registry-integration-test-suite_archive",
+    ":flatland-focus-integration-test-suite_archive",
+    ":flatland-touch-integration-test-suite_archive",
+    ":observer-registry-integration-test-suite_archive",
+    ":scoped-observer-registry-integration-test-suite_archive",
+
+    # TODO(https://fxbug.dev/362762825): Update the test to the current
+    # fuchsia.ui.composition API and re-enable.
     # ":screen-capture2-integration-test-suite_archive",
 
     ":flatland-allocation-test-suite_archive",
@@ -78,8 +63,7 @@ group("ctf-tests") {
   # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
   # riscv64.
   if (target_cpu != "riscv64") {
-    # TODO(https://fxbug.dev/362762825): Re-enable this test following API stabilization.
-    # deps += [ ":cpu-renderer-integration-test-suite_archive" ]
+    deps += [ ":cpu-renderer-integration-test-suite_archive" ]
   }
 }
 

@@ -5,10 +5,14 @@ use crate::OnInterestChanged;
 use diagnostics_log_encoding::encode::TestRecord;
 use diagnostics_log_types::Severity;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
+use fidl_fuchsia_diagnostics as fdiagnostics;
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+use fidl_fuchsia_diagnostics_types as fdiagnostics;
 
 pub(crate) struct InterestFilter {
     listener: Arc<Mutex<Option<Box<dyn OnInterestChanged + Send + Sync + 'static>>>>,

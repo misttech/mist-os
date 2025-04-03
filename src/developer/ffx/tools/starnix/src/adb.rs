@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::Context;
 use argh::{ArgsInfo, FromArgs};
 use emulator_instance::EMU_INSTANCE_ROOT_DIR;
@@ -10,7 +10,7 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
 use fho::{bug, return_bug, FfxContext, Result};
-use fidl_fuchsia_developer_ffx::TargetAddrInfo;
+use fidl_fuchsia_developer_ffx::TargetIpAddrInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
@@ -85,13 +85,13 @@ impl AdbConnectArgs {
         adb: &str,
         target_proxy: &TargetProxyHolder,
     ) -> Result<()> {
-        let addr_info: TargetAddrInfo =
+        let addr_info: TargetIpAddrInfo =
             timeout(Duration::from_secs(1), target_proxy.get_ssh_address())
                 .await
                 .user_message("Timed out getting target ssh address")?
                 .user_message("Failed to get target ssh address")?;
 
-        let ssh_address: TargetAddr = addr_info.into();
+        let ssh_address: TargetIpAddr = addr_info.into();
         let ssh_address: SocketAddr = ssh_address.into();
 
         let adb_port = if ssh_address.port() == 22 || ssh_address.port() == 8022 {
@@ -128,7 +128,7 @@ impl AdbConnectArgs {
 
         eprintln!("adb is connected!");
         eprintln!("See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.");
-        eprintln!("This connection's \"serial number\" for adb is `{adb_address}`.");
+        eprintln!("This connection's \"serial number\" for adb is '{adb_address}'.");
         Ok(())
     }
 }

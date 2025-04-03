@@ -19,6 +19,7 @@ use crate::bindings::filter::controller::{
     Rule,
 };
 use crate::bindings::filter::CommitError;
+use crate::bindings::util::{IntoCore as _, TryFromFidl};
 
 // The requirement or lack thereof that a particular resource's IP version (for
 // example, whether an address matcher is IPv4 or IPv6) must match the version
@@ -240,6 +241,18 @@ impl<I: IpExt> From<State<I>> for CoreRoutines<I> {
     }
 }
 
+impl TryFromFidl<fnet_filter_ext::MarkAction> for netstack3_core::filter::MarkAction {
+    type Error = std::convert::Infallible;
+
+    fn try_from_fidl(fidl: fnet_filter_ext::MarkAction) -> Result<Self, Self::Error> {
+        match fidl {
+            fnet_filter_ext::MarkAction::SetMark { clearing_mask, mark } => {
+                Ok(Self::SetMark { clearing_mask, mark })
+            }
+        }
+    }
+}
+
 fn convert_rules<I, F>(
     namespace: &fnet_filter_ext::NamespaceId,
     routine: &str,
@@ -299,6 +312,12 @@ where
                 fnet_filter_ext::Action::Masquerade { src_port } => {
                     netstack3_core::filter::Action::Masquerade {
                         src_port: src_port.map(|fnet_filter_ext::PortRange(range)| range),
+                    }
+                }
+                fnet_filter_ext::Action::Mark { domain, action } => {
+                    netstack3_core::filter::Action::Mark {
+                        domain: domain.into_core(),
+                        action: action.into_core(),
                     }
                 }
             };
@@ -389,6 +408,7 @@ impl<I: IpExt> CoreUninstalledRoutines<I> {
             // converted routine if it's already been converted, or recursively convert the
             // target routine before continuing.
             |name, rule_id| {
+                #[allow(clippy::map_entry)] // TODO(https://fxbug.dev/407087136)
                 if self.routine_types.contains_key(&name) {
                     self.expect_routine_resolved(&name, routine_type, rule_id)
                 } else {

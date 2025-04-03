@@ -52,7 +52,7 @@ constexpr uint32_t create_mask(uint32_t start_bit, uint32_t size) {
 template <typename T>
 bool ExtractUint(const uint8_t* report, size_t report_len, const hid::Attributes& attr,
                  T* value_out) {
-  static_assert(std::is_pod<T>::value, "not POD");
+  static_assert(std::is_scalar<T>::value, "not a scalar");
   if (attr.bit_sz > sizeof(T) * 8) {
     return false;
   }

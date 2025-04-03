@@ -81,19 +81,19 @@ pub(crate) fn encode_dirent(
     }
 
     assert!(
-        name.len() <= fio::MAX_FILENAME as usize,
+        name.len() <= fio::MAX_NAME_LENGTH as usize,
         "Entry names are expected to be no longer than MAX_FILENAME ({}) bytes.\n\
          Got entry: '{}'\n\
          Length: {} bytes",
-        fio::MAX_FILENAME,
+        fio::MAX_NAME_LENGTH,
         name,
         name.len()
     );
 
     assert!(
-        fio::MAX_FILENAME <= u8::max_value() as u64,
+        fio::MAX_NAME_LENGTH <= u8::max_value() as u64,
         "Expecting to be able to store MAX_FILENAME ({}) in one byte.",
-        fio::MAX_FILENAME
+        fio::MAX_NAME_LENGTH
     );
 
     buf.write_u64::<LittleEndian>(entry.inode())

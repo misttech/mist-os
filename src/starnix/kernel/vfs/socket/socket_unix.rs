@@ -16,7 +16,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
-    LookupContext, Message,
+    LookupContext, Message, UcredPtr,
 };
 use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, FieldMapping, Packet,
@@ -27,7 +27,7 @@ use ebpf_api::{
     SOCKET_FILTER_CBPF_CONFIG,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
@@ -170,12 +170,16 @@ impl UnixSocket {
     /// # Parameters
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
     /// - `socket_type`: The type of the socket (e.g., `SOCK_STREAM`).
-    pub fn new_pair(
+    pub fn new_pair<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
         open_flags: OpenFlags,
-    ) -> Result<(FileHandle, FileHandle), Errno> {
+    ) -> Result<(FileHandle, FileHandle), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let credentials = current_task.as_ucred();
         let left = Socket::new(current_task, domain, socket_type, SocketProtocol::default())?;
         let right = Socket::new(current_task, domain, socket_type, SocketProtocol::default())?;
@@ -183,8 +187,8 @@ impl UnixSocket {
         downcast_socket_to_unix(&left).lock().credentials = Some(credentials.clone());
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
         downcast_socket_to_unix(&right).lock().credentials = Some(credentials);
-        let left = Socket::new_file(current_task, left, open_flags);
-        let right = Socket::new_file(current_task, right, open_flags);
+        let left = Socket::new_file(locked, current_task, left, open_flags);
+        let right = Socket::new_file(locked, current_task, right, open_flags);
         Ok((left, right))
     }
 
@@ -793,17 +797,18 @@ impl SocketOps for UnixSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
         let opt_value = match level {
             SOL_SOCKET => match optname {
-                SO_PEERCRED => self
-                    .peer_cred()
-                    .unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX })
-                    .as_bytes()
-                    .to_owned(),
+                SO_PEERCRED => UcredPtr::into_bytes(
+                    current_task,
+                    self.peer_cred().unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX }),
+                )
+                .map_err(|_| errno!(EINVAL))?,
                 SO_PEERSEC => "unconfined".as_bytes().to_vec(),
                 SO_ACCEPTCONN =>
                 {
@@ -1132,7 +1137,8 @@ mod tests {
             .setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
             .unwrap();
 
-        let opt_bytes = server_socket.getsockopt(&mut locked, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
+        let opt_bytes =
+            server_socket.getsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
         let retrieved_capacity = socklen_t::from_ne_bytes(opt_bytes.try_into().unwrap());
         // Setting SO_SNDBUF actually sets it to double the size
         assert_eq!(2 * send_capacity, retrieved_capacity);

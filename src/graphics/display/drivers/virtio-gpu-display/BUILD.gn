@@ -88,6 +88,7 @@ test("virtio-gpu-display-test") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/testing/fake-bti",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
@@ -112,9 +113,9 @@ fuchsia_cc_driver("driver") {
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }

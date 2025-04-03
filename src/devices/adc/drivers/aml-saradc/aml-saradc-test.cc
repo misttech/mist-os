@@ -4,13 +4,13 @@
 
 #include "src/devices/adc/drivers/aml-saradc/aml-saradc.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/adc/drivers/aml-saradc/registers.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 
 namespace {
 
@@ -33,7 +33,7 @@ class FakeMmio {
   void set(size_t offset, uint64_t value) { reg_values_[offset] = value; }
 
  private:
-  ddk_fake::FakeMmioRegRegion region_;
+  fake_mmio::FakeMmioRegRegion region_;
   std::map<size_t, uint64_t> reg_values_;
 };
 
@@ -43,7 +43,7 @@ class AmlSaradcTestEnvironment : fdf_testing::Environment {
     device_server_.Initialize(component::kDefaultInstance);
     device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.irqs[0] = {};
     zx_status_t status =
         zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]);
@@ -72,7 +72,7 @@ class AmlSaradcTestEnvironment : fdf_testing::Environment {
 
   FakeMmio mmio_[kRegisterBanks];
   zx::unowned_interrupt irq_;
-  fake_pdev::FakePDevFidl pdev_server_;
+  fdf_fake::FakePDev pdev_server_;
 };
 
 class AmlSaradcTestConfig final {

@@ -12,7 +12,7 @@ source_set("driver_entry") {
     ":msd_impl",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",

@@ -34,6 +34,9 @@ pub enum Command {
 
     // fuchsia.update.installer protocol:
     ForceInstall(ForceInstall),
+
+    // fuchsia.update CommitStatusProvider protocol:
+    WaitForCommit(WaitForCommit),
 }
 
 /// Get the current (running) channel.
@@ -229,6 +232,11 @@ pub struct ForceInstall {
     #[argh(positional)]
     pub product_bundle_path: Option<PathBuf>,
 }
+
+/// Wait for the update to be committed.
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[argh(subcommand, name = "wait-for-commit")]
+pub struct WaitForCommit {}
 
 #[cfg(test)]
 mod tests {

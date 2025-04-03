@@ -158,7 +158,7 @@ class TracingUsingFc(tracing.Tracing):
         _LOGGER.info("Trace categories: '%s'", categories)
 
         assert self._trace_controller_proxy is None
-        trace_provisioner_proxy = f_tracingcontroller.Provisioner.Client(
+        trace_provisioner_proxy = f_tracingcontroller.ProvisionerClient(
             self._fc_transport.connect_device_proxy(
                 _FC_PROXIES["TraceProvisioner"]
             )
@@ -182,9 +182,7 @@ class TracingUsingFc(tracing.Tracing):
             raise TracingError(
                 "fuchsia.tracing.controller.Initialize FIDL Error"
             ) from status
-        self._trace_controller_proxy = f_tracingcontroller.Session.Client(
-            client
-        )
+        self._trace_controller_proxy = f_tracingcontroller.SessionClient(client)
         self._trace_socket = AsyncSocket(trace_socket_client)
         self._session_initialized = True
 

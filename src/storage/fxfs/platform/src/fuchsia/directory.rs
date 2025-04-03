@@ -14,7 +14,6 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
-use futures::FutureExt;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::SyncOptions;
 use fxfs::log::*;
@@ -684,7 +683,6 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
 
-        // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
         self.directory
             .update_attributes(transaction, Some(&attributes), 0, Some(Timestamp::now()))
             .await
@@ -735,10 +733,15 @@ impl MutableDirectory for FxDirectory {
                     .commit_with_callback(|_| {
                         let node = Arc::new(FxSymlink::new(self.volume().clone(), object_id));
                         p.commit(&(node.clone() as Arc<dyn FxNode>));
-                        let scope = self.volume().scope();
-                        scope.spawn(
-                            symlink::Connection::new(scope.clone(), node)
-                                .run(fio::PERM_READABLE.to_object_request(connection)),
+                        let scope = self.volume().scope().clone();
+                        let flags = fio::Flags::PROTOCOL_SYMLINK | fio::PERM_READABLE;
+                        // fio::Flags::FLAG_SEND_REPRESENTATION isn't specified so connection
+                        // creation is synchronous.
+                        symlink::Connection::create_sync(
+                            scope,
+                            node,
+                            flags,
+                            flags.to_object_request(connection),
                         );
                     })
                     .await
@@ -792,7 +795,15 @@ impl vfs::node::Node for FxDirectory {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.directory.get_properties().await.map_err(map_to_status)?;
+        let mut props = self.directory.get_properties().await.map_err(map_to_status)?;
+
+        if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
+            self.store()
+                .update_access_time(self.directory.object_id(), &mut props)
+                .await
+                .map_err(map_to_status)?;
+        }
+
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -851,17 +862,16 @@ impl VfsDirectory for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
+        scope.clone().spawn(flags.to_object_request(server_end).handle_async(
+            async move |object_request| {
                 let node =
                     self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
-                    object_request.create_connection(
-                        scope,
-                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags,
-                        MutableConnection::create,
-                    )
+                    let directory =
+                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take();
+                    object_request
+                        .create_connection::<MutableConnection<_>, _>(scope, directory, flags)
+                        .await
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                     // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
@@ -878,36 +888,46 @@ impl VfsDirectory for FxDirectory {
                             );
                             return Err(zx::Status::ACCESS_DENIED);
                         }
-                        let mut server = BlockServer::new(
+                        let server = BlockServer::new(
                             node,
                             /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
                             object_request.take().into_channel(),
                         );
-                        Ok(async move {
-                            let _ = server.run().await;
-                        }
-                        .boxed())
+                        scope.spawn(server.run());
+                        Ok(())
                     } else {
                         FxFile::create_connection_async(node, scope, flags, object_request).await
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope.clone(),
-                        node.take(),
-                        flags,
-                        |scope, symlink, protocols, object_request| {
-                            symlink::Connection::create(scope, symlink, &protocols, object_request)
-                        },
-                    )
+                    object_request
+                        .create_connection::<symlink::Connection<_>, _>(
+                            scope.clone(),
+                            node.take(),
+                            flags,
+                        )
+                        .await
                 } else {
                     unreachable!();
                 }
-            })
-        });
+            },
+        ));
     }
 
     fn open3(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        self.volume().scope().clone().spawn(object_request.take().handle_async(
+            async move |object_request| self.open3_async(scope, path, flags, object_request).await,
+        ));
+        Ok(())
+    }
+
+    async fn open3_async(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,
@@ -917,36 +937,28 @@ impl VfsDirectory for FxDirectory {
         // Ignore the provided scope which might be for the parent pseudo filesystem and use the
         // volume's scope instead.
         let scope = self.volume().scope().clone();
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                let node =
-                    self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
-                if node.is::<FxDirectory>() {
-                    object_request.create_connection(
-                        scope,
-                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        flags,
-                        MutableConnection::create,
-                    )
-                } else if node.is::<FxFile>() {
-                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(node, scope, flags, object_request).await
-                } else if node.is::<FxSymlink>() {
-                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope.clone(),
-                        node.take(),
-                        flags,
-                        |scope, symlink, flags, object_request| {
-                            symlink::Connection::create(scope, symlink, &flags, object_request)
-                        },
-                    )
-                } else {
-                    unreachable!();
-                }
-            })
-        });
-        Ok(())
+        let node = self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
+        if node.is::<FxDirectory>() {
+            let directory =
+                node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take();
+            object_request
+                .create_connection::<MutableConnection<_>, _>(scope, directory, flags)
+                .await
+        } else if node.is::<FxFile>() {
+            let file = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+            FxFile::create_connection_async(file, scope, flags, object_request).await
+        } else if node.is::<FxSymlink>() {
+            let symlink = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
+            object_request
+                .create_connection::<symlink::Connection<_>, _>(
+                    scope.clone(),
+                    symlink.take(),
+                    flags,
+                )
+                .await
+        } else {
+            unreachable!();
+        }
     }
 
     async fn read_dirents<'a>(
@@ -3293,6 +3305,331 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_link_symlink_into_encrypted_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        {
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
+                root.open(
+                    path,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+                let representation = proxy
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
+
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
+
+                proxy
+            }
+
+            let proxy = open_symlink(&root, "symlink").await;
+
+            let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            proxy
+                .link_into(zx::Event::from(dst_token.unwrap()), "symlink2")
+                .await
+                .expect("link_into (FIDL) failed")
+                .expect("link_into failed");
+
+            open_symlink(&parent, "symlink2").await;
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_link_symlink_into_locked_directory_fails() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        {
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
+                let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
+                root.open(
+                    path,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+                let representation = proxy
+                    .take_event_stream()
+                    .next()
+                    .await
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
+
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
+
+                proxy
+            }
+
+            let proxy = open_symlink(&root, "symlink").await;
+
+            let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("get_token failed");
+            proxy
+                .link_into(zx::Event::from(dst_token.unwrap()), "symlink2")
+                .await
+                .expect("link_into (FIDL) failed")
+                .expect_err("linking into a locked directory should fail");
+        }
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_stat_locked_symlink() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        // This is where we create the symlink
+        parent
+            .create_symlink("symlink", b"target", None)
+            .await
+            .expect("FIDL call failed")
+            .expect("create_symlink failed");
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let (status, buf) = parent.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("read_dirents failed");
+        let mut encrypted_entries = vec![];
+        for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+            encrypted_entries.push(res.expect("Failed to parse entry"));
+        }
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= FSCRYPT_PADDING);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::Symlink)
+            }
+        }
+        {
+            let (symlink, server_end) = create_proxy::<fio::SymlinkMarker>();
+            parent
+                .open(
+                    &encrypted_name,
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
+                )
+                .expect("open failed");
+
+            let representation = symlink
+                .take_event_stream()
+                .next()
+                .await
+                .expect("missing Symlink event")
+                .expect("failed to read Symlink event")
+                .into_on_representation()
+                .expect("failed to decode OnRepresentation");
+            let mut encrypted_target = None;
+            if let fio::Representation::Symlink(fio::SymlinkInfo { target: Some(target), .. }) =
+                representation
+            {
+                encrypted_target = Some(target)
+            };
+
+            let (_mutable, immutable) = symlink
+                .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+                .await
+                .expect("transport error on get_attributes")
+                .expect("failed to get attributes on a locked symlink");
+
+            assert_eq!(immutable.content_size, encrypted_target.map(|x| x.len() as u64));
+        }
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_create_symlink_in_locked_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        parent
+            .create_symlink("symlink", b"target", None)
+            .await
+            .expect("FIDL call failed")
+            .expect_err("creating a symlink in a locked directory should fail");
+
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
     async fn test_symlink() {
         let fixture = TestFixture::new().await;
 
@@ -4434,6 +4771,177 @@ mod tests {
         )
         .await;
 
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes_persists() {
+        const DIR: &str = "foo";
+        let mtime = Some(Timestamp::now().as_nanos());
+        let atime = Some(Timestamp::now().as_nanos());
+        let mode = Some(111);
+
+        let device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let dir = open_dir_checked(
+                &root,
+                DIR,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await;
+
+            dir.update_attributes(&fio::MutableNodeAttributes {
+                modification_time: mtime,
+                access_time: atime,
+                mode: mode,
+                ..Default::default()
+            })
+            .await
+            .expect("update_attributes FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+            // Calling close should flush the node attributes to the device.
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let dir = open_dir_checked(
+            &root,
+            DIR,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
+
+        let (mutable_attributes, _immutable_attributes) = dir
+            .get_attributes(
+                fio::NodeAttributesQuery::MODIFICATION_TIME
+                    | fio::NodeAttributesQuery::ACCESS_TIME
+                    | fio::NodeAttributesQuery::MODE,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.modification_time, mtime);
+        assert_eq!(mutable_attributes.access_time, atime);
+        assert_eq!(mutable_attributes.mode, mode);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_atime_from_pending_access_time_update_request() {
+        const DIR: &str = "foo";
+
+        let (device, expected_atime, expected_ctime) = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let dir = open_dir_checked(
+                &root,
+                DIR,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                fio::Options {
+                    attributes: Some(fio::NodeAttributesQuery::CHANGE_TIME),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+            let (mutable_attributes, immutable_attributes) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            let initial_ctime = immutable_attributes.change_time;
+            let initial_atime = mutable_attributes.access_time;
+            // When creating a node, ctime, mtime, and atime are all updated to the current time.
+            assert_eq!(initial_atime, initial_ctime);
+            assert_eq!(initial_atime, mutable_attributes.modification_time);
+
+            // Client manages atime and they signal to Fxfs that an access has occurred and it may
+            // require an access time update. They do so by querying with
+            // `fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE`.
+            let (mutable_attributes, immutable_attributes) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be updated as atime <= ctime (or mtime)
+            assert!(initial_atime < mutable_attributes.access_time);
+            let updated_atime = mutable_attributes.access_time;
+            // Calling get_attributes with PENDING_ACCESS_TIME_UPDATE will trigger an update of
+            // object attributes if access_time needs to be updated. Check that ctime isn't updated.
+            assert_eq!(initial_ctime, immutable_attributes.change_time);
+
+            let (mutable_attributes, _) = dir
+                .get_attributes(
+                    fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be not be updated as atime > ctime (or mtime)
+            assert_eq!(updated_atime, mutable_attributes.access_time);
+
+            (fixture.close().await, mutable_attributes.access_time, initial_ctime)
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let dir = open_dir_checked(
+            &root,
+            DIR,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
+
+        let (mutable_attributes, immutable_attributes) = dir
+            .get_attributes(
+                fio::NodeAttributesQuery::CHANGE_TIME | fio::NodeAttributesQuery::ACCESS_TIME,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert_eq!(immutable_attributes.change_time, expected_ctime);
+        assert_eq!(mutable_attributes.access_time, expected_atime);
         fixture.close().await;
     }
 }

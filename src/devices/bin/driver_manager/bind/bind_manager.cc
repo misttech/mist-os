@@ -50,6 +50,7 @@ void BindManager::TryBindAllAvailable(NodeBindingInfoResultCallback result_callb
 void BindManager::Bind(Node& node, std::string_view driver_url_suffix,
                        std::shared_ptr<BindResultTracker> result_tracker) {
   BindRequest request = {
+      .node_moniker = node.MakeComponentMoniker(),
       .node = node.weak_from_this(),
       .driver_url_suffix = std::string(driver_url_suffix),
       .tracker = result_tracker,
@@ -83,6 +84,7 @@ void BindManager::TryBindAllAvailableInternal(std::shared_ptr<BindResultTracker>
     }
 
     BindInternal(BindRequest{
+        .node_moniker = path,
         .node = node_weak,
         .tracker = tracker,
         .composite_only = true,
@@ -93,6 +95,7 @@ void BindManager::TryBindAllAvailableInternal(std::shared_ptr<BindResultTracker>
       bind_node_set_.CurrentOrphanedNodes();
   for (auto& [path, node] : orphaned_nodes) {
     BindInternal(BindRequest{
+        .node_moniker = path,
         .node = node,
         .tracker = tracker,
         .composite_only = false,
@@ -105,7 +108,8 @@ void BindManager::BindInternal(BindRequest request,
   ZX_ASSERT(bind_node_set_.is_bind_ongoing());
   std::shared_ptr node = request.node.lock();
   if (!node) {
-    LOGF(WARNING, "Node was freed before bind request is processed.");
+    LOGF(WARNING, "Node was freed before bind request is processed. %s",
+         request.node_moniker.c_str());
     if (request.tracker) {
       request.tracker->ReportNoBind();
     }

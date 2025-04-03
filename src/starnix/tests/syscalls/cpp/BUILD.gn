@@ -7,6 +7,7 @@ import("//build/test.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/lib/testing/expectation/generated_expectations_file.gni")
+import("//src/starnix/build/starnix_container_config_component.gni")
 import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
@@ -23,84 +24,144 @@ syscall_tests = [
   "abort_test",
   "ashmem_test",
   "aspace_test",
+  "bpf_test",
   "capabilities_test",
   "cgroup_freezer_test",
   "cgroup_test",
   "custom_artifact_test",
   "epoll_test",
+  "extended_pstate_test",
   "fcntl_test",
+  "fs_test",
+  "fsverity_test",
+  "fuchsia_network_monitor_fs_test",
+  "fuse_test",
   "futex_test",
   "getrandom_test",
   "loop_test",
   "memfd_test",
   "mmap_test",
   "mount_test",
-  "nmfs_test",
+  "overlayfs_test",
+  "perf_event_open_test",
+  "pidfd_test",
   "pipe_test",
   "poll_test",
   "prctl_test",
+  "procfs_mem_test",
+  "procfs_test",
+  "ptrace_test",
   "read_write_test",
+  "reboot_test",
   "restart_read_test",
+  "rlimit_test",
+  "seccomp_test",
   "sendfile_test",
   "setpriority_test",
   "signal_handling_test",
+  "socket_test",
   "suid_test",
   "sw_breakpoint_test",
   "symlink_test",
   "sysfs_kernel_test",
+  "sysfs_power_test",
   "syslog_test",
   "task_test",
+  "terminal_test",
   "test_helper_test",
   "time_test",
   "timerfd_test",
   "timers_test",
   "tmpfs_test",
-  "touch_standby_test",
   "trivial_test",
-  "vmsplice_test",
-  "waitpid_exit_signal_test",
-
-  # go/keep-sorted end
-]
-
-# syscall tests that can only be run on arch64.
-# TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
-arch64_syscall_tests = [
-  # go/keep-sorted start
-
-  "bpf_test",
-  "extended_pstate_test",
-  "fs_test",
-  "fsverity_test",
-  "fuse_test",
-  "input_test",
-  "ioctl_test",
-  "overlayfs_test",
-  "perf_event_open_test",
-  "pidfd_test",
-  "procfs_mem_test",
-  "procfs_test",
-  "ptrace_test",
-  "reboot_test",
-  "rlimit_test",
-  "seccomp_test",
-  "socket_test",
-  "sysfs_power_test",
-  "terminal_test",
   "tun_test",
-  "udev_test",
   "uio_test",
   "userfaultfd_test",
   "vdso_test",
+  "vmsplice_test",
+  "waitpid_exit_signal_test",
   "waitpid_flags_test",
 
   # go/keep-sorted end
 ]
 
+syscall_tests_etc = [
+  {
+    name = "input_test"
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
+  },
+  {
+    name = "ioctl_test"
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
+  },
+  {
+    name = "touch_standby_test"
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
+  },
+  {
+    name = "udev_test"
+    container_config = {
+      extra_features = [ "framebuffer" ]
+    }
+  },
+]
+
 if (target_cpu == "x64") {
   # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
   # This test requires test-ui-stack.
-  syscall_tests += [ "uinput_test" ]
+  syscall_tests_etc += [
+    {
+      name = "uinput_test"
+      container_config = {
+        extra_features = [ "framebuffer" ]
+      }
+    },
+  ]
+}
+
+mlock_onfault_behaviors = [
+  true,
+  false,
+]
+mlock_pin_flavors = [
+  "noop",
+  "shadow_process",
+  "vmar_always_need",
+]
+
+foreach(onfault_behavior, mlock_onfault_behaviors) {
+  foreach(pin_flavor, mlock_pin_flavors) {
+    if (onfault_behavior) {
+      onfault_str = "_always_onfault"
+    } else {
+      onfault_str = ""
+    }
+    syscall_tests_etc += [
+      {
+        name = "mlock_test${onfault_str}_${pin_flavor}_pin"
+        sources = [ "mlock_test.cc" ]
+
+        # Sanitizer runtimes stub out mlock() because it is incompatible with their virtual memory
+        # management.
+        disable_sanitizers_on_host = true
+        container_config = {
+          mlock_always_onfault = onfault_behavior
+          mlock_pin_flavor = pin_flavor
+        }
+      },
+    ]
+  }
+}
+
+all_test_names = syscall_tests
+foreach(test_def, syscall_tests_etc) {
+  all_test_names += [ test_def.name ]
 }
 
 group("tests") {
@@ -110,7 +171,7 @@ group("tests") {
     deps += [ ":starnix_arch32_syscalls_cpp_tests" ]
   }
   if (host_os == "linux" && host_cpu == "x64") {
-    foreach(test_name, syscall_tests + arch64_syscall_tests) {
+    foreach(test_name, all_test_names) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
         ":starnix_${test_name}_baseline($host_toolchain)",
@@ -200,6 +261,36 @@ config("march") {
 
 template("syscall_test") {
   test_name = invoker.test_name
+  _disable_sanitizers_on_host = false
+  if (defined(invoker.disable_sanitizers_on_host)) {
+    _disable_sanitizers_on_host = invoker.disable_sanitizers_on_host
+  }
+
+  _test_sources = []
+  if (defined(invoker.sources)) {
+    _test_sources = invoker.sources
+  } else {
+    _test_sources = [ "${test_name}.cc" ]
+  }
+
+  _container_config = {
+  }
+  if (defined(invoker.container_config)) {
+    _container_config = invoker.container_config
+  }
+
+  _container_config_component = "${test_name}_config"
+  starnix_container_config_component(_container_config_component) {
+    config = _container_config
+  }
+
+  _container_config_shard_label = "${_container_config_component}_shard"
+  _container_config_shard = "${target_gen_dir}/${test_name}_config.shard.cml"
+  starnix_container_config_offers(_container_config_shard_label) {
+    output = _container_config_shard
+    offer_from = "#config"
+    offer_to = "#container"
+  }
 
   # Generate the manifest
   _manifest_label = "${test_name}.cml"
@@ -208,12 +299,22 @@ template("syscall_test") {
     outputs = [ _manifest_file ]
     output_conversion = "json"
     contents = {
-      include =
-          [ "//src/starnix/tests/syscalls/cpp/meta/syscalls_cpp_test.cml" ]
+      include = [
+        rebase_path(_container_config_shard, root_build_dir),
+        "//src/starnix/tests/syscalls/cpp/meta/syscalls_cpp_test.cml",
+      ]
       program = {
         binary = "data/tests/${test_name}_bin"
       }
+      children = [
+        {
+          name = "config"
+          url = "#meta/${_container_config_component}.cm"
+        },
+      ]
     }
+
+    deps = [ ":${_container_config_shard_label}" ]
   }
 
   _target_test_label = "${test_name}_bin"
@@ -249,13 +350,16 @@ template("syscall_test") {
     test(_target_test_label) {
       # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
       exclude_toolchain_tags = [ "instrumented" ]
-      sources = [ "${test_name}.cc" ]
+      sources = _test_sources
       deps = _test_deps
       configs += _test_configs
     }
 
     test(_host_test_label) {
-      sources = [ "${test_name}.cc" ]
+      if (_disable_sanitizers_on_host) {
+        exclude_toolchain_tags = [ "instrumented" ]
+      }
+      sources = _test_sources
       deps = _test_deps
       configs += _test_configs
     }
@@ -263,6 +367,7 @@ template("syscall_test") {
     not_needed([
                  "_target_test_label",
                  "_host_test_label",
+                 "_disable_sanitizers_on_host",
                ])
   }
 
@@ -296,7 +401,7 @@ template("syscall_test") {
     test_type = "starnix"
   }
 
-  if (!invoker.arch64_only && starnix_enable_arch32) {
+  if (starnix_enable_arch32) {
     starnix_linux_test_component("${target_name}_arch32") {
       test_toolchain = target_linux_arch32_toolchain
       test_label = ":${_target_test_label}"
@@ -322,14 +427,13 @@ template("syscall_test") {
 foreach(test_name, syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
-    arch64_only = false
   }
 }
 
-foreach(test_name, arch64_syscall_tests) {
-  syscall_test(test_name) {
-    test_name = test_name
-    arch64_only = true
+foreach(test_def, syscall_tests_etc) {
+  syscall_test(test_def.name) {
+    test_name = test_def.name
+    forward_variables_from(test_def, "*", [ "name" ])
   }
 }
 
@@ -442,7 +546,7 @@ if (is_linux) {
 resource("extended_pstate_initial_state_child_resource") {
   testonly = true
   binary_name = "extended_pstate_initial_state_child"
-  exe_label = ":${binary_name}($target_linux_toolchain)"
+  exe_label = ":${binary_name}"
   out_dir = get_label_info(exe_label, "root_out_dir")
   sources = [ "${out_dir}/${binary_name}" ]
   outputs = [ "data/tests/${binary_name}" ]
@@ -473,8 +577,10 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":syslog_non_root_test",
     ":crash_test",
   ]
-  foreach(test_name, syscall_tests + arch64_syscall_tests) {
+  deps = []
+  foreach(test_name, all_test_names) {
     test_components += [ ":${test_name}" ]
+    deps += [ ":${test_name}_config" ]
   }
 
   subpackages = starnix_test_subpackages
@@ -486,8 +592,8 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
   }
 
-  deps = [
-    ":extended_pstate_initial_state_child_resource",
+  deps += [
+    ":extended_pstate_initial_state_child_resource($target_linux_toolchain)",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
 
@@ -509,8 +615,10 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
 if (starnix_enable_arch32) {
   fuchsia_test_package("starnix_arch32_syscalls_cpp_tests") {
     test_components = []
-    foreach(test_name, syscall_tests) {
+    deps = []
+    foreach(test_name, all_test_names) {
       test_components += [ ":${test_name}_arch32" ]
+      deps += [ ":${test_name}_config" ]
     }
 
     subpackages = starnix_test_subpackages
@@ -522,8 +630,8 @@ if (starnix_enable_arch32) {
       subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
     }
 
-    deps = [
-      ":extended_pstate_initial_state_child_resource",
+    deps += [
+      ":extended_pstate_initial_state_child_resource($target_linux_arch32_toolchain)",
       "//src/lib/testing/expectation:expectation_comparer",
     ]
 

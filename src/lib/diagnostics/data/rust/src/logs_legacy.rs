@@ -5,6 +5,7 @@
 use crate::{Data, Logs};
 use fidl_fuchsia_logger::LogMessage;
 
+use std::collections::HashSet;
 use std::fmt::Write;
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
@@ -41,33 +42,70 @@ impl From<&Data<Logs>> for LogMessage {
     }
 }
 
+/// Applies legacy formatting to a log message, matching the formatting
+/// used for a legacy LogMessage.
+/// Prefer using LogTextPresenter if possible instead of this function.
+pub fn format_log_message(data: &Data<Logs>) -> String {
+    let mut msg = data.msg().unwrap_or("").to_string();
+
+    if let Some(payload) = data.payload_keys() {
+        for property in payload.properties.iter() {
+            write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
+        }
+    }
+    let file = data.metadata.file.as_ref();
+    let line = data.metadata.line.as_ref();
+    if let (Some(file), Some(line)) = (file, line) {
+        msg = format!("[{}({})] {}", file, line, msg);
+    }
+    msg
+}
+
+// Rust uses tags of the form "<foo>::<bar>" so if we have a filter for "<foo>" we should
+// include messages that have "<foo>" as a prefix.
+fn include_tag_prefix(tag: &str, tags: &HashSet<String>) -> bool {
+    if tag.contains("::") {
+        tags.iter().any(|t| {
+            tag.len() > t.len() + 2 && &tag[t.len()..t.len() + 2] == "::" && tag.starts_with(t)
+        })
+    } else {
+        false
+    }
+}
+
+/// Filters by tags according to legacy LogMessage rules.
+/// Prefer filtering by moniker/selectors instead of using this function.
+pub fn filter_by_tags(log_message: &Data<Logs>, include_tags: &HashSet<String>) -> bool {
+    let reject_tags = if include_tags.is_empty() {
+        false
+    } else if log_message.tags().map(|t| t.is_empty()).unwrap_or(true) {
+        !include_tags.contains(log_message.component_name().as_ref())
+    } else {
+        !log_message
+            .tags()
+            .map(|tags| {
+                tags.iter()
+                    .any(|tag| include_tags.contains(tag) || include_tag_prefix(tag, include_tags))
+            })
+            .unwrap_or(false)
+    };
+    reject_tags
+}
+
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
 impl From<Data<Logs>> for LogMessage {
     fn from(data: Data<Logs>) -> LogMessage {
-        let mut msg = data.msg().unwrap_or("").to_string();
-
-        if let Some(payload) = data.payload_keys() {
-            for property in payload.properties.iter() {
-                write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
-            }
-        }
-        let file = data.metadata.file.as_ref();
-        let line = data.metadata.line.as_ref();
-        if let (Some(file), Some(line)) = (file, line) {
-            msg = format!("[{}({})] {}", file, line, msg);
-        }
-
         LogMessage {
             pid: data.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: data.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             time: data.metadata.timestamp,
             severity: data.metadata.raw_severity() as i32,
             dropped_logs: data.dropped_logs().unwrap_or(0) as _,
+            msg: format_log_message(&data),
             tags: match data.metadata.tags {
                 Some(tags) => tags,
                 None => vec![data.component_name().to_string()],
             },
-            msg,
         }
     }
 }

@@ -9,6 +9,7 @@ ffx product download
 ffx product get-artifacts
 ffx product get-image-path
 ffx product lookup
+ffx log
 ffx repository create
 ffx repository publish
 ffx repository server start

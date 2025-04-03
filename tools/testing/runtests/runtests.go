@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/metadata"
 )
 
 // TODO(olivernewman): Move the contents of this file into a separate library as
@@ -117,6 +118,9 @@ type TestDetails struct {
 
 	// FailureReason is an optional human-readable error message or explanation of the failure.
 	FailureReason string `json:"error_line,omitempty"`
+
+	// Test metadata
+	Metadata metadata.TestMetadata `json:"metadata,omitempty"`
 }
 
 // TestCaseResult contains the details of a single test case, nested within a

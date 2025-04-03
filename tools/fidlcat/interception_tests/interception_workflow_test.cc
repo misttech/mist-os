@@ -54,7 +54,7 @@ DataForSyscallTest::DataForSyscallTest(debug::Arch arch) : arch_(arch) {
   header2_.ordinal = kOrdinal2;
 
   for (int i = 0; i < 100; ++i) {
-    large_bytes_.push_back(i * i);
+    large_bytes_.push_back(static_cast<uint8_t>(i * i));
   }
   sp_ = stack_ + kMaxStackSizeInWords;
 }
@@ -579,7 +579,6 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_job_set_policy not automated\n"
       "zx_ktrace_control not automated\n"
       "zx_ktrace_read partially automated\n"
-      "zx_ktrace_write doesn't need automation\n"
       "zx_mtrace_control fully automated\n"
       "zx_nanosleep doesn't need automation\n"
       "zx_object_get_child fully automated\n"
@@ -671,7 +670,7 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_vmo_set_size doesn't need automation\n"
       "zx_vmo_write fully automated\n";
   uint32_t expected_fully_automated = 63;
-  uint32_t expected_cant_be_automated = 58;
+  uint32_t expected_cant_be_automated = 57;
   uint32_t expected_partially_automated = 17;
   uint32_t expected_not_automated = 12;
   EXPECT_EQ(actual_fully_automated, expected_fully_automated);

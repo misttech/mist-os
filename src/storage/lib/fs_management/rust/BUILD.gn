@@ -51,9 +51,6 @@ rustc_library("fs_management") {
     "src/lib.rs",
     "src/partition.rs",
   ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 storage_driver_test_realm_v2_component("fs-management-rust-tests-component") {

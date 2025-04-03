@@ -19,7 +19,6 @@
 
 // See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
-#include <openssl/crypto.h>
 #include <openssl/mem.h>
 #include <openssl/sha.h>
 
@@ -65,7 +64,6 @@ Digest& Digest::operator=(const Digest& other) {
 }
 
 void Digest::Init() {
-  CRYPTO_library_init();
   ctx_.reset(new Context());
   SHA256_Init(&ctx_->impl);
 }

@@ -58,6 +58,15 @@ class TestNinjaOutputsDatabase(unittest.TestCase):
 
         self.assertListEqual(sorted(_NINJA_OUTPUTS.keys()), db.get_labels())
 
+        self.assertListEqual(
+            ["//:zoo", "//:zoo(//toolchain:secondary)"],
+            db.target_name_to_gn_labels("zoo.output"),
+        )
+        self.assertListEqual(
+            ["//:bar"], db.target_name_to_gn_labels("bar.output")
+        )
+        self.assertListEqual([], db.target_name_to_gn_labels("unknown_target"))
+
         expected_paths = sorted(
             path for sublist in _NINJA_OUTPUTS.values() for path in sublist
         )

@@ -13,11 +13,13 @@ pub struct Struct {
     #[serde(flatten)]
     pub attributes: Attributes,
     pub name: CompIdent,
+    pub naming_context: Vec<String>,
     pub members: Vec<StructMember>,
     #[serde(rename = "resource")]
     pub is_resource: bool,
     #[serde(rename = "type_shape_v2")]
     pub shape: TypeShape,
+    pub is_empty_success_struct: bool,
 }
 
 impl Index for Struct {
@@ -36,4 +38,12 @@ pub struct StructMember {
     pub name: Ident,
     #[serde(rename = "type")]
     pub ty: Type,
+    #[serde(rename = "field_shape_v2")]
+    pub field_shape: FieldShape,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FieldShape {
+    pub offset: u32,
+    pub padding: u32,
 }

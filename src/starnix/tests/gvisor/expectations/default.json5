@@ -448,25 +448,14 @@
                 "MincoreTest.InvalidLengthFails",
 
                 // mlock_test
-                "MlockTest.Basic",
                 "MapLockedTest.Basic",
                 "MapLockedTest.RlimitMemlockZero",
-                "MlockTest.MsyncInvalidate",
-                "MlockTest.ProtNone",
-                "MlockTest.Fork",
-                "MlockTest.RlimitMemlockZero",
-                "MunlockTest.Basic",
-                "MlockTest.RlimitMemlockInsufficient",
                 "MlockallTest.Future",
                 "MunlockallTest.Basic",
-                "Mlock2Test.NoFlags",
                 "MapLockedTest.RlimitMemlockInsufficient",
                 "MremapLockedTest.Basic",
-                "Mlock2Test.UnknownFlags",
                 "MremapLockedTest.RlimitMemlockZero",
-                "Mlock2Test.MlockOnfault",
                 "MremapLockedTest.RlimitMemlockInsufficient",
-                "MlockTest.MadviseDontneed",
 
                 // mmap_test
                 "MMapDeathTest.TruncateAfterCOWBreak",
@@ -475,7 +464,6 @@
                 "MMapFileTest.MapLastPositivePage",
                 "MMapFileTest.MapSecondToLastNegativePage",
                 "MMapTest.ExceedLimitAS",
-                "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
 
                 // mount_test
@@ -1207,6 +1195,11 @@
 
                 // TODO(https://fxbug.dev/397205797): Fix and re-enable
                 "ExecTest.Setpgid",
+
+                // TODO(https://fxbug.dev/404199474): Fix and re-enable
+                "PtyTest.PacketModeWriteMasterToReplica",
+                "PtyTest.PacketModeWriteReplicaToMaster",
+                "PtyTest.PacketModeFailsOnReplica",
             ],
         },
     ],

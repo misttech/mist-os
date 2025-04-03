@@ -8,6 +8,11 @@ import("//build/fidl/fidl.gni")
 # Define a target for our FIDL library by passing it the FIDL source files
 # that make up the library.
 fidl("fuchsia.examples") {
+  # Used by CTF examples.
+  sdk_category = "compat_test"
+  stable = true
+  sdk_area = "Testing"
+
   sources = [
     "echo.test.fidl",
     "types.test.fidl",

@@ -124,7 +124,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
   zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
@@ -154,7 +154,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
   zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
@@ -193,7 +193,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
   zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

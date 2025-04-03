@@ -37,7 +37,6 @@ DELIVERY_BLOB_TYPE = struct(
 def fuchsia_product_bundle(
         *,
         name,
-        board_name = None,
         product_bundle_name = None,
         partitions_config = None,
         main = None,
@@ -69,7 +68,6 @@ def fuchsia_product_bundle(
 
     _build_fuchsia_product_bundle(
         name = name,
-        board_name = board_name,
         partitions_config = partitions_config,
         main = main,
         product_bundle_name = product_bundle_name,
@@ -578,10 +576,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     size_report = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
-    if ctx.attr.board_name:
-        product_bundle_name = "{}.{}".format(ctx.attr.product_bundle_name, ctx.attr.board_name)
-    else:
-        product_bundle_name = ctx.attr.product_bundle_name
+    product_bundle_name = ctx.attr.product_bundle_name
     delivery_blob_type = ctx.attr.delivery_blob_type
 
     # In the future, the product bundles should be versioned independently of
@@ -735,10 +730,6 @@ _build_fuchsia_product_bundle = rule(
     toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
-        # Deprecated. Please provide the entire name in `product_bundle_name`.
-        "board_name": attr.string(
-            doc = "Name of the board this PB runs on. E.g. x64.",
-        ),
         "product_bundle_name": attr.string(
             doc = "Name of the Fuchsia product. E.g. workstation_eng.x64",
         ),

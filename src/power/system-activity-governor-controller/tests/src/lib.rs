@@ -28,7 +28,7 @@ macro_rules! block_until_inspect_matches {
         let mut reader = ArchiveReader::inspect();
 
         reader
-            .select_all_for_moniker($moniker)
+            .select_all_for_component($moniker.to_string())
             .with_minimum_schema_count(1);
 
         for i in 1.. {
@@ -224,7 +224,7 @@ async fn test_system_activity_control() -> Result<()> {
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
                 ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
             },
-            suspend_events: {
+            suspend_events: contains {
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -253,16 +253,22 @@ async fn test_system_activity_control() -> Result<()> {
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: contains {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
                 "2": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
                 },
                 "3": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                },
+                "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },

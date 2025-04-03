@@ -139,7 +139,7 @@ impl Iterator for DirentIterator<'_> {
             return None;
         }
         let mut entry = zxio_dirent_t::default();
-        let mut name_buffer = Vec::with_capacity(fio::MAX_FILENAME as usize);
+        let mut name_buffer = Vec::with_capacity(fio::MAX_NAME_LENGTH as usize);
         // The FFI interface expects a pointer to c_char which is i8 on x86_64.
         // The Rust str and OsStr types expect raw character data to be stored in a buffer u8 values.
         // The types are equivalent for all practical purposes and Rust permits casting between the types,
@@ -1448,12 +1448,19 @@ impl Zxio {
         let status = unsafe { zxio::zxio_sync(self.as_ptr()) };
         zx::ok(status)
     }
+
+    pub fn close(&self) -> Result<(), zx::Status> {
+        let status = unsafe {
+            zxio::zxio_close(self.as_ptr(), /* should_wait= */ true)
+        };
+        zx::ok(status)
+    }
 }
 
 impl Drop for Zxio {
     fn drop(&mut self) {
         unsafe {
-            zxio::zxio_close(self.as_ptr(), true);
+            zxio::zxio_close(self.as_ptr(), /* should_wait= */ false);
         };
     }
 }
@@ -1580,6 +1587,29 @@ pub fn directory_read_file(
             return Ok(result);
         }
     }
+}
+
+/// Create an anonymous temp file in the given directory.
+pub fn directory_create_tmp_file(
+    directory: &fio::DirectorySynchronousProxy,
+    flags: fio::Flags,
+    deadline: zx::MonotonicInstant,
+) -> Result<fio::FileSynchronousProxy, zx::Status> {
+    let description = directory_open(
+        directory,
+        ".",
+        flags
+            | fio::PERM_WRITABLE
+            | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+            | fio::Flags::PROTOCOL_FILE,
+        deadline,
+    )?;
+    let file = match description.kind {
+        NodeKind::File => fio::FileSynchronousProxy::new(description.node.into_channel()),
+        _ => return Err(zx::Status::NOT_FILE),
+    };
+
+    Ok(file)
 }
 
 /// Open the given path in the given directory without blocking.

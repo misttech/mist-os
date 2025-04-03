@@ -19,11 +19,19 @@
         {% when DeclType::Enum %}
             {{ self.enm(schema.enum_declarations[ident]) }}
         {% when DeclType::Struct %}
-            {{ self.strct(schema.struct_declarations[ident]) }}
+            {% let strct = schema.struct_declarations[ident] %}
+            {% if !strct.is_empty_success_struct %}
+                {{ self.strct(schema.struct_declarations[ident]) }}
+            {% else %}
+                {{ self.empty_success_struct(schema.struct_declarations[ident]) }}
+            {% endif %}
         {% when DeclType::Table %}
             {{ self.table(schema.table_declarations[ident]) }}
         {% when DeclType::Union %}
-            {{ self.union(schema.union_declarations[ident]) }}
+            {% let union = schema.union_declarations[ident] %}
+            {% if !union.is_result %}
+                {{ self.union(union) }}
+            {% endif %}
         {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
         {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}
         {% when DeclType::Protocol %}
@@ -33,26 +41,6 @@
             {{ self.service(schema.service_declarations[ident]) }}
     {% endmatch %}
 {% endfor %}
-
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    {%- for ident in schema.declaration_order -%}
-        {%- match schema.declarations[ident] -%}
-            {%- when DeclType::Protocol -%}
-                {%- let protocol = schema.protocol_declarations[ident] -%}
-                {%- let protocol_base_name = protocol.name.decl_name().camel() -%}
-                pub use super::{
-                    {{ format!("{protocol_base_name}ClientSender") }},
-                    {{ format!("{protocol_base_name}ServerSender") }},
-                };
-            {%- when DeclType::Service -%}
-                {%- let service = schema.service_declarations[ident] -%}
-                {%- let service_base_name = service.name.decl_name().camel() -%}
-                pub use super::{{ format!("{service_base_name}Instance") }};
-            {%- else -%}
-        {%- endmatch -%}
-    {%- endfor -%}
-}
 
 {% if config.emit_compat %}
     {{ self.compat() }}

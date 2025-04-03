@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
@@ -146,12 +145,6 @@ fuchsia_package("package-advanced") {
   package_name = "netcfg-advanced"
   deps = [ ":component-advanced" ]
   visibility = [ "//bundles/assembly/*" ]
-}
-
-config_data("config-default") {
-  for_pkg = "netcfg"
-  sources = [ "config/netcfg_default.json" ]
-  outputs = [ "netcfg_default.json" ]
 }
 
 fuchsia_unittest_package("netcfg-tests") {

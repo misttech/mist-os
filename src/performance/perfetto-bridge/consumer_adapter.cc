@@ -37,6 +37,7 @@
 #include <third_party/perfetto/protos/perfetto/config/track_event/track_event_config.gen.h>
 
 namespace {
+
 // The size of the consumer buffer.
 constexpr size_t kConsumerBufferSizeKb = 20ul * 1024ul;  // 20MB.
 
@@ -494,7 +495,9 @@ std::vector<trace::KnownCategory> ConsumerAdapter::GetKnownCategories() {
     }
     latch.count_down();
   };
-  consumer_endpoint->QueryServiceState(std::move(on_service_state));
+  consumer_endpoint->QueryServiceState(
+      perfetto::ConsumerEndpoint::QueryServiceStateArgs{.sessions_only = false},
+      std::move(on_service_state));
   // Querying the service state triggers an ipc, the categories may not actually be filled in yet.
   latch.wait();
   return known_categories;

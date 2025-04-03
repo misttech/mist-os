@@ -215,7 +215,7 @@ class DirentIteratorImpl {
     }
 
     // Check that the name length is within bounds.
-    if (packed_entry.size > fio::wire::kMaxFilename) {
+    if (packed_entry.size > fio::wire::kMaxNameLength) {
       return ZX_ERR_INVALID_ARGS;
     }
 
@@ -495,6 +495,8 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kWrappingKeyId;
   if (attr_has.selinux_context)
     query |= fio::NodeAttributesQuery::kSelinuxContext;
+  if (attr_has.pending_access_time_update)
+    query |= fio::NodeAttributesQuery::kPendingAccessTimeUpdate;
 #endif
   return query;
 }

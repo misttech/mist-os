@@ -126,6 +126,7 @@ bool IsYuvFormat(vk::Format format) {
     case vk::Format::eG8B8G8R8422Unorm:
     case vk::Format::eG8B8R82Plane420Unorm:
     case vk::Format::eG8B8R83Plane420Unorm:
+    case vk::Format::eG10X6B10X6R10X62Plane420Unorm3Pack16:
       return true;
     default:
       return false;

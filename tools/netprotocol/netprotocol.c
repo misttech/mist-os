@@ -48,7 +48,7 @@ static int netboot_timeout_get_msec(const struct timeval* end_tv) {
   struct timeval now_tv;
   gettimeofday(&now_tv, NULL);
   timersub(end_tv, &now_tv, &wait_tv);
-  return wait_tv.tv_sec * 1000 + wait_tv.tv_usec / 1000;
+  return (int)(wait_tv.tv_sec * 1000 + wait_tv.tv_usec / 1000);
 }
 
 static int netboot_bind_to_cmd_port(int socket) {
@@ -65,7 +65,7 @@ static int netboot_bind_to_cmd_port(int socket) {
   return -1;
 }
 
-static int netboot_send_query(int socket, unsigned port, const char* ifname) {
+static int netboot_send_query(int socket, uint16_t port, const char* ifname) {
   const char* hostname = "*";
   size_t hostname_len = strlen(hostname) + 1;
 
@@ -212,10 +212,10 @@ int netboot_handle_custom_getopt(int argc, char* const* argv, const struct optio
         netboot_wait = false;
         break;
       case 'b':
-        tftp_block_size = atoi(optarg);
+        tftp_block_size = (uint16_t)atoi(optarg);
         break;
       case 'w':
-        tftp_window_size = atoi(optarg);
+        tftp_window_size = (uint16_t)atoi(optarg);
         break;
       default:
         if (opt_callback && opt_callback(ch, argc, argv)) {
@@ -248,7 +248,7 @@ void netboot_usage(bool show_tftp_opts) {
   }
 }
 
-int netboot_discover(unsigned port, const char* ifname, on_device_cb callback, void* data) {
+int netboot_discover(uint16_t port, const char* ifname, on_device_cb callback, void* data) {
   if (!callback) {
     errno = EINVAL;
     return -1;

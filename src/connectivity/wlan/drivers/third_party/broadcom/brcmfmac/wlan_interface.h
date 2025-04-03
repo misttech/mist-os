@@ -83,7 +83,6 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   // WlanFullmacImpl implementations, dispatching FIDL requests from higher layers.
   void Init(InitRequestView request, InitCompleter::Sync& completer) override;
   void Query(QueryCompleter::Sync& completer) override;
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override;
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override;
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) override;
@@ -100,7 +99,7 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void StopBss(StopBssRequestView request, StopBssCompleter ::Sync& completer) override;
   void SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& completer) override;
   void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override;
-  void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override;
+  void GetIfaceStats(GetIfaceStatsCompleter::Sync& completer) override;
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override;
   void SaeHandshakeResp(SaeHandshakeRespRequestView request,
                         SaeHandshakeRespCompleter::Sync& completer) override;

@@ -5,18 +5,34 @@
 #![cfg(test)]
 
 use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_net_filter_ext::{
+    Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, IpHook, MarkAction,
+    Matchers, Namespace, NamespaceId, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+};
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::rules::{
+    FidlRuleAdminIpExt, FidlRuleIpExt, MarkMatcher, RuleAction, RuleIndex, RuleMatcher,
+    RuleSetPriority,
+};
+use fidl_fuchsia_net_routes_ext::{FidlRouteIpExt, TableId};
 use fuchsia_async::{self as fasync};
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _};
+use net_declare::fidl_subnet;
+use net_types::ip::IpVersion;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use assert_matches::assert_matches;
 use netemul::{InStack, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
-use netstack_testing_common::realms::{KnownServiceProvider, Netstack, TestSandboxExt as _};
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack, Netstack3, TestSandboxExt as _,
+};
 use netstack_testing_common::{dhcpv4, interfaces, ndp};
 use netstack_testing_macros::netstack_test;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
@@ -444,4 +460,168 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         .map(|_: Option<()>| ())
     })
     .await;
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn mark_on_incoming_syn<
+    I: FidlRuleAdminIpExt + FidlRuleIpExt + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let server = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("{name}_server"))
+        .expect("create netstack");
+    let client = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("{name}_client"))
+        .expect("create netstack");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let server_ep = server.join_network(&network, "server_ep").await.expect("join network");
+    let client_ep = client.join_network(&network, "client_ep").await.expect("join network");
+
+    let (server_subnet, client_subnet) = match I::VERSION {
+        IpVersion::V4 => (fidl_subnet!("192.168.0.2/24"), fidl_subnet!("192.168.0.1/24")),
+        IpVersion::V6 => (
+            fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64"),
+            fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64"),
+        ),
+    };
+
+    server_ep.add_address_and_subnet_route(server_subnet).await.expect("set ip");
+    client_ep.add_address_and_subnet_route(client_subnet).await.expect("set ip");
+
+    let control =
+        server.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller = Controller::new(&control, &ControllerId(String::from("mangle")))
+        .await
+        .expect("create controller");
+    let namespace_id = NamespaceId(String::from("namespace"));
+    let routine_id = RoutineId { namespace: namespace_id.clone(), name: String::from("routine") };
+    const MARK: u32 = 100;
+    const DOMAIN: fnet::MarkDomain = fnet::MarkDomain::Mark1;
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        Resource::Routine(Routine {
+            id: routine_id.clone(),
+            routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                hook: IpHook::Ingress,
+                priority: 0,
+            })),
+        }),
+        Resource::Rule(Rule {
+            id: RuleId { routine: routine_id.clone(), index: 0 },
+            matchers: Matchers::default(),
+            action: Action::Mark {
+                domain: DOMAIN,
+                action: MarkAction::SetMark { clearing_mask: 0, mark: MARK },
+            },
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let rule_table =
+        server.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
+    let priority = RuleSetPriority::from(0);
+    let rule_set =
+        fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, priority).expect("fidl error");
+
+    const RULE_INDEX_0: RuleIndex = RuleIndex::new(0);
+    const RULE_INDEX_1: RuleIndex = RuleIndex::new(1);
+
+    let main_table = server
+        .connect_to_protocol::<I::RouteTableMarker>()
+        .expect("connect to route table provider");
+
+    let fnet_routes_admin::GrantForRouteTableAuthorization { table_id: main_table_id, token } =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&main_table)
+            .await
+            .expect("fidl error");
+
+    fnet_routes_ext::rules::authenticate_for_route_table::<I>(&rule_set, main_table_id, token)
+        .await
+        .expect("fidl error")
+        .expect("failed to authenticate");
+    fnet_routes_ext::rules::add_rule::<I>(
+        &rule_set,
+        RULE_INDEX_0,
+        RuleMatcher {
+            mark_1: Some(MarkMatcher::Marked { mask: !0, between: MARK..=MARK }),
+            ..Default::default()
+        },
+        RuleAction::Lookup(TableId::new(main_table_id)),
+    )
+    .await
+    .expect("fidl error")
+    .expect("failed to add a new rule");
+
+    fnet_routes_ext::rules::add_rule::<I>(
+        &rule_set,
+        RULE_INDEX_1,
+        RuleMatcher::default(),
+        RuleAction::Unreachable,
+    )
+    .await
+    .expect("fidl error")
+    .expect("failed to add a new rule");
+
+    let fnet_ext::IpAddress(client_addr) = client_subnet.addr.into();
+    let client_addr = std::net::SocketAddr::new(client_addr, 1234);
+
+    let fnet_ext::IpAddress(server_addr) = server_subnet.addr.into();
+    let server_addr = std::net::SocketAddr::new(server_addr, 8080);
+
+    // We pick a payload that is small enough to be guaranteed to fit in a TCP segment so both the
+    // client and server can read the entire payload in a single `read`.
+    const PAYLOAD: &'static str = "Hello World";
+
+    let listener = fasync::net::TcpListener::listen_in_realm(&server, server_addr)
+        .await
+        .expect("failed to create server socket");
+
+    let server_fut = async {
+        let (_, mut stream, from) = listener.accept().await.expect("accept failed");
+
+        let mut buf = [0u8; 1024];
+        let read_count = stream.read(&mut buf).await.expect("read from tcp server stream failed");
+        assert_eq!(from.ip(), client_addr.ip());
+
+        assert_eq!(read_count, PAYLOAD.as_bytes().len());
+        assert_eq!(&buf[..read_count], PAYLOAD.as_bytes());
+
+        let write_count =
+            stream.write(PAYLOAD.as_bytes()).await.expect("write to tcp server stream failed");
+        assert_eq!(write_count, PAYLOAD.as_bytes().len());
+
+        // The accepted socket should bear the mark that we set by filter rules.
+        let channel = fdio::clone_channel(stream.std()).expect("failed to clone channel");
+        let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
+        assert_eq!(
+            proxy.get_mark(DOMAIN).await.expect("fidl error").expect("get mark"),
+            fposix_socket::OptionalUint32::Value(MARK),
+        );
+    };
+
+    let client_fut = async {
+        let mut stream = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+            .await
+            .expect("failed to create client socket");
+
+        let write_count =
+            stream.write(PAYLOAD.as_bytes()).await.expect("write to tcp client stream failed");
+
+        assert_eq!(write_count, PAYLOAD.as_bytes().len());
+
+        let mut buf = [0u8; 1024];
+        let read_count = stream.read(&mut buf).await.expect("read from tcp client stream failed");
+
+        assert_eq!(read_count, PAYLOAD.as_bytes().len());
+        assert_eq!(&buf[..read_count], PAYLOAD.as_bytes());
+    };
+
+    let ((), ()) = futures::future::join(client_fut, server_fut).await;
 }

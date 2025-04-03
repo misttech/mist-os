@@ -201,13 +201,13 @@ fn executability_status(
     }
 }
 
-fn make_pkgdir_flags(executability_status: ExecutabilityStatus) -> fio::OpenFlags {
-    use ExecutabilityStatus::*;
-    fio::OpenFlags::RIGHT_READABLE
-        | match executability_status {
-            Allowed => fio::OpenFlags::RIGHT_EXECUTABLE,
-            Forbidden => fio::OpenFlags::empty(),
+impl From<ExecutabilityStatus> for fio::Flags {
+    fn from(status: ExecutabilityStatus) -> Self {
+        match status {
+            ExecutabilityStatus::Allowed => fio::PERM_READABLE | fio::PERM_EXECUTABLE,
+            ExecutabilityStatus::Forbidden => fio::PERM_READABLE,
         }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -353,9 +353,9 @@ async fn get_impl(
         }
     };
 
-    let open_flags =
-        make_pkgdir_flags(executability_status(executability_restrictions, base_packages, pkg));
-    let () = root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
+    let flags = executability_status(executability_restrictions, base_packages, pkg).into();
+    let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
+    request.handle(|request| root_dir.open3(scope, vfs::path::Path::dot(), flags, request));
 
     cobalt_sender.open_success();
     Ok(())
@@ -809,28 +809,18 @@ async fn get_subpackage(
         error!(superpackage:%, subpackage:%; "get_subpackage: not a subpackage of the superpackage");
         return Err(fpkg::GetSubpackageError::DoesNotExist);
     };
-    let () = open_packages
-        .get_or_insert(*hash, None)
-        .await
-        .map_err(|e| {
-            error!(
-                superpackage:%,
-                subpackage:%;
-                "get_subpackage: creating subpackage RootDir: {:#}",
-                anyhow!(e)
-            );
-            fpkg::GetSubpackageError::Internal
-        })?
-        .open(
-            scope,
-            make_pkgdir_flags(executability_status(
-                executability_restrictions,
-                base_packages,
-                *hash,
-            )),
-            vfs::path::Path::dot(),
-            dir.into_channel().into(),
+    let root = open_packages.get_or_insert(*hash, None).await.map_err(|e| {
+        error!(
+            superpackage:%,
+            subpackage:%;
+            "get_subpackage: creating subpackage RootDir: {:#}",
+            anyhow!(e)
         );
+        fpkg::GetSubpackageError::Internal
+    })?;
+    let flags = executability_status(executability_restrictions, base_packages, *hash).into();
+    let request = vfs::ObjectRequest::new(flags, &Default::default(), dir.into_channel());
+    request.handle(|request| root.open3(scope, vfs::path::Path::dot(), flags, request));
 
     Ok(())
 }

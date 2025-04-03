@@ -29,7 +29,7 @@ sdk_atom("sdk_atom_unittest") {
 sdk_collection("sdk_collection_unittest") {
   testonly = true
 
-  category = "partner_internal"
+  category = "prebuilt"
   deps = [ ":sdk_atom_unittest" ]
 }
 

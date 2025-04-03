@@ -15,7 +15,16 @@ namespace fdf {
 
 namespace {
 std::atomic<Logger*> g_instance = nullptr;
-}
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+using FidlSeverity = fuchsia_diagnostics_types::wire::Severity;
+using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
+#else
+using FidlSeverity = fuchsia_diagnostics::wire::Severity;
+using FidlInterest = fuchsia_diagnostics::wire::Interest;
+#endif
+
+}  // namespace
 
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
@@ -122,27 +131,32 @@ bool Logger::HasGlobalInstance() { return g_instance != nullptr; }
 
 Logger::~Logger() = default;
 
-void Logger::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
+void Logger::HandleInterest(FidlInterest interest) {
   if (interest.has_min_severity()) {
     switch (interest.min_severity()) {
-      case fuchsia_diagnostics::Severity::kTrace:
+      case FidlSeverity::kTrace:
         severity_ = FUCHSIA_LOG_TRACE;
         return;
-      case fuchsia_diagnostics::Severity::kDebug:
+      case FidlSeverity::kDebug:
         severity_ = FUCHSIA_LOG_DEBUG;
         return;
-      case fuchsia_diagnostics::Severity::kInfo:
+      case FidlSeverity::kInfo:
         severity_ = FUCHSIA_LOG_INFO;
         return;
-      case fuchsia_diagnostics::Severity::kWarn:
+      case FidlSeverity::kWarn:
         severity_ = FUCHSIA_LOG_WARNING;
         return;
-      case fuchsia_diagnostics::Severity::kError:
+      case FidlSeverity::kError:
         severity_ = FUCHSIA_LOG_ERROR;
         return;
-      case fuchsia_diagnostics::Severity::kFatal:
+      case FidlSeverity::kFatal:
         severity_ = FUCHSIA_LOG_FATAL;
         return;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+      default:
+        severity_ = FUCHSIA_LOG_INFO;
+        return;
+#endif
     }
   } else {
     severity_ = default_severity_;

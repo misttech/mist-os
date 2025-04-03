@@ -4,9 +4,9 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
-import("//build/config.gni")
 import("//build/host.gni")
 import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
@@ -117,13 +117,9 @@ if (is_fuchsia) {
     outputs = [ files.version ]
   }
 
-  resource("bootfs") {
-    sources = [ files.version ]
-    outputs = [ "path/to/version" ]
-  }
-
   board_configuration("board_config") {
     name = "test"
+    version = "fake_version"
     filesystems = {
       fvm = {
         sparse_output = {
@@ -133,13 +129,13 @@ if (is_fuchsia) {
   }
 
   product_assembly_configuration("assembly_config") {
+    testonly = true
     platform = {
-      feature_set_level = "empty"
+      feature_set_level = "utility"
       build_type = "eng"
       storage = {
         filesystems = {
           image_name = "assembly"
-          image_mode = "no_image"
         }
       }
     }
@@ -147,16 +143,9 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
-    include_legacy_bundle = true
-    bootfs_labels = [ ":bootfs" ]
-    base_packages = []
-    cmdline = [
-      "abc",
-      "def",
-    ]
-
     product_assembly_config_label = ":assembly_config"
     board_config_label = ":board_config"
+    generate_fxfs = true
   }
 
   product_bundle("product_bundle") {

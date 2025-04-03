@@ -8,6 +8,7 @@
 #include <lib/fit/defer.h>
 
 #include "../runtime-dynamic-linker.h"
+#include "../tlsdesc-runtime-dynamic.h"
 #include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
@@ -18,9 +19,42 @@ namespace dl::testing {
 
 extern const ld::abi::Abi<>& gStartupLdAbi;
 
-// The Base class provides testing facilities and logic specific to the platform
-// the test is running on. DlImplTests invokes Base methods when functions
-// need to operate differently depending on the OS.
+// This handles TLS runtime test support that need not be templated like the
+// rest of DlImplTests.  The only instance of this (empty) class is its own
+// private thread_local that ensures per-thread cleanup.
+class DlImplTestsTls {
+ public:
+  // Ensure this thread is ready for a TLSDESC access.  This stands in for the
+  // integration of thread startup with RuntimeDynamicLinker, and for the
+  // synchronization regime for existing threads when dlopen expands the
+  // _dl_tlsdesc_runtime_dynamic_blocks arrays.
+  static void Prepare(const RuntimeDynamicLinker& linker);
+
+  // This happens at the end of each test, which is only on the main thread.
+  // Always leave a clean slate for the next test.
+  static void Cleanup();
+
+ private:
+  constexpr DlImplTestsTls() = default;
+
+  ~DlImplTestsTls() { Cleanup(); }
+
+  // This just exists to get the destructor run in each thread as it exits.  On
+  // the main thread, this doesn't happen until process exit; it's almost
+  // always a no-op because the last ~DlImplTestsTls() run after the end of a
+  // test left things clear anyway.  Other threads are from std::jthread used
+  // inside a test, so those are all joined and this have already run this
+  // destructor before the governing test ended (and hit its Cleanup() call).
+  static thread_local DlImplTestsTls cleanup_at_thread_exit_;
+
+  // This tracks the last-allocated blocks in case of expansion.
+  // Its ownership is "shared" with _dl_tlsdesc_runtime_dynamic_blocks.
+  SizedDynamicTlsArray blocks_;
+};
+
+// The Base class provides testing facilities and logic specific to the
+// platform the test is running on. DlImplTests invokes Base methods when
+// functions need to operate differently depending on the OS.
 template <class Base>
 class DlImplTests : public Base {
  public:
@@ -28,12 +62,33 @@ class DlImplTests : public Base {
   // since the error message returned from the libdl implementation will be the
   // same regardless of the OS.
   static constexpr bool kCanMatchExactError = true;
-  // TODO(https://fxbug.dev/342480690): Support Dynamic TLS
-  static constexpr bool kSupportsDynamicTls = false;
   // TODO(https://fxbug.dev/382529434): Have dlclose() run finalizers
   static constexpr bool kDlCloseCanRunFinalizers = false;
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
   static constexpr bool kDlCloseUnloadsModules = false;
+
+  class DynamicTlsHelper {
+   public:
+    // Load the same module in parallel with the system dlopen.  It and its
+    // deps should get assigned the same module IDs that the just-completed
+    // DlImplTests::DlOpen call assigned, so the system __tls_get_addr lookups
+    // will find the corresponding module's dynamic TLS segment with the right
+    // initial data.
+    void Init(const char* file) {
+      ASSERT_EQ(system_handle_, nullptr);
+      system_handle_ = dlopen(file, RTLD_NOW | RTLD_LOCAL);
+      ASSERT_TRUE(system_handle_) << "system dlopen(\"" << file << "\"): " << dlerror();
+    }
+
+    ~DynamicTlsHelper() {
+      if (system_handle_) {
+        EXPECT_EQ(dlclose(system_handle_), 0) << dlerror();
+      }
+    }
+
+   private:
+    void* system_handle_ = nullptr;
+  };
 
   void SetUp() override {
     Base::SetUp();
@@ -42,6 +97,8 @@ class DlImplTests : public Base {
     dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
     ASSERT_TRUE(ac.check());
   }
+
+  void TearDown() override { DlImplTestsTls::Cleanup(); }
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -85,9 +142,15 @@ class DlImplTests : public Base {
     return dynamic_linker_->IteratePhdrInfo(callback, data);
   }
 
-  // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining in
-  // its modules list, so there is no need to do any extra clean up operation.
+  // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining
+  // in its modules list, so there is no need to do any extra clean up
+  // operation.
   void CleanUpOpenedFile(void* ptr) override {}
+
+  // A test will call this function before the running thread accesses a TLS
+  // variable. This function will allocate and initialize TLS data on the
+  // thread so the thread can access that data.
+  void PrepareForTlsAccess() { DlImplTestsTls::Prepare(*dynamic_linker_); }
 
  private:
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;

@@ -17,10 +17,6 @@
             path: "/fs/blob/root",
         },
         {
-            protocol: "fuchsia.update.verify.BlobfsVerifier",
-            path: "/fs/blob/svc/fuchsia.update.verify.BlobfsVerifier",
-        },
-        {
             protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
             path: "/fs/blob/svc/fuchsia.update.verify.ComponentOtaHealthCheck",
         },
@@ -52,6 +48,13 @@
             path: "/fvm/svc/fuchsia.fs.startup.Startup",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.boot.WriteOnlyLog",
+            from: "parent",
+            to: "#fvm2",
+        },
+    ],
     expose: [
         {
             directory: [
@@ -71,12 +74,8 @@
         {
             protocol: [
                 "fuchsia.fxfs.BlobCreator",
-                "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
-            from: "self",
-        },
-        {
-            protocol: [ "fuchsia.update.verify.ComponentOtaHealthCheck" ],
             from: "self",
         },
         {

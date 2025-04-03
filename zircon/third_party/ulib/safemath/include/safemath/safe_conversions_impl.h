@@ -72,7 +72,7 @@ constexpr typename std::make_signed<T>::type ConditionalNegate(
   using SignedT = typename std::make_signed<T>::type;
   using UnsignedT = typename std::make_unsigned<T>::type;
   return static_cast<SignedT>(
-      (static_cast<UnsignedT>(x) ^ -SignedT(is_negative)) + is_negative);
+      (static_cast<UnsignedT>(x) ^ static_cast<UnsignedT>(-SignedT(is_negative))) + is_negative);
 }
 
 // This performs a safe, absolute value via unsigned overflow.

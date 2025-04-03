@@ -16,7 +16,7 @@ type FastbootTarget = table {
     /// The fastboot serial number of the target.
     1: serial string:MAX_FASTBOOT_MESSAGE_SIZE;
     /// The addresses the target can be found at
-    2: addresses vector<TargetAddrInfo>:256;
+    2: addresses vector<TargetIpAddrInfo>:256;
 };
 
 @discoverable

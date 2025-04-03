@@ -4,13 +4,13 @@
 
 #include "spi.h"
 
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fit/function.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -22,14 +22,14 @@
 namespace spi {
 
 zx::result<> SpiDriver::Start() {
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_spi_businfo::SpiBusMetadata>(
-      incoming(), DEVICE_METADATA_SPI_CHANNELS);
-  if (!decoded.is_ok()) {
-    FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-    return decoded.take_error();
+  zx::result metadata_result =
+      fdf_metadata::GetMetadata<fuchsia_hardware_spi_businfo::SpiBusMetadata>(*incoming());
+  if (metadata_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get SPI metadata: %s", metadata_result.status_string());
+    return metadata_result.take_error();
   }
+  fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata = metadata_result.value();
 
-  fuchsia_hardware_spi_businfo::SpiBusMetadata& metadata = *decoded;
   if (!metadata.bus_id()) {
     FDF_LOG(ERROR, "No bus ID metadata provided");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -37,13 +37,18 @@ zx::result<> SpiDriver::Start() {
 
   bus_id_ = *metadata.bus_id();
 
-  auto scheduler_role = compat::GetMetadata<fuchsia_scheduler::RoleName>(
-      incoming(), DEVICE_METADATA_SCHEDULER_ROLE_NAME);
-  if (scheduler_role.is_ok()) {
-    const std::string role_name(scheduler_role->role());
+  zx::result scheduler_role_name_result =
+      fdf_metadata::GetMetadataIfExists<fuchsia_scheduler::RoleName>(*incoming());
+  if (scheduler_role_name_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get scheduler role name: %s",
+            scheduler_role_name_result.status_string());
+    return scheduler_role_name_result.take_error();
+  }
+  if (scheduler_role_name_result.value().has_value()) {
+    const auto& scheduler_role_name = scheduler_role_name_result.value().value();
 
-    zx::result result =
-        fdf::SynchronizedDispatcher::Create({}, "SPI", [](fdf_dispatcher_t*) {}, role_name);
+    zx::result result = fdf::SynchronizedDispatcher::Create(
+        {}, "SPI", [](fdf_dispatcher_t*) {}, scheduler_role_name.role());
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to create SynchronizedDispatcher: %s", result.status_string());
       return result.take_error();
@@ -53,7 +58,7 @@ zx::result<> SpiDriver::Start() {
     // dispatcher instead of the default dispatcher passed to this method.
     fidl_dispatcher_.emplace(*std::move(result));
 
-    FDF_LOG(DEBUG, "Using dispatcher with role \"%s\"", role_name.c_str());
+    FDF_LOG(DEBUG, "Using dispatcher with role \"%s\"", scheduler_role_name.role().c_str());
   }
 
   zx::result spi_impl_client_end = incoming()->Connect<fuchsia_hardware_spiimpl::Service::Device>();

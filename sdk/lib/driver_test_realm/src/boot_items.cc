@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/zbi.h>
+#include <zircon/rights.h>
 
 #include <ddk/metadata/test.h>
 
@@ -36,14 +37,21 @@ const zbi_board_info_t kBoardInfo = []() {
 // updated with the function that deserialized the data. This function
 // is TestBoard::FetchAndDeserialize.
 zx_status_t GetBootItem(const std::vector<board_test::DeviceEntry>& entries, uint32_t type,
-                        const std::string& board_name, uint32_t extra, zx::vmo* out,
-                        uint32_t* length) {
+                        const std::string& board_name, const std::optional<uint32_t>& vid,
+                        const std::optional<uint32_t>& pid, const zx::vmo& devicetree,
+                        uint32_t extra, zx::vmo* out, uint32_t* length) {
   zx::vmo vmo;
   switch (type) {
     case ZBI_TYPE_PLATFORM_ID: {
       zbi_platform_id_t platform_id = kPlatformId;
       if (!board_name.empty()) {
         strncpy(platform_id.board_name, board_name.c_str(), ZBI_BOARD_NAME_LEN - 1);
+      }
+      if (vid.has_value()) {
+        platform_id.vid = vid.value();
+      }
+      if (pid.has_value()) {
+        platform_id.pid = pid.value();
       }
       zx_status_t status = zx::vmo::create(sizeof(kPlatformId), 0, &vmo);
       if (status != ZX_OK) {
@@ -108,6 +116,19 @@ zx_status_t GetBootItem(const std::vector<board_test::DeviceEntry>& entries, uin
       *length = static_cast<uint32_t>(list_size + entry_size + metadata_size);
       break;
     }
+    case ZBI_TYPE_DEVICETREE: {
+      zx_status_t status = devicetree.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+      if (status != ZX_OK) {
+        return status;
+      }
+      uint64_t length64;
+      status = devicetree.get_size(&length64);
+      if (status != ZX_OK) {
+        return status;
+      }
+      *length = static_cast<uint32_t>(length64);
+      break;
+    }
     default:
       return ZX_ERR_NOT_FOUND;
   }
@@ -117,6 +138,12 @@ zx_status_t GetBootItem(const std::vector<board_test::DeviceEntry>& entries, uin
 }  // namespace
 
 void BootItems::SetBoardName(std::string_view board_name) { board_name_ = std::string(board_name); }
+
+void BootItems::SetDeviceTree(zx::vmo devicetree) { devicetree_ = std::move(devicetree); }
+
+void BootItems::SetVid(uint32_t vid) { vid_ = vid; }
+
+void BootItems::SetPid(uint32_t pid) { pid_ = pid; }
 
 zx::result<> BootItems::Serve(async_dispatcher_t* dispatcher,
                               fidl::ServerEnd<fuchsia_boot::Items> server_end,
@@ -133,8 +160,8 @@ void BootItems::Get(GetRequestView request, GetCompleter::Sync& completer) {
   zx::vmo vmo;
   uint32_t length = 0;
   std::vector<board_test::DeviceEntry> entries = {};
-  zx_status_t status =
-      GetBootItem(entries, request->type, board_name_, request->extra, &vmo, &length);
+  zx_status_t status = GetBootItem(entries, request->type, board_name_, vid_, pid_, devicetree_,
+                                   request->extra, &vmo, &length);
   if (status != ZX_OK) {
     FX_LOG_KV(WARNING, "Failed to get boot items", FX_KV("status", status));
   }
@@ -146,7 +173,8 @@ void BootItems::Get2(Get2RequestView request, Get2Completer::Sync& completer) {
   zx::vmo vmo;
   uint32_t length = 0;
   uint32_t extra = 0;
-  zx_status_t status = GetBootItem(entries, request->type, board_name_, extra, &vmo, &length);
+  zx_status_t status = GetBootItem(entries, request->type, board_name_, vid_, pid_, devicetree_,
+                                   extra, &vmo, &length);
   if (status != ZX_OK) {
     FX_LOG_KV(WARNING, "Failed to get boot items", FX_KV("status", status));
     completer.Reply(zx::error(status));

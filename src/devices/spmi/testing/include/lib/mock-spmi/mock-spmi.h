@@ -70,8 +70,12 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
     std::visit(
         overloaded{[&](WatchControllerRequest& request) {
                      EXPECT_EQ(request.address, address);
+                     zx::eventpair e0, e1;
+                     EXPECT_EQ(zx::eventpair::create(0, &e0, &e1), ZX_OK);
                      request.completer.Reply(
-                         zx::ok(std::vector<fuchsia_hardware_spmi::Register8>{{address, data}}));
+                         zx::ok(fuchsia_hardware_spmi::DeviceWatchControllerWriteCommandsResponse{
+                             std::vector<fuchsia_hardware_spmi::Register8>{{address, data}},
+                             request.wake_lease_requested ? std::move(e0) : zx::eventpair{}}));
                      expect_watch_ = std::monostate{};
                    },
                    [](std::vector<fuchsia_hardware_spmi::Register8>& data) { ZX_ASSERT(false); },
@@ -159,17 +163,25 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
       WatchControllerWriteCommandsCompleter::Sync& completer) override {
     EXPECT_EQ(request.size(), 1);
 
-    std::visit(overloaded{[](WatchControllerRequest&) { ZX_ASSERT(false); },
+    std::visit(overloaded{[](WatchControllerRequest& request) { ZX_ASSERT(false); },
                           [&](std::vector<fuchsia_hardware_spmi::Register8>& data) {
                             EXPECT_EQ(data.size(), 1);
                             EXPECT_EQ(data[0].address(), request.address());
 
-                            completer.Reply(zx::ok(std::move(data)));
+                            zx::eventpair e0, e1;
+                            EXPECT_EQ(zx::eventpair::create(0, &e0, &e1), ZX_OK);
+                            completer.Reply(zx::ok(
+                                fuchsia_hardware_spmi::DeviceWatchControllerWriteCommandsResponse{
+                                    std::move(data), request.setup_wake_lease().is_valid()
+                                                         ? std::move(e0)
+                                                         : zx::eventpair{}}));
                             expect_watch_ = std::monostate{};
                           },
                           [&](std::monostate&) {
                             expect_watch_ = WatchControllerRequest{
-                                .address = request.address(), .completer = completer.ToAsync()};
+                                .address = request.address(),
+                                .completer = completer.ToAsync(),
+                                .wake_lease_requested = request.setup_wake_lease().is_valid()};
                           }},
                expect_watch_);
   }
@@ -203,6 +215,7 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   struct WatchControllerRequest {
     uint8_t address;
     WatchControllerWriteCommandsCompleter::Async completer;
+    bool wake_lease_requested;
   };
   std::variant<std::monostate, WatchControllerRequest,
                std::vector<fuchsia_hardware_spmi::Register8>>

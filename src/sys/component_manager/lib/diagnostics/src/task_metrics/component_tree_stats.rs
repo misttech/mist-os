@@ -11,7 +11,7 @@ use crate::task_metrics::runtime_stats_source::{
 use crate::task_metrics::task_info::{create_cpu_histogram, TaskInfo};
 use async_trait::async_trait;
 use errors::ModelError;
-use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, ArrayProperty, HistogramProperty};
 use futures::channel::{mpsc, oneshot};

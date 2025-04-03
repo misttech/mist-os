@@ -8,8 +8,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-
-	"go.fuchsia.dev/fuchsia/tools/qemu"
 )
 
 func TestNewEmulator(t *testing.T) {
@@ -21,7 +19,7 @@ func TestNewEmulator(t *testing.T) {
 	}{{
 		name:       "qemu",
 		emuType:    "qemu",
-		wantBinary: fmt.Sprintf("%s-%s", qemuSystemPrefix, qemu.TargetEnum.X86_64),
+		wantBinary: fmt.Sprintf("%s-%s", qemuSystemPrefix, qemuTargetMapping[TargetX64]),
 	}, {
 		name:       "aemu",
 		emuType:    "aemu",

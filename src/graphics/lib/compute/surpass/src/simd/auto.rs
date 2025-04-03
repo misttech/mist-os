@@ -27,7 +27,7 @@ impl m32x8 {
     }
 
     pub fn any(self) -> bool {
-        self.0.iter().any(|&val| val == u32::MAX)
+        self.0.contains(&u32::MAX)
     }
 }
 

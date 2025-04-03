@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::*;
+use addr::TargetIpAddr;
 use assert_matches::assert_matches;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use fidl_fuchsia_overnet_protocol::NodeId;
@@ -43,7 +44,14 @@ async fn test_update_single() {
         true,
     );
 
-    assert_eq!(&Vec::from_iter(t.addrs().into_iter().map(|addr| SocketAddr::from(addr))), &[ADDR]);
+    assert_eq!(
+        &Vec::from_iter(
+            t.addrs()
+                .into_iter()
+                .map(|addr| SocketAddr::from(TargetIpAddr::try_from(addr).unwrap()))
+        ),
+        &[ADDR]
+    );
     assert_matches!(t.get_connection_state(), TargetConnectionState::Fastboot(_));
 
     let local_node = overnet_core::Router::new(None).unwrap();

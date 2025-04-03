@@ -66,7 +66,6 @@ library_headers("headers") {
 
   if (is_fuchsia || is_mistos) {
     headers += [
-      "lib/ld/log-zircon.h",
       "lib/ld/remote-abi-heap.h",
       "lib/ld/remote-abi-stub.h",
       "lib/ld/remote-abi-transcriber.h",
@@ -371,6 +370,7 @@ static_library("standalone") {
   visibility = [
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
+    "//src/devices/lib/driver-host-passive-abi/*",
     "//zircon/kernel/lib/userabi/vdso/*",
   ]
 
@@ -392,6 +392,7 @@ static_library("standalone") {
 }
 
 source_set("posix.headers") {
+  visibility = [ "./*" ]
   public = [ "posix.h" ]
   public_deps = [
     ":ld-log-posix.headers",
@@ -401,6 +402,7 @@ source_set("posix.headers") {
 }
 
 source_set("zircon.headers") {
+  visibility = [ "./*" ]
   public = [ "zircon.h" ]
   public_deps = [
     ":ld-log-zircon.headers",
@@ -410,6 +412,7 @@ source_set("zircon.headers") {
 }
 
 source_set("zircon") {
+  visibility = [ ":*" ]
   public_deps = [ ":zircon.headers" ]
   sources = [
     "ldsvc.cc",
@@ -427,6 +430,7 @@ source_set("zircon") {
 }
 
 source_set("startup-load") {
+  visibility = [ ":*" ]
   public = [ "startup-load.h" ]
   public_deps = [
     ":abi",
@@ -494,6 +498,7 @@ shared_library("ld-startup") {
 }
 
 source_set("startup-diagnostics.headers") {
+  visibility = [ ":*" ]
   public = [ "startup-diagnostics.h" ]
   public_deps = [
     ":headers",
@@ -526,6 +531,7 @@ source_set("startup-diagnostics") {
 # ubsan-custom to provide a bespoke ubsan runtime that reuses the normal
 # diagnostics code.
 source_set("startup-ubsan") {
+  visibility = [ ":*" ]
   if (is_ubsan) {
     sources = [ "startup-ubsan.cc" ]
 

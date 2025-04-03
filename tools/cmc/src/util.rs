@@ -20,7 +20,11 @@ pub(crate) fn json_or_json5_from_file(file: &PathBuf) -> Result<Value, Error> {
     let mut buffer = String::new();
     fs::File::open(&file)
         .map_err(|e| {
-            Error::invalid_args(format!("Could not open file at path \"{:?}\": {}", file, e))
+            Error::invalid_args(format!(
+                "Could not open file at path \"{}\": {}",
+                file.display(),
+                e
+            ))
         })?
         .read_to_string(&mut buffer)?;
 
@@ -28,7 +32,7 @@ pub(crate) fn json_or_json5_from_file(file: &PathBuf) -> Result<Value, Error> {
         // If JSON parsing fails, try JSON5 parsing (which is slower)
         serde_json5::from_str(&buffer).map_err(|e| {
             Error::parse(
-                format!("Couldn't read {:#?} as JSON: {}", file, e),
+                format!("Couldn't read {} as JSON: {}", file.display(), e),
                 e.try_into().ok(),
                 Some(file.as_path()),
             )

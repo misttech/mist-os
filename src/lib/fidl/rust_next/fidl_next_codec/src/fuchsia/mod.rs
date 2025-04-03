@@ -24,6 +24,12 @@ pub trait HandleDecoder: InternalHandleDecoder {
 
     /// Returns the number of handles remaining in the decoder.
     fn handles_remaining(&mut self) -> usize;
+
+    /// Takes the next raw driver handle from the decoder.
+    #[doc(hidden)]
+    fn take_raw_driver_handle(&mut self) -> Result<u32, DecodeError> {
+        Err(DecodeError::DriverHandlesUnsupported)
+    }
 }
 
 /// An encoder which supports Zircon handles.
@@ -33,4 +39,10 @@ pub trait HandleEncoder: InternalHandleEncoder {
 
     /// Returns the number of handles added to the encoder.
     fn handles_pushed(&self) -> usize;
+
+    /// Pushes a raw driver handle into the encoder.
+    #[doc(hidden)]
+    fn push_raw_driver_handle(&mut self, _raw_driver_handle: u32) -> Result<(), EncodeError> {
+        Err(EncodeError::DriverHandlesUnsupported)
+    }
 }

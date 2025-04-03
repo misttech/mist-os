@@ -37,6 +37,7 @@ use starnix_uapi::auth::{
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
+use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -126,24 +127,12 @@ pub struct FsNode {
     /// specific behaviors for this FsNode.
     ops: Box<dyn FsNodeOps>,
 
-    /// The current kernel.
-    // TODO(https://fxbug.dev/42080557): This is a temporary measure to access a task on drop.
-    kernel: Weak<Kernel>,
-
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
 
     /// The node idenfier for this FsNode. By default, this will be used as the inode number of
     /// this node.
     pub node_id: ino_t,
-
-    /// The pipe located at this node, if any.
-    ///
-    /// Used if, and only if, the node has a mode of FileMode::IFIFO.
-    pub fifo: Option<PipeHandle>,
-
-    /// The UNIX domain socket bound to this node, if any.
-    bound_socket: OnceLock<SocketHandle>,
 
     /// A RwLock to synchronize append operations for this node.
     ///
@@ -156,6 +145,30 @@ pub struct FsNode {
     ///
     /// This data is used to populate the uapi::stat structure.
     info: RwLock<FsNodeInfo>,
+
+    /// Data associated with an FsNode that is rarely needed.
+    rare_data: OnceLock<Box<FsNodeRareData>>,
+
+    /// Tracks lock state for this file.
+    pub write_guard_state: Mutex<FileWriteGuardState>,
+
+    /// Cached FsVerity state associated with this node.
+    pub fsverity: Mutex<FsVerityState>,
+
+    /// The security state associated with this node. Must always be acquired last
+    /// relative to other `FsNode` locks.
+    pub security_state: security::FsNodeState,
+}
+
+#[derive(Default)]
+struct FsNodeRareData {
+    /// The pipe located at this node, if any.
+    ///
+    /// Used if, and only if, the node has a mode of FileMode::IFIFO.
+    fifo: Option<PipeHandle>,
+
+    /// The UNIX domain socket bound to this node, if any.
+    bound_socket: OnceLock<SocketHandle>,
 
     /// Information about the locking information on this node.
     ///
@@ -170,18 +183,8 @@ pub struct FsNode {
     /// Only set for nodes created with `O_TMPFILE`.
     link_behavior: OnceLock<FsNodeLinkBehavior>,
 
-    /// Tracks lock state for this file.
-    pub write_guard_state: Mutex<FileWriteGuardState>,
-
-    /// Cached Fsverity state associated with this node.
-    pub fsverity: Mutex<FsVerityState>,
-
     /// Inotify watchers on this node. See inotify(7).
-    pub watchers: inotify::InotifyWatchers,
-
-    /// The security state associated with this node. Must always be acquired last
-    /// relative to other `FsNode` locks.
-    pub security_state: security::FsNodeState,
+    watchers: inotify::InotifyWatchers,
 }
 
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
@@ -289,6 +292,12 @@ impl FsNodeInfo {
     }
 }
 
+impl FsNodeRareData {
+    fn new(fifo: PipeHandle) -> Self {
+        Self { fifo: Some(fifo), ..Default::default() }
+    }
+}
+
 #[derive(Default)]
 struct FlockInfo {
     /// Whether the node is currently locked. The meaning of the different values are:
@@ -370,7 +379,7 @@ impl FileObject {
             return error!(EBADF);
         }
         loop {
-            let mut flock_info = self.name.entry.node.flock_info.lock();
+            let mut flock_info = self.name.entry.node.ensure_rare_data().flock_info.lock();
             if operation.is_unlock() {
                 flock_info.retain(|fh| !std::ptr::eq(fh, self));
                 return Ok(());
@@ -885,15 +894,15 @@ where
 #[macro_export]
 macro_rules! fs_node_impl_symlink {
     () => {
-        starnix_core::vfs::fs_node_impl_not_dir!();
+        $crate::vfs::fs_node_impl_not_dir!();
 
         fn create_file_ops(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            node: &starnix_core::vfs::FsNode,
+            node: &$crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
-        ) -> Result<Box<dyn starnix_core::vfs::FileOps>, starnix_uapi::errors::Errno> {
+        ) -> Result<Box<dyn $crate::vfs::FileOps>, starnix_uapi::errors::Errno> {
             assert!(node.is_lnk());
             unreachable!("Symlink nodes cannot be opened.");
         }
@@ -906,47 +915,47 @@ macro_rules! fs_node_impl_dir_readonly {
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            name: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            name: &$crate::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS, format!("mkdir failed: {:?}", name))
         }
 
         fn mknod(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            name: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            name: &$crate::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS, format!("mknod failed: {:?}", name))
         }
 
         fn create_symlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            name: &starnix_core::vfs::FsStr,
-            _target: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            name: &$crate::vfs::FsStr,
+            _target: &$crate::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS, format!("symlink failed: {:?}", name))
         }
 
         fn link(
             &self,
             _locked: &mut Locked<'_, FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            name: &starnix_core::vfs::FsStr,
-            _child: &starnix_core::vfs::FsNodeHandle,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            name: &$crate::vfs::FsStr,
+            _child: &$crate::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS, format!("link failed: {:?}", name))
         }
@@ -954,10 +963,10 @@ macro_rules! fs_node_impl_dir_readonly {
         fn unlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            name: &starnix_core::vfs::FsStr,
-            _child: &starnix_core::vfs::FsNodeHandle,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            name: &$crate::vfs::FsStr,
+            _child: &$crate::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS, format!("unlink failed: {:?}", name))
         }
@@ -1011,9 +1020,9 @@ macro_rules! fs_node_impl_xattr_delegate {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &starnix_core::vfs::FsStr,
+            name: &$crate::vfs::FsStr,
             _size: usize,
-        ) -> Result<starnix_core::vfs::ValueOrSize<starnix_core::vfs::FsString>, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::ValueOrSize<$crate::vfs::FsString>, starnix_uapi::errors::Errno> {
             Ok($delegate.get_xattr(name)?.into())
         }
 
@@ -1022,9 +1031,9 @@ macro_rules! fs_node_impl_xattr_delegate {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &starnix_core::vfs::FsStr,
-            value: &starnix_core::vfs::FsStr,
-            op: starnix_core::vfs::XattrOp,
+            name: &$crate::vfs::FsStr,
+            value: &$crate::vfs::FsStr,
+            op: $crate::vfs::XattrOp,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             $delegate.set_xattr(name, value, op)
         }
@@ -1034,7 +1043,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &starnix_core::vfs::FsStr,
+            name: &$crate::vfs::FsStr,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             $delegate.remove_xattr(name)
         }
@@ -1045,7 +1054,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
-        ) -> Result<starnix_core::vfs::ValueOrSize<Vec<starnix_core::vfs::FsString>>, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::ValueOrSize<Vec<$crate::vfs::FsString>>, starnix_uapi::errors::Errno> {
             Ok($delegate.list_xattrs()?.into())
         }
     };
@@ -1058,57 +1067,57 @@ macro_rules! fs_node_impl_not_dir {
         fn lookup(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            _name: &$crate::vfs::FsStr,
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn mknod(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            _name: &$crate::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            _name: &$crate::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn create_symlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
-            _target: &starnix_core::vfs::FsStr,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            _name: &$crate::vfs::FsStr,
+            _target: &$crate::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<$crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn unlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &starnix_core::vfs::FsNode,
-            _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
-            _child: &starnix_core::vfs::FsNodeHandle,
+            _node: &$crate::vfs::FsNode,
+            _current_task: &$crate::task::CurrentTask,
+            _name: &$crate::vfs::FsStr,
+            _child: &$crate::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
@@ -1210,7 +1219,9 @@ impl FsNode {
             info
         };
 
-        let fifo = if info.mode.is_fifo() {
+        let rare_data = OnceLock::new();
+
+        if info.mode.is_fifo() {
             let current_task = current_task
                 .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
@@ -1220,29 +1231,23 @@ impl FsNode {
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
             }
 
-            Some(Pipe::new(default_pipe_capacity))
-        } else {
-            None
-        };
+            let fifo = Pipe::new(default_pipe_capacity);
+            assert!(rare_data.set(Box::new(FsNodeRareData::new(fifo))).is_ok());
+        }
+
         // The linter will fail in non test mode as it will not see the lock check.
         #[allow(clippy::let_and_return)]
         {
             let result = Self {
                 weak_handle: Default::default(),
-                kernel,
                 ops,
                 fs,
                 node_id,
-                fifo,
-                bound_socket: Default::default(),
                 info: RwLock::new(info),
                 append_lock: Default::default(),
-                flock_info: Default::default(),
-                record_locks: Default::default(),
-                link_behavior: Default::default(),
+                rare_data,
                 write_guard_state: Default::default(),
                 fsverity: Mutex::new(FsVerityState::None),
-                watchers: Default::default(),
                 security_state: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
@@ -1250,11 +1255,10 @@ impl FsNode {
                 let mut locked = unsafe { Unlocked::new() };
                 let _l1 = result.append_lock.read_for_lock_ordering(&mut locked);
                 let _l2 = result.info.read();
-                let _l3 = result.flock_info.lock();
-                let _l4 = result.write_guard_state.lock();
-                let _l5 = result.fsverity.lock();
+                let _l3 = result.write_guard_state.lock();
+                let _l4 = result.fsverity.lock();
                 // TODO(https://fxbug.dev/367585803): Add lock levels to SELinux implementation.
-                let _l6 = result.security_state.lock();
+                let _l5 = result.security_state.lock();
             }
             result
         }
@@ -1275,7 +1279,6 @@ impl FsNode {
     pub fn set_fs(&mut self, fs: &FileSystemHandle) {
         debug_assert!(self.fs.ptr_eq(&Weak::new()));
         self.fs = Arc::downgrade(fs);
-        self.kernel = fs.kernel.clone();
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {
@@ -1313,8 +1316,8 @@ impl FsNode {
     }
 
     pub fn on_file_closed(&self, file: &FileObject) {
-        {
-            let mut flock_info = self.flock_info.lock();
+        if let Some(rare_data) = self.rare_data.get() {
+            let mut flock_info = rare_data.flock_info.lock();
             // This function will drop the flock from `file` because the `WeakFileHandle` for
             // `file` will no longer upgrade to an `FileHandle`.
             flock_info.retain(|_| true);
@@ -1330,12 +1333,14 @@ impl FsNode {
         cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        self.record_locks.lock(locked, current_task, file, cmd, flock)
+        self.ensure_rare_data().record_locks.lock(locked, current_task, file, cmd, flock)
     }
 
     /// Release all record locks acquired by the given owner.
     pub fn record_lock_release(&self, owner: RecordLockOwner) {
-        self.record_locks.release_locks(owner);
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.record_locks.release_locks(owner);
+        }
     }
 
     pub fn create_dir_entry_ops(&self) -> Box<dyn DirEntryOps> {
@@ -1428,7 +1433,7 @@ impl FsNode {
                     DeviceMode::Block,
                 )
             }
-            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo.as_ref().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(locked, current_task, flags),
@@ -1608,7 +1613,9 @@ impl FsNode {
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
         self.init_new_node_security_on_create(locked, current_task, &node, "".into())?;
-        node.link_behavior.set(link_behavior).unwrap();
+        if link_behavior == FsNodeLinkBehavior::Disallowed {
+            node.ensure_rare_data().link_behavior.set(link_behavior).unwrap();
+        }
         Ok(node)
     }
 
@@ -1650,8 +1657,10 @@ impl FsNode {
             return error!(EPERM);
         }
 
-        if matches!(child.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
-            return error!(ENOENT);
+        if let Some(child_rare_data) = child.rare_data.get() {
+            if matches!(child_rare_data.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
+                return error!(ENOENT);
+            }
         }
 
         // Check that `current_task` has permission to create the hard link.
@@ -2036,16 +2045,28 @@ impl FsNode {
         Ok(())
     }
 
+    pub fn fifo(&self) -> Option<&PipeHandle> {
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.fifo.as_ref()
+        } else {
+            None
+        }
+    }
+
     /// Returns the UNIX domain socket bound to this node, if any.
     pub fn bound_socket(&self) -> Option<&SocketHandle> {
-        self.bound_socket.get()
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.bound_socket.get()
+        } else {
+            None
+        }
     }
 
     /// Register the provided socket as the UNIX domain socket bound to this node.
     ///
     /// It is a fatal error to call this method again if it has already been called on this node.
     pub fn set_bound_socket(&self, socket: SocketHandle) {
-        assert!(self.bound_socket.set(socket).is_ok());
+        assert!(self.ensure_rare_data().bound_socket.set(socket).is_ok());
     }
 
     pub fn update_attributes<L, F>(
@@ -2616,6 +2637,32 @@ impl FsNode {
             "file"
         };
         format!("{}:[{}]", class, self.node_id).into()
+    }
+
+    fn ensure_rare_data(&self) -> &FsNodeRareData {
+        self.rare_data.get_or_init(|| Box::new(FsNodeRareData::default()))
+    }
+
+    /// Returns the set of watchers for this node.
+    ///
+    /// Only call this function if you require this node to actually store a list of watchers. If
+    /// you just wish to notify any watchers that might exist, please use `notify` instead.
+    pub fn ensure_watchers(&self) -> &inotify::InotifyWatchers {
+        &self.ensure_rare_data().watchers
+    }
+
+    /// Notify the watchers of the given event.
+    pub fn notify(
+        &self,
+        event_mask: InotifyMask,
+        cookie: u32,
+        name: &FsStr,
+        mode: FileMode,
+        is_dead: bool,
+    ) {
+        if let Some(rare_data) = self.rare_data.get() {
+            rare_data.watchers.notify(event_mask, cookie, name, mode, is_dead);
+        }
     }
 }
 

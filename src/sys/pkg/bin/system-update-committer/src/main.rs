@@ -102,6 +102,11 @@ async fn fresh_run() -> Result<(), Error> {
     } else {
         zx::MonotonicDuration::INFINITE
     };
+    let commit_timeout = if config.commit_timeout_seconds >= 0 {
+        zx::MonotonicDuration::from_seconds(config.commit_timeout_seconds)
+    } else {
+        zx::MonotonicDuration::INFINITE
+    };
     inspector
         .root()
         .record_child("structured_config", |config_node| config.record_inspect(config_node));
@@ -140,6 +145,7 @@ async fn fresh_run() -> Result<(), Error> {
             &p_internal,
             unblocker,
             &health_verification,
+            commit_timeout,
             verification_node_ref,
             commit_node_ref,
         )

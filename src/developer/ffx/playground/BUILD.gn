@@ -5,6 +5,8 @@
 import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_plugin.gni")
 
+assert(is_host, "playground is for use with the host toolchain only")
+
 rustc_library("playground") {
   version = "0.1.0"
   edition = "2021"

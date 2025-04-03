@@ -104,7 +104,7 @@ closed protocol Counter {
     /// * less than or equal to zero - `ZX_COUNTER_NON_POSITIVE` will be asserted and
     /// `ZX_COUNTER_POSITIVE` will be deasserted.
     ///
-    ///  * greater than zero - `ZX_COUNTER_POSITIVE` will be asserted and
+    /// * greater than zero - `ZX_COUNTER_POSITIVE` will be asserted and
     /// `ZX_COUNTER_NON_POSITIVE` will be deasserted.
     ///
     /// ## Rights

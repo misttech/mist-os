@@ -103,7 +103,8 @@ uint64_t RawPrinter::PrintOneTrace(uint32_t iter_num) {
   };
 
   std::unique_ptr<perfmon::FileReader> reader;
-  if (!perfmon::FileReader::Create(get_file_name, session_result_spec_->num_traces, &reader)) {
+  if (!perfmon::FileReader::Create(
+          get_file_name, static_cast<uint32_t>(session_result_spec_->num_traces), &reader)) {
     return 0;
   }
 

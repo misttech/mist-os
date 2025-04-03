@@ -19,7 +19,7 @@ impl ::fidl_next::Encodable for Baz {
     type Encoded = WireBaz;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Baz
+unsafe impl<___E> ::fidl_next::Encode<___E> for Baz
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -27,13 +27,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 g,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.g, encoder, g)?;
@@ -46,7 +46,7 @@ impl ::fidl_next::EncodableOption for Box<Baz> {
     type EncodedOption = ::fidl_next::WireBox<WireBaz>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<Baz>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Baz>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Baz: ::fidl_next::Encode<___E>,
@@ -55,13 +55,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -82,11 +82,16 @@ impl ::fidl_next::TakeFrom<WireBaz> for Baz {
     }
 }
 
-/// The wire type corersponding to [`Baz`].
+/// The wire type corresponding to [`Baz`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireBaz {
     pub g: ::fidl_next_test_middle::WireBar,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireBaz {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBaz
@@ -110,8 +115,13 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBaz> for ::fidl_test_transitivedependencies::Baz {
+        #[inline]
+        fn take_from(from: &crate::WireBaz) -> Self {
+            Self { g: ::fidl_next::TakeFrom::take_from(&from.g) }
+        }
+    }
+}

@@ -26,13 +26,14 @@ use cm_rust::*;
 use cm_types::{Name, Url};
 use component_id_index::InstanceId;
 use errors::ModelError;
-use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd};
+use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy};
 use fidl::{self};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
 use futures::prelude::*;
-use hooks::HooksRegistration;
+use hooks::{EventType, HooksRegistration};
 use moniker::{ChildName, Moniker};
+use router_error::Explain;
 use sandbox::{Capability, Message, RouterResponse};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -657,6 +658,11 @@ impl RoutingTest {
     pub fn resolved_url(component_name: &str) -> String {
         format!("test:///{}_resolved", component_name)
     }
+
+    /// Create a new event stream for the test components.
+    pub async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+        new_event_stream(&self.builtin_environment, events).await
+    }
 }
 
 #[async_trait]
@@ -788,7 +794,7 @@ impl RoutingTestModel for RoutingTest {
                         assert_eq!(expected_res, ExpectedResult::Ok);
                         response
                     }
-                    Err(fidl::Error::ClientChannelClosed { status, protocol_name: _ }) => {
+                    Err(fidl::Error::ClientChannelClosed { status, .. }) => {
                         let ExpectedResult::Err(expected_status) = expected_res else {
                             panic!("StorageAdmin client channel closed: {:?}", status);
                         };
@@ -1219,7 +1225,7 @@ pub mod capability_util {
             // `open_directory` could fail if service capability routing fails.
             .map_err(|e| match e {
                 OpenError::OpenError(status) => {
-                    fidl::Error::ClientChannelClosed { status, protocol_name: "" }
+                    fidl::Error::ClientChannelClosed { status, protocol_name: "", epitaph: None }
                 }
                 _ => panic!("Unexpected open error {:?}", e),
             })?;
@@ -1228,9 +1234,11 @@ pub mod capability_util {
             fuchsia_fs::directory::open_directory(&service_dir, instance, fio::Flags::empty())
                 .await
                 .map_err(|e| match e {
-                    OpenError::OpenError(status) => {
-                        fidl::Error::ClientChannelClosed { status, protocol_name: "" }
-                    }
+                    OpenError::OpenError(status) => fidl::Error::ClientChannelClosed {
+                        status,
+                        protocol_name: "",
+                        epitaph: None,
+                    },
                     _ => panic!("Unexpected open error {:?}", e),
                 })?;
         Ok(connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
@@ -1366,11 +1374,10 @@ pub mod capability_util {
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
-        open_exposed_dir(&path, moniker, model, true, server_end).await;
-        let dir_proxy = fio::DirectoryProxy::new(node_proxy.into_channel().unwrap());
+        let dir_proxy = open_in_exposed_dir(&path, moniker, model).await;
         match expected_res {
             ExpectedResult::Ok => {
+                let dir_proxy = dir_proxy.unwrap();
                 let file_proxy =
                     fuchsia_fs::directory::open_file(&dir_proxy, &file, fio::PERM_READABLE)
                         .await
@@ -1378,22 +1385,28 @@ pub mod capability_util {
                 let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
                 assert_eq!("hello", res.expect("failed to read file"));
             }
-            ExpectedResult::Err(s) => {
-                fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
-                    .expect("failed to open file");
-                let epitaph = dir_proxy.take_event_stream().next().await.expect("no epitaph");
-                assert_matches!(
-                    epitaph,
-                    Err(fidl::Error::ClientChannelClosed {
-                        status, ..
-                    }) if status == s
-                );
-            }
-            ExpectedResult::ErrWithNoEpitaph => {
-                fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
-                    .expect("failed to open file");
-                assert_matches!(dir_proxy.take_event_stream().next().await, None);
-            }
+            ExpectedResult::Err(s) => match dir_proxy {
+                Err(status) => assert_eq!(status, s),
+                Ok(dir_proxy) => {
+                    fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
+                        .expect("failed to open file");
+                    let epitaph = dir_proxy.take_event_stream().next().await.expect("no epitaph");
+                    assert_matches!(
+                        epitaph,
+                        Err(fidl::Error::ClientChannelClosed {
+                            status, ..
+                        }) if status == s
+                    );
+                }
+            },
+            ExpectedResult::ErrWithNoEpitaph => match dir_proxy {
+                Err(status) => assert_eq!(status, zx::Status::PEER_CLOSED),
+                Ok(dir_proxy) => {
+                    fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
+                        .expect("failed to open file");
+                    assert_matches!(dir_proxy.take_event_stream().next().await, None);
+                }
+            },
         }
     }
 
@@ -1405,10 +1418,15 @@ pub mod capability_util {
         model: &'a Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
-        open_exposed_dir(&path, moniker, model, false, server_end).await;
-        let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
-        call_echo_and_validate_result(echo_proxy, expected_res).await;
+        let echo_proxy = connect_in_exposed_dir::<echo::EchoMarker>(&path, moniker, model).await;
+        match echo_proxy {
+            Ok(echo_proxy) => call_echo_and_validate_result(echo_proxy, expected_res).await,
+            Err(status) => match expected_res {
+                ExpectedResult::Ok => panic!("Failed to connect to {path}!"),
+                ExpectedResult::Err(expected_status) => assert_eq!(status, expected_status),
+                ExpectedResult::ErrWithNoEpitaph => assert_eq!(status, zx::Status::PEER_CLOSED),
+            },
+        }
     }
 
     /// Attempts to use the fidl.examples.routing.echo.Echo service with name
@@ -1468,11 +1486,9 @@ pub mod capability_util {
         model: &Arc<Model>,
         expected_res: ExpectedResult,
     ) {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
-        open_exposed_dir(&path, moniker, model, true, server_end).await;
+        let service_dir = open_in_exposed_dir(&path, moniker, model).await.unwrap();
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
-        let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
         let instance_dir =
             fuchsia_fs::directory::open_directory(&service_dir, &instance, fio::Flags::empty())
                 .await
@@ -1488,11 +1504,9 @@ pub mod capability_util {
         moniker: &Moniker,
         model: &Arc<Model>,
     ) -> Vec<String> {
-        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
-        open_exposed_dir(&path, moniker, model, true, server_end).await;
+        let service_dir = open_in_exposed_dir(&path, moniker, model).await.unwrap();
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
-        let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
         let entries = fuchsia_fs::directory::readdir(&service_dir)
             .await
             .expect("failed to read directory entries")
@@ -1544,39 +1558,60 @@ pub mod capability_util {
     }
 
     /// Open the exposed dir for `moniker`.
-    async fn open_exposed_dir<'a>(
-        path: &'a cm_types::Path,
+    async fn open_in_exposed_dir<'a>(
+        cm_path: &'a cm_types::Path,
         moniker: &'a Moniker,
         model: &'a Arc<Model>,
-        directory: bool,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
+    ) -> Result<fio::DirectoryProxy, zx::Status> {
+        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let root = model.root();
         let component = root
             .find_and_maybe_resolve(moniker)
             .await
             .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
         root.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
-        let flags = if directory {
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY
-        } else {
-            fio::OpenFlags::NOT_DIRECTORY
-        };
-        let mut object_request = flags.to_object_request(server_end);
+        let path = vfs::Path::validate_and_split(cm_path.to_string())
+            .unwrap_or_else(|e| panic!("failed to process path {cm_path}: {e}"));
+        const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PROTOCOL_DIRECTORY);
+        let mut object_request = FLAGS.to_object_request(server);
         component
             .open_exposed(OpenRequest::new(
                 component.execution_scope.clone(),
-                flags,
-                to_fvfs_path(path),
+                FLAGS,
+                path,
                 &mut object_request,
             ))
             .await
-            .unwrap();
+            .map(|_| proxy)
+            .map_err(|e| e.as_zx_status())
     }
 
-    /// Function to convert a [cm_types::Path] to a [vfs::path::Path]
-    fn to_fvfs_path(path: &cm_types::Path) -> vfs::path::Path {
-        vfs::path::Path::validate_and_split(path.to_string())
-            .expect("Failed to validate and split path")
+    /// Connect to the protocol in the exposed dir for `moniker`.
+    async fn connect_in_exposed_dir<'a, T: fidl::endpoints::ProtocolMarker>(
+        cm_path: &'a cm_types::Path,
+        moniker: &'a Moniker,
+        model: &'a Arc<Model>,
+    ) -> Result<T::Proxy, zx::Status> {
+        let (proxy, server) = fidl::endpoints::create_proxy::<T>();
+        let root = model.root();
+        let component = root
+            .find_and_maybe_resolve(moniker)
+            .await
+            .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
+        root.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");
+        let path = vfs::Path::validate_and_split(cm_path.to_string())
+            .unwrap_or_else(|e| panic!("failed to process path {cm_path}: {e}"));
+        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+        let mut object_request = FLAGS.to_object_request(server);
+        component
+            .open_exposed(OpenRequest::new(
+                component.execution_scope.clone(),
+                FLAGS,
+                path,
+                &mut object_request,
+            ))
+            .await
+            .map(|_| proxy)
+            .map_err(|e| e.as_zx_status())
     }
 }

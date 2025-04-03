@@ -32,9 +32,9 @@ namespace media::audio::drivers::test {
 
 extern void RegisterBasicTestsForDevice(const DeviceEntry& device_entry);
 extern void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
-                                        bool expect_audio_core_not_connected);
+                                        bool expect_audio_svcs_not_connected);
 extern void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
-                                           bool expect_audio_core_not_connected,
+                                           bool expect_audio_svcs_not_connected,
                                            bool enable_position_tests);
 
 static const struct {
@@ -55,10 +55,10 @@ DeviceHost::DeviceHost() : device_loop_(async::Loop(&kAsyncLoopConfigNeverAttach
 DeviceHost::~DeviceHost() { QuitDeviceLoop(); }
 
 // Post a task to our thread to detect and add all devices, so that testing can begin.
-void DeviceHost::AddDevices(bool devfs_only, bool no_virtual_audio) {
+void DeviceHost::AddDevices(bool no_bluetooth, bool no_virtual_audio) {
   libsync::Completion done;
-  async::PostTask(device_loop_.dispatcher(), [this, &done, devfs_only, no_virtual_audio]() {
-    DetectDevices(devfs_only, no_virtual_audio);
+  async::PostTask(device_loop_.dispatcher(), [this, &done, no_bluetooth, no_virtual_audio]() {
+    DetectDevices(no_bluetooth, no_virtual_audio);
     done.Signal();
   });
   // If we hang indefinitely here, the test execution environment will eventually timeout.
@@ -80,7 +80,7 @@ void DeviceHost::AddDevices(bool devfs_only, bool no_virtual_audio) {
 // this method exits. This requires us to use class member `device_enumeration_complete_` to signal
 // that these subsequent device-detection callbacks should trigger immediate failures instead of
 // treating this like another device to be tested.
-void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
+void DeviceHost::DetectDevices(bool no_bluetooth, bool no_virtual_audio) {
   // This is guarded by `device_enumeration_complete_` which we set before we exit, but we give this
   // variable static scope to avoid future issues.
   static DeviceType dev_type = DeviceType::BuiltIn;
@@ -88,7 +88,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
   // Ensure that an initial devfs enumeration pass completes before creating the next watcher.
   // This is only accessed by the idle_callback, which we explicitly await before we exit. Just in
   // case the callback can subsequently run for some reason, we give this variable static scope.
-  static bool initial_enumeration_done;
+  static volatile bool initial_enumeration_done;
 
   // Set up the device watchers. If any fail, automatically stop monitoring all device sources.
   // First, we add any preexisting ("built-in") devices.
@@ -145,7 +145,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
 
   // And finally, unless expressly excluded, manually add a device entry for the Bluetooth audio
   // library, to validate admin functions even if AudioCore has connected to "real" audio drivers.
-  if (!devfs_only) {
+  if (!no_bluetooth) {
     device_entries().insert({{}, "A2DP", DriverType::StreamConfigOutput, DeviceType::A2DP});
   }
 }
@@ -159,7 +159,8 @@ void DeviceHost::AddVirtualDevices() {
         fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
     zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                               controller_.NewRequest().TakeChannel().release());
-    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
+    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect(" << kControlNodePath
+                             << ") failed: " << status;
 
     uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
     status = controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
@@ -182,22 +183,33 @@ void DeviceHost::AddVirtualDevices() {
         fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
     zx_status_t status = fdio_service_connect(
         kLegacyControlNodePath.c_str(), legacy_controller_.NewRequest().TakeChannel().release());
-    ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";
+    if (status != ZX_OK) {
+      legacy_controller_.Unbind();
+      FAIL() << "fdio_service_connect(" << kLegacyControlNodePath << ") failed: " << status;
+    }
 
     uint32_t num_inputs = -1, num_outputs = -1, num_unspecified_direction = -1;
     status =
         legacy_controller_->GetNumDevices(&num_inputs, &num_outputs, &num_unspecified_direction);
-    ASSERT_EQ(status, ZX_OK) << "GetNumDevices failed";
-    ASSERT_TRUE(legacy_controller_.is_bound()) << "virtualaudio::Control did not stay bound";
-    ASSERT_EQ(num_inputs, 0u) << num_inputs
-                              << " virtual-audio-legacy inputs already exist (should be 0)";
-    ASSERT_EQ(num_outputs, 0u) << num_outputs
-                               << " virtual-audio-legacy outputs already exist (should be 0)";
-    ASSERT_EQ(num_unspecified_direction, 0u)
-        << num_unspecified_direction
-        << " virtual-audio-legacy devices with unspecified direction already exist (should be 0)";
+    if (status != ZX_OK) {
+      legacy_controller_.Unbind();
+      FAIL() << "GetNumDevices(legacy) failed: " << status;
+    }
+    ASSERT_TRUE(legacy_controller_.is_bound())
+        << "virtualaudio::Control(legacy) did not stay bound";
 
-    // Codec directionality is not applicable.
+    if (num_inputs || num_outputs || num_unspecified_direction) {
+      legacy_controller_.Unbind();
+      ASSERT_EQ(num_inputs, 0u)
+          << num_inputs << " virtual-audio-legacy 'input' devices already exist (should be 0)";
+      ASSERT_EQ(num_outputs, 0u)
+          << num_outputs << " virtual-audio-legacy 'output' devices already exist (should be 0)";
+      ASSERT_EQ(num_unspecified_direction, 0u)
+          << num_unspecified_direction
+          << " virtual-audio-legacy 'unspecified direction' devices already exist (should be 0)";
+    }
+
+    // For Codec drivers, directionality is not applicable.
     AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::CODEC);
 
     AddVirtualDevice(legacy_controller_, fuchsia::virtualaudio::DeviceType::DAI, true);
@@ -210,7 +222,12 @@ void DeviceHost::AddVirtualDevices() {
 void DeviceHost::AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& controller,
                                   const fuchsia::virtualaudio::DeviceType device_type,
                                   std::optional<bool> is_input) {
-  const char* direction = is_input ? (*is_input ? "input" : "output") : "NONE";
+  const char* direction;
+  if (is_input.has_value()) {
+    direction = *is_input ? "input" : "output";
+  } else {
+    direction = "NONE";
+  }
   const char* type;
   switch (device_type) {
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
@@ -259,11 +276,11 @@ void DeviceHost::AddVirtualDevice(fuchsia::virtualaudio::ControlSyncPtr& control
 }
 
 // Create testcase instances for each device entry.
-void DeviceHost::RegisterTests(bool expect_audio_core_not_connected, bool enable_position_tests) {
+void DeviceHost::RegisterTests(bool expect_audio_svcs_not_connected, bool enable_position_tests) {
   for (auto& device_entry : device_entries()) {
     RegisterBasicTestsForDevice(device_entry);
-    RegisterAdminTestsForDevice(device_entry, expect_audio_core_not_connected);
-    RegisterPositionTestsForDevice(device_entry, expect_audio_core_not_connected,
+    RegisterAdminTestsForDevice(device_entry, expect_audio_svcs_not_connected);
+    RegisterPositionTestsForDevice(device_entry, expect_audio_svcs_not_connected,
                                    enable_position_tests);
   }
 }

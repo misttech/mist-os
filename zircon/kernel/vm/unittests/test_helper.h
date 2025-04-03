@@ -78,7 +78,6 @@ class StubPageProvider : public PageProvider {
       .is_user_pager = true,
       .is_preserving_page_content = true,
       .is_providing_specific_physical_pages = false,
-      .is_handling_free = false,
   };
   const bool trap_dirty_ = false;
   const bool ignore_requests_ = false;

@@ -34,36 +34,54 @@ class SdkCommonTests(unittest.TestCase):
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
         atoms = [
             _atom("hello", "compat_test"),
-            _atom("world", "partner_internal"),
+            _atom("world", "host_tool"),
+            _atom("solar_system", "prebuilt"),
             _atom("universe", "partner"),
         ]
         self.assertEqual(
             [*detect_category_violations("compat_test", atoms)], []
         )
 
-        atoms = [_atom("hello", "partner_internal"), _atom("world", "partner")]
+        atoms = [
+            _atom("world", "host_tool"),
+            _atom("solar_system", "prebuilt"),
+            _atom("universe", "partner"),
+        ]
         self.assertEqual(
             [*detect_category_violations("compat_test", atoms)], []
         )
-        self.assertEqual(
-            [*detect_category_violations("partner_internal", atoms)], []
-        )
+        self.assertEqual([*detect_category_violations("host_tool", atoms)], [])
 
-        atoms = [_atom("hello", "partner")]
+        atoms = [
+            _atom("solar_system", "prebuilt"),
+            _atom("universe", "partner"),
+        ]
         self.assertEqual(
             [*detect_category_violations("compat_test", atoms)], []
         )
+        self.assertEqual([*detect_category_violations("host_tool", atoms)], [])
+        self.assertEqual([*detect_category_violations("prebuilt", atoms)], [])
+
+        atoms = [_atom("universe", "partner")]
         self.assertEqual(
-            [*detect_category_violations("partner_internal", atoms)], []
+            [*detect_category_violations("compat_test", atoms)], []
         )
+        self.assertEqual([*detect_category_violations("host_tool", atoms)], [])
+        self.assertEqual([*detect_category_violations("prebuilt", atoms)], [])
         self.assertEqual([*detect_category_violations("partner", atoms)], [])
 
     def test_categories_failure(self) -> None:
         atoms = [_atom("hello", "compat_test"), _atom("world", "partner")]
         self.assertEqual(
-            [*detect_category_violations("partner_internal", atoms)],
+            [*detect_category_violations("host_tool", atoms)],
             [
-                '"hello" has publication level "compat_test", which is incompatible with "partner_internal".'
+                '"hello" has publication level "compat_test", which is incompatible with "host_tool".'
+            ],
+        )
+        self.assertEqual(
+            [*detect_category_violations("prebuilt", atoms)],
+            [
+                '"hello" has publication level "compat_test", which is incompatible with "prebuilt".'
             ],
         )
         self.assertEqual(
@@ -73,11 +91,25 @@ class SdkCommonTests(unittest.TestCase):
             ],
         )
 
-        atoms = [_atom("hello", "partner_internal"), _atom("world", "partner")]
+        atoms = [_atom("hello", "host_tool"), _atom("world", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("prebuilt", atoms)],
+            [
+                '"hello" has publication level "host_tool", which is incompatible with "prebuilt".'
+            ],
+        )
         self.assertEqual(
             [*detect_category_violations("partner", atoms)],
             [
-                '"hello" has publication level "partner_internal", which is incompatible with "partner".'
+                '"hello" has publication level "host_tool", which is incompatible with "partner".'
+            ],
+        )
+
+        atoms = [_atom("hello", "prebuilt"), _atom("world", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("partner", atoms)],
+            [
+                '"hello" has publication level "prebuilt", which is incompatible with "partner".'
             ],
         )
 

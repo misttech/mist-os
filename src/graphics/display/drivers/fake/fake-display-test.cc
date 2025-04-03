@@ -5,11 +5,14 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
 #include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/stdcompat/span.h>
@@ -36,9 +39,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/graphics/display/drivers/fake/fake-display-stack.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 #include "src/graphics/display/lib/api-types/cpp/color.h"
+#include "src/graphics/display/lib/api-types/cpp/dimensions.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -49,6 +53,40 @@ namespace fake_display {
 
 namespace {
 
+class TestDisplayEngineListener
+    : public ddk::DisplayEngineListenerProtocol<TestDisplayEngineListener> {
+ public:
+  // fuchsia.hardware.display.controller/DisplayEngineListener:
+  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
+    display_added_.Signal();
+  }
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id) {
+    GTEST_FAIL() << "Unexpected call to OnDisplayRemoved";
+  }
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
+                                           const config_stamp_t* config_stamp) {
+    // VSync signals are ignored for now.
+  }
+  void DisplayEngineListenerOnCaptureComplete() { capture_completed_.Signal(); }
+
+  display_engine_listener_protocol_t GetProtocol() {
+    return {
+        .ops = &display_engine_listener_protocol_ops_,
+        .ctx = this,
+    };
+  }
+
+  // Signaled when the driver signals that a display was added.
+  libsync::Completion& display_added() { return display_added_; }
+
+  // Signaled when the driver signals that a capture was completed.
+  libsync::Completion& capture_completed() { return capture_completed_; }
+
+ private:
+  libsync::Completion display_added_;
+  libsync::Completion capture_completed_;
+};
+
 class FakeDisplayTest : public testing::Test {
  public:
   FakeDisplayTest() = default;
@@ -57,11 +95,16 @@ class FakeDisplayTest : public testing::Test {
     zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
         FakeSysmemDeviceHierarchy::Create();
     ASSERT_OK(create_sysmem_provider_result);
-    fake_display_stack_ = std::make_unique<FakeDisplayStack>(
-        std::move(create_sysmem_provider_result).value(), GetFakeDisplayDeviceConfig());
-  }
+    fake_sysmem_hierarchy_ = std::move(create_sysmem_provider_result).value();
 
-  void TearDown() override { fake_display_stack_->SyncShutdown(); }
+    zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_allocator_result =
+        fake_sysmem_hierarchy_->ConnectAllocator2();
+    ASSERT_OK(connect_allocator_result);
+
+    fake_display_ = std::make_unique<FakeDisplay>(GetFakeDisplayDeviceConfig(),
+                                                  std::move(connect_allocator_result).value(),
+                                                  inspect::Inspector());
+  }
 
   virtual FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const {
     return FakeDisplayDeviceConfig{
@@ -71,12 +114,21 @@ class FakeDisplayTest : public testing::Test {
   }
 
  protected:
-  std::unique_ptr<FakeDisplayStack> fake_display_stack_;
+  fdf_testing::ScopedGlobalLogger logger_;
+
+  TestDisplayEngineListener engine_listener_;
+  display_engine_listener_protocol_t engine_listener_banjo_protocol_ =
+      engine_listener_.GetProtocol();
+
+  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
+  std::unique_ptr<FakeSysmemDeviceHierarchy> fake_sysmem_hierarchy_;
+
+  std::unique_ptr<FakeDisplay> fake_display_;
 };
 
 TEST_F(FakeDisplayTest, Inspect) {
   fpromise::result<inspect::Hierarchy> read_result =
-      inspect::ReadFromVmo(fake_display_stack_->display_engine().DuplicateInspectorVmoForTesting());
+      inspect::ReadFromVmo(fake_display_->DuplicateInspectorVmoForTesting());
   ASSERT_TRUE(read_result.is_ok());
 
   const inspect::Hierarchy& hierarchy = read_result.value();
@@ -198,8 +250,13 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 
   void SetUp() override {
     FakeDisplayTest::SetUp();
+
+    zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_allocator_result =
+        fake_sysmem_hierarchy_->ConnectAllocator2();
+    ASSERT_OK(connect_allocator_result);
+
     sysmem_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(
-        fake_display_stack_->ConnectToSysmemAllocatorV2());
+        std::move(connect_allocator_result).value());
     EXPECT_TRUE(sysmem_.is_valid());
   }
 
@@ -212,35 +269,6 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
 
  private:
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
-};
-
-// A completion semaphore indicating the display capture is completed.
-class DisplayCaptureCompletion {
- public:
-  // Tests can import the display controller interface protocol to set up the
-  // callback to trigger the semaphore.
-  display_engine_listener_protocol_t GetDisplayEngineListenerProtocol() {
-    static constexpr display_engine_listener_protocol_ops_t kDisplayEngineListenerProtocolOps = {
-        .on_display_added = [](void* ctx, const raw_display_info_t* display_info) {},
-        .on_display_removed = [](void* ctx, uint64_t display_id) {},
-        .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
-                               const config_stamp_t* config_stamp) {},
-        .on_capture_complete =
-            [](void* ctx) {
-              reinterpret_cast<DisplayCaptureCompletion*>(ctx)->OnCaptureComplete();
-            },
-    };
-    return display_engine_listener_protocol_t{
-        .ops = &kDisplayEngineListenerProtocolOps,
-        .ctx = this,
-    };
-  }
-
-  libsync::Completion& completed() { return completed_; }
-
- private:
-  void OnCaptureComplete() { completed().Signal(); }
-  libsync::Completion completed_;
 };
 
 // Creates a BufferCollectionConstraints that tests can use to configure their
@@ -361,14 +389,14 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
   constexpr uint64_t kBanjoValidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoValidBufferCollectionId, token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
+                                                               token.TakeChannel()));
 
   // `driver_buffer_collection_id` must be unused.
   zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> another_token_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_OK(another_token_endpoints);
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
+  EXPECT_EQ(fake_display_->DisplayEngineImportBufferCollection(
                 kBanjoValidBufferCollectionId, another_token_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
@@ -376,7 +404,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
       &kDisplayUsage, kBanjoValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
@@ -399,11 +427,9 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-                kBanjoInvalidBufferCollectionId),
+  EXPECT_EQ(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoValidBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
 }
 
 TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
@@ -414,15 +440,15 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoBufferCollectionId, token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
+                                                               token.TakeChannel()));
 
   // Driver sets BufferCollection buffer memory constraints.
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
-      &kDisplayUsage, kBanjoBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                       kBanjoBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
   static constexpr const image_metadata_t kDisplayImageMetadata = {
@@ -458,41 +484,40 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
   uint64_t image_handle = 0;
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportImage(
-                &kInvalidTilingTypeMetadata, kBanjoBufferCollectionId,
-                /*index=*/0, &image_handle),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      fake_display_->DisplayEngineImportImage(&kInvalidTilingTypeMetadata, kBanjoBufferCollectionId,
+                                              /*index=*/0, &image_handle),
+      ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
   image_handle = 0;
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportImage(
-                &kDisplayImageMetadata, kBanjoInvalidBufferCollectionId,
-                /*index=*/0, &image_handle),
+  EXPECT_EQ(fake_display_->DisplayEngineImportImage(&kDisplayImageMetadata,
+                                                    kBanjoInvalidBufferCollectionId,
+                                                    /*index=*/0, &image_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
   image_handle = 0;
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportImage(
-                &kDisplayImageMetadata, kBanjoBufferCollectionId, kInvalidBufferCollectionIndex,
-                &image_handle),
-            ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(
+      fake_display_->DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
+                                              kInvalidBufferCollectionIndex, &image_handle),
+      ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   image_handle = 0;
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportImage(
-      &kDisplayImageMetadata, kBanjoBufferCollectionId,
-      /*index=*/0, &image_handle));
+  EXPECT_OK(fake_display_->DisplayEngineImportImage(&kDisplayImageMetadata,
+                                                    kBanjoBufferCollectionId,
+                                                    /*index=*/0, &image_handle));
   EXPECT_NE(image_handle, 0u);
 
   // Release the image.
-  fake_display_stack_->display_engine().DisplayEngineReleaseImage(image_handle);
+  fake_display_->DisplayEngineReleaseImage(image_handle);
 
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
 TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
@@ -503,8 +528,8 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoBufferCollectionId, token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
+                                                               token.TakeChannel()));
 
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
@@ -515,8 +540,8 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
-      &kDisplayUsage, kBanjoBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                       kBanjoBufferCollectionId));
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
   const uint32_t size_bytes = kDisplayWidth * kDisplayHeight * bytes_per_pixel;
   // Set BufferCollection buffer memory constraints.
@@ -541,29 +566,27 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
-                kBanjoInvalidBufferCollectionId,
-                /*index=*/0, &out_capture_handle),
+  EXPECT_EQ(fake_display_->DisplayEngineImportImageForCapture(kBanjoInvalidBufferCollectionId,
+                                                              /*index=*/0, &out_capture_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
+  EXPECT_EQ(fake_display_->DisplayEngineImportImageForCapture(
                 kBanjoBufferCollectionId, kInvalidBufferCollectionIndex, &out_capture_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
-      kBanjoBufferCollectionId, /*index=*/0, &out_capture_handle));
+  EXPECT_OK(fake_display_->DisplayEngineImportImageForCapture(kBanjoBufferCollectionId, /*index=*/0,
+                                                              &out_capture_handle));
   EXPECT_NE(out_capture_handle, INVALID_ID);
 
   // Release the image.
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the
   // imported images and buffer collections.
-  fake_display_stack_->display_engine().DisplayEngineReleaseCapture(out_capture_handle);
+  fake_display_->DisplayEngineReleaseCapture(out_capture_handle);
 
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
 }
 
 TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
@@ -579,13 +602,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   auto [framebuffer_collection_client, framebuffer_token] =
       std::move(new_framebuffer_buffer_collection_result.value());
 
-  DisplayCaptureCompletion display_capture_completion = {};
-  const display_engine_listener_protocol_t& controller_protocol =
-      display_capture_completion.GetDisplayEngineListenerProtocol();
-
   engine_info_t banjo_engine_info;
-  fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
-      &controller_protocol, &banjo_engine_info);
+  fake_display_->DisplayEngineCompleteCoordinatorConnection(&engine_listener_banjo_protocol_,
+                                                            &banjo_engine_info);
   ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
@@ -594,10 +613,10 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   constexpr display::DriverBufferCollectionId kFramebufferBufferCollectionId(2);
   constexpr uint64_t kBanjoFramebufferBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kFramebufferBufferCollectionId);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoCaptureBufferCollectionId, capture_token.TakeChannel()));
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoFramebufferBufferCollectionId, framebuffer_token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoCaptureBufferCollectionId,
+                                                               capture_token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoFramebufferBufferCollectionId,
+                                                               framebuffer_token.TakeChannel()));
 
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
@@ -612,12 +631,12 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
       &kDisplayUsage, kBanjoFramebufferBufferCollectionId));
   static constexpr image_buffer_usage_t kCaptureUsage = {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
       &kCaptureUsage, kBanjoCaptureBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints from the test's end.
@@ -664,9 +683,8 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
 
   // Import capture image.
   uint64_t capture_handle = INVALID_ID;
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
-      kBanjoCaptureBufferCollectionId,
-      /*index=*/0, &capture_handle));
+  EXPECT_OK(fake_display_->DisplayEngineImportImageForCapture(kBanjoCaptureBufferCollectionId,
+                                                              /*index=*/0, &capture_handle));
   EXPECT_NE(capture_handle, INVALID_ID);
 
   // Import framebuffer image.
@@ -676,9 +694,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   };
 
   uint64_t framebuffer_image_handle = 0;
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportImage(
-      &kFramebufferImageMetadata, kBanjoFramebufferBufferCollectionId,
-      /*index=*/0, &framebuffer_image_handle));
+  EXPECT_OK(fake_display_->DisplayEngineImportImage(&kFramebufferImageMetadata,
+                                                    kBanjoFramebufferBufferCollectionId,
+                                                    /*index=*/0, &framebuffer_image_handle));
   EXPECT_NE(framebuffer_image_handle, INVALID_ID);
 
   // Create display configuration.
@@ -711,22 +729,20 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   size_t layer_composition_operations_count = 0;
 
   // Check and apply the display configuration.
-  config_check_result_t config_check_result =
-      fake_display_stack_->display_engine().DisplayEngineCheckConfiguration(
-          &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
-          &layer_composition_operations_count);
+  config_check_result_t config_check_result = fake_display_->DisplayEngineCheckConfiguration(
+      &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
+      &layer_composition_operations_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::DriverConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kDisplayConfig,
-                                                                        &banjo_config_stamp);
+  fake_display_->DisplayEngineApplyConfiguration(&kDisplayConfig, &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
-  EXPECT_FALSE(display_capture_completion.completed().signaled());
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineStartCapture(capture_handle));
-  display_capture_completion.completed().Wait();
-  EXPECT_TRUE(display_capture_completion.completed().signaled());
+  ASSERT_FALSE(engine_listener_.capture_completed().signaled());
+  EXPECT_OK(fake_display_->DisplayEngineStartCapture(capture_handle));
+  engine_listener_.capture_completed().Wait();
+  EXPECT_TRUE(engine_listener_.capture_completed().signaled());
 
   // Verify the captured image has the same content as the original image.
   constexpr int kCaptureBytesPerPixel = 4;
@@ -777,19 +793,17 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   const display::DriverConfigStamp empty_config_stamp(2);
   const config_stamp_t banjo_empty_config_stamp =
       display::ToBanjoDriverConfigStamp(empty_config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kEmptyDisplayConfig,
-                                                                        &banjo_empty_config_stamp);
+  fake_display_->DisplayEngineApplyConfiguration(&kEmptyDisplayConfig, &banjo_empty_config_stamp);
 
   // Release the image.
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the
   // imported images and buffer collections.
-  fake_display_stack_->display_engine().DisplayEngineReleaseImage(framebuffer_image_handle);
-  fake_display_stack_->display_engine().DisplayEngineReleaseCapture(capture_handle);
+  fake_display_->DisplayEngineReleaseImage(framebuffer_image_handle);
+  fake_display_->DisplayEngineReleaseCapture(capture_handle);
 
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoFramebufferBufferCollectionId));
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoCaptureBufferCollectionId));
+  EXPECT_OK(
+      fake_display_->DisplayEngineReleaseBufferCollection(kBanjoFramebufferBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoCaptureBufferCollectionId));
 }
 
 TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
@@ -805,13 +819,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   auto [framebuffer_collection_client, framebuffer_token] =
       std::move(new_framebuffer_buffer_collection_result.value());
 
-  DisplayCaptureCompletion display_capture_completion = {};
-  const display_engine_listener_protocol_t& controller_protocol =
-      display_capture_completion.GetDisplayEngineListenerProtocol();
-
   engine_info_t banjo_engine_info;
-  fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
-      &controller_protocol, &banjo_engine_info);
+  fake_display_->DisplayEngineCompleteCoordinatorConnection(&engine_listener_banjo_protocol_,
+                                                            &banjo_engine_info);
   ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
@@ -820,10 +830,10 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   constexpr display::DriverBufferCollectionId kFramebufferBufferCollectionId(2);
   constexpr uint64_t kBanjoFramebufferBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kFramebufferBufferCollectionId);
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoCaptureBufferCollectionId, capture_token.TakeChannel()));
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportBufferCollection(
-      kBanjoFramebufferBufferCollectionId, framebuffer_token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoCaptureBufferCollectionId,
+                                                               capture_token.TakeChannel()));
+  EXPECT_OK(fake_display_->DisplayEngineImportBufferCollection(kBanjoFramebufferBufferCollectionId,
+                                                               framebuffer_token.TakeChannel()));
 
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
@@ -840,12 +850,12 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
       &kDisplayUsage, kBanjoFramebufferBufferCollectionId));
   static constexpr image_buffer_usage_t kCaptureUsage = {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineSetBufferCollectionConstraints(
+  EXPECT_OK(fake_display_->DisplayEngineSetBufferCollectionConstraints(
       &kCaptureUsage, kBanjoCaptureBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints from the test's end.
@@ -869,9 +879,8 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
 
   // Import capture image.
   uint64_t capture_handle = INVALID_ID;
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
-      kBanjoCaptureBufferCollectionId,
-      /*index=*/0, &capture_handle));
+  EXPECT_OK(fake_display_->DisplayEngineImportImageForCapture(kBanjoCaptureBufferCollectionId,
+                                                              /*index=*/0, &capture_handle));
   EXPECT_NE(capture_handle, INVALID_ID);
 
   // Create display configuration.
@@ -906,22 +915,20 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   size_t layer_composition_operations_count = 0;
 
   // Check and apply the display configuration.
-  config_check_result_t config_check_result =
-      fake_display_stack_->display_engine().DisplayEngineCheckConfiguration(
-          &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
-          &layer_composition_operations_count);
+  config_check_result_t config_check_result = fake_display_->DisplayEngineCheckConfiguration(
+      &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
+      &layer_composition_operations_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::DriverConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kDisplayConfig,
-                                                                        &banjo_config_stamp);
+  fake_display_->DisplayEngineApplyConfiguration(&kDisplayConfig, &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
-  EXPECT_FALSE(display_capture_completion.completed().signaled());
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineStartCapture(capture_handle));
-  display_capture_completion.completed().Wait();
-  EXPECT_TRUE(display_capture_completion.completed().signaled());
+  ASSERT_FALSE(engine_listener_.capture_completed().signaled());
+  EXPECT_OK(fake_display_->DisplayEngineStartCapture(capture_handle));
+  engine_listener_.capture_completed().Wait();
+  EXPECT_TRUE(engine_listener_.capture_completed().signaled());
 
   // Verify the captured image has the same content as the original image.
   constexpr int kCaptureBytesPerPixel = 4;
@@ -958,10 +965,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   // Release the capture image.
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the
   // imported images and buffer collections.
-  fake_display_stack_->display_engine().DisplayEngineReleaseCapture(capture_handle);
+  fake_display_->DisplayEngineReleaseCapture(capture_handle);
 
-  EXPECT_OK(fake_display_stack_->display_engine().DisplayEngineReleaseBufferCollection(
-      kBanjoCaptureBufferCollectionId));
+  EXPECT_OK(fake_display_->DisplayEngineReleaseBufferCollection(kBanjoCaptureBufferCollectionId));
 }
 
 class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest {
@@ -978,22 +984,20 @@ TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ImportImageForCapture) {
   constexpr uint64_t kFakeCollectionId = 1;
   constexpr uint32_t kFakeCollectionIndex = 0;
   uint64_t out_capture_handle;
-  EXPECT_STATUS(fake_display_stack_->display_engine().DisplayEngineImportImageForCapture(
+  EXPECT_STATUS(fake_display_->DisplayEngineImportImageForCapture(
                     kFakeCollectionId, kFakeCollectionIndex, &out_capture_handle),
                 ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, StartCapture) {
   constexpr uint64_t kFakeCaptureHandle = 1;
-  EXPECT_STATUS(fake_display_stack_->display_engine().DisplayEngineStartCapture(kFakeCaptureHandle),
-                ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(fake_display_->DisplayEngineStartCapture(kFakeCaptureHandle), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ReleaseCapture) {
   constexpr uint64_t kFakeCaptureHandle = 1;
-  EXPECT_STATUS(
-      fake_display_stack_->display_engine().DisplayEngineReleaseCapture(kFakeCaptureHandle),
-      ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(fake_display_->DisplayEngineReleaseCapture(kFakeCaptureHandle),
+                ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace

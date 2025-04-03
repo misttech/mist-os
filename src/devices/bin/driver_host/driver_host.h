@@ -17,6 +17,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_counted.h>
 
+#include "src/devices/bin/driver_host/crash_listener.h"
 #include "src/devices/bin/driver_host/driver.h"
 
 namespace driver_host {
@@ -30,14 +31,21 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
   fpromise::promise<inspect::Inspector> Inspect();
   zx::result<> PublishDriverHost(component::OutgoingDirectory& outgoing_directory);
 
+  std::optional<const Driver*> ValidateAndGetDriver(const void* driver);
+
  private:
   // fidl::Server<fuchsia_driver_host::DriverHost>
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
+  void StartLoadedDriver(StartLoadedDriverRequest& request,
+                         StartLoadedDriverCompleter::Sync& completer) override;
 
   void GetProcessInfo(GetProcessInfoCompleter::Sync& completer) override;
 
   void InstallLoader(InstallLoaderRequest& request,
                      InstallLoaderCompleter::Sync& completer) override;
+  void FindDriverCrashInfoByThreadKoid(
+      FindDriverCrashInfoByThreadKoidRequest& request,
+      FindDriverCrashInfoByThreadKoidCompleter::Sync& completer) override;
 
   void StartDriver(fbl::RefPtr<Driver> driver, fuchsia_driver_framework::DriverStartArgs start_args,
                    fdf::Dispatcher dispatcher,
@@ -48,6 +56,7 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
   async::Loop& loop_;
   std::mutex mutex_;
   fbl::DoublyLinkedList<fbl::RefPtr<Driver>> drivers_ __TA_GUARDED(mutex_);
+  CrashListener crash_listener_;
 };
 
 }  // namespace driver_host

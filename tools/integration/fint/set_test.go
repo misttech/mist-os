@@ -446,15 +446,11 @@ func TestGenArgs(t *testing.T) {
 		{
 			name: "packages",
 			staticSpec: &fintpb.Static{
-				BasePackages:     []string{"//b"},
-				CachePackages:    []string{"//c"},
 				UniversePackages: []string{"//u1", "//u2"},
 				HostLabels:       []string{"//src:host-tests"},
 				BuildOnlyLabels:  []string{"//tools:build_only"},
 			},
 			expectedArgs: []string{
-				`base_package_labels=["//b"]`,
-				`cache_package_labels=["//c"]`,
 				`universe_package_labels=["//u1","//u2"]`,
 				`host_labels=["//src:host-tests"]`,
 				`build_only_labels=["//tools:build_only"]`,
@@ -464,15 +460,11 @@ func TestGenArgs(t *testing.T) {
 			name: "packages with product",
 			staticSpec: &fintpb.Static{
 				Product:          "products/core.gni",
-				BasePackages:     []string{"//b"},
-				CachePackages:    []string{"//c"},
 				UniversePackages: []string{"//u1", "//u2"},
 				HostLabels:       []string{"//src:host-tests"},
 				BuildOnlyLabels:  []string{"//tools:build_only"},
 			},
 			expectedArgs: []string{
-				`base_package_labels=["//b"]`,
-				`cache_package_labels=["//c"]`,
 				`universe_package_labels=["//u1","//u2"]`,
 				`host_labels=["//src:host-tests"]`,
 				`build_only_labels=["//tools:build_only"]`,

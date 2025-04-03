@@ -6,6 +6,9 @@ library fuchsia.hardware.gpio;
 
 using zx;
 
+@available(added=NEXT)
+const SIGNAL_ACK_INTERRUPT uint32 = 0x01000000; // ZX_USER_SIGNAL_0
+
 /// Whether to drive the GPIO to a high or low voltage, or disable the output buffer.
 type BufferMode = strict enum {
     INPUT = 0;
@@ -44,6 +47,12 @@ open protocol Gpio {
     /// Gets an interrupt object pertaining to a particular GPIO pin. Only one interrupt may
     /// be outstanding per pin, and it must be released by calling `ReleaseInterrupt()` before the
     /// next call to `GetInterrupt()` will succeed.
+    ///
+    /// Some GPIO controllers have a single interrupt that is demultiplexed across all pins. In this
+    /// case, the server masks the interrupt corresponding to this pin before triggering
+    /// `interrupt`, then waits for the client to assert `SIGNAL_ACK_INTERRUPT` on `interrupt`
+    /// before unmasking. Once the client has asserted the signal, the server is responsible for
+    /// clearing it.
     ///
     /// Returns `ZX_ERR_ALREADY_EXISTS` if `GetInterrupt()` has already been called without a
     /// subsequent call to `ReleaseInterrupt()`, `ZX_ERR_INVALID_ARGS` if `options` is invalid, or

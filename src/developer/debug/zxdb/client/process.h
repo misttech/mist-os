@@ -20,6 +20,7 @@
 #include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/fxl/observer_list.h"
+#include "src/lib/unwinder/memory.h"
 
 namespace debug_ipc {
 struct MemoryBlock;
@@ -38,7 +39,7 @@ class ProcessSymbols;
 class Target;
 class Thread;
 
-class Process : public ClientObject {
+class Process : public ClientObject, public unwinder::AsyncMemory::Delegate {
  public:
   struct TLSHelpers {
     std::vector<uint8_t> thrd_t;

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_build_info//:args.bzl", "build_info_version")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
     "fuchsia_board_configuration",
@@ -16,6 +17,7 @@ fuchsia_board_input_bundle(
         "//src/devices/board/drivers/vim3-devicetree",
     ],
     power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
+    release_version = build_info_version,
 )
 
 fuchsia_board_input_bundle(
@@ -27,11 +29,13 @@ fuchsia_board_input_bundle(
         "//src/devices/usb/drivers/aml-usb-phy",
         "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo",
     ],
+    release_version = build_info_version,
 )
 
 fuchsia_board_input_bundle(
     name = "paver",
     bootfs_packages = ["//src/bringup/bin/paver:package-vim3"],
+    release_version = build_info_version,
 )
 
 fuchsia_board_configuration(
@@ -86,4 +90,5 @@ fuchsia_board_configuration(
         "fuchsia::paver",
         "fuchsia::usb_peripheral_support",
     ],
+    version = build_info_version,
 )

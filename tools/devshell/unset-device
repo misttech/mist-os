@@ -16,6 +16,16 @@ set -e -o pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-standard-switches "$@"
 fx-config-read
+fx-fail-if-device-specified
+
+# Check if the user has set the default via an environment variable which will cause this
+# to be a noop. This variable is always set if the user has already called fx set-device so
+# we need to set FUCHSIA_NODENAME_IS_FROM_FILE which is exported from the hermetic-env script.
+if [[ -n "${FUCHSIA_NODENAME}" && ! -n "${FUCHSIA_NODENAME_IS_FROM_FILE}" ]]; then
+  fx-warn "FUCHSIA_NODENAME is already set to ${FUCHSIA_NODENAME}"
+  fx-warn "Calling fx unset-device will remove the <build-dir>.device file but it will not"
+  fx-warn "unset FUCHSIA_NODENAME meaning that the default target will still be set"
+fi
 
 if [[ -n "${FUCHSIA_BUILD_DIR}" ]]; then
   rm -f "${FUCHSIA_BUILD_DIR}.device"

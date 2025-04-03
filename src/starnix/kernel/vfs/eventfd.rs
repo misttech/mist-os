@@ -45,7 +45,7 @@ pub fn new_eventfd(
     blocking: bool,
 ) -> FileHandle {
     let open_flags = if blocking { OpenFlags::RDWR } else { OpenFlags::RDWR | OpenFlags::NONBLOCK };
-    Anon::new_file(
+    Anon::new_private_file(
         current_task,
         Box::new(EventFdFileObject {
             inner: Mutex::new(EventFdInner {

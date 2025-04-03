@@ -71,8 +71,10 @@ bool CpuStatsFetcherImpl::CalculateCpuPercentage(double *cpu_percentage) {
         cpu_stats_->per_cpu_stats[i].idle_time(), last_cpu_stats_->per_cpu_stats[i].idle_time());
     zx_duration_t delta_busy_time =
         (delta_idle_time > elapsed_time ? 0 : elapsed_time - delta_idle_time);
-    cpu_percentage_sum +=
+    double this_cpu_percentage =
         static_cast<double>(delta_busy_time) * 100 / static_cast<double>(elapsed_time);
+    cpu_percentage_sum += this_cpu_percentage;
+    TRACE_COUNTER("system_metrics", "per_core_util", i, "pct", this_cpu_percentage);
   }
   *cpu_percentage = cpu_percentage_sum / static_cast<double>(num_cpu_cores_);
   TRACE_COUNTER("system_metrics", "cpu_usage", 0, "average_cpu_percentage", *cpu_percentage);

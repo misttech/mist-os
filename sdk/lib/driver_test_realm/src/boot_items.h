@@ -11,6 +11,9 @@ namespace driver_test_realm {
 class BootItems final : public fidl::WireServer<fuchsia_boot::Items> {
  public:
   void SetBoardName(std::string_view board_name);
+  void SetDeviceTree(zx::vmo devicetree);
+  void SetVid(uint32_t vid);
+  void SetPid(uint32_t pid);
 
   // If tunnel_to_incoming, we just connect the request to the one we have in our incoming
   // namespace. Otherwise this class serves as the server implementation.
@@ -24,6 +27,9 @@ class BootItems final : public fidl::WireServer<fuchsia_boot::Items> {
 
  private:
   std::string board_name_;
+  zx::vmo devicetree_;
+  std::optional<uint32_t> vid_;
+  std::optional<uint32_t> pid_;
   fidl::ServerBindingGroup<fuchsia_boot::Items> bindings_;
 };
 }  // namespace driver_test_realm

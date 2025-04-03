@@ -226,11 +226,6 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     WLAN_TRACE_DURATION();
     bridge_client_->Query().Then(ForwardResult<WlanFullmacImpl::Query>(completer.ToAsync()));
   }
-  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
-    WLAN_TRACE_DURATION();
-    bridge_client_->QueryMacSublayerSupport().Then(
-        ForwardResult<WlanFullmacImpl::QueryMacSublayerSupport>(completer.ToAsync()));
-  }
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->QuerySecuritySupport().Then(
@@ -302,10 +297,10 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     bridge_client_->EapolTx(request).Then(
         ForwardResult<WlanFullmacImpl::EapolTx>(completer.ToAsync()));
   }
-  void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override {
+  void GetIfaceStats(GetIfaceStatsCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
-    bridge_client_->GetIfaceCounterStats().Then(
-        ForwardResult<WlanFullmacImpl::GetIfaceCounterStats>(completer.ToAsync()));
+    bridge_client_->GetIfaceStats().Then(
+        ForwardResult<WlanFullmacImpl::GetIfaceStats>(completer.ToAsync()));
   }
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();

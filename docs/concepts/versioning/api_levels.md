@@ -142,10 +142,12 @@ corresponding API level in the Supported phase.
 Note: In most cases, you should not need to worry about special API levels
 unless you are a Fuchsia platform developer.
 
-In addition to the stable numerical API levels there are two special API levels:
+In addition to the stable numerical API levels there are three special API
+levels:
 
 * [`NEXT`](#next)
 * [`HEAD`](#head)
+* [`PLATFORM`](#platform)
 
 Unlike other API levels, the contents of `NEXT` and `HEAD` can be changed in
 arbitrary ways from release to release. API elements can be added, modified,
@@ -157,7 +159,8 @@ practice, changes will be incremental.
 included in `HEAD`.
 
 As a user of the Fuchsia SDK, targeting `HEAD` or `NEXT` voids the
-[API][api-compability] and [ABI compatibility guarantees][abi-compability].
+[API][api-compability] and [ABI compatibility guarantees][abi-compability]. As
+a user of the Fuchsia SDK, you should not target the `PLATFORM` level directly.
 
 ### `NEXT` {#next}
 
@@ -176,6 +179,27 @@ clients (for example, other platform components or integration tests), where
 there is no expectation of stability. API elements introduced in `HEAD` may not
 even be functional; for example, a method may have been added to a protocol at
 `HEAD`, but the protocol server might not actually implement that method yet.
+
+### `PLATFORM` {#platform}
+
+Note: This only applies to platform developers.
+
+`PLATFORM` is a special meta API level that is used while building the Fuchsia
+platform and is not intended to be targeted by an SDK user.
+
+`PLATFORM` represents a complete set of APIs that the current version of
+the Fuchsia platform must support, such as:
+
+* The `NEXT` API level.
+* The `HEAD` API level.
+* All currently supported stable numerical API levels. See
+  [Supported](#supported) and [Sunset](#sunset).
+
+The main purpose of `PLATFORM` is to ensure that the platform can run components
+built against any of its supported stable API levels, as well as those targeting
+the `HEAD` level. `PLATFORM` includes APIs from all supported stable numerical
+levels, so it may contain APIs that have already been removed from `NEXT` or
+`HEAD`.
 
 [abi-compability]: /docs/concepts/versioning/compatibility.md#abi-compatibility-guarantee
 [api-compability]: /docs/concepts/versioning/compatibility.md#api-compatibility-guarantee

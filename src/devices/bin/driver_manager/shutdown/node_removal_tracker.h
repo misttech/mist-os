@@ -12,19 +12,24 @@
 #include <unordered_set>
 
 #include "src/devices/bin/driver_manager/node.h"
+#include "src/devices/bin/driver_manager/node_types.h"
 
 namespace driver_manager {
+
+using NodeId = uint32_t;
+
+struct NodeInfo {
+  std::string name;
+  std::string driver_url;
+  Collection collection;
+  NodeState state;
+};
+
 class NodeRemovalTracker {
  public:
-  struct Node {
-    std::string name;
-    Collection collection;
-    NodeState state;
-  };
-
   explicit NodeRemovalTracker(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  NodeId RegisterNode(Node node);
+  NodeId RegisterNode(NodeInfo node);
   void Notify(NodeId id, NodeState state);
 
   void FinishEnumeration();
@@ -48,7 +53,7 @@ class NodeRemovalTracker {
 
   std::unordered_set<NodeId> remaining_pkg_nodes_;
   std::unordered_set<NodeId> remaining_non_pkg_nodes_;
-  std::unordered_map<NodeId, Node> nodes_;
+  std::unordered_map<NodeId, NodeInfo> nodes_;
 
   fit::callback<void()> pkg_callback_;
   fit::callback<void()> all_callback_;

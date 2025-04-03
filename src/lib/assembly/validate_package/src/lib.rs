@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::File;
 use std::path::PathBuf;
-use version_history::{AbiRevision, AbiRevisionError};
+use version_history::AbiRevision;
 
 /// Validate a package's contents.
 ///
@@ -48,27 +48,27 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
         .map_err(|e| PackageValidationError::MissingAbiRevisionFile(e))?;
     let abi_revision = AbiRevision::try_from(raw_abi_revision.as_slice())
         .map_err(|e| PackageValidationError::InvalidAbiRevisionFile(e))?;
-
-    match version_history_data::HISTORY.check_abi_revision_for_runtime(abi_revision) {
-        Ok(()) => {}
-        Err(AbiRevisionError::PlatformMismatch { .. })
-        | Err(AbiRevisionError::UnstableMismatch { .. })
-        | Err(AbiRevisionError::Malformed { .. }) => {
-            // TODO(https://fxbug.dev/347724655): Make these cases errors.
-            eprintln!(
-                "Unsupported platform ABI revision: 0x{}.
-This will become an error soon! See https://fxbug.dev/347724655",
-                abi_revision
-            );
-        }
-        Err(e @ AbiRevisionError::TooNew { .. })
-        | Err(e @ AbiRevisionError::Retired { .. })
-        | Err(e @ AbiRevisionError::Invalid) => {
-            return Err(PackageValidationError::UnsupportedAbiRevision(e))
-        }
+    // Due to exceptional technical constraints, `bt-host` is the only example
+    // of a platform component which is not built as part of the platform build,
+    // and therefore cannot pass the ABI revision checks.
+    //
+    // This is not a generic opt-out mechanism for ABI revision validation. It's
+    // specifically for platform components that are built out-of-tree, of which
+    // there should only be one.
+    //
+    // If a specific product wants to use an out-of-tree package with an invalid
+    // ABI revision, that should be specified in an allowlist in the product
+    // configuration.
+    //
+    // TODO(https://fxbug.dev/398204128): Add a package allowlist to product
+    // configuration.
+    if manifest.name().as_ref() == "bt-host" {
+        Ok(())
+    } else {
+        version_history_data::HISTORY
+            .check_abi_revision_for_runtime(abi_revision)
+            .map_err(PackageValidationError::UnsupportedAbiRevision)
     }
-
-    Ok(())
 }
 
 /// Validate an individual component within the package.

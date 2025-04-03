@@ -34,16 +34,11 @@ func TestEnableDebuggingSyscalls(t *testing.T) {
 	ensureContains(t, stdout, "zx_debug_read: enabled")
 	ensureContains(t, stdout, "zx_debug_send_command: enabled")
 	ensureContains(t, stdout, "zx_debug_write: enabled")
-	ensureContains(t, stdout, "zx_ktrace_control: enabled")
-	ensureContains(t, stdout, "zx_ktrace_read: enabled")
 	ensureContains(t, stdout, "zx_mtrace_control: enabled")
 	ensureContains(t, stdout, "zx_process_write_memory: enabled")
 	ensureContains(t, stdout, "zx_system_mexec: enabled")
 	ensureContains(t, stdout, "zx_system_mexec_payload_get: enabled")
 	ensureContains(t, stdout, "zx_thread_write_state: enabled")
-
-	// ktrace write is no longer supported and will be removed in the future.
-	ensureContains(t, stdout, "zx_ktrace_write: disabled")
 
 	if stderr != "" {
 		t.Fatal(stderr)

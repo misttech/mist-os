@@ -230,6 +230,33 @@ inline zx_instant_boot_ticks_t timer_current_boot_ticks() {
   return timer_current_boot_ticks_synchronized<GetTicksSyncFlag::kNone>();
 }
 
+// CurrentTicksObservation contains a coherent read of the current ticks on both the monotonic and
+// boot timeline.
+struct CurrentTicksObservation {
+  zx_instant_mono_ticks_t mono_now;
+  zx_instant_boot_ticks_t boot_now;
+};
+// Performs a coherent read of both the mono and boot timelines and returns a tuple with the current
+// value of both timelines.
+inline CurrentTicksObservation timer_current_mono_and_boot_ticks() {
+  while (true) {
+    const zx_ticks_t boot_off1 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t mono_obs1 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+    const zx_ticks_t raw_ticks =
+        platform_current_raw_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
+                                                GetTicksSyncFlag::kBeforeSubsequentLoads>();
+    const zx_ticks_t boot_off2 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t mono_obs2 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+    if (boot_off1 == boot_off2 && mono_obs1 == mono_obs2) {
+      // If our monotonic modifier observation was positive, the clock is paused and the observation
+      // is the current monotonic ticks value.
+      const zx_instant_mono_ticks_t mono_now = mono_obs1 > 0 ? mono_obs1 : raw_ticks + mono_obs1;
+      const zx_instant_boot_ticks_t boot_now = raw_ticks + boot_off1;
+      return {.mono_now = mono_now, .boot_now = boot_now};
+    }
+  }
+}
+
 // The current monotonic time in ticks.
 inline zx_instant_mono_ticks_t current_mono_ticks() { return timer_current_mono_ticks(); }
 

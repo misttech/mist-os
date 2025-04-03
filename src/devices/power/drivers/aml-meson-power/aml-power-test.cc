@@ -150,7 +150,7 @@ class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware
   }
 
   void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override {
-    completer.Reply(min_uv_, step_size_uv_, num_steps_);
+    completer.ReplySuccess(min_uv_, step_size_uv_, num_steps_);
   }
 
   void SetVoltageStep(::fuchsia_hardware_vreg::wire::VregSetVoltageStepRequest* request,
@@ -160,7 +160,15 @@ class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware
   }
 
   void GetVoltageStep(GetVoltageStepCompleter::Sync& completer) override {
-    completer.Reply(voltage_step_);
+    completer.ReplySuccess(voltage_step_);
+  }
+
+  void Enable(EnableCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void Disable(DisableCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {

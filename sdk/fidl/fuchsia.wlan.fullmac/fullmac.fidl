@@ -383,9 +383,6 @@ closed protocol WlanFullmacImpl {
         3: band_caps vector<BandCapability>:fuchsia.wlan.common.MAX_BANDS;
     }) error zx.Status;
 
-    strict QueryMacSublayerSupport() -> (struct {
-        resp fuchsia.wlan.common.MacSublayerSupport;
-    }) error zx.Status;
     strict QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.Status;
@@ -434,13 +431,17 @@ closed protocol WlanFullmacImpl {
         /// auth_type is SAE.
         4: sae_password vector<uint8>:MAX;
 
-        /// WEP key used in the authentication exchange. Only included for WEP security type.
-        // TODO(https://fxbug.dev/42166364): this should be optional, but we can't because
-        // Banjo code generation would give us "a field has incomplete type" error
+        /// WEP key used in the authentication exchange.
+        /// This is only populated for the WEP security type, otherwise this field is empty.
+        // TODO(https://fxbug.dev/399839691): Will be removed after v/g is updated to use ieee80211.SetKeyDescriptor.
         5: wep_key fuchsia.wlan.common.WlanKeyConfig;
 
         /// Additional parameters specific to the association exchange.
         6: security_ie vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
+
+        /// WEP key used in the authentication exchange.
+        /// This is only populated for the WEP security type, otherwise this field is empty.
+        7: wep_key_desc ieee80211.SetKeyDescriptor;
     }) -> ();
     strict Reconnect(table {
         1: peer_sta_address ieee80211.MacAddr;
@@ -487,7 +488,9 @@ closed protocol WlanFullmacImpl {
     /// Note that the platform assumes that the driver will automatically delete keys on a
     /// disconnect or key rotation.
     strict SetKeys(table {
+        // TODO(https://fxbug.dev/399839691): keylist will be removed after v/g is updated to use ieee80211.SetKeyDescriptor.
         1: keylist vector<fuchsia.wlan.common.WlanKeyConfig>:WLAN_MAX_KEYLIST_SIZE;
+        2: key_descriptors vector<ieee80211.SetKeyDescriptor>:WLAN_MAX_KEYLIST_SIZE;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
@@ -498,8 +501,8 @@ closed protocol WlanFullmacImpl {
     }) -> ();
 
     // MLME extensions
-    strict GetIfaceCounterStats() -> (struct {
-        stats fuchsia.wlan.stats.IfaceCounterStats;
+    strict GetIfaceStats() -> (struct {
+        stats fuchsia.wlan.stats.IfaceStats;
     }) error zx.Status;
     strict GetIfaceHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;

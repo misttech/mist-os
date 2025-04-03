@@ -13,7 +13,7 @@ ffx_plugin("ffx_repository_server_start") {
   args_sources = [ "src/args.rs" ]
   args_deps = [
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
@@ -35,7 +35,6 @@ ffx_plugin("ffx_repository_server_start") {
     "//src/developer/ffx/lib/daemonize:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",

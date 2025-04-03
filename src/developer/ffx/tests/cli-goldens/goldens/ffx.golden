@@ -56,7 +56,7 @@
       "optionality": "optional",
       "long": "--machine",
       "short": null,
-      "description": "produce output for a machine in the specified format; available formats: \"json\", \"json-pretty\"",
+      "description": "produce output for a machine in the specified format; available formats: \"json\", \"json-pretty\", \"raw\"",
       "hidden": false
     },
     {

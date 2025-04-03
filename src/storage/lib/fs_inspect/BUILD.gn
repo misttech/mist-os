@@ -9,6 +9,7 @@ rustc_library("fs_inspect") {
   version = "0.1.0"
   deps = [
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]

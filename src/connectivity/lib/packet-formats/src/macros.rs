@@ -10,7 +10,7 @@ macro_rules! __create_protocol_enum_inner {
     // A `From` implementation will be provided from `$repr`. The unspecified values will
     // be mapped to the Other variant.
     ($(#[$attr:meta])* ($($vis:tt)*) enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
         _, $other_fmt:expr;
     }) => {
@@ -73,7 +73,7 @@ macro_rules! __create_protocol_enum_inner {
     // In this case, a `TryFrom` implementation is provided from `$repr` instead of a `From`
     // implementation.
     ($(#[$attr:meta])* ($($vis:tt)*) enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
     }) => {
         $(#[$attr])*
@@ -128,7 +128,7 @@ macro_rules! __create_protocol_enum_inner {
     // A `From` implementation will be provided from `$repr`. The unspecified values will
     // be mapped to the Other variant.
     ($(#[$attr:meta])* ($($vis:tt)*) enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         _, $other_fmt:expr;
     }) => {
         $(#[$attr])*
@@ -180,7 +180,7 @@ macro_rules! __create_protocol_enum_inner {
     // In this case, a `TryFrom` implementation is provided from `$repr` instead of a `From`
     // implementation.
     ($(#[$attr:meta])* ($($vis:tt)*) enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
     }) => {
         $(#[$attr])*
         $($vis)* enum $name {
@@ -273,7 +273,7 @@ macro_rules! __create_protocol_enum_inner {
 /// `Other` variant is not specified, `TryFrom<U>` will be generated instead.
 macro_rules! create_protocol_enum {
     ($(#[$attr:meta])* enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
         _, $other_fmt:expr;
     }) => {
@@ -281,47 +281,47 @@ macro_rules! create_protocol_enum {
         __create_protocol_enum_inner!($(#[$attr])* () enum $name: $repr { $($variant, $value, $fmt;)* + $delegate_name($delegate_ty); _, $other_fmt; });
     };
     ($(#[$attr:meta])* pub enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
         _, $other_fmt:expr;
     }) => {
         __create_protocol_enum_inner!($(#[$attr])* (pub) enum $name: $repr { $($variant, $value, $fmt;)* + $delegate_name($delegate_ty); _, $other_fmt; });
     };
     ($(#[$attr:meta])* enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
     }) => {
         // use `()` to explicitly forward the information about private items
         __create_protocol_enum_inner!($(#[$attr])* () enum $name: $repr { $($variant, $value, $fmt;)* + $delegate_name($delegate_ty); });
     };
     ($(#[$attr:meta])* pub enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         + $delegate_name:ident($delegate_ty:ty);
     }) => {
         __create_protocol_enum_inner!($(#[$attr])* (pub) enum $name: $repr { $($variant, $value, $fmt;)* + $delegate_name($delegate_ty); });
     };
 
     ($(#[$attr:meta])* enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         _, $other_fmt:expr;
     }) => {
         // use `()` to explicitly forward the information about private items
         __create_protocol_enum_inner!($(#[$attr])* () enum $name: $repr { $($variant, $value, $fmt;)* _, $other_fmt; });
     };
     ($(#[$attr:meta])* pub enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
         _, $other_fmt:expr;
     }) => {
         __create_protocol_enum_inner!($(#[$attr])* (pub) enum $name: $repr { $($variant, $value, $fmt;)* _, $other_fmt; });
     };
     ($(#[$attr:meta])* enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
     }) => {
         // use `()` to explicitly forward the information about private items
         __create_protocol_enum_inner!($(#[$attr])* () enum $name: $repr { $($variant, $value, $fmt;)* });
     };
     ($(#[$attr:meta])* pub enum $name:ident: $repr:ty {
-        $($variant:ident, $value:expr, $fmt:expr;)*
+        $($variant:ident, $value:tt, $fmt:expr;)*
     }) => {
         __create_protocol_enum_inner!($(#[$attr])* (pub) enum $name: $repr { $($variant, $value, $fmt;)* });
     };

@@ -85,15 +85,13 @@ fn show(boot_dir: &File, package_name: &str) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl::endpoints::{create_endpoints, ServerEnd};
+    use fidl::endpoints::Proxy as _;
     use fuchsia_async as fasync;
     use fuchsia_merkle::Hash;
     use maplit::hashmap;
     use std::collections::BTreeMap;
     use std::io::Read;
     use std::str::FromStr;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
 
@@ -117,16 +115,10 @@ mod test {
                 "bootfs_packages" => read_only(data),
             },
         };
-        let (client, server) = create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        boot_dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
+        let dir_client = vfs::directory::serve_read_only(boot_dir);
         fasync::unblock(move || {
-            let client: File = fdio::create_fd(client.into_channel().into()).unwrap().into();
+            let channel = dir_client.into_channel().unwrap().into_zx_channel();
+            let client: File = fdio::create_fd(channel.into()).unwrap().into();
             list(&client).unwrap();
         })
         .await;
@@ -162,16 +154,10 @@ mod test {
                 "b21b34f8370687249a9cd9d4b306dee4c81f1f854f84de4626dc00c000c902fe" => read_only(far_contents),
             }
         };
-        let (client, server) = create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
-        let scope = ExecutionScope::new();
-        boot_dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server.into_channel()),
-        );
+        let dir_client = vfs::directory::serve_read_only(boot_dir);
         fasync::unblock(move || {
-            let client: File = fdio::create_fd(client.into_channel().into()).unwrap().into();
+            let channel = dir_client.into_channel().unwrap().into_zx_channel();
+            let client: File = fdio::create_fd(channel.into()).unwrap().into();
             show(&client, "foo").unwrap();
         })
         .await;

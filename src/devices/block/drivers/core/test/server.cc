@@ -179,4 +179,93 @@ TEST_F(ServerTestFixture, SplitRequestAfterFailedRequestReturnsFailure) {
   EXPECT_EQ(response.reqid, 104);
 }
 
+TEST(OffsetMap, InvalidMapping) {
+  // Zero-length
+  ASSERT_NOT_OK(OffsetMap::Create(fuchsia_hardware_block::wire::BlockOffsetMapping{
+      .source_block_offset = 0,
+      .target_block_offset = 1000,
+      .length = 0,
+  }));
+
+  // Source overflow
+  ASSERT_NOT_OK(OffsetMap::Create(fuchsia_hardware_block::wire::BlockOffsetMapping{
+      .source_block_offset = std::numeric_limits<uint64_t>::max(),
+      .target_block_offset = 0,
+      .length = 100,
+  }));
+
+  // Target overflow
+  ASSERT_NOT_OK(OffsetMap::Create(fuchsia_hardware_block::wire::BlockOffsetMapping{
+      .source_block_offset = 0,
+      .target_block_offset = std::numeric_limits<uint64_t>::max(),
+      .length = 100,
+  }));
+}
+
+TEST(OffsetMap, RemapRequests) {
+  zx::result map = OffsetMap::Create(fuchsia_hardware_block::wire::BlockOffsetMapping{
+      .source_block_offset = 10,
+      .target_block_offset = 1000,
+      .length = 100,
+  });
+  ASSERT_OK(map);
+  block_fifo_request_t request{
+      .command = {.opcode = BLOCK_OPCODE_WRITE},
+      .reqid = 1,
+      .group = 2,
+      .vmoid = 3,
+      .length = 10,
+      .vmo_offset = 0x2000,
+  };
+  const block_fifo_request_t orig_request = request;
+
+  auto AssertUnchangedExceptOffset = [&orig_request](block_fifo_request_t& request) {
+    request.dev_offset = orig_request.dev_offset;
+    ASSERT_BYTES_EQ(&request, &orig_request, sizeof(request));
+  };
+
+  request.dev_offset = 10;
+  ASSERT_TRUE(map->AdjustRequest(request));
+  ASSERT_EQ(request.dev_offset, 1000);
+  AssertUnchangedExceptOffset(request);
+
+  request.dev_offset = 40;
+  ASSERT_TRUE(map->AdjustRequest(request));
+  ASSERT_EQ(request.dev_offset, 1030);
+  AssertUnchangedExceptOffset(request);
+
+  request.dev_offset = 100;
+  ASSERT_TRUE(map->AdjustRequest(request));
+  ASSERT_EQ(request.dev_offset, 1090);
+  AssertUnchangedExceptOffset(request);
+
+  // Past end of map
+  request.dev_offset = 101;
+  ASSERT_FALSE(map->AdjustRequest(request));
+  AssertUnchangedExceptOffset(request);
+
+  // Before start of map
+  request.dev_offset = 9;
+  ASSERT_FALSE(map->AdjustRequest(request));
+  AssertUnchangedExceptOffset(request);
+
+  // Source beyond end of target is OK too
+  map = OffsetMap::Create(fuchsia_hardware_block::wire::BlockOffsetMapping{
+      .source_block_offset = 1000,
+      .target_block_offset = 0,
+      .length = 100,
+  });
+  ASSERT_OK(map);
+
+  request.dev_offset = 1000;
+  ASSERT_TRUE(map->AdjustRequest(request));
+  ASSERT_EQ(request.dev_offset, 0);
+  AssertUnchangedExceptOffset(request);
+
+  request.dev_offset = 1090;
+  ASSERT_TRUE(map->AdjustRequest(request));
+  ASSERT_EQ(request.dev_offset, 90);
+  AssertUnchangedExceptOffset(request);
+}
+
 }  // namespace

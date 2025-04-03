@@ -16,6 +16,7 @@
 
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -35,6 +36,10 @@ struct AcpiDebugPortDescriptor;
 
 namespace uart {
 
+// Config type for stub drivers, such that certain operations may be defined
+// against them.
+struct StubConfig {};
+
 // Tagged configuration type, used to represent the configuration of `Driver` even if multiple types
 // of driver have the same `config_type`.
 template <typename Driver>
@@ -51,6 +56,34 @@ class Config {
 
   constexpr config_type& operator*() { return config_; }
   constexpr const config_type& operator*() const { return config_; }
+
+  constexpr bool operator==(const Config& rhs) const
+    requires(std::is_same_v<config_type, StubConfig>)
+  {
+    return true;
+  }
+
+  constexpr bool operator==(const Config& rhs) const
+    requires(std::is_same_v<config_type, zbi_dcfg_simple_pio_t>)
+  {
+    return config_.base == rhs.config_.base && config_.irq == rhs.config_.irq;
+  }
+
+  constexpr bool operator==(const Config& rhs) const
+    requires(std::is_same_v<config_type, zbi_dcfg_simple_t>)
+  {
+    return config_.mmio_phys == rhs.config_.mmio_phys && config_.irq == rhs.config_.irq &&
+           config_.flags == rhs.config_.flags;
+  }
+
+  template <typename OtherDriver>
+  constexpr bool operator==(const Config<OtherDriver>& rhs) const {
+    return false;
+  }
+
+  constexpr std::span<const std::byte> as_bytes() const {
+    return {reinterpret_cast<const std::byte*>(&config_), sizeof(config_)};
+  }
 
  private:
   config_type config_;
@@ -501,10 +534,6 @@ class KernelDriver {
       waiter_.Init(uart_);
     }
   }
-
-  // Access underlying hardware driver object.
-  const auto& uart() const { return uart_; }
-  auto& uart() { return uart_; }
 
   template <typename LockPolicy = DefaultLockPolicy, MmioDriver = UartDriver>
   constexpr MmioRange mmio_range() const {

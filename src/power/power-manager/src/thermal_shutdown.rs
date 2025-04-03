@@ -161,10 +161,14 @@ impl ThermalShutdown {
         fuchsia_trace::duration!(c"power_manager", c"ThermalShutdown::poll_temperature");
         let timestamp = get_current_timestamp();
 
-        if self.temperature_filter.get_temperature(timestamp).await?.filtered
-            >= self.thermal_shutdown_temperature
-        {
-            info!("{:?} crossed high temperature mark. Rebooting...", self.temperature_node.name());
+        let temperature = self.temperature_filter.get_temperature(timestamp).await?.filtered;
+        if temperature >= self.thermal_shutdown_temperature {
+            info!(
+                "{:?} crossed high temperature mark ({:?} >= {:?}). Rebooting...",
+                self.temperature_node.name(),
+                temperature,
+                self.thermal_shutdown_temperature
+            );
             let msg = Message::LogPlatformMetric(PlatformMetric::ThrottlingResultShutdown);
             log_if_err!(
                 self.send_message(&self.platform_metrics_node, &msg).await,

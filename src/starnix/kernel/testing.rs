@@ -166,10 +166,9 @@ fn create_test_kernel(
         SchedulerManager::empty_for_tests(),
         None,
         fuchsia_inspect::Node::default(),
-        #[cfg(not(feature = "starnix_lite"))]
-        None,
         security::testing::kernel_state(security_server),
         Vec::new(),
+        /* time_adjustment_proxy=*/ None,
     )
     .expect("failed to create kernel")
 }
@@ -496,7 +495,8 @@ pub fn anon_test_file(
     ops: Box<dyn FileOps>,
     flags: OpenFlags,
 ) -> FileHandle {
-    Anon::new_file(current_task, ops, flags, "[fuchsia:test_file]")
+    // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+    Anon::new_private_file(current_task, ops, flags, "[fuchsia:test_file]")
 }
 
 /// Helper to write out data to a task's memory sequentially.

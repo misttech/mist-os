@@ -12,7 +12,6 @@ use alloc::vec::Vec;
 use core::mem::MaybeUninit;
 use net_types::ip::{Ip, IpVersion};
 use packet::InnerPacketBuilder;
-use packet_formats::ip::IpExt;
 
 use crate::ip::Mms;
 use crate::tcp::segment::{Payload, PayloadLen};
@@ -47,7 +46,7 @@ pub struct Mss(pub NonZeroU16);
 
 impl Mss {
     /// Creates MSS from the maximum message size of the IP layer.
-    pub fn from_mms<I: IpExt>(mms: Mms) -> Option<Self> {
+    pub fn from_mms(mms: Mms) -> Option<Self> {
         NonZeroU16::new(
             u16::try_from(mms.get().get().saturating_sub(TCP_HEADER_LEN)).unwrap_or(u16::MAX),
         )

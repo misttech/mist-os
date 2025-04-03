@@ -647,7 +647,7 @@ namespace {
 [[maybe_unused]] constexpr uint32_t kMaxTestFreq = ktl::numeric_limits<uint32_t>::max();
 [[maybe_unused]] constexpr uint32_t kCurTestFreq = 0;
 
-inline uint64_t abs_int64(int64_t a) { return (a > 0) ? a : -a; }
+inline uint64_t abs_int64(int64_t a) { return (a > 0) ? a : static_cast<int64_t>(-a); }
 
 bool test_time_conversion_check_result(uint64_t a, uint64_t b, uint64_t limit) {
   BEGIN_TEST;

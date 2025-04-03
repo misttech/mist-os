@@ -17,6 +17,7 @@ use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
+use zx::MonotonicDuration;
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -66,12 +67,18 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
+    let stall_provider = Arc::new(stalls::StallProviderImpl::new(
+        MonotonicDuration::from_minutes(5),
+        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
+    )?);
+
     // Serves Fuchsia performance trace system.
     // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
     // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
     let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
         traces::watcher::subscribe(),
         kernel_stats.clone(),
+        stall_provider.clone(),
     ));
 
     let root_job: Mutex<Box<dyn Job>> = Mutex::new(Box::new(
@@ -85,8 +92,11 @@ async fn main() -> Result<(), Error> {
 
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
-    let _inspect_nodes_service =
-        inspect_nodes::start_service(attribution_data_provider.clone(), kernel_stats.clone())?;
+    let _inspect_nodes_service = inspect_nodes::start_service(
+        attribution_data_provider.clone(),
+        kernel_stats.clone(),
+        stall_provider,
+    )?;
 
     service_fs
         .for_each_concurrent(None, |stream| async {

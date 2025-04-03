@@ -489,12 +489,41 @@ void DumpHandlesForKoid(zx_koid_t id) {
     return;
   }
 
+  // Wrapper type to let us build a linked list of all child processes.
+  struct ProcessNode : fbl::SinglyLinkedListable<ktl::unique_ptr<ProcessNode>> {
+    fbl::RefPtr<ProcessDispatcher> proc;
+  };
+  fbl::SinglyLinkedList<ktl::unique_ptr<ProcessNode>> procs;
+
+  bool alloc_failed = false;
+  // Enumerate all the children and build the linked list of all processes. This lets us separate
+  // the enumeration of the children, which requires holding the job dispatcher lock, with the
+  // iteration of the handles, which requires holding the handle table lock. Specifically it ensures
+  // we do not take the locks in the order JobDispatcher->HandleTable, as this is invalid.
+  auto find_processes = MakeProcessWalker([&](ProcessDispatcher* process) {
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<ProcessNode> p = ktl::make_unique<ProcessNode>(&ac);
+    if (ac.check()) {
+      p->proc = fbl::RefPtr(process);
+      procs.push_front(ktl::move(p));
+    } else {
+      alloc_failed = true;
+    }
+  });
+  GetRootJobDispatcher()->EnumerateChildrenRecursive(&find_processes);
+
+  if (alloc_failed) {
+    printf("WARNING: Allocation failure, search has been truncated\n");
+  }
+
   uint32_t total_proc = 0;
   uint32_t total_handles = 0;
-  auto walker = MakeProcessWalker([&](ProcessDispatcher* process) {
+
+  // Inspect all the handle tables of the processes we previously found.
+  for (auto& proc : procs) {
     bool found_handle = false;
-    process->handle_table().ForEachHandle([&](zx_handle_t handle, zx_rights_t rights,
-                                              const Dispatcher* disp) {
+    proc.proc->handle_table().ForEachHandle([&](zx_handle_t handle, zx_rights_t rights,
+                                                const Dispatcher* disp) {
       if (disp->get_koid() != id) {
         return ZX_OK;
       }
@@ -506,19 +535,17 @@ void DumpHandlesForKoid(zx_koid_t id) {
 
       char pname[ZX_MAX_NAME_LEN];
       char rights_mask[sizeof(kRightsHeader)];
-      [[maybe_unused]] zx_status_t status = process->get_name(pname);
+      [[maybe_unused]] zx_status_t status = proc.proc->get_name(pname);
       DEBUG_ASSERT(status == ZX_OK);
       FormatHandleRightsMask(rights, rights_mask, sizeof(rights_mask));
-      printf("%7" PRIu64 " %#10x: {%s} [%s]\n", process->get_koid(), rights, rights_mask, pname);
+      printf("%7" PRIu64 " %#10x: {%s} [%s]\n", proc.proc->get_koid(), rights, rights_mask, pname);
 
       ++total_handles;
       found_handle = true;
       return ZX_OK;
     });
     total_proc += found_handle;
-  });
-  GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
-
+  }
   if (total_handles > 0) {
     printf("total: %u handles in %u processes\n", total_handles, total_proc);
   } else {

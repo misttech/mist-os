@@ -53,7 +53,7 @@ impl QuantaExt for Quanta {
 }
 
 /// A point in time.
-pub type Timestamp = fuchsia_async::MonotonicInstant;
+pub type Timestamp = fuchsia_async::BootInstant;
 
 pub trait TimestampExt {
     /// Calculates the number of quanta between zero and the current timestamp.
@@ -67,7 +67,7 @@ impl TimestampExt for Timestamp {
 }
 
 /// A vector in time.
-pub type Duration = fuchsia_async::MonotonicDuration;
+pub type Duration = zx::BootDuration;
 
 pub trait DurationExt {
     /// The unit duration.

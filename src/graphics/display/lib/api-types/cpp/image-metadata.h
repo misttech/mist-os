@@ -44,8 +44,10 @@ class ImageMetadata {
   // `banjo_image_metadata` must be convertible to a valid ImageMetadata.
   explicit constexpr ImageMetadata(const image_metadata_t& banjo_image_metadata);
 
-  ImageMetadata(const ImageMetadata&) = default;
-  ImageMetadata& operator=(const ImageMetadata&) = default;
+  constexpr ImageMetadata(const ImageMetadata&) noexcept = default;
+  constexpr ImageMetadata(ImageMetadata&&) noexcept = default;
+  constexpr ImageMetadata& operator=(const ImageMetadata&) noexcept = default;
+  constexpr ImageMetadata& operator=(ImageMetadata&&) noexcept = default;
   ~ImageMetadata() = default;
 
   friend constexpr bool operator==(const ImageMetadata& lhs, const ImageMetadata& rhs);

@@ -17,6 +17,7 @@ rustc_library("kernel_manager") {
   sources = [
     "src/kernels.rs",
     "src/lib.rs",
+    "src/proxy.rs",
     "src/suspend.rs",
   ]
   with_unit_tests = true

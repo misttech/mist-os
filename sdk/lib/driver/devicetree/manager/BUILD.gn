@@ -50,7 +50,6 @@ sdk_source_set("manager") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/zbi-format",

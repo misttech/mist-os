@@ -39,7 +39,7 @@ use crate::log::*;
 use crate::lsm_tree::cache::{NullCache, ObjectCache};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::{LSMTree, Query};
-use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::Allocator;
 use crate::object_store::graveyard::Graveyard;
 use crate::object_store::journal::{JournalCheckpoint, JournaledTransaction};
@@ -53,6 +53,8 @@ use crate::round::round_up;
 use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
+use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
 use fuchsia_inspect::ArrayProperty;
@@ -62,6 +64,7 @@ use fxfs_crypto::{
     Crypt, KeyPurpose, StreamCipher, UnwrappedKey, WrappedKey, WrappedKeyV32, WrappedKeyV40,
     WrappedKeys,
 };
+use mundane::hash::{Digest, Hasher, Sha256};
 use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -2051,10 +2054,40 @@ impl ObjectStore {
         Ok(())
     }
 
+    // When the symlink is unlocked, this function decrypts `link` and returns a bag of bytes that
+    // is identical to that which was passed in as the target on `create_symlink`.
+    // If the symlink is locked, this function hashes the encrypted `link` with Sha256 in order to
+    // get a standard length and then base64 encodes the hash and returns that to the caller.
+    pub async fn read_encrypted_symlink(
+        &self,
+        object_id: u64,
+        link: Vec<u8>,
+    ) -> Result<Vec<u8>, Error> {
+        let mut link = link;
+        let key = self
+            .key_manager()
+            .get_fscrypt_key(object_id, self.crypt().unwrap().as_ref(), async || {
+                self.get_keys(object_id).await
+            })
+            .await?;
+        if let Some(key) = key {
+            key.decrypt_filename(object_id, &mut link)?;
+            Ok(link)
+        } else {
+            let digest = Sha256::hash(&link).bytes();
+            let encrypted_link = BASE64_URL_SAFE_NO_PAD.encode(&digest);
+            Ok(encrypted_link.into())
+        }
+    }
+
     /// Returns the link of a symlink object.
     pub async fn read_symlink(&self, object_id: u64) -> Result<Vec<u8>, Error> {
         match self.tree.find(&ObjectKey::object(object_id)).await? {
             None => bail!(FxfsError::NotFound),
+            Some(Item {
+                value: ObjectValue::Object { kind: ObjectKind::EncryptedSymlink { link, .. }, .. },
+                ..
+            }) => self.read_encrypted_symlink(object_id, link).await,
             Some(Item {
                 value: ObjectValue::Object { kind: ObjectKind::Symlink { link, .. }, .. },
                 ..
@@ -2138,6 +2171,49 @@ impl ObjectStore {
                 .context("ObjectStore.update_attributes: Expected object value"));
         };
         transaction.add(self.store_object_id(), Mutation::ObjectStore(mutation));
+        Ok(())
+    }
+
+    // Updates and commits the changes to access time in ObjectProperties. The update matches
+    // Linux's RELATIME. That is, access time is updated to the current time if access time is less
+    // than or equal to the last modification or status change, or if it has been more than a day
+    // since the last access.
+    pub async fn update_access_time(
+        &self,
+        object_id: u64,
+        props: &mut ObjectProperties,
+    ) -> Result<(), Error> {
+        let access_time = props.access_time.as_nanos();
+        let modification_time = props.modification_time.as_nanos();
+        let change_time = props.change_time.as_nanos();
+        let now = Timestamp::now();
+        if access_time <= modification_time
+            || access_time <= change_time
+            || access_time
+                < now.as_nanos()
+                    - Timestamp::from(std::time::Duration::from_secs(24 * 60 * 60)).as_nanos()
+        {
+            let mut transaction = self
+                .filesystem()
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(self.store_object_id, object_id,)],
+                    Options { borrow_metadata_space: true, ..Default::default() },
+                )
+                .await?;
+            self.update_attributes(
+                &mut transaction,
+                object_id,
+                Some(&fio::MutableNodeAttributes {
+                    access_time: Some(now.as_nanos()),
+                    ..Default::default()
+                }),
+                None,
+            )
+            .await?;
+            transaction.commit().await?;
+            props.access_time = now;
+        }
         Ok(())
     }
 }

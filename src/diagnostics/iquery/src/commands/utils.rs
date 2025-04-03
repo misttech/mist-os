@@ -104,13 +104,13 @@ pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
 /// Returns the selectors for a component whose url, manifest, or moniker contains the
 /// `component` string.
 pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvider>(
-    component: String,
+    component: &str,
     tree_selectors: impl Iterator<Item = String>,
     provider: &P,
 ) -> Result<Vec<Selector>, Error> {
     let mut tree_selectors = tree_selectors.into_iter().peekable();
     let realm_query = provider.realm_query();
-    let instance = fuzzy_search(component.as_str(), realm_query).await?;
+    let instance = fuzzy_search(component, realm_query).await?;
 
     let mut results = vec![];
     if tree_selectors.peek().is_none() {
@@ -465,7 +465,7 @@ mod test {
     #[fuchsia::test]
     async fn test_fuzzy_component_search() {
         let actual = process_component_query_with_partial_selectors(
-            "moniker1".to_string(),
+            "moniker1",
             [].into_iter(),
             &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
@@ -477,7 +477,7 @@ mod test {
         assert_eq!(actual, expected);
 
         let actual = process_component_query_with_partial_selectors(
-            "moniker1".to_string(),
+            "moniker1",
             ["root/foo:bar".to_string()].into_iter(),
             &FakeProvider::new(&["core/moniker1", "core/moniker2"]).await,
         )
@@ -489,7 +489,7 @@ mod test {
         assert_eq!(actual, expected);
 
         let actual = process_component_query_with_partial_selectors(
-            "moniker1".to_string(),
+            "moniker1",
             ["root/foo:bar".to_string()].into_iter(),
             &FakeProvider::new(&["core/moniker2", "core/moniker3"]).await,
         )

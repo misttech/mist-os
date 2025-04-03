@@ -15,7 +15,7 @@ async fn open_file_as_unnamed_temporary() {
 
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
     let _file_proxy = dir
-        .open3_node::<fio::FileMarker>(
+        .open_node::<fio::FileMarker>(
             ".",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -23,11 +23,11 @@ async fn open_file_as_unnamed_temporary() {
             None,
         )
         .await
-        .expect("open3 failed to open unnamed temporary file");
+        .expect("open failed to open unnamed temporary file");
 }
 
 #[fuchsia::test]
-async fn open3_non_file_as_unnamed_temporary_should_fail() {
+async fn open_non_file_as_unnamed_temporary_should_fail() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_unnamed_temporary_file {
         return;
@@ -42,7 +42,7 @@ async fn open3_non_file_as_unnamed_temporary_should_fail() {
         fio::Flags::PROTOCOL_SYMLINK,
     ] {
         assert_eq!(
-            dir.open3_node::<fio::NodeMarker>(
+            dir.open_node::<fio::NodeMarker>(
                 ".",
                 unallowed_protocol
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -67,7 +67,7 @@ async fn open_file_as_unnamed_temporary_fail_when_not_supported() {
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
     assert_eq!(
-        dir.open3_node::<fio::FileMarker>(
+        dir.open_node::<fio::FileMarker>(
             "dir",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -82,7 +82,7 @@ async fn open_file_as_unnamed_temporary_fail_when_not_supported() {
     // Also check for the case of creating an unnamed temporary file at the current directory. Some
     // filesystems return earlier at empty path (assuming opening current directory),
     assert_eq!(
-        dir.open3_node::<fio::FileMarker>(
+        dir.open_node::<fio::FileMarker>(
             ".",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -104,7 +104,7 @@ async fn open_file_as_unnamed_temporary_in_nonexistent_directory_should_fail() {
 
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
     assert_eq!(
-        dir.open3_node::<fio::FileMarker>(
+        dir.open_node::<fio::FileMarker>(
             "foo",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -118,7 +118,7 @@ async fn open_file_as_unnamed_temporary_in_nonexistent_directory_should_fail() {
 
     // It should also fail when we pass in "must create" flag.
     assert_eq!(
-        dir.open3_node::<fio::FileMarker>(
+        dir.open_node::<fio::FileMarker>(
             "foo",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY

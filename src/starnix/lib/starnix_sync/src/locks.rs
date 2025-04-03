@@ -63,6 +63,25 @@ pub fn ordered_lock<'a, T>(
     }
 }
 
+/// Acquires multiple mutexes in a consistent order based on their memory addresses.
+/// This helps prevent deadlocks.
+pub fn ordered_lock_vec<'a, T>(mutexes: &[&'a Mutex<T>]) -> Vec<MutexGuard<'a, T>> {
+    // Create a vector of tuples containing the mutex and its original index.
+    let mut indexed_mutexes =
+        mutexes.into_iter().enumerate().map(|(i, m)| (i, *m)).collect::<Vec<_>>();
+
+    // Sort the indexed mutexes by their memory addresses.
+    indexed_mutexes.sort_by_key(|(_, m)| *m as *const Mutex<T>);
+
+    // Acquire the locks in the sorted order.
+    let mut guards = indexed_mutexes.into_iter().map(|(i, m)| (i, m.lock())).collect::<Vec<_>>();
+
+    // Reorder the guards to match the original order of the mutexes.
+    guards.sort_by_key(|(i, _)| *i);
+
+    guards.into_iter().map(|(_, g)| g).collect::<Vec<_>>()
+}
+
 /// A wrapper for mutex that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this mutex.
@@ -236,6 +255,26 @@ mod test {
             let (g2, g1) = ordered_lock(&l2, &l1);
             assert_eq!(*g1, 1);
             assert_eq!(*g2, 2);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_vec_lock_ordering() {
+        let l1 = Mutex::new(1);
+        let l0 = Mutex::new(0);
+        let l2 = Mutex::new(2);
+
+        {
+            let guards = ordered_lock_vec(&[&l0, &l1, &l2]);
+            assert_eq!(*guards[0], 0);
+            assert_eq!(*guards[1], 1);
+            assert_eq!(*guards[2], 2);
+        }
+        {
+            let guards = ordered_lock_vec(&[&l2, &l1, &l0]);
+            assert_eq!(*guards[0], 2);
+            assert_eq!(*guards[1], 1);
+            assert_eq!(*guards[2], 0);
         }
     }
 

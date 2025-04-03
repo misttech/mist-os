@@ -12,7 +12,6 @@ use crate::fuchsia::pager::{
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
 use fidl_fuchsia_io as fio;
-use futures::future::BoxFuture;
 use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
@@ -226,7 +225,7 @@ impl FxFile {
         scope: ExecutionScope,
         flags: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<BoxFuture<'static, ()>, zx::Status> {
+    ) -> Result<(), zx::Status> {
         if let Some(rights) = flags.rights() {
             if rights.intersects(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES) {
                 if let Some(fut) = this.handle.pre_fetch_keys() {
@@ -245,7 +244,9 @@ impl FxFile {
                 }
             }
         }
-        object_request.create_connection(scope, this.take(), flags, StreamIoConnection::create)
+        object_request
+            .create_connection::<StreamIoConnection<_>, _>(scope, this.take(), flags)
+            .await
     }
 
     /// Marks the file to be purged when the open count drops to zero.
@@ -424,7 +425,7 @@ impl vfs::node::Node for FxFile {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        let mut props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
         // In most cases, the reference count of objects can be used as the link count. There are
@@ -434,6 +435,15 @@ impl vfs::node::Node for FxFile {
         // `TO_BE_PURGED` will be set and `refs` is one.
         let Flags { to_be_purged, .. } = self.state.get_flags();
         let link_count = if to_be_purged && props.refs == 1 { 0 } else { props.refs };
+
+        if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
+            self.handle
+                .store()
+                .update_access_time(self.handle.object_id(), &mut props)
+                .await
+                .map_err(map_to_status)?;
+        }
+
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -599,7 +609,7 @@ impl File for FxFile {
         if attributes == fio::MutableNodeAttributes::default() {
             return Ok(());
         }
-        // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
+
         self.handle.update_attributes(&attributes).await.map_err(map_to_status)?;
         Ok(())
     }
@@ -737,6 +747,7 @@ mod tests {
     use futures::join;
     use fxfs::fsck::fsck;
     use fxfs::object_handle::INVALID_OBJECT_ID;
+    use fxfs::object_store::Timestamp;
     use rand::{thread_rng, Rng};
     use std::sync::atomic::{self, AtomicBool};
     use std::sync::Arc;
@@ -2691,6 +2702,176 @@ mod tests {
             assert_eq!(immutable_attributes.link_count.unwrap(), 2);
             close_file_checked(tmpfile).await;
         }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes_persists() {
+        const FILE: &str = "foo";
+        let mtime = Some(Timestamp::now().as_nanos());
+        let atime = Some(Timestamp::now().as_nanos());
+        let mode = Some(111);
+
+        let device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let file = open_file_checked(
+                &root,
+                FILE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            file.update_attributes(&fio::MutableNodeAttributes {
+                modification_time: mtime,
+                access_time: atime,
+                mode: Some(111),
+                ..Default::default()
+            })
+            .await
+            .expect("update_attributes FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+            // Calling close should flush the node attributes to the device.
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            FILE,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &fio::Options::default(),
+        )
+        .await;
+
+        let (mutable_attributes, _immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::MODIFICATION_TIME
+                    | fio::NodeAttributesQuery::ACCESS_TIME
+                    | fio::NodeAttributesQuery::MODE,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+        assert_eq!(mutable_attributes.modification_time, mtime);
+        assert_eq!(mutable_attributes.access_time, atime);
+        assert_eq!(mutable_attributes.mode, mode);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_atime_from_pending_access_time_update_request() {
+        const FILE: &str = "foo";
+
+        let (device, expected_atime, expected_ctime) = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let file = open_file_checked(
+                &root,
+                FILE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+                &fio::Options::default(),
+            )
+            .await;
+
+            let (mutable_attributes, immutable_attributes) = file
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            let initial_ctime = immutable_attributes.change_time;
+            let initial_atime = mutable_attributes.access_time;
+            // When creating a file, ctime, mtime, and atime are all updated to the current time.
+            assert_eq!(initial_atime, initial_ctime);
+            assert_eq!(initial_atime, mutable_attributes.modification_time);
+
+            // Client manages atime and they signal to Fxfs that a file access has occurred and it
+            // may require an access time update. They do so by querying with
+            // `fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE`.
+            let (mutable_attributes, immutable_attributes) = file
+                .get_attributes(
+                    fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be updated as atime <= ctime (or mtime)
+            assert!(initial_atime < mutable_attributes.access_time);
+            let updated_atime = mutable_attributes.access_time;
+            // Calling get_attributes with PENDING_ACCESS_TIME_UPDATE will trigger an update of
+            // object attributes if access_time needs to be updated. Check that ctime isn't updated.
+            assert_eq!(initial_ctime, immutable_attributes.change_time);
+
+            let (mutable_attributes, _) = file
+                .get_attributes(
+                    fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+                )
+                .await
+                .expect("update_attributes FIDL call failed")
+                .map_err(zx::ok)
+                .expect("get_attributes failed");
+            // atime will be not be updated as atime > ctime (or mtime)
+            assert_eq!(updated_atime, mutable_attributes.access_time);
+
+            (fixture.close().await, mutable_attributes.access_time, initial_ctime)
+        };
+
+        let fixture = TestFixture::open(
+            device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            FILE,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &fio::Options::default(),
+        )
+        .await;
+
+        // Make sure that the pending atime update persisted.
+        let (mutable_attributes, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CHANGE_TIME | fio::NodeAttributesQuery::ACCESS_TIME,
+            )
+            .await
+            .expect("update_attributesFIDL call failed")
+            .map_err(zx::ok)
+            .expect("get_attributes failed");
+
+        assert_eq!(immutable_attributes.change_time, expected_ctime);
+        assert_eq!(mutable_attributes.access_time, expected_atime);
         fixture.close().await;
     }
 }

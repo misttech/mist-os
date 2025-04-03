@@ -53,7 +53,7 @@ class Bits final {
   constexpr inline void operator&=(const Bits& other);
   constexpr inline void operator^=(const Bits& other);
   constexpr inline Bits unknown_bits() const {
-    return *this & Bits(~kMask.value_);
+    return *this & Bits(static_cast<uint32_t>(~kMask.value_));
   }
   constexpr inline bool has_unknown_bits() const { return static_cast<bool>(unknown_bits()); }
 

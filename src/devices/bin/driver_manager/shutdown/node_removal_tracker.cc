@@ -13,17 +13,36 @@ namespace driver_manager {
 
 namespace {
 
-zx::duration kRemovalTimeoutDuration = zx::sec(30);
+zx::duration kRemovalTimeoutDuration = zx::sec(15);
 
+const char* GetNodeStateDescription(NodeState state) {
+  switch (state) {
+    case NodeState::kWaitingOnDriverBind:
+      return "waiting for driver to finish binding";
+    case NodeState::kRunning:
+      return "in normal running state";
+    case NodeState::kPrestop:
+      return "in running state, but flagged for removal soon.";
+    case NodeState::kWaitingOnChildren:
+      return "waiting for children to complete shutdown";
+    case NodeState::kWaitingOnDriver:
+      return "waiting for driver's Stop() function and destructor finish running";
+    case NodeState::kWaitingOnDriverComponent:
+      return "waiting for the driver component to shutdown";
+    case NodeState::kStopped:
+      return "node shutdown is completed";
+  }
 }
 
-NodeId NodeRemovalTracker::RegisterNode(Node node) {
-  if (node.collection == Collection::kPackage) {
+}  // namespace
+
+NodeId NodeRemovalTracker::RegisterNode(NodeInfo info) {
+  if (info.collection == Collection::kPackage) {
     remaining_pkg_nodes_.emplace(next_node_id_);
   } else {
     remaining_non_pkg_nodes_.emplace(next_node_id_);
   }
-  nodes_[next_node_id_] = node;
+  nodes_[next_node_id_] = info;
   return next_node_id_++;
 }
 
@@ -56,11 +75,11 @@ void NodeRemovalTracker::OnRemovalTimeout() {
   LOGF(INFO, "Removal hanging, nodes remaining: %zu pkg, %zu pkg+boot", remaining_pkg_node_count(),
        remaining_node_count());
   for (auto& [id, node] : nodes_) {
-    if (node.state == NodeState::kStopped) {
+    if (node.state == NodeState::kStopped || node.state == NodeState::kPrestop) {
       continue;
     }
-    LOGF(INFO, "  Node '%s' in state %s", node.name.c_str(),
-         ShutdownHelper::NodeStateAsString(node.state));
+    LOGF(INFO, "  '%s' ('%s'): %s", node.name.c_str(), node.driver_url.c_str(),
+         GetNodeStateDescription(node.state));
   }
   handle_timeout_task_.PostDelayed(dispatcher_, kRemovalTimeoutDuration);
 }

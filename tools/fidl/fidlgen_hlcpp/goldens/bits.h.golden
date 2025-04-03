@@ -166,7 +166,7 @@ class FlexibleBits final {
   constexpr inline void operator&=(const FlexibleBits& other);
   constexpr inline void operator^=(const FlexibleBits& other);
   constexpr inline FlexibleBits unknown_bits() const {
-    return *this & FlexibleBits(~kMask.value_);
+    return *this & FlexibleBits(static_cast<uint64_t>(~kMask.value_));
   }
   constexpr inline bool has_unknown_bits() const { return static_cast<bool>(unknown_bits()); }
 
@@ -260,7 +260,7 @@ class EmptyBits final {
   constexpr inline void operator&=(const EmptyBits& other);
   constexpr inline void operator^=(const EmptyBits& other);
   constexpr inline EmptyBits unknown_bits() const {
-    return *this & EmptyBits(~kMask.value_);
+    return *this & EmptyBits(static_cast<uint32_t>(~kMask.value_));
   }
   constexpr inline bool has_unknown_bits() const { return static_cast<bool>(unknown_bits()); }
 

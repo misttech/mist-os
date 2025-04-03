@@ -38,7 +38,22 @@ static int send_kernel_debug_command(const char* command, size_t length) {
 
   auto result = fidl::WireSyncClient(std::move(*client_end))
                     ->SendDebugCommand(fidl::StringView::FromExternal(command, length));
-  if (result.status() != ZX_OK || result->status != ZX_OK) {
+  const zx_status_t fidl_status = result.status();
+  if (fidl_status != ZX_OK) {
+    fprintf(stderr,
+            "error: unable to send kernel debug command (%s), is kernel debugging disabled?\n",
+            zx_status_get_string(fidl_status));
+    return -1;
+  }
+
+  // We got a reply.
+  const zx_status_t command_status = result->status;
+  if (command_status != ZX_OK) {
+    // If the command status was ZX_ERR_NOT_SUPPORTED, then the kernel probably has debugging
+    // syscalls disabled.
+    const char* hint =
+        (command_status == ZX_ERR_NOT_SUPPORTED) ? ", is kernel debugging disabled?" : "";
+    fprintf(stderr, "error: %s%s\n", zx_status_get_string(command_status), hint);
     return -1;
   }
 
@@ -233,10 +248,6 @@ int zxc_k(int argc, char** argv) {
   }
   command_length = command_end - buffer;
 
-  int send_result = send_kernel_debug_command(buffer, command_length);
-  if (send_result != 0) {
-    fprintf(stderr, "Unable to send kernel debug command, is kernel debugging disabled?\n");
-  }
-  return send_result;
+  return send_kernel_debug_command(buffer, command_length);
 }
 __END_CDECLS

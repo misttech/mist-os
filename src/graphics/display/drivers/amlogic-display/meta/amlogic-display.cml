@@ -13,6 +13,7 @@
         bind: "meta/bind/amlogic-display.bindbc",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.graphics.display.drivers.amlogic-display.vsync" ],
     },
     use: [
         { protocol: "fuchsia.scheduler.RoleManager" },

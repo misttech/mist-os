@@ -44,6 +44,14 @@
       "short": null,
       "description": "return a non-zero exit code if no matching devices are found.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--unbound",
+      "short": "u",
+      "description": "list only unbound nodes.",
+      "hidden": false
     }
   ],
   "notes": [],

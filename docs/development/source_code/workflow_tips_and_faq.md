@@ -295,7 +295,7 @@ combination you pick, we just need to start building Zircon.
 
 ```shell
 # We start with bringup, because it's small, but it doesn't matter which you start with:
-$ fx --dir out.bringup.x64 set bringup.x64
+$ fx --dir out/bringup.x64 set bringup.x64
 $ fx --dir out/bringup.x64 build
 ```
 

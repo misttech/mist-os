@@ -57,6 +57,10 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 set -e
 shopt -s nullglob
 
+# Set an envrionment variable so that child processes can know they were invoked (directly or
+# indirectly) by fx multi. For example, build metrics need this information.
+export FUCHSIA_FX_MULTI_RUN=1
+
 readonly MULTI_LIST_FILE="${FUCHSIA_DIR}/.fx-multi-list"
 readonly MULTI_SPEC_DIRS=(
   "${FUCHSIA_DIR}/tools/devshell/lib/multi-specs"

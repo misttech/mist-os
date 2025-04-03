@@ -4,7 +4,7 @@
 
 from . import _import
 from ._async_socket import AsyncSocket
-from ._construct import construct_response_object
+from ._construct import Unsupported, construct_response_object
 from ._fidl_common import (
     DomainError,
     EpitaphError,
@@ -24,4 +24,5 @@ __all__ = [
     "StopEventHandler",
     "StopServer",
     "construct_response_object",
+    "Unsupported",
 ]

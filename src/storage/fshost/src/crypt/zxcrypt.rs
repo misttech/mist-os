@@ -119,6 +119,10 @@ impl Device for ZxcryptDevice {
         self.inner_device.get_block_info().await
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     fn is_nand(&self) -> bool {
         self.parent_is_nand
     }
@@ -133,6 +137,10 @@ impl Device for ZxcryptDevice {
 
     fn path(&self) -> &str {
         self.inner_device.path()
+    }
+
+    fn source(&self) -> &str {
+        "zxcrypt"
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {

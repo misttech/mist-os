@@ -270,6 +270,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
                                           VkFormat format, VkImageUsageFlags usage,
                                           VkSwapchainCreateFlagsKHR swapchain_flags,
                                           VkExtent2D extent, uint32_t image_count,
+                                          VkCompositeAlphaFlagBitsKHR alpha_flags,
                                           const VkAllocationCallbacks* pAllocator,
                                           std::vector<ImageInfo>* image_info_out) {
   // To create BufferCollection, the image must have a valid format.

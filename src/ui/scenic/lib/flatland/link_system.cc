@@ -8,6 +8,7 @@
 #include <lib/trace/event.h>
 
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
+#include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/task_utils.h"
 
 #include <glm/gtc/matrix_access.hpp>

@@ -187,6 +187,10 @@ class BazelRepositoryAttr(object):
     def name(self) -> str:
         return self._name
 
+    @property
+    def visibility_templates(self) -> T.Dict[str, str]:
+        return {}
+
 
 class BazelRepositoryContext(object):
     """A Python object that mimics a Starlark repository_ctx at runtime."""
@@ -527,7 +531,6 @@ def main() -> int:
         generate_sdk_repository(
             runtime,
             manifests,
-            bool(args.use_rules_fuchsia),
         )
 
         if args.depfile:

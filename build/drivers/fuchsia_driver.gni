@@ -130,11 +130,13 @@ template("_fuchsia_driver") {
 
     deps += [ ":$check_target" ]
 
+    if (!defined(assert_no_deps)) {
+      assert_no_deps = []
+    }
+    assert_no_deps += [ "//src/devices/bin/driver_runtime" ]
+
     # If no syslog backend is found, ensure we have not included the syslog frontend.
     if (!has_syslog_backend) {
-      if (!defined(assert_no_deps)) {
-        assert_no_deps = []
-      }
       assert_no_deps += [ "//sdk/lib/syslog/cpp" ]
     }
 

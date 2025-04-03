@@ -293,19 +293,30 @@ impl<'a, T: AsRef<[u8]> + ?Sized>
                 let mut next_hops = vec![];
                 let mut buf = payload;
                 loop {
-                    let nh_buf = RouteNextHopBuffer::new_checked(&buf).map_err(|error| {
-                        RouteError::InvalidValue { kind: "RTA_MULTIPATH", error }
-                    })?;
-                    let len = nh_buf.length() as usize;
-                    let nh = RouteNextHop::parse_with_param(
-                        &nh_buf,
-                        (address_family, route_type, encap_type),
-                    )?;
-                    next_hops.push(nh);
-                    if buf.len() == len {
-                        break;
-                    }
-                    buf = &buf[len..];
+                    match RouteNextHopBuffer::new_checked(&buf) {
+                        Ok(nh_buf) => {
+                            let len = nh_buf.length() as usize;
+                            let nh = RouteNextHop::parse_with_param(
+                                &nh_buf,
+                                (address_family, route_type, encap_type),
+                            )?;
+                            next_hops.push(nh);
+                            if buf.len() == len {
+                                break;
+                            }
+                            buf = &buf[len..];
+                        }
+                        Err(e) => {
+                            // This is a Fuchsia-only change to the Netlink logic. In the
+                            // upstream rust-netlink library, they treat an invalid nexthop
+                            // configuration as an error, and promptly fail. Starnix instead
+                            // would prefer to silently discard these, to more closely match
+                            // Linux behavior. See b/387579405 for more context, and the upstream
+                            // commit: https://github.com/rust-netlink/netlink-packet-route/pull/153
+                            log::error!("Invalid nexthop configuration, {}", e);
+                            break;
+                        }
+                    };
                 }
                 Self::MultiPath(next_hops)
             }

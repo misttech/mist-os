@@ -9,6 +9,7 @@
 #include <lib/fdio/fd.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace metadata_test {
 
@@ -22,25 +23,24 @@ class MetadataTest : public gtest::TestLoopFixture {
 
     // Start DriverTestRealm.
     zx::result result = realm_->component().Connect<fuchsia_driver_test::Realm>();
-    ASSERT_EQ(result.status_value(), ZX_OK);
+    ASSERT_OK(result);
     fidl::SyncClient<fuchsia_driver_test::Realm> driver_test_realm{std::move(result.value())};
     fidl::Result start_result = driver_test_realm->Start(
         fuchsia_driver_test::RealmArgs{{.root_driver = "fuchsia-boot:///dtr#meta/sender.cm"}});
-    ASSERT_TRUE(start_result.is_ok()) << start_result.error_value();
+    ASSERT_OK(start_result);
 
     // Open /dev directory.
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    ASSERT_EQ(realm_->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
-                                                  server_end.TakeChannel()),
-              ZX_OK);
-    ASSERT_EQ(fdio_fd_create(client_end.TakeChannel().release(), &dev_fd_), ZX_OK);
+    ASSERT_OK(realm_->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                                  server_end.TakeChannel()));
+    ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), &dev_fd_));
   }
 
  protected:
   template <typename FidlProtocol>
   fidl::SyncClient<FidlProtocol> ConnectToNode(std::string_view path) const {
     zx::result channel = device_watcher::RecursiveWaitForFile(dev_fd_, std::string{path}.c_str());
-    EXPECT_EQ(channel.status_value(), ZX_OK) << path;
+    EXPECT_OK(channel) << path;
     return fidl::SyncClient{fidl::ClientEnd<FidlProtocol>{std::move(channel.value())}};
   }
 
@@ -61,16 +61,12 @@ TEST_F(MetadataTest, TransferMetadata) {
   // (the `forwarder` driver).
   {
     fuchsia_examples_metadata::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = sender->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_OK(sender->SetMetadata(std::move(metadata)));
   }
 
   // Make the `forwarder` driver retrieve metadata from its parent driver (the
   // `sender` driver) and offer it to its child driver (the `retriever` driver).
-  {
-    fidl::Result result = forwarder->ForwardMetadata();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
-  }
+  ASSERT_OK(forwarder->ForwardMetadata());
 
   // Retrieve the metadata from `retriever`'s parent driver, `forwarder`.
   // This verifies that:
@@ -79,7 +75,7 @@ TEST_F(MetadataTest, TransferMetadata) {
   //   * The `retriever` driver retrieved the correct metadata.
   {
     fidl::Result result = retriever->GetMetadata();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_OK(result);
     auto metadata = std::move(result.value().metadata());
     ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
   }

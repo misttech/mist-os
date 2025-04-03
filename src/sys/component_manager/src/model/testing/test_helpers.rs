@@ -8,8 +8,6 @@ use crate::framework::realm::Realm;
 use crate::model::component::instance::InstanceState;
 use crate::model::component::{ComponentInstance, StartReason};
 use crate::model::events::registry::EventSubscription;
-use crate::model::events::source::EventSource;
-use crate::model::events::stream::EventStream;
 use crate::model::model::Model;
 use crate::model::testing::mocks::{ControlMessage, MockResolver, MockRunner};
 use crate::model::testing::test_hook::TestHook;
@@ -21,12 +19,12 @@ use cm_rust::{
     ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
 };
 use cm_rust_testing::*;
-use cm_types::{Name, Url};
+use cm_types::Url;
 use fidl::endpoints;
 use futures::channel::mpsc::Receiver;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
-use hooks::HooksRegistration;
+use hooks::{EventType, HooksRegistration};
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -456,22 +454,61 @@ impl ActionsTest {
             .await;
         res.expect("failed to create child")
     }
+
+    pub async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+        let builtin_environment_guard = self.builtin_environment.lock().await;
+        new_event_stream(&*builtin_environment_guard, events).await
+    }
+}
+
+/// Pulls events from the stream until the number of returned events is at least n.
+pub async fn get_n_events(
+    proxy: &fcomponent::EventStreamProxy,
+    n: usize,
+) -> Vec<fcomponent::Event> {
+    let mut events = vec![];
+    while events.len() < n {
+        let mut next_events = proxy.get_next().await.unwrap();
+        events.append(&mut next_events);
+    }
+    events
+}
+
+pub fn assert_event_type_and_moniker(
+    event: &fcomponent::Event,
+    event_type: fcomponent::EventType,
+    moniker: impl std::string::ToString,
+) {
+    let fcomponent::Event {
+        header:
+            Some(fcomponent::EventHeader {
+                event_type: Some(discovered_event_type),
+                moniker: Some(discovered_moniker),
+                ..
+            }),
+        ..
+    } = event
+    else {
+        panic!("malformed event discovered: {:?}", event);
+    };
+    assert_eq!(&event_type, discovered_event_type);
+    let moniker = moniker.to_string();
+    assert_eq!(&moniker, discovered_moniker);
 }
 
 /// Create a new event stream for the provided environment.
 pub async fn new_event_stream(
-    builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
-    events: Vec<Name>,
-) -> (EventSource, EventStream) {
-    let mut event_source =
-        builtin_environment.as_ref().lock().await.event_source_factory.create_for_above_root();
+    builtin_environment: &BuiltinEnvironment,
+    events: Vec<EventType>,
+) -> fcomponent::EventStreamProxy {
+    let mut event_source = builtin_environment.event_source_factory.create_for_above_root();
     let event_stream = event_source
         .subscribe(
             events
                 .into_iter()
                 .map(|event| EventSubscription {
                     event_name: UseEventStreamDecl {
-                        source_name: event,
+                        source_name: event.into(),
                         source: UseSource::Parent,
                         scope: None,
                         target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
@@ -483,7 +520,16 @@ pub async fn new_event_stream(
         )
         .await
         .expect("subscribe to event stream");
-    (event_source, event_stream)
+    let (proxy, fidl_stream) =
+        fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>();
+    // It's obviously not ideal to detach this, but the need to create an extra task here goes away
+    // in the next commit.
+    fuchsia_async::Task::spawn(async move {
+        let _event_source = event_source;
+        crate::model::events::serve::serve_event_stream(event_stream, fidl_stream).await;
+    })
+    .detach();
+    proxy
 }
 
 /// Create a test ConfigDecl and an associated ConfigValuesData and ConfigChecksum.

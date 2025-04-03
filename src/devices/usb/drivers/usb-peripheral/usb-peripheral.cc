@@ -653,6 +653,11 @@ zx::result<fbl::RefPtr<UsbFunction>> UsbPeripheral::AddFunction(UsbConfiguration
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
+  if (zx::result result = function->Init(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize function: %s", result.status_string());
+    return result.take_error();
+  }
+
   config.functions.push_back(function);
   return zx::ok(std::move(function));
 }

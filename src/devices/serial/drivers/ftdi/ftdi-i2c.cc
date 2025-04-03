@@ -9,7 +9,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -104,19 +103,6 @@ zx_status_t FtdiI2c::Bind() {
       .channels = std::move(i2c_channels),
       .bus_id = 0,
   }};
-  fit::result persisted = fidl::Persist(metadata);
-  if (!persisted.is_ok()) {
-    zxlogf(ERROR, "encoding device metadata failed: %s\n",
-           persisted.error_value().FormatDescription().c_str());
-    return ZX_ERR_INTERNAL;
-  }
-  std::vector<uint8_t>& bytes = persisted.value();
-  // TODO(b/373918767): Don't add DEVICE_METADATA_I2C_CHANNELS once no longer retrieved.
-  status = DdkAddMetadata(DEVICE_METADATA_I2C_CHANNELS, bytes.data(), bytes.size());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add metadata: %s", zx_status_get_string(status));
-    return status;
-  }
 
   status = metadata_server_.SetMetadata(metadata);
   if (status != ZX_OK) {

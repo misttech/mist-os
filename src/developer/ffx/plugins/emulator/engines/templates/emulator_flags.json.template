@@ -27,13 +27,13 @@
         "-smp",
         {{! These should probably be predicated on the host CPU. }}
         {{#if (eq device.cpu.architecture "x64")}}
-	    {{#if (eq device.cpu.count 1)}}
-	        "{{device.cpu.count}}",
-	    {{else}}
+            {{#if (eq device.cpu.count 1)}}
+                "{{device.cpu.count}}",
+            {{else}}
                 "{{device.cpu.count}},threads=2",
-	    {{/if}}
+            {{/if}}
         {{else}}
-          "{{device.cpu.count}}",
+            "{{device.cpu.count}}",
         {{/if}}
         {{#if guest.disk_image}}
             {{#if (eq device.cpu.architecture "riscv64")}}
@@ -72,9 +72,9 @@
         "-machine",
         {{#if (eq device.cpu.architecture "arm64")}}
             {{#if (eq host.architecture "arm64")}}
-                "virt-2.12,gic-version=host",
+                "virt-9.2,gic-version=host,highmem-ecam=off",
             {{else}}
-                "virt-2.12,virtualization=true", "-cpu", "max",
+                "virt-9.2,virtualization=true,highmem-ecam=off", "-cpu", "max",
             {{/if}}
         {{/if}}
         {{#if (eq device.cpu.architecture "x64")}}
@@ -112,7 +112,6 @@
             {{#if (eq device.cpu.architecture "x64")}}
                 "Haswell,+smap,-check,-fsgsbase",
             {{/if}}
-
             {{#if (eq device.cpu.architecture "riscv64")}}
                 "rv64,svpbmt=true,v=true,vext_spec=v1.0",
             {{/if}}
@@ -212,13 +211,15 @@
             "-object", "rng-random,filename=/dev/urandom,id=rng0",
             "-device", "virtio-rng-device,rng=rng0"
         {{/if}}
-        {{#if device.vsock.enabled}}
-            ,"-device",
-            "vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={{device.vsock.cid}}"
+        {{#if (ne runtime.engine_type "femu")}}
+            {{#if device.vsock.enabled}}
+                ,"-device",
+                "vhost-vsock-pci,id=vhost-vsock-pci0,guest-cid={{device.vsock.cid}}"
+            {{/if}}
         {{/if}}
-         {{#each runtime.addl_emu_args}}
-          ,"{{this}}"
-         {{/each}}
+        {{#each runtime.addl_emu_args}}
+         ,"{{this}}"
+        {{/each}}
     ],
     "features": [
         {{! TODO(https://fxbug.dev/322029860): The following feature flags are

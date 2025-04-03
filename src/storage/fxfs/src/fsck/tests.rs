@@ -2083,6 +2083,97 @@ async fn test_missing_encryption_keys() {
 }
 
 #[fuchsia::test]
+async fn test_encrypted_symlink_has_missing_keys() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, symlink_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", NO_OWNER, Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        crypt.add_wrapping_key(2, [1; 32]);
+        handle
+            .update_attributes(
+                transaction,
+                Some(&fio::MutableNodeAttributes {
+                    wrapping_key_id: Some(u128::to_le_bytes(2)),
+                    ..Default::default()
+                }),
+                0,
+                None,
+            )
+            .await
+            .expect("update attributes failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let symlink_id = handle
+            .create_symlink(&mut transaction, b"target", "child_symlink")
+            .await
+            .expect("create_symlink failed");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| match m.mutation {
+                Mutation::ObjectStore(ObjectStoreMutation {
+                    item:
+                        Item { key: ObjectKey { object_id, data: ObjectKeyData::Keys { .. } }, .. },
+                    ..
+                }) if object_id == symlink_id => true,
+                _ => false,
+            })
+            .expect("find failed");
+
+        let mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+        transaction.commit().await.expect("commit failed");
+
+        (store_id, symlink_id)
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::MissingKey(sid, oid, 1)) ]
+        if *sid == store_id && *oid == symlink_id);
+}
+
+#[fuchsia::test]
 async fn test_encrypted_directory_has_unencrypted_child() {
     let mut test = FsckTest::new().await;
 

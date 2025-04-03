@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_archivist_test::{LogPuppetLogRequest, PuppetProxy};
-use fidl_fuchsia_diagnostics::Severity;
+use fidl_fuchsia_diagnostics_types::Severity;
 
 pub(crate) type LogMessage = (Severity, &'static str);
 

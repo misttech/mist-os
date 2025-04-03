@@ -132,10 +132,10 @@ async fn wipe_storage_deletes_starnix_volume() {
     let (_exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     volume_provider
-        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .create(crypt.into_client_end().unwrap(), exposed_dir_server)
         .await
         .expect("fidl transport error")
-        .expect("mount failed");
+        .expect("create failed");
 
     let disk = fixture.tear_down().await.unwrap();
 

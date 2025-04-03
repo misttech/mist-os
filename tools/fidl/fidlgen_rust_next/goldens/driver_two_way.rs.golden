@@ -21,7 +21,7 @@ impl ::fidl_next::Encodable for TwoWayAddRequest {
     type Encoded = WireTwoWayAddRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for TwoWayAddRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for TwoWayAddRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -29,14 +29,14 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 addend1,
                 addend2,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.addend1, encoder, addend1)?;
@@ -51,7 +51,7 @@ impl ::fidl_next::EncodableOption for Box<TwoWayAddRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireTwoWayAddRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     TwoWayAddRequest: ::fidl_next::Encode<___E>,
@@ -60,13 +60,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -91,13 +91,18 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddRequest> for TwoWayAddRequest {
     }
 }
 
-/// The wire type corersponding to [`TwoWayAddRequest`].
+/// The wire type corresponding to [`TwoWayAddRequest`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddRequest {
     pub addend1: ::fidl_next::WireU16,
 
     pub addend2: ::fidl_next::WireU16,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddRequest
@@ -140,7 +145,7 @@ impl ::fidl_next::Encodable for TwoWayAddResponse {
     type Encoded = WireTwoWayAddResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for TwoWayAddResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for TwoWayAddResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -148,13 +153,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 sum,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.sum, encoder, sum)?;
@@ -167,7 +172,7 @@ impl ::fidl_next::EncodableOption for Box<TwoWayAddResponse> {
     type EncodedOption = ::fidl_next::WireBox<WireTwoWayAddResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     TwoWayAddResponse: ::fidl_next::Encode<___E>,
@@ -176,13 +181,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -202,11 +207,16 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
     }
 }
 
-/// The wire type corersponding to [`TwoWayAddResponse`].
+/// The wire type corresponding to [`TwoWayAddResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddResponse {
     pub sum: ::fidl_next::WireU16,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireTwoWayAddResponse {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddResponse
@@ -235,6 +245,16 @@ where
 pub struct TwoWay;
 
 pub mod two_way {
+    pub mod prelude {
+        pub use crate::{
+            two_way, TwoWay, TwoWayClientHandler, TwoWayClientSender, TwoWayServerHandler,
+            TwoWayServerSender,
+        };
+
+        pub use crate::TwoWayAddRequest;
+
+        pub use crate::TwoWayAddResponse;
+    }
 
     pub struct Add;
 
@@ -302,7 +322,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: TwoWayClientHandler<___T>,
 
-    crate::WireTwoWayAddResponse: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <two_way::Add as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -386,17 +407,44 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{TwoWayClientSender, TwoWayServerSender};
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireTwoWayAddRequest>
+        for ::fidl_test_drivertwoway::TwoWayAddRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTwoWayAddRequest) -> Self {
+            Self {
+                addend1: ::fidl_next::TakeFrom::take_from(&from.addend1),
+
+                addend2: ::fidl_next::TakeFrom::take_from(&from.addend2),
+            }
+        }
+    }
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::WireTwoWayAddResponse>
+        for ::fidl_test_drivertwoway::TwoWayAddResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireTwoWayAddResponse) -> Self {
+            Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `TwoWay`
     /// protocol.
     pub type TwoWayProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::TwoWay>;
+
+    #[cfg(feature = "driver")]
+    impl ::fidl_next::TakeFrom<crate::TwoWay> for ::fidl_test_drivertwoway::TwoWayMarker {
+        #[inline]
+        fn take_from(from: &crate::TwoWay) -> Self {
+            Self
+        }
+    }
 }

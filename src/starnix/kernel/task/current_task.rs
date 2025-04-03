@@ -15,9 +15,9 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, RobustList, RobustListHead, RobustListHeadPtr, SeccompFilter,
-    SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState,
-    Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
+    PtraceOptions, RobustListHeadPtr, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle,
+    SeccompState, SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent,
+    Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -54,6 +54,7 @@ use starnix_uapi::{
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
+use std::collections::VecDeque;
 use std::ffi::CString;
 use std::fmt;
 use std::marker::PhantomData;
@@ -190,6 +191,12 @@ impl ThreadState {
 
     pub fn set_user_register(&mut self, offset: usize, value: usize) -> Result<(), Errno> {
         self.registers.apply_user_register(offset, &mut |register| *register = value as u64)
+    }
+}
+
+impl ArchSpecific for ThreadState {
+    fn is_arch32(&self) -> bool {
+        self.arch_width.is_arch32()
     }
 }
 
@@ -1154,7 +1161,7 @@ impl CurrentTask {
         // prevents conflicts with fact that SECCOMP_FILTER_FLAG_NEW_LISTENER
         // makes seccomp return an fd.
         if flags & SECCOMP_FILTER_FLAG_TSYNC_ESRCH != 0 {
-            Err(errno!(ESRCH))
+            error!(ESRCH)
         } else {
             Ok(id.into())
         }
@@ -1172,7 +1179,7 @@ impl CurrentTask {
             // No one has called set_robust_list.
             return;
         }
-        let robust_list_res = RobustListHead::read(self, task_state.robust_list_head);
+        let robust_list_res = self.read_multi_arch_object(task_state.robust_list_head);
 
         let head = if let Ok(head) = robust_list_res {
             head
@@ -1185,7 +1192,7 @@ impl CurrentTask {
         let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
         while curr_ptr.addr() != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
-            let curr_ref = RobustList::read(self, curr_ptr);
+            let curr_ref = self.read_multi_arch_object(curr_ptr);
 
             let curr = if let Ok(curr) = curr_ref {
                 curr
@@ -1527,6 +1534,7 @@ impl CurrentTask {
                 Arc::clone(&kernel.default_abstract_vsock_namespace),
                 Some(SIGCHLD),
                 Default::default(),
+                Default::default(),
                 None,
                 Default::default(),
                 kernel.root_uts_ns.clone(),
@@ -1595,6 +1603,7 @@ impl CurrentTask {
             Arc::clone(&system_task.abstract_socket_namespace),
             Arc::clone(&system_task.abstract_vsock_namespace),
             None,
+            Default::default(),
             Default::default(),
             None,
             scheduler_policy,
@@ -1674,6 +1683,7 @@ impl CurrentTask {
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
         let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
         let clone_newuts = flags & (CLONE_NEWUTS as u64) != 0;
+        let clone_into_cgroup = flags & CLONE_INTO_CGROUP != 0;
 
         if clone_ptrace {
             track_stub!(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
@@ -1681,6 +1691,10 @@ impl CurrentTask {
 
         if clone_sysvsem {
             track_stub!(TODO("https://fxbug.dev/322875185"), "CLONE_SYSVSEM");
+        }
+
+        if clone_into_cgroup {
+            track_stub!(TODO("https://fxbug.dev/403612570"), "CLONE_INTO_CGROUP");
         }
 
         if clone_sighand && !clone_vm {
@@ -1728,6 +1742,17 @@ impl CurrentTask {
         let files = if clone_files { self.files.clone() } else { self.files.fork() };
 
         let kernel = self.kernel();
+
+        // Lock the cgroup process hierarchy so that the parent process cannot move to a different
+        // cgroup while a new task or thread_group is created. This may be unnecessary if
+        // CLONE_INTO_CGROUP is implemented and passed in.
+        let mut cgroup2_pid_table = kernel.cgroups.lock_cgroup2_pid_table();
+        // Create a `KernelSignal::Freeze` to put onto the new task, if the cgroup is frozen.
+        let child_kernel_signals = cgroup2_pid_table
+            .maybe_create_freeze_signal(self.get_pid())
+            .into_iter()
+            .collect::<VecDeque<_>>();
+
         let mut pids = kernel.pids.write();
 
         let pid;
@@ -1824,7 +1849,7 @@ impl CurrentTask {
 
                 task_info.thread_group.write().is_sharing = is_sharing;
 
-                kernel.cgroups.cgroup2.inherit_cgroup(
+                cgroup2_pid_table.inherit_cgroup(
                     self.get_pid(),
                     pid,
                     &OwnedRef::temp(&task_info.thread_group),
@@ -1850,6 +1875,7 @@ impl CurrentTask {
             self.abstract_vsock_namespace.clone(),
             child_exit_signal,
             child_signal_mask,
+            child_kernel_signals,
             vfork_event,
             scheduler_policy,
             uts_ns,
@@ -2132,7 +2158,7 @@ impl CurrentTask {
 
 impl ArchSpecific for CurrentTask {
     fn is_arch32(&self) -> bool {
-        self.thread_state.arch_width.is_arch32()
+        self.thread_state.is_arch32()
     }
 }
 

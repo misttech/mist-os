@@ -128,9 +128,7 @@ func (*Service) DescribeDeprecated() io.NodeInfoDeprecated {
 }
 
 func (*Service) Representation() io.Representation {
-	var repr io.Representation
-	repr.SetConnector(io.ConnectorInfo{})
-	return repr
+	return io.Representation{}
 }
 
 func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
@@ -194,7 +192,7 @@ func (*Service) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
 	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+func (*Service) SetFlags(fidl.Context, io.Flags) (io.NodeSetFlagsResult, error) {
 	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -537,7 +535,7 @@ func (*directoryState) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
 	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+func (*directoryState) SetFlags(fidl.Context, io.Flags) (io.NodeSetFlagsResult, error) {
 	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -859,7 +857,7 @@ func (*fileState) GetFlags(fidl.Context) (io.NodeGetFlagsResult, error) {
 	return io.NodeGetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) SetFlags(fidl.Context) (io.NodeSetFlagsResult, error) {
+func (*fileState) SetFlags(fidl.Context, io.Flags) (io.NodeSetFlagsResult, error) {
 	return io.NodeSetFlagsResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 

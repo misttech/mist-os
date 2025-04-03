@@ -13,9 +13,9 @@ use fidl::endpoints::{Proxy, RequestStream};
 use fidl::Error;
 use fidl_fuchsia_io as fio;
 use fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream};
+use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
-use std::sync::Mutex;
 use zx_status::Status;
 
 async fn echo_server(
@@ -101,8 +101,8 @@ fn server_state_checking() {
         host(move |requests| {
             echo_server(
                 requests,
-                Some(on_message_tx.lock().unwrap().take().unwrap()),
-                Some(done_tx.lock().unwrap().take().unwrap()),
+                Some(on_message_tx.lock().take().unwrap()),
+                Some(done_tx.lock().take().unwrap()),
             )
         }),
         |node_proxy| {

@@ -27,6 +27,16 @@ impl Index for Protocol {
     }
 }
 
+impl Protocol {
+    pub fn transport(&self) -> Option<&str> {
+        self.attributes
+            .attributes
+            .get("transport")
+            .and_then(|attr| attr.args.get("value"))
+            .map(|arg| arg.value.value.as_str())
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProtocolOpenness {
@@ -45,18 +55,14 @@ pub struct ProtocolMethod {
     pub has_response: bool,
     #[expect(dead_code)]
     pub is_composed: bool,
-    #[expect(dead_code)]
     pub has_error: bool,
     pub kind: ProtocolMethodKind,
     pub maybe_request_payload: Option<Box<Type>>,
     pub maybe_response_payload: Option<Box<Type>>,
-    #[expect(dead_code)]
     pub maybe_response_success_type: Option<Box<Type>>,
-    #[expect(dead_code)]
-    pub maybe_response_error_type: Option<Box<Type>>,
+    pub maybe_response_err_type: Option<Box<Type>>,
     pub name: Ident,
     pub ordinal: u64,
-    #[expect(dead_code)]
     #[serde(rename = "strict")]
     pub is_strict: bool,
 }

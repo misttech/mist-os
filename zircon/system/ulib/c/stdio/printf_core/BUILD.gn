@@ -5,14 +5,31 @@
 import("../../libc.gni")
 
 llvm_libc_source_set("printf_core") {
-  public = [ "printf_main.h" ]
-  sources = [ "printf_main.cpp" ]
-  configs = [ ":printf-options" ]
+  visibility = [ "../*" ]
+  public = [
+    "printf_main.h",
+    "writer.h",
+  ]
+  public_configs = [ ":printf-options" ]
   functions = []
-  deps = [
-    ":converter",
-    ":parser",
-    ":writer",
+
+  # The implementation is entirely in headers, but they are all used only via
+  # the single printf_main.h header.
+  sources = [
+    "converter.h",
+    "core_structs.h",
+    "parser.h",
+  ]
+
+  # Each implementation pieces has its own tests.
+  test_sources = [
+    "converter_test.cpp",
+    "writer_test.cpp",
+
+    # TODO(https://fxbug.dev/42141211): This test code requires the fancier
+    # test machinery that we don't yet support since zxtest doesn't have the
+    # features.
+    #"parser_test.cpp",
   ]
 }
 
@@ -35,46 +52,19 @@ config("printf-options") {
   }
 }
 
-# These aren't really functions, but they follow the pattern of the actual libc
-# function implementations in each having a corresponding header file and test
-# file in the usual places.
+libc_source_set("wrapper") {
+  visibility = [ "//sdk/lib/ld/*" ]
 
-llvm_libc_source_set("converter") {
-  visibility = [ ":*" ]
-
-  functions = [ "converter" ]
-
-  configs = [ ":printf-options" ]
-
-  deps = [ ":writer" ]
-}
-
-llvm_libc_source_set("parser") {
-  visibility = [ ":*" ]
-
-  public = [ "parser.h" ]
-  public_configs = [ ":printf-options" ]
-
-  functions = []
-
-  # TODO(https://fxbug.dev/42141211): There are parser tests that can be built though
-  # there is no "parser" source file so the build machinery will have to be
-  # custom for those tests. But that test code requires the fancier test
-  # machinery that we don't yet support since zxtest doesn't have the features.
-}
-
-llvm_libc_source_set("writer") {
-  functions = [ "writer" ]
-  configs = [ ":printf-options" ]
-}
-
-source_set("wrapper") {
   public = [ "wrapper.h" ]
-  public_configs = [ ":printf-options" ]
+  public_configs = [ ":wrapper.config" ]
 
-  # The llvm-libc headers used by wrapper.h need defines and include_dirs as
-  # used for building libc itself.
-  public_configs += [ "../..:llvm-libc-public.config" ]
-
+  sources = [ "wrapper.cc" ]
+  configs = [ ":printf-options" ]
   deps = [ ":printf_core" ]
+}
+
+config("wrapper.config") {
+  visibility = [ ":*" ]
+  defines = [ "LIBC_NAMESPACE=$libc_namespace" ]
+  include_dirs = [ libc ]
 }

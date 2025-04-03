@@ -88,7 +88,16 @@ pub struct HashMap {
 }
 
 impl HashMap {
-    pub fn new(schema: &MapSchema) -> Result<Self, MapError> {
+    pub fn new(schema: &MapSchema, vmo: Option<zx::Vmo>) -> Result<Self, MapError> {
+        if schema.key_size == 0 || schema.max_entries == 0 {
+            return Err(MapError::InvalidParam);
+        }
+
+        if vmo.is_some() {
+            // Hash map sharing is not implemented yet.
+            return Err(MapError::Internal);
+        }
+
         let buffer_size = compute_map_storage_size(schema)? as usize;
         let data = new_pinned_buffer(buffer_size);
         Ok(Self {

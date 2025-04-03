@@ -39,6 +39,14 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+wlan_astro_env = {
+  dimensions = {
+    device_type = "Astro"
+    pool = "fuchsia.tests.connectivity"
+  }
+  tags = [ "antlion" ]
+}
+
 crosvm_env = {
   dimensions = {
     device_type = "crosvm"
@@ -208,6 +216,14 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+wlan_nelson_env = {
+  dimensions = {
+    device_type = "Nelson"
+    pool = "fuchsia.tests.connectivity"
+  }
+  tags = [ "antlion" ]
+}
+
 nuc7_env = {
   dimensions = {
     device_type = "Intel NUC Kit NUC7i5DNHE"
@@ -232,6 +248,14 @@ _all_named_fuchsia_envs += [
     env = nuc11_env
   },
 ]
+
+wlan_nuc11_env = {
+  dimensions = {
+    device_type = "Intel NUC Kit NUC11TNHv5"
+    pool = "fuchsia.tests.connectivity"
+  }
+  tags = [ "antlion" ]
+}
 
 qemu_env = {
   dimensions = {
@@ -265,6 +289,14 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+wlan_sherlock_env = {
+  dimensions = {
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.connectivity"
+  }
+  tags = [ "antlion" ]
+}
+
 vim3_env = {
   dimensions = {
     device_type = "Vim3"
@@ -276,6 +308,14 @@ _all_named_fuchsia_envs += [
     env = vim3_env
   },
 ]
+
+wlan_vim3_env = {
+  dimensions = {
+    device_type = "Vim3"
+    pool = "fuchsia.tests.connectivity"
+  }
+  tags = [ "antlion" ]
+}
 
 gce_env = {
   dimensions = {
@@ -385,6 +425,15 @@ lacewing_wlan_ap_envs = [
   wlan_sherlock_ap_env,
   wlan_nelson_ap_env,
   wlan_vim3_ap_env,
+]
+
+# Set of Display environments for few Antlion tests.
+wlan_with_display_envs = [
+  wlan_astro_env,
+  wlan_sherlock_env,
+  wlan_nelson_env,
+  wlan_nuc11_env,
+  wlan_vim3_env,
 ]
 
 basic_envs = []

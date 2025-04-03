@@ -5,8 +5,6 @@
 import("//build/python/python_library.gni")
 
 python_library("depfile") {
-  # TODO(b/366268742): Enable MyPy type checking
-  enable_mypy = false
   sources = [
     "__init__.py",
     "depfile.py",

@@ -11,7 +11,7 @@ rustc_library("utils") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
     "//src/lib/diagnostics/log/encoding/rust",
   ]

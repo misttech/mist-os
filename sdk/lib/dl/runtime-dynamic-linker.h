@@ -18,6 +18,7 @@
 
 namespace dl {
 
+using size_type = Elf::size_type;
 using DlIteratePhdrCallback = int(dl_phdr_info*, size_t, void*);
 
 enum OpenSymbolScope : int {
@@ -47,7 +48,6 @@ inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 class RuntimeDynamicLinker {
  public:
   using Soname = elfldltl::Soname<>;
-  using size_type = Elf::size_type;
 
   // Create a RuntimeDynamicLinker with the passed in passive `abi`. The caller
   // is required to pass an AllocChecker and check it to verify the
@@ -56,6 +56,8 @@ class RuntimeDynamicLinker {
                                                       fbl::AllocChecker& ac);
 
   constexpr const ModuleList& modules() const { return modules_; }
+
+  size_t max_static_tls_modid() const { return max_static_tls_modid_; }
 
   // Lookup a symbol from the given module, returning a pointer to it in memory,
   // or an error if not found (ie undefined symbol).
@@ -113,22 +115,28 @@ class RuntimeDynamicLinker {
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
-    LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_};
+    LinkingSession<Loader> linking_session{modules_, max_static_tls_modid_, max_tls_modid_};
 
     if (!linking_session.Link(diag, name, std::forward<RetrieveFile>(retrieve_file))) {
       return diag.take_error();
     }
 
     // Commit the linking session and its mapped modules.
-    auto pending_modules = std::move(linking_session).Commit();
+    LinkingResult result = std::move(linking_session).Commit();
+
+    // The max_tls_modid from the LinkingResult should be an updated counter
+    // of any new TLS modules that were loaded.
+    assert(result.max_tls_modid >= max_tls_modid_);
+    assert(result.max_tls_modid >= max_static_tls_modid_);
+    max_tls_modid_ = result.max_tls_modid;
 
     // Obtain a reference to the root module for the dlopen-ed file to return
     // back to the caller.
-    RuntimeModule& root_module = pending_modules.front();
+    RuntimeModule& root_module = result.loaded_modules.front();
 
     // After successful loading and relocation, append the new permanent modules
     // created by the linking session to the dynamic linker's module list.
-    AddNewModules(std::move(pending_modules));
+    AddNewModules(std::move(result.loaded_modules));
 
     // If RTLD_GLOBAL was passed, make the module and all of its dependencies
     // global. This is done after modules from the linking session have been
@@ -146,6 +154,15 @@ class RuntimeDynamicLinker {
   // a non-zero value. The result of the last callback function to run is
   // returned to the caller.
   int IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const;
+
+  // Allocate and initialize the thread's dynamic TLS blocks. This will iterate
+  // through all the currently loaded modules with dynamic TLS and populate this
+  // thread's _dl_tlsdesc_runtime_dynamic_blocks variable with their TLS data.
+  // This function will fail if allocation fails.
+  [[nodiscard]] fit::result<Error> PrepareTlsBlocksForThread(void* tp) const;
+
+  // The number of dynamic TLS modules that are loaded.
+  size_t DynamicTlsCount() const { return max_tls_modid_ - max_static_tls_modid_; }
 
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
@@ -174,6 +191,9 @@ class RuntimeDynamicLinker {
     return {.adds = loaded_, .subs = loaded_ - modules_.size()};
   }
 
+  // Return a pointer to the beginning of a module's static or dynamic TLS block.
+  void* TlsBlock(const RuntimeModule& module) const;
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   ModuleList modules_;
@@ -182,6 +202,12 @@ class RuntimeDynamicLinker {
   // creation and passed to LinkinSessions to be able to detect TLS modules
   // during relocation.
   size_type max_static_tls_modid_ = 0;
+
+  // The maximum TLS modid assigned to a module in modules_. This value
+  // describes the number of static and dynamic TLS modules that are currently
+  // loaded. This gets set to max_static_tls_modid_ when startup TLS modules are
+  // loaded and gets incremented when a new dynamic TLS module is dlopen-ed.
+  size_type max_tls_modid_ = 0;
 
   // This is incremented every time a module is loaded into the system. This
   // number only ever increases and includes startup modules.

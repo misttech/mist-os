@@ -28,6 +28,7 @@
         { protocol: "fuchsia.power.broker.Topology" },
         { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
     expose: [
         {

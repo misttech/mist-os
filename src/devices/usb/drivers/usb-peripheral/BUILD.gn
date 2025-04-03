@@ -20,44 +20,58 @@ driver_bind_rules("usb_peripheral_bind") {
   ]
 }
 
-fuchsia_cc_driver("usb-peripheral-driver") {
-  legacy = true
-  output_name = "usb-peripheral"
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
     "config-parser.cc",
+    "config-parser.h",
     "usb-dci-interface-server.cc",
+    "usb-dci-interface-server.h",
     "usb-function.cc",
+    "usb-function.h",
     "usb-peripheral.cc",
+    "usb-peripheral.h",
   ]
   deps = [
-    ":usb-peripheral-config",
-    ":usb_peripheral_bind",
-    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.descriptor:fuchsia.hardware.usb.descriptor_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.usb:fuchsia.usb_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
     "//src/devices/usb/lib/usb:peripheral",
-    "//src/devices/usb/lib/usb-monitor-util",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+  ]
+  public_deps = [
+    ":usb-peripheral-config",
+    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb-monitor-util",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+}
+
+fuchsia_cc_driver("usb-peripheral-driver") {
+  legacy = true
+  output_name = "usb-peripheral"
+  deps = [
+    ":common",
+    ":usb_peripheral_bind",
   ]
 }
 
@@ -86,48 +100,17 @@ fuchsia_driver_package("package") {
 }
 
 test("usb-peripheral-unittest-bin") {
-  sources = [
-    "config-parser.cc",
-    "usb-dci-interface-server.cc",
-    "usb-function.cc",
-    "usb-peripheral-test.cc",
-    "usb-peripheral.cc",
-  ]
+  sources = [ "usb-peripheral-test.cc" ]
   output_name = "usb-peripheral-unittest"
   deps = [
-    ":usb-peripheral-config",
-    ":usb_peripheral_bind",
-    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    ":common",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.descriptor:fuchsia.hardware.usb.descriptor_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.usb:fuchsia.usb_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
-    "//src/devices/usb/lib/usb:cdc",
-    "//src/devices/usb/lib/usb:peripheral",
-    "//src/devices/usb/lib/usb-monitor-util",
-    "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
-    "//src/lib/utf_conversion",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zxtest",
   ]
 }

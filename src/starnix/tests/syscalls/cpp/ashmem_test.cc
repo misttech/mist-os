@@ -460,7 +460,7 @@ TEST_F(AshmemTest, LseekFileOp) {
   // PAGE_SIZE, SEEK_HOLE
   EXPECT_THAT(lseek(fd.get(), 2 * PAGE_SIZE, SEEK_CUR), SyscallSucceedsWithValue(3 * PAGE_SIZE));
   EXPECT_THAT(lseek(fd.get(), -99, SEEK_END), SyscallSucceedsWithValue(4 * PAGE_SIZE - 99));
-  EXPECT_THAT(lseek(fd.get(), -(int)PAGE_SIZE, SEEK_CUR),
+  EXPECT_THAT(lseek(fd.get(), static_cast<int>(-1 * PAGE_SIZE), SEEK_CUR),
               SyscallSucceedsWithValue(3 * PAGE_SIZE - 99));
 
   ASSERT_THAT(munmap(addr, kMapSize), SyscallSucceeds());

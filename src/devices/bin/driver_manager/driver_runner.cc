@@ -269,6 +269,26 @@ void CallStartDriverOnRunner(Runner& runner, Node& node, const std::string& moni
       });
 }
 
+// Helper class to make sending out concurrent async requests and making a callback when they have
+// all finished easier.
+class AsyncSharder {
+ public:
+  AsyncSharder(size_t count, fit::callback<void()> complete_callback)
+      : remaining_(count), complete_callback_(std::move(complete_callback)) {}
+
+  ~AsyncSharder() { ZX_ASSERT_MSG(remaining_ == 0, "Sharder not complete"); }
+
+  void CompleteShard() {
+    if (--remaining_ == 0) {
+      complete_callback_();
+    }
+  }
+
+ private:
+  size_t remaining_;
+  fit::callback<void()> complete_callback_;
+};
+
 }  // namespace
 
 Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
@@ -350,6 +370,59 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
           fit::result<fuchsia_driver_framework::CompositeNodeSpecError> result) mutable {
         completer.Reply(result);
       });
+}
+
+void DriverRunner::FindDriverCrash(FindDriverCrashRequestView request,
+                                   FindDriverCrashCompleter::Sync& completer) {
+  for (const DriverHostComponent& host : driver_hosts_) {
+    zx::result process_koid = host.GetProcessKoid();
+    if (process_koid.is_ok() && process_koid.value() == request->process_koid) {
+      host.GetCrashInfo(
+          request->thread_koid,
+          [this, async_completer = completer.ToAsync()](
+              zx::result<fuchsia_driver_host::DriverCrashInfo> info_result) mutable {
+            if (info_result.is_error()) {
+              async_completer.ReplyError(info_result.error_value());
+              return;
+            }
+            fuchsia_driver_host::DriverCrashInfo& found = info_result.value();
+            zx_info_handle_basic_t info;
+            zx_status_t status = found.node_token()->get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                              sizeof(info), nullptr, nullptr);
+            if (status != ZX_OK) {
+              async_completer.ReplyError(ZX_ERR_INTERNAL);
+              return;
+            }
+
+            const Node* node = nullptr;
+            PerformBFS(root_node_, [&node, token_koid = info.koid](
+                                       const std::shared_ptr<driver_manager::Node>& current) {
+              if (node != nullptr) {
+                // Already found it.
+                return false;
+              }
+              std::optional current_koid = current->token_koid();
+              if (current_koid && current_koid.value() == token_koid) {
+                node = current.get();
+                return false;
+              }
+              return true;
+            });
+            if (node == nullptr) {
+              async_completer.ReplyError(ZX_ERR_NOT_FOUND);
+              return;
+            }
+
+            fidl::Arena arena;
+            async_completer.ReplySuccess(fuchsia_driver_crash::wire::DriverCrashInfo::Builder(arena)
+                                             .node_moniker(arena, node->MakeComponentMoniker())
+                                             .url(arena, found.url().value())
+                                             .Build());
+          });
+      return;
+    }
+  }
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void DriverRunner::handle_unknown_method(
@@ -487,6 +560,10 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
              info.FormatDescription().c_str());
       }));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+
+  result = outgoing.AddUnmanagedProtocol<fuchsia_driver_crash::CrashIntrospect>(
+      crash_introspect_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 
 zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
@@ -589,6 +666,37 @@ void DriverRunner::BindToUrl(Node& node, std::string_view driver_url_suffix,
 void DriverRunner::RebindComposite(std::string spec, std::optional<std::string> driver_url,
                                    fit::callback<void(zx::result<>)> callback) {
   composite_node_spec_manager_.Rebind(spec, driver_url, std::move(callback));
+}
+
+void DriverRunner::RebindCompositesWithDriver(const std::string& url,
+                                              fit::callback<void(size_t)> complete_callback) {
+  std::unordered_set<std::string> names;
+  PerformBFS(root_node_, [&names, url](const std::shared_ptr<driver_manager::Node>& current) {
+    if (current->type() == driver_manager::NodeType::kComposite && current->driver_url() == url) {
+      LOGF(DEBUG, "RebindCompositesWithDriver rebinding composite %s",
+           current->MakeComponentMoniker().c_str());
+      names.insert(current->name());
+      return false;
+    }
+
+    return true;
+  });
+
+  if (names.empty()) {
+    complete_callback(0);
+    return;
+  }
+
+  auto complete_wrapper = [complete_callback = std::move(complete_callback),
+                           count = names.size()]() mutable { complete_callback(count); };
+
+  std::shared_ptr<AsyncSharder> sharder =
+      std::make_shared<AsyncSharder>(names.size(), std::move(complete_wrapper));
+
+  for (const auto& name : names) {
+    RebindComposite(name, std::nullopt,
+                    [sharder](zx::result<>) mutable { sharder->CompleteShard(); });
+  }
 }
 
 void DriverRunner::DestroyDriverComponent(driver_manager::Node& node,
@@ -838,16 +946,22 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
       if (current->type() == driver_manager::NodeType::kComposite) {
         // Composites need to go through a different flow that will fully remove the
         // node and empty out the composite spec management layer.
+        LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl rebinding composite %s",
+             current->MakeComponentMoniker().c_str());
         RebindComposite(current->name(), std::nullopt, [](zx::result<>) {});
         return false;
       }
 
       // Non-composite nodes use the restart with rematch flow.
+      LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl restarting node with rematch %s",
+           current->MakeComponentMoniker().c_str());
       current->RestartNodeWithRematch();
       return false;
     }
 
     // Not rematching, plain node restart.
+    LOGF(DEBUG, "RestartNodesColocatedWithDriverUrl restarting node %s",
+         current->MakeComponentMoniker().c_str());
     current->RestartNode();
     return false;
   });

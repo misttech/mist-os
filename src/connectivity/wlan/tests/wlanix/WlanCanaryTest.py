@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-import fidl.fuchsia_wlan_device_service as fidl_wlan_device_service
+import fidl_fuchsia_wlan_device_service as fidl_wlan_device_service
 from antlion import base_test
 from antlion.controllers import fuchsia_device
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
@@ -33,7 +33,7 @@ class WlanCanaryTest(AsyncAdapter, base_test.AntlionBaseTest):
             "Requires a Honeydew-enabled FuchsiaDevice",
         )
 
-        self.wlan_device_monitor_proxy = fidl_wlan_device_service.DeviceMonitor.Client(
+        self.wlan_device_monitor_proxy = fidl_wlan_device_service.DeviceMonitorClient(
             self.fuchsia_device.honeydew_fd.fuchsia_controller.connect_device_proxy(
                 FidlEndpoint(
                     "core/wlandevicemonitor",

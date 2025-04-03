@@ -10,6 +10,7 @@ config("clippy_warn_default") {
 
     "-Wclippy::correctness",
     "-Wclippy::expect_fun_call",
+    "-Wclippy::fn_to_numeric_cast_with_truncation",
     "-Wclippy::large_enum_variant",
     "-Wclippy::large_futures",
     "-Wclippy::missing_safety_doc",

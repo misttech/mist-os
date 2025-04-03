@@ -27,9 +27,30 @@
     ],
     offer: [
         {
+            protocol: [ "fuchsia.session.power.Handoff" ],
+            from: "void",
+            to: "#container",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
             from: "#ui",
             to: [ "#container" ],
+        },
+        {
+            protocol: [
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.starnix.psi.PsiProvider",
+            ],
+            from: "void",
+            to: "#kernel",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "void",
+            to: "#runner",
+            availability: "optional",
         },
     ],
 }

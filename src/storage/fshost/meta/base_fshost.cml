@@ -20,6 +20,11 @@
     ],
     capabilities: [
         {
+            directory: "block",
+            rights: [ "r*" ],
+            path: "/block",
+        },
+        {
             directory: "data",
             rights: [ "rw*" ],
             path: "/fs/data/root",
@@ -79,6 +84,7 @@
     expose: [
         {
             directory: [
+                "block",
                 "data",
                 "factory",
             ],

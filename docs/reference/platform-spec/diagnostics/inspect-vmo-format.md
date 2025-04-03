@@ -654,6 +654,30 @@ Unlock the file allowing concurrent reads by setting the generation to
 a new even number. Release ordering ensures that writes to the file are
 visible before the generation count update is visible.
 
+## Frequently asked questions
+
+### How many bytes does my string need?
+
+Strings are stored in `STRING_REFERENCE` blocks. Therefore, if a string length
+is `N` bytes, it may end up using more than `N` bytes in the Inspect VMO. The
+following table illustrates how many bytes a string of a specific length
+actually uses:
+
+
+| String length | Block order| Block size (bytes) |
+| ------------- | ---------- | ------------------ |
+|    0 - 4      | 0          | 16                 |
+|    5 - 20     | 1          | 32                 |
+|   21 - 52     | 2          | 64                 |
+|   53 - 116    | 3          | 128                |
+|  117 - 244    | 4          | 256                |
+|  245 - 500    | 5          | 512                |
+|  501 - 1012   | 6          | 1024               |
+| 1013 - 2036   | 7          | 2048               |
+
+If a string is longer than 2036 bytes, then the format begins to use `EXTENT`
+blocks for the remaining data.
+
 <!-- xrefs -->
 [block.h]: /zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/block.h
 [buddy]: https://en.wikipedia.org/wiki/Buddy_memory_allocation

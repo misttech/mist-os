@@ -2,16 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
 use core::ptr::slice_from_raw_parts_mut;
 
 use munge::munge;
 
-use crate::{Slot, WirePointer, WireU64};
+use crate::{WirePointer, WireU64, ZeroPadding};
 
 #[repr(C)]
 pub struct RawWireVector<T> {
     pub len: WireU64,
     pub ptr: WirePointer<T>,
+}
+
+unsafe impl<T> ZeroPadding for RawWireVector<T> {
+    #[inline]
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
+        // Wire vectors have no padding bytes
+    }
 }
 
 // SAFETY: `RawWireVector` doesn't add any restrictions on sending across thread boundaries, and so
@@ -22,15 +30,15 @@ unsafe impl<T: Send> Send for RawWireVector<T> {}
 unsafe impl<T: Sync> Sync for RawWireVector<T> {}
 
 impl<T> RawWireVector<T> {
-    pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
-        munge!(let Self { len: mut encoded_len, ptr } = slot);
-        **encoded_len = len;
+    pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
+        munge!(let Self { len: encoded_len, ptr } = out);
+        encoded_len.write(WireU64(len));
         WirePointer::encode_present(ptr);
     }
 
-    pub fn encode_absent(slot: Slot<'_, Self>) {
-        munge!(let Self { mut len, ptr } = slot);
-        **len = 0;
+    pub fn encode_absent(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { len, ptr } = out);
+        len.write(WireU64(0));
         WirePointer::encode_absent(ptr);
     }
 

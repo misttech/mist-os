@@ -17,6 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_
 #include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
+#include <fidl/fuchsia.wlan.stats/cpp/wire_types.h>
 #include <lib/stdcompat/span.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
@@ -78,6 +79,7 @@ struct brcmf_bus_ops {
   zx_status_t (*get_tail_length)(brcmf_bus* bus, uint16_t* tail_length_out);
   zx_status_t (*recovery)(brcmf_bus* bus);
   void (*log_stats)(brcmf_bus* bus);
+  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> (*get_counters)(brcmf_bus* bus);
   zx_status_t (*prepare_vmo)(brcmf_bus* bus, uint8_t vmo_id, zx_handle_t vmo, uint8_t* mapped_addr,
                              size_t mapped_size);
   zx_status_t (*release_vmo)(brcmf_bus* bus, uint8_t vmo_id);
@@ -179,6 +181,11 @@ static inline zx_status_t brcmf_bus_recovery(struct brcmf_bus* bus) {
 }
 
 static inline void brcmf_bus_log_stats(struct brcmf_bus* bus) { bus->ops->log_stats(bus); }
+
+static inline std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> brcmf_bus_get_counters(
+    struct brcmf_bus* bus) {
+  return bus->ops->get_counters(bus);
+}
 
 static inline zx_status_t brcmf_bus_prepare_vmo(struct brcmf_bus* bus, uint8_t vmo_id,
                                                 zx_handle_t vmo, uint8_t* mapped_addr,

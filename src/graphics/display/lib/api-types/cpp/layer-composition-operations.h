@@ -37,8 +37,10 @@ class LayerCompositionOperations {
   explicit constexpr LayerCompositionOperations(layer_composition_operations_t banjo_operations);
 
   constexpr LayerCompositionOperations(const LayerCompositionOperations&) noexcept = default;
+  constexpr LayerCompositionOperations(LayerCompositionOperations&&) noexcept = default;
   constexpr LayerCompositionOperations& operator=(const LayerCompositionOperations&) noexcept =
       default;
+  constexpr LayerCompositionOperations& operator=(LayerCompositionOperations&&) noexcept = default;
   ~LayerCompositionOperations() = default;
 
   constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations ToFidl() const;

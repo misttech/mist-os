@@ -544,7 +544,7 @@ mod tests {
 
     #[test]
     fn too_long_filename() {
-        let string = "a".repeat(fio::MAX_FILENAME as usize + 1);
+        let string = "a".repeat(fio::MAX_NAME_LENGTH as usize + 1);
         negative_construction_test! {
             path: &string,
             "filename too long",
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn too_long_path() {
-        let filename = "a".repeat(fio::MAX_FILENAME as usize);
+        let filename = "a".repeat(fio::MAX_NAME_LENGTH as usize);
         const OVER_LIMIT_LENGTH: usize = fio::MAX_PATH_LENGTH as usize + 1;
         let mut path = String::new();
         while path.len() < OVER_LIMIT_LENGTH as usize {
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn long_filename() {
-        let string = "a".repeat(fio::MAX_FILENAME as usize);
+        let string = "a".repeat(fio::MAX_NAME_LENGTH as usize);
         simple_construction_test! {
             path: &string,
             mut path => {

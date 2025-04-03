@@ -56,7 +56,8 @@ std::vector<fuchsia::ui::pointerinjector::Event> EventsTemplate() {
 class PointerinjectorRegistryTest : public gtest::TestLoopFixture {
  public:
   PointerinjectorRegistryTest()
-      : registry_(/*context*/ nullptr,
+      : registry_(/*context*/
+                  nullptr,
                   /*inject_touch_exclusive=*/[](auto...) {},
                   /*inject_touch_hit_tested=*/[](auto...) {},
                   /*inject_mouse_exclusive=*/[](auto...) {},
@@ -529,7 +530,8 @@ TEST_F(PointerinjectorRegistryTest,
   bool exclusive_mouse_used = false;
   bool hit_tested_mouse_used = false;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [&exclusive_touch_used](auto...) { exclusive_touch_used = true; },
       /*inject_touch_hit_tested*/
       [&hit_tested_touch_used](auto...) { hit_tested_touch_used = true; },
@@ -568,7 +570,8 @@ TEST_F(PointerinjectorRegistryTest,
   bool exclusive_mouse_used = false;
   bool hit_tested_mouse_used = false;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [&exclusive_touch_used](auto...) { exclusive_touch_used = true; },
       /*inject_touch_hit_tested*/
       [&hit_tested_touch_used](auto...) { hit_tested_touch_used = true; },
@@ -600,6 +603,33 @@ TEST_F(PointerinjectorRegistryTest,
   EXPECT_FALSE(hit_tested_mouse_used);
 }
 
+TEST_F(PointerinjectorRegistryTest, MouseDevice_CanRegisterMouseWithoutButtons) {
+  scenic_impl::input::PointerinjectorRegistry registry(
+      /*context*/
+      nullptr,
+      /*inject_touch_exclusive*/ [](auto...) {},
+      /*inject_touch_hit_tested*/ [](auto...) {},
+      /*inject_mouse_exclusive*/ [](const auto&...) {},
+      /*inject_mouse_hit_tested*/ [](const auto&...) {},
+      /*cancel_mouse_stream=*/[](auto...) {});
+  const auto [parent, child] = SetupSceneWithParentAndChildViews(&registry);
+
+  fuchsia::ui::pointerinjector::DevicePtr injector;
+  bool register_callback_fired = false;
+  bool error_callback_fired = false;
+  injector.set_error_handler(
+      [&error_callback_fired](zx_status_t status) { error_callback_fired = true; });
+  fuchsia::ui::pointerinjector::Config config = ConfigTemplate(parent.view_ref, child.view_ref);
+  config.set_device_type(DeviceType::MOUSE);
+  config.set_dispatch_policy(DispatchPolicy::EXCLUSIVE_TARGET);
+  config.clear_buttons();
+  registry.Register(std::move(config), injector.NewRequest(),
+                    [&register_callback_fired] { register_callback_fired = true; });
+  RunLoopUntilIdle();
+  EXPECT_TRUE(register_callback_fired);
+  EXPECT_FALSE(error_callback_fired);
+}
+
 TEST_F(PointerinjectorRegistryTest,
        MouseDeviceAndExclusivePolicy_ShouldTriggerExclusiveMouseInjectFunc) {
   bool exclusive_touch_used = false;
@@ -607,7 +637,8 @@ TEST_F(PointerinjectorRegistryTest,
   bool exclusive_mouse_used = false;
   bool hit_tested_mouse_used = false;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [&exclusive_touch_used](auto...) { exclusive_touch_used = true; },
       /*inject_touch_hit_tested*/
       [&hit_tested_touch_used](auto...) { hit_tested_touch_used = true; },
@@ -647,7 +678,8 @@ TEST_F(PointerinjectorRegistryTest,
   bool exclusive_mouse_used = false;
   bool hit_tested_mouse_used = false;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [&exclusive_touch_used](auto...) { exclusive_touch_used = true; },
       /*inject_touch_hit_tested*/
       [&hit_tested_touch_used](auto...) { hit_tested_touch_used = true; },
@@ -684,7 +716,8 @@ TEST_F(PointerinjectorRegistryTest,
        MouseInjectorChannelDying_ShouldTriggerCancelMouseStreamCallback) {
   uint32_t cancel_mouse_stream_count = 0;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [](auto...) {},
       /*inject_touch_hit_tested*/ [](auto...) {},
       /*inject_mouse_exclusive*/ [](auto...) {},
@@ -730,7 +763,8 @@ TEST_F(PointerinjectorRegistryTest,
        MouseInjector_CancelEvent_ShouldTriggerCancelMouseStreamCallback) {
   uint32_t cancel_mouse_stream_count = false;
   scenic_impl::input::PointerinjectorRegistry registry(
-      /*context*/ nullptr,
+      /*context*/
+      nullptr,
       /*inject_touch_exclusive*/ [](auto...) {},
       /*inject_touch_hit_tested*/ [](auto...) {},
       /*inject_mouse_exclusive*/ [](auto...) {},

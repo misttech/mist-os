@@ -7,8 +7,9 @@ use crate::vfs::{FdTableId, FileObject, FileObjectId};
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::{Errno, EAGAIN};
 use starnix_uapi::{
-    __kernel_off_t, c_short, errno, error, pid_t, uapi, F_GETLK, F_OFD_GETLK, F_OFD_SETLK,
-    F_OFD_SETLKW, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, SEEK_CUR, SEEK_END, SEEK_SET,
+    __kernel_off_t, c_short, errno, error, pid_t, uapi, F_GETLK, F_GETLK64, F_OFD_GETLK,
+    F_OFD_SETLK, F_OFD_SETLKW, F_RDLCK, F_SETLK, F_SETLK64, F_SETLKW, F_SETLKW64, F_UNLCK, F_WRLCK,
+    SEEK_CUR, SEEK_END, SEEK_SET,
 };
 use std::collections::BTreeSet;
 
@@ -382,9 +383,9 @@ pub enum RecordLockCommand {
 impl RecordLockCommand {
     pub fn from_raw(cmd: u32) -> Option<Self> {
         match cmd {
-            F_SETLK => Some(RecordLockCommand::SETLK),
-            F_SETLKW => Some(RecordLockCommand::SETLKW),
-            F_GETLK => Some(RecordLockCommand::GETLK),
+            F_SETLK | F_SETLK64 => Some(RecordLockCommand::SETLK),
+            F_SETLKW | F_SETLKW64 => Some(RecordLockCommand::SETLKW),
+            F_GETLK | F_GETLK64 => Some(RecordLockCommand::GETLK),
             F_OFD_GETLK => Some(RecordLockCommand::OFD_GETLK),
             F_OFD_SETLK => Some(RecordLockCommand::OFD_SETLK),
             F_OFD_SETLKW => Some(RecordLockCommand::OFD_SETLKW),

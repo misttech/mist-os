@@ -19,6 +19,7 @@ rustc_library("realm_management") {
 
   test_deps = [
     "//src/lib/fdio",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
     "//src/session/testing",

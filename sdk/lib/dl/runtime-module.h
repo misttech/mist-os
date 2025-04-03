@@ -20,11 +20,14 @@
 #include <lib/ld/load.h>  // For ld::AbiModule
 #include <lib/ld/tls.h>
 
+#include <cstring>
+
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/vector.h>
 
 #include "diagnostics.h"
+#include "tls-desc-resolver.h"
 
 namespace dl {
 
@@ -99,19 +102,35 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // create the runtime module. This is usually the same as the DT_SONAME of the
   // AbiModule, but that is not guaranteed. When performing an equality check,
   // match against both possible name values.
-  constexpr bool operator==(const Soname& name) const {
-    return name == name_ || name == abi_module_.soname;
+  constexpr bool operator==(const Soname& other) const {
+    return other == name() || other == abi_module_.soname;
   }
 
   constexpr const Soname& name() const { return name_; }
 
   // TODO(https://fxbug.dev/333920495): pass in the symbolizer_modid.
-  [[nodiscard]] static std::unique_ptr<RuntimeModule> Create(fbl::AllocChecker& ac, Soname name) {
-    std::unique_ptr<RuntimeModule> module{new (ac) RuntimeModule};
-    if (module) [[likely]] {
-      module->name_ = name;
+  [[nodiscard]] static std::unique_ptr<RuntimeModule> Create(fbl::AllocChecker& ac, Soname soname) {
+    auto result = [&ac](std::unique_ptr<RuntimeModule> v) {
+      ac.arm(sizeof(RuntimeModule), v);
+      return v;
+    };
+
+    fbl::AllocChecker module_ac;
+    std::unique_ptr<RuntimeModule> module{new (module_ac) RuntimeModule};
+    if (!module_ac.check()) [[unlikely]] {
+      return result(nullptr);
     }
-    return module;
+    fbl::AllocChecker name_ac;
+
+    size_t buf_sz = soname.size() + 1;
+    char* buf = new (name_ac) char[buf_sz];
+    if (!name_ac.check()) [[unlikely]] {
+      return result(nullptr);
+    }
+    soname.copy(buf, buf_sz);
+    module->name_ = Soname{buf};
+
+    return result(std::move(module));
   }
 
   // This is called if the RuntimeModule is created from a startup module (i.e.
@@ -133,6 +152,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr AbiModule& module() { return abi_module_; }
   constexpr const AbiModule& module() const { return abi_module_; }
 
+  constexpr void set_tls_module(TlsModule tls_module) { tls_module_ = tls_module; }
   constexpr const TlsModule& tls_module() const { return tls_module_; }
 
   size_t vaddr_size() const { return abi_module_.vaddr_end - abi_module_.vaddr_start; }
@@ -191,6 +211,11 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr void set_global() { abi_module_.symbols_visible = true; }
   constexpr bool is_local() const { return !is_global(); }
 
+  // This is the list of TlsDesc objects (see tls-desc-resolver.h) that was set
+  // during TLS relocation for this module. The RuntimeModule owns this list:
+  // it will get destroyed with the module.
+  constexpr TlsdescIndirectList& tls_desc_indirect_list() { return tls_desc_indirect_list_; }
+
   // Run the init functions for this module (as the root module) and the init
   // functions for all its dependencies.
   void InitializeModuleTree();
@@ -200,7 +225,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   void Initialize();
 
   // Construct the `dl_phdr_info` for this module.
-  dl_phdr_info MakeDlPhdrInfo(ld::DlPhdrInfoCounts counts) const;
+  dl_phdr_info MakeDlPhdrInfo(void* tls_data, ld::DlPhdrInfoCounts counts) const {
+    return ld::MakeDlPhdrInfo(module(), tls_data, counts);
+  }
 
  private:
   // A RuntimeModule can only be created with Module::Create...).
@@ -211,11 +238,12 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   Soname name_;
   AbiModule abi_module_;
   TlsModule tls_module_;
-  size_type static_tls_bias_ = 0;
-  bool can_unload_ = true;
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
+  size_type static_tls_bias_ = 0;
+  bool can_unload_ = true;
   bool initialized_ = false;
+  TlsdescIndirectList tls_desc_indirect_list_;
 };
 
 // This is the module tree view type returned by RuntimeModule::module_tree.

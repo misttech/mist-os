@@ -187,7 +187,12 @@ encode_success("Float32SignallingNaN") {
     // >>> f = struct.unpack('>f', b'\x7f\xa0\x00\x00')[0]) # Signalling float.
     // >>> struct.pack('>f', f)
     // b'\x7f\xe0\x00\x00'  # Quiet float.
-    bindings_denylist = [dart, fuchsia_controller],
+    //
+    // TODO(https://fxbug.dev/394421154): For the static Python bindings, we should
+    // consider the tradeoffs associated with this problem. It would seem using
+    // a float32 with Python FIDL bindings would likely result in unexpected
+    // behavior.
+    bindings_denylist = [dart, fuchsia_controller, python],
     value = MyFloat32{
         value: raw_float(0b0_11111111_01000000000000000000000),
     },

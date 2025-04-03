@@ -1,0 +1,22 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("netstack3-trace") {
+  version = "0.0.1"
+  edition = "2021"
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
+  sources = [
+    "src/id.rs",
+    "src/lib.rs",
+  ]
+
+  deps = []
+  if (is_fuchsia) {
+    deps += [ "//src/lib/trace/rust:trace" ]
+  }
+}

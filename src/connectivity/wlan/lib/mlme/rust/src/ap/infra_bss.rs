@@ -2080,7 +2080,7 @@ mod tests {
                 protection: Some(fidl_softmac::WlanProtection::RxTx),
                 cipher_oui: Some([1, 2, 3]),
                 cipher_type: Some(4),
-                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                key_type: Some(fidl_ieee80211::KeyType::Pairwise),
                 peer_addr: Some([5; 6]),
                 key_idx: Some(6),
                 key: Some(vec![1, 2, 3, 4, 5, 6, 7]),
@@ -2163,7 +2163,7 @@ mod tests {
     async fn handle_probe_req_has_offload() {
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
             FakeDeviceConfig::default().with_mock_probe_response_offload(
-                fidl_common::ProbeResponseOffloadExtension { supported: true },
+                fidl_softmac::ProbeResponseOffloadExtension { supported: true },
             ),
         )
         .await;

@@ -15,7 +15,7 @@ use wlan_ffi_transport::{EthernetRx, FfiEthernetRx, FfiWlanTx, WlanTx};
 use wlan_mlme::device::Device;
 use {fidl_fuchsia_wlan_softmac as fidl_softmac, wlan_trace as wtrace};
 
-use fdf::DispatcherBuilder;
+use fdf::{DispatcherBuilder, OnDispatcher};
 
 static LOGGER_ONCE: Once = Once::new();
 
@@ -76,6 +76,10 @@ pub unsafe extern "C" fn start_bridged_wlansoftmac(
     // of MLME, that means we can only call it once for both the client and ap modules. Ensure this
     // by using a shared `Once::call_once()`.
     LOGGER_ONCE.call_once(|| {
+        if log::log_enabled!(log::Level::Info) {
+            // Assuming logger is already initialized if log level is enabled.
+            return;
+        }
         // Initialize logging with a tag that can be used to filter for forwarding to console
         diagnostics_log::initialize_sync(
             PublishOptions::default()

@@ -9,9 +9,6 @@ if (is_host) {
     name = "symbolizer_sys"
     edition = "2021"
     sources = [ "src/lib.rs" ]
-    if (current_cpu == "x64") {
-      sources += [ "src/x86_64.rs" ]
-    }
     deps = [ ":wrapper" ]
   }
 

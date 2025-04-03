@@ -7,9 +7,7 @@
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_
 
-#include <lib/affine/transform.h>
-#include <lib/kconcurrent/seqlock.h>
-#include <lib/relaxed_atomic.h>
+#include <lib/fasttime/clock.h>
 #include <sys/types.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/clock.h>
@@ -18,8 +16,14 @@
 #include <object/dispatcher.h>
 #include <object/handle.h>
 
+namespace internal {
+struct FuchsiaKernelOsal;
+}
+
 class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_CLOCK_RIGHTS> {
  public:
+  static inline constexpr uint64_t kMappedSize = PAGE_SIZE;
+
   static zx_status_t Create(uint64_t options, const zx_clock_create_args_v1_t& create_args,
                             KernelHandle<ClockDispatcher>* handle, zx_rights_t* rights);
 
@@ -32,49 +36,32 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   template <typename UpdateArgsType>
   zx_status_t Update(uint64_t options, const UpdateArgsType& args);
 
+  const fbl::RefPtr<VmObjectPaged>& vmo() { return vmo_; }
+  bool is_mappable() const { return clock_transformation_->is_mappable(); }
+
  private:
-  struct Params {
-    affine::Transform reference_to_synthetic{0, 0, {0, 1}};
-    uint64_t error_bound = ZX_CLOCK_UNKNOWN_ERROR;
-    zx_ticks_t last_value_update_ticks = 0;
-    zx_ticks_t last_rate_adjust_update_ticks = 0;
-    zx_ticks_t last_error_bounds_update_ticks = 0;
-    uint32_t generation_counter_ = 0;
-    int32_t cur_ppm_adj = 0;
+  ClockDispatcher(uint64_t options, zx_time_t backstop_time, fbl::RefPtr<VmObjectPaged> vmo);
+
+  // Supply the kernel specific implementation of ArchYield and reference timer
+  // accessors in order to use libfasttime's implementation of the
+  // ClockTransformation class.
+  struct ClockTransformationAdapter {
+    static inline void ArchYield() { arch::Yield(); }
+    static zx_instant_mono_ticks_t GetMonoTicks() { return current_mono_ticks(); }
+    static zx_instant_boot_ticks_t GetBootTicks() { return current_boot_ticks(); }
   };
 
-  ClockDispatcher(uint64_t options, zx_time_t backstop_time);
-
-  zx_ticks_t GetCurrentTicks() const;
-
-  bool is_monotonic() const { return (options_ & ZX_CLOCK_OPT_MONOTONIC) != 0; }
-  bool is_boot() const { return (options_ & ZX_CLOCK_OPT_BOOT) != 0; }
-  bool is_continuous() const { return (options_ & ZX_CLOCK_OPT_CONTINUOUS) != 0; }
-  bool is_started() TA_REQ(seq_lock_) {
-    // Note, we require that we hold the seq_lock_ exclusively here.  This
-    // should ensure that there are no other threads writing to this memory
-    // location concurrent with our read, meaning there is no formal data race
-    // here.
-    return params_.unsynchronized_get().reference_to_synthetic.numerator() != 0;
+  static zx_time_t GetCurrentTime(bool boot_time) {
+    return boot_time ? current_boot_time() : current_mono_time();
   }
 
-  const uint64_t options_;
-  const zx_time_t backstop_time_;
+  using ClockTransformationType = ::fasttime::ClockTransformation<ClockTransformationAdapter>;
+  static_assert(sizeof(ClockTransformationType) <= kMappedSize);
+  static_assert(alignof(ClockTransformationType) <= kMappedSize);
 
-  // The transformation "payload" parameters, and the sequence lock which protects them.
-  //
-  // Note that the reference_ticks_to_synthetic transformation is kept separate from the
-  // rest of the parameters.  While we need to observe all of the parameters
-  // during a call to GetDetails, we only need to observe reference_ticks_to_synthetic
-  // during Read, and keeping the parameters separate makes this a bit easier.
-  DECLARE_SEQLOCK_FENCE_SYNC(ClockDispatcher) seq_lock_;
-  template <typename T>
-  using Payload = SeqLockPayload<T, decltype(seq_lock_)>;
-  template <typename Policy>
-  using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
-  TA_GUARDED(seq_lock_)
-  Payload<affine::Transform> reference_ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
-  TA_GUARDED(seq_lock_) Payload<Params> params_;
+  alignas(ClockTransformationType) uint8_t local_storage_[sizeof(ClockTransformationType)];
+  const fbl::RefPtr<VmObjectPaged> vmo_;
+  ClockTransformationType* clock_transformation_{nullptr};
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_CLOCK_DISPATCHER_H_

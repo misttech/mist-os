@@ -125,7 +125,7 @@ std::vector<controller::ProviderSpec> TranslateProviderSpecs(
   // Uniquify the list, with later entries overriding earlier entries.
   std::map<std::string, uint32_t> spec_map;
   for (const auto& it : specs) {
-    spec_map[it.name] = it.buffer_size_in_mb;
+    spec_map[it.name] = static_cast<uint32_t>(it.buffer_size_in_mb);
   }
   std::vector<controller::ProviderSpec> uniquified_specs;
   for (const auto& it : spec_map) {

@@ -3,4 +3,4 @@
 // found in the LICENSE file.
 
 mod target_addr;
-pub use target_addr::TargetAddr;
+pub use target_addr::{TargetAddr, TargetIpAddr};

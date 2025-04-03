@@ -43,14 +43,12 @@ rustc_binary("starnix_kernel_bin") {
     ":android_5.10_kernel_config",
     ":starnix_core",
     ":starnix_kernel_runner",
-    ":starnix_kernel_structured_config",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/rust/zx",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
@@ -76,8 +74,10 @@ rustc_binary("starnix_kernel_bin") {
 
   sources = [ "main.rs" ]
 
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+  configs += [
+    "//build/config/rust/lints:clippy_warn_all",
+    "//src/starnix/config:starnix_clippy_lints",
+  ]
 
   disable_rustdoc = false
 
@@ -131,6 +131,7 @@ rustc_library("starnix_core") {
     "device/registry.rs",
     "device/remote_binder.rs",
     "device/remote_block_device.rs",
+    "device/serial.rs",
     "device/terminal.rs",
     "dynamic_thread_spawner.rs",
     "execution/crash_reporter.rs",
@@ -139,6 +140,9 @@ rustc_library("starnix_core") {
     "fs/devpts.rs",
     "fs/devtmpfs.rs",
     "fs/fuchsia/mod.rs",
+    "fs/fuchsia/nmfs/fs.rs",
+    "fs/fuchsia/nmfs/manager.rs",
+    "fs/fuchsia/nmfs/mod.rs",
     "fs/fuchsia/remote.rs",
     "fs/fuchsia/remote_bundle.rs",
     "fs/fuchsia/remote_unix_domain_socket.rs",
@@ -148,9 +152,6 @@ rustc_library("starnix_core") {
     "fs/fuchsia/timer.rs",
     "fs/fuchsia/zxio.rs",
     "fs/mod.rs",
-    "fs/nmfs/fs.rs",
-    "fs/nmfs/manager.rs",
-    "fs/nmfs/mod.rs",
     "fs/proc/cgroups.rs",
     "fs/proc/config_gz.rs",
     "fs/proc/cpuinfo.rs",
@@ -197,6 +198,7 @@ rustc_library("starnix_core") {
     "mm/mapping.rs",
     "mm/memory.rs",
     "mm/memory_manager.rs",
+    "mm/mlock.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
     "mm/userfault.rs",
@@ -218,6 +220,7 @@ rustc_library("starnix_core") {
     "security/selinux_hooks/fs_node.rs",
     "security/selinux_hooks/mod.rs",
     "security/selinux_hooks/selinuxfs.rs",
+    "security/selinux_hooks/socket.rs",
     "security/selinux_hooks/superblock.rs",
     "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
@@ -356,6 +359,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_rust",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
@@ -379,16 +383,17 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
+    "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
+    "//sdk/lib/scheduler/rust",
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netlink",
     "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/async-utils",
     "//src/lib/debug/rust",
     "//src/lib/dense-map",
@@ -515,7 +520,6 @@ rustc_library("starnix_core") {
     "//src/storage/ext4/tests:test_img",
     "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
   ]
@@ -542,6 +546,9 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  # Allows binaries that depend on this library to link.
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
   # Linking the lib tests requires a lot of memory.
   # Notes: if (is_asan || target_cpu == "riscv64"), linking is known to
@@ -576,24 +583,25 @@ rustc_library("starnix_kernel_runner") {
   ]
 
   deps = [
+    ":starnix_container_structured_config",
     ":starnix_core",
-    ":starnix_kernel_structured_config",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
+    "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//sdk/rust/zx",
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
@@ -616,6 +624,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/nanohub",
     "//src/starnix/modules/overlayfs",
     "//src/starnix/modules/perfetto_consumer",
+    "//src/starnix/modules/thermal",
     "//src/starnix/modules/touch_power_policy",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
@@ -823,8 +832,12 @@ resource("android_5.10_kernel_config") {
   deps = [ ":gzip_android_5.10_kernel_config" ]
 }
 
-fuchsia_structured_config_rust_lib("starnix_kernel_structured_config") {
-  cm_label = ":starnix_kernel_manifest"
+fuchsia_component_manifest("empty_container_manifest") {
+  manifest = "//src/starnix/containers/empty_container/meta/empty_container.cml"
+}
+
+fuchsia_structured_config_rust_lib("starnix_container_structured_config") {
+  cm_label = ":empty_container_manifest"
 }
 
 fuchsia_component("starnix_kernel") {

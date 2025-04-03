@@ -81,6 +81,7 @@ impl DeviceProxyInterface for MockDeviceProxy {
             .map_err(|_| fidl::Error::ClientChannelClosed {
                 status: ZxStatus::PEER_CLOSED,
                 protocol_name: "mock",
+                epitaph: None,
             })
             .map(|()| self.max_frame_size);
 
@@ -92,6 +93,7 @@ impl DeviceProxyInterface for MockDeviceProxy {
             |_| fidl::Error::ClientChannelClosed {
                 status: ZxStatus::PEER_CLOSED,
                 protocol_name: "mock",
+                epitaph: None,
             },
         )
     }
@@ -104,6 +106,7 @@ impl DeviceProxyInterface for MockDeviceProxy {
             .map_err(|_| fidl::Error::ClientChannelClosed {
                 status: ZxStatus::PEER_CLOSED,
                 protocol_name: "mock",
+                epitaph: None,
             })
     }
 }

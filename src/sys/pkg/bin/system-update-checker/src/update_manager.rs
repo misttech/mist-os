@@ -52,8 +52,14 @@ where
             .0
             .send(UpdateManagerRequest::TryStartUpdate { options, callback, responder: send })
             .await
-            .map_err(|_| CheckNotStartedReason::Internal)?;
-        recv.await.map_err(|_| CheckNotStartedReason::Internal)?
+            .map_err(|_| {
+                log::error!("try_start_update send failed");
+                CheckNotStartedReason::Internal
+            })?;
+        recv.await.map_err(|futures::channel::oneshot::Canceled| {
+            log::error!("try_start_update recv failed");
+            CheckNotStartedReason::Internal
+        })?
     }
 
     pub async fn handle_all_these_updates(
@@ -288,7 +294,10 @@ where
             let (options, callback) = loop {
                 let request = match requests.next().await {
                     Some(request) => request,
-                    None => return,
+                    None => {
+                        info!("UpdateManager stopping");
+                        return;
+                    }
                 };
 
                 match request {

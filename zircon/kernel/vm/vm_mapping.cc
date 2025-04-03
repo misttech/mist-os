@@ -1020,7 +1020,27 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
   // Calculate the number of pages from va until the end of the VMO and protection range, so we
   // don't try to fault pages outside of the current VMO and protection range.
   const size_t num_protection_range_pages = (range.region_top - va) / PAGE_SIZE;
-  const size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
+  size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
+
+  // If fault-beyond-stream-size is set, throw exception on memory accesses past the page
+  // containing the user defined stream size.
+  VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get());
+  if (flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE) {
+    DEBUG_ASSERT(paged);
+    AssertHeld(paged->lock_ref());
+
+    uint64_t stream_size;
+    auto res = paged->saturating_content_size_locked();
+    // Creating a fault-beyond-stream-size mapping should have allocated a CSM.
+    DEBUG_ASSERT(res);
+    stream_size = res.value();
+    if (vmo_offset >= stream_size) {
+      return {ZX_ERR_OUT_OF_RANGE, 0};
+    }
+
+    // Trim num_vmo_pages, to ensure no pages past the stream size are fault.
+    num_vmo_pages = (stream_size - vmo_offset) / PAGE_SIZE;
+  }
 
   // Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the user
   // knows the appropriate range, so opportunistic pages will not be added.
@@ -1053,7 +1073,7 @@ ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const ui
   __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
-  if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); likely(paged)) {
+  if (likely(paged)) {
     AssertHeld(paged->lock_ref());
 
     // fault in or grab existing pages.
@@ -1385,6 +1405,83 @@ void VmMapping::CommitHighMemoryPriority() {
   vmo->CommitHighPriorityPages(offset, len);
   // Ignore the return result of MapRange as this is just best effort.
   MapRange(offset, len, false, true);
+}
+
+zx_status_t VmMapping::ForceWritableLocked() {
+  canary_.Assert();
+  if (state_ != LifeCycleState::ALIVE) {
+    return ZX_ERR_BAD_STATE;
+  }
+  DEBUG_ASSERT(object_);
+  // If we have already re-directed to a private clone then there is no need to do so again.
+  if (private_clone_) {
+    return ZX_OK;
+  }
+  // If the mapping is already possible to write to (even if disabled by current protections), then
+  // writing is already safe.
+  if (is_valid_mapping_flags(ARCH_MMU_FLAG_PERM_WRITE)) {
+    return ZX_OK;
+  }
+  // A physical VMO cannot be cloned and so we cannot make this safe, just allow the write.
+  if (!object_->is_paged()) {
+    return ZX_OK;
+  }
+  // Create a clone of our VMO that covers the size of our mapping.
+  fbl::RefPtr<VmObject> clone;
+  zx_status_t status = object_->CreateClone(Resizability::NonResizable, SnapshotType::OnWrite,
+                                            object_offset_locked(), size_locked(), true, &clone);
+  if (status != ZX_OK) {
+    return status;
+  }
+  {
+    Guard<VmoLockType> guard{object_->lock()};
+    // Clear out all mappings from the previous object, Must be done the object lock to prevent
+    // mappings being modified in between.
+    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
+                                          nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    // Finally unlink from the object_.
+    object_->RemoveMappingLocked(this);
+    // We created the clone started at object_offset_ in the old object, so that makes the
+    // equivalent object_offset_ start at 0 in the clone.
+    object_offset_ = 0;
+  }
+  // Reset object_ outside its lock in case we trigger its destructor.
+  object_.reset();
+  // Take the lock for the clone so we can install it.
+  Guard<VmoLockType> guard{clone->lock()};
+  clone->AddMappingLocked(this);
+  object_ = ktl::move(clone);
+  // Set private_clone_ so that we do not repeatedly create clones of clones for no reason.
+  private_clone_ = true;
+  return ZX_OK;
+}
+
+uint64_t VmMapping::TrimmedObjectRangeLocked(uint64_t offset, uint64_t len) const TA_REQ(lock())
+    TA_REQ(object_->lock()) {
+  const uint64_t vmo_offset = object_offset_locked() + offset;
+  const uint64_t vmo_size = object_->size_locked();
+  if (vmo_offset >= vmo_size) {
+    return 0;
+  }
+
+  uint64_t trim_len = vmo_size - vmo_offset;
+
+  if (flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE) {
+    VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get());
+    DEBUG_ASSERT(paged);
+    AssertHeld(paged->lock_ref());
+    auto stream_size_res = paged->saturating_content_size_locked();
+    // Creating a fault-beyond-stream-size mapping should have allocated a CSM.
+    DEBUG_ASSERT(stream_size_res);
+    size_t stream_size = stream_size_res.value();
+    DEBUG_ASSERT(stream_size <= vmo_size);
+    trim_len = stream_size - vmo_offset;
+  }
+
+  return ktl::min(trim_len, len);
 }
 
 template <typename F>

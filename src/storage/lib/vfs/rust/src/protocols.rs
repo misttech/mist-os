@@ -12,7 +12,7 @@ use fidl_fuchsia_io as fio;
 use zx_status::Status;
 
 /// Extends fio::Flags and fio::OpenFlags
-pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
+pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Send + Sync + 'static {
     /// True if the directory protocol is allowed.
     fn is_dir_allowed(&self) -> bool;
 
@@ -21,9 +21,6 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
 
     /// True if the symlink protocol is allowed.
     fn is_symlink_allowed(&self) -> bool;
-
-    /// True if any node protocol is allowed.
-    fn is_any_node_protocol_allowed(&self) -> bool;
 
     /// The creation mode for the connection.
     fn creation_mode(&self) -> CreationMode;
@@ -41,9 +38,6 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
 
     /// Convert to service options.  Returns an error if the request is not valid for a service.
     fn to_service_options(&self) -> Result<ServiceOptions, Status>;
-
-    /// True if REPRESENTATION is desired.
-    fn get_representation(&self) -> bool;
 
     /// True if the file should be in append mode.
     fn is_append(&self) -> bool;
@@ -72,10 +66,6 @@ impl ProtocolsExt for fio::OpenFlags {
 
     fn is_symlink_allowed(&self) -> bool {
         !self.contains(fio::OpenFlags::DIRECTORY)
-    }
-
-    fn is_any_node_protocol_allowed(&self) -> bool {
-        !self.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NOT_DIRECTORY)
     }
 
     fn creation_mode(&self) -> CreationMode {
@@ -201,10 +191,6 @@ impl ProtocolsExt for fio::OpenFlags {
         Ok(ServiceOptions)
     }
 
-    fn get_representation(&self) -> bool {
-        false
-    }
-
     fn is_append(&self) -> bool {
         self.contains(fio::OpenFlags::APPEND)
     }
@@ -228,20 +214,18 @@ impl ProtocolsExt for fio::OpenFlags {
 
 impl ProtocolsExt for fio::Flags {
     fn is_dir_allowed(&self) -> bool {
-        self.contains(fio::Flags::PROTOCOL_DIRECTORY) || self.is_any_node_protocol_allowed()
+        self.contains(fio::Flags::PROTOCOL_DIRECTORY)
+            || self.intersection(fio::MASK_KNOWN_PROTOCOLS).is_empty()
     }
 
     fn is_file_allowed(&self) -> bool {
-        self.contains(fio::Flags::PROTOCOL_FILE) || self.is_any_node_protocol_allowed()
+        self.contains(fio::Flags::PROTOCOL_FILE)
+            || self.intersection(fio::MASK_KNOWN_PROTOCOLS).is_empty()
     }
 
     fn is_symlink_allowed(&self) -> bool {
-        self.contains(fio::Flags::PROTOCOL_SYMLINK) || self.is_any_node_protocol_allowed()
-    }
-
-    fn is_any_node_protocol_allowed(&self) -> bool {
-        self.intersection(fio::MASK_KNOWN_PROTOCOLS).is_empty()
-            || self.contains(fio::Flags::PROTOCOL_NODE)
+        self.contains(fio::Flags::PROTOCOL_SYMLINK)
+            || self.intersection(fio::MASK_KNOWN_PROTOCOLS).is_empty()
     }
 
     fn creation_mode(&self) -> CreationMode {
@@ -330,10 +314,6 @@ impl ProtocolsExt for fio::Flags {
         Ok(ServiceOptions)
     }
 
-    fn get_representation(&self) -> bool {
-        self.contains(fio::Flags::FLAG_SEND_REPRESENTATION)
-    }
-
     fn is_append(&self) -> bool {
         self.contains(fio::Flags::FILE_APPEND)
     }
@@ -356,7 +336,7 @@ impl ProtocolsExt for fio::Flags {
     }
 }
 
-pub trait ToFileOptions {
+pub trait ToFileOptions: Send + 'static {
     fn to_file_options(&self) -> Result<FileOptions, Status>;
 }
 
@@ -457,7 +437,7 @@ impl ToFileOptions for FileOptions {
     }
 }
 
-pub trait ToNodeOptions {
+pub trait ToNodeOptions: Send + 'static {
     fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status>;
 }
 

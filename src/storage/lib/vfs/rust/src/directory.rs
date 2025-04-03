@@ -5,9 +5,7 @@
 //! Module holding different kinds of pseudo directories and their building blocks.
 
 use crate::directory::entry_container::Directory;
-use crate::execution_scope::ExecutionScope;
 use crate::path::Path;
-use fidl::endpoints::{create_endpoints, ServerEnd};
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 
@@ -53,11 +51,6 @@ impl DirectoryOptions {
         }
         flags
     }
-
-    /// Creates a copy of these options with new [rights].
-    pub fn new(rights: fio::Operations) -> DirectoryOptions {
-        Self { rights: rights }
-    }
 }
 
 impl From<&DirectoryOptions> for fio::Flags {
@@ -73,19 +66,16 @@ impl Default for DirectoryOptions {
     }
 }
 
-/// Serves [dir] and returns a `DirectoryProxy` to it.
-pub fn spawn_directory<D: Directory + ?Sized>(dir: Arc<D>) -> fio::DirectoryProxy {
-    spawn_directory_with_options(dir, DirectoryOptions::default())
+/// Helper function to serve a new connection to `directory` with `flags`. Errors will be
+/// communicated via epitaph on the returned proxy. A new [`crate::execution_scope::ExecutionScope`]
+/// will be created for the request.
+pub fn serve<D: Directory + ?Sized>(directory: Arc<D>, flags: fio::Flags) -> fio::DirectoryProxy {
+    crate::serve_directory(directory, Path::dot(), flags)
 }
 
-/// Serves [dir] with the given [options] and returns a `DirectoryProxy` to it.
-pub fn spawn_directory_with_options<D: Directory + ?Sized>(
-    dir: Arc<D>,
-    options: DirectoryOptions,
-) -> fio::DirectoryProxy {
-    let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-    let scope = ExecutionScope::new();
-    let rights = options.to_io1();
-    dir.open(scope, rights, Path::dot(), ServerEnd::new(server_end.into_channel()));
-    client_end.into_proxy()
+/// Helper function to serve a new connection to `directory` as read-only (i.e. with
+/// [`fio::PERM_READABLE`]). Errors will be communicated via epitaph on the returned proxy. A new
+/// [`crate::execution_scope::ExecutionScope`] will be created for the request.
+pub fn serve_read_only<D: Directory + ?Sized>(directory: Arc<D>) -> fio::DirectoryProxy {
+    crate::serve_directory(directory, Path::dot(), fio::PERM_READABLE)
 }

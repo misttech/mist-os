@@ -61,6 +61,18 @@
             availability: "optional",
         },
         {
+            directory: "dev-serial",
+            rights: [ "r*" ],
+            path: "/dev/class/serial",
+            availability: "optional",
+        },
+        {
+            directory: "dev-trippoint",
+            rights: [ "r*" ],
+            path: "/dev/class/trippoint",
+            availability: "optional",
+        },
+        {
             // This service replaces the directory capability above.
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",
@@ -88,6 +100,7 @@
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
@@ -98,6 +111,7 @@
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.tun.Control",
+                "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
@@ -125,14 +139,6 @@
             ],
             from: "parent",
             availability: "optional",
-        },
-        {
-            config: "fuchsia.ui.VisualDebuggingLevel",
-            from: "parent",
-            key: "ui_visual_debugging_level",
-            type: "uint8",
-            default: 0,
-            availability: "transitional",
         },
     ],
     expose: [

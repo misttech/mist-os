@@ -14,8 +14,8 @@ use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::sync::{PrimaryRc, RwLock};
 use netstack3_base::{
     AnyDevice, ContextPair, DeferredResourceRemovalContext, DeviceIdContext, Inspector,
-    InspectorDeviceExt, MarkDomain, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
-    StrongDeviceIdentifier, WrapBroadcastMarker,
+    InspectorDeviceExt, MarkDomain, Marks, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, StrongDeviceIdentifier, WrapBroadcastMarker,
 };
 
 use crate::internal::base::{
@@ -25,7 +25,7 @@ use crate::internal::base::{
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
-use crate::internal::routing::rules::{MarkMatcher, Marks, Rule, RuleAction, RuleMatcher};
+use crate::internal::routing::rules::{MarkMatcher, Rule, RuleAction, RuleMatcher};
 use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,

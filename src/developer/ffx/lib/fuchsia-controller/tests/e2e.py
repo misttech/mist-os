@@ -74,7 +74,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
 
     async def test_client_sends_message_before_coro_await(self):
         (ch0, ch1) = Channel.create()
-        echo_proxy = ffx_fidl.Echo.Client(ch0)
+        echo_proxy = ffx_fidl.EchoClient(ch0)
         coro = echo_proxy.echo_string(value="foo")
         buf, _ = ch1.read()
         txid = int.from_bytes(buf[0:4], sys.byteorder)
@@ -111,7 +111,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
     async def test_sending_fidl_protocol(self):
         tc_server, tc_client = Channel.create()
         list_server, list_client = Channel.create()
-        tc_proxy = ffx_fidl.TargetCollection.Client(tc_client)
+        tc_proxy = ffx_fidl.TargetCollectionClient(tc_client)
         query = ffx_fidl.TargetQuery(string_matcher="foobar")
         tc_proxy.list_targets(query=query, reader=list_client.take())
         buf, hdls = tc_server.read()

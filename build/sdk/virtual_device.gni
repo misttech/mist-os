@@ -136,7 +136,7 @@ template("virtual_device_specification") {
         window_size = emu_window_size
         vsock = {
           enabled = false
-          cid = 3
+          cid = 0
         }
         memory = _memory
         storage = _storage

@@ -4,6 +4,7 @@
 
 # Used by Honeydew's Fuchsia Controller WLAN affordance
 wlan_fidls_allowlist = [
+  "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter",
   "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin",
   "//sdk/fidl/fuchsia.net.root:fuchsia.net.root",

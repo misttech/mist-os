@@ -96,9 +96,9 @@ pub mod filter {
 
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
-        FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
-        PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule, TransparentProxy,
-        TransportProtocolMatcher, Tuple, UninstalledRoutine, ValidationError,
+        FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, MarkAction,
+        NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
+        TransparentProxy, TransportProtocolMatcher, Tuple, UninstalledRoutine, ValidationError,
     };
 }
 
@@ -167,10 +167,10 @@ pub mod neighbor {
 /// Types and utilities for dealing with routes.
 pub mod routes {
     // Re-exported types.
-    pub use netstack3_base::WrapBroadcastMarker;
+    pub use netstack3_base::{Marks, WrapBroadcastMarker};
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
-        Generation, MarkMatcher, MarkMatchers, Marks, Metric, NextHop, RawMetric, ResolvedRoute,
+        Generation, MarkMatcher, MarkMatchers, Metric, NextHop, RawMetric, ResolvedRoute,
         RoutableIpAddr, RouteResolveOptions, RoutingTableId, Rule, RuleAction, RuleMatcher,
         TrafficOriginMatcher,
     };
@@ -217,6 +217,12 @@ pub mod tcp {
     };
 }
 
+/// Tracing utilities.
+pub mod trace {
+    // Re-export all of the trace crate to match how the rest of core works.
+    pub use netstack3_trace::*;
+}
+
 /// Miscellaneous and common types.
 pub mod types {
     pub use netstack3_base::{Counter, WorkQueueReport};
@@ -236,8 +242,7 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TracingContext,
-    TxMetadataBindingsTypes,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};

@@ -43,11 +43,11 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryRegularFile};
 use starnix_logging::track_stub;
 use starnix_types::user_buffer::UserBuffer;
-use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::{errno, error};
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -128,7 +128,7 @@ fn attempt_open_path(
     let result = unsafe { magma_device_import(device_channel, &mut device_out as *mut u64) };
 
     if result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     let magma_device = MagmaDevice { handle: device_out };
 
@@ -143,12 +143,12 @@ fn attempt_open_path(
         )
     };
     if query_result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
 
     let vendor_id = result_out as u16;
     if !supported_vendor_list.contains(&vendor_id) {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     Ok(magma_device)
 }
@@ -166,11 +166,12 @@ pub fn device_import(
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
 ) -> Result<MagmaDevice, Errno> {
-    let entries =
-        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+    let entries = std::fs::read_dir("/svc/fuchsia.gpu.magma.Service")
+        .map_err(|_| errno!(EINVAL))?
+        .filter_map(|x| x.ok());
 
-    let mut magma_devices =
-        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendors).ok());
+    let mut magma_devices = entries
+        .filter_map(|entry| attempt_open_path(entry.path().join("device"), supported_vendors).ok());
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
 
     if magma_devices.next().is_some() {
@@ -186,11 +187,13 @@ pub fn device_import(
 }
 
 fn get_magma_vendor_id(supported_vendor_list: &Vec<u16>) -> Result<u64, Errno> {
-    let entries =
-        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+    let entries = std::fs::read_dir("/svc/fuchsia.gpu.magma.Service")
+        .map_err(|_| errno!(EINVAL))?
+        .filter_map(|x| x.ok());
 
-    let mut magma_devices =
-        entries.filter_map(|entry| attempt_open_path(entry.path(), supported_vendor_list).ok());
+    let mut magma_devices = entries.filter_map(|entry| {
+        attempt_open_path(entry.path().join("device"), supported_vendor_list).ok()
+    });
     let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
     let mut result_out = 0;
     let mut result_buffer_out = 0;
@@ -203,7 +206,7 @@ fn get_magma_vendor_id(supported_vendor_list: &Vec<u16>) -> Result<u64, Errno> {
         )
     };
     if query_result != MAGMA_STATUS_OK {
-        return Err(errno!(EINVAL));
+        return error!(EINVAL);
     }
     return Ok(result_out);
 }
@@ -501,7 +504,8 @@ pub fn export_buffer(
             if let Some(image_info) = image_info_opt {
                 ImageFile::new_file(current_task, image_info, memory)
             } else {
-                Anon::new_file(
+                // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+                Anon::new_private_file(
                     current_task,
                     Box::new(MemoryRegularFile::new(Arc::new(memory))),
                     OpenFlags::RDWR,
@@ -560,7 +564,8 @@ pub fn get_buffer_handle(
     } else {
         let memory =
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
-        let file = Anon::new_file(
+        // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let file = Anon::new_private_file(
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
@@ -599,7 +604,8 @@ pub fn query(
         let memory =
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) });
         let memory_size = memory.get_size();
-        let file = Anon::new_file_extended(
+        // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let file = Anon::new_private_file_extended(
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,

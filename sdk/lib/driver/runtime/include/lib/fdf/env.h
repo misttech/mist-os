@@ -6,6 +6,7 @@
 #define LIB_FDF_ENV_H_
 
 #include <lib/fdf/dispatcher.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS
@@ -30,8 +31,12 @@ struct fdf_env_driver_shutdown_observer {
   fdf_env_driver_shutdown_handler_t* handler;
 };
 
+// When new dispatchers are created, enforce that scheduler_roles specified must line up with
+// roles previously registered via the `fdf_env_add_allowed_scheduler_role_for_driver` API.
+#define FDF_ENV_ENFORCE_ALLOWED_SCHEDULER_ROLES ((uint32_t)1u << 0)
+
 // Start the driver runtime. This sets up the initial thread that the dispatchers run on.
-zx_status_t fdf_env_start();
+zx_status_t fdf_env_start(uint32_t options);
 
 // Resets the driver runtime to zero threads. This may only be called when there are no
 // existing dispatchers.
@@ -63,7 +68,6 @@ void fdf_env_dispatcher_get_dump_deprecated(fdf_dispatcher_t* dispatcher, char**
 // after all the dispatcher's shutdown observers have been called, and will be running
 // on the thread of the final dispatcher which has been shutdown.
 //
-// after all dispatcher's shutdown observers have had their handlers called.
 // While a driver is shutting down, no new dispatchers can be created by the driver.
 //
 // If this succeeds, you must keep the |observer| object alive until the
@@ -126,6 +130,24 @@ uint32_t fdf_env_get_thread_limit(const char* scheduler_role, size_t scheduler_r
 // ZX_ERR_OUT_OF_RANGE: |max_threads| is less that the current number of threads.
 zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t scheduler_role_len,
                                      uint32_t max_threads);
+
+// Adds an allowed scheduler role for the given driver.
+void fdf_env_add_allowed_scheduler_role_for_driver(const void* driver, const char* role,
+                                                   size_t role_length) ZX_AVAILABLE_SINCE(NEXT);
+
+// Gets the opaque pointer uniquely associated with the driver currently running on the
+// thread identified by |tid|.
+//
+// Returns the driver pointer through out parameter |out_driver|.
+//
+// # Errors
+//
+// ZX_ERR_NOT_FOUND: If the tid did not have a driver running on it, or the tid was not able
+// to be identified.
+//
+// ZX_ERR_INVALID_ARGS: If the out_driver is not valid.
+zx_status_t fdf_env_get_driver_on_tid(zx_koid_t tid, const void** out_driver)
+    ZX_AVAILABLE_SINCE(NEXT);
 
 __END_CDECLS
 

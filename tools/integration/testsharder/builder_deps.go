@@ -98,21 +98,16 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 	return nil
 }
 
-func checkoutRootFromBuildDir(buildDir string) string {
-	return filepath.Join(buildDir, "../..")
-}
-
 // GetBuilderDeps returns all the deps required from the checkout/build that a builder needs
 // as file paths relative to the checkout root, including all shard deps and deps required by
 // the orchestrator builder.
-func GetBuilderDeps(shards []*Shard, buildDir string, tools build.Tools, hostPlatform string, extraDeps []string) ([]string, error) {
+func GetBuilderDeps(shards []*Shard, buildDir, checkoutDir string, tools build.Tools, hostPlatform string, extraDeps []string) ([]string, error) {
 	allDepsMap := make(map[string]string)
-	checkoutRoot := checkoutRootFromBuildDir(buildDir)
 	for _, s := range shards {
 		for _, dep := range s.Deps {
 			if _, ok := allDepsMap[dep]; !ok {
 				absPath := filepath.Join(buildDir, dep)
-				relToCheckout, err := filepath.Rel(checkoutRoot, absPath)
+				relToCheckout, err := filepath.Rel(checkoutDir, absPath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get rel path of %s to checkout: %w", absPath, err)
 				}
@@ -129,7 +124,7 @@ func GetBuilderDeps(shards []*Shard, buildDir string, tools build.Tools, hostPla
 			return nil, err
 		}
 		absPath := filepath.Join(buildDir, t.Path)
-		relToCheckout, err := filepath.Rel(checkoutRoot, absPath)
+		relToCheckout, err := filepath.Rel(checkoutDir, absPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get rel path of %s to checkout: %w", absPath, err)
 		}
@@ -137,12 +132,12 @@ func GetBuilderDeps(shards []*Shard, buildDir string, tools build.Tools, hostPla
 	}
 	// Add other files required by the orchestrator.
 	for _, file := range extraDeps {
-		relToCheckout, err := filepath.Rel(checkoutRoot, file)
+		relToCheckout, err := filepath.Rel(checkoutDir, file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get rel path of %s to checkout: %w", file, err)
 		}
 		if strings.HasPrefix(relToCheckout, "..") {
-			return nil, fmt.Errorf("%s must be within the checkout root at %s", file, checkoutRoot)
+			return nil, fmt.Errorf("%s must be within the checkout root at %s", file, checkoutDir)
 		}
 		allDepsMap[file] = relToCheckout
 	}
@@ -156,11 +151,10 @@ func GetBuilderDeps(shards []*Shard, buildDir string, tools build.Tools, hostPla
 
 // WriteCASPathsJSONFile writes all the builder deps to a file in the format
 // expected from `cas archive -paths-json`.
-func WriteCASPathsJSONFile(allDeps []string, buildDir, depsFile string) error {
-	checkoutRoot := checkoutRootFromBuildDir(buildDir)
+func WriteCASPathsJSONFile(allDeps []string, buildDir, checkoutDir, depsFile string) error {
 	casPaths := [][2]string{}
 	for _, relPath := range allDeps {
-		casPaths = append(casPaths, [2]string{checkoutRoot, relPath})
+		casPaths = append(casPaths, [2]string{checkoutDir, relPath})
 	}
 	f, err := os.Create(depsFile)
 	if err != nil {

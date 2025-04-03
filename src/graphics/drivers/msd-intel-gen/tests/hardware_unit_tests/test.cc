@@ -52,9 +52,9 @@ inline void RestartAndWait(std::string driver_url) {
   // Loop until a new device with the correct specs is found.
   auto deadline_time = zx::clock::get_monotonic() + zx::sec(40);
   while (zx::clock::get_monotonic() < deadline_time) {
-    for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
-      auto magma_client =
-          component::Connect<fuchsia_gpu_magma::TestDevice>(static_cast<std::string>(p.path()));
+    for (auto& p : std::filesystem::directory_iterator("/svc/fuchsia.gpu.magma.Service")) {
+      auto magma_client = component::Connect<fuchsia_gpu_magma::TestDevice>(
+          static_cast<std::string>(p.path()) + "/device");
 
       magma_device_t device;
       EXPECT_EQ(MAGMA_STATUS_OK,

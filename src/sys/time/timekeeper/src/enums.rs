@@ -257,3 +257,9 @@ impl Into<CobaltTimeSourceEvent> for TimeSourceError {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum UserAdjustUtcOutcome {
+    Failed,
+    Succeeded,
+}

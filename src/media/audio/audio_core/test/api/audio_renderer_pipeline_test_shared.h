@@ -376,7 +376,7 @@ class AudioRendererEffectsV1Test
       AudioBuffer<fuchsia::media::AudioSampleFormat::SIGNED_16>* audio_buffer_ptr) {
     auto& samples = audio_buffer_ptr->samples();
     for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
-      sample = -sample;
+      sample = static_cast<std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT>(-sample);
     }
   }
 
@@ -499,7 +499,7 @@ class AudioRendererPipelineTuningTest
       AudioBuffer<fuchsia::media::AudioSampleFormat::SIGNED_16>* audio_buffer_ptr) {
     auto& samples = audio_buffer_ptr->samples();
     for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
-      sample = -sample;
+      sample = static_cast<std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT>(-sample);
     }
   }
 

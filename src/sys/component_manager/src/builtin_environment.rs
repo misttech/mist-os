@@ -82,6 +82,7 @@ use builtins::power_resource::PowerResource;
 use builtins::profile_resource::ProfileResource;
 use builtins::root_job::RootJob;
 use builtins::stall_resource::StallResource;
+use builtins::tracing_resource::TracingResource;
 use builtins::vmex_resource::VmexResource;
 use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{
@@ -94,7 +95,7 @@ use elf_runner::process_launcher::ProcessLauncher;
 use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd};
 use fidl_fuchsia_component_internal::BuiltinBootResolver;
-use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+use fidl_fuchsia_component_runner::Task as DiagnosticsTask;
 use fuchsia_component::server::*;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::stats::InspectorExt;
@@ -730,8 +731,8 @@ impl RootComponentInputBuilder {
             runner.name().clone(),
             Some(self.policy_checker.clone()),
             Arc::new(move |server_end, weak_component| {
-                let flags = fio::OpenFlags::empty();
-                let mut object_request = flags.to_object_request(server_end);
+                const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+                let mut object_request = FLAGS.to_object_request(server_end);
                 runner
                     .factory()
                     .clone()
@@ -739,7 +740,7 @@ impl RootComponentInputBuilder {
                         ScopedPolicyChecker::new(security_policy.clone(), weak_component.moniker),
                         OpenRequest::new(
                             execution_scope.clone(),
-                            flags,
+                            FLAGS,
                             Path::dot(),
                             &mut object_request,
                         ),
@@ -1373,6 +1374,28 @@ impl BuiltinEnvironment {
             );
         }
 
+        // Set up the TracingResource service.
+        let tracing_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_TRACING_BASE,
+                        1,
+                        b"tracing",
+                    )
+                    .ok()
+            })
+            .map(TracingResource::new)
+            .and_then(Result::ok);
+        if let Some(tracing_resource) = tracing_resource {
+            root_input_builder.add_builtin_protocol_if_enabled::<fkernel::TracingResourceMarker>(
+                move |stream| tracing_resource.clone().serve(stream).boxed(),
+            );
+        }
+
         // Set up the VmexResource service.
         let vmex_resource = system_resource_handle
             .as_ref()
@@ -1608,7 +1631,7 @@ impl BuiltinEnvironment {
             let root = self.model.top_instance().root();
             let root = WeakComponentInstance::new(&root);
             scope.spawn(async move {
-                let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();
+                let flags: fio::Flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into();
                 let mut object_request = flags.to_object_request(server_end);
                 object_request.wait_till_ready().await;
                 if let Ok(root) = root.upgrade() {
@@ -1801,11 +1824,12 @@ impl BuiltinEnvironment {
     async fn connect_to_tracing_from_exposed(&self) {
         let (trace_provider_proxy, server) = endpoints::create_proxy::<ftp::RegistryMarker>();
         let root = self.model.root();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server);
+        const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
+        let mut object_request = FLAGS.to_object_request(server);
         match root
             .open_exposed(OpenRequest::new(
                 root.execution_scope.clone(),
-                fio::OpenFlags::empty(),
+                FLAGS,
                 ftp::RegistryMarker::PROTOCOL_NAME.try_into().unwrap(),
                 &mut object_request,
             ))

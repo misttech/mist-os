@@ -2111,7 +2111,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_write_mtime_ctime() {
+    async fn test_write_timestamps() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
@@ -2127,10 +2127,20 @@ mod tests {
         .await;
 
         file::write(&file, &[1, 2, 3, 4]).await.expect("write failed");
-        let write_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        // Remove `PENDING_ACCESS_TIME_UPDATE` from the query as no file access has been made.
+        let write_attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
+        .await;
         assert_eq!(
             write_attributes.mutable_attributes.modification_time,
             write_attributes.immutable_attributes.change_time
+        );
+        // Access time should not have been updated for a write
+        assert!(
+            write_attributes.mutable_attributes.access_time
+                < write_attributes.mutable_attributes.modification_time
         );
 
         // Do something else that should not change mtime or ctime
@@ -2141,6 +2151,10 @@ mod tests {
             .expect("seek failed");
         file::read(&file).await.expect("read failed");
         let read_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        assert!(
+            read_attributes.mutable_attributes.access_time
+                > write_attributes.mutable_attributes.access_time
+        );
         assert_eq!(
             write_attributes.mutable_attributes.modification_time,
             read_attributes.mutable_attributes.modification_time,
@@ -2150,16 +2164,24 @@ mod tests {
             read_attributes.immutable_attributes.change_time,
         );
 
-        // Syncing the file should have no affect on ctime
+        // Syncing the file should have no affect on the timestamps
         file.sync().await.unwrap().unwrap();
-        let sync_attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+        let sync_attributes = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
+        .await;
         assert_eq!(
-            write_attributes.mutable_attributes.modification_time,
+            read_attributes.mutable_attributes.modification_time,
             sync_attributes.mutable_attributes.modification_time,
         );
         assert_eq!(
-            write_attributes.immutable_attributes.change_time,
+            read_attributes.immutable_attributes.change_time,
             sync_attributes.immutable_attributes.change_time,
+        );
+        assert_eq!(
+            read_attributes.mutable_attributes.access_time,
+            sync_attributes.mutable_attributes.access_time,
         );
 
         close_file_checked(file).await;

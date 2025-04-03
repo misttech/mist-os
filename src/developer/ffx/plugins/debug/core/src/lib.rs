@@ -38,7 +38,7 @@ impl FfxMain for CoreTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
         let sdk = self.context.get_sdk()?;
-        if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
+        if let Err(e) = symbol_index::ensure_symbol_index_registered(&self.context) {
             eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 

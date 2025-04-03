@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 
 const HOST_TEST_BINARY_OPTION: &str = "host_test_binary";
@@ -19,7 +20,7 @@ const OUTPUT_DIRECTORY_OPTION: &str = "output_directory";
 const BINARY_OPTION: &str = "binary";
 const TEST_CONFIG_FILE_PATTERN: &str = "test_config_file";
 const RESOLVED_HOST_TEST_ARGS_EXPECT: &str =
-    "resolved_host_test_args called on unvalidated TestConfig";
+    "TestConfig is validated prior to calling resolved_host_test_args";
 
 /// Parameters describing a test to be run.
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
@@ -72,13 +73,15 @@ impl TestConfig {
     #[allow(dead_code)]
     pub fn resolved_host_test_args<'a>(
         &'a self,
-        test_config_file_path: &'a str,
+        test_config_file_path: &'a PathBuf,
     ) -> Box<dyn Iterator<Item = Cow<'a, str>> + 'a> {
         if self.host_test_args.is_empty() {
             // Default host test arguments are <path to JSON test params> <path to output dir>.
             return Box::new(
                 [
-                    Cow::from(test_config_file_path),
+                    Cow::from(
+                        test_config_file_path.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT),
+                    ),
                     Cow::from(
                         self.output_directory.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT),
                     ),
@@ -96,14 +99,14 @@ impl TestConfig {
 
     /// Validates `self`.
     fn validate(&self) -> Result<(), UsageError> {
+        validate_binary_path(&self.host_test_binary, Name::from_str(HOST_TEST_BINARY_OPTION))?;
+
         for arg in &self.host_test_args {
             self.validate_arg(arg)?;
         }
 
         for output_processor in &self.output_processors {
-            if output_processor.binary == PathBuf::new() {
-                return Err(UsageError::MissingRequiredParameter(Name::from_str(BINARY_OPTION)));
-            }
+            validate_binary_path(&output_processor.binary, Name::from_str(BINARY_OPTION))?;
 
             for arg in &output_processor.args {
                 self.validate_arg(arg)?;
@@ -145,7 +148,7 @@ impl TestConfig {
 
     /// Formats a host test or output processor argument by performing substitutions. This
     /// function assumes that `self` has been validated.
-    fn format_arg<'a>(&'a self, arg: &'a str, test_config_file_path: &str) -> Cow<'a, str> {
+    fn format_arg<'a>(&'a self, arg: &'a str, test_config_file_path: &PathBuf) -> Cow<'a, str> {
         if !arg.contains('{') {
             return Cow::from(arg);
         }
@@ -170,7 +173,11 @@ impl TestConfig {
 
     /// Returns the string value for a substitution pattern. `arg` is the argument containing
     /// the pattern. This function assumes that `self` has been validated.
-    fn value_for_pattern<'a>(&'a self, pattern: &str, test_config_file_path: &'a str) -> &'a str {
+    fn value_for_pattern<'a>(
+        &'a self,
+        pattern: &str,
+        test_config_file_path: &'a PathBuf,
+    ) -> &'a str {
         match pattern {
             HOST_TEST_BINARY_OPTION => {
                 self.host_test_binary.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT)
@@ -178,7 +185,9 @@ impl TestConfig {
             OUTPUT_DIRECTORY_OPTION => {
                 self.output_directory.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT)
             }
-            TEST_CONFIG_FILE_PATTERN => test_config_file_path,
+            TEST_CONFIG_FILE_PATTERN => {
+                test_config_file_path.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT)
+            }
             _ => self
                 .unknown
                 .get(pattern)
@@ -229,13 +238,15 @@ impl OutputProcessor {
     pub fn resolved_args<'a>(
         &'a self,
         test_config: &'a TestConfig,
-        test_config_file_path: &'a str,
+        test_config_file_path: &'a PathBuf,
     ) -> Box<dyn Iterator<Item = Cow<'a, str>> + 'a> {
         if self.args.is_empty() {
             // Default host test arguments are <path to JSON test params> <path to output dir>.
             return Box::new(
                 [
-                    Cow::from(test_config_file_path),
+                    Cow::from(
+                        test_config_file_path.to_str().expect(RESOLVED_HOST_TEST_ARGS_EXPECT),
+                    ),
                     Cow::from(
                         test_config
                             .output_directory
@@ -251,6 +262,23 @@ impl OutputProcessor {
             self.args.iter().map(|arg| test_config.format_arg(arg.as_str(), test_config_file_path)),
         )
     }
+}
+
+/// Validate a binary file path, checking that the file exists and is an executable file.
+fn validate_binary_path(path: &PathBuf, option: Name) -> Result<(), UsageError> {
+    if !path.exists() {
+        return Err(UsageError::BinaryDoesNotExist { option, path: path.clone() });
+    }
+
+    if let Ok(metadata) = fs::metadata(&path) {
+        if !metadata.is_file() {
+            return Err(UsageError::BinaryIsNotAFile { option, path: path.clone() });
+        }
+    } else {
+        return Err(UsageError::BinaryUnreadable { option, path: path.clone() });
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -451,11 +479,10 @@ mod tests {
         );
         let result = TestConfig::from_env_like(&fake_env, test_schema(), &mut NullLogger);
         assert_matches!(result, Ok(_));
-        assert!(result.unwrap().resolved_host_test_args("test/params/path").eq(vec![
-            "test/params/path",
-            "/nonexistent"
-        ]
-        .into_iter()));
+        assert!(result
+            .unwrap()
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
+            .eq(vec!["test/params/path", "/nonexistent"].into_iter()));
 
         // Multiple args, no patterns.
         let fake_env = FakeEnv::new(
@@ -471,7 +498,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1", "true", "thing"].into_iter()));
 
         // One arg, no patterns.
@@ -487,7 +514,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["just_one"].into_iter()));
 
         // Three args, one pattern in first position.
@@ -504,7 +531,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1", "true", "thing"].into_iter()));
 
         // Three args, one pattern in second position.
@@ -521,7 +548,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1", "true", "thing"].into_iter()));
 
         // Three args, one pattern in third position.
@@ -538,7 +565,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1", "true", "thing"].into_iter()));
 
         // Three args, three patterns.
@@ -555,7 +582,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1", "true", "thing"].into_iter()));
 
         // One arg with initial pattern.
@@ -572,7 +599,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with embedded pattern.
@@ -589,7 +616,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with final pattern.
@@ -606,7 +633,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with two initial patterns.
@@ -623,7 +650,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with one initial and one final pattern.
@@ -640,7 +667,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with two final patterns.
@@ -657,7 +684,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         // One arg with three patterns.
@@ -674,7 +701,7 @@ mod tests {
         assert_matches!(result, Ok(_));
         assert!(result
             .unwrap()
-            .resolved_host_test_args("test/params/path")
+            .resolved_host_test_args(&PathBuf::from("test/params/path"))
             .eq(vec!["1truething"].into_iter()));
 
         temp_file.close().expect("Failed to close temporary file");

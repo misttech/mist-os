@@ -22,7 +22,6 @@ rustc_library("elf_runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
-    "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
@@ -78,6 +77,7 @@ rustc_library("elf_runner") {
 
   test_deps = [
     "//src/lib/diagnostics/log/message/rust",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/scoped_task",

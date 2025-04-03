@@ -220,7 +220,7 @@ else
     fx-warn "No default device set. If 'fx serve' gets stuck on"
     fx-warn "\"Discovery...\" you can set a default device by running"
     fx-warn "'ffx target list' to get a list of devices, and then running"
-    fx-warn "'ffx target default set'."
+    fx-warn "'fx set-device'."
     fx-warn "\n"
   else
     fx-info ""
@@ -257,7 +257,7 @@ while true; do
         if [[ -n "${device_name}" ]]; then
           log "Trying to resolve '${device_name}'..."
         else
-          log "Either no device or multiple devices are discoverable. Run 'ffx target list' and if necessary run 'ffx target default set'."
+          log "Either no device or multiple devices are discoverable. Run 'ffx target list' and if necessary run 'fx set-device'."
         fi
       else
         log "Trying to connect to ${device_addr}..."

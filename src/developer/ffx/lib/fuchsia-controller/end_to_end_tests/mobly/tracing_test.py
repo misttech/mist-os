@@ -32,9 +32,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
-            "core/trace_manager", tracing_controller.Provisioner.MARKER
+            "core/trace_manager", tracing_controller.ProvisionerMarker
         )
-        controller = tracing_controller.Provisioner.Client(ch)
+        controller = tracing_controller.ProvisionerClient(ch)
         res = await controller.get_known_categories()
         asserts.assert_true(
             res.response,
@@ -57,9 +57,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
-            "core/trace_manager", tracing_controller.Provisioner.MARKER
+            "core/trace_manager", tracing_controller.ProvisionerMarker
         )
-        provisioner = tracing_controller.Provisioner.Client(ch)
+        provisioner = tracing_controller.ProvisionerClient(ch)
         categories = [
             "blobfs",
             "gfx",
@@ -78,7 +78,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         provisioner.initialize_tracing(
             controller=server_end.take(), config=config, output=server.take()
         )
-        controller = tracing_controller.Session.Client(client_end)
+        controller = tracing_controller.SessionClient(client_end)
 
         await controller.start_tracing()
         socket_task = asyncio.get_running_loop().create_task(client.read_all())

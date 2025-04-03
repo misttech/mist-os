@@ -77,7 +77,6 @@ class FuchsiaConfigurationData {
   cobalt::ReleaseStage release_stage_;
   cobalt::CobaltServiceInterface::DataCollectionPolicy data_collection_policy_;
   bool watch_for_user_consent_;
-  bool enable_replacement_metrics_;
   SystemProfile_BuildType build_type_;
 };
 

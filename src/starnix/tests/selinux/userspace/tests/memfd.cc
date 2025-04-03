@@ -17,9 +17,9 @@ TEST(PolicyLoadTest, MemFdsRetrospectivelyLabeledOnPolicyLoad) {
   EXPECT_THAT((before_policy_fd = memfd_create("test", 0)), SyscallSucceeds());
 
   LoadPolicy("memfd_transition.pp");
-  EXPECT_THAT(before_policy_fd, FdIsLabeled("system_u:object_r:transition_t:s0"));
+  EXPECT_THAT(GetLabel(before_policy_fd), "system_u:object_r:transition_t:s0");
 
   int fd;
   EXPECT_THAT((fd = memfd_create("test", 0)), SyscallSucceeds());
-  EXPECT_THAT(fd, FdIsLabeled("system_u:object_r:transition_t:s0"));
+  EXPECT_THAT(GetLabel(fd), "system_u:object_r:transition_t:s0");
 }

@@ -257,7 +257,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::path::Path;
-    use vfs::pseudo_directory;
+    use vfs::{pseudo_directory, ToObjectRequest as _};
     use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn mock_pkg_resolver(
@@ -401,12 +401,14 @@ mod tests {
             match server.try_next().await.unwrap().expect("client makes one request") {
                 fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
                     assert_eq!(package_url, "fuchsia-pkg://fuchsia.example/test");
-                    fs.clone().open(
-                        ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                        Path::dot(),
-                        dir.into_channel().into(),
-                    );
+                    fio::PERM_READABLE.to_object_request(dir).handle(|request| {
+                        fs.clone().open3(
+                            ExecutionScope::new(),
+                            Path::dot(),
+                            fio::PERM_READABLE,
+                            request,
+                        )
+                    });
                     responder
                         .send(Ok(&fpkg::ResolutionContext { bytes: b"context-contents".to_vec() }))
                         .unwrap();
@@ -456,12 +458,14 @@ mod tests {
                         context,
                         fpkg::ResolutionContext { bytes: b"incoming-context".to_vec() }
                     );
-                    fs.clone().open(
-                        ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                        Path::dot(),
-                        dir.into_channel().into(),
-                    );
+                    fio::PERM_READABLE.to_object_request(dir).handle(|request| {
+                        fs.clone().open3(
+                            ExecutionScope::new(),
+                            Path::dot(),
+                            fio::PERM_READABLE,
+                            request,
+                        )
+                    });
                     responder
                         .send(Ok(&fpkg::ResolutionContext { bytes: b"outgoing-context".to_vec() }))
                         .unwrap();
@@ -571,14 +575,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_fails_with_component_not_found() {
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        pseudo_directory! {}.clone().open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            dir_server.into_channel().into(),
-        );
-
+        let fs = pseudo_directory! {};
+        let dir = vfs::directory::serve_read_only(fs);
         assert_matches!(
             resolve_component(
                 &"fuchsia-pkg://fuchsia.com/test#meta/test.cm".parse().unwrap(),
@@ -610,21 +608,13 @@ mod tests {
             ..Default::default()
         };
         let cvf_bytes = fidl::persist(&expected_config.clone()).unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        pseudo_directory! {
+        let fs = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
                 "test_with_config.cvf" => read_only(cvf_bytes),
-            },
-        }
-        .clone()
-        .open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            dir_server.into_channel().into(),
-        );
-
+            }
+        };
+        let dir = vfs::directory::serve_read_only(fs);
         assert_matches!(
             resolve_component(
                 &"fuchsia-pkg://fuchsia.example/test#meta/test_with_config.cm".parse().unwrap(),
@@ -659,20 +649,12 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        pseudo_directory! {
+        let fs = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
             },
-        }
-        .clone()
-        .open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            dir_server.into_channel().into(),
-        );
-
+        };
+        let dir = vfs::directory::serve_read_only(fs);
         assert_matches!(
             resolve_component(
                 &"fuchsia-pkg://fuchsia.example/test#meta/test_with_config.cm".parse().unwrap(),
@@ -692,21 +674,13 @@ mod tests {
         })
         .unwrap();
         let cvf_bytes = fidl::persist(&fdecl::ConfigValuesData::default().clone()).unwrap();
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        pseudo_directory! {
+        let fs = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test_with_config.cm" => read_only(cm_bytes),
                 "test_with_config.cvf" => read_only(cvf_bytes),
             },
-        }
-        .clone()
-        .open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            dir_server.into_channel().into(),
-        );
-
+        };
+        let dir = vfs::directory::serve_read_only(fs);
         assert_matches!(
             resolve_component(
                 &"fuchsia-pkg://fuchsia.com/test#meta/test_with_config.cm".parse().unwrap(),
@@ -720,24 +694,17 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn resolve_component_sets_pkg_abi_revision() {
-        let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let cm_bytes = fidl::persist(&fdecl::Component::default().clone())
             .expect("failed to encode ComponentDecl FIDL");
-        pseudo_directory! {
+        let fs = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "test.cm" => read_only(cm_bytes),
                 "fuchsia.abi" => pseudo_directory! {
                   "abi-revision" => read_only(1u64.to_le_bytes()),
                 }
             },
-        }
-        .clone()
-        .open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            dir_server.into_channel().into(),
-        );
+        };
+        let dir = vfs::directory::serve_read_only(fs);
         let resolved_component = resolve_component(
             &"fuchsia-pkg://fuchsia.com/test#meta/test.cm".parse().unwrap(),
             dir,

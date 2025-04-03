@@ -17,6 +17,7 @@ rustc_library("fidl_driver") {
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
   ]
+  test_deps = [ "//src/devices/bin/driver_runtime" ]
   with_unit_tests = true
 
   # Rust fidl driver transport support is currently experimental, and restricted by a visibility

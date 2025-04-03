@@ -163,27 +163,25 @@ async fn mount_main_starnix_volume(
     }
 }
 
-async fn mount_test_starnix_volume(
+async fn create_starnix_volume_impl(
     environment: &Arc<Mutex<dyn Environment>>,
+    starnix_volume_name: &str,
     crypt: ClientEnd<CryptMarker>,
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
     let mut env = environment.lock().await;
     if let Some(multi_vol_fs) = env.get_container() {
-        // If the test starnix volume already exists, unmount if mounted and then remove.
-        if multi_vol_fs.has_volume(STARNIX_TEST_VOLUME_NAME).await? {
-            if let Some(_) = multi_vol_fs.volume(STARNIX_TEST_VOLUME_NAME) {
-                log::warn!(
-                    "WARNING: Unmounting the Starnix test volume. Either the prior system
-                        test did not unmount on exit or a concurrent system test is running!"
-                );
-                multi_vol_fs.shutdown_volume(STARNIX_TEST_VOLUME_NAME).await?;
+        // If the starnix volume already exists, unmount if mounted and then remove.
+        if multi_vol_fs.has_volume(starnix_volume_name).await? {
+            if let Some(_) = multi_vol_fs.volume(starnix_volume_name) {
+                log::warn!("Unmounting the Starnix volume.");
+                multi_vol_fs.shutdown_volume(starnix_volume_name).await?;
             }
-            multi_vol_fs.remove_volume(STARNIX_TEST_VOLUME_NAME).await?;
+            multi_vol_fs.remove_volume(starnix_volume_name).await?;
         }
         let mounted_vol = multi_vol_fs
             .create_volume(
-                STARNIX_TEST_VOLUME_NAME,
+                starnix_volume_name,
                 CreateOptions::default(),
                 MountOptions { crypt: Some(crypt), ..MountOptions::default() },
             )
@@ -202,7 +200,7 @@ async fn mount_starnix_volume(
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
     if config.starnix_volume_name.is_empty() {
-        mount_test_starnix_volume(environment, crypt, exposed_dir).await
+        create_starnix_volume_impl(environment, STARNIX_TEST_VOLUME_NAME, crypt, exposed_dir).await
     } else {
         mount_main_starnix_volume(
             environment,
@@ -212,6 +210,21 @@ async fn mount_starnix_volume(
         )
         .await
     }
+}
+
+async fn create_starnix_volume(
+    environment: &Arc<Mutex<dyn Environment>>,
+    config: &fshost_config::Config,
+    crypt: ClientEnd<CryptMarker>,
+    exposed_dir: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), Error> {
+    let volume_name = if config.starnix_volume_name.is_empty() {
+        STARNIX_TEST_VOLUME_NAME
+    } else {
+        &config.starnix_volume_name
+    };
+
+    create_starnix_volume_impl(environment, volume_name, crypt, exposed_dir).await
 }
 
 async fn unmount_starnix_volume(
@@ -821,6 +834,24 @@ pub fn fshost_volume_provider(
                             };
                         responder.send(res).unwrap_or_else(|e| {
                             log::error!("failed to send Mount response. error: {:?}", e);
+                        });
+                    }
+                    Ok(fshost::StarnixVolumeProviderRequest::Create {
+                        crypt,
+                        exposed_dir,
+                        responder,
+                    }) => {
+                        log::info!("volume provider create called");
+                        let res =
+                            match create_starnix_volume(&env, &config, crypt, exposed_dir).await {
+                                Ok(()) => Ok(()),
+                                Err(e) => {
+                                    log::error!("volume provider service: create failed: {:?}", e);
+                                    Err(zx::Status::INTERNAL.into_raw())
+                                }
+                            };
+                        responder.send(res).unwrap_or_else(|e| {
+                            log::error!("failed to send Create response. error: {:?}", e);
                         });
                     }
                     Ok(fshost::StarnixVolumeProviderRequest::Unmount { responder }) => {

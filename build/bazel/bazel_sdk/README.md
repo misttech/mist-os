@@ -7,28 +7,43 @@ rest of the migration to Bazel, and will be updated accordingly.
 
 ## The GN-generated IDKs and Bazel SDKs
 
-### The Fuchsia Core IDK
+### The Fuchsia IDK
 
-The GN `//sdk:final_fuchsia_idk` target is used to build and
-validate the Fuchsia Core IDK, which is the official archive
-distributed to third-party developers, and which all atoms in
-the "partner" category, as well as prebuilt binaries for all
-supported CPU architectures, and supported API levels.
+The GN `//sdk:final_fuchsia_idk` target is used to build [^1] and validate the
+Fuchsia IDK (formerly known as the "core" or "partner" IDK), which is the
+official archive distributed to third-party SDK developers. It contains all
+atoms in the "partner" category, as well as prebuilt binaries for all
+combinations of supported CPU architectures and API levels.
 
 Currently, this is built directly from Ninja (no Bazel required)
-as the shape of the Core IDK (i.e. which atoms it includes) it
-entirely defined in the GN build graph.
+as the shape of the Fuchsia IDK (i.e. which atoms it includes) it
+entirely defined in the GN build graph (in [`//sdk/BUILD.gn`](/sdk/BUILD.gn)).
 
-Note that building the core IDK is very long, due to the high number
-of `(cpu, api_level)` combinations it needs to support. Thus is only
-built by a few dedicated builder configurations (e.g. `sdk-core-linux`).
+Note that building the Fuchsia IDK takes a long time [^2][^3] due to the high
+number of `(cpu, api_level)` combinations that must be built. Thus, this target
+is only built by a few dedicated builder configurations (e.g. `sdk-core-linux`).
 
-### The Fuchsia Core Bazel SDK
+[^1]: `//sdk:final_fuchsia_idk.exported` is the GN target for the IDK.
+`//sdk:final_fuchsia_idk` wraps it along with its validation and archive
+targets.
 
-The GN `//sdk:final_fuchsia_sdk` target is used to build and
-validate the official Fuchsia Bazel SDK distributed to third-party
-developers. It augments the Core IDK with our set of Bazel-specific
-build rules and target declarations.
+[^2]: Because these sub-builds are rarely built, the remote cache is rarely
+helpful. As a result, each sub-build takes approximately 5 to 8 minutes. Due to
+sub-build mechanics, the sub-builds cannot start until the contents of the IDK
+have already been built once and thus start late in the build. Also, sub-build
+parallelism is limited for performance reasons, so there will be effectively
+multiple rounds of sub-builds.
+
+[^3]: For local builds, the build time can be
+significantly reduced by setting the `override_idk_target_cpus` and
+`override_idk_buildable_api_levels` GN args.
+
+### The Fuchsia Bazel SDK
+
+The GN `//sdk:final_fuchsia_sdk` target is used to build (but not validate or
+generate the archive) the official Fuchsia Bazel SDK distributed to third-party
+developers. It augments the Fuchsia IDK with our set of Bazel-specific build
+rules and target declarations.
 
 Its content is directly usable by third-party Bazel projects, which
 can include it with a simple `local_repository()` directive in their
@@ -37,41 +52,43 @@ can include it with a simple `local_repository()` directive in their
 ```
 local_repository(
     name = "fuchsia_sdk",
-    path = "/path/to/final_fuchsia_sdk",
+    path = "/path/to/fuchsia_sdk",
 )
 ```
 
-Just like the Fuchsia Core IDK, the Fuchsia Core Bazel SDK is
+Just like the Fuchsia IDK, the Fuchsia Bazel SDK is
 built directly from GN, without using any Bazel workspace, and
-building it is so long that this is only done on a few dedicated
+building it takes so long that this is only done on a few dedicated
 builder configurations (e.g. `sdk-bazel-linux`).
 
 ### The In-Tree IDK
 
 The GN `//sdk:bazel_in_tree_idk` target is used to build an IDK
-that has the same set of atoms as the core IDK, but which only
+that has the same set of atoms as the Fuchsia IDK, but which only
 provides prebuilt binaries for the current `target_cpu` architecture,
-and the `HEAD` API level. It is only intended to be used to
-populate the `@fuchsia_sdk` and `@fuchsia_in_tree_idk`
-repositories (described below).
+and the `HEAD` API level (using artifacts from the main `PLATFORM` build).
+It is only intended to be used to populate the `@fuchsia_sdk` and
+`@fuchsia_in_tree_idk` repositories (described below).
 
 ### The In-Tree Internal IDK
 
 The GN `//sdk:bazel_internal_only_idk` target groups atoms with
-and unstable API and that are not ready to be moved to the "partner"
+an unstable API and that are not ready to be moved to the "partner"
 category. This should only be used to populate the `@internal_sdk`
 repository of the in-tree Bazel workspace. These atoms should
 never be used outside of the platform build.
 
 It only contains prebuilt binaries for the current `target_cpu`
-architecture, and the HEAD API level.
+architecture, and the `HEAD` API level (also from the `PLATFORM` build)).
 
 Nothing in the GN graph should depend on this.
 
 ## The Bazel external repositories
 
 The platform build's internal Bazel workspace also uses a number
-of external repositories that are related to the IDK and the Bazel SDK:
+of [external](https://bazel.build/external/overview)
+[repositories](https://bazel.build/concepts/build-ref#repositories)
+that are related to the IDK and the Bazel SDK:
 
 ### The `@fuchsia_in_tree_idk` repository:
 
@@ -161,8 +178,8 @@ This is useful for at least two use cases:
 - Possibly developing drivers or other Fuchsia software in `fuchsia.git`
   using the developer workflows provided by the Bazel SDK rules, which
   differ considerably from what `fx` can support, while still being
-  able to access internal atoms at the HEAD API level, something that
-  is not possible using the Core Bazel SDK.
+  able to access internal atoms at the `HEAD` API level, something that
+  is not possible using the Fuchsia Bazel SDK.
 
 In both cases, this means setting up a separate Bazel workspace, and
 using a directive such as:
@@ -189,7 +206,7 @@ as `@fuchsia_in_tree_idk`, but following the official IDK layout.
 
 In other words, this undoes the work performed by `fuchsia_idk_repository`
 by removing all Bazel target labels from metadata files. Fortunately, doing
-so it pretty simple.
+so is pretty simple.
 
 This is used as input for the target building the final Fuchsia
 in-tree SDK.
@@ -199,7 +216,7 @@ Ninja-generated in-tree IDK, but this will change in the future:
 IDK atom definitions will be gradually moved from the GN graph to the
 Bazel one. At the end of this migration, the `fuchsia_idk_repository()` rule
 will disappear entirely. However, the in-tree IDK will still be needed to
-generate the final in-tree SDK.
+generate the final Fuchsia in-tree SDK.
 
 # Existing dependencies
 
@@ -213,13 +230,13 @@ explcitit `bazel build` command.
 GN Build Graph                                       |  Bazel Workspace
                                                      |
                                                      |
-  Core IDK                                           |
+  Fuchsia IDK                                        |
      |   //sdk:final_fuchsia_idk                     |
      |                                               |
   [fuchsia_sdk_repository() in Python]               |
      |                                               |
      v                                               |
-  Core Bazel SDK                                     |
+  Fuchsia Bazel SDK                                  |
         //sdk:final_fuchsia_sdk                      |
                                                      |
                                                      |
@@ -274,8 +291,8 @@ Its logic is written in a special way to allow it to run either in
 a Starlark environment (i.e. as a Bazel repository rule), or in a
 Python one (i.e. as a build action, either from Ninja or Bazel).
 
-Currently, it is used as build time to generate the Core Bazel SDK
-from the Core IDK, as a Ninja action, and the final Fuchsia in-tree
+Currently, it is used as Python at build time to generate the Fuchsia Bazel SDK
+from the Fuchsia IDK, as a Ninja action, and the final Fuchsia in-tree
 SDK, as a Bazel action.
 
 It is also used as Starlark in the Bazel repository rules that generate

@@ -37,6 +37,8 @@ class AdminTest : public TestBase {
   void TearDown() override;
   void DropRingBuffer();
 
+  void ValidateElementTopologyClosure();
+
   void ResetAndExpectResponse();
   void RequestCodecStartAndExpectResponse();
   void RequestCodecStopAndExpectResponse();
@@ -48,7 +50,7 @@ class AdminTest : public TestBase {
   void RequestRingBufferProperties();
   void RequestBuffer(uint32_t min_ring_buffer_frames, uint32_t notifications_per_ring);
 
-  enum SetActiveChannelsOutcome {
+  enum SetActiveChannelsOutcome : uint8_t {
     SUCCESS = 1,  // May or may not represent a change
     CHANGE,       // Successful change of active channels.
     NO_CHANGE,    // Successful but not a change.

@@ -21,6 +21,7 @@
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/starnix/tests/syscalls/cpp/capabilities_helper.h"
 #include "src/starnix/tests/syscalls/cpp/proc_test_base.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
@@ -449,6 +450,7 @@ TEST_F(ProcTaskDirTest, SelfStatusSensibleOutput) {
   EXPECT_THAT(contents, testing::HasSubstr("\nGid:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nGroups:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nVmSize:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmLck:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nVmRSS:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nRssAnon:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nRssFile:"));
@@ -519,6 +521,75 @@ TEST_F(ProcTaskDirTest, FdOpathSymlink) {
 
   std::string symlink_fd_path = fxl::StringPrintf(kProcSelfFdPath, symlink_fd.get());
   ASSERT_THAT(open(symlink_fd_path.c_str(), O_RDONLY), SyscallFailsWithErrno(ELOOP));
+}
+
+TEST_F(ProcTaskDirTest, TimerslackNsSelf) {
+  // We do not need CAP_SYS_NICE to access our own timerslack_ns file.
+  test_helper::UnsetCapabilityEffective(CAP_SYS_NICE);
+
+  std::string initial_contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/timerslack_ns", &initial_contents));
+
+  std::string new_contents = "1" + initial_contents;
+  fbl::unique_fd fd(open("/proc/self/timerslack_ns", O_RDWR));
+  if (!fd.is_valid()) {
+    if (errno == EROFS) {
+      GTEST_SKIP() << "/proc is not writable, skipping";
+    } else {
+      ADD_FAILURE() << "Failed to open /proc/self/timerslack_ns for writing: " << strerror(errno);
+      return;
+    }
+  }
+  ASSERT_NE(write(fd.get(), new_contents.c_str(), new_contents.size()), -1) << errno;
+  fd.reset();
+
+  std::string read_contents;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/timerslack_ns", &read_contents));
+  EXPECT_EQ(read_contents, new_contents);
+
+  // Writing zero resets to the default value.
+  ASSERT_TRUE(files::WriteFile("/proc/self/timerslack_ns", "0"));
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/timerslack_ns", &read_contents));
+  EXPECT_EQ(read_contents, initial_contents);
+}
+
+TEST_F(ProcTaskDirTest, TimerslackNsOtherNoAccess) {
+  pid_t parent_pid = getpid();
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // Ensure we don't have CAP_SYS_NICE, otherwise we would have access.
+    test_helper::DropAllCapabilities();
+
+    std::string path = fxl::StringPrintf("/proc/%d/timerslack_ns", parent_pid);
+
+    // Open succeeds even though the file will not be readable.
+    fbl::unique_fd fd(open(path.c_str(), O_RDONLY));
+    ASSERT_TRUE(fd.is_valid());
+
+    // But reading fails.
+    char buf[256];
+    EXPECT_EQ(read(fd.get(), buf, sizeof(buf)), -1);
+    EXPECT_EQ(errno, EPERM);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(ProcTaskDirTest, TimerslackNsOtherAccessWithCap) {
+  if (!test_helper::HasCapabilityPermitted(CAP_SYS_NICE)) {
+    GTEST_SKIP() << "Needs the CAP_SYS_NICE capability.";
+  }
+  pid_t parent_pid = getpid();
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // We need to have the effective CAP_SYS_NICE capability.
+    test_helper::SetCapabilityEffective(CAP_SYS_NICE);
+    std::string path = fxl::StringPrintf("/proc/%d/timerslack_ns", parent_pid);
+    std::string contents;
+    EXPECT_TRUE(files::ReadFileToString(path, &contents));
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
 }
 
 class ProcfsTest : public ProcTestBase {

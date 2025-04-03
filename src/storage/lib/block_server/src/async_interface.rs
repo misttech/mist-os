@@ -2,20 +2,52 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, DeviceInfo, IntoSessionManager, Operation, SessionHelper};
+use super::{DecodedRequest, DeviceInfo, IntoSessionManager, OffsetMap, Operation, SessionHelper};
 use anyhow::Error;
-use block_protocol::{BlockFifoRequest, WriteOptions};
-use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
-use futures::stream::StreamExt as _;
-use futures::FutureExt;
+use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
+use futures::future::Fuse;
+use futures::stream::FuturesUnordered;
+use futures::{select_biased, FutureExt, StreamExt};
 use std::borrow::Cow;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::mem::MaybeUninit;
 use std::num::NonZero;
+use std::pin::pin;
 use std::sync::Arc;
-use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume};
+use std::task::{ready, Poll};
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+    fuchsia_async as fasync,
+};
+
+pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
 
 pub trait Interface: Send + Sync + Unpin + 'static {
+    /// Runs `stream` to completion.
+    ///
+    /// Implementors can override this method if they want to create a passthrough session instead
+    /// (and can use `[PassthroughSession]` below to do so).  See
+    /// fuchsia.hardware.block.Block/OpenSessionWithOffsetMap.
+    ///
+    /// If the implementor uses a `[PassthroughSession]`, the following Interface methods
+    /// will not be called, and can be stubbed out:
+    ///   - on_attach_vmo
+    ///   - on_detach_vmo
+    ///   - read
+    ///   - write
+    ///   - flush
+    ///   - trim
+    fn open_session(
+        &self,
+        session_manager: Arc<SessionManager<Self>>,
+        stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
+        block_size: u32,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        // By default, serve the session rather than forwarding/proxying it.
+        session_manager.serve_session(stream, offset_map, block_size)
+    }
+
     /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.  Whilst
     /// the VMO is attached, `vmo` will keep the same address so it is safe to use the pointer
     /// value (as, say, a key into a HashMap).
@@ -99,59 +131,69 @@ pub trait Interface: Send + Sync + Unpin + 'static {
     }
 }
 
-pub struct SessionManager<I> {
+/// A helper object to run a passthrough (proxy) session.
+pub struct PassthroughSession(fblock::SessionProxy);
+
+impl PassthroughSession {
+    pub fn new(proxy: fblock::SessionProxy) -> Self {
+        Self(proxy)
+    }
+
+    async fn handle_request(&self, request: fblock::SessionRequest) -> Result<(), Error> {
+        match request {
+            fblock::SessionRequest::GetFifo { responder } => {
+                responder.send(self.0.get_fifo().await?)?;
+            }
+            fblock::SessionRequest::AttachVmo { vmo, responder } => {
+                responder.send(self.0.attach_vmo(vmo).await?.as_ref().map_err(|s| *s))?;
+            }
+            fblock::SessionRequest::Close { responder } => {
+                responder.send(self.0.close().await?)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Runs `stream` until completion.
+    pub async fn serve(&self, mut stream: fblock::SessionRequestStream) -> Result<(), Error> {
+        while let Some(Ok(request)) = stream.next().await {
+            if let Err(error) = self.handle_request(request).await {
+                log::warn!(error:?; "FIDL error");
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct SessionManager<I: ?Sized> {
     interface: Arc<I>,
 }
 
-impl<I: Interface> SessionManager<I> {
+impl<I: Interface + ?Sized> SessionManager<I> {
     pub fn new(interface: Arc<I>) -> Self {
         Self { interface }
     }
-}
 
-impl<I: Interface> super::SessionManager for SessionManager<I> {
-    async fn on_attach_vmo(self: Arc<Self>, vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
-        self.interface.on_attach_vmo(vmo).await
-    }
-
-    async fn open_session(
+    /// Runs `stream` until completion.
+    pub async fn serve_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
         block_size: u32,
     ) -> Result<(), Error> {
-        let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
+        let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
         let helper = Arc::new(helper);
         let interface = self.interface.clone();
 
         let mut stream = stream.fuse();
-        let fifo = Arc::new(fasync::Fifo::from_fifo(fifo));
 
         let scope = fasync::Scope::new();
-        let scope_ref = scope.clone();
         let helper_clone = helper.clone();
         let mut fifo_task = scope
             .spawn(async move {
-                let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); 64];
-                while let Ok(count) = fifo.read_entries(&mut requests[..]).await {
-                    for request in &requests[..count] {
-                        if let Some(decoded_request) =
-                            helper.decode_fifo_request(unsafe { request.assume_init_ref() })
-                        {
-                            let interface = interface.clone();
-                            let fifo = fifo.clone();
-                            let helper = helper.clone();
-                            scope_ref.spawn(async move {
-                                let tracking = decoded_request.request_tracking;
-                                let status =
-                                    process_fifo_request(interface, decoded_request).await.into();
-                                if let Some(response) = helper.finish_fifo_request(tracking, status)
-                                {
-                                    if let Err(_) = fifo.write_entries(&response).await {
-                                        return;
-                                    }
-                                }
-                            });
-                        }
+                if let Err(status) = run_fifo(fifo, interface, helper).await {
+                    if status != zx::Status::PEER_CLOSED {
+                        log::error!(status:?; "FIFO error");
                     }
                 }
             })
@@ -178,6 +220,100 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         }
 
         Ok(())
+    }
+}
+
+// A task loop for receiving and responding to FIFO requests.
+async fn run_fifo<I: Interface + ?Sized>(
+    fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
+    interface: Arc<I>,
+    helper: Arc<SessionHelper<SessionManager<I>>>,
+) -> Result<(), zx::Status> {
+    // The FIFO has to be processed by a single task due to implementation constraints on
+    // fuchsia_async::Fifo.  Thus, we use an event loop to drive the FIFO.  FIFO reads and writes
+    // can happen in batch, and request processing is parallel.
+    // The general flow is:
+    //  - Read messages from the FIFO, write into `requests`.
+    //  - Read `requests`, decode them, and spawn a task to process them in `active_requests`, which
+    //    will eventually write them into `responses`.
+    //  - Read `responses` and write out to the FIFO.
+    let mut fifo = fasync::Fifo::from_fifo(fifo);
+    let (mut reader, mut writer) = fifo.async_io();
+    let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); FIFO_MAX_REQUESTS];
+    let mut active_requests = FuturesUnordered::new();
+    let mut responses = vec![];
+
+    loop {
+        let new_requests = {
+            // We provide some flow control by limiting how many in-flight requests we will allow.
+            let pending_requests = active_requests.len() + responses.len();
+            let count = requests.len() - pending_requests;
+            let mut receive_requests = pin!(if count == 0 {
+                Fuse::terminated()
+            } else {
+                reader.read_entries(&mut requests[..count]).fuse()
+            });
+            let mut send_responses = pin!(if responses.is_empty() {
+                Fuse::terminated()
+            } else {
+                poll_fn(|cx| -> Poll<Result<(), zx::Status>> {
+                    match ready!(writer.try_write(cx, &responses[..])) {
+                        Ok(written) => {
+                            responses.drain(..written);
+                            Poll::Ready(Ok(()))
+                        }
+                        Err(status) => Poll::Ready(Err(status)),
+                    }
+                })
+                .fuse()
+            });
+
+            // Order is important here.  We want to prioritize sending results on the FIFO and
+            // processing FIFO messages over receiving new ones, to provide flow control.
+            select_biased!(
+                res = send_responses => {
+                    res?;
+                    0
+                },
+                response = active_requests.select_next_some() => {
+                    responses.extend(response);
+                    0
+                }
+                count = receive_requests => {
+                    count?
+                }
+            )
+        };
+        // NB: It is very important that there are no `await`s for the rest of the loop body, as
+        // otherwise active requests might become stalled.
+        for request in &requests[..new_requests] {
+            if let Some(decoded_request) =
+                helper.decode_fifo_request(unsafe { request.assume_init_ref() })
+            {
+                let interface = interface.clone();
+                let helper = helper.clone();
+                active_requests.push(async move {
+                    let tracking = decoded_request.request_tracking;
+                    let status = process_fifo_request(interface, decoded_request).await.into();
+                    helper.finish_fifo_request(tracking, status)
+                });
+            }
+        }
+    }
+}
+
+impl<I: Interface + ?Sized> super::SessionManager for SessionManager<I> {
+    async fn on_attach_vmo(self: Arc<Self>, vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
+        self.interface.on_attach_vmo(vmo).await
+    }
+
+    async fn open_session(
+        self: Arc<Self>,
+        stream: fblock::SessionRequestStream,
+        offset_map: Option<OffsetMap>,
+        block_size: u32,
+    ) -> Result<(), Error> {
+        self.interface.clone().open_session(self, stream, offset_map, block_size).await
     }
 
     async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
@@ -215,7 +351,7 @@ impl<I: Interface> IntoSessionManager for Arc<I> {
 }
 
 /// Processes a fifo request.
-async fn process_fifo_request<I: Interface>(
+async fn process_fifo_request<I: Interface + ?Sized>(
     interface: Arc<I>,
     r: DecodedRequest,
 ) -> Result<(), zx::Status> {

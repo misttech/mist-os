@@ -522,104 +522,11 @@ void Control::CreateColorBuffer2(CreateColorBuffer2RequestView request,
   }
 }
 
-Control::CreateBuffer2Result Control::CreateBuffer2(
-    fidl::AnyArena& allocator, const zx::vmo& vmo, BufferKey buffer_key,
-    fuchsia_hardware_goldfish::wire::CreateBuffer2Params create_params) {
-  using fuchsia_hardware_goldfish::ControlDevice;
-  using fuchsia_hardware_goldfish::wire::ControlDeviceCreateBuffer2Response;
-  using fuchsia_hardware_goldfish::wire::ControlDeviceCreateBuffer2Result;
-
-  // Check argument validity.
-  if (!create_params.has_size() || !create_params.has_memory_property()) {
-    zxlogf(ERROR, "%s: invalid arguments: size? %d memory property? %d\n", kTag,
-           create_params.has_size(), create_params.has_memory_property());
-    return fpromise::ok(ControlDeviceCreateBuffer2Result::WithErr(ZX_ERR_INVALID_ARGS));
-  }
-  if ((create_params.memory_property() &
-       fuchsia_hardware_goldfish::wire::kMemoryPropertyHostVisible) &&
-      !create_params.has_physical_address()) {
-    zxlogf(ERROR, "%s: invalid arguments: memory_property %d, no physical address\n", kTag,
-           create_params.memory_property());
-    return fpromise::ok(ControlDeviceCreateBuffer2Result::WithErr(ZX_ERR_INVALID_ARGS));
-  }
-
-  TRACE_DURATION("gfx", "Control::CreateBuffer2", "size", create_params.size(), "memory_property",
-                 create_params.memory_property());
-
-  fbl::AutoLock lock(&lock_);
-
-  auto it = buffer_handles_.find(buffer_key);
-  if (it == buffer_handles_.end()) {
-    return fpromise::ok(ControlDeviceCreateBuffer2Result::WithErr(ZX_ERR_INVALID_ARGS));
-  }
-
-  if (it->second != kInvalidBufferHandle) {
-    return fpromise::ok(ControlDeviceCreateBuffer2Result::WithErr(ZX_ERR_ALREADY_EXISTS));
-  }
-
-  uint32_t id;
-  zx_status_t status =
-      CreateBuffer2Locked(create_params.size(), create_params.memory_property(), &id);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to create buffer: %d", kTag, status);
-    return fpromise::error(status);
-  }
-
-  auto close_buffer =
-      fit::defer([this, id]() TA_NO_THREAD_SAFETY_ANALYSIS { CloseBufferLocked(id); });
-
-  int32_t hw_address_page_offset = -1;
-  if (create_params.memory_property() &
-      fuchsia_hardware_goldfish::wire::kMemoryPropertyHostVisible) {
-    uint64_t vmo_size;
-    status = vmo.get_size(&vmo_size);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: zx_vmo_get_size error: %d", kTag, status);
-      return fpromise::error(status);
-    }
-    uint32_t map_result = 0;
-    status =
-        MapGpaToBufferHandleLocked(id, create_params.physical_address(), vmo_size, &map_result);
-    if (status != ZX_OK || map_result < 0) {
-      zxlogf(ERROR, "%s: failed to map gpa to buffer: %d %d", kTag, status, map_result);
-      return fpromise::error(status);
-    }
-
-    hw_address_page_offset = map_result;
-  }
-
-  close_buffer.cancel();
-  it->second = id;
-  buffer_handle_info_[id] = {.type = fuchsia_hardware_goldfish::wire::BufferHandleType::kBuffer,
-                             .memory_property = create_params.memory_property()};
-
-  return fpromise::ok(ControlDeviceCreateBuffer2Result::WithResponse(
-      ControlDeviceCreateBuffer2Response{.hw_address_page_offset = hw_address_page_offset}));
-}
-
 void Control::CreateBuffer2(CreateBuffer2RequestView request,
                             CreateBuffer2Completer::Sync& completer) {
-  auto buffer_key_result = GetBufferKeyForVmo(request->vmo);
-  if (!buffer_key_result.is_ok()) {
-    zxlogf(ERROR, "%s: GetBufferKeyForVmo failed: %d", kTag, buffer_key_result.error_value());
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  auto& buffer_key = buffer_key_result.value();
-
-  fidl::Arena allocator;
-  auto result = CreateBuffer2(allocator, std::move(request->vmo), buffer_key,
-                              std::move(request->create_params));
-  if (!result.is_ok()) {
-    completer.Close(result.error());
-    return;
-  }
-  if (result.value().is_err()) {
-    completer.ReplyError(result.value().err());
-    return;
-  }
-  ZX_ASSERT(result.value().is_response());
-  completer.ReplySuccess(result.value().response().hw_address_page_offset);
+  // TODO(https://fxbug.dev/406545904): Support CreateBuffer2() render commands.
+  zxlogf(ERROR, "CreateBuffer2 render control command is not supported on Fuchsia.");
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void Control::CreateSyncFence(CreateSyncFenceRequestView request,
@@ -829,18 +736,6 @@ zx_status_t Control::ExecuteCommandLocked(uint32_t cmd_size, uint32_t* result) {
 
   WriteLocked(cmd_size);
   return ReadResultLocked(result);
-}
-
-zx_status_t Control::CreateBuffer2Locked(uint64_t size, uint32_t memory_property, uint32_t* id) {
-  TRACE_DURATION("gfx", "Control::CreateBuffer2", "size", size, "memory_property", memory_property);
-
-  auto cmd = static_cast<CreateBuffer2Cmd*>(io_buffer_.virt());
-  cmd->op = kOP_rcCreateBuffer2;
-  cmd->size = kSize_rcCreateBuffer2;
-  cmd->buffer_size = size;
-  cmd->memory_property = memory_property;
-
-  return ExecuteCommandLocked(kSize_rcCreateBuffer2, id);
 }
 
 zx_status_t Control::CreateColorBufferLocked(uint32_t width, uint32_t height, uint32_t format,

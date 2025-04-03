@@ -5,7 +5,8 @@
 #ifndef SRC_DEVICES_I2C_DRIVERS_I2C_I2C_TEST_ENV_H_
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_TEST_ENV_H_
 
-#include <lib/ddk/metadata.h>
+#include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include "src/devices/i2c/drivers/i2c/fake-i2c-impl.h"
@@ -19,29 +20,29 @@ class TestEnvironment : public fdf_testing::Environment {
   TestEnvironment() : i2c_impl_(1024) {}
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    // Set up and add the compat device server.
-    device_server_.Initialize("default");
-    ZX_ASSERT(device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   &to_driver_vfs) == ZX_OK);
+    if (zx::result result = metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
+    }
 
     // Add the i2c service.
-    ZX_ASSERT(to_driver_vfs
-                  .AddService<fuchsia_hardware_i2cimpl::Service>(i2c_impl_.CreateInstanceHandler())
-                  .is_ok());
+    if (zx::result result = to_driver_vfs.AddService<fuchsia_hardware_i2cimpl::Service>(
+            i2c_impl_.CreateInstanceHandler());
+        result.is_error()) {
+      return result.take_error();
+    }
     return zx::ok();
   }
 
-  void AddMetadata(fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata) {
-    fit::result persisted = fidl::Persist(metadata);
-    ZX_ASSERT(persisted.is_ok());
-    ZX_ASSERT(device_server_.AddMetadata(DEVICE_METADATA_I2C_CHANNELS, persisted->data(),
-                                         persisted->size()) == ZX_OK);
+  void AddMetadata(const fuchsia_hardware_i2c_businfo::I2CBusMetadata& metadata) {
+    ZX_ASSERT(metadata_server_.SetMetadata(metadata).is_ok());
   }
 
   FakeI2cImpl& i2c_impl() { return i2c_impl_; }
 
  private:
-  compat::DeviceServer device_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata> metadata_server_;
   FakeI2cImpl i2c_impl_;
 };
 

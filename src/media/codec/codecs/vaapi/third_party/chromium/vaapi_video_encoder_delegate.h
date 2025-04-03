@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef MEDIA_GPU_VAAPI_VAAPI_VIDEO_ENCODER_DELEGATE_H_
-#define MEDIA_GPU_VAAPI_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#ifndef SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#define SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_VAAPI_VIDEO_ENCODER_DELEGATE_H_
 
 #include <vector>
 
@@ -15,9 +15,9 @@
 // #include "base/memory/scoped_refptr.h"
 // #include "base/sequence_checker.h"
 // #include "base/time/time.h"
-#include "media/base/video_bitrate_allocation.h"
+#include "src/media/third_party/chromium_media/media/base/video_bitrate_allocation.h"
 // #include "media/base/video_codecs.h"
-#include "media/video/video_encode_accelerator.h"
+#include "src/media/third_party/chromium_media/media/video/video_encode_accelerator.h"
 // #include "media/video/video_encoder_info.h"
 #include "src/media/codec/codecs/vaapi/vaapi_utils.h"
 #include "src/media/third_party/chromium_media/chromium_utils.h"
@@ -57,8 +57,8 @@ class VaapiVideoEncoderDelegate {
   virtual ~VaapiVideoEncoderDelegate();
 
   enum class BitrateControl {
-    kConstantBitrate,  // Constant Bitrate mode. This class relies on other
-                       // parts (e.g. driver) to achieve the specified bitrate.
+    kConstantBitrate,               // Constant Bitrate mode. This class relies on other
+                                    // parts (e.g. driver) to achieve the specified bitrate.
     kConstantQuantizationParameter  // Constant Quantization Parameter mode.
                                     // This class needs to compute a proper
                                     // quantization parameter and give other
@@ -107,11 +107,8 @@ class VaapiVideoEncoderDelegate {
     // If |keyframe| is true, requests this job to produce a keyframe.
     EncodeJob(scoped_refptr<VideoFrame> input_frame, bool keyframe);
     // Constructor for VA-API.
-    EncodeJob(scoped_refptr<VideoFrame> input_frame,
-              bool keyframe,
-              VASurfaceID input_surface_id,
-              const gfx::Size& input_surface_size,
-              scoped_refptr<CodecPicture> picture,
+    EncodeJob(scoped_refptr<VideoFrame> input_frame, bool keyframe, VASurfaceID input_surface_id,
+              const gfx::Size& input_surface_size, scoped_refptr<CodecPicture> picture,
               std::unique_ptr<ScopedVABuffer> coded_buffer);
 
     EncodeJob(const EncodeJob&) = delete;
@@ -122,8 +119,7 @@ class VaapiVideoEncoderDelegate {
     // Creates EncodeResult with |metadata|. This passes ownership of the
     // resources owned by EncodeJob and therefore must be called with
     // std::move().
-    std::unique_ptr<EncodeResult> CreateEncodeResult(
-        const BitstreamBufferMetadata& metadata) &&;
+    std::unique_ptr<EncodeResult> CreateEncodeResult(const BitstreamBufferMetadata& metadata) &&;
 
     // Requests this job to produce a keyframe; requesting a keyframe may not
     // always result in one being produced by the encoder (e.g. if it would
@@ -162,9 +158,8 @@ class VaapiVideoEncoderDelegate {
   // Initializes the encoder with requested parameter set |config| and
   // |ave_config|. Returns false if the requested set of parameters is not
   // supported, true on success.
-  virtual bool Initialize(
-      const VideoEncodeAccelerator::Config& config,
-      const VaapiVideoEncoderDelegate::Config& ave_config) = 0;
+  virtual bool Initialize(const VideoEncodeAccelerator::Config& config,
+                          const VaapiVideoEncoderDelegate::Config& ave_config) = 0;
 
   // Updates current framerate and/or bitrate to |framerate| in FPS
   // and the specified video bitrate allocation.
@@ -190,8 +185,7 @@ class VaapiVideoEncoderDelegate {
 
   // Creates and returns the encode result for specified EncodeJob by
   // synchronizing the corresponding encode operation.
-  std::unique_ptr<EncodeResult> GetEncodeResult(
-      std::unique_ptr<EncodeJob> encode_job);
+  std::unique_ptr<EncodeResult> GetEncodeResult(std::unique_ptr<EncodeJob> encode_job);
 
   // Gets the active spatial layer resolutions for K-SVC encoding, VaapiVEA
   // can get this info from the encoder delegate. Returns empty vector on
@@ -199,8 +193,7 @@ class VaapiVideoEncoderDelegate {
   virtual std::vector<gfx::Size> GetSVCLayerResolutions() = 0;
 
  protected:
-  virtual BitstreamBufferMetadata GetMetadata(const EncodeJob& encode_job,
-                                              size_t payload_size);
+  virtual BitstreamBufferMetadata GetMetadata(const EncodeJob& encode_job, size_t payload_size);
 
   const scoped_refptr<VaapiWrapper> vaapi_wrapper_;
 
@@ -224,4 +217,4 @@ class VaapiVideoEncoderDelegate {
 };
 }  // namespace media
 
-#endif  // MEDIA_GPU_VAAPI_VAAPI_VIDEO_ENCODER_DELEGATE_H_
+#endif  // SRC_MEDIA_CODEC_CODECS_VAAPI_THIRD_PARTY_CHROMIUM_VAAPI_VIDEO_ENCODER_DELEGATE_H_

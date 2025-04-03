@@ -33,13 +33,18 @@ idk_category_marker_template("not-in-idk") {
 
 idk_category_marker_template("compat_test") {
   visibility = [
+    "//examples/fidl/fuchsia.examples:*",
     "//sdk/ctf/tests/fidl/*",
     "//sdk/fidl/*",
     "//src/*",
   ]
 }
 
-idk_category_marker_template("partner_internal") {
+idk_category_marker_template("host_tool") {
+  visibility = [ "//sdk/fidl/*" ]
+}
+
+idk_category_marker_template("prebuilt") {
   visibility = [ "//sdk/fidl/*" ]
 }
 
@@ -63,10 +68,19 @@ if (is_host || is_fidl_toolchain) {
       visibility += [
         "${target}_compile_fidlc",
         "${target}_fdomain.actual",
+        "${target}_fdomain.aux.deps.deps",
+        "${target}_fdomain.aux.deps.transdeps",
+        "${target}_fdomain.rustdoc",
         "${target}_ir_root",
         "${target}_lint",
         "${target}_rust.actual",
+        "${target}_rust.aux.deps.deps",
+        "${target}_rust.aux.deps.transdeps",
+        "${target}_rust.rustdoc",
         "${target}_rust_common.actual",
+        "${target}_rust_common.aux.deps.deps",
+        "${target}_rust_common.aux.deps.transdeps",
+        "${target}_rust_common.rustdoc",
       ]
     }
 
@@ -121,18 +135,21 @@ group("test_all_markers") {
 group("test_all_marker_lists") {
   testonly = true
   visibility = [ ":tests" ]
-  deps = markers_partner_idk_sources_must_not_depend_on +
-         markers_partner_idk_prebuilts_must_not_depend_on
+  deps = markers_partner_idk_sources_must_not_depend_on_indirectly +
+         markers_partner_idk_prebuilts_must_not_depend_on +
+         markers_partner_idk_host_tools_must_not_depend_on
 
-  assert(markers_partner_idk_sources_must_not_depend_on -
-         [ "//sdk/categories:marker-partner_internal" ] ==
+  assert(markers_partner_idk_sources_must_not_depend_on_indirectly ==
          markers_partner_idk_prebuilts_must_not_depend_on)
 
-  assert(markers_partner_idk_prebuilts_must_not_depend_on == [
-               "//sdk/categories:marker-not-in-idk",
-               "//sdk/categories:marker-compat_test",
-             ],
-         "${markers_partner_idk_prebuilts_must_not_depend_on}")
+  assert(markers_partner_idk_prebuilts_must_not_depend_on -
+         [ "//sdk/categories:marker-host_tool" ] ==
+         markers_partner_idk_host_tools_must_not_depend_on)
+
+  assert(markers_partner_idk_host_tools_must_not_depend_on == [
+           "//sdk/categories:marker-not-in-idk",
+           "//sdk/categories:marker-compat_test",
+         ])
 }
 
 group("tests") {

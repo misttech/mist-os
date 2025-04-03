@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <unistd.h>
 #include <zircon/types.h>
 
@@ -50,21 +51,24 @@ zx_status_t AmlCpuFrequency::Create(
   little_cluster_current_rate_ = thermal_info.initial_cluster_frequencies[static_cast<uint32_t>(
       fuchsia_hardware_thermal::wire::PowerDomain::kLittleClusterPowerDomain)];
 
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-cpufreq: failed to get pdev protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Initialized the MMIOs
-  zx_status_t status = pdev.MapMmio(kHiuMmio, &hiu_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-cpufreq: could not map periph mmio: %d", status);
-    return status;
+  zx::result hiu_mmio = pdev.MapMmio(kHiuMmio);
+  if (hiu_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map hiu mmio: %s", hiu_mmio.status_string());
+    return hiu_mmio.status_value();
   }
+  hiu_mmio_.emplace(std::move(hiu_mmio.value()));
 
   // HIU Init.
-  status = s905d2_hiu_init(get_mmio_resource(parent), &*hiu_);
+  zx_status_t status = s905d2_hiu_init(get_mmio_resource(parent), &*hiu_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-cpufreq: hiu_init failed: %s", zx_status_get_string(status));
     return status;

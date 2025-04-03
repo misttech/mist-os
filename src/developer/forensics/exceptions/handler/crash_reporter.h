@@ -4,6 +4,7 @@
 #ifndef SRC_DEVELOPER_FORENSICS_EXCEPTIONS_HANDLER_CRASH_REPORTER_H_
 #define SRC_DEVELOPER_FORENSICS_EXCEPTIONS_HANDLER_CRASH_REPORTER_H_
 
+#include <fidl/fuchsia.driver.crash/cpp/fidl.h>
 #include <fuchsia/exception/cpp/fidl.h>
 #include <fuchsia/exception/internal/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
@@ -26,7 +27,8 @@ namespace handler {
 class CrashReporter : public fuchsia::exception::internal::CrashReporter {
  public:
   CrashReporter(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-                zx::duration component_lookup_timeout, std::unique_ptr<WakeLeaseBase> wake_lease);
+                zx::duration component_lookup_timeout, std::unique_ptr<WakeLeaseBase> wake_lease,
+                fidl::ClientEnd<fuchsia_driver_crash::CrashIntrospect> driver_crash_introspect);
 
   // |fuchsia::exception::internal::CrashReporter|
   virtual void Send(zx::exception exception, zx::process crashed_proces, zx::thread crashed_thread,
@@ -38,6 +40,7 @@ class CrashReporter : public fuchsia::exception::internal::CrashReporter {
   std::shared_ptr<sys::ServiceDirectory> services_;
   zx::duration component_lookup_timeout_;
   std::unique_ptr<WakeLeaseBase> wake_lease_;
+  fidl::Client<fuchsia_driver_crash::CrashIntrospect> driver_crash_introspect_;
 };
 
 }  // namespace handler

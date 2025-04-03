@@ -38,7 +38,7 @@ constexpr KTraceCategory kGroupCategories[] = {
     {"kernel:tasks", KTRACE_GRP_TASKS, "<unused>"},
     {"kernel:ipc", KTRACE_GRP_IPC, "Emit an event for each FIDL call"},
     {"kernel:irq", KTRACE_GRP_IRQ, "Emit a duration event for interrupts"},
-    {"kernel:probe", KTRACE_GRP_PROBE, "Userspace defined zx_ktrace_write events"},
+    {"kernel:probe", KTRACE_GRP_PROBE, "Used for LOCAL_KTRACE events"},
     {"kernel:arch", KTRACE_GRP_ARCH, "Hypervisor vcpus"},
     {"kernel:syscall", KTRACE_GRP_SYSCALL, "Emit an event for each syscall"},
     {"kernel:vm", KTRACE_GRP_VM, "Virtual memory events such as paging, mappings, and accesses"},
@@ -61,15 +61,16 @@ void LogFidlFailure(const char* rqst_name, const fidl::Result<T>& result) {
   }
 }
 
-zx::result<> RequestKtraceStop(const zx::resource& debug_resource) {
-  return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_STOP, 0, nullptr));
+zx::result<> RequestKtraceStop(const zx::resource& tracing_resource) {
+  return zx::make_result(zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_STOP, 0, nullptr));
 }
 
-zx::result<> RequestKtraceRewind(const zx::resource& debug_resource) {
-  return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr));
+zx::result<> RequestKtraceRewind(const zx::resource& tracing_resource) {
+  return zx::make_result(
+      zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr));
 }
 
-zx::result<> RequestKtraceStart(const zx::resource& debug_resource,
+zx::result<> RequestKtraceStart(const zx::resource& tracing_resource,
                                 trace_buffering_mode_t buffering_mode, uint32_t group_mask) {
   switch (buffering_mode) {
     // ktrace does not currently support streaming, so for now we preserve the
@@ -77,10 +78,10 @@ zx::result<> RequestKtraceStart(const zx::resource& debug_resource,
     case trace_buffering_mode_t::TRACE_BUFFERING_MODE_STREAMING:
     case trace_buffering_mode_t::TRACE_BUFFERING_MODE_ONESHOT:
       return zx::make_result(
-          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START, group_mask, nullptr));
+          zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_START, group_mask, nullptr));
 
     case trace_buffering_mode_t::TRACE_BUFFERING_MODE_CIRCULAR:
-      return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START_CIRCULAR,
+      return zx::make_result(zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_START_CIRCULAR,
                                                group_mask, nullptr));
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
@@ -101,8 +102,8 @@ std::vector<trace::KnownCategory> GetKnownCategories() {
   return known_categories;
 }
 
-App::App(zx::resource debug_resource, const fxl::CommandLine& command_line)
-    : debug_resource_(std::move(debug_resource)) {
+App::App(zx::resource tracing_resource, const fxl::CommandLine& command_line)
+    : tracing_resource_(std::move(tracing_resource)) {
   trace_observer_.Start(async_get_default_dispatcher(), [this] {
     if (zx::result res = UpdateState(); res.is_error()) {
       FX_PLOGS(ERROR, res.error_value()) << "Update state failed";
@@ -177,15 +178,15 @@ zx::result<> App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffer
   }
   current_group_mask_ = group_mask;
 
-  if (zx::result res = RequestKtraceStop(debug_resource_); res.is_error()) {
+  if (zx::result res = RequestKtraceStop(tracing_resource_); res.is_error()) {
     return res.take_error();
   }
   if (!retain_current_data) {
-    if (zx::result res = RequestKtraceRewind(debug_resource_); res.is_error()) {
+    if (zx::result res = RequestKtraceRewind(tracing_resource_); res.is_error()) {
       return res.take_error();
     }
   }
-  if (zx::result res = RequestKtraceStart(debug_resource_, buffering_mode, group_mask);
+  if (zx::result res = RequestKtraceStart(tracing_resource_, buffering_mode, group_mask);
       res.is_error()) {
     return res.take_error();
   }
@@ -263,11 +264,11 @@ zx::result<> App::StopKTrace() {
 
   FX_LOGS(INFO) << "Stopping ktrace";
 
-  if (zx::result res = RequestKtraceStop(debug_resource_); res.is_error()) {
+  if (zx::result res = RequestKtraceStop(tracing_resource_); res.is_error()) {
     return res;
   }
 
-  auto drain_context = DrainContext::Create(debug_resource_);
+  auto drain_context = DrainContext::Create(tracing_resource_);
   if (!drain_context) {
     FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
     return zx::error(ZX_ERR_NO_RESOURCES);

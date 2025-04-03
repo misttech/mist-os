@@ -468,6 +468,39 @@ namespace fidl {
 }  // namespace fidl
 
 template<>
+struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+    static constexpr bool HasRequestPayload = true;
+      using Request = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest;
+      using Response = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult;
+  using DomainError = uint32_t;
+    
+      using Completer = fidl::Completer<::fidl::internal::WireCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>;
+  using Thenable = ::fidl::internal::WireThenableImpl<
+      ::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython,
+      ::fidl::internal::OwnedEncodedMessage<
+          ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::ChannelTransport
+      >
+  >;
+
+  using BufferThenable = ::fidl::internal::WireThenableImpl<
+      ::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython,
+      ::fidl::internal::UnownedEncodedMessage<
+          ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::ChannelTransport
+      >
+  >;
+};
+
+namespace fidl {
+
+#endif  // __Fuchsia__
+
+
+#ifdef __Fuchsia__
+
+
+}  // namespace fidl
+
+template<>
 struct ::fidl::internal::WireMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> {
     static constexpr bool HasRequestPayload = true;
       using Request = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest;
@@ -853,6 +886,107 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRespons
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     WireCodingTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>, WireCodingConstraintEmpty, IsRecursive>::Decode(
+        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+  }
+};
+
+#ifdef __Fuchsia__
+template<>
+struct ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final {
+  FIDL_ALIGNDECL
+  fidl_message_header_t header;
+  
+  ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest body;
+  explicit TransactionalRequest(bool a)
+  : body(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest { a } ) {
+    _InitHeader();
+  }
+  TransactionalRequest() {
+    _InitHeader();
+  }
+  using ResponseType = ::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>;
+
+ private:
+  void _InitHeader();
+};
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t kInlineSize = 1 + sizeof(fidl_message_header_t);
+
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    *position.As<fidl_message_header_t>() = value->header;
+    WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
+        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
+        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
+  }
+};
+
+#endif  // __Fuchsia__
+
+
+template<>
+struct ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult {
+
+  
+  explicit WireResponse(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult DenyEachBindingOnlyDenyPythonResult) : ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult(DenyEachBindingOnlyDenyPythonResult){}
+  WireResponse() = default;
+};
+
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public WireStructCodingTraitsBase<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t kInlineSize = 16;
+
+  static void Encode(
+    internal::WireEncoder* encoder, ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(
+      encoder, value, position, recursion_depth);
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
+      decoder, position, recursion_depth);
+  }
+};
+
+template<>
+struct ::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final {
+  FIDL_ALIGNDECL
+  fidl_message_header_t header;
+  
+  ::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> body;
+  explicit TransactionalResponse(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult DenyEachBindingOnlyDenyPythonResult)
+  : body(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(DenyEachBindingOnlyDenyPythonResult)) {
+    _InitHeader();
+  }
+  TransactionalResponse() {
+    _InitHeader();
+  }
+
+ private:
+  void _InitHeader();
+};
+
+template <bool IsRecursive>
+struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public WireStructCodingTraitsBase<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
+
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    *position.As<fidl_message_header_t>() = value->header;
+    WireCodingTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, WireCodingConstraintEmpty, IsRecursive>::Encode(
+        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
+  }
+  static void Decode(
+    internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    WireCodingTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + sizeof(fidl_message_header_t), recursion_depth);
   }
 };
@@ -1271,6 +1405,75 @@ static_assert(sizeof(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBindi
     == TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>>::kPrimarySize);
 #ifdef __Fuchsia__
 template <>
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
+template <>
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
+
+
+template <>
+struct TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> {
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 0;
+  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(1 + sizeof(fidl_message_header_t));
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasPointer = false;
+  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
+    ::fidl::internal::TransactionalMessageKind::kRequest;
+};
+
+static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>)
+    == TypeTraits<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, body) == sizeof(fidl_message_header_t));
+static_assert(sizeof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest)
+    == TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest>::kPrimarySize);
+static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest, a) == 0);
+
+#endif  // __Fuchsia__
+
+
+template <>
+struct IsFidlType<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
+template <>
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
+template <>
+struct IsFidlType<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> : public std::true_type {};
+
+
+template <>
+struct TypeTraits<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> {
+  static constexpr bool kHasServerToClientBody = true;
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 1;
+  static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasPointer = true;
+  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
+    ::fidl::internal::TransactionalMessageKind::kResponse;
+};
+
+static_assert(sizeof(::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>)
+    == TypeTraits<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>::kPrimarySize);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, header) == 0);
+static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, body) == sizeof(fidl_message_header_t));
+template <>
+struct TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> {
+  static constexpr bool kHasServerToClientBody = true;
+  static constexpr uint32_t kMaxNumHandles = 0;
+  static constexpr uint32_t kMaxDepth = 1;
+  static constexpr uint32_t kPrimarySize = 16;
+  static constexpr uint32_t kMaxOutOfLine = 0;
+  static constexpr bool kHasFlexibleEnvelope = false;
+  static constexpr bool kHasPointer = true;
+  static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
+    ::fidl::internal::TransactionalMessageKind::kResponse;
+};
+static_assert(sizeof(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>)
+    == TypeTraits<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>::kPrimarySize);
+#ifdef __Fuchsia__
+template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>> : public std::true_type {};
 template <>
 struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>> : public std::true_type {};
@@ -1457,6 +1660,22 @@ static_assert(sizeof(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBindi
         : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>>> {
       ::fidl::internal::InlineMessageBuffer<32> bytes_;
       ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>> handles_storage_;
+    };
+    template<>
+    struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> final
+        : public ::fidl::internal::ChannelHandleStorageBase<::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>> {
+      static constexpr uint32_t kNumHandles =
+            fidl::internal::ClampedHandleCount<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>, fidl::MessageDirection::kReceiving>();
+
+      ::std::array<zx_handle_t, kNumHandles> handles_;
+      ::std::array<fidl_channel_handle_metadata_t, kNumHandles> handle_metadata_;
+    };
+
+    template<>
+    struct ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> final
+        : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>> {
+      ::fidl::internal::InlineMessageBuffer<32> bytes_;
+      ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> handles_storage_;
     };
     template<>
     struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>> final
@@ -1679,6 +1898,62 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_bindingsdenylist::DenyEachB
 
 
 template<>
+struct ::fidl::internal::WireResultUnwrap<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+  using Type = ::fit::result<uint32_t, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse*>;
+};
+
+template<>
+class [[nodiscard]] ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+ public:
+  WireResult(
+      ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> client,
+      ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* request
+  );
+
+  explicit WireResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(result) {}
+  WireResult(WireResult&&) = delete;
+  WireResult(const WireResult&) = delete;
+  WireResult& operator=(WireResult&&) = delete;
+  WireResult& operator=(const WireResult&) = delete;
+  ~WireResult() = default;
+   private:
+    ::fidl::internal::InlineMessageBuffer<32> bytes_;
+      ::fidl::DecodedValue<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> decoded_;
+};
+
+
+template<>
+class [[nodiscard]] ::fidl::WireUnownedResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+ public:
+    explicit WireUnownedResult(::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> client_end, ::fidl::internal::AnyBufferAllocator& allocator, ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* request);
+    explicit WireUnownedResult(::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>* response)
+        : ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(fidl::Status::Ok()), decoded_(response) {
+      ExtractValueFromDecoded(decoded_.pointer());
+    }
+
+    explicit WireUnownedResult(
+        ::fit::result<::fidl::Error, ::fidl::DecodedValue<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>>>&& decoded,
+        ::fidl::internal::MessageStorageViewBase* storage_view
+    ) : ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(::fidl::internal::StatusFromResult(decoded)) {
+      if (decoded.is_ok()) {
+        decoded_ = std::move(decoded.value());
+        ExtractValueFromDecoded(decoded_.pointer());
+      }
+    }
+
+  explicit WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(result) {}
+  WireUnownedResult(WireUnownedResult&&) = default;
+  WireUnownedResult(const WireUnownedResult&) = delete;
+  WireUnownedResult& operator=(WireUnownedResult&&) = default;
+  WireUnownedResult& operator=(const WireUnownedResult&) = delete;
+  ~WireUnownedResult() = default;
+
+  private:
+      ::fidl::DecodedValue<::fidl::WireResponse<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>> decoded_;
+};
+
+
+template<>
 struct ::fidl::internal::WireResultUnwrap<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> {
   using Type = ::fit::result<uint32_t, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse*>;
 };
@@ -1857,6 +2132,13 @@ class ::fidl::internal::WireSyncClientImpl<::test_bindingsdenylist::DenyEachBind
     }
 
     // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
+    ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>
+    OnlyDenyPython(bool a) {
+      ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> _request{ a };
+      return ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(_client_end(), &_request);
+    }
+
+    // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
     ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>
     OnlyDenyRust(bool a) {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> _request{ a };
@@ -1902,6 +2184,13 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_bindingsdenylist::DenyEa
     OnlyDenyLibfuzzer(bool a) {
       ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> _request{ a };
       return ::fidl::WireUnownedResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer>(_client_end(), _allocator(), &_request);
+    }
+
+    // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
+    ::fidl::WireUnownedResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>
+    OnlyDenyPython(bool a) {
+      ::fidl::internal::TransactionalRequest<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> _request{ a };
+      return ::fidl::WireUnownedResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>(_client_end(), _allocator(), &_request);
     }
 
     // Caller provides the backing storage for FIDL message via an argument to `.buffer()`.
@@ -2054,6 +2343,48 @@ class ::fidl::internal::WireCompleterBase<::test_bindingsdenylist::DenyEachBindi
 
 
 template<>
+class ::fidl::internal::WireCompleterImpl<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> : public ::fidl::internal::CompleterImplBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+ public:
+  using CompleterImplBase::CompleterImplBase;
+
+  void Reply(::fit::result<uint32_t, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse*> result);
+  void ReplySuccess(int32_t b);
+  void ReplyError(uint32_t error);
+
+ private:
+  void MakeReply(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult DenyEachBindingOnlyDenyPythonResult);
+};
+
+template <>
+class ::fidl::internal::WireBufferCompleterImpl<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> : public ::fidl::internal::BufferCompleterImplBase {
+ public:
+  using BufferCompleterImplBase::BufferCompleterImplBase;
+
+  void Reply(::fit::result<uint32_t, ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResponse*> result);
+  void ReplySuccess(int32_t b);
+  void ReplyError(uint32_t error);
+
+ private:
+  void MakeReply(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonResult DenyEachBindingOnlyDenyPythonResult);
+};
+
+template<>
+class ::fidl::internal::WireCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> : public ::fidl::CompleterBase, public ::fidl::internal::WireCompleterImpl<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> {
+ public:
+  WireCompleterBase(::fidl::Transaction* transaction, bool owned, bool expects_reply)
+      : CompleterBase(transaction, owned, expects_reply),
+        WireCompleterImpl(this) {}
+  WireCompleterBase(WireCompleterBase&& other) noexcept
+      : CompleterBase(std::move(other)), WireCompleterImpl(this) {}
+  WireCompleterBase& operator=(WireCompleterBase&& other) noexcept {
+    CompleterBase::operator=(std::move(other));
+    WireCompleterImpl::_set_core(this);
+    return *this;
+  }
+};
+
+
+template<>
 class ::fidl::internal::WireCompleterImpl<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> : public ::fidl::internal::CompleterImplBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> {
  public:
   using CompleterImplBase::CompleterImplBase;
@@ -2174,6 +2505,14 @@ class ::fidl::WireServer<::test_bindingsdenylist::DenyEachBinding> : public ::fi
   virtual void OnlyDenyLibfuzzer(
       ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest* request,
     OnlyDenyLibfuzzerCompleter::Sync& completer) = 0;
+
+    using OnlyDenyPythonCompleter = ::fidl::internal::WireCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>;
+      using OnlyDenyPythonRequestView = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest*;
+
+  
+  virtual void OnlyDenyPython(
+      ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyPythonRequest* request,
+    OnlyDenyPythonCompleter::Sync& completer) = 0;
 
     using OnlyDenyRustCompleter = ::fidl::internal::WireCompleter<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>;
       using OnlyDenyRustRequestView = ::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest*;
@@ -2958,6 +3297,8 @@ class ::fidl::internal::WireWeakAsyncClientImpl<::test_bindingsdenylist::DenyEac
     // Allocates 24 bytes of request buffer on the stack. The callback is stored on the heap.
   ::fidl::internal::WireThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> OnlyDenyLibfuzzer(bool a);
     // Allocates 24 bytes of request buffer on the stack. The callback is stored on the heap.
+  ::fidl::internal::WireThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> OnlyDenyPython(bool a);
+    // Allocates 24 bytes of request buffer on the stack. The callback is stored on the heap.
   ::fidl::internal::WireThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> OnlyDenyRust(bool a);
     // Allocates 24 bytes of request buffer on the stack. The callback is stored on the heap.
   ::fidl::internal::WireThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> OnlyDenySyzkaller(bool a);
@@ -2987,6 +3328,10 @@ class ::fidl::internal::WireWeakAsyncBufferClientImpl<::test_bindingsdenylist::D
 
 
 // Caller provides the backing storage for FIDL message.
+::fidl::internal::WireBufferThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> OnlyDenyPython(bool a);
+
+
+// Caller provides the backing storage for FIDL message.
 ::fidl::internal::WireBufferThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> OnlyDenyRust(bool a);
 
 
@@ -3007,6 +3352,9 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_bindingsdenylist::DenyEach
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyLibfuzzer> OnlyDenyLibfuzzer(bool a);
+  
+  // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
+  ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> OnlyDenyPython(bool a);
   
   // Allocates 56 bytes of message buffer on the stack. No heap allocation necessary.
   ::fidl::WireResult<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> OnlyDenyRust(bool a);

@@ -1150,6 +1150,61 @@ TEST(VmoTestCase, StreamSizeSlicesAndReferences) {
   ASSERT_EQ(stream_size, zx_system_get_page_size() * 10);
 }
 
+TEST(VmoTestCase, FaultBeyondStreamSizeNoPhysOrContig) {
+  size_t vmo_size = _zx_system_get_page_size() * 2;
+
+  // 6 page VMAR.
+  zx::vmar vmar;
+  uintptr_t vmar_addr;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
+      zx_system_get_page_size() * 6, &vmar, &vmar_addr));
+
+  // Can't create fault-beyond-stream-size mapping of physical VMO.
+  vmo_test::PhysVmo phys_vmo;
+  if (auto res = vmo_test::GetTestPhysVmo(vmo_size); !res.is_ok()) {
+    if (res.error_value() == ZX_ERR_NOT_SUPPORTED) {
+      printf("Root resource not available, skipping\n");
+    }
+    return;
+  } else {
+    phys_vmo = std::move(res.value());
+  }
+
+  zx_vaddr_t addr;
+
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                                               ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                                           0, phys_vmo.vmo, 0, vmo_size, &addr));
+
+  // Can't create fault-beyond-stream-size mapping of contiguous VMO.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::UncachedContiguous");
+
+  zx::vmo contig_vmo;
+  EXPECT_OK(zx::vmo::create_contiguous(bti, vmo_size, 0, &contig_vmo));
+
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC |
+                                               ZX_VM_FAULT_BEYOND_STREAM_SIZE | ZX_VM_ALLOW_FAULTS,
+                                           0, contig_vmo, 0, vmo_size, &addr));
+}
+
 void RightsTestMapHelper(zx_handle_t vmo, size_t len, uint32_t flags, bool expect_success,
                          zx_status_t fail_err_code) {
   uintptr_t ptr;

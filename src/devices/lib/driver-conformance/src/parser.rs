@@ -78,6 +78,7 @@ pub trait ValidateAgainstMetadata {
 impl ValidateAgainstMetadata for TestMetadata {
     fn validate_device_categories(&self, list: &[DeviceCategory]) -> Result<()> {
         for cat in list {
+            #[allow(clippy::map_entry)] // TODO(https://fxbug.dev/407086469)
             if self.device_category_types.contains_key(&cat.category) {
                 if !cat.subcategory.is_empty()
                     && !self.device_category_types[&cat.category].contains_key(&cat.subcategory)

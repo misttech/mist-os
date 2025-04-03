@@ -16,6 +16,7 @@ use fidl::endpoints::{create_proxy, ProtocolMarker};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use futures::prelude::*;
 use vfs::directory::entry_container::Directory as _;
+use vfs::ToObjectRequest as _;
 use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[fuchsia::test]
@@ -25,26 +26,22 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
         .add_child("component-manager", "#meta/component_manager.cm", ChildOptions::new())
         .await
         .unwrap();
+    const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::PERM_EXECUTABLE);
     let mock_boot = builder
         .add_local_child(
             "mock-boot",
             |mock_handles| {
                 let scope = vfs::execution_scope::ExecutionScope::new();
-                let () = vfs::pseudo_directory! {
+                let dir = vfs::pseudo_directory! {
                     "boot" => vfs::remote::remote_dir(
-                        fuchsia_fs::directory::open_in_namespace(
-                            "/pkg",
-                            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
-                        )
-                        .unwrap()
+                        fuchsia_fs::directory::open_in_namespace("/pkg", FLAGS).unwrap()
                     ),
-                }
-                .open(
-                    scope.clone(),
-                    fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
-                    vfs::path::Path::dot(),
-                    mock_handles.outgoing_dir.into_channel().into(),
-                );
+                };
+                let object_request =
+                    FLAGS.to_object_request(mock_handles.outgoing_dir.into_channel());
+                let scope_clone = scope.clone();
+                object_request
+                    .handle(|request| dir.open3(scope_clone, vfs::Path::dot(), FLAGS, request));
                 async move { Ok(scope.wait().await) }.boxed()
             },
             ChildOptions::new(),

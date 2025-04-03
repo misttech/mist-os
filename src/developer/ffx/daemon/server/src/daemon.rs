@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetIpAddr;
 use anyhow::{anyhow, bail, Context, Result};
 use ascendd::Ascendd;
 use async_trait::async_trait;
@@ -20,7 +21,7 @@ use ffx_target::Description;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
-    RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
+    TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
@@ -159,7 +160,11 @@ impl DaemonEventHandler {
             t.nodename.as_deref().unwrap_or("<unknown>")
         );
 
-        let addrs = t.addresses.into_iter().map(|a| a.into()).collect::<Vec<_>>();
+        let addrs = t
+            .addresses
+            .into_iter()
+            .filter_map(|a| TargetIpAddr::try_from(a).map(Into::into).ok())
+            .collect::<Vec<_>>();
 
         let mut update = target::TargetUpdateBuilder::new()
             .net_addresses(&addrs)
@@ -435,13 +440,11 @@ impl Daemon {
 
     async fn start_protocols(&mut self) -> Result<()> {
         let cx = protocols::Context::new(self.clone());
-        let ((), ()) = futures::future::try_join(
-            self.protocol_register
-                .start(RepositoryRegistryMarker::PROTOCOL_NAME.to_string(), cx.clone()),
-            self.protocol_register.start(TargetCollectionMarker::PROTOCOL_NAME.to_string(), cx),
-        )
-        .await?;
-        Ok(())
+
+        self.protocol_register
+            .start(TargetCollectionMarker::PROTOCOL_NAME.to_string(), cx)
+            .await
+            .map_err(Into::into)
     }
 
     /// Awaits a target that has RCS active.
@@ -993,7 +996,9 @@ mod test {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_with_netsvc_addrs(
             Some("abc"),
-            BTreeSet::from_iter(vec![TargetAddr::from_str("[fe80::1%1]:22").unwrap()].into_iter()),
+            BTreeSet::from_iter(
+                vec![TargetIpAddr::from_str("[fe80::1%1]:22").unwrap()].into_iter(),
+            ),
         );
         daemon.target_collection.merge_insert(target);
         let result = daemon.open_remote_control(None).await;

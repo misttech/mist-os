@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+assert(is_host, "buildid is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "buildid"
   edition = "2021"
@@ -17,7 +19,7 @@ rustc_library("lib") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":lib_test($host_toolchain)" ]
+  public_deps = [ ":lib_test" ]
 }
 
 group("buildid") {

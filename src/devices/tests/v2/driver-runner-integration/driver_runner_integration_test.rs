@@ -81,7 +81,7 @@ async fn driver_runner_test() -> Result<(), anyhow::Error> {
                 if log.msg().unwrap().contains("Hello world") {
                     assert_data_tree!(log.payload.as_ref().unwrap(), root:{
                         "keys": {
-                            "The answer is": 42u64,
+                            "The answer is": 42i64,
                         },
                         "message": contains {
                         "value": "Hello world",

@@ -46,6 +46,11 @@ if (is_host) {
     output_name = "symbolizer"
   }
 
+  install_host_tools("symbolizer_host_tool") {
+    deps = [ ":symbolizer" ]
+    outputs = [ "symbolizer" ]
+  }
+
   test("symbolizer_tests") {
     sources = [
       "analytics_test.cc",
@@ -60,9 +65,6 @@ if (is_host) {
       "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
     ]
-
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-conversion" ]
   }
 
   host_test_data("e2e_test_cases") {

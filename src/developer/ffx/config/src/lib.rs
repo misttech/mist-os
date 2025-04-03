@@ -248,7 +248,14 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
             ));
         }
     }
-    sdk.get_host_tool(name)
+    match sdk.get_host_tool(name) {
+        Ok(tool_path) if tool_path.exists() => {
+            tracing::info!("SDK returned {tool_path:?} for {name}");
+            Ok(tool_path)
+        }
+        Ok(tool_path) => Err(anyhow!("SDK returned {tool_path:?} for {name}, but does not exist")),
+        Err(e) => Err(e),
+    }
 }
 
 #[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
@@ -477,6 +484,7 @@ mod test {
 
         put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
         put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
+        put_file!(sdk_root, "../test_data/sdk", "tools/x64/a-host-tool");
 
         let sdk = env.context.get_sdk().expect("test sdk");
 

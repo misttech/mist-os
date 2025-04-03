@@ -68,6 +68,7 @@ group("ctf") {
     ":manifests",
     ":summarize_ctf_fidl_methods($default_toolchain)",
     ":tests",
+    "//src/testing/fidl_coverage:fidl_coverage_py_bin",
   ]
 }
 
@@ -100,7 +101,6 @@ group("tests") {
   testonly = true
   deps = [
     ":ctf_subbuild",
-    "build/scripts:tests",
     "tests",
     "tests:e2e_tests",
   ]
@@ -182,7 +182,7 @@ if (current_toolchain == default_toolchain) {
     outputs = [ output_file ]
 
     metadata = {
-      ctf_fidl_method_summary = [ output_file ]
+      ctf_fidl_method_summary = [ rebase_path(output_file, root_build_dir) ]
     }
 
     args = [

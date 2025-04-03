@@ -12,7 +12,7 @@ use ieee80211::MacAddr;
 use log::error;
 use std::sync::{Arc, Mutex};
 use wlan_common::ie::rsn::rsne;
-use wlan_common::ie::{intersect, SupportedRate};
+use wlan_common::ie::SupportedRate;
 use wlan_common::mac::{Aid, CapabilityInfo};
 use wlan_common::timer::EventHandle;
 use wlan_rsn::gtk::GtkProvider;
@@ -20,10 +20,7 @@ use wlan_rsn::nonce::NonceReader;
 use wlan_rsn::rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink};
 use wlan_rsn::{NegotiatedProtection, ProtectionInfo};
 use wlan_statemachine::*;
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
-};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
 // This is not specified by 802.11, but we need some way of kicking out clients that authenticate
 // but don't intend to associate.
@@ -146,9 +143,7 @@ impl Authenticated {
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
         aid_map: &mut aid::Map,
-        ap_capabilities: CapabilityInfo,
         client_capablities: u16,
-        ap_rates: &[SupportedRate],
         client_rates: &[SupportedRate],
         rsn_cfg: &Option<RsnCfg>,
         s_rsne: Option<Vec<u8>>,
@@ -185,44 +180,9 @@ impl Authenticated {
             reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
         })?;
 
-        let (capabilities, rates) = if ctx.mac_sublayer_support.device.mac_implementation_type
-            == fidl_common::MacImplementationType::Softmac
-        {
-            let capabilities = CapabilityInfo(client_capablities & ap_capabilities.raw());
-
-            // The IEEE 802.11 standard doesn't really specify what happens if the client rates
-            // mismatch the AP rates at this point: the client should have already determined
-            // the appropriate rates via the beacon or probe response frames. However, just to
-            // be safe, we intersect these rates here.
-            let rates = intersect::intersect_rates(
-                intersect::ApRates(ap_rates),
-                intersect::ClientRates(client_rates),
-            )
-            .map_err(|error| AssociationError {
-                error: format_err!(
-                    "could not intersect rates ({:?} + {:?}): {:?}",
-                    ap_rates,
-                    client_rates,
-                    error
-                ),
-                result_code: match error {
-                    intersect::IntersectRatesError::BasicRatesMismatch => {
-                        fidl_mlme::AssociateResultCode::RefusedBasicRatesMismatch
-                    }
-                    intersect::IntersectRatesError::NoApRatesSupported => {
-                        fidl_mlme::AssociateResultCode::RefusedCapabilitiesMismatch
-                    }
-                },
-                reason_code: fidl_ieee80211::ReasonCode::ReasonInvalidElement,
-            })?;
-
-            (capabilities, rates)
-        } else {
-            // If we are using a FullMAC driver, don't do the intersection and just pass the
-            // client rates back: they won't be used meaningfully anyway.
-            (CapabilityInfo(client_capablities), client_rates.to_vec())
-        };
-
+        // TODO(https://g-issues.fuchsia.dev/issues/406220225): Intersect client and AP rates for
+        // SoftMAC AP.
+        let (capabilities, rates) = (CapabilityInfo(client_capablities), client_rates.to_vec());
         Ok(Association {
             capabilities: capabilities
                 // IEEE Std 802.11-2016, 9.4.1.4: An AP sets the Privacy subfield to 1 within
@@ -574,9 +534,7 @@ impl States {
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
         aid_map: &mut aid::Map,
-        ap_capabilities: CapabilityInfo,
         client_capablities: u16,
-        ap_rates: &[SupportedRate],
         client_rates: &[SupportedRate],
         rsn_cfg: &Option<RsnCfg>,
         s_rsne: Option<Vec<u8>>,
@@ -587,9 +545,7 @@ impl States {
                     r_sta,
                     ctx,
                     aid_map,
-                    ap_capabilities,
                     client_capablities,
-                    ap_rates,
                     client_rates,
                     rsn_cfg,
                     s_rsne,
@@ -797,7 +753,6 @@ mod tests {
     use wlan_common::ie::rsn::akm::AKM_PSK;
     use wlan_common::ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_GCMP_256};
     use wlan_common::ie::rsn::rsne::Rsne;
-    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
     use wlan_common::{assert_variant, timer};
     use wlan_rsn::key::exchange::Key;
 
@@ -812,15 +767,9 @@ mod tests {
 
     fn make_env() -> (Context, MlmeStream, timer::EventStream<Event>) {
         let device_info = test_utils::fake_device_info(*AP_ADDR);
-        let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
-        let ctx = Context {
-            device_info,
-            mac_sublayer_support,
-            mlme_sink: MlmeSink::new(mlme_sink),
-            timer,
-        };
+        let ctx = Context { device_info, mlme_sink: MlmeSink::new(mlme_sink), timer };
         (ctx, mlme_stream, time_stream)
     }
 
@@ -891,9 +840,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,
@@ -985,9 +932,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,
@@ -1017,59 +962,7 @@ mod tests {
     }
 
     #[test]
-    fn authenticated_goes_to_associated_no_rsn_differing_cap() {
-        let mut r_sta = make_remote_client();
-        let (mut ctx, mut mlme_stream, _) = make_env();
-
-        let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
-            .into();
-
-        let mut aid_map = aid::Map::default();
-        let state = state.handle_assoc_ind(
-            &mut r_sta,
-            &mut ctx,
-            &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true).with_spectrum_mgmt(true),
-            CapabilityInfo(0)
-                .with_short_preamble(true)
-                .with_spectrum_mgmt(true)
-                .with_radio_measurement(true)
-                .raw(),
-            &[SupportedRate(0b11111000)][..],
-            &[SupportedRate(0b11111000)][..],
-            &None,
-            None,
-        );
-
-        let (_, Associated { rsna_link_state, aid }) = match state {
-            States::Associated(state) => state.release_data(),
-            _ => panic!("unexpected_state"),
-        };
-
-        assert_variant!(rsna_link_state, None);
-        assert_eq!(aid, 1);
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address,
-            result_code,
-            capability_info,
-            rates,
-            ..
-        }) => {
-            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
-            assert_eq!(result_code, fidl_mlme::AssociateResultCode::Success);
-            assert_eq!(
-                capability_info,
-                CapabilityInfo(0).with_short_preamble(true).with_spectrum_mgmt(true).raw(),
-            );
-            assert_eq!(rates, vec![0b11111000]);
-        });
-    }
-
-    #[test]
-    fn authenticated_goes_to_associated_differing_nonbasic_rates() {
+    fn authenticated_goes_to_associated() {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
@@ -1082,46 +975,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000), SupportedRate(0b01111001)][..],
-            &[SupportedRate(0b11111000), SupportedRate(0b01111010)][..],
-            &None,
-            None,
-        );
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            capability_info,
-            rates,
-            ..
-        }) => {
-            assert_eq!(capability_info, CapabilityInfo(0).with_short_preamble(true).raw());
-            assert_eq!(rates, vec![0b11111000]);
-        });
-    }
-
-    #[test]
-    fn authenticated_goes_to_associated_fullmac() {
-        let mut r_sta = make_remote_client();
-        let (mut ctx, mut mlme_stream, _) = make_env();
-
-        ctx.mac_sublayer_support = fake_mac_sublayer_support();
-        ctx.mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
-
-        let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
-            .into();
-
-        let mut aid_map = aid::Map::default();
-        let _next_state = state.handle_assoc_ind(
-            &mut r_sta,
-            &mut ctx,
-            &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
-            CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[][..],
             &[SupportedRate(0b11111000), SupportedRate(0b01111010)][..],
             &None,
             None,
@@ -1135,92 +989,6 @@ mod tests {
         }) => {
             assert_eq!(capability_info, CapabilityInfo(0).with_short_preamble(true).raw());
             assert_eq!(rates, vec![0b11111000, 0b01111010]);
-        });
-    }
-
-    #[test]
-    fn authenticated_goes_to_associated_differing_basic_rates() {
-        let mut r_sta = make_remote_client();
-        let (mut ctx, mut mlme_stream, _) = make_env();
-
-        let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
-            .into();
-
-        let mut aid_map = aid::Map::default();
-        let _next_state = state.handle_assoc_ind(
-            &mut r_sta,
-            &mut ctx,
-            &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
-            CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111001)][..],
-            &[SupportedRate(0b11111000)][..],
-            &None,
-            None,
-        );
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address,
-            result_code,
-            ..
-        }) => {
-            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
-            assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedBasicRatesMismatch);
-        });
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
-            peer_sta_address,
-            reason_code,
-            ..
-        }) => {
-            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
-            assert_eq!(reason_code, fidl_ieee80211::ReasonCode::ReasonInvalidElement);
-        });
-    }
-
-    #[test]
-    fn authenticated_goes_to_associated_no_ap_rates() {
-        let mut r_sta = make_remote_client();
-        let (mut ctx, mut mlme_stream, _) = make_env();
-
-        let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
-            .into();
-
-        let mut aid_map = aid::Map::default();
-        let _next_state = state.handle_assoc_ind(
-            &mut r_sta,
-            &mut ctx,
-            &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
-            CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b01111000)][..],
-            &[][..],
-            &None,
-            None,
-        );
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address,
-            result_code,
-            ..
-        }) => {
-            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
-            assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedCapabilitiesMismatch);
-        });
-
-        let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
-        assert_variant!(mlme_event, MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
-            peer_sta_address,
-            reason_code,
-            ..
-        }) => {
-            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
-            assert_eq!(reason_code, fidl_ieee80211::ReasonCode::ReasonInvalidElement);
         });
     }
 
@@ -1242,9 +1010,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,
@@ -1294,9 +1060,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             Some(s_rsne_vec),
@@ -1360,9 +1124,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
             Some(s_rsne_vec),
@@ -1414,9 +1176,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
             Some(s_rsne_vec),
@@ -1468,12 +1228,7 @@ mod tests {
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0)
-                .with_short_preamble(true)
-                .with_spectrum_mgmt(true)
-                .with_radio_measurement(true),
             CapabilityInfo(0).with_short_preamble(true).with_spectrum_mgmt(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
             Some(s_rsne_vec),

@@ -25,9 +25,7 @@ TEST(ServiceDirectoryTest, Control) {
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
-  // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
-  ASSERT_EQ(fio::Directory::DeprecatedOpen::kOrdinal, message.ordinal());
+  ASSERT_EQ(fio::Directory::Open::kOrdinal, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, CreateWithRequest) {
@@ -42,9 +40,7 @@ TEST(ServiceDirectoryTest, CreateWithRequest) {
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
-  // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
-  ASSERT_EQ(fio::Directory::DeprecatedOpen::kOrdinal, message.ordinal());
+  ASSERT_EQ(fio::Directory::Open::kOrdinal, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Clone) {

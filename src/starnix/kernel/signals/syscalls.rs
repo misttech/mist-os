@@ -70,7 +70,7 @@ fn rt_sigaction<Arch32SigAction>(
 ) -> Result<(), Errno>
 where
     Arch32SigAction:
-        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + Into<uapi::sigaction_t>,
+        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + TryInto<uapi::sigaction_t>,
 {
     let signal = Signal::try_from(signum)?;
 
@@ -774,7 +774,7 @@ pub fn sys_waitid(
     id: i32,
     user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: UserRef<uapi::rusage>,
+    user_rusage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -810,7 +810,7 @@ pub fn sys_waitid(
             };
 
             track_stub!(TODO("https://fxbug.dev/322874712"), "real rusage from waitid");
-            current_task.write_object(user_rusage, &usage)?;
+            current_task.write_multi_arch_object(user_rusage, usage)?;
         }
 
         if !user_info.is_null() {
@@ -890,10 +890,28 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
+    use crate::task::CurrentTask;
+    use crate::vfs::FdNumber;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::signals::SigSet;
+    use starnix_uapi::user_address::UserRef;
+
+    pub fn sys_arch32_signalfd(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        mask_addr: UserRef<SigSet>,
+        mask_size: usize,
+    ) -> Result<FdNumber, Errno> {
+        super::sys_signalfd4(locked, current_task, fd, mask_addr, mask_size, 0)
+    }
+
     pub use super::{
         sys_rt_sigaction as sys_arch32_rt_sigaction,
         sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
-        sys_sigaltstack as sys_arch32_sigaltstack,
+        sys_sigaltstack as sys_arch32_sigaltstack, sys_signalfd4 as sys_arch32_signalfd4,
+        sys_waitid as sys_arch32_waitid,
     };
 }
 
@@ -1723,7 +1741,7 @@ mod tests {
                 id,
                 MultiArchUserRef::null(&current_task),
                 0,
-                UserRef::default()
+                UserRef::default().into()
             ),
             error!(EINVAL)
         );
@@ -1735,7 +1753,7 @@ mod tests {
                 id,
                 MultiArchUserRef::null(&current_task),
                 0xffff,
-                UserRef::default()
+                UserRef::default().into()
             ),
             error!(EINVAL)
         );
@@ -2014,7 +2032,7 @@ mod tests {
                 child2_pid,
                 address.into(),
                 WEXITED,
-                UserRef::default()
+                UserRef::default().into()
             ),
             Ok(())
         );
@@ -2029,7 +2047,7 @@ mod tests {
                 0,
                 address.into(),
                 WEXITED,
-                UserRef::default()
+                UserRef::default().into()
             ),
             Ok(())
         );
@@ -2043,10 +2061,12 @@ mod tests {
 
         const TEST_VALUE: u64 = 101;
 
+        // Add the padding int for arch64
+        const ARCH64_SI_HEADER_SIZE: usize = SI_HEADER_SIZE + 4;
         // Taken from gVisor of SignalInfo in  //pkg/abi/linux/signal.go
-        const PID_DATA_OFFSET: usize = SI_HEADER_SIZE;
-        const UID_DATA_OFFSET: usize = SI_HEADER_SIZE + 4;
-        const VALUE_DATA_OFFSET: usize = SI_HEADER_SIZE + 8;
+        const PID_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE;
+        const UID_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE + 4;
+        const VALUE_DATA_OFFSET: usize = ARCH64_SI_HEADER_SIZE + 8;
 
         let mut data = vec![0u8; SI_MAX_SIZE as usize];
         let header = SignalInfoHeader {

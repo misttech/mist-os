@@ -57,9 +57,9 @@ melon/output: \
 """
 import os
 from os import PathLike
-from typing import Iterable, Set, Union
+from typing import Any, Iterable, Self, TextIO, Union
 
-FilePath = Union[str, PathLike]
+FilePath = Union[str, PathLike[Any]]
 
 
 class DepFile:
@@ -70,13 +70,15 @@ class DepFile:
     output file.
     """
 
-    def __init__(self, output: FilePath, rebase: FilePath = None) -> None:
+    def __init__(
+        self, output: FilePath, rebase: None | FilePath = None
+    ) -> None:
         if rebase is not None:
             self.rebase_from = rebase
         else:
             self.rebase_from = os.getcwd()
         self.output = self._rebase(output)
-        self.deps: Set[FilePath] = set()
+        self.deps: set[FilePath] = set()
 
     def _rebase(self, path: FilePath) -> FilePath:
         return os.path.relpath(path, start=self.rebase_from)
@@ -85,14 +87,19 @@ class DepFile:
         """Add an input to the depfile"""
         self.deps.add(self._rebase(input))
 
-    def update(self, other: Union["DepFile", Iterable[FilePath]]) -> None:
+    def update(self, other: Union[Self, Iterable[FilePath]]) -> None:
         """Add each input to this depfile"""
         # If other is another DepFile, just snag the values from it's internal
         # dict.
+        inputs: Iterable[FilePath] = set()
         if isinstance(other, self.__class__):
             inputs = other.deps
+        elif isinstance(other, Iterable):
+            inputs = other
         else:
-            inputs: Iterable[FilePath] = other
+            raise TypeError(
+                "update() can only accept a DepFile or an iterable of paths"
+            )
 
         # Rebase them all in a bulk operation.
         inputs = [self._rebase(input) for input in inputs]
@@ -106,7 +113,7 @@ class DepFile:
         cls,
         output: FilePath,
         inputs: Iterable[FilePath],
-        rebase: FilePath = None,
+        rebase: None | FilePath = None,
     ) -> "DepFile":
         dep_file = cls(output, rebase)
         dep_file.update(inputs)
@@ -114,12 +121,13 @@ class DepFile:
 
     def __repr__(self) -> str:
         if self.deps:
+            sorted_deps = sorted(str(d) for d in self.deps)
             return "{}: \\\n  {}\n".format(
-                self.output, " \\\n  ".join(sorted(self.deps))
+                self.output, " \\\n  ".join(sorted_deps)
             )
         else:
             return "{}:\n".format(self.output)
 
-    def write_to(self, file) -> None:
+    def write_to(self, file: TextIO) -> None:
         """Write out the depfile contents to the given writeable `file-like` object."""
         file.write(str(self))

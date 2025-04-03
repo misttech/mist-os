@@ -11,6 +11,7 @@
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/cpp/env.h>
+#include <lib/fdf/env.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
@@ -365,6 +366,8 @@ void Driver::Start(fbl::RefPtr<Driver> self, fdf::DriverStartArgs start_args,
     }});
   }
 
+  start_args.node_token()->duplicate(ZX_RIGHT_SAME_RIGHTS, &node_token_);
+
   fbl::AutoLock al(&lock_);
   initial_dispatcher_ = std::move(dispatcher);
 
@@ -414,6 +417,12 @@ void Driver::Unbind() {
     // multiple times.
     binding_.reset();
   }
+}
+
+zx::event Driver::node_token() const {
+  zx::event res;
+  node_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &res);
+  return res;
 }
 
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program) {
@@ -530,6 +539,20 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
                driver.status_string());
           callback(driver.take_error());
           return;
+        }
+
+        zx::result allowed_scheduler_roles =
+            fdf_internal::ProgramValueAsVector(*start_args.program(), "allowed_scheduler_roles");
+        if (allowed_scheduler_roles.is_ok()) {
+          for (const auto& role : *allowed_scheduler_roles) {
+            fdf_env_add_allowed_scheduler_role_for_driver(driver.value().get(), role.data(),
+                                                          role.length());
+          }
+        }
+        if (!default_dispatcher_scheduler_role.empty()) {
+          fdf_env_add_allowed_scheduler_role_for_driver(driver.value().get(),
+                                                        default_dispatcher_scheduler_role.data(),
+                                                        default_dispatcher_scheduler_role.length());
         }
 
         zx::result<fdf::Dispatcher> driver_dispatcher =

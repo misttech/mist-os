@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.trippoint/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.trippoint/cpp/wire_types.h>
-#include <lib/ddk/debug.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -17,6 +16,7 @@
 #include <src/devices/temperature/drivers/aml-trip/util.h>
 
 #include "aml-tsensor-regs.h"
+
 namespace temperature {
 
 void AmlTripDevice::Init() {
@@ -476,8 +476,8 @@ void AmlTripDevice::EnableIrq(uint32_t index) {
   auto sensor_ctl = thermal::TsCfgReg1::Get().ReadFrom(&sensor_mmio_);
   auto reg_value = sensor_ctl.reg_value();
 
-  reg_value |= (1 << (IRQ_RISE_ENABLE_SHIFT + index));
-  reg_value &= ~(1 << (IRQ_RISE_STAT_CLR_SHIFT + index));
+  reg_value |= (1U << (IRQ_RISE_ENABLE_SHIFT + index));
+  reg_value &= ~(1U << (IRQ_RISE_STAT_CLR_SHIFT + index));
 
   sensor_ctl.set_reg_value(reg_value);
 

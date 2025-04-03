@@ -574,7 +574,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use diagnostics_assertions::AnyProperty;
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
 
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;

@@ -193,13 +193,13 @@ class OpenModule {
   using SymbolMap = std::unordered_map<std::string, void*>;
 
  public:
-  explicit OpenModule(Test& test_fixture) : fixture_(test_fixture) {}
+  explicit OpenModule(Test& test) : test_(test) {}
 
   void InitModule(const char* file, int mode, std::initializer_list<const char*> lookup_symbols,
                   const char* canary_symbol = nullptr) {
-    fixture_.ExpectRootModule(file);
+    test_.ExpectRootModule(file);
     file_ = file;
-    auto open = fixture_.DlOpen(file_, mode);
+    auto open = test_.DlOpen(file_, mode);
     ASSERT_TRUE(open.is_ok()) << file_ << ": " << open.error_value();
     handle_ = open.value();
 
@@ -207,18 +207,22 @@ class OpenModule {
       return;
     }
     InitSymbols(lookup_symbols);
+
+    // This is only really needed for the __tls_get_addr tests, but doesn't
+    // really hurt for the TLSDESC tests.
+    ASSERT_NO_FATAL_FAILURE(helper_.Init(file));
   }
 
   void InitSymbols(std::initializer_list<const char*> symbol_list) {
     for (const char* symbol : symbol_list) {
-      auto sym = fixture_.DlSym(handle_, symbol);
+      auto sym = test_.DlSym(handle_, symbol);
       ASSERT_TRUE(sym.is_ok()) << file_ << ": " << symbol << ": " << sym.error_value();
       symbols_[symbol] = sym.value();
     }
   }
 
   bool IsSymbolEnabledAtCompileTime(const char* symbol) {
-    auto sym = fixture_.DlSym(handle_, symbol);
+    auto sym = test_.DlSym(handle_, symbol);
     if (sym.is_error()) {
       EXPECT_THAT(sym.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol, file_));
       skip_ = true;
@@ -228,7 +232,7 @@ class OpenModule {
 
   void CloseHandle() {
     if (handle_) {
-      auto close = fixture_.DlClose(std::exchange(handle_, nullptr));
+      auto close = test_.DlClose(std::exchange(handle_, nullptr));
       EXPECT_TRUE(close.is_ok()) << close.error_value();
     }
   }
@@ -253,7 +257,8 @@ class OpenModule {
   }
 
  private:
-  Test& fixture_;
+  Test& test_;
+  [[no_unique_address]] Test::DynamicTlsHelper helper_;
   const char* file_ = nullptr;
   void* handle_ = nullptr;
   SymbolMap symbols_;
@@ -327,11 +332,13 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   }
 
   // Access TLS data from the 'early' module.
-  auto access_early_var = [&early_module = std::as_const(early_module)] {
+  auto access_early_var = [&self, &early_module = std::as_const(early_module)] {
+    self.PrepareForTlsAccess();
     AccessEarlyLoadedVar(early_module);
   };
 
-  auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
+  auto access_tls_vars = [&self, &names, &mod = std::as_const(mod), &ctx]() {
+    self.PrepareForTlsAccess();
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
     EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
@@ -364,10 +371,6 @@ void DynamicTlsFastPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
@@ -387,10 +390,6 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
@@ -411,10 +410,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
@@ -435,10 +430,6 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicFastPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicFastPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
@@ -497,7 +488,8 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 
   OpenModule mod(self);
 
-  auto access_tls_vars = [&names, &mod = std::as_const(mod), &ctx]() {
+  auto access_tls_vars = [&self, &names, &mod = std::as_const(mod), &ctx]() {
+    self.PrepareForTlsAccess();
     EXPECT_THAT(mod.template TryAccess<int>(names.data_symbol),
                 std::optional(std::pair{ctx.tls_data_initial_val, ctx.tls_data_initial_val + 1}));
     EXPECT_THAT(mod.template TryAccess<char>(names.bss_symbol), std::optional(std::pair{0, 1}));
@@ -508,7 +500,8 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
   };
 
   // Access TLS data from the 'early' module.
-  auto access_early_var = [&early_module = std::as_const(early_module)] {
+  auto access_early_var = [&self, &early_module = std::as_const(early_module)] {
+    self.PrepareForTlsAccess();
     AccessEarlyLoadedVar(early_module);
   };
 
@@ -553,10 +546,6 @@ void DynamicTlsSlowPath(Test& self, const TlsLoadedSymbolNames& names, const Tls
 }
 
 TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescGdModuleName,
@@ -577,10 +566,6 @@ TYPED_TEST(DlTests, TlsDescGlobalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsGdModuleName,
@@ -601,10 +586,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTlsDescLdModuleName,
@@ -625,10 +606,6 @@ TYPED_TEST(DlTests, TlsDescLocalDynamicSlowPath) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicSlowPath) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires TLS";
-  }
-
   // TLS module details
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = kTraditionalTlsLdModuleName,
@@ -665,6 +642,12 @@ void DynamicTlsGetAddrRelocTest(auto& self, const TlsLoadedSymbolNames& names) {
     GTEST_SKIP() << "test requires __tls_get_addr to resolve symbols";
   }
 
+  // This is incidental to the actual TLS functionality tested here.  But it's
+  // necessary for DlImplTests::DlIteratePhdr to work when it tries to return
+  // the TLS data pointer, even though the use of GetPhdrInfoForModule here
+  // does not look at that pointer.
+  ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess());
+
   // The TLS modid will be compared with what is shown by dl_iterate_phdr.
   auto info = GetPhdrInfoForModule(self, names.module);
 
@@ -687,10 +670,6 @@ void DynamicTlsGetAddrRelocTest(auto& self, const TlsLoadedSymbolNames& names) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires dynamic TLS support";
-  }
-
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = "tls-get-addr-global-dynamic-reloc.so",
       .data_symbol = kGdDataSymbolName,
@@ -701,10 +680,6 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
 }
 
 TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
-  if constexpr (!TestFixture::kSupportsDynamicTls) {
-    GTEST_SKIP() << "test requires dynamic TLS support";
-  }
-
   constexpr TlsLoadedSymbolNames kModuleNames = {
       .module = "tls-get-addr-local-dynamic-reloc.so",
       .data_symbol = kLdDataSymbolName,
@@ -712,6 +687,29 @@ TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
   };
 
   DynamicTlsGetAddrRelocTest(*this, kModuleNames);
+}
+
+void PerThreadTlsTest(auto& self) {
+  constexpr auto do_nothing = [] {};
+  auto prepare_thread_for_tls_access = [&self]() {
+    ASSERT_NO_FATAL_FAILURE(self.PrepareForTlsAccess());
+  };
+
+  TestThreadRunner tr;
+  tr.StartWorkersNow(do_nothing, prepare_thread_for_tls_access, do_nothing);
+  tr.MainWaitForWorkerDone();
+  tr.MainLetWorkersFinish();
+}
+
+// This is a basic test for per-thread TLS set-up and tear-down.
+TYPED_TEST(DlTests, PrepareForTlsAccess) {
+  // Open a module with a PT_TLS so there will be something to allocate.
+  OpenModule tls_dep{*this};
+  ASSERT_NO_FATAL_FAILURE(tls_dep.InitModule(  //
+      "tls-desc-dep-module.so", RTLD_NOW | RTLD_LOCAL, {}));
+
+  ASSERT_NO_FATAL_FAILURE(this->PrepareForTlsAccess());
+  PerThreadTlsTest(*this);
 }
 
 }  // namespace

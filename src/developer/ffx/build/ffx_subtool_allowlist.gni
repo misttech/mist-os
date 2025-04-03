@@ -14,7 +14,7 @@ ffx_subtool_fidl_partner_unstable_allowlist = [
   "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 ]
 
-# Unstable FIDL libraries that are not in "partner_internal" or greater but are
+# Unstable FIDL libraries that are not in "host_tool" or greater but are
 # temporarily allowed to be depended on by a ffx plugin/subtool.
 # TODO(https://fxbug.dev/42081073): Add these to the SDK or remove the
 # plugin/tool from the SDK and remove them below.
@@ -29,7 +29,7 @@ ffx_subtool_fidl_allowlist = [
   "//zircon/vdso:zx",
 
   # ffx driver
-  # "//sdk/fidl/fuchsia.device:fuchsia.device" is in "partner_internal", but
+  # "//sdk/fidl/fuchsia.device:fuchsia.device" is in "prebuilt", but
   # most APIs in it are unstable.
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
 
@@ -54,6 +54,7 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.net.dhcpv6:fuchsia.net.dhcpv6",
 
   # used by ffx net
+  "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter",
   "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated",
   "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin",

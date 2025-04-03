@@ -36,6 +36,7 @@
 #include "src/storage/blobfs/cache_node.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/loader_info.h"
+#include "src/storage/blobfs/transaction.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
@@ -131,6 +132,25 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // Returns true is the blob is currently readable.
   bool IsReadable() __TA_EXCLUDES(mutex_);
 
+  // Lock and replace this blob with another with the same digest at the inode `map_index` that uses
+  // `block_count` data blocks. The removal of this blob is added to the `transaction` which must be
+  // committed inside `transaction_completion` along with any other operations that need to be done
+  // or verified while this blob is held under lock.
+  zx::result<> ReplaceBlob(BlobTransaction& transaction, uint32_t map_index, uint64_t block_count,
+                           const std::function<zx::result<>()>& transaction_completion)
+      __TA_EXCLUDES(mutex_);
+
+  // Sets the blob in a status of being overwritten. Returns ZX_ERR_ALREADY_EXISTS if the flag is
+  // already set.
+  zx_status_t SetOverwriting() __TA_EXCLUDES(mutex_);
+
+  // Clears the status of being overwritten. Returns ZX_ERR_NOT_FOUND if the flag is not already
+  // set.
+  zx_status_t ClearOverwriting() __TA_EXCLUDES(mutex_);
+
+  // Reference the blob that is being overwritten by this one.
+  void SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) __TA_EXCLUDES(mutex_);
+
  private:
   friend class BlobLoaderTest;
   friend class BlobTest;
@@ -143,7 +163,8 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // Note that this *must* be called on the main dispatch thread; otherwise the underlying state of
   // the blob could change after (or during) the call, and the blob might not really be purgeable.
   bool Purgeable() const __TA_REQUIRES_SHARED(mutex_) {
-    return !HasReferences() && (deletable_ || state_ != BlobState::kReadable);
+    return !HasReferences() && (deletable_ || state_ != BlobState::kReadable) &&
+           !being_overwritten_;
   }
 
   // Vnode protected overrides:
@@ -210,6 +231,14 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // destroy the associated `writer_`.
   zx_status_t MarkReadable(const WrittenBlob& written_blob) __TA_REQUIRES(mutex_);
 
+  // Used in the second half of `ReplaceBlob()` to finish updating the loader_info_ and related
+  // fields so that future requests will load data from the old blob.
+  zx::result<> CompleteReplacement(uint32_t map_index, uint64_t block_count) __TA_REQUIRES(mutex_);
+
+  // Called by `ReplaceBlob()` when some step fails. Marks the blob as corrupt as the metadata for
+  // it is now in an unknown state.
+  void FailedReplacement() __TA_REQUIRES(mutex_);
+
   Blobfs& blobfs_;  // Doesn't need locking because this is never changed.
   BlobState state_ __TA_GUARDED(mutex_) = BlobState::kEmpty;
   // True if this node should be unlinked when closed.
@@ -254,6 +283,9 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   uint32_t map_index_ __TA_GUARDED(mutex_) = 0;
   uint64_t blob_size_ __TA_GUARDED(mutex_) = 0;
   uint64_t block_count_ __TA_GUARDED(mutex_) = 0;
+
+  // If the Blob is currently being overwritten. Used to prevent multiple in-flight overwrites.
+  bool being_overwritten_ __TA_GUARDED(mutex_) = false;
 
   // Data used exclusively during writeback. Only used by Write()/Append().
   class Writer;

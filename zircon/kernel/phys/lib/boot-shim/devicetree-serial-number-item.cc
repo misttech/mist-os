@@ -26,12 +26,12 @@ devicetree::ScanState DevicetreeSerialNumberItem::OnNode(
       return devicetree::ScanState::kDone;
     }
 
-    size_t start_index = cmdline_.find(kAndroidBootSerial) + kAndroidBootSerial.size();
+    size_t start_index = cmdline_.find(kAndroidBootSerial);
     if (start_index == std::string_view::npos) {
       return devicetree::ScanState::kDone;
     }
-    size_t pos = cmdline_.substr(start_index).find_first_of(" ");
-    std::string_view serial_number = cmdline_.substr(start_index, pos);
+    std::string_view serial_number = cmdline_.substr(start_index + kAndroidBootSerial.size());
+    serial_number = serial_number.substr(0, serial_number.find_first_of(' '));
 
     if (!serial_number.empty()) {
       set_payload({reinterpret_cast<const std::byte*>(serial_number.data()), serial_number.size()});

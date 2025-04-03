@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/drivers/bazel_driver_package.gni")
-import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
 import("//build/devicetree/devicetree.gni")
 import("//build/devicetree/devicetree_visitor.gni")
@@ -67,33 +66,6 @@ bazel_driver_package("bazel_package") {
   inputs = [
     "vim3-devicetree.cc",
     "vim3-devicetree.h",
-  ]
-}
-
-bazel_fuchsia_test_package("vim3-devicetree-test-package") {
-  test_package_name = "vim3-devicetree-test"
-  test_component_names = [ "vim3-devicetree-test" ]
-
-  # Integration test for the board driver requires these prebuilt artifacts:
-  #   - devicetree blob (.dtb)
-  #   - Platform bus driver (.far)
-  #   - driver-test-realm package (.far)
-  bazel_inputs = [
-    ":vim3-dtb",
-    "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
-  ]
-  inputs = [
-    "vim3-devicetree-test.cc",
-    "vim3-devicetree.cc",
-    "vim3-devicetree.h",
-    "visitors/vim3-adc-buttons.cc",
-    "visitors/vim3-adc-buttons.h",
-    "visitors/vim3-gpio-buttons.cc",
-    "visitors/vim3-gpio-buttons.h",
-    "visitors/vim3-wifi.cc",
-    "visitors/vim3-wifi.h",
-    "visitors/vim3-nna.cc",
-    "visitors/vim3-nna.h",
   ]
 }
 

@@ -462,14 +462,6 @@ impl Indexer {
 
         log::info!("Disabled {} driver(s).", count);
 
-        let rebind_result = self.rebind_composites_with_driver(driver_url);
-        if let Err(e) = rebind_result {
-            log::error!(
-                "Failed to rebind composites with the driver being disabled: {}.",
-                Status::from_raw(e)
-            );
-        }
-
         Ok(())
     }
 
@@ -485,14 +477,6 @@ impl Indexer {
         }
 
         log::info!("Enabled {} driver(s).", count);
-
-        let rebind_result = self.rebind_composites_with_driver(driver_url);
-        if let Err(e) = rebind_result {
-            log::error!(
-                "Failed to rebind composites with the driver being enabled: {}.",
-                Status::from_raw(e)
-            );
-        }
 
         Ok(())
     }

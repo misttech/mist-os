@@ -20,8 +20,10 @@ class ImageTilingType {
       fuchsia_hardware_display_types::wire::ImageTilingTypeIdValue fidl_tiling_type_id_value)
       : tiling_type_id_(fidl_tiling_type_id_value) {}
 
-  ImageTilingType(const ImageTilingType&) = default;
-  ImageTilingType& operator=(const ImageTilingType&) = default;
+  constexpr ImageTilingType(const ImageTilingType&) noexcept = default;
+  constexpr ImageTilingType(ImageTilingType&&) noexcept = default;
+  constexpr ImageTilingType& operator=(const ImageTilingType&) = default;
+  constexpr ImageTilingType& operator=(ImageTilingType&&) noexcept = default;
   ~ImageTilingType() = default;
 
   constexpr fuchsia_hardware_display_types::wire::ImageTilingTypeIdValue ToFidl() const;

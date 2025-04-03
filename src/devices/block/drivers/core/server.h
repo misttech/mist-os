@@ -31,10 +31,33 @@
 #include "message-group.h"
 #include "message.h"
 
+// Remaps the dev_offset of block requests based on an internal map.
+// TODO(https://fxbug.dev/402515764): For now, this just supports a single entry in the map, which
+// is all that is required for GPT partitions.  If we want to support this for FVM, we will need
+// to support multiple entries, which requires changing the block server to support request
+// splitting.
+class OffsetMap {
+ public:
+  static zx::result<std::unique_ptr<OffsetMap>> Create(
+      fuchsia_hardware_block::wire::BlockOffsetMapping initial_mapping);
+
+  // Adjusts `request` by applying the map to dev_offset.
+  // Returns false if the request would exceed the range known to OffsetMap.
+  bool AdjustRequest(block_fifo_request_t& request) const;
+
+ private:
+  explicit OffsetMap(fuchsia_hardware_block::wire::BlockOffsetMapping mapping);
+
+  fuchsia_hardware_block::wire::BlockOffsetMapping mapping_;
+};
+
 class Server : public fidl::WireServer<fuchsia_hardware_block::Session> {
  public:
   // Creates a new Server.
-  static zx::result<std::unique_ptr<Server>> Create(ddk::BlockProtocolClient* bp);
+  static zx::result<std::unique_ptr<Server>> Create(
+      ddk::BlockProtocolClient* bp,
+      fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map = {},
+      std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings = {});
 
   // This will block until all outstanding messages have been processed.
   ~Server() override;
@@ -69,7 +92,8 @@ class Server : public fidl::WireServer<fuchsia_hardware_block::Session> {
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Server);
-  explicit Server(ddk::BlockProtocolClient* bp);
+  Server(ddk::BlockProtocolClient* bp, block_info_t block_info, size_t block_op_size,
+         std::unique_ptr<OffsetMap> offset_map);
 
   // Helper for processing a single message read from the FIFO.
   void ProcessRequest(block_fifo_request_t* request);
@@ -91,6 +115,7 @@ class Server : public fidl::WireServer<fuchsia_hardware_block::Session> {
   fzl::fifo<block_fifo_response_t, block_fifo_request_t> fifo_;
   fzl::fifo<block_fifo_request_t, block_fifo_response_t> fifo_peer_;
   block_info_t info_;
+  std::unique_ptr<OffsetMap> offset_map_;
   ddk::BlockProtocolClient* bp_;
   size_t block_op_size_;
 

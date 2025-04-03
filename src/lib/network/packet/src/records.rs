@@ -1655,7 +1655,7 @@ pub mod options {
         /// `encode_length` computes the value which should be stored in the
         /// length field, returning `None` if the value cannot be stored in an
         /// `F`.
-        fn encode_length<F: KindLenField>(self, option_body_len: usize) -> Option<F> {
+        pub fn encode_length<F: KindLenField>(self, option_body_len: usize) -> Option<F> {
             let len = match self {
                 LengthEncoding::TypeLengthValue { option_len_multiplier } => {
                     let unpadded_len = (2 * mem::size_of::<F>()).checked_add(option_body_len)?;

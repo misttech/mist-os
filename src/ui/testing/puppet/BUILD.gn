@@ -7,6 +7,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("lib") {
+  testonly = true
   name = "ui_puppet_lib"
   version = "0.1.0"
   edition = "2021"
@@ -38,6 +39,7 @@ rustc_library("lib") {
 }
 
 rustc_binary("bin") {
+  testonly = true
   output_name = "ui_puppet_bin"
   edition = "2021"
   deps = [

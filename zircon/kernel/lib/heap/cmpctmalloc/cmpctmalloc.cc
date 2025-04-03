@@ -120,7 +120,8 @@
 //   will try to hold onto one entirely-free, non-large OS allocation instead of
 //   returning it to the OS. See cached_os_alloc.
 
-#if defined(DEBUG) || LK_DEBUGLEVEL > 2
+#if defined(DEBUG) || defined(__riscv) || LK_DEBUGLEVEL > 2
+// TODO(https://fxbug.dev/404291515): Enable on riscv to track down heap corruption.
 #include <platform.h>
 
 #define CMPCT_DEBUG
@@ -928,7 +929,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     while (!heap_grow(growby)) {
       if (growby <= rounded_up) {
         guard.Release();
-        heap_report_alloc_failure();
+        heap_report_alloc_failure(rounded_up);
         return NULL;
       }
       growby = std::max(growby >> 1, rounded_up);
@@ -1147,6 +1148,10 @@ void cmpct_init(void) {
 
   const bool success = heap_grow(kHeapUsableGrowSize);
   ZX_ASSERT(success);
+
+#ifdef CMPCT_DEBUG
+  printf("CMPCT: Enabling debug\n");
+#endif
 }
 
 void cmpct_dump(CmpctDumpOptions options) {

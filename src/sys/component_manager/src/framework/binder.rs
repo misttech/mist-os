@@ -109,8 +109,6 @@ async fn report_routing_failure_to_target(target: WeakComponentInstance, err: Mo
 mod tests {
     use super::*;
     use crate::builtin_environment::BuiltinEnvironment;
-    use crate::model::events::source::EventSource;
-    use crate::model::events::stream::EventStream;
     use crate::model::testing::test_helpers::*;
     use assert_matches::assert_matches;
     use cm_rust::ComponentDecl;
@@ -119,7 +117,6 @@ mod tests {
     use fidl::client::Client;
     use fidl::encoding::DefaultFuchsiaResourceDialect;
     use fidl::handle::AsyncChannel;
-    use fidl_fuchsia_io as fio;
     use futures::lock::Mutex;
     use futures::StreamExt;
     use hooks::EventType;
@@ -129,6 +126,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
@@ -142,8 +140,9 @@ mod tests {
             BinderCapabilityTestFixture { builtin_environment }
         }
 
-        async fn new_event_stream(&self, events: Vec<Name>) -> (EventSource, EventStream) {
-            new_event_stream(self.builtin_environment.clone(), events).await
+        async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+            let builtin_environment_guard = self.builtin_environment.lock().await;
+            new_event_stream(&*builtin_environment_guard, events).await
         }
 
         async fn provider(
@@ -183,15 +182,14 @@ mod tests {
             ("target", component_decl_with_test_runner()),
         ])
         .await;
-        let (_event_source, mut event_stream) = fixture
-            .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
-            .await;
+        let event_stream =
+            fixture.new_event_stream(vec![EventType::Resolved, EventType::Started]).await;
         let (_client_end, server_end) = zx::Channel::create();
         let moniker: Moniker = vec!["source"].try_into().unwrap();
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         fixture
             .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
@@ -199,7 +197,7 @@ mod tests {
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -208,8 +206,11 @@ mod tests {
             .expect("failed to call open()");
         task_group.join().await;
 
-        assert!(event_stream.wait_until(EventType::Resolved, moniker.clone()).await.is_some());
-        assert!(event_stream.wait_until(EventType::Started, moniker.clone()).await.is_some());
+        let events = get_n_events(&event_stream, 4).await;
+        assert_event_type_and_moniker(&events[0], fcomponent::EventType::Resolved, Moniker::root());
+        assert_event_type_and_moniker(&events[1], fcomponent::EventType::Resolved, &moniker);
+        assert_event_type_and_moniker(&events[2], fcomponent::EventType::Resolved, "target");
+        assert_event_type_and_moniker(&events[3], fcomponent::EventType::Started, &moniker);
     }
 
     // TODO(https://fxbug.dev/42073225): Figure out a way to test this behavior.
@@ -229,7 +230,7 @@ mod tests {
 
         let task_group = TaskGroup::new();
         let scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::PROTOCOL_SERVICE.to_object_request(server_end);
         fixture
             .provider(moniker, Moniker::root())
             .await
@@ -237,7 +238,7 @@ mod tests {
                 task_group.clone(),
                 OpenRequest::new(
                     scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::PROTOCOL_SERVICE,
                     VfsPath::dot(),
                     &mut object_request,
                 ),
@@ -253,7 +254,8 @@ mod tests {
             event_receiver.next().await,
             Some(Err(fidl::Error::ClientChannelClosed {
                 status: zx::Status::NOT_FOUND,
-                protocol_name: "binder_service"
+                protocol_name: "binder_service",
+                ..
             }))
         );
         assert_matches!(event_receiver.next().await, None);

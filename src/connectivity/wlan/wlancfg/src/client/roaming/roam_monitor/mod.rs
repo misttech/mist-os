@@ -49,10 +49,7 @@ pub trait RoamMonitorApi: Any {
     ) -> Result<RoamTriggerDataOutcome, anyhow::Error>;
     // Determines if the selected roam candidate is still relevant and provides enough potential
     // improvement to warrant a roam. Returns true if roam request should be sent to state machine.
-    fn should_send_roam_request(
-        &self,
-        candidate: types::ScannedCandidate,
-    ) -> Result<bool, anyhow::Error>;
+    fn should_send_roam_request(&self, request: PolicyRoamRequest) -> Result<bool, anyhow::Error>;
 }
 
 // Service loop that orchestrates interaction between state machine (incoming roam data and outgoing
@@ -62,7 +59,7 @@ pub async fn serve_roam_monitor(
     roaming_policy: RoamingPolicy,
     mut trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
     connection_selection_requester: ConnectionSelectionRequester,
-    mut roam_sender: mpsc::Sender<types::ScannedCandidate>,
+    mut roam_request_sender: mpsc::Sender<PolicyRoamRequest>,
     telemetry_sender: TelemetrySender,
     past_roams: Arc<Mutex<PastRoamList>>,
 ) -> Result<(), anyhow::Error> {
@@ -77,7 +74,7 @@ pub async fn serve_roam_monitor(
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
                 match roam_monitor.handle_roam_trigger_data(data).await {
                     Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential, reasons}) => {
-                        telemetry_sender.send(TelemetryEvent::RoamingScan);
+                        telemetry_sender.send(TelemetryEvent::PolicyRoamScan { reasons: reasons.clone() });
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
                             connection_selection_requester.clone(),
@@ -95,15 +92,15 @@ pub async fn serve_roam_monitor(
             // Handle the result of a completed roam search, sending recommentation to roam if
             // necessary.
             roam_search_result = roam_search_result_futs.select_next_some() => match roam_search_result {
-                Ok(PolicyRoamRequest { candidate, reasons: _ }) => {
-                    if roam_monitor.should_send_roam_request(candidate.clone()).unwrap_or_else(|e| {
+                Ok(request) => {
+                    if roam_monitor.should_send_roam_request(request.clone()).unwrap_or_else(|e| {
                             error!("Error validating selected roam candidate: {}", e);
                             false
                         }) {
                             match roaming_policy {
                                 RoamingPolicy::Enabled { mode: RoamingMode::CanRoam, ..} => {
-                                    info!("Requesting roam to candidate: {:?}", candidate.to_string_without_pii());
-                                    if roam_sender.try_send(candidate).is_err() {
+                                    info!("Requesting roam to candidate: {:?}", request.candidate.to_string_without_pii());
+                                    if roam_request_sender.try_send(request).is_err() {
                                         warn!("Failed to send roam request, exiting monitor service loop.");
                                         break
                                     }
@@ -174,8 +171,8 @@ mod test {
     struct TestValues {
         trigger_data_sender: mpsc::Sender<RoamTriggerData>,
         trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
-        roam_sender: mpsc::Sender<types::ScannedCandidate>,
-        roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
+        roam_request_sender: mpsc::Sender<PolicyRoamRequest>,
+        roam_request_receiver: mpsc::Receiver<PolicyRoamRequest>,
         connection_selection_requester: ConnectionSelectionRequester,
         connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
         telemetry_sender: TelemetrySender,
@@ -196,8 +193,8 @@ mod test {
         TestValues {
             trigger_data_sender,
             trigger_data_receiver,
-            roam_sender,
-            roam_receiver,
+            roam_request_sender: roam_sender,
+            roam_request_receiver: roam_receiver,
             connection_selection_requester,
             connection_selection_request_receiver,
             telemetry_sender,
@@ -242,7 +239,7 @@ mod test {
             },
             test_values.trigger_data_receiver,
             test_values.connection_selection_requester,
-            test_values.roam_sender,
+            test_values.roam_request_sender,
             test_values.telemetry_sender,
             test_values.past_roams,
         );
@@ -269,7 +266,7 @@ mod test {
                 // Verify metric was sent for upcoming roam scan
                 assert_variant!(
                     test_values.telemetry_receiver.try_next(),
-                    Ok(Some(TelemetryEvent::RoamingScan))
+                    Ok(Some(TelemetryEvent::PolicyRoamScan { .. }))
                 );
                 // Verify that a roam search request was sent after monitor responded true.
                 assert_variant!(
@@ -316,7 +313,7 @@ mod test {
             RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: roaming_mode },
             test_values.trigger_data_receiver,
             test_values.connection_selection_requester,
-            test_values.roam_sender,
+            test_values.roam_request_sender,
             test_values.telemetry_sender,
             test_values.past_roams,
         );
@@ -351,19 +348,19 @@ mod test {
         // Verify metric was sent for upcoming roam scan
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RoamingScan))
+            Ok(Some(TelemetryEvent::PolicyRoamScan { .. }))
         );
 
         if response_to_should_send_roam_request && roaming_mode == RoamingMode::CanRoam {
             // Verify that a roam request is sent if the should_send_roam_request method returns
             // true.
-            assert_variant!(test_values.roam_receiver.try_next(), Ok(Some(roam_request)) => {
-                assert_eq!(roam_request, candidate);
+            assert_variant!(test_values.roam_request_receiver.try_next(), Ok(Some(selection)) => {
+                assert_eq!(selection.candidate, candidate);
             });
         } else {
             // Verify that no roam request is sent if the should_send_roam_request method returns
             // false, regardless of the roaming mode.
-            assert_variant!(test_values.roam_receiver.try_next(), Err(_));
+            assert_variant!(test_values.roam_request_receiver.try_next(), Err(_));
         }
     }
 
@@ -392,7 +389,7 @@ mod test {
             },
             test_values.trigger_data_receiver,
             test_values.connection_selection_requester,
-            test_values.roam_sender,
+            test_values.roam_request_sender,
             test_values.telemetry_sender,
             test_values.past_roams.clone(),
         );
@@ -403,7 +400,7 @@ mod test {
             &mut serve_fut,
             &mut test_values.trigger_data_sender,
             &mut test_values.connection_selection_request_receiver,
-            &mut test_values.roam_receiver,
+            &mut test_values.roam_request_receiver,
         );
 
         // A roam request should have been sent, verify that it is recorded in the past roams list.
@@ -420,7 +417,7 @@ mod test {
             &mut serve_fut,
             &mut test_values.trigger_data_sender,
             &mut test_values.connection_selection_request_receiver,
-            &mut test_values.roam_receiver,
+            &mut test_values.roam_request_receiver,
         );
 
         // A roam request should have been sent, verify that it is recorded in the past roams list.
@@ -441,7 +438,7 @@ mod test {
         serve_fut: &mut Pin<&mut impl Future<Output = std::result::Result<(), anyhow::Error>>>,
         trigger_data_sender: &mut mpsc::Sender<RoamTriggerData>,
         connection_selection_request_receiver: &mut mpsc::Receiver<ConnectionSelectionRequest>,
-        roam_receiver: &mut mpsc::Receiver<types::ScannedCandidate>,
+        roam_request_receiver: &mut mpsc::Receiver<PolicyRoamRequest>,
     ) {
         // Run the serve loop forward
         assert_variant!(exec.run_until_stalled(serve_fut), Poll::Pending);
@@ -466,8 +463,8 @@ mod test {
         });
 
         assert_variant!(exec.run_until_stalled(serve_fut), Poll::Pending);
-        assert_variant!(roam_receiver.try_next(), Ok(Some(roam_request)) => {
-            assert_eq!(roam_request, candidate);
+        assert_variant!(roam_request_receiver.try_next(), Ok(Some(selection)) => {
+            assert_eq!(selection.candidate, candidate);
         });
     }
 }

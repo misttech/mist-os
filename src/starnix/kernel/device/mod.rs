@@ -22,4 +22,5 @@ pub mod mem;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod perfetto_consumer;
 pub mod remote_block_device;
+pub mod serial;
 pub mod terminal;

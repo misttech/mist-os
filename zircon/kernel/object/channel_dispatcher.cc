@@ -82,7 +82,7 @@ inline uint32_t HashB(uint32_t high, uint32_t low) {
 //
 // In general, koids are guaranteed to be unique over the lifetime of a particular system boot.
 // Using the min endpoint koid ensures both endpoints use the same hash input. A txid is shared
-// between sender and receiver is expected to be unique (guaranteed for kerenel-generated txids)
+// between sender and receiver is expected to be unique (guaranteed for kernel-generated txids)
 // among the set of txids for messages pending in a particular channel. Likewise, the message packet
 // address is shared between the sender and receiver and is guaranteed to be unique among the set of
 // pointers to pending messages.
@@ -139,7 +139,7 @@ inline void TraceMessage(const MessagePacket& msg, const ChannelDispatcher* chan
   //    associated correctly.
 
   uint64_t ts;
-  const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
+  const auto get_timestamp = [&ts] { return ts = KTrace::Timestamp(); };
 
   KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
                                   ("ordinal", msg.fidl_header().ordinal));

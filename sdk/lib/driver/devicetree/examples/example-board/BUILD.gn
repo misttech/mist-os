@@ -4,7 +4,6 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/drivers/bazel_driver_package.gni")
-import("//build/bazel/wrappers.gni")
 import("//build/config/fuchsia_cxx_version.gni")
 import("//build/devicetree/devicetree.gni")
 import("//build/zbi/zbi_input.gni")
@@ -37,26 +36,4 @@ bazel_input_file("test-dtb") {
   generator = ":example-board"
   outputs = [ "$target_out_dir/example-board.dtb" ]
   gn_targets_name = "test-dtb"
-}
-
-bazel_fuchsia_test_package("example-board-test-package") {
-  test_package_name = "example-board-test"
-  test_component_names = [ "example-board-test" ]
-
-  # Integration test for the board driver requires these prebuilt artifacts:
-  #   - devicetree blob (.dtb)
-  #   - Platform bus driver (.far)
-  #   - driver-test-realm package (.far)
-  bazel_inputs = [
-    ":test-dtb",
-    "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
-  ]
-
-  # TODO(b/352586714) - Driver will link in restricted symbols when Bazel uses RBE.
-  remote_build = target_cpu != "riscv64"
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":example-board-test-package" ]
 }

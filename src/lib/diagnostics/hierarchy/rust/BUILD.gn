@@ -36,6 +36,14 @@ rustc_library("diagnostics-hierarchy") {
     "src/serialization/serialize.rs",
   ]
 
+  if (is_host) {
+    features = [ "json_schema" ]
+    deps += [ "//third_party/rust_crates:schemars" ]
+
+    # Contains a one-line check for a schema.
+    test_deps += [ "//src/developer/ffx/lib/writer:lib" ]
+  }
+
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
@@ -56,4 +64,7 @@ group("rust") {
 group("tests") {
   testonly = true
   deps = [ ":diagnostics-hierarchy-test" ]
+  if (is_host) {
+    deps += [ ":diagnostics-hierarchy_test" ]
+  }
 }

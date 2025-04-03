@@ -17,13 +17,13 @@ async fn create_directory_with_create_if_absent_flag() {
 
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
-    let mnt_dir = open_dir_with_flags(
+    let mnt_dir = deprecated_open_dir_with_flags(
         &dir,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE,
         "mnt",
     )
     .await;
-    let _tmp_dir = open_dir_with_flags(
+    let _tmp_dir = deprecated_open_dir_with_flags(
         &mnt_dir,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE,
         "tmp",
@@ -57,8 +57,13 @@ async fn create_file_with_sufficient_rights() {
         let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
         // Create a new file inside `dir` with a connection that only has the rights in `flags`.
         {
-            let dir = open_dir_with_flags(&dir, flags, ".").await;
-            open_node::<fio::FileMarker>(&dir, flags | fio::OpenFlags::CREATE, TEST_FILE).await;
+            let dir = deprecated_open_dir_with_flags(&dir, flags, ".").await;
+            deprecated_open_node::<fio::FileMarker>(
+                &dir,
+                flags | fio::OpenFlags::CREATE,
+                TEST_FILE,
+            )
+            .await;
         }
         // Ensure that the file was created and is accessible.
         assert_eq!(read_file(&dir, TEST_FILE).await, &[]);
@@ -76,8 +81,8 @@ async fn create_file_with_insufficient_rights() {
         let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
         // Try to create a new file inside `dir` with a connection that lacks writable rights.
         {
-            let dir = open_dir_with_flags(&dir, flags, ".").await;
-            let result = open_node_status::<fio::FileMarker>(
+            let dir = deprecated_open_dir_with_flags(&dir, flags, ".").await;
+            let result = deprecated_open_node_status::<fio::FileMarker>(
                 &dir,
                 flags | fio::OpenFlags::CREATE,
                 TEST_FILE,
@@ -100,24 +105,24 @@ async fn create_directory() {
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_sufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     assert_matches!(
         dir_with_sufficient_rights
-            .open3_node::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_MAYBE_CREATE, None,)
+            .open_node::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_MAYBE_CREATE, None,)
             .await
             .expect_err("open should fail when creating directory without specifiying a protocol."),
         zx::Status::INVALID_ARGS
     );
 
     let (_, representation) = dir_with_sufficient_rights
-        .open3_node_repr::<fio::DirectoryMarker>(
+        .open_node_repr::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION
                 | fio::Flags::PROTOCOL_DIRECTORY
@@ -129,7 +134,7 @@ async fn create_directory() {
     assert_matches!(representation, fio::Representation::Directory(_));
 
     let (_, representation) = dir_with_sufficient_rights
-        .open3_node_repr::<fio::FileMarker>(
+        .open_node_repr::<fio::FileMarker>(
             TEST_FILE,
             fio::Flags::FLAG_SEND_REPRESENTATION
                 | fio::Flags::PROTOCOL_FILE
@@ -152,18 +157,18 @@ async fn create_directory_with_insufficient_rights() {
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_insufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     // Should fail without update_attribues
     assert_matches!(
         dir_with_insufficient_rights
-            .open3_node::<fio::DirectoryMarker>(
+            .open_node::<fio::DirectoryMarker>(
                 "dir",
                 fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE,
                 None,
@@ -190,7 +195,7 @@ async fn create_directory_with_create_attributes() {
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
     let dir_with_sufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
@@ -199,10 +204,10 @@ async fn create_directory_with_create_attributes() {
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     let (_, representation) = dir_with_sufficient_rights
-        .open3_node_repr::<fio::DirectoryMarker>(
+        .open_node_repr::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::FLAG_SEND_REPRESENTATION
                 | fio::Flags::PROTOCOL_DIRECTORY
@@ -249,7 +254,7 @@ async fn open_directory_with_never_create_and_create_attributes() {
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;
 
     let status = dir
-        .open3_node_repr::<fio::DirectoryMarker>(
+        .open_node_repr::<fio::DirectoryMarker>(
             "dir",
             flags,
             Some(fio::Options {
@@ -277,16 +282,16 @@ async fn create_file() {
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_sufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     let (_, representation) = dir_with_sufficient_rights
-        .open3_node_repr::<fio::FileMarker>(
+        .open_node_repr::<fio::FileMarker>(
             TEST_FILE,
             fio::Flags::FLAG_SEND_REPRESENTATION
                 | fio::Flags::PROTOCOL_FILE
@@ -309,18 +314,18 @@ async fn create_file_with_insufficient_rights_open3() {
 
     // A request to create a new object requires that the parent connection has the right to modify.
     let dir_with_insufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     // Should fail without update_attribues
     assert_matches!(
         dir_with_insufficient_rights
-            .open3_node::<fio::FileMarker>(
+            .open_node::<fio::FileMarker>(
                 TEST_FILE,
                 fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE,
                 None,
@@ -344,7 +349,7 @@ async fn create_file_with_create_attributes() {
     // A request to create create a new object requires that the parent directory has the right to
     // modify directory.
     let dir_with_sufficient_rights = dir
-        .open3_node::<fio::DirectoryMarker>(
+        .open_node::<fio::DirectoryMarker>(
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
@@ -353,10 +358,10 @@ async fn create_file_with_create_attributes() {
             None,
         )
         .await
-        .expect("open3 failed.");
+        .expect("open failed.");
 
     let (_, representation) = dir_with_sufficient_rights
-        .open3_node_repr::<fio::FileMarker>(
+        .open_node_repr::<fio::FileMarker>(
             TEST_FILE,
             fio::Flags::FLAG_SEND_REPRESENTATION
                 | fio::Flags::PROTOCOL_FILE
@@ -403,7 +408,7 @@ async fn open_file_with_never_create_and_create_attributes() {
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION;
 
     let status = dir
-        .open3_node_repr::<fio::FileMarker>(
+        .open_node_repr::<fio::FileMarker>(
             TEST_FILE,
             flags,
             Some(fio::Options {

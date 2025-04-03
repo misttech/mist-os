@@ -34,9 +34,6 @@ func TestDisableDebuggingDisableSerialSyscalls(t *testing.T) {
 	ensureContains(t, stdout, "zx_debug_write: disabled")
 
 	ensureContains(t, stdout, "zx_debug_send_command: disabled")
-	ensureContains(t, stdout, "zx_ktrace_control: disabled")
-	ensureContains(t, stdout, "zx_ktrace_read: disabled")
-	ensureContains(t, stdout, "zx_ktrace_write: disabled")
 	ensureContains(t, stdout, "zx_mtrace_control: disabled")
 	ensureContains(t, stdout, "zx_process_write_memory: disabled")
 	ensureContains(t, stdout, "zx_system_mexec: disabled")

@@ -6,9 +6,9 @@
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
-use core::slice::from_mut;
+use core::slice::{from_mut, from_raw_parts};
 
-use crate::{Chunk, Encode, EncodeError, Slot, WireU64, CHUNK_SIZE};
+use crate::{Chunk, Encode, EncodeError, WireU64, ZeroPadding, CHUNK_SIZE};
 
 /// An encoder for FIDL handles (internal).
 pub trait InternalHandleEncoder {
@@ -135,13 +135,15 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
     }
 
     fn encode_next_slice<T: Encode<Self>>(&mut self, values: &mut [T]) -> Result<(), EncodeError> {
-        let mut slots = self.preallocate::<T::Encoded>(values.len());
+        let mut outputs = self.preallocate::<T::Encoded>(values.len());
 
-        let mut backing = MaybeUninit::<T::Encoded>::uninit();
+        let mut out = MaybeUninit::<T::Encoded>::uninit();
+        <T::Encoded as ZeroPadding>::zero_padding(&mut out);
         for value in values {
-            let mut slot = Slot::new(&mut backing);
-            value.encode(slots.encoder, slot.as_mut())?;
-            slots.write_next(slot);
+            value.encode(outputs.encoder, &mut out)?;
+            unsafe {
+                outputs.write_next(out.assume_init_ref());
+            }
         }
 
         Ok(())
@@ -164,14 +166,20 @@ pub struct Preallocated<'a, E: ?Sized, T> {
 
 impl<E: Encoder + ?Sized, T> Preallocated<'_, E, T> {
     /// Writes into the next pre-allocated slot in the encoder.
-    pub fn write_next(&mut self, slot: Slot<'_, T>) {
+    ///
+    /// # Safety
+    ///
+    /// All of the bytes of `value` must be initialized, including padding.
+    pub unsafe fn write_next(&mut self, value: &T) {
         #[cfg(debug_assertions)]
         {
             assert!(self.remaining > 0, "attemped to write more slots than preallocated");
             self.remaining -= 1;
         }
 
-        self.encoder.rewrite(self.pos, slot.as_bytes());
+        let bytes_ptr = (value as *const T).cast::<u8>();
+        let bytes = unsafe { from_raw_parts(bytes_ptr, size_of::<T>()) };
+        self.encoder.rewrite(self.pos, bytes);
         self.pos += size_of::<T>();
     }
 }

@@ -58,8 +58,10 @@ class Color {
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr Color(const Color::ConstructorArgs& args);
 
-  Color(const Color&) = default;
-  Color& operator=(const Color&) = default;
+  constexpr Color(const Color&) noexcept = default;
+  constexpr Color(Color&&) noexcept = default;
+  constexpr Color& operator=(const Color&) noexcept = default;
+  constexpr Color& operator=(Color&&) noexcept = default;
   ~Color() = default;
 
   friend constexpr bool operator==(const Color& lhs, const Color& rhs);

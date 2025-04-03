@@ -18,10 +18,21 @@ type TargetIpPort = struct {
     port uint16;
 };
 
+type TargetVSockCtx = struct {
+    cid uint32;
+};
+
+// TODO(awdavies): Add serial number.
+type TargetIpAddrInfo = strict union {
+    1: ip TargetIp;
+    2: ip_port TargetIpPort;
+};
+
 // TODO(awdavies): Add serial number.
 type TargetAddrInfo = strict union {
     1: ip TargetIp;
     2: ip_port TargetIpPort;
+    3: vsock TargetVSockCtx;
 };
 
 // TODO(awdavies): Add more target states once they're more well defined.
@@ -71,7 +82,7 @@ type TargetInfo = table {
     /// ssh_address is the preferred address to use to connect to the
     /// device over SSH, and will include a port number if a custom SSH
     /// port number has been set.
-    9: ssh_address TargetAddrInfo;
+    9: ssh_address TargetIpAddrInfo;
     10: fastboot_interface FastbootInterface;
     /// The address of the ssh host as seen by the target.
     11: ssh_host_address SshHostAddrInfo;
@@ -324,7 +335,7 @@ closed protocol Target {
     ///   wait until there is. It is the client's responsibility to handle
     ///   potential timeouts.
     strict GetSshAddress() -> (struct {
-        address TargetAddrInfo;
+        address TargetIpAddrInfo;
     });
 
     /// Sets the preferred SSH address.

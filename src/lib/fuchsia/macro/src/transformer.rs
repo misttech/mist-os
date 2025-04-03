@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(fuchsia_api_level_less_than = "NEXT")]
 use fidl_fuchsia_diagnostics::Severity;
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+use fidl_fuchsia_diagnostics_types::Severity;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, TokenStreamExt};
+use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream, Parser};
+use syn::punctuated::Punctuated;
 use syn::{Attribute, Block, Error, Expr, ItemFn, LitBool, LitStr, Signature, Token, Visibility};
 
 #[derive(Clone, Copy)]
@@ -87,7 +91,7 @@ impl quote::ToTokens for Executor {
 }
 
 // Helper trait for things that can generate the final token stream
-trait Finish {
+pub trait Finish {
     fn finish(self) -> TokenStream
     where
         Self: Sized;
@@ -101,7 +105,7 @@ pub struct Transformer {
     block: Box<Block>,
     logging: bool,
     logging_blocking: bool,
-    logging_tags: LoggingTags,
+    logging_tags: Punctuated<LitStr, Token![,]>,
     logging_include_file_line: bool,
     panic_prefix: LitStr,
     interest: Interest,
@@ -114,39 +118,11 @@ struct Args {
     allow_stalls: Option<bool>,
     logging: bool,
     logging_blocking: bool,
-    logging_tags: LoggingTags,
+    logging_tags: Punctuated<LitStr, Token![,]>,
     logging_include_file_line: bool,
     interest: Interest,
     panic_prefix: Option<LitStr>,
     add_test_attr: bool,
-}
-
-#[derive(Default)]
-struct LoggingTags {
-    tags: Vec<String>,
-}
-
-impl quote::ToTokens for LoggingTags {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        for tag in &self.tags {
-            tag.as_str().to_tokens(tokens);
-            tokens.append(proc_macro2::Punct::new(',', proc_macro2::Spacing::Alone));
-        }
-    }
-}
-
-impl Parse for LoggingTags {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let mut tags = vec![];
-        while !input.is_empty() {
-            tags.push(input.parse::<LitStr>()?.value());
-            if input.is_empty() {
-                break;
-            }
-            input.parse::<Token![,]>()?;
-        }
-        Ok(Self { tags })
-    }
 }
 
 #[derive(Default)]
@@ -187,6 +163,10 @@ impl quote::ToTokens for Interest {
                     Severity::Warn => quote!(::fuchsia::Severity::Warn),
                     Severity::Error => quote!(::fuchsia::Severity::Error),
                     Severity::Fatal => quote!(::fuchsia::Severity::Fatal),
+                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    Severity::__SourceBreaking { unknown_ordinal: o } => {
+                        panic!("unknown severity type with ordinal: {o:?}")
+                    }
                 };
                 quote! {
                     ::fuchsia::Interest {
@@ -212,12 +192,11 @@ fn get_bool_arg(p: &ParseStream<'_>, if_present: bool) -> syn::Result<bool> {
     }
 }
 
-fn get_logging_tags(p: &ParseStream<'_>) -> syn::Result<LoggingTags> {
+fn get_logging_tags(p: &ParseStream<'_>) -> syn::Result<Punctuated<LitStr, Token![,]>> {
     p.parse::<Token![=]>()?;
     let content;
     syn::bracketed!(content in p);
-    let logging_tags = content.parse::<LoggingTags>()?;
-    Ok(logging_tags)
+    Punctuated::parse_terminated(&content)
 }
 
 fn get_interest_arg(input: &ParseStream<'_>) -> syn::Result<Interest> {
@@ -233,7 +212,7 @@ impl Args {
             allow_stalls: None,
             logging: true,
             logging_blocking: false,
-            logging_tags: LoggingTags::default(),
+            logging_tags: Default::default(),
             logging_include_file_line: false,
             panic_prefix: None,
             interest: Interest::default(),
@@ -379,7 +358,7 @@ impl Finish for Transformer {
         let init_logging = if !self.logging {
             quote! { func }
         } else if self.executor.is_test() {
-            logging_tags.tags.insert(0, format!("{ident}"));
+            logging_tags.insert(0, LitStr::new(&ident.to_string(), ident.span()));
             let logging_options = quote! {
                 ::fuchsia::LoggingOptions {
                     blocking: #logging_blocking,
@@ -485,17 +464,11 @@ impl Finish for Transformer {
     }
 }
 
-impl Finish for Error {
-    fn finish(self) -> TokenStream {
-        self.to_compile_error().into()
-    }
-}
-
-impl<R: Finish, E: Finish> Finish for Result<R, E> {
+impl<R: Finish> Finish for Result<R, Error> {
     fn finish(self) -> TokenStream {
         match self {
             Ok(r) => r.finish(),
-            Err(e) => e.finish(),
+            Err(e) => e.to_compile_error(),
         }
     }
 }

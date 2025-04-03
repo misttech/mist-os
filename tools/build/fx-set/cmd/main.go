@@ -279,15 +279,16 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	}
 
 	if len(cmd.basePackages) != 0 || len(cmd.cachePackages) != 0 {
-		fmt.Fprintln(os.Stderr, "WARNING:  The --with-base and --with-cache arguments have been deprecated.")
-		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Please switch to one of the following:")
-		fmt.Fprintln(os.Stderr, "  - Use --with-test for tests.")
-		fmt.Fprintln(os.Stderr, "  - Use developer overrides for assembly (go/fuchsia-assembly-overrides) for")
-		fmt.Fprintln(os.Stderr, "    anything that needs to be added to the base/cache package set for a product.")
-		fmt.Fprintln(os.Stderr, "  - Use --with for adding other targets to the build (such as tools not in")
-		fmt.Fprintln(os.Stderr, "    //bundles/tools).")
-		fmt.Fprintln(os.Stderr)
+		message := "The --with-base and --with-cache arguments have been removed.\n" +
+			"\n" +
+			"Please switch to one of the following:\n" +
+			"  - Use --with-test for tests.\n" +
+			"  - Use developer overrides for assembly (go/fuchsia-assembly-overrides) for\n" +
+			"    anything that needs to be added to the base/cache package set for a product.\n" +
+			"  - Use --with for adding other targets to the build (such as tools not in\n" +
+			"    //bundles/tools).\n" +
+			"\n"
+		return nil, fmt.Errorf(message)
 	}
 
 	if cmd.buildDir == "" {
@@ -355,6 +356,18 @@ func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
 
+// rbeHostType returns the type of host that this appears to be, defaulting to
+// "workstation".
+func rbeHostType() string {
+	cmd := exec.Command("vendor/google/scripts/devshell/detect-build-host-class")
+	out, err := cmd.Output()
+	if err != nil {
+		return "workstation"
+	} else {
+		return strings.Split(string(out), "\n")[0]
+	}
+}
+
 func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	productPath, err := findGNIFile(checkoutDir, "products", args.product)
 	if err != nil {
@@ -406,8 +419,6 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 		Product:             productPath,
 		MainPbLabel:         args.mainPbLabel,
 		CompilationMode:     compilationMode,
-		BasePackages:        args.basePackages,
-		CachePackages:       args.cachePackages,
 		UniversePackages:    args.universePackages,
 		HostLabels:          hostLabels,
 		DeveloperTestLabels: args.testLabels,
@@ -429,7 +440,7 @@ func applyRbeSettings(static *fintpb.Static, args *setArgs, canUseRbe bool) (*fi
 	rbeMode := args.rbeMode
 	if rbeMode == "auto" {
 		if rbeSupported && canUseRbe {
-			rbeMode = "cloudtop"
+			rbeMode = rbeHostType()
 		} else {
 			rbeMode = "off"
 		}

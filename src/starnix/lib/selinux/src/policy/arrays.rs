@@ -355,7 +355,7 @@ impl<PS: ParseStrategy> AccessVectorRule<PS> {
     #[allow(dead_code)]
     pub fn extended_permissions(&self) -> Option<&ExtendedPermissions> {
         match &self.permission_data {
-            PermissionData::ExtendedPermissions(xperms) => Some(PS::deref(xperms)),
+            PermissionData::ExtendedPermissions(xperms) => Some(xperms),
             _ => None,
         }
     }
@@ -378,12 +378,9 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
         let num_bytes = tail.len();
         let (permission_data, tail) =
             if (access_vector_rule_type & ACCESS_VECTOR_RULE_DATA_IS_XPERM_MASK) != 0 {
-                let (xperms, tail) =
-                    PS::parse::<ExtendedPermissions>(tail).ok_or(ParseError::MissingData {
-                        type_name: std::any::type_name::<ExtendedPermissions>(),
-                        type_size: std::mem::size_of::<ExtendedPermissions>(),
-                        num_bytes,
-                    })?;
+                let (xperms, tail) = ExtendedPermissions::parse(tail)
+                    .map_err(Into::<anyhow::Error>::into)
+                    .context("parsing extended permissions")?;
                 (PermissionData::ExtendedPermissions(xperms), tail)
             } else if (access_vector_rule_type & ACCESS_VECTOR_RULE_DATA_IS_TYPE_ID_MASK) != 0 {
                 let (new_type, tail) =
@@ -414,7 +411,7 @@ impl<PS: ParseStrategy> Validate for AccessVectorRule<PS> {
             return Err(ValidateError::NonOptionalIdIsZero.into());
         }
         if let PermissionData::ExtendedPermissions(xperms) = &self.permission_data {
-            let xperms_type = PS::deref(xperms).xperms_type;
+            let xperms_type = xperms.xperms_type;
             if !(xperms_type == XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES
                 || xperms_type == XPERMS_TYPE_IOCTL_PREFIXES)
             {
@@ -440,23 +437,60 @@ pub(super) struct AccessVectorRuleMetadata {
 pub(super) enum PermissionData<PS: ParseStrategy> {
     AccessVector(PS::Output<le::U32>),
     NewType(PS::Output<le::U32>),
-    ExtendedPermissions(PS::Output<ExtendedPermissions>),
+    ExtendedPermissions(ExtendedPermissions),
 }
 
-#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
-#[repr(C, packed)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) struct ExtendedPermissions {
-    xperms_type: u8,
-    xperms_optional_prefix: u8,
-    xperms_bitmap: [u32; 8],
+    pub(super) xperms_type: u8,
+    pub(super) xperms_optional_prefix: u8,
+    pub(super) xperms_bitmap: XpermsBitmap,
+}
+
+impl<PS: ParseStrategy> Parse<PS> for ExtendedPermissions {
+    type Error = anyhow::Error;
+
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+        let tail = bytes;
+        let num_bytes = tail.len();
+        let (type_, tail) = PS::parse::<u8>(tail).ok_or(ParseError::MissingData {
+            type_name: "ExtendedPermissions::xperms_type",
+            type_size: std::mem::size_of::<u8>(),
+            num_bytes,
+        })?;
+        let xperms_type = *PS::deref(&type_);
+        let num_bytes = tail.len();
+        let (prefix, tail) = PS::parse::<u8>(tail).ok_or(ParseError::MissingData {
+            type_name: "ExtendedPermissions::xperms_optional_prefix",
+            type_size: std::mem::size_of::<u8>(),
+            num_bytes,
+        })?;
+        let xperms_optional_prefix = *PS::deref(&prefix);
+        let num_bytes = tail.len();
+        let (bitmap, tail) = PS::parse::<[le::U32; 8]>(tail).ok_or(ParseError::MissingData {
+            type_name: "ExtendedPermissions::xperms_bitmap",
+            type_size: std::mem::size_of::<[le::U32; 8]>(),
+            num_bytes,
+        })?;
+        Ok((
+            ExtendedPermissions {
+                xperms_type,
+                xperms_optional_prefix,
+                xperms_bitmap: XpermsBitmap(*PS::deref(&bitmap)),
+            },
+            tail,
+        ))
+    }
 }
 
 impl ExtendedPermissions {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn count(&self) -> u64 {
-        let bitmap = self.xperms_bitmap;
-        let count =
-            bitmap.iter().fold(0, |count, block| (count as u64) + (block.count_ones() as u64));
+        let count = self
+            .xperms_bitmap
+            .0
+            .iter()
+            .fold(0, |count, block| (count as u64) + (block.get().count_ones() as u64));
         match self.xperms_type {
             XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES => count,
             XPERMS_TYPE_IOCTL_PREFIXES => count * 0x100,
@@ -464,7 +498,7 @@ impl ExtendedPermissions {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn contains(&self, xperm: u16) -> bool {
         let [postfix, prefix] = xperm.to_le_bytes();
         if self.xperms_type == XPERMS_TYPE_IOCTL_PREFIX_AND_POSTFIXES
@@ -477,10 +511,40 @@ impl ExtendedPermissions {
             XPERMS_TYPE_IOCTL_PREFIXES => prefix,
             _ => unreachable!("invalid xperms_type in validated ExtendedPermissions"),
         };
-        let block_bits = 8 * std::mem::size_of::<le::U32>();
-        let block_index = (value as usize) / block_bits;
-        let bit_index = ((value as usize) % block_bits) as u32;
-        self.xperms_bitmap[block_index] & le::U32::new(1).shl(bit_index) != 0
+        self.xperms_bitmap.contains(value)
+    }
+}
+
+// A bitmap representing a subset of `{0x0,...,0xff}`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct XpermsBitmap([le::U32; 8]);
+
+impl XpermsBitmap {
+    const BITMAP_BLOCKS: usize = 8;
+    pub const ALL: Self = Self([le::U32::MAX_VALUE; Self::BITMAP_BLOCKS]);
+    pub const NONE: Self = Self([le::U32::ZERO; Self::BITMAP_BLOCKS]);
+
+    #[cfg(test)]
+    pub fn new(elements: [le::U32; 8]) -> Self {
+        Self(elements)
+    }
+
+    pub fn contains(&self, value: u8) -> bool {
+        let block_index = (value as usize) / 32;
+        let bit_index = ((value as usize) % 32) as u32;
+        self.0[block_index] & le::U32::new(1).shl(bit_index) != 0
+    }
+}
+
+impl std::ops::BitOrAssign<&Self> for XpermsBitmap {
+    fn bitor_assign(&mut self, rhs: &Self) {
+        (0..Self::BITMAP_BLOCKS).for_each(|i| self.0[i] |= rhs.0[i])
+    }
+}
+
+impl std::ops::SubAssign<&Self> for XpermsBitmap {
+    fn sub_assign(&mut self, rhs: &Self) {
+        (0..Self::BITMAP_BLOCKS).for_each(|i| self.0[i] = self.0[i] ^ (self.0[i] & rhs.0[i]))
     }
 }
 
@@ -1615,9 +1679,8 @@ mod tests {
         assert!(rules[0].is_allowxperm());
         if let Some(xperms) = rules[0].extended_permissions() {
             assert_eq!(xperms.count(), 0x100);
-            // Any ioctl in the 0x00?? range should be in the set.
-            assert!(xperms.contains(0x0));
-            assert!(xperms.contains(0xab));
+            assert!(xperms.contains(0x1000));
+            assert!(xperms.contains(0x10ab));
         } else {
             panic!("unexpected permission data type")
         }
@@ -1644,9 +1707,6 @@ mod tests {
         assert!(rules[0].is_allowxperm());
         if let Some(xperms) = rules[0].extended_permissions() {
             assert_eq!(xperms.count(), 0x10000);
-            // Any ioctl should be in the set.
-            assert!(xperms.contains(0x0));
-            assert!(xperms.contains(0xabcd));
         } else {
             panic!("unexpected permission data type")
         }

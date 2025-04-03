@@ -551,7 +551,8 @@ mod tests {
     use super::SessionManager;
     use anyhow::{anyhow, Error};
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fidl::endpoints::{create_proxy_and_stream, spawn_stream_handler, ServerEnd};
+    use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
+    use fidl_test_util::spawn_stream_handler;
     use futures::channel::mpsc;
     use futures::prelude::*;
     use session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server};
@@ -630,9 +631,8 @@ mod tests {
 
     fn open_session_exposed_dir(
         session_manager: SessionManager,
-        flags: fio::OpenFlags,
         path: &str,
-        server_end: ServerEnd<fio::NodeMarker>,
+        server_end: ServerEnd<fio::DirectoryMarker>,
     ) {
         session_manager
             .state
@@ -640,7 +640,7 @@ mod tests {
             .lock()
             .unwrap()
             .exposed_dir
-            .deprecated_open(flags, fio::ModeType::empty(), path, server_end)
+            .open(path, fio::PERM_READABLE, &fio::Options::default(), server_end.into_channel())
             .unwrap();
     }
 
@@ -954,8 +954,8 @@ mod tests {
         let (path_sender, mut path_receiver) = mpsc::channel(1);
 
         let session_exposed_dir_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::DeprecatedOpen { path, .. } => {
-                let mut path_sender = path_sender.clone();
+            fio::DirectoryRequest::Open { path, .. } => {
+                let mut path_sender: mpsc::Sender<String> = path_sender.clone();
                 path_sender.try_send(path).unwrap();
             }
             _ => panic!("Directory handler received an unexpected request"),
@@ -987,9 +987,9 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy();
 
-        open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
+        open_session_exposed_dir(session_manager, svc_path, server_end);
         // Start the session.
         lifecycle
             .start(&fsession::LifecycleStartRequest {
@@ -1015,7 +1015,7 @@ mod tests {
         let (path_sender, mut path_receiver) = mpsc::channel(1);
 
         let session_exposed_dir_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::DeprecatedOpen { path, .. } => {
+            fio::DirectoryRequest::Open { path, .. } => {
                 let mut path_sender = path_sender.clone();
                 path_sender.try_send(path).unwrap();
             }
@@ -1056,9 +1056,9 @@ mod tests {
 
         // Open an arbitrary node in the session's exposed dir.
         // The actual protocol does not matter because it's not being served.
-        let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
+        let (_client_end, server_end) = fidl::endpoints::create_proxy();
 
-        open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
+        open_session_exposed_dir(session_manager, svc_path, server_end);
 
         assert_eq!(path_receiver.next().await.unwrap(), svc_path);
 

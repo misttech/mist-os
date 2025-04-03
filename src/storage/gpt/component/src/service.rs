@@ -206,7 +206,7 @@ impl StorageHostService {
         // fshost to better support this case, which might require changing how queueing works so
         // there's more flexibility to either resolve queueing when the component starts up (what we
         // need here), or when `Start` is successful (what a filesystem like Fxfs needs).
-        *state = match GptManager::new(&device, self.partitions_dir.clone()).await {
+        *state = match GptManager::new(device.clone(), self.partitions_dir.clone()).await {
             Ok(runner) => State::Running(runner),
             Err(err) => {
                 log::error!(err:?; "Failed to load GPT.  Reformatting may be required.");
@@ -353,10 +353,12 @@ impl StorageHostService {
                     zx::Status::IO
                 })?;
                 *state = State::Running(
-                    GptManager::new(&*block, self.partitions_dir.clone()).await.map_err(|err| {
-                        log::error!(err:?; "reset_partition_table: failed to re-launch GPT");
-                        zx::Status::BAD_STATE
-                    })?,
+                    GptManager::new(block.clone(), self.partitions_dir.clone()).await.map_err(
+                        |err| {
+                            log::error!(err:?; "reset_partition_table: failed to re-launch GPT");
+                            zx::Status::BAD_STATE
+                        },
+                    )?,
                 );
             }
             State::Running(gpt) => {

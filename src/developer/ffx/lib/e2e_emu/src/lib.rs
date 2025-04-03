@@ -37,13 +37,19 @@ impl IsolatedEmulator {
     pub async fn start(name: &str) -> anyhow::Result<Self> {
         let amber_files_path = std::env::var("PACKAGE_REPOSITORY_PATH")
             .expect("PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'");
-        Self::start_internal(name, Some(&amber_files_path)).await
+        let symbol_index_path = std::env::var("SYMBOL_INDEX_PATH")
+            .expect("SYMBOL_INDEX_PATH env var must be set -- run this test with 'fx test'");
+        Self::start_internal(name, Some(&amber_files_path), Some(&symbol_index_path)).await
     }
 
     // This is private to be used for testing with a path to a different package repo. Path
     // to amber-files is optional for testing to ensure that other successful tests are actually
     // matching a developer workflow.
-    async fn start_internal(name: &str, amber_files_path: Option<&str>) -> anyhow::Result<Self> {
+    async fn start_internal(
+        name: &str,
+        amber_files_path: Option<&str>,
+        symbol_index_path: Option<&str>,
+    ) -> anyhow::Result<Self> {
         let emu_name = format!("{name}-emu");
 
         info!(%name, "making ffx isolate");
@@ -90,6 +96,11 @@ impl IsolatedEmulator {
         this.ffx(&["config", "set", "log.level", "debug"])
             .await
             .context("setting ffx log level")?;
+        if let Some(symbol_index_path) = symbol_index_path {
+            this.ffx(&["debug", "symbol-index", "add", symbol_index_path])
+                .await
+                .context("setting ffx symbol index path")?;
+        }
 
         this.ffx_isolate.start_daemon().await?;
 
@@ -385,9 +396,10 @@ mod tests {
     async fn public_apis_succeed() {
         let amber_files_path = std::env::var("PACKAGE_REPOSITORY_PATH")
             .expect("PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'");
-        let emu = IsolatedEmulator::start_internal("e2e-emu-public-apis", Some(&amber_files_path))
-            .await
-            .expect("Couldn't start emulator");
+        let emu =
+            IsolatedEmulator::start_internal("e2e-emu-public-apis", Some(&amber_files_path), None)
+                .await
+                .expect("Couldn't start emulator");
 
         info!("Checking target monotonic time to ensure we can connect and get stdout");
         let time = emu.ffx_output(&["target", "get-time"]).await.unwrap();
@@ -422,9 +434,10 @@ mod tests {
         let test_package_name = std::env::var("TEST_PACKAGE_NAME")
             .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
         let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
-        let emu = IsolatedEmulator::start_internal("pkg-resolve", Some(&test_amber_files_path))
-            .await
-            .unwrap();
+        let emu =
+            IsolatedEmulator::start_internal("pkg-resolve", Some(&test_amber_files_path), None)
+                .await
+                .unwrap();
         emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap();
         emu.stop().await;
     }
@@ -433,7 +446,7 @@ mod tests {
     /// demonstrating that the same package is unavailable when there's no server running.
     #[fuchsia::test]
     async fn fail_to_resolve_package_when_no_package_server_running() {
-        let emu = IsolatedEmulator::start_internal("pkg-resolve-fail", None).await.unwrap();
+        let emu = IsolatedEmulator::start_internal("pkg-resolve-fail", None, None).await.unwrap();
         let test_package_name = std::env::var("TEST_PACKAGE_NAME")
             .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
         let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");

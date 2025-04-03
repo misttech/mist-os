@@ -1,0 +1,9 @@
+{% let base_name = strct.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
+
+{{ self::doc_string(strct.attributes) -}}
+pub type {{ name }} = ();
+
+/// The wire type corresponding to [`{{ name }}`].
+pub type {{ wire_name }} = ();

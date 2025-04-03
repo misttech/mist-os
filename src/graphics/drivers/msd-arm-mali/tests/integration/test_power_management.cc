@@ -5,6 +5,7 @@
 #define MAGMA_DLOG_ENABLE 1
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/magma/magma.h>
 #include <lib/magma/util/dlog.h>
 #include <lib/magma/util/short_macros.h>
@@ -59,14 +60,8 @@ class TestConnection : public magma::TestDeviceBase {
 };
 
 TEST(PowerManagement, SuspendResume) {
-  std::string gpu_device_value;
-  for (auto& p : std::filesystem::directory_iterator("/dev/class/mali-util")) {
-    gpu_device_value = p.path();
-  }
-
-  ASSERT_FALSE(gpu_device_value.empty());
-  zx::result client_end =
-      component::Connect<fuchsia_hardware_gpu_mali::MaliUtils>(gpu_device_value);
+  component::SyncServiceMemberWatcher<fuchsia_hardware_gpu_mali::UtilsService::Device> watcher;
+  zx::result client_end = watcher.GetNextInstance(false);
   ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
 
   auto client = fidl::WireSyncClient(std::move(*client_end));
@@ -89,14 +84,8 @@ TEST(PowerManagement, SuspendResume) {
 
 // Repeatedly attempt to suspend/resume to GPU to attempt to trigger a soft stop.
 TEST(PowerManagement, RepeatedSuspendResume) {
-  std::string gpu_device_value;
-  for (auto& p : std::filesystem::directory_iterator("/dev/class/mali-util")) {
-    gpu_device_value = p.path();
-  }
-
-  ASSERT_FALSE(gpu_device_value.empty());
-  zx::result client_end =
-      component::Connect<fuchsia_hardware_gpu_mali::MaliUtils>(gpu_device_value);
+  component::SyncServiceMemberWatcher<fuchsia_hardware_gpu_mali::UtilsService::Device> watcher;
+  zx::result client_end = watcher.GetNextInstance(false);
   ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
 
   auto client = fidl::WireSyncClient(std::move(*client_end));

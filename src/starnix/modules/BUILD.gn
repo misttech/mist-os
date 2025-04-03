@@ -12,6 +12,7 @@ group("tests") {
     "input:tests",
     "layeredfs:tests",
     "loop:tests",
+    "nanohub:tests",
     "selinuxfs:tests",
     "tracefs:tests",
   ]

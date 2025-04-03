@@ -4,9 +4,11 @@
 
 use core::fmt;
 use core::hint::unreachable_unchecked;
+use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom, WireI32,
+    ZeroPadding,
 };
 
 /// An internal framework error.
@@ -22,6 +24,11 @@ pub enum FrameworkError {
 #[repr(transparent)]
 pub struct WireFrameworkError {
     inner: WireI32,
+}
+
+unsafe impl ZeroPadding for WireFrameworkError {
+    #[inline]
+    fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
 
 impl fmt::Debug for WireFrameworkError {
@@ -53,9 +60,13 @@ impl Encodable for FrameworkError {
     type Encoded = WireFrameworkError;
 }
 
-impl<E: ?Sized> Encode<E> for FrameworkError {
-    fn encode(&mut self, _: &mut E, slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
-        munge!(let WireFrameworkError { mut inner } = slot);
+unsafe impl<E: ?Sized> Encode<E> for FrameworkError {
+    fn encode(
+        &mut self,
+        _: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        munge!(let WireFrameworkError { inner } = out);
         inner.write(WireI32(match self {
             Self::UnknownMethod => -2,
         }));

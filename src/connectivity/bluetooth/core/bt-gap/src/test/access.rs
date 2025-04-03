@@ -2,23 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
 use assert_matches::assert_matches;
 use fidl::endpoints;
 use fidl_fuchsia_bluetooth_host::HostRequest;
-use fidl_fuchsia_bluetooth_sys::AccessMarker;
+use fidl_fuchsia_bluetooth_sys::{
+    AccessMarker, AccessSetConnectionPolicyRequest, ProcedureTokenMarker,
+};
 use fuchsia_bluetooth::types::pairing_options::{BondableMode, PairingOptions, SecurityLevel};
 use fuchsia_bluetooth::types::{HostId, PeerId, Technology};
 use fuchsia_sync::RwLock;
 use futures::future;
-use futures::stream::TryStreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 
 use crate::services::access;
 use crate::{host_device, host_dispatcher};
 
 #[fuchsia::test]
-async fn test_pair() -> Result<(), Error> {
+async fn initiate_pairing() {
     let dispatcher = host_dispatcher::test::make_simple_test_dispatcher();
 
     let (host_server, _, _gatt_server, _bonding) =
@@ -42,7 +43,7 @@ async fn test_pair() -> Result<(), Error> {
     let make_request = async move {
         let response = client.pair(&req_id.into(), &req_opts_.into()).await;
         assert_matches!(response, Ok(Ok(())));
-        // This terminating will drop the access client, which causest the access stream to
+        // This terminating will drop the access client, which causes the access stream to
         // terminate. This will cause run_access to terminate which drops the host dispatcher, which
         // closes the host channel and will cause run_host to terminate
         Ok(())
@@ -58,14 +59,16 @@ async fn test_pair() -> Result<(), Error> {
         }).await.map_err(|e| e.into())
     };
 
-    let r = future::try_join3(make_request, run_host, run_access).await.map(|_: ((), (), ())| ());
-    r
+    future::try_join3(make_request, run_host, run_access)
+        .await
+        .map(|_: ((), (), ())| ())
+        .expect("successful execution")
 }
 
 // Test that we can start discovery on a host then migrate that discovery session onto a different
 // host when the original host is deactivated
 #[fuchsia::test]
-async fn test_discovery_over_adapter_change() -> Result<(), Error> {
+async fn discovery_over_adapter_change() {
     // Create mock host dispatcher
     let hd = host_dispatcher::test::make_simple_test_dispatcher();
 
@@ -76,7 +79,7 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
             .unwrap();
     let host_info_1 = Arc::new(RwLock::new(host_1.info()));
 
-    hd.set_active_host(HostId(1))?;
+    hd.set_active_host(HostId(1)).expect("can set active host");
 
     // Add Host #2 to dispatcher
     let (host_server_2, host_2, _gatt_server_2, _bonding) =
@@ -146,4 +149,90 @@ async fn test_discovery_over_adapter_change() -> Result<(), Error> {
     )
     .await
     .map(|_: ((), (), (), ())| ())
+    .expect("successful execution")
+}
+
+#[fuchsia::test]
+async fn make_active_host_discoverable() {
+    let dispatcher = host_dispatcher::test::make_simple_test_dispatcher();
+
+    let (host_server, _, _gatt_server, _bonding) =
+        host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(49), &dispatcher)
+            .await
+            .unwrap();
+
+    let (client, server) = endpoints::create_proxy_and_stream::<AccessMarker>();
+    let run_access = access::run(dispatcher, server);
+
+    let make_request = async move {
+        let (token, server) = fidl::endpoints::create_sync_proxy::<ProcedureTokenMarker>();
+        let response = client.make_discoverable(server).await;
+        assert_matches!(response, Ok(Ok(())));
+        // Immediately dropping the token should trigger a SetDiscoverable request to turn it off.
+        drop(token);
+        Ok(())
+    };
+
+    let mut expected_enabled = true;
+    let run_host = async move {
+        host_server
+            .try_for_each(move |req| {
+                let HostRequest::SetDiscoverable { enabled, responder } = req else {
+                    panic!("Expected HostRequest::SetDiscoverable");
+                };
+                assert_matches!(responder.send(Ok(())), Ok(()));
+                assert_eq!(enabled, expected_enabled);
+                // We first expect the Discoverable request with `enabled=true`. Then when the token
+                // is dropped, we expect it to be false.
+                expected_enabled = !expected_enabled;
+                future::ok(())
+            })
+            .await
+            .map_err(|e| e.into())
+    };
+
+    future::try_join3(make_request, run_host, run_access)
+        .await
+        .map(|_: ((), (), ())| ())
+        .expect("successful execution");
+}
+
+#[fuchsia::test]
+async fn toggle_connectable_of_active_host() {
+    let dispatcher = host_dispatcher::test::make_simple_test_dispatcher();
+
+    let (mut host_server, _, _gatt_server, _bonding) =
+        host_dispatcher::test::create_and_add_test_host_to_dispatcher(HostId(49), &dispatcher)
+            .await
+            .unwrap();
+
+    let (client, server) = endpoints::create_proxy_and_stream::<AccessMarker>();
+    let _run_access_task = fuchsia_async::Task::spawn(access::run(dispatcher, server));
+
+    let (token, server) = fidl::endpoints::create_sync_proxy::<ProcedureTokenMarker>();
+    let policy = AccessSetConnectionPolicyRequest {
+        suppress_bredr_connections: Some(server),
+        ..Default::default()
+    };
+    let connection_policy_fut = client.set_connection_policy(policy);
+    // Expect the Host server to receive a request to disable `connectable'.
+    match host_server.next().await.expect("valid_request") {
+        Ok(HostRequest::SetConnectable { enabled: false, responder }) => {
+            responder.send(Ok(())).expect("valid response");
+        }
+        x => panic!("Expected SetConnectable, got: {x:?}"),
+    }
+
+    // Expect the connection policy request to resolve successfully.
+    let result = connection_policy_fut.await;
+    assert_matches!(result, Ok(Ok(_)));
+
+    // Immediately dropping the token should result in a request to re-enable connectable.
+    drop(token);
+    match host_server.next().await.expect("valid_request") {
+        Ok(HostRequest::SetConnectable { enabled: true, responder }) => {
+            responder.send(Ok(())).expect("valid response");
+        }
+        x => panic!("Expected SetConnectable, got: {x:?}"),
+    }
 }

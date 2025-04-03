@@ -60,9 +60,6 @@ source_set("common") {
 
   public_deps = [
     ":emboss",
-    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_c",
-    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.bt.vendor:fuchsia.hardware.bt.vendor_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
   ]
@@ -122,7 +119,6 @@ cc_test_executable("tests_executable") {
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fdio",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

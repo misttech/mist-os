@@ -9,7 +9,7 @@ use crate::mm::{
     read_to_object_as_bytes, DesiredAddress, IOVecPtr, MappingName, MappingOptions, ProtectionFlags,
 };
 use crate::task::CurrentTask;
-use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto};
+use crate::vfs::socket::syscalls::{sys_recvfrom, sys_recvmsg, sys_sendmsg, sys_sendto, MsgHdrPtr};
 use crate::vfs::syscalls::{
     sys_pread64, sys_preadv2, sys_pwrite64, sys_pwritev2, sys_read, sys_write,
 };
@@ -142,60 +142,23 @@ struct SqEntry {
     field3: [u64; 2usize],
 }
 
-static_assertions::assert_eq_size!(SqEntry, uapi::io_uring_sqe);
-static_assertions::assert_eq_size!(SqEntry, uapi::arch32::io_uring_sqe);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, opcode),
-    std::mem::offset_of!(io_uring_sqe, opcode)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, flags),
-    std::mem::offset_of!(io_uring_sqe, flags)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, ioprio),
-    std::mem::offset_of!(io_uring_sqe, ioprio)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, raw_fd),
-    std::mem::offset_of!(io_uring_sqe, fd)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, field0),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_1)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, field1),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_2)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, len),
-    std::mem::offset_of!(io_uring_sqe, len)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, op_flags),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_3)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, user_data),
-    std::mem::offset_of!(io_uring_sqe, user_data)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, buf_index_or_group),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_4)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, personality),
-    std::mem::offset_of!(io_uring_sqe, personality)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, field2),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_5)
-);
-static_assertions::const_assert_eq!(
-    std::mem::offset_of!(SqEntry, field3),
-    std::mem::offset_of!(io_uring_sqe, __bindgen_anon_6)
-);
+uapi::check_arch_independent_same_layout! {
+    SqEntry = io_uring_sqe {
+        opcode => opcode,
+        flags => flags,
+        ioprio => ioprio,
+        raw_fd => fd,
+        field0 => __bindgen_anon_1,
+        field1 => __bindgen_anon_2,
+        len => len,
+        op_flags => __bindgen_anon_3,
+        user_data => user_data,
+        buf_index_or_group => __bindgen_anon_4,
+        personality => personality,
+        field2 => __bindgen_anon_5,
+        field3 => __bindgen_anon_6,
+    }
+}
 
 impl SqEntry {
     fn complete(&self, result: Result<SyscallResult, Errno>) -> CqEntry {
@@ -750,7 +713,7 @@ impl IoUringFileObject {
                 locked,
                 current_task,
                 entry.fd(),
-                entry.address().into(),
+                MsgHdrPtr::new(current_task, entry.address()),
                 entry.op_flags,
             )
             .map(Into::into),
@@ -758,7 +721,7 @@ impl IoUringFileObject {
                 locked,
                 current_task,
                 entry.fd(),
-                entry.address().into(),
+                MsgHdrPtr::new(current_task, entry.address()),
                 entry.op_flags,
             )
             .map(Into::into),

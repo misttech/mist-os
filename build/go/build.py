@@ -366,9 +366,13 @@ def main():
         "CGO_LDFLAGS": ldflags_joined,
     }
 
+    # This variable is used by LLVM profile runtime.
+    if llvm_profile_file := os.getenv("LLVM_PROFILE_FILE"):
+        env["LLVM_PROFILE_FILE"] = llvm_profile_file
+
     # Infra sets $TMPDIR which is cleaned between builds.
-    if os.getenv("TMPDIR"):
-        env["TMPDIR"] = os.getenv("TMPDIR")
+    if tmpdir := os.getenv("TMPDIR"):
+        env["TMPDIR"] = tmpdir
 
     if args.cgo:
         env["CGO_ENABLED"] = "1"

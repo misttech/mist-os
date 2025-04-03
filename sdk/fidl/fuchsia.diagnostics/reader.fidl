@@ -56,6 +56,14 @@ type FormattedContent = flexible resource union {
     /// The size will be in ZX_PROP_VMO_CONTENT_SIZE.
     @available(added=HEAD)
     3: cbor zx.Handle:<VMO>;
+
+    /// A diagnostics schema encoded as FXT.
+    /// This is only valid for logs data.
+    /// The VMO will contain up to PerformanceConfiguration/max_aggregate_content_size_bytes
+    /// of diagnostics data, or 1mb if not specified.
+    /// The size will be in ZX_PROP_VMO_CONTENT_SIZE.
+    @available(added=HEAD)
+    4: fxt zx.Handle:<VMO>;
 };
 
 /// Enum specifying the modes by which a user can connect to and stream diagnostics metrics.

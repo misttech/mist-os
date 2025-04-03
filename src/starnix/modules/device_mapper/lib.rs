@@ -120,7 +120,7 @@ impl DeviceMapperRegistry {
         if let Some((_, device)) = entry {
             Ok(device.clone())
         } else {
-            Err(errno!(ENODEV))
+            error!(ENODEV)
         }
     }
 
@@ -136,7 +136,7 @@ impl DeviceMapperRegistry {
         if let Some((_, device)) = entry {
             Ok(device.clone())
         } else {
-            Err(errno!(ENODEV))
+            error!(ENODEV)
         }
     }
 
@@ -177,7 +177,7 @@ impl DeviceMapperRegistry {
                 Entry::Occupied(_) => {}
             }
         }
-        Err(errno!(ENODEV))
+        error!(ENODEV)
     }
 
     /// Removes `device` from both the Device and DeviceMapper registries.
@@ -193,7 +193,7 @@ impl DeviceMapperRegistry {
         L: LockBefore<FileOpsCore>,
     {
         match devices.entry(minor) {
-            Entry::Vacant(_) => Err(errno!(ENODEV)),
+            Entry::Vacant(_) => error!(ENODEV),
             Entry::Occupied(e) => {
                 e.remove();
                 let kernel = current_task.kernel();
@@ -201,7 +201,7 @@ impl DeviceMapperRegistry {
                 if let Some(dev) = &k_device {
                     registry.remove_device(locked, current_task, dev.clone());
                 } else {
-                    return Err(errno!(EINVAL));
+                    return error!(EINVAL);
                 }
                 Ok(())
             }
@@ -292,7 +292,7 @@ fn verify_read(
             ));
             (hasher, <Sha512 as Hasher>::Digest::DIGEST_LEN)
         }
-        _ => return Err(errno!(ENOTSUP)),
+        _ => return error!(ENOTSUP),
     };
 
     let leaf_nodes: Vec<&[u8]> = args.hash_device.chunks(digest_size).collect();
@@ -303,7 +303,7 @@ fn verify_read(
             != leaf_nodes[leaf_nodes_offset / args.base_args.hash_block_size as usize]
         {
             args.corrupted = true;
-            return Err(errno!(EINVAL));
+            return error!(EINVAL);
         }
 
         leaf_nodes_offset += args.base_args.hash_block_size as usize;
@@ -354,7 +354,7 @@ impl FileOps for DmDeviceFile {
                     TODO("https://fxbug.dev/339701082"),
                     "Support reads for multiple targets."
                 );
-                return Err(errno!(ENOTSUP));
+                return error!(ENOTSUP);
             }
             let target = &mut active_table.targets[0];
             let start = (target.sector_start * SECTOR_SIZE) as usize;
@@ -397,7 +397,7 @@ impl FileOps for DmDeviceFile {
         let state = device.state.lock();
         if state.suspended {
             track_stub!(TODO("https://fxbug.dev/338241090"), "Defer io for suspended devices.");
-            return Err(errno!(EINVAL));
+            return error!(EINVAL);
         }
         if let Some(active_table) = &state.active_table {
             if active_table.targets.len() > 1 {
@@ -405,7 +405,7 @@ impl FileOps for DmDeviceFile {
                     TODO("https://fxbug.dev/339701082"),
                     "Support pager-backed vmos for multiple targets."
                 );
-                return Err(errno!(ENOTSUP));
+                return error!(ENOTSUP);
             }
             match &active_table.targets[0].target_type {
                 TargetType::Verity(args) => {
@@ -413,7 +413,7 @@ impl FileOps for DmDeviceFile {
                 }
             }
         } else {
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         }
     }
 
@@ -730,7 +730,7 @@ fn parse_parameter_string(
             let hash_size: u64 = match base_args.hash_algorithm.as_str() {
                 "sha256" => <Sha256 as Hasher>::Digest::DIGEST_LEN as u64,
                 "sha512" => <Sha512 as Hasher>::Digest::DIGEST_LEN as u64,
-                _ => return Err(errno!(ENOTSUP)),
+                _ => return error!(ENOTSUP),
             };
 
             debug_assert!(base_args.hash_block_size > 0);
@@ -822,7 +822,7 @@ impl FileOps for DeviceMapper {
                 }
                 if info.target_count > 1 {
                     track_stub!(TODO("https://fxbug.dev/339701082"), "Support multiple targets.");
-                    return Err(errno!(ENOTSUP));
+                    return error!(ENOTSUP);
                 }
                 track_stub!(
                     TODO("https://fxbug.dev/338245544"),
@@ -1106,7 +1106,7 @@ impl FileOps for DeviceMapper {
                             }
                         } else if flags.contains(DeviceMapperFlags::IMA_MEASUREMENT) {
                             // Linux 6.6.15 does not currently support IMA for dm-verity.
-                            return Err(errno!(ENOTSUP));
+                            return error!(ENOTSUP);
                         } else {
                             match &target.target_type {
                                 TargetType::Verity(args) => {

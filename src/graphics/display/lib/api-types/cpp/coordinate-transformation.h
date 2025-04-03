@@ -34,8 +34,10 @@ class CoordinateTransformation {
 
   explicit constexpr CoordinateTransformation(coordinate_transformation_t banjo_transformation);
 
-  CoordinateTransformation(const CoordinateTransformation&) = default;
-  CoordinateTransformation& operator=(const CoordinateTransformation&) = default;
+  constexpr CoordinateTransformation(const CoordinateTransformation&) noexcept = default;
+  constexpr CoordinateTransformation(CoordinateTransformation&&) noexcept = default;
+  constexpr CoordinateTransformation& operator=(const CoordinateTransformation&) noexcept = default;
+  constexpr CoordinateTransformation& operator=(CoordinateTransformation&&) noexcept = default;
   ~CoordinateTransformation() = default;
 
   constexpr fuchsia_hardware_display_types::wire::CoordinateTransformation ToFidl() const;

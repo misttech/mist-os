@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use fidl::HandleBased;
+use fuchsia_sync::{Condvar, Mutex};
 use std::cell::UnsafeCell;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
-use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::zx_handle_t;
@@ -47,7 +48,7 @@ impl<T: HandleBased> TempClonable<T> {
     /// Panics if the handle is invalid.
     pub fn temp_clone(&self) -> TempClone<T> {
         assert!(!self.is_invalid_handle());
-        let mut clones = clones().lock().unwrap();
+        let mut clones = clones().lock();
         let raw_handle = self.0.raw_handle();
         TempClone {
             handle: match clones.entry(raw_handle) {
@@ -78,8 +79,7 @@ impl<T: HandleBased> TempClonable<T> {
 
 impl<T: HandleBased> Drop for TempClonable<T> {
     fn drop(&mut self) {
-        if let Some(handle) =
-            clones().lock().unwrap().remove(&self.0.raw_handle()).and_then(|c| c.upgrade())
+        if let Some(handle) = clones().lock().remove(&self.0.raw_handle()).and_then(|c| c.upgrade())
         {
             // There are still some temporary clones alive, so mark the handle with a tombstone.
 
@@ -134,7 +134,7 @@ impl Drop for TempHandle {
             // handle. There are no memory safety issues here.
             unsafe { fidl::Handle::from_raw(self.raw_handle) };
         } else {
-            if let Entry::Occupied(o) = clones().lock().unwrap().entry(self.raw_handle) {
+            if let Entry::Occupied(o) = clones().lock().entry(self.raw_handle) {
                 // There's a small window where another TempHandle could have been inserted, so
                 // before removing this entry, check for a match.
                 if std::ptr::eq(o.get().as_ptr(), self) {
@@ -168,12 +168,12 @@ pub async fn unblock<T: 'static + Send>(f: impl FnOnce() -> T + Send + 'static) 
         for _ in 0..NUM_THREADS {
             std::thread::spawn(|| loop {
                 let item = {
-                    let mut queue = state.queue.lock().unwrap();
+                    let mut queue = state.queue.lock();
                     loop {
                         if let Some(item) = queue.pop_front() {
                             break item;
                         }
-                        queue = state.cvar.wait(queue).unwrap();
+                        state.cvar.wait(&mut queue);
                     }
                 };
                 item();
@@ -182,7 +182,7 @@ pub async fn unblock<T: 'static + Send>(f: impl FnOnce() -> T + Send + 'static) 
     }
 
     let (tx, rx) = futures::channel::oneshot::channel();
-    state.queue.lock().unwrap().push_back(Box::new(move || {
+    state.queue.lock().push_back(Box::new(move || {
         let _ = tx.send(f());
     }));
     state.cvar.notify_one();
@@ -243,7 +243,7 @@ mod tests {
 
         // Make sure that all the VMOs got properly cleaned up.
         assert_eq!(parent_vmo.info().expect("info failed").num_children, 0);
-        assert!(clones().lock().unwrap().is_empty());
+        assert!(clones().lock().is_empty());
     }
 
     #[test]
@@ -284,6 +284,6 @@ mod tests {
 
         // Make sure that all the VMOs got properly cleaned up.
         assert_eq!(parent_vmo.info().expect("info failed").num_children, 0);
-        assert!(clones().lock().unwrap().is_empty());
+        assert!(clones().lock().is_empty());
     }
 }

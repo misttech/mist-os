@@ -5,6 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use super::BpfMap;
 use crate::bpf::attachments::{bpf_prog_attach, bpf_prog_detach, BpfAttachAttr};
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::program::{Program, ProgramInfo};
@@ -40,9 +41,9 @@ use starnix_uapi::{
     bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_BIND_MAP,
     bpf_cmd_BPF_PROG_DETACH, bpf_cmd_BPF_PROG_GET_FD_BY_ID, bpf_cmd_BPF_PROG_GET_NEXT_ID,
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
-    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_insn, bpf_map_info,
-    bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
-    error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
+    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE, bpf_insn,
+    bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
+    bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
@@ -82,6 +83,7 @@ fn reopen_bpf_fd(
     open_flags: OpenFlags,
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
+    handle.security_check_open_fd(current_task)?;
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file =
         FileObject::new(current_task, Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
@@ -94,6 +96,8 @@ fn install_bpf_fd(
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
     let name = handle.type_name();
+    handle.security_check_open_fd(current_task)?;
+
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file =
         Anon::new_file(current_task, Box::new(handle), OpenFlags::RDWR | OpenFlags::CLOEXEC, name);
@@ -122,7 +126,7 @@ fn map_error_to_errno(e: MapError) -> Errno {
         MapError::EntryExists => errno!(EEXIST),
         MapError::NoMemory => errno!(ENOMEM),
         MapError::SizeLimit => errno!(E2BIG),
-        MapError::Internal => errno!(EIO),
+        MapError::InvalidVmo | MapError::Internal => errno!(EIO),
     }
 }
 
@@ -167,7 +171,11 @@ pub fn sys_bpf(
             {
                 flags |= BPF_F_RDONLY_PROG;
             }
-            let map = Map::new(schema, flags).map_err(map_error_to_errno)?;
+
+            let map = BpfMap::new(
+                Map::new(schema, flags).map_err(map_error_to_errno)?,
+                security::bpf_map_alloc(current_task),
+            );
             install_bpf_fd(current_task, map)
         }
 
@@ -529,9 +537,22 @@ pub fn sys_bpf(
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_BIND_MAP");
             error!(EINVAL)
         }
+        bpf_cmd_BPF_TOKEN_CREATE => {
+            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_TOKEN_CREATE");
+            error!(EINVAL)
+        }
         _ => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "bpf", cmd);
             error!(EINVAL)
         }
     }
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    pub use super::sys_bpf as sys_arch32_bpf;
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;

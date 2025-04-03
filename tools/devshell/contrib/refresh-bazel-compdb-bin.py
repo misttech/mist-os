@@ -62,6 +62,15 @@ _REGEX_PATH_PATTERNS = [
             fidl_lib=m["name"]
         ),
     ),
+    # Fidl libraries defined in Bazel in vendor repos.
+    (
+        re.compile(
+            ".*bazel-out.*\/bin\/vendor\/(?P<path>.*)\/fidl\/.*\/_virtual_includes\/(?P<name>.*)_cpp"
+        ),
+        lambda m: "-Ifidling/gen/vendor/{vendor_path}/fidl/{fidl_lib}/{fidl_lib}/cpp".format(
+            vendor_path=m["path"], fidl_lib=m["name"]
+        ),
+    ),
     # bind libraries defined in tree under //src/devices/bind
     (
         re.compile(

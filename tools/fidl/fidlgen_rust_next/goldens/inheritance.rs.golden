@@ -11,7 +11,7 @@ impl ::fidl_next::Encodable for SuperFooRequest {
     type Encoded = WireSuperFooRequest;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SuperFooRequest
+unsafe impl<___E> ::fidl_next::Encode<___E> for SuperFooRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -21,13 +21,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
@@ -40,7 +40,7 @@ impl ::fidl_next::EncodableOption for Box<SuperFooRequest> {
     type EncodedOption = ::fidl_next::WireBox<WireSuperFooRequest>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooRequest>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooRequest>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SuperFooRequest: ::fidl_next::Encode<___E>,
@@ -49,13 +49,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -69,11 +69,16 @@ impl ::fidl_next::TakeFrom<WireSuperFooRequest> for SuperFooRequest {
     }
 }
 
-/// The wire type corersponding to [`SuperFooRequest`].
+/// The wire type corresponding to [`SuperFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSuperFooRequest {
     pub s: ::fidl_next::WireString,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSuperFooRequest {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooRequest
@@ -115,7 +120,7 @@ impl ::fidl_next::Encodable for SuperFooResponse {
     type Encoded = WireSuperFooResponse;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for SuperFooResponse
+unsafe impl<___E> ::fidl_next::Encode<___E> for SuperFooResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -123,13 +128,13 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
                 y,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
@@ -142,7 +147,7 @@ impl ::fidl_next::EncodableOption for Box<SuperFooResponse> {
     type EncodedOption = ::fidl_next::WireBox<WireSuperFooResponse>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooResponse>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooResponse>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SuperFooResponse: ::fidl_next::Encode<___E>,
@@ -151,13 +156,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -177,11 +182,16 @@ impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
     }
 }
 
-/// The wire type corersponding to [`SuperFooResponse`].
+/// The wire type corresponding to [`SuperFooResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSuperFooResponse {
     pub y: ::fidl_next::WireI64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireSuperFooResponse {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooResponse
@@ -210,6 +220,16 @@ where
 pub struct Super;
 
 pub mod super_ {
+    pub mod prelude {
+        pub use crate::{
+            super_, Super, SuperClientHandler, SuperClientSender, SuperServerHandler,
+            SuperServerSender,
+        };
+
+        pub use crate::SuperFooRequest;
+
+        pub use crate::SuperFooResponse;
+    }
 
     pub struct Foo;
 
@@ -277,7 +297,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SuperClientHandler<___T>,
 
-    crate::WireSuperFooResponse: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <super_::Foo as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -366,6 +387,15 @@ where
 pub struct Sub;
 
 pub mod sub {
+    pub mod prelude {
+        pub use crate::{
+            sub, Sub, SubClientHandler, SubClientSender, SubServerHandler, SubServerSender,
+        };
+
+        pub use crate::SuperFooRequest;
+
+        pub use crate::SuperFooResponse;
+    }
 
     pub struct Foo;
 
@@ -427,7 +457,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SubClientHandler<___T>,
 
-    crate::WireSuperFooResponse: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <sub::Foo as ::fidl_next::Method>::Response:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -511,13 +542,26 @@ where
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {
-    pub use super::{SubClientSender, SubServerSender, SuperClientSender, SuperServerSender};
-}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireSuperFooRequest>
+        for ::fidl_test_inheritance::SuperFooRequest
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSuperFooRequest) -> Self {
+            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireSuperFooResponse>
+        for ::fidl_test_inheritance::SuperFooResponse
+    {
+        #[inline]
+        fn take_from(from: &crate::WireSuperFooResponse) -> Self {
+            Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
+        }
+    }
 
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Super`
@@ -525,8 +569,22 @@ pub mod compat {
     pub type SuperProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Super>;
 
+    impl ::fidl_next::TakeFrom<crate::Super> for ::fidl_test_inheritance::Super_Marker {
+        #[inline]
+        fn take_from(from: &crate::Super) -> Self {
+            Self
+        }
+    }
+
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Sub`
     /// protocol.
     pub type SubProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Sub>;
+
+    impl ::fidl_next::TakeFrom<crate::Sub> for ::fidl_test_inheritance::SubMarker {
+        #[inline]
+        fn take_from(from: &crate::Sub) -> Self {
+            Self
+        }
+    }
 }

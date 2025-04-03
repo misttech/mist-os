@@ -5,12 +5,12 @@
     children: [
         {
             name: "bar",
-            url: "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm",
+            url: "fuchsia-pkg://fuchsia.com/for-test#meta/bar.cm",
             startup: "eager",
         },
         {
             name: "baz",
-            url: "fuchsia-pkg://fuchsia.com/foo#meta/baz.cm",
+            url: "fuchsia-pkg://fuchsia.com/for-test#meta/baz.cm",
             startup: "eager",
         },
     ],

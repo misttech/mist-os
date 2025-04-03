@@ -35,7 +35,6 @@ source_set("restricted-mode") {
     "//src/lib/symbolizer-markup",
     "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
@@ -55,7 +54,7 @@ source_set("restricted-mode") {
   if (current_cpu == "arm64" && !is_asan) {
     restricted_blob_arm_name = "\"test/restricted-blob.arm.so\""
     restricted_blob_arm_info =
-        "{$restricted_blob_arm_name, elfldltl::ElfMachine::kArm, 0x100000000UL}"
+        "{$restricted_blob_arm_name, elfldltl::ElfMachine::kArm, 0xffffffffUL}"
     defines += [
       "RESTRICTED_BLOB_COUNT=2",
       "RESTRICTED_BLOB_INFO={ $restricted_blob_info, $restricted_blob_arm_info }",

@@ -40,7 +40,7 @@ Set your Fuchsia build configuration through the command palette and select
 
 <img class="vscode-image vscode-image-center"
      alt="This figure shows fx set and fx build in the command palette."
-     src="images/extensions/ext-command-palette.png"/>
+     src="images/extensions/ext-command-palette-fx.png"/>
 
 You can select products and boards available from a dropdown list. The extension
 displays a message when `fx set` finishes running.
@@ -94,23 +94,31 @@ VS Code command palette. In most cases, you have the following options:
      Fuchsia device through the Fuchsia VS Code extension."
      src="images/extensions/ext-command-palette.png"/>
 
-* **Default target: `<device-name>`**: This option shows which Fuchsia device is
-  currently configured as your default target. If you have additional Fuchsia
-  devices, click the `Set <device-name> as default` to connect to that specific
-  device. This is equivalent to running `ffx target default get`.
-* **Set `<device-name>` as default**: This options lets you connect to the selected
-  Fuchsia device. This is equivalent to running
-  `ffx target default set <device-name>`.
-* **Show log for `<device-name>`**: This option opens the **Fuchsia logs** tab of
-  the Fuchsia extension. For more information, see
+* **VSCode target device: `<device-name>`**: This option shows which Fuchsia
+  device is currently configured as the active target for your VSCode editor
+  window. This device is applied across the Fuchsia VSCode extension's features and VSCode
+  spawned terminal sessions. If you have additional Fuchsia devices, click the
+  `Use target device: <device-name>` to switch to that specific device.
+  This is equivalent to running `ffx target default get`.
+* **Use target device: `<device-name>`**: This options lets you connect and
+  switch to the selected Fuchsia device. This is equivalent to setting the
+  `$FUCHSIA_NODENAME` environment variable across VSCode IDE's scope.
+* **Show log for `<device-name>`**: This option opens the **Fuchsia logs** tab
+  of the Fuchsia extension. For more information, see
   [View Fuchsia logs](#view-fuchsia-logs). This is equivalent to running
   `ffx log`.
+* **Capture snapshot for `<device-name>`**: This option captures a snapshot of
+  the active device. This is equivalent to running `ffx target snapshot`.
+* **OTA for `<device-name>`**: This option runs an over-the-air update against
+  the active device, optionally building beforehand. OTAing is equivalent to
+  running `ffx target update`.
 * **Reboot `<device-name>`**: This options restarts your Fuchsia device. This is
   equivalent to running `ffx target reboot`.
-* **Power off `<device-name>`**: This option powers off your Fuchsia device. This
-  is equivalent to running `ffx target off`. If you power off a Fuchsia emulator,
-  you need to use `ffx emu start <product-bundle>` to start the emulator again.
-  For more information, see [Start the Fuchsia emulator][sdk-start-emulator].
+* **Power off `<device-name>`**: This option powers off your Fuchsia device.
+  This is equivalent to running `ffx target off`. If you power off a Fuchsia
+  emulator, you need to use this extension or `ffx emu start <product-bundle>`
+  to start the emulator again. For more information, see
+  [Start the Fuchsia emulator][sdk-start-emulator].
 
 ## View Fuchsia logs {#view-fuchsia-logs}
 

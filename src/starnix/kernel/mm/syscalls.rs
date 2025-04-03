@@ -15,6 +15,7 @@ use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutpu
 use crate::vfs::{FdFlags, FdNumber, UserFaultFile};
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcTimeline;
+use linux_uapi::MLOCK_ONFAULT;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
@@ -29,9 +30,9 @@ use starnix_uapi::{
     FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI, FUTEX_LOCK_PI2,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI, FUTEX_WAIT,
     FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET, FUTEX_WAKE_OP,
-    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE,
-    MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK, O_CLOEXEC, O_NONBLOCK,
-    PROT_EXEC, UFFD_USER_MODE_ONLY,
+    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_LOCKED,
+    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
+    MS_INVALIDATE, O_CLOEXEC, O_NONBLOCK, PROT_EXEC, UFFD_USER_MODE_ONLY,
 };
 use std::ops::Deref as _;
 use zx;
@@ -100,7 +101,8 @@ where
         | MAP_NORESERVE
         | MAP_STACK
         | MAP_DENYWRITE
-        | MAP_GROWSDOWN;
+        | MAP_GROWSDOWN
+        | MAP_LOCKED;
     if flags & !valid_flags != 0 {
         if flags & MAP_SHARED_VALIDATE != 0 {
             return error!(EOPNOTSUPP);
@@ -151,6 +153,13 @@ where
     if flags & MAP_POPULATE != 0 {
         options |= MappingOptions::POPULATE;
     }
+    if flags & MAP_LOCKED != 0 {
+        // The kernel isn't expected to return an error if locking fails with this flag, so for now
+        // this implementation will always fail to lock memory even if mapping succeeds.
+        track_stub!(TODO("https://fxbug.dev/406377606"), "MAP_LOCKED");
+    }
+
+    security::mmap_file(current_task, &file, prot_flags, options)?;
 
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
@@ -231,12 +240,21 @@ pub fn sys_msync(
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
-    _flags: u32,
+    flags: u32,
 ) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/322874588"), "msync");
+
+    let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
+
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
-    current_task.mm().ok_or_else(|| errno!(EINVAL))?.ensure_mapped(addr, length)?;
+    mm.ensure_mapped(addr, length)?;
+
+    // gvisor mlock tests rely on returning EBUSY from msync on locked ranges.
+    if flags & MS_INVALIDATE != 0 && mm.state.read().num_locked_bytes(addr..addr + length) > 0 {
+        return error!(EBUSY);
+    }
+
     Ok(())
 }
 
@@ -643,13 +661,41 @@ pub fn sys_set_robust_list(
 }
 
 pub fn sys_mlock(
-    _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _addr: UserAddress,
-    _length: usize,
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    length: usize,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297591218"), "mlock");
-    Ok(())
+    // If flags is 0, mlock2() behaves exactly the same as mlock().
+    sys_mlock2(locked, current_task, addr, length, 0)
+}
+
+pub fn sys_mlock2(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    length: usize,
+    flags: u64,
+) -> Result<(), Errno> {
+    const KNOWN_FLAGS: u64 = MLOCK_ONFAULT as u64;
+    if (flags & !KNOWN_FLAGS) != 0 {
+        return error!(EINVAL);
+    }
+
+    let on_fault = flags & MLOCK_ONFAULT as u64 != 0;
+
+    let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
+    mm.state.write().mlock(current_task, addr, length, on_fault)
+}
+
+pub fn sys_munlock(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    length: usize,
+) -> Result<(), Errno> {
+    let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
+    mm.state.write().munlock(current_task, addr, length)
 }
 
 pub fn sys_mlockall(
@@ -661,14 +707,13 @@ pub fn sys_mlockall(
     error!(ENOSYS)
 }
 
-pub fn sys_munlock(
+pub fn sys_munlockall(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
-    _addr: UserAddress,
-    _length: usize,
+    _flags: u64,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297591218"), "munlock");
-    Ok(())
+    track_stub!(TODO("https://fxbug.dev/297292097"), "munlockall()");
+    error!(ENOSYS)
 }
 
 pub fn sys_mincore(
@@ -735,7 +780,12 @@ mod arch32 {
 
     pub use super::{
         sys_futex as sys_arch32_futex, sys_madvise as sys_arch32_madvise,
+        sys_mincore as sys_arch32_mincore, sys_mlock as sys_arch32_mlock,
+        sys_mlock2 as sys_arch32_mlock2, sys_mlockall as sys_arch32_mlockall,
         sys_mremap as sys_arch32_mremap, sys_msync as sys_arch32_msync,
+        sys_munlock as sys_arch32_munlock, sys_munlockall as sys_arch32_munlockall,
+        sys_process_vm_readv as sys_arch32_process_vm_readv,
+        sys_userfaultfd as sys_arch32_userfaultfd,
     };
 }
 

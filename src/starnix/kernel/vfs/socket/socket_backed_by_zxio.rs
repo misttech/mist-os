@@ -5,6 +5,7 @@
 use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
+use crate::task::syscalls::SockFProgPtr;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
 use crate::vfs::socket::{
     Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
@@ -12,14 +13,15 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use byteorder::ByteOrder;
+use linux_uapi::IP_MULTICAST_ALL;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, sock_fprog,
-    uapi, ucred, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
+    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, uapi, ucred,
+    AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
 use ebpf::convert_and_verify_cbpf;
@@ -478,7 +480,9 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {}
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {
+        let _ = self.zxio.close();
+    }
 
     fn getsockname(
         &self,
@@ -514,16 +518,21 @@ impl SocketOps for ZxioBackedSocket {
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog = current_task.read_object::<sock_fprog>(user_opt.try_into()?)?;
-                if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+                let fprog_ptr = SockFProgPtr::new_with_ref(current_task, user_opt)?;
+                let fprog = current_task.read_multi_arch_object(fprog_ptr)?;
+                if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);
                 }
-                let code: Vec<sock_filter> =
-                    current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                let code: Vec<sock_filter> = current_task
+                    .read_multi_arch_objects_to_vec(fprog.filter, fprog.len as usize)?;
                 self.attach_cbpf_filter(current_task, code)
             }
             (SOL_IP, IP_RECVERR) => {
                 track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
+                Ok(())
+            }
+            (SOL_IP, IP_MULTICAST_ALL) => {
+                track_stub!(TODO("https://fxbug.dev/404596095"), "SOL_IP.IP_MULTICAST_ALL");
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
@@ -555,6 +564,7 @@ impl SocketOps for ZxioBackedSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         optlen: u32,

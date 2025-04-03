@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::client::roaming::lib::RoamingConnectionData;
+use crate::client::roaming::lib::{PolicyRoamRequest, RoamReason, RoamingConnectionData};
 use crate::client::types;
 use crate::config_management::{Credential, HistoricalListsByBssid};
 use crate::util::pseudo_energy::EwmaSignalData;
@@ -355,6 +355,15 @@ pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
     )
 }
 
+pub fn generate_random_roam_reason() -> RoamReason {
+    let mut rng = rand::thread_rng();
+    match rng.gen_range(0..1) {
+        0 => RoamReason::RssiBelowThreshold,
+        1 => RoamReason::SnrBelowThreshold,
+        _ => panic!(),
+    }
+}
+
 pub fn generate_random_roaming_connection_data() -> RoamingConnectionData {
     RoamingConnectionData::new(
         generate_random_ap_state(),
@@ -362,4 +371,14 @@ pub fn generate_random_roaming_connection_data() -> RoamingConnectionData {
         generate_random_password(),
         generate_random_ewma_signal_data(),
     )
+}
+
+pub fn generate_policy_roam_request(bssid: types::Bssid) -> PolicyRoamRequest {
+    PolicyRoamRequest {
+        candidate: types::ScannedCandidate {
+            bss: types::Bss { bssid, ..generate_random_bss() },
+            ..generate_random_scanned_candidate()
+        },
+        reasons: vec![generate_random_roam_reason()],
+    }
 }

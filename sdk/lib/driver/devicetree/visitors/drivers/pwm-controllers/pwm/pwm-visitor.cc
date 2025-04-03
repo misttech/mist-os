@@ -47,12 +47,11 @@ zx::result<> PwmVisitor::Visit(fdf_devicetree::Node& node,
     return parser_output.take_error();
   }
 
-  if (parser_output->find(kPwmReference) == parser_output->end()) {
+  if (!parser_output->contains(kPwmReference)) {
     return zx::ok();
   }
 
-  if (parser_output->find(kPwmNames) == parser_output->end() &&
-      (*parser_output)[kPwmReference].size() != 1u) {
+  if (!parser_output->contains(kPwmNames) && (*parser_output)[kPwmReference].size() != 1u) {
     FDF_LOG(
         ERROR,
         "PWM reference '%s' does not have valid pwm names property. Name is required to generate bind rules, especially when more than one pwm is referenced.",

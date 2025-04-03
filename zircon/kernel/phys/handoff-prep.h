@@ -17,6 +17,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_single_list.h>
 #include <ktl/byte.h>
+#include <ktl/concepts.h>
 #include <ktl/initializer_list.h>
 #include <ktl/move.h>
 #include <ktl/pair.h>
@@ -25,6 +26,7 @@
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
+#include <phys/new.h>
 #include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
 
@@ -94,6 +96,35 @@ class HandoffPrep {
   void PublishExtraVmo(PhysVmo&& vmo);
 
  private:
+  // Comprises a list in scratch memory of the pending VM objects so they can
+  // be packed into a single array at the end (via NewFromList()).
+  template <ktl::derived_from<PhysVmObject> VmObject>
+  struct HandoffVmObject : public fbl::SinglyLinkedListable<HandoffVmObject<VmObject>*> {
+    static HandoffVmObject* New(VmObject obj) {
+      fbl::AllocChecker ac;
+      HandoffVmObject* handoff_obj =
+          new (gPhysNew<memalloc::Type::kPhysScratch>, ac) HandoffVmObject;
+      ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu scratch bytes for hand-off VM object",
+                    sizeof(*handoff_obj));
+      handoff_obj->object = ktl::move(obj);
+      return handoff_obj;
+    }
+
+    VmObject object;
+  };
+
+  template <typename VmObject>
+  using HandoffVmObjectList = fbl::SizedSinglyLinkedList<HandoffVmObject<VmObject>*>;
+
+  using HandoffVmo = HandoffVmObject<PhysVmo>;
+  using HandoffVmoList = HandoffVmObjectList<PhysVmo>;
+
+  using HandoffVmar = HandoffVmObject<PhysVmar>;
+  using HandoffVmarList = HandoffVmObjectList<PhysVmar>;
+
+  using HandoffMapping = HandoffVmObject<PhysMapping>;
+  using HandoffMappingList = HandoffVmObjectList<PhysMapping>;
+
   template <memalloc::Type Type>
   class PhysPages {
    public:
@@ -133,12 +164,42 @@ class HandoffPrep {
 
   using TemporaryAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
 
-  // A list in scratch memory of the pending PhysVmo structs so they
-  // can be packed into a single array at the end.
-  struct HandoffVmo : public fbl::SinglyLinkedListable<HandoffVmo*> {
-    PhysVmo vmo;
+  // TODO(https://fxbug.dev/42164859): kMmio too.
+  enum class MappingType { kNormal };
+
+  // A convenience class for building up a PhysVmar.
+  class PhysVmarPrep {
+   public:
+    constexpr PhysVmarPrep() = default;
+
+    // Creates the provided mapping and publishes it within the associated VMAR
+    // being built up.
+    void PublishMapping(PhysMapping mapping, MappingType type) {
+      ZX_DEBUG_ASSERT(vmar_.base <= mapping.vaddr);
+      ZX_DEBUG_ASSERT(mapping.vaddr_end() <= vmar_.end());
+      CreateMapping(mapping, type);
+      mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
+    }
+
+    // Publishes the PhysVmar in the hand-off.
+    void Publish() && {
+      prep_->NewFromList(vmar_.mappings, ktl::move(mappings_));
+      prep_->vmars_.push_front(HandoffVmar::New(ktl::move(vmar_)));
+      prep_ = nullptr;
+    }
+
+   private:
+    friend class HandoffPrep;
+
+    explicit PhysVmarPrep(HandoffPrep* prep, ktl::string_view name, uintptr_t base, size_t size)
+        : prep_(prep), vmar_{.base = base, .size = size} {
+      vmar_.set_name(name);
+    }
+
+    HandoffPrep* prep_ = nullptr;
+    PhysVmar vmar_;
+    HandoffMappingList mappings_;
   };
-  using HandoffVmoList = fbl::SizedSinglyLinkedList<HandoffVmo*>;
 
   struct Debugdata {
     ktl::string_view announce, sink_name, vmo_name;
@@ -152,6 +213,26 @@ class HandoffPrep {
   // `data.size_bytes()`.
   static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
                              size_t content_size);
+
+  static void CreateMapping(const PhysMapping& mapping, MappingType type);
+
+  // Packs a list of pending VM objects into a single hand-off span in sorted
+  // order.
+  template <typename VmObject>
+  ktl::span<VmObject> NewFromList(PhysHandoffTemporarySpan<const VmObject>& span,
+                                  HandoffVmObjectList<VmObject> list) {
+    fbl::AllocChecker ac;
+    ktl::span objects = New(span, ac, list.size());
+    ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte VM object span", list.size(),
+                  sizeof(VmObject));
+    ZX_DEBUG_ASSERT(objects.size() == list.size());
+
+    for (VmObject& obj : objects) {
+      obj = ktl::move(list.pop_front()->object);
+    }
+    ktl::sort(objects.begin(), objects.end());
+    return objects;
+  }
 
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 
@@ -185,9 +266,22 @@ class HandoffPrep {
   // Do PublishExtraVmo with a Log buffer, which is consumed.
   void PublishLog(ktl::string_view vmo_name, Log&& log);
 
-  // Do final handoff of the extra VMO list.  The contents are already in place,
-  // so this does not invalidate pointers from PublishExtraVmo.
-  void FinishExtraVmos();
+  // Constructs a prep object for publishing a PhysVmar.
+  PhysVmarPrep PrepareVmarAt(ktl::string_view name, uintptr_t base, size_t size) {
+    PhysVmarPrep prep;
+    prep.prep_ = this;
+    prep.vmar_ = PhysVmar{.base = base, .size = size};
+    prep.vmar_.set_name(name);
+    return prep;
+  }
+
+  // Publishes a PhysVmar with a single mapping covering its extent.
+  void PublishSingleMappingVmar(PhysMapping mapping, MappingType type);
+
+  // Do final handoff of the VM object lists.  The contents are already in
+  // place so this does not invalidate any pointers to the objects (e.g., from
+  // PublishExtraVmo).
+  void FinishVmObjects();
 
   // Normalizes and publishes RAM and the allocations of interest to the kernel.
   //
@@ -198,6 +292,7 @@ class HandoffPrep {
 
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
+  HandoffVmarList vmars_;
   HandoffVmoList extra_vmos_;
 };
 

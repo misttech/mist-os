@@ -23,6 +23,9 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "development_support": {
             "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
         },
+        "driver_framework": {
+            "use_rust_driver_host": True,
+        },
         "fonts": {
             "enabled": False,
         },
@@ -49,8 +52,6 @@ fuchsia_product_configuration(
 fuchsia_product(
     name = "image.x64",
     board_config = "//boards:x64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -62,11 +63,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.x64",
-    board_name = "x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.x64",
     recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -81,8 +81,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.arm64",
     board_config = "//boards:arm64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -94,11 +92,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.arm64",
-    board_name = "arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.arm64",
     recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -113,8 +110,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.vim3",
     board_config = "//boards:vim3",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -126,10 +121,9 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.vim3",
-    board_name = "vim3",
     main = ":image.vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.vim3",
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
@@ -139,8 +133,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.emac",
     board_config = "//boards/emac",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -152,10 +144,9 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.emac",
-    board_name = "emac",
     main = ":image.emac",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.emac",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
     update_version_file = "//build/info:version",
@@ -164,8 +155,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -177,11 +166,10 @@ fuchsia_elf_sizes(
 
 fuchsia_product_bundle(
     name = "product_bundle.riscv64",
-    board_name = "riscv64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:riscv64-emu-recommended",
     main = ":image.riscv64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
-    product_bundle_name = "fuchsia",
+    product_bundle_name = "minimal.riscv64",
     recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",

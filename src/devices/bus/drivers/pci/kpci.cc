@@ -130,19 +130,25 @@ zx_status_t pci_get_next_capability(kpci_device* device, uint8_t cap_id, uint8_t
 }
 
 zx_status_t pci_get_bti(kpci_device* device, uint32_t index, zx::bti* out_bti) {
-  zx_status_t st = ZX_ERR_NOT_SUPPORTED;
   uint32_t bdf = (static_cast<uint32_t>(device->info.bus_id) << 8) |
                  (static_cast<uint32_t>(device->info.dev_id) << 3) | device->info.func_id;
   if (device->pciroot.ops) {
-    st = pciroot_get_bti(&device->pciroot, bdf, index, out_bti->reset_and_get_address());
-  } else if (device->pdev.is_valid()) {
+    return pciroot_get_bti(&device->pciroot, bdf, index, out_bti->reset_and_get_address());
+  }
+
+  if (device->pdev.is_valid()) {
     // TODO(teisenbe): This isn't quite right. We need to develop a way to
     // resolve which BTI should go to downstream. However, we don't currently
     // support any SMMUs for ARM, so this will work for now.
-    st = device->pdev.GetBti(0, out_bti);
+    zx::result bti = device->pdev.GetBti(0);
+    if (bti.is_error()) {
+      return bti.status_value();
+    }
+    *out_bti = std::move(bti.value());
+    return ZX_OK;
   }
 
-  return st;
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 template <typename T>
@@ -188,7 +194,10 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
   // Store the PCIROOT protocol for use with get_bti in the pci protocol It is
   // not fatal if this fails, but bti protocol methods will not work.
   device_get_protocol(parent, ZX_PROTOCOL_PCIROOT, &device.pciroot);
-  device.pdev = ddk::PDevFidl(parent);
+  zx::result pdev =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
+  device.pdev = fdf::PDev{std::move(pdev.value())};
 
   bool uses_acpi = false;
   for (size_t i = 0; i < plat_info->acpi_bdfs_count; i++) {

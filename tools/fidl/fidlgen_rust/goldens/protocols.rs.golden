@@ -223,6 +223,20 @@ impl AnotherDiscoverableProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<AnotherDiscoverableProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: AnotherDiscoverableProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for AnotherDiscoverableProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AnotherDiscoverableProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -565,6 +579,20 @@ impl ChannelProtocolSynchronousProxy {
                 ___deadline,
             )?;
         Ok(_response.b)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<ChannelProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: ChannelProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ChannelProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 
@@ -1287,6 +1315,20 @@ impl DiscoverableProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<DiscoverableProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: DiscoverableProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for DiscoverableProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DiscoverableProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -1629,6 +1671,20 @@ impl HandleRightsProtocolSynchronousProxy {
             ___deadline,
         )?;
         Ok(_response.h)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<HandleRightsProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: HandleRightsProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for HandleRightsProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 
@@ -2142,6 +2198,20 @@ impl ManyParametersSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<ManyParametersSynchronousProxy> for zx::Handle {
+    fn from(value: ManyParametersSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ManyParametersSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ManyParametersProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -2584,6 +2654,20 @@ impl MethodWithUnionSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<MethodWithUnionSynchronousProxy> for zx::Handle {
+    fn from(value: MethodWithUnionSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for MethodWithUnionSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MethodWithUnionProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -2991,6 +3075,20 @@ impl PlatformServer_SynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<PlatformServer_SynchronousProxy> for zx::Handle {
+    fn from(value: PlatformServer_SynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for PlatformServer_SynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PlatformServer_Proxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -3363,6 +3461,20 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
             ___deadline,
         )?;
         Ok(_response.ret)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<WithAndWithoutRequestResponseSynchronousProxy> for zx::Handle {
+    fn from(value: WithAndWithoutRequestResponseSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for WithAndWithoutRequestResponseSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 
@@ -4379,6 +4491,20 @@ impl WithErrorSyntaxSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<WithErrorSyntaxSynchronousProxy> for zx::Handle {
+    fn from(value: WithErrorSyntaxSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for WithErrorSyntaxSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct WithErrorSyntaxProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -5245,6 +5371,20 @@ impl WithProtocolEndsSynchronousProxy {
             ___deadline,
         )?;
         Ok(_response.out)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<WithProtocolEndsSynchronousProxy> for zx::Handle {
+    fn from(value: WithProtocolEndsSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for WithProtocolEndsSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 

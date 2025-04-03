@@ -23,11 +23,15 @@ pub fn recursive_copy<'a>(
                     fio::PERM_READABLE,
                 )
                 .context("open src dir")?;
-                let dst = fuchsia_fs::directory::open_directory_async(
+                // Verifying the OnOpen event when creating the destination directory, otherwise we
+                // never confirm that this directory was successfully created if the source
+                // directory turns out to be empty.
+                let dst = fuchsia_fs::directory::open_directory(
                     dst,
                     entry.name.as_str(),
                     fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
                 )
+                .await
                 .context("open dst dir")?;
                 recursive_copy(&src, &dst)
                     .await
@@ -39,11 +43,15 @@ pub fn recursive_copy<'a>(
                     fio::PERM_READABLE,
                 )
                 .context("open src file")?;
-                let dst = fuchsia_fs::directory::open_file_async(
+                // Verifying the OnOpen event when creating the destination file, otherwise we never
+                // confirm that this file was successfully created if the source file turns out to
+                // be empty.
+                let dst = fuchsia_fs::directory::open_file(
                     dst,
                     entry.name.as_str(),
                     fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
                 )
+                .await
                 .context("open dst file")?;
                 loop {
                     let bytes = src

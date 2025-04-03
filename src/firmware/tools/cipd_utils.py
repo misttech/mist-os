@@ -14,10 +14,10 @@ some common target-agnostic utilities for working with these CIPD packages.
 
 import argparse
 import json
+import logging
 import os
 import re
 import subprocess
-import sys
 import tempfile
 
 _MY_DIR = os.path.dirname(__file__)
@@ -27,20 +27,25 @@ _FUCHSIA_ROOT = os.path.normpath(os.path.join(_MY_DIR, "..", "..", ".."))
 _GIT_TOOL = "git"
 _REPO_TOOL = "repo"
 
-# `cipd` is available as a prebuilt in the Fuchsia checkout.
+# `cipd` is available as a prebuilt in the Fuchsia checkout, but fall back to $PATH
+# in case this is being run out-of-tree.
 CIPD_TOOL = os.path.join(_FUCHSIA_ROOT, ".jiri_root", "bin", "cipd")
+if not os.path.isfile(CIPD_TOOL):
+    CIPD_TOOL = "cipd"
 
 
 class Git:
     """Wraps operations on a git repo."""
 
-    def __init__(self, repo_path: str):
+    def __init__(self, repo_path: str, revision: str):
         """Initializes a Git object.
 
         Args:
             repo_path: path to git repo root.
+            revision: current revision
         """
         self.repo_path = repo_path
+        self.revision = revision
 
     def git(
         self,
@@ -117,6 +122,37 @@ class Repo:
         self.root = os.path.realpath(root)
         self.git_repos = self._list_git_repos(spec)
 
+    def manifest(self, allow_dirty: bool) -> dict[str, str]:
+        """Returns a {name: version} manifest of this repo.
+
+        Normally this requires a clean repo, because the git revisions aren't stable if
+        they are only local to this machine. A clean repo means they actually exist
+        upstream and can be used to point to a specific version.
+
+        Args:
+            allow_dirty: allow generating a manifest on a dirty repo.
+
+        Raises:
+            ValueError if the repo is not clean.
+        """
+        if not allow_dirty:
+            # `repo status --quiet` doesn't print anything if the repo is clean,
+            # otherwise it prints the dirty repo path(s).
+            repo_status = subprocess.run(
+                [_REPO_TOOL, "status", "--quiet"],
+                cwd=self.root,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            ).stdout.strip()
+            if repo_status:
+                raise ValueError(
+                    f"Repo at '{self.root}' is dirty, cannot create stable manifest"
+                )
+
+        return {name: git.revision for name, git in self.git_repos.items()}
+
     def _list_git_repos(self, spec: Spec | None = None) -> dict[str, Git]:
         """Returns a {name: Git} mapping of all repos in this checkout."""
         # `repo info` gives us the information we need. Output format is:
@@ -137,14 +173,14 @@ class Repo:
         )
 
         matches = re.findall(
-            r"Project: (.*?)$\s*Mount path: (.*?)$",
+            r"Project: (.*?)$\s*Mount path: (.*?)$\s*Current revision: (.*?)$",
             repo_info.stdout,
             re.MULTILINE,
         )
 
         gits: dict[str, Git] = {}
         used_specs = set()
-        for name, path in matches:
+        for name, path, revision in matches:
             relative_path = os.path.relpath(path, self.root)
 
             # If a spec was given, only use the gits listed in the spec and
@@ -162,7 +198,7 @@ class Repo:
                     f"Duplicate git '{name}' at {[gits[name], path]}"
                 )
 
-            gits[name] = Git(path)
+            gits[name] = Git(path, revision)
 
         # Make sure we used all the provided specs.
         if spec:
@@ -374,6 +410,57 @@ def copy(source_package: str, source_version: str, dest_package: str) -> None:
         subprocess.run(command, check=True)
 
 
+def upload(package: str, contents_dir: str) -> str:
+    """Uploads a CIPD package.
+
+    Adds CIPD tags using the manifest.json file in the contents_dir, and also marks
+    the package with the standard "latest" ref.
+
+    Args:
+        package: package name.
+        content_dir: path to the directory containing the contents.
+
+    Returns:
+        The created package version ID.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        json_out_path = os.path.join(temp_dir, "cipd_out.json")
+        command = [
+            CIPD_TOOL,
+            "create",
+            "-name",
+            package,
+            "-in",
+            contents_dir,
+            "-install-mode",
+            "copy",
+            "-ref",
+            "latest",
+            "-json-output",
+            json_out_path,
+        ]
+
+        # Add revision tags from the manifest file.
+        with open(os.path.join(contents_dir, "manifest.json"), "r") as file:
+            manifest = json.load(file)
+        for project, revision in manifest.items():
+            # CIPD tags can't have slashes, so replace them with underscores.
+            command += ["-tag", f"{project.replace('/', '_')}:{revision}"]
+
+        subprocess.run(command, check=True)
+
+        # The output json looks like:
+        # {
+        #     "result": {
+        #         "package": "package_name",
+        #         "instance_id": "cipd_version"
+        #     }
+        # }
+        with open(json_out_path, "r") as file:
+            output = json.load(file)
+        return output["result"]["instance_id"]
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -382,11 +469,23 @@ def _parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="action", required=True)
 
+    def _add_common_repo_args(parser: argparse.ArgumentParser) -> None:
+        """Adds common args for commands that point to a repo."""
+        parser.add_argument("repo", help="Path to the repo root")
+        parser.add_argument(
+            "--spec-file",
+            help="Repo specification file as a JSON {path, alias} mapping. By"
+            " default all git repos in the manifest are used, but if a spec is"
+            " provided only the listed git repos are included. Alias is the name"
+            " to give the git repo in the changelog, or null to use the project"
+            " name.",
+        )
+
     changelog_parser = subparsers.add_parser(
         "changelog",
         help="Generate a source changelog between two CIPD packages",
     )
-    changelog_parser.add_argument("repo", help="Path to the repo root")
+    _add_common_repo_args(changelog_parser)
     changelog_parser.add_argument("package", help="The old CIPD package name")
     changelog_parser.add_argument(
         "old_version", help="The old version: ref, tag, ID, or local path"
@@ -400,29 +499,46 @@ def _parse_args() -> argparse.Namespace:
         nargs="?",
         help="The new version: ref, tag, ID, or local path",
     )
-    changelog_parser.add_argument(
-        "--spec-file",
-        help="Repo specification file as a JSON {path, alias} mapping. By"
-        " default all git repos in the manifest are used, but if a spec is"
-        " provided only the listed git repos are included. Alias is the name"
-        " to give the git repo in the changelog, or null to use the project"
-        " name.",
-    )
 
     copy_parser = subparsers.add_parser("copy", help="Copy a CIPD package")
     copy_parser.add_argument("source_package", help="Source CIPD name")
     copy_parser.add_argument("source_version", help="Source CIPD version")
     copy_parser.add_argument("dest_package", help="Destination CIPD name")
 
+    manifest_parser = subparsers.add_parser(
+        "manifest",
+        help="Print a version manifest for the given repo, formatted as expected for"
+        " use with this script",
+    )
+    _add_common_repo_args(manifest_parser)
+    manifest_parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow dirty repos. Note that the resulting manifest is not stable since"
+        " the revisions only apply to the local checkout, so should only be used for"
+        " local testing and verification",
+    )
+
+    create_parser = subparsers.add_parser(
+        "upload", help="Uploads a CIPD package"
+    )
+    create_parser.add_argument("package", help="CIPD package name")
+    create_parser.add_argument(
+        "contents",
+        help="Path to the directory containing the package contents; must contain a"
+        " manifest.json file which will be translated into CIPD tags",
+    )
+    create_parser.add_argument(
+        "--version-out",
+        help="Path to a file to write the new version string to",
+    )
+
     return parser.parse_args()
 
 
-def main() -> int:
-    """Script entry point.
-
-    Returns:
-        0 on success, non-zero on failure.
-    """
+def main() -> None:
+    """Script entry point."""
+    logging.basicConfig()
     args = _parse_args()
 
     if args.action == "changelog":
@@ -459,11 +575,38 @@ def main() -> int:
     elif args.action == "copy":
         copy(args.source_package, args.source_version, args.dest_package)
 
+    elif args.action == "manifest":
+        if args.spec_file:
+            with open(args.spec_file, "r") as f:
+                spec = json.load(f)
+        else:
+            spec = None
+
+        repo = Repo(args.repo, spec=spec)
+        print(
+            json.dumps(
+                repo.manifest(args.allow_dirty), indent=2, sort_keys=True
+            )
+        )
+
+    elif args.action == "upload":
+        new_version = upload(args.package, args.contents)
+        if args.version_out:
+            with open(args.version_out, "w") as file:
+                file.write(new_version)
+
     else:
         raise NotImplementedError(f"Unimplemented command: {args.action}")
 
-    return 0
-
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        # Dump stdout/stderr for failed subprocesses so the caller knows what failed.
+        logging.error("Failed command: `%s`", " ".join([str(c) for c in e.cmd]))
+        if e.stdout:
+            logging.error("\n-- stdout --\n%s------------", e.stdout)
+        if e.stderr:
+            logging.error("\n-- stderr --\n%s------------", e.stderr)
+        raise

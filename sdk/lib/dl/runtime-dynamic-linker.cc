@@ -4,6 +4,14 @@
 
 #include "runtime-dynamic-linker.h"
 
+#include <lib/fit/defer.h>
+
+#include <algorithm>
+
+#include <fbl/array.h>
+
+#include "tlsdesc-runtime-dynamic.h"
+
 namespace dl {
 
 void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
@@ -12,12 +20,28 @@ void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
 }
 
 RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
-  if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
-    // TODO(https://fxbug.dev/328135195): increase reference count.
-    RuntimeModule& found = *it;
-    return &found;
+  auto it = std::ranges::find_if(modules_, name.equal_to());
+  if (it == modules_.end()) {
+    return nullptr;
   }
-  return nullptr;
+  // TODO(https://fxbug.dev/328135195): increase reference count.
+  RuntimeModule& found = *it;
+  return &found;
+}
+
+void* RuntimeDynamicLinker::TlsBlock(const RuntimeModule& module) const {
+  assert(module.tls_module_id() > 0);
+  if (module.tls_module_id() <= max_static_tls_modid_) {
+    // TODO(https://fxbug.dev/403350238): Have the linker hold a reference to
+    // the passive abi so this could pass in ld::InitialExecOffset to
+    // ld::TpRelative.
+    return ld::TpRelative(static_cast<ptrdiff_t>(module.static_tls_bias()));
+  }
+  // TODO(https://fxbug.dev/403366387): Introduce a dynamic_tls_index accessor
+  // method on RuntimeModule
+  auto dynamic_tls_index = module.tls_module_id() - max_static_tls_modid_ - 1;
+  DynamicTlsPtr& module_tls = _dl_tlsdesc_runtime_dynamic_blocks[dynamic_tls_index];
+  return module_tls.contents(module.tls_module()).data();
 }
 
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
@@ -27,15 +51,13 @@ fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule
   ld::ScopedModuleDiagnostics root_diag{diag, root.name().str()};
 
   elfldltl::SymbolName name{ref};
-  // TODO(https://fxbug.dev/338229633): use elfldltl::MakeSymbolResolver.
+  // TODO(https://fxbug.dev/370087572): properly handle weak symbols.
   for (const RuntimeModule& module : root.module_tree()) {
     if (const auto* sym = name.Lookup(module.symbol_info())) {
-      if (sym->type() == elfldltl::ElfSymType::kTls) {
-        diag.SystemError(
-            "TODO(https://fxbug.dev/331421403): TLS semantics for dlsym() are not supported yet.");
-        return diag.take_error();
-      }
-      return diag.ok(reinterpret_cast<void*>(sym->value + module.load_bias()));
+      bool is_tls = sym->type() == elfldltl::ElfSymType::kTls;
+      uintptr_t bias = (is_tls ? reinterpret_cast<uintptr_t>(TlsBlock(module))
+                               : static_cast<size_type>(module.load_bias()));
+      return diag.ok(reinterpret_cast<void*>(sym->value + bias));
     }
   }
   diag.UndefinedSymbol(ref);
@@ -106,7 +128,9 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
     if (!populate_ac.check()) [[unlikely]] {
       return result(nullptr);
     }
-    dynamic_linker->max_static_tls_modid_ = abi.static_tls_modules.size();
+    size_t max_static_tls_modid = abi.static_tls_modules.size();
+    dynamic_linker->max_static_tls_modid_ = max_static_tls_modid;
+    dynamic_linker->max_tls_modid_ = max_static_tls_modid;
   }
 
   return result(std::move(dynamic_linker));
@@ -117,13 +141,49 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
 // of any locks.
 int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const {
   for (const RuntimeModule& module : modules_) {
-    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(dl_phdr_info_counts());
+    void* tls = module.tls_module_id() == 0 ? nullptr : TlsBlock(module);
+    dl_phdr_info phdr_info = module.MakeDlPhdrInfo(tls, dl_phdr_info_counts());
     // A non-zero return value ends the iteration.
     if (int result = callback(&phdr_info, sizeof(phdr_info), data); result != 0) {
       return result;
     }
   }
   return 0;
+}
+
+[[nodiscard]] fit::result<Error> RuntimeDynamicLinker::PrepareTlsBlocksForThread(void* tp) const {
+  fbl::AllocChecker ac;
+  SizedDynamicTlsArray blocks = MakeDynamicTlsArray(ac, DynamicTlsCount());
+  if (!ac.check()) [[unlikely]] {
+    dl::Diagnostics diag;
+    diag.OutOfMemory("dynamic TLS vector", DynamicTlsCount() * sizeof(blocks[0]));
+    return diag.take_error();
+  }
+
+  // TODO(https://fxbug.dev/403350238): this loop needs to be optimized to only
+  // loop through TLS modules while avoiding multiple O(N) scans.
+  // Iterate through every `RuntimeModule` with dynamic TLS and copy its TLS
+  // data into its respective index in `blocks`.
+  auto next = blocks.begin();
+  for (const RuntimeModule& module : modules_) {
+    // Skip non-tls or static-tls modules.
+    if (module.tls_module_id() <= max_static_tls_modid_) {
+      continue;
+    }
+
+    *next++ = DynamicTlsPtr::New(ac, module.tls_module());
+    if (!ac.check()) [[unlikely]] {
+      dl::Diagnostics diag;
+      diag.OutOfMemory("dynamic TLS block", module.tls_module().tls_size());
+      return diag.take_error();
+    }
+  }
+  assert(next == blocks.end());
+
+  UnsizedDynamicTlsArray old_blocks = ExchangeRuntimeDynamicBlocks(std::move(blocks), tp);
+  assert(!old_blocks);
+
+  return fit::ok();
 }
 
 }  // namespace dl

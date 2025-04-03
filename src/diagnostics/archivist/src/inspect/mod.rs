@@ -364,8 +364,9 @@ mod tests {
     #[fuchsia::test]
     async fn read_server_formatting_tree_inspect_sink() {
         let inspector = inspector_for_reader_test();
-        let (_inspect_server, tree_client) =
-            service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
+        let scope = fasync::Scope::new();
+        let tree_client =
+            service::spawn_tree_server(inspector, TreeServerSendPreference::default(), &scope);
         verify_reader(tree_client).await;
     }
 
@@ -374,8 +375,9 @@ mod tests {
         // This inspector doesn't contain valid inspect data.
         let vmo = zx::Vmo::create(4096).unwrap();
         let inspector = Inspector::new(InspectorConfig::default().vmo(vmo));
-        let (_inspect_server, tree_client) =
-            service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
+        let scope = fasync::Scope::new();
+        let tree_client =
+            service::spawn_tree_server(inspector, TreeServerSendPreference::default(), &scope);
         let (done0, done1) = zx::Channel::create();
         // Run the actual test in a separate thread so that it does not block on FS operations.
         // Use signalling on a zx::Channel to indicate that the test is done.
@@ -411,17 +413,18 @@ mod tests {
         let inspector = inspector_for_reader_test();
 
         let mut clients = HashMap::<String, Vec<TreeProxy>>::new();
-        let mut servers = vec![];
+        let scope = fasync::Scope::new();
         for (component_name, handle_count) in component_name_handle_counts.clone() {
             for _ in 0..handle_count {
                 let inspector_dup = Inspector::new(
                     InspectorConfig::default()
                         .vmo(inspector.duplicate_vmo().expect("failed to duplicate vmo")),
                 );
-                let (server, client) =
-                    service::spawn_tree_server(inspector_dup, TreeServerSendPreference::default())
-                        .unwrap();
-                servers.push(server);
+                let client = service::spawn_tree_server(
+                    inspector_dup,
+                    TreeServerSendPreference::default(),
+                    &scope,
+                );
                 clients.entry(component_name.clone()).or_default().push(client.into_proxy());
             }
         }

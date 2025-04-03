@@ -6,10 +6,21 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/test_spec.gni")
 
+assert(is_host, "manual_targets is for use with the host toolchain only")
+
 rustc_library("lib") {
   name = "manual_targets"
   edition = "2021"
   with_unit_tests = true
+
+  visibility = [
+    ":*",
+    "//src/developer/ffx/daemon/protocols/target_collection:*",
+    "//src/developer/ffx/daemon/server:*",
+    "//src/developer/ffx/lib/discovery:*",
+    "//src/developer/ffx/lib/target:*",
+    "//src/developer/ffx/plugins/target/remove:*",
+  ]
 
   deps = [
     "//src/developer/ffx/config:lib",

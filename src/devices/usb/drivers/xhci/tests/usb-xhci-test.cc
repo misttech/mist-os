@@ -4,6 +4,8 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
@@ -12,10 +14,8 @@
 #include <list>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace usb_xhci {
@@ -213,7 +213,7 @@ class FakeDevice {
   }
 
   fdf::MmioBuffer mmio() { return region_->GetMmioBuffer(); }
-  ddk_fake::FakeMmioRegRegion& region() { return *region_; }
+  fake_mmio::FakeMmioRegRegion& region() { return *region_; }
 
   void set_irq_signaller(zx::unowned_interrupt signaller) { irq_signaller_ = std::move(signaller); }
 
@@ -224,7 +224,7 @@ class FakeDevice {
   FakeTRB* crcr() { return FakeTRB::get(crcr_); }
 
  private:
-  std::optional<ddk_fake::FakeMmioRegRegion> region_;
+  std::optional<fake_mmio::FakeMmioRegRegion> region_;
   zx::unowned_interrupt irq_signaller_;
   bool driver_owned_controller_ = false;
   bool controller_enabled_ = false;
@@ -296,7 +296,7 @@ class XhciTestEnvironment : fdf_testing::Environment {
     EXPECT_OK(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
 
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.mmios[0] = fake_device_.mmio();
     config.irqs[0] = {};
     EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
@@ -311,7 +311,7 @@ class XhciTestEnvironment : fdf_testing::Environment {
 
  private:
   compat::DeviceServer device_server_;
-  fake_pdev::FakePDevFidl pdev_server_;
+  fdf_fake::FakePDev pdev_server_;
   FakeDevice fake_device_;
 };
 

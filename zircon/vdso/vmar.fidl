@@ -266,14 +266,17 @@ closed protocol Vmar {
     /// - `ZX_VM_MAP_RANGE`  Immediately page into the new mapping all backed
     ///   regions of the VMO.  This cannot be specified if
     ///   `ZX_VM_SPECIFIC_OVERWRITE` is used.
-    /// - `ZX_VM_ALLOW_FAULTS` Required if it would be possible for the created
-    ///   mapping to generate faults. In particular, it is required if *vmo* is resizable,
-    ///   if *vmo* is non-resizable but the mapping extends past the end of *vmo*, if
-    ///   *vmo* is discardable, or if *vmo* was created from [`zx_pager_create_vmo()`].
+    ///   `ZX_VM_ALLOW_FAULTS` Required if it would be possible for the created mapping to generate
+    ///   faults. In particular, it is required if *vmo* is resizable, if
+    ///   `ZX_VM_FAULT_BEYOND_STREAM_SIZE` is set, if *vmo* is non-resizable but the mapping extends past
+    ///   the end of *vmo*, if *vmo* is discardable, or if *vmo* was created from
+    ///   [`zx_pager_create_vmo()`].
     /// - `ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED` Map *vmo* as readable if the system does
     ///   not support mapping execute-only pages. If the system can map execute-only
     ///   this flag is ignored.
     /// - `ZX_VM_REQUIRE_NON_RESIZABLE` Fail if *vmo* is resizable.
+    /// - `ZX_VM_FAULT_BEYOND_STREAM_SIZE` Memory accesses beyond the stream size rounded up to the page
+    ///   boundary will fault. Requires `ZX_VM_ALLOW_FAULTS`.
     ///
     /// *vmar_offset* must be 0 if *options* does not have `ZX_VM_SPECIFIC`,
     /// `ZX_VM_SPECIFIC_OVERWRITE` or `ZX_VM_OFFSET_IS_UPPER_LIMIT` set.
@@ -338,7 +341,8 @@ closed protocol Vmar {
     /// `ZX_ERR_NOT_SUPPORTED` If the vmo is resizable, discardable, or backed by a pager but
     /// `ZX_VM_ALLOW_FAULTS` is not set.
     ///
-    /// `ZX_ERR_NOT_SUPPORTED` If the vmo is resizable and `ZX_VM_REQUIRE_NON_RESIZABLE` is set.
+    /// `ZX_ERR_NOT_SUPPORTED` If the vmo is resizable and `ZX_VM_REQUIRE_NON_RESIZABLE` is set. Or,
+    /// `ZX_VM_FAULT_BEYOND_STREAM_SIZE` is set and *vmo* is physical or contiguous.
     ///
     /// `ZX_ERR_BUFFER_TOO_SMALL` The VMO is not resizable and the mapping extends past the end
     /// of the VMO but `ZX_VM_ALLOW_FAULTS` is not set.
@@ -648,9 +652,14 @@ closed protocol Vmar {
     /// `ZX_ERR_NOT_SUPPORTED`  *op* was not `ZX_VMO_OP_DECOMMIT`, or one or more mapped VMOs do not
     /// support the requested *op*.
     ///
-    /// `ZX_ERR_OUT_OF_RANGE`  The range specified by *address* and *size* is not wholly within the VM
-    /// address range specified by *handle*, or any VMOs mapped in this range are resized down such
-    /// that access in the specified range should generate a fault.
+    /// `ZX_ERR_OUT_OF_RANGE` Returned for any of the following reasons:
+    ///
+    /// - the range specified by *address* and *size* is not wholly within the VM address range
+    /// specified by *handle*.
+    /// - any VMOs mapped in this range are resized down such that access in the specified range
+    /// should generate a fault.
+    /// - any of the mappings in this range were created with `ZX_VM_FAULT_BEYOND_STREAM_SIZE` and
+    /// have regions that would generate a fault outside of the stream size.
     ///
     /// `ZX_ERR_WRONG_TYPE`  *handle* is not a VMAR handle.
     ///
@@ -784,6 +793,114 @@ closed protocol Vmar {
         region_index uint32;
         region_offset uint64;
         region_length usize64;
+    }) -> (resource struct {
+        mapped_addr Vaddr;
+    }) error Status;
+
+    /// ## Summary
+    ///
+    /// Map a kernel clock object's state.
+    ///
+    /// ## Declaration
+    ///
+    /// ```
+    /// zx_status_t zx_vmar_map_clock(zx_handle_t handle,
+    ///                               zx_vm_option_t options,
+    ///                               uint64_t vmar_offset,
+    ///                               zx_handle_t clock_handle,
+    ///                               uint64_t len,
+    ///                               user_out_ptr<zx_vaddr_t> mapped_addr);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Maps the given clock's state into the given virtual memory address region.  The mapping
+    /// retains a reference to the underlying virtual memory object, which means closing the clock
+    /// handle does not remove the mapping added by this function.  Specified `options` are
+    /// identical to [those used](vmar_map.md#Description) in a call to [`zx_vmar_map()`], except
+    /// that the following options are explicitly disallowed and will always result in an error:
+    ///
+    ///  - `ZX_VM_PERM_WRITE`
+    ///  - `ZX_VM_PERM_EXECUTE`
+    ///  - `ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED`
+    ///
+    /// Additionally, no `vmo_offet` is provided, and the length passed must be the length reported
+    /// using a call to [`zx_object_get_info()`] executed against the clock object with the
+    /// `ZX_INFO_CLOCK_MAPPED_SIZE` topic.  Partial mappings of clock state are not allowed.
+    ///
+    /// Mappings created using this syscall are always non-resizeable, regardless of options passed
+    /// by the user.
+    ///
+    /// In addition to having sufficient VMAR rights to create a mapping, the `clock_handle` must
+    /// also have the `ZX_RIGHT_READ` and `ZX_RIGHT_MAP` rights.
+    ///
+    /// Unmapping a clock is achieved the same way it is with a VMO, by passing the original mapped
+    /// address and length to a call to [`zx_vmar_unmap()`].
+    ///
+    /// User's may close their clock's handle after mapping it and still read the clock's state.
+    /// Closing the clock handle will not destroy the mapping, only a properly constructed call to
+    /// `zx_vmar_unmap()` can do so.
+    ///
+    /// ## Rights
+    ///
+    /// *handle* must be of type `ZX_OBJ_TYPE_VMAR`.
+    ///
+    /// *clock_handle* must be of type `ZX_OBJ_TYPE_CLOCK`.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_vmar_map_clock()` returns `ZX_OK` and the absolute base address of the mapping (via
+    /// *mapped_addr*) on success.  The base address will be page-aligned and non-zero.  In the
+    /// event of failure, a negative error value is returned.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_BAD_HANDLE`  *handle* or *clock_handle* is not a valid handle.
+    ///
+    /// `ZX_ERR_WRONG_TYPE`  *handle* or *clock_handle* is not a VMAR or Clock handle, respectively.
+    ///
+    /// `ZX_ERR_BAD_STATE`  *handle* refers to a destroyed VMAR.
+    ///
+    /// `ZX_ERR_INVALID_ARGS` for any of the following:
+    ///  - `len` does not match the mapped size reported by `ZX_INFO_CLOCK_MAPPED_SIZE`.
+    ///  - `options` contains one of the explicitly disallowed flags specified above.
+    ///
+    /// Please also refer to the [errors which may be returned by zx_vmar_map()](vmar_map.md#Errors)
+    /// for additional possible error common to both syscalls.
+    ///
+    /// ## Notes
+    ///
+    /// Mappings enumerated using the [`ZX_INFO_VMAR_MAPS`] or [`ZX_INFO_PROCESS_MAPS`] topics with
+    /// the [`zx_object_get_info()`] syscall will contain the same information as a mapped VMO, with
+    /// the following exceptions:
+    ///
+    ///  - The string "kernel-clock" will be returned as the name of the mapping
+    ///  - The KOID of the mapping reported as the clock object's KOID.
+    ///
+    /// ## See also
+    ///
+    ///  - [mappable_clocks]
+    ///  - [`zx_vmar_map()`]
+    ///  - [`zx_vmar_unmap()`]
+    ///  - [`zx_object_get_info()`]
+    ///  - [`ZX_INFO_CLOCK_MAPPED_SIZE`]: object_get_info.md#zx_info_clock_mapped_size
+    ///  - [`ZX_INFO_VMAR_MAPS`]: object_get_info.md#zx_info_vmar_maps
+    ///  - [`ZX_INFO_PROCESS_MAPS`]: object_get_info.md#zx_info_process_maps
+    ///
+    /// [mappable_clocks]: /docs/reference/kernel_objects/clock.md#mappable_clocks
+    /// [`zx_vmar_map()`]: vmar_map.md
+    /// [`zx_vmar_unmap()`]: vmar_unmap.md
+    /// [`zx_object_get_info()`]: object_get_info.md
+    /// [`ZX_INFO_CLOCK_MAPPED_SIZE`]: object_get_info.md#zx_info_clock_mapped_size
+    /// [`ZX_INFO_VMAR_MAPS`]: object_get_info.md#zx_info_vmar_maps
+    /// [`ZX_INFO_PROCESS_MAPS`]: object_get_info.md#zx_info_process_maps
+    // @available(added=NEXT)
+    strict MapClock(resource struct {
+        handle Handle:VMAR;
+        options VmOption;
+        vmar_offset usize64;
+        clock Handle:VMO;
+        len usize64;
     }) -> (resource struct {
         mapped_addr Vaddr;
     }) error Status;

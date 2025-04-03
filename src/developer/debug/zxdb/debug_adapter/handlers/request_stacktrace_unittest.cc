@@ -24,7 +24,7 @@ using RequestStackTraceTest = DebugAdapterContextTest;
 TEST_F(RequestStackTraceTest, FullFrameAvailable) {
   InitializeDebugging();
 
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid, 0x1000);
   // Run client to receive process started event.
   RunClient();
   auto thread = InjectThread(kProcessKoid, kThreadKoid);

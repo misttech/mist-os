@@ -76,7 +76,7 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     def test_initialize(
@@ -102,7 +102,7 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_initialize.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     def test_initialize_error(
@@ -143,11 +143,11 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -176,11 +176,11 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_start.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -224,16 +224,16 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -262,16 +262,16 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_stop.assert_called()
 
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -307,7 +307,7 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     def test_terminate(
@@ -347,16 +347,16 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
@@ -418,7 +418,7 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(fc, "Channel")
@@ -501,16 +501,16 @@ class TracingFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        f_tracingcontroller.Provisioner.Client,
+        f_tracingcontroller.ProvisionerClient,
         "initialize_tracing",
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
     @mock.patch.object(
-        f_tracingcontroller.Session.Client,
+        f_tracingcontroller.SessionClient,
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )

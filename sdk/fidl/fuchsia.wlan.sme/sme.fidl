@@ -356,41 +356,14 @@ closed protocol Telemetry {
     strict QueryTelemetrySupport() -> (struct {
         resp fuchsia.wlan.stats.TelemetrySupport;
     }) error zx.Status;
-    strict GetCounterStats() -> (struct {
-        stats fuchsia.wlan.stats.IfaceCounterStats;
+    strict GetIfaceStats() -> (struct {
+        stats fuchsia.wlan.stats.IfaceStats;
     }) error zx.Status;
     strict GetHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;
     }) error zx.Status;
     strict CloneInspectVmo() -> (resource struct {
         inspect_vmo zx.Handle:VMO;
-    }) error zx.Status;
-};
-
-closed protocol FeatureSupport {
-    /// Return support for features related to discovery of potential BSSs.
-    /// * see [`fuchsia.wlan.common/DiscoverySupport`]
-    strict QueryDiscoverySupport() -> (struct {
-        resp fuchsia.wlan.common.DiscoverySupport;
-    }) error zx.Status;
-
-    /// Return support for features related to the MAC sublayer.
-    /// * see [`fuchsia.wlan.common/MacSublayerSupport`]
-    strict QueryMacSublayerSupport() -> (struct {
-        resp fuchsia.wlan.common.MacSublayerSupport;
-    }) error zx.Status;
-
-    /// Return support for features related to security/access control
-    /// and data confidentiality.
-    /// * see [`fuchsia.wlan.common/SecuritySupport`]
-    strict QuerySecuritySupport() -> (struct {
-        resp fuchsia.wlan.common.SecuritySupport;
-    }) error zx.Status;
-
-    /// Return support for features related to spectrum management.
-    /// * see [`fuchsia.wlan.common/SpectrumManagementSupport`]
-    strict QuerySpectrumManagementSupport() -> (struct {
-        resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;
 };
 
@@ -448,14 +421,5 @@ closed protocol GenericSme {
     ///     * PEER_CLOSED: The underlying SME is shutting down.
     strict GetSmeTelemetry(resource struct {
         telemetry_server server_end:Telemetry;
-    }) -> () error zx.Status;
-    /// Attempt to establish a new connection to feature support information for
-    /// the underlying SME.
-    /// Connections may be established for the whole lifetime of the SME, and
-    /// concurrent connections are safe since this is a read-only API.
-    /// Likely errors include:
-    ///     * PEER_CLOSED: The underlying SME is shutting down.
-    strict GetFeatureSupport(resource struct {
-        feature_support_server server_end:FeatureSupport;
     }) -> () error zx.Status;
 };

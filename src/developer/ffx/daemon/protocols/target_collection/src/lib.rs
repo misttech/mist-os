@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::target_handle::TargetHandle;
-use addr::TargetAddr;
+use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use discovery::query::target_addr_info_to_socketaddr;
@@ -18,7 +18,7 @@ use ffx_daemon_target::target_collection::{TargetCollection, TargetUpdateFilter}
 use ffx_stream_util::TryStreamUtilExt;
 use ffx_target::{FastbootInterface, TargetInfoQuery};
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_ffx::{self as ffx, TargetAddrInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 #[cfg(test)]
 use futures::channel::oneshot::Sender;
@@ -180,7 +180,10 @@ async fn remove_manual_target(
         // editing the config.
         let ssh_port = target.ssh_port();
         for addr in target.manual_addrs() {
-            let mut sockaddr = SocketAddr::from(addr);
+            let Ok(sockaddr) = TargetIpAddr::try_from(addr) else {
+                continue;
+            };
+            let mut sockaddr: SocketAddr = sockaddr.into();
             ssh_port.map(|p| sockaddr.set_port(p));
             let _ = manual_targets.remove(format!("{}", sockaddr)).await.map_err(|e| {
                 tracing::error!("Unable to persist target removal: {}", e);
@@ -412,14 +415,28 @@ impl FidlProtocol for TargetCollectionProtocol {
                 };
 
                 tracing::trace!("Found target: {target:?}");
-
-                self.tasks.spawn(TargetHandle::new(target, cx.clone(), target_handle)?);
+                self.tasks.spawn(TargetHandle::new(
+                    target,
+                    cx.clone(),
+                    target_handle,
+                    target_collection.clone(),
+                )?);
                 responder.send(Ok(())).map_err(Into::into)
             }
             ffx::TargetCollectionRequest::AddTarget {
                 ip, config, add_target_responder, ..
             } => {
                 let add_target_responder = add_target_responder.into_proxy();
+                let ip = TargetAddr::from(ip);
+                let Ok(ip) = ip.try_into() else {
+                    return add_target_responder
+                        .error(&ffx::AddTargetError {
+                            connection_error: None,
+                            connection_error_logs: Some(vec!["Wrong address type!".to_owned()]),
+                            ..Default::default()
+                        })
+                        .map_err(Into::into);
+                };
                 let addr = target_addr_info_to_socketaddr(ip);
                 let node = cx.overnet_node()?;
                 let do_add_target = || {
@@ -532,6 +549,11 @@ impl FidlProtocol for TargetCollectionProtocol {
                 connect_timeout_seconds,
                 responder,
             } => {
+                let ip = TargetAddr::from(ip);
+                let Ok(ip) = ip.try_into() else {
+                    tracing::warn!("Could not add ephemeral target due to IP mismatch");
+                    return responder.send().map_err(Into::into);
+                };
                 let addr = target_addr_info_to_socketaddr(ip);
                 add_manual_target(
                     self.manual_targets.clone(),
@@ -713,7 +735,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
 
         let mut nadders = vec![];
         for addr in addrs {
-            nadders.push(SocketAddr::from(TargetAddr::from(addr)));
+            nadders.push(SocketAddr::from(TargetIpAddr::from(addr)));
         }
         let update = TargetUpdateBuilder::new()
             .discovered(TargetProtocol::Fastboot, TargetTransport::Network)
@@ -725,7 +747,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
     }
 }
 
-// mDNS Fastboot & RCS
+// mDNS/Emulator Fastboot & RCS
 #[tracing::instrument(skip(tc))]
 fn handle_discovered_target(
     tc: &Rc<TargetCollection>,
@@ -750,10 +772,26 @@ fn handle_discovered_target(
 
     let identity = t.nodename.as_deref().map(target::Identity::from_name);
 
-    let addrs =
-        t.addresses.iter().flatten().map(|a| TargetAddr::from(a).into()).collect::<Vec<_>>();
+    let addrs = t
+        .addresses
+        .iter()
+        .flatten()
+        .filter_map(|a| TargetIpAddr::try_from(a).ok().map(Into::into))
+        .collect::<Vec<_>>();
+
+    let vsock_addr = t.addresses.iter().flatten().find_map(|x| {
+        if let TargetAddrInfo::Vsock(x) = x {
+            Some(*x)
+        } else {
+            None
+        }
+    });
 
     let mut update = TargetUpdateBuilder::new().net_addresses(&addrs);
+
+    if let Some(vsock_addr) = vsock_addr {
+        update = update.vsock_cid(vsock_addr.cid);
+    }
 
     if autoconnect {
         update = update.enable();
@@ -772,23 +810,23 @@ fn handle_discovered_target(
                 _ => panic!("Discovered non-network fastboot interface over mDNS, {interface:?}"),
             },
         ),
-        None => update.discovered(TargetProtocol::Ssh, TargetTransport::Network),
+        None => {
+            if vsock_addr.is_some() {
+                update.discovered(TargetProtocol::Vsock, TargetTransport::Network)
+            } else {
+                update.discovered(TargetProtocol::Ssh, TargetTransport::Network)
+            }
+        }
     };
 
-    if let Some(ffx::TargetAddrInfo::IpPort(ssh_address)) = t.ssh_address {
+    if let Some(ffx::TargetIpAddrInfo::IpPort(ssh_address)) = t.ssh_address {
         update = update.ssh_port(Some(ssh_address.port));
     }
 
-    let mut single_filter = None;
-    let mut both_filter = None;
-
     let filter = if let Some(ref name) = t.nodename {
-        &both_filter.insert([
-            TargetUpdateFilter::NetAddrs(&addrs),
-            TargetUpdateFilter::LegacyNodeName(name),
-        ])[..]
+        &[TargetUpdateFilter::NetAddrs(&addrs), TargetUpdateFilter::LegacyNodeName(name)][..]
     } else {
-        &single_filter.insert([TargetUpdateFilter::NetAddrs(&addrs)])[..]
+        &[TargetUpdateFilter::NetAddrs(&addrs)][..]
     };
 
     tc.update_target(filter, update.build(), true);
@@ -1163,7 +1201,7 @@ mod tests {
             .register_fidl_protocol::<FakeFastboot>()
             .register_fidl_protocol::<TargetCollectionProtocol>()
             .build();
-        let target_addr = TargetAddr::from_str("[::1]:0").unwrap();
+        let target_addr = TargetIpAddr::from_str("[::1]:0").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
@@ -1176,7 +1214,7 @@ mod tests {
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
-        assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
+        assert_eq!(target.addrs().into_iter().next(), Some(target_addr.into()));
     }
 
     #[fuchsia::test]
@@ -1190,7 +1228,7 @@ mod tests {
             .register_fidl_protocol::<FakeFastboot>()
             .register_fidl_protocol::<TargetCollectionProtocol>()
             .build();
-        let target_addr = TargetAddr::from_str("[::1]:0").unwrap();
+        let target_addr = TargetIpAddr::from_str("[::1]:0").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
@@ -1199,7 +1237,7 @@ mod tests {
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
-        assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
+        assert_eq!(target.addrs().into_iter().next(), Some(target_addr.into()));
     }
 
     #[fuchsia::test]
@@ -1213,7 +1251,7 @@ mod tests {
             .register_fidl_protocol::<FakeFastboot>()
             .register_fidl_protocol::<TargetCollectionProtocol>()
             .build();
-        let target_addr = TargetAddr::from_str("[::1]:8022").unwrap();
+        let target_addr = TargetIpAddr::from_str("[::1]:8022").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
@@ -1226,7 +1264,7 @@ mod tests {
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
-        assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
+        assert_eq!(target.addrs().into_iter().next(), Some(target_addr.into()));
     }
 
     #[fuchsia::test]
@@ -1240,7 +1278,7 @@ mod tests {
             .register_fidl_protocol::<FakeFastboot>()
             .register_fidl_protocol::<TargetCollectionProtocol>()
             .build();
-        let target_addr = TargetAddr::from_str("[::1]:8022").unwrap();
+        let target_addr = TargetIpAddr::from_str("[::1]:8022").unwrap();
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
@@ -1249,7 +1287,7 @@ mod tests {
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
-        assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
+        assert_eq!(target.addrs().into_iter().next(), Some(target_addr.into()));
     }
 
     #[fuchsia::test]

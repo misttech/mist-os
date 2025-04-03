@@ -1,0 +1,15 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.location.gnss.types") {
+  sources = [ "gnss_types.fidl" ]
+  sdk_area = "Unknown"
+  sdk_category = "partner"
+
+  # TODO(https://fxbug.dev/396653562): Stabilize the FIDL
+  stable = false
+  public_deps = [ "//zircon/vdso/zx" ]
+}

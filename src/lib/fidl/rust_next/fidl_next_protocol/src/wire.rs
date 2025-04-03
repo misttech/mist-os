@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
+
 use fidl_next_codec::{
-    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64,
+    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64, ZeroPadding,
 };
 
 use zerocopy::IntoBytes;
@@ -22,6 +24,13 @@ pub struct WireMessageHeader {
     pub ordinal: WireU64,
 }
 
+unsafe impl ZeroPadding for WireMessageHeader {
+    #[inline]
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
+        // Wire message headers have no padding
+    }
+}
+
 /// The flag 0 bit indicating that the wire format is v2.
 pub const FLAG_0_WIRE_FORMAT_V2_BIT: u8 = 0b0000_0010;
 
@@ -32,10 +41,14 @@ impl Encodable for WireMessageHeader {
     type Encoded = WireMessageHeader;
 }
 
-impl<E: ?Sized> Encode<E> for WireMessageHeader {
+unsafe impl<E: ?Sized> Encode<E> for WireMessageHeader {
     #[inline]
-    fn encode(&mut self, _: &mut E, mut slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
-        slot.write(*self);
+    fn encode(
+        &mut self,
+        _: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        out.write(*self);
         Ok(())
     }
 }

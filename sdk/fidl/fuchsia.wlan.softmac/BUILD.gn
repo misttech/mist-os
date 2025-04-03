@@ -9,6 +9,7 @@ fidl("fuchsia.wlan.softmac") {
   stable = true
   sdk_area = "WLAN"
   sources = [
+    "features.fidl",
     "overview.fidl",
     "softmac.fidl",
   ]

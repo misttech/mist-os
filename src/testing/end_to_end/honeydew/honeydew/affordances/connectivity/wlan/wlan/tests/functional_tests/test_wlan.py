@@ -86,7 +86,7 @@ class WlanTests(wlan_base_test.WlanBaseTest):
 
             query_resp = self.device.wlan.query_iface(iface_id)
             asserts.assert_equal(query_resp.role, WlanMacRole.CLIENT)
-            asserts.assert_equal(query_resp.id, iface_id)
+            asserts.assert_equal(query_resp.id_, iface_id)
             asserts.assert_equal(query_resp.phy_id, phy_ids[0])
 
             self.device.wlan.destroy_iface(iface_id)

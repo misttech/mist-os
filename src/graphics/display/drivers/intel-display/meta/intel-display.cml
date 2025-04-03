@@ -12,6 +12,7 @@
         binary: "driver/intel-display.so",
         bind: "meta/bind/intel-display-bind.bindbc",
         colocate: "false",
+        allowed_scheduler_roles: [ "fuchsia.graphics.display.drivers.intel-display.interrupt" ],
     },
     use: [
         {

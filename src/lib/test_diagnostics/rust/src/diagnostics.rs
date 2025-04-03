@@ -82,7 +82,7 @@ mod fuchsia {
     #[pin_project]
     pub struct BatchLogStream {
         #[pin]
-        subscription: Subscription<LogsData>,
+        subscription: Subscription,
     }
 
     impl BatchLogStream {

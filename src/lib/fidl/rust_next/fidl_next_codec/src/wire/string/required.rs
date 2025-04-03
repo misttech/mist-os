@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use core::fmt;
+use core::mem::MaybeUninit;
 use core::ops::Deref;
 use core::str::{from_utf8, from_utf8_unchecked};
 
@@ -10,7 +11,7 @@ use munge::munge;
 
 use crate::{
     Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, Slot, TakeFrom,
-    WireVector,
+    WireVector, ZeroPadding,
 };
 
 /// A FIDL string
@@ -19,11 +20,19 @@ pub struct WireString {
     vec: WireVector<u8>,
 }
 
+unsafe impl ZeroPadding for WireString {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { vec } = out);
+        WireVector::<u8>::zero_padding(vec);
+    }
+}
+
 impl WireString {
     /// Encodes that a string is present in a slot.
     #[inline]
-    pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
-        munge!(let Self { vec } = slot);
+    pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
+        munge!(let Self { vec } = out);
         WireVector::encode_present(vec, len);
     }
 
@@ -87,15 +96,15 @@ impl Encodable for String {
     type Encoded = WireString;
 }
 
-impl<E: Encoder + ?Sized> Encode<E> for String {
+unsafe impl<E: Encoder + ?Sized> Encode<E> for String {
     #[inline]
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         encoder.write(self.as_bytes());
-        WireString::encode_present(slot, self.len() as u64);
+        WireString::encode_present(out, self.len() as u64);
         Ok(())
     }
 }

@@ -11,31 +11,36 @@ use log::warn;
 use std::sync::Arc;
 use zx::{AsHandleRef, Task};
 
-/// The signal that the runner raises when handing over an event to the kernel.
-pub const RUNNER_SIGNAL: zx::Signals = zx::Signals::USER_0;
-
-/// The signal that the kernel raises to indicate that a message has been handled.
-pub const KERNEL_SIGNAL: zx::Signals = zx::Signals::USER_1;
-
 /// The signal that the kernel raises to indicate that it's awake.
 pub const AWAKE_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
 /// The signal that the kernel raises to indicate that it's suspended.
 pub const ASLEEP_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
-pub struct ResumeEvent {
-    pub event: zx::EventPair,
-    pub name: String,
+pub struct WakeSource {
+    counter: zx::Counter,
+    name: String,
 }
 
-#[derive(Default)]
-pub struct ResumeEvents {
-    pub events: std::collections::HashMap<zx::Koid, ResumeEvent>,
+impl WakeSource {
+    pub fn new(counter: zx::Counter, name: String) -> Self {
+        Self { counter, name }
+    }
+
+    fn as_wait_item(&self) -> zx::WaitItem<'_> {
+        zx::WaitItem {
+            handle: self.counter.as_handle_ref(),
+            waitfor: zx::Signals::COUNTER_POSITIVE,
+            pending: zx::Signals::empty(),
+        }
+    }
 }
+
+pub type WakeSources = std::collections::HashMap<zx::Koid, WakeSource>;
 
 #[derive(Default)]
 pub struct SuspendContext {
-    pub resume_events: Arc<Mutex<ResumeEvents>>,
+    pub wake_sources: Arc<Mutex<WakeSources>>,
     pub wake_watchers: Arc<Mutex<Vec<zx::EventPair>>>,
 }
 
@@ -103,16 +108,9 @@ pub async fn suspend_container(
     }
     kernels.drop_wake_lease(&container_job)?;
 
-    let resume_events = suspend_context.resume_events.lock();
-    let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
-        .events
-        .iter()
-        .map(|(_koid, event)| zx::WaitItem {
-            handle: event.event.as_handle_ref(),
-            waitfor: RUNNER_SIGNAL,
-            pending: zx::Signals::empty(),
-        })
-        .collect();
+    let wake_sources = suspend_context.wake_sources.lock();
+    let mut wait_items: Vec<zx::WaitItem<'_>> =
+        wake_sources.iter().map(|(_, w)| w.as_wait_item()).collect();
 
     // TODO: We will likely have to handle a larger number of wake sources in the
     // future, at which point we may want to consider a Port-based approach. This
@@ -133,9 +131,9 @@ pub async fn suspend_container(
 
     let mut resume_reason: Option<String> = None;
     for wait_item in &wait_items {
-        if wait_item.pending.contains(RUNNER_SIGNAL) {
+        if wait_item.pending.contains(zx::Signals::COUNTER_POSITIVE) {
             let koid = wait_item.handle.get_koid().unwrap();
-            if let Some(event) = resume_events.events.get(&koid) {
+            if let Some(event) = wake_sources.get(&koid) {
                 log::info!("Woke container from sleep for: {}", event.name);
                 resume_reason = Some(event.name.clone());
             }

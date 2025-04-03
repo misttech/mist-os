@@ -61,14 +61,19 @@ zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_ha
 
 __EXPORT
 zx_status_t fdio_ns_service_connect(fdio_ns_t* ns, const char* path, zx_handle_t request) {
-  // TODO(https://fxbug.dev/376575307): Migrate to fdio_ns_open3 when we no longer have callers of
-  // this method that open directories. Some existing callers of this method assume the availability
-  // of certain operations on the resulting connection that used to be unprivileged. Callers should
-  // use fdio_ns_open3 directly to open directories instead of connect.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // TODO(https://fxbug.dev/324080864): We have some CTF tests built with older versions of the
+  // driver framework that incorrectly used this function to open the service directory. They now
+  // use `fdio_ns_open3` directly with the correct flags (PERM_READABLE). We can remove this
+  // conditional when we drop support for the simulate-scan-wlan-hw-sim CTF tests archived prior to
+  // API level 23.
+  if (path && std::string_view(path) == "/svc") {
+    return fdio_ns_open3(ns, path, uint64_t{fio::wire::kPermReadable}, request);
+  }
+  return fdio_ns_open3(ns, path, uint64_t{fio::Flags::kProtocolService}, request);
+#else
   return fdio_ns_open(ns, path, 0, request);
-#pragma clang diagnostic pop
+#endif
 }
 
 __EXPORT

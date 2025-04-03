@@ -108,9 +108,6 @@ rustc_library("openthread") {
 
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_unittest_package("openthread-rust-tests") {

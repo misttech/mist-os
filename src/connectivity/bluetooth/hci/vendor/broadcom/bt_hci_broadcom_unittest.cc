@@ -4,6 +4,7 @@
 
 #include "bt_hci_broadcom.h"
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/async/cpp/task.h>
@@ -13,9 +14,12 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/cpp/completion.h>
+
+#include <algorithm>
 
 #include <gtest/gtest.h>
 
@@ -206,9 +210,24 @@ class TestEnvironment : fdf_testing::Environment {
     }
   }
 
-  zx_status_t SetMetadata(uint32_t name, const std::vector<uint8_t>& data, const size_t size) {
-    // Serve metadata.
-    return device_server_.AddMetadata(name, data.data(), size);
+  zx_status_t SetMacAddressMetadata(std::vector<uint8_t> mac_address_octets) {
+    zx_status_t status = device_server_.AddMetadata(
+        DEVICE_METADATA_MAC_ADDRESS, mac_address_octets.data(), mac_address_octets.size());
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    if (mac_address_octets.size() == 6) {
+      std::array<uint8_t, 6> mac_address_octets_copy;
+      std::ranges::copy(mac_address_octets, mac_address_octets_copy.begin());
+      fuchsia_boot_metadata::MacAddressMetadata metadata{{.mac_address{mac_address_octets_copy}}};
+      zx::result result = mac_address_metadata_server_.SetMetadata(metadata);
+      if (result.is_error()) {
+        return result.status_value();
+      }
+    }
+
+    return ZX_OK;
   }
 
   FakeTransportDevice transport_device_;
@@ -217,6 +236,8 @@ class TestEnvironment : fdf_testing::Environment {
   compat::DeviceServer device_server_;
   fbl::RefPtr<fs::PseudoDir> firmware_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
   fs::SynchronousVfs firmware_server_;
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
+      mac_address_metadata_server_;
 };
 
 class FixtureConfig final {
@@ -242,10 +263,11 @@ class BtHciBroadcomTest : public ::testing::Test {
         [&](TestEnvironment& env) { env.AddFirmwareFile(firmware); });
   }
 
-  void SetMetadata(uint32_t name = DEVICE_METADATA_MAC_ADDRESS,
-                   const std::vector<uint8_t> data = kMacAddress, const size_t size = kMacAddrLen) {
-    ASSERT_EQ(ZX_OK, driver_test().RunInEnvironmentTypeContext<zx_status_t>(
-                         [&](TestEnvironment& env) { return env.SetMetadata(name, data, size); }));
+  void SetMacAddressMetadata(std::vector<uint8_t> mac_address_octets = kMacAddress) {
+    ASSERT_EQ(ZX_OK,
+              driver_test().RunInEnvironmentTypeContext<zx_status_t>([&](TestEnvironment& env) {
+                return env.SetMacAddressMetadata(std::move(mac_address_octets));
+              }));
   }
 
   void OpenVendor() {
@@ -282,7 +304,7 @@ class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
   void SetUp() override {
     BtHciBroadcomTest::SetUp();
     SetFirmware();
-    SetMetadata();
+    SetMacAddressMetadata();
     ASSERT_TRUE(driver_test().StartDriver().is_ok());
     OpenVendor();
   }
@@ -310,7 +332,7 @@ TEST_F(BtHciBroadcomInitializedTest, HciTransportOpenTwice) {
 
 TEST_F(BtHciBroadcomTest, ReportLoadFirmwareError) {
   // Ensure reading metadata succeeds.
-  SetMetadata();
+  SetMacAddressMetadata();
 
   // No firmware has been set, so load_firmware() should fail during initialization.
   ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_NOT_FOUND);
@@ -318,7 +340,7 @@ TEST_F(BtHciBroadcomTest, ReportLoadFirmwareError) {
 
 TEST_F(BtHciBroadcomTest, TooSmallFirmwareBuffer) {
   // Ensure reading metadata succeeds.
-  SetMetadata();
+  SetMacAddressMetadata();
 
   SetFirmware(std::vector<uint8_t>{0x00});
   ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_INTERNAL);
@@ -331,7 +353,7 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanEventHeader) {
   });
 
   SetFirmware();
-  SetMetadata();
+  SetMacAddressMetadata();
   ASSERT_NE(driver_test().StartDriver().status_value(), ZX_OK);
 }
 
@@ -342,14 +364,14 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanCommandComplete) {
   });
 
   SetFirmware();
-  SetMetadata();
+  SetMacAddressMetadata();
   ASSERT_FALSE(driver_test().StartDriver().is_ok());
 }
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
   // Set an invalid mac address in the metadata so that a ReadBdaddr command is sent to get
   // fallback address.
-  SetMetadata(DEVICE_METADATA_MAC_ADDRESS, kMacAddress, kMacAddress.size() - 1);
+  SetMacAddressMetadata({kMacAddress.begin(), kMacAddress.end() - 1});
   //  Respond to ReadBdaddr command with a command complete (which doesn't include the bdaddr).
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.transport_device_.SetCustomizedReply(std::vector<uint8_t>(
@@ -364,7 +386,7 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
 }
 
 TEST_F(BtHciBroadcomTest, SendsPowerCapWhenNeeded) {
-  SetMetadata();
+  SetMacAddressMetadata();
   //  Respond to SetInfo command with a controller needing PowerCap
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.transport_device_.SetSerialPid(PDEV_PID_BCM4381A1); });
@@ -381,7 +403,7 @@ TEST_F(BtHciBroadcomTest, SendsPowerCapWhenNeeded) {
 
 TEST_F(BtHciBroadcomTest, VendorProtocolUnknownMethod) {
   SetFirmware();
-  SetMetadata();
+  SetMacAddressMetadata();
   ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   OpenVendorWithHciTransportClient();

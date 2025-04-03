@@ -24,7 +24,7 @@ impl Fixture {
         let entries = vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-        let file = open_file_with_flags(&dir, rights, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, rights, TEST_FILE).await;
 
         Some(Self { _harness: harness, dir, file })
     }
@@ -142,7 +142,7 @@ async fn file_link_into_target_unlinked_dir() {
         return;
     };
 
-    let target_dir = open_dir_with_flags(
+    let target_dir = deprecated_open_dir_with_flags(
         &fixture.dir,
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         "dir",
@@ -179,7 +179,7 @@ async fn unnamed_temporary_file_can_link_into_named_file() {
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let temporary_file = dir
-        .open3_node::<fio::FileMarker>(
+        .open_node::<fio::FileMarker>(
             ".",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -188,7 +188,7 @@ async fn unnamed_temporary_file_can_link_into_named_file() {
             None,
         )
         .await
-        .expect("open3 failed to open unnamed temporary file");
+        .expect("open failed to open unnamed temporary file");
     temporary_file
         .write(CONTENTS)
         .await
@@ -216,7 +216,7 @@ async fn unlinkable_unnamed_temporary_should_fail_link_into() {
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let temporary_file = dir
-        .open3_node::<fio::FileMarker>(
+        .open_node::<fio::FileMarker>(
             ".",
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -225,7 +225,7 @@ async fn unlinkable_unnamed_temporary_should_fail_link_into() {
             None,
         )
         .await
-        .expect("open3 failed to open unnamed temporary file");
+        .expect("open failed to open unnamed temporary file");
 
     let token = get_token(&dir).await.into();
 

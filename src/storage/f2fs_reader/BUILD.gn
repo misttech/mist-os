@@ -1,0 +1,56 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("lib") {
+  name = "f2fs_reader"
+  edition = "2021"
+  with_unit_tests = true
+  sources = [
+    "src/checkpoint.rs",
+    "src/crypto.rs",
+    "src/crypto/direntry.rs",
+    "src/crypto/hkdf.rs",
+    "src/dir.rs",
+    "src/inode.rs",
+    "src/lib.rs",
+    "src/nat.rs",
+    "src/reader.rs",
+    "src/superblock.rs",
+    "src/xattr.rs",
+  ]
+  deps = [
+    "//src/storage/lib/storage_device",
+    "//third_party/rust_crates:aes",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:cbc",
+    "//third_party/rust_crates:enumn",
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:siphasher",
+    "//third_party/rust_crates:zerocopy",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//src/storage/f2fs_reader/testdata:images",
+    "//third_party/rust_crates:zstd",
+    "//third_party/zstd",
+  ]
+}
+
+fuchsia_unittest_package("f2fs-reader-tests") {
+  deps = [ ":lib_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":f2fs-reader-tests" ]
+}

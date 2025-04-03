@@ -82,6 +82,18 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       boot_items_.SetBoardName(*request.args().board_name());
     }
 
+    if (request.args().devicetree().has_value()) {
+      boot_items_.SetDeviceTree(std::move(*request.args().devicetree()));
+    }
+
+    if (request.args().platform_vid().has_value()) {
+      boot_items_.SetVid(std::move(*request.args().platform_vid()));
+    }
+
+    if (request.args().platform_pid().has_value()) {
+      boot_items_.SetPid(std::move(*request.args().platform_pid()));
+    }
+
     zx::result result = outgoing_->AddUnmanagedProtocol<fuchsia_boot::Items>(
         [this, tunnel_boot_items =
                    config_.tunnel_boot_items()](fidl::ServerEnd<fuchsia_boot::Items> server_end) {

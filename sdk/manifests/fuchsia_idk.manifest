@@ -64,6 +64,7 @@ cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
 cc_source_library://pkg/driver_fake_bti_cpp
+cc_source_library://pkg/driver_fake_gpio_cpp (unstable)
 cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
@@ -251,7 +252,7 @@ fidl_library://fidl/fuchsia.factory
 fidl_library://fidl/fuchsia.factory.wlan
 fidl_library://fidl/fuchsia.feedback
 fidl_library://fidl/fuchsia.fonts
-fidl_library://fidl/fuchsia.gnss.types (unstable)
+fidl_library://fidl/fuchsia.location.gnss.types (unstable)
 fidl_library://fidl/fuchsia.gpu.agis
 fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
@@ -426,7 +427,6 @@ host_tool://tools/arm64/fidlgen_cpp
 host_tool://tools/arm64/fidlgen_hlcpp
 host_tool://tools/arm64/fidlgen_rust
 host_tool://tools/arm64/fssh
-host_tool://tools/arm64/fuchsia-sdk-run
 host_tool://tools/arm64/funnel
 host_tool://tools/arm64/fvm
 host_tool://tools/arm64/gen-android-starnix-container
@@ -454,7 +454,6 @@ host_tool://tools/x64/fidlgen_cpp
 host_tool://tools/x64/fidlgen_hlcpp
 host_tool://tools/x64/fidlgen_rust
 host_tool://tools/x64/fssh
-host_tool://tools/x64/fuchsia-sdk-run
 host_tool://tools/x64/funnel
 host_tool://tools/x64/fvm
 host_tool://tools/x64/gen-android-starnix-container

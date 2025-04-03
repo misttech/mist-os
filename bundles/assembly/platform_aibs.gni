@@ -31,6 +31,8 @@ bootstrap_user_platform_aib_names = [
 
   # Driver Framework
   "driver_framework",
+  "driver_host_cpp",
+  "driver_host_rust",
 
   # Power
   "legacy_power_framework",
@@ -60,6 +62,7 @@ bootstrap_user_platform_aib_names = [
   "fshost_fvm_fxfs",
   "fshost_fvm_minfs",
   "fshost_fvm_minfs_migration",
+  "fshost_non_eng",
   "fshost_storage",
   "paver_legacy",
 
@@ -109,6 +112,12 @@ bootstrap_userdebug_platform_aib_names = [
   # Trusted application support.
   "trusted_execution_environment",
 
+  # Timekeeper
+  # Gives timekeeper some mutable persistent storage. This is optionally
+  # used (1) in tests; and (2) on specific platforms that need
+  # persistence for RTC functionality.
+  "timekeeper_persistence",
+
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
 ]
@@ -137,6 +146,7 @@ bootstrap_eng_platform_aib_names = [
   "power_test_platform_drivers",
 
   # Storage
+  "fshost_eng",
   "fshost_storage_host_fxfs",
   "fshost_storage_host_gpt_fvm_minfs",
   "fshost_storage_host_fvm_minfs",
@@ -332,8 +342,8 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          # Needed by both eng and userdebug products, but contains things disallowed in
                          # user.
                          "adb_support",
+                         "bluetooth_hfp_hf",
                          "core_realm_development_access",
-                         "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
                          "core_realm_development_access_userdebug",
                          "session_manager_enable_pkg_cache",
@@ -404,9 +414,6 @@ eng_only_platform_aib_names =
       # Example AIB
       "example_assembly_bundle",
 
-      # Gives timekeeper some mutable persistent storage.
-      "timekeeper_persistence",
-
       # Topology test support
       "topology_test_daemon",
 
@@ -442,6 +449,7 @@ required_user_aib_names = [
   "core_realm",
   "core_realm_user_and_userdebug",
   "driver_framework",
+  "driver_host_cpp",
   "legacy_power_framework",
   "zircon",
 ]
@@ -451,25 +459,42 @@ required_userdebug_aib_names = required_user_aib_names + [
                                  "bootstrap_userdebug",
                                ]
 
+# An allowlist of experimental AIBs.
+#
 # If an AIB is added to this experimental list, it does not require security
 # review, but will be banned from user builds. These AIBs may still be used
 # on userdebug builds as long as scrutiny is not run on those builds.
+#
+# NOTE: This is an allowlist only. To include your AIB,  you must also add it
+# to the appropriate AIB list above.
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
+
+  # Bluetooth
+  # Bluetooth phone calling as the Hands Free role. Currently in development.
+  "bluetooth_hfp_hf",
+
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
 
+  "session_manager_enable_pkg_cache",
+
+  "sensors_framework_eng",
+
+  # Timekeeper
+  # Gives timekeeper some mutable persistent storage. This is optionally
+  # used (1) in tests; and (2) on specific platforms that need
+  # persistence for RTC functionality.
+  "timekeeper_persistence",
+
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
 
   "trusted_execution_environment",
-  "session_manager_enable_pkg_cache",
-
-  "sensors_framework_eng",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

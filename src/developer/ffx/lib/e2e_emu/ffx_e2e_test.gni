@@ -27,6 +27,9 @@ template("ffx_e2e_test") {
   _amber_files_label = "//build/images/updates:publish($default_toolchain)"
   _amber_files_path = "$root_build_dir/amber-files"
 
+  _symbol_index_label = "//src/developer/ffx/lib/symbol-index:symbol_index_json($default_toolchain)"
+  _symbol_index_path = "$root_build_dir/.symbol-index.json"
+
   # Default product bundle containing emulator image.
   _pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
   if (defined(invoker.product_bundle)) {
@@ -44,6 +47,7 @@ template("ffx_e2e_test") {
     data_deps = [
       ":$_host_test_data_label",
       "//src/developer/ffx:suite_test_data",
+      _symbol_index_label,
     ]
     if (defined(invoker.data_deps)) {
       data_deps += invoker.data_deps
@@ -53,6 +57,8 @@ template("ffx_e2e_test") {
       "env PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir),
       "env PACKAGE_REPOSITORY_PATH=" +
           rebase_path(_amber_files_path, root_build_dir),
+      "env SYMBOL_INDEX_PATH=" +
+          rebase_path(_symbol_index_path, root_build_dir),
     ]
 
     if (defined(invoker.env)) {

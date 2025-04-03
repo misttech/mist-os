@@ -24,7 +24,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
             (bytearray([1, 0, 0, 0]), []),
         ]
         # The proxy here really doesn't matter, we're trying to access internal methods.
-        proxy = ffx.Echo.Client(channel)
+        proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
         proxy.pending_txids.add(2)
         proxy.channel_waker.handle_ready_queues = {}
@@ -47,7 +47,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
             ZxStatus(ZxStatus.ZX_ERR_SHOULD_WAIT),
             (bytearray([1, 0, 0, 0]), []),
         ]
-        proxy = ffx.Echo.Client(channel)
+        proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
         proxy.channel_waker.handle_ready_queues = {}
         proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()
@@ -66,7 +66,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
             ZxStatus(ZxStatus.ZX_ERR_SHOULD_WAIT),
             ZxStatus(ZxStatus.ZX_ERR_SHOULD_WAIT),
         ]
-        proxy = ffx.Echo.Client(channel)
+        proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
         proxy.channel_waker.handle_ready_queues = {}
         proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()
@@ -82,7 +82,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         channel.__class__ = Channel
         channel.as_int.return_value = 0
         channel.read.side_effect = [(bytearray([1, 0, 0, 0]), ())]
-        proxy = ffx.Echo.Client(channel)
+        proxy = ffx.EchoClient(channel)
         proxy.channel_waker.handle_ready_queues = {}
         proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()
         proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
@@ -94,7 +94,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
-        proxy = ffx.Echo.Client(channel)
+        proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
         proxy._stage_message(1, (bytearray([1, 2, 3]), []))
         self.assertEqual(len(proxy.staged_messages), 1)

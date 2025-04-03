@@ -153,7 +153,8 @@ python_library("honeydew_no_testonly") {
   # Ensure all FIDL dependencies meet the compatibility and stability
   # requirements.
   # There are currently exceptions for host tests: https://fxbug.dev/326090508.
-  assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
+  # Host tests in the IDK can depend on SDK categories up to "host_tool".
+  assert_no_deps = markers_partner_idk_host_tools_must_not_depend_on
 }
 
 # FIDL dependencies that will be used in Honeydew using Fuchsia-Controller.

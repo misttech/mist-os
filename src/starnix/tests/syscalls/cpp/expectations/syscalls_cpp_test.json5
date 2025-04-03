@@ -43,7 +43,7 @@
                 "SocketFault/SocketFault.WriteV/2",
 
                 // TODO(https://fxbug.dev/307595538)
-                "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/[01]",
+                "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/*",
 
                 // TODO(https://fxbug.dev/328270498)
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Execute",

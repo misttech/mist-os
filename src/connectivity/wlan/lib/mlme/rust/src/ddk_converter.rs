@@ -6,8 +6,8 @@ use crate::WlanSoftmacBandCapabilityExt as _;
 use anyhow::format_err;
 use std::fmt::Display;
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
 };
 
 #[macro_export]
@@ -30,10 +30,10 @@ pub fn softmac_key_configuration_from_mlme(
             key_descriptor.cipher_suite_type,
         ) as u8),
         key_type: Some(match key_descriptor.key_type {
-            fidl_mlme::KeyType::Pairwise => fidl_common::WlanKeyType::Pairwise,
-            fidl_mlme::KeyType::PeerKey => fidl_common::WlanKeyType::Peer,
-            fidl_mlme::KeyType::Igtk => fidl_common::WlanKeyType::Igtk,
-            fidl_mlme::KeyType::Group => fidl_common::WlanKeyType::Group,
+            fidl_mlme::KeyType::Pairwise => fidl_ieee80211::KeyType::Pairwise,
+            fidl_mlme::KeyType::PeerKey => fidl_ieee80211::KeyType::Peer,
+            fidl_mlme::KeyType::Igtk => fidl_ieee80211::KeyType::Igtk,
+            fidl_mlme::KeyType::Group => fidl_ieee80211::KeyType::Group,
         }),
         peer_addr: Some(key_descriptor.address),
         key_idx: Some(key_descriptor.key_id as u8),
@@ -125,6 +125,7 @@ pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_wlan_common as fidl_common;
 
     fn empty_rx_info() -> fidl_softmac::WlanRxInfo {
         fidl_softmac::WlanRxInfo {

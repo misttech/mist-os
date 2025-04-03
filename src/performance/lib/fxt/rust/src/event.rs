@@ -91,7 +91,7 @@ pub struct RawEventRecord<'a> {
     process: ProcessRef,
     thread: ThreadRef,
     category: StringRef<'a>,
-    name: StringRef<'a>,
+    pub name: StringRef<'a>,
     pub args: Vec<RawArg<'a>>,
     payload: EventPayload<Ticks>,
 }
@@ -187,6 +187,11 @@ impl<'a> RawEventRecord<'a> {
             }
         }
         Ok(event_record.build())
+    }
+
+    pub fn set_flow_step_payload(&mut self, id: u64) {
+        self.event_type = FLOW_STEP_EVENT_TYPE;
+        self.payload = EventPayload::FlowStep { id };
     }
 }
 

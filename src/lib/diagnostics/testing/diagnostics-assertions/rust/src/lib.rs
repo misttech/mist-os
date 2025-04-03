@@ -32,7 +32,7 @@ pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
     fn get_json(&self) -> String {
         let mut tree = self.get_diagnostics_hierarchy();
         tree.to_mut().sort();
-        serde_json::to_string(&tree).expect("pretty json string")
+        serde_json::to_string(&tree).expect("json string")
     }
 }
 
@@ -199,10 +199,10 @@ macro_rules! tree_assertion {
 ///         sub: AnyProperty,   // only verify that `sub` is a property of `key`
 ///         sub2: "sub2_value",
 ///         child1: {
-///             child1_sub: 10i64,
+///             child1_sub: 10,
 ///         },
 ///         child2: {
-///             child2_sub: 20u64,
+///             child2_sub: 20,
 ///         },
 ///     }
 /// );
@@ -271,24 +271,24 @@ macro_rules! assert_json_diff {
         let actual = actual_hierarchy.get_pretty_json();
 
         if actual != expected {
-            panic!("{}", $crate::line_diff(&expected, &actual));
+            panic!("{}", $crate::Diff::from_text(&expected, &actual));
         }
     }}
 }
 
-#[doc(hidden)]
-pub fn line_diff(expected: &str, actual: &str) -> Changeset {
-    Changeset::new(expected, actual, "\n")
-}
-
 /// A difference between expected and actual output.
-struct Diff(Changeset);
+pub struct Diff(Changeset);
 
 impl Diff {
     fn new(expected: &dyn Debug, actual: &dyn Debug) -> Self {
         let expected = format!("{:#?}", expected);
         let actual = format!("{:#?}", actual);
-        Diff(Changeset::new(&expected, &actual, "\n"))
+        Self::from_text(&expected, &actual)
+    }
+
+    #[doc(hidden)]
+    pub fn from_text(expected: &str, actual: &str) -> Self {
+        Diff(Changeset::new(expected, actual, "\n"))
     }
 }
 
@@ -444,6 +444,22 @@ macro_rules! impl_property_assertion {
                 }
             }
         )+
+    };
+
+    ($prop_variant:ident, $cast:ty; $($ty:ty),+) => {
+        $(
+            impl<K> PropertyAssertion<K> for $ty {
+                fn run(&self, actual: &Property<K>) -> Result<(), Error> {
+                    if let Property::$prop_variant(_key, value, ..) = actual {
+                        eq_or_bail!(*self as $cast, *value);
+                    } else {
+                        return Err(format_err!("expected {}, found {}",
+                            stringify!($prop_variant), actual.discriminant_name()));
+                    }
+                    Ok(())
+                }
+            }
+        )+
     }
 }
 
@@ -549,9 +565,9 @@ macro_rules! impl_array_properties_assertion {
 
 impl_property_assertion!(String, &str, String);
 impl_property_assertion!(Bytes, Vec<u8>);
-impl_property_assertion!(Uint, u64);
-impl_property_assertion!(Int, i64);
-impl_property_assertion!(Double, f64);
+impl_property_assertion!(Uint, u64; u64, u32, u16, u8);
+impl_property_assertion!(Int, i64; i64, i32, i16, i8);
+impl_property_assertion!(Double, f64; f64, f32);
 impl_property_assertion!(Bool, bool);
 impl_array_properties_assertion!(DoubleArray, f64);
 impl_array_properties_assertion!(IntArray, i64);
@@ -844,10 +860,10 @@ mod tests {
             sub: "sub_value",
             sub2: "sub2_value",
             child1: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             },
             child2: {
-                child2_sub: 20u64,
+                child2_sub: 20,
             },
         });
     }
@@ -868,10 +884,10 @@ mod tests {
             sb: "sub_value",
             sub2: "sub2_value",
             child: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             },
             child3: {
-                child2_sub: 20u64,
+                child2_sub: 20,
             },
         });
     }
@@ -892,7 +908,7 @@ mod tests {
             sub: "sub_value",
             sub2: "sub2_value",
             child1: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             },
             child2: {
                 child2_sub: 20u64,
@@ -918,10 +934,10 @@ mod tests {
             sub: "sub_value",
             sub2: "sub2_value",
             child1: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             },
             child3: {
-                child2_sub: 20u64,
+                child2_sub: 20,
             },
         });
     }
@@ -934,10 +950,10 @@ mod tests {
             sub: "sub_value",
             sub2: "sub2_value",
             child1: {
-                child2_sub: 10i64,
+                child2_sub: 10,
             },
             child2: {
-                child2_sub: 20u64,
+                child2_sub: 20,
             },
         });
     }
@@ -969,7 +985,7 @@ mod tests {
             sub: "sub_value",
             sub2: "sub2_value",
             child1: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             },
         });
     }
@@ -1185,7 +1201,7 @@ mod tests {
         let diagnostics_hierarchy = complex_tree();
         let child1 = tree_assertion!(
             child1: {
-                child1_sub: 10i64,
+                child1_sub: 10,
             }
         );
         assert_data_tree!(diagnostics_hierarchy, key: {
@@ -1230,7 +1246,7 @@ mod tests {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
-                prop: 10i64
+                prop: 10
             }
         });
     }
@@ -1241,7 +1257,7 @@ mod tests {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
-                prop: 20i64
+                prop: 20
             }
         });
     }
@@ -1252,10 +1268,10 @@ mod tests {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
-                prop: 10i64,
+                prop: 10,
             },
             child: {
-                prop: 20i64,
+                prop: 20,
             },
         });
     }
@@ -1626,13 +1642,13 @@ mod tests {
     }
 
     #[test]
-    fn test_line_diff() {
+    fn test_diff_from_text() {
         let original = "foo\nbar\nbaz";
         let update = "foo\nbaz\nqux";
 
-        let changeset = line_diff(original, update);
+        let changeset = Diff::from_text(original, update);
         assert_eq!(
-            changeset.diffs,
+            changeset.0.diffs,
             vec![
                 Same("foo".to_string()),
                 Rem("bar".to_string()),

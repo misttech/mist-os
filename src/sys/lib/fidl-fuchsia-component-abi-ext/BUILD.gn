@@ -18,7 +18,6 @@ rustc_library("fidl-fuchsia-component-abi-ext") {
     "//third_party/rust_crates:thiserror",
   ]
   test_deps = [
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/versioning/version-history/rust/data",
     "//src/storage/lib/vfs/rust:vfs",

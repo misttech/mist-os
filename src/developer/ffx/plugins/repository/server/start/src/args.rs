@@ -6,7 +6,7 @@ use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use core::net::Ipv6Addr;
 use ffx_core::ffx_command;
-use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
+use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 

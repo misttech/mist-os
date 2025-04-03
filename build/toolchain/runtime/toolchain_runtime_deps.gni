@@ -110,6 +110,7 @@ template("_define_runtime_group") {
 
   _binaries = []
   _distribution_entries = []
+  _debug_symbol_files = []
 
   if (_entry != false) {
     # Add all runtime libraries for this entry to metadata.binaries even
@@ -125,12 +126,42 @@ template("_define_runtime_group") {
           dist = _dist_file
           if (defined(lib.debug)) {
             debug = "${_rebased_lib_dir}/${lib.debug}"
-            if (output_breakpad_syms) {
+            if (defined(lib.breakpad)) {
               breakpad = "${_rebased_lib_dir}/${lib.breakpad}"
             }
           }
         },
       ]
+
+      if (defined(lib.debug)) {
+        # Compute build-id from lib.debug if possible. Look for ..../.build-id/xx/yyyyyy.debug
+        _build_id = ""
+        _lib_debug_nosuffix = string_replace(lib.debug, ".debug", "")
+        _has_debug_suffix = _lib_debug_nosuffix != lib.debug
+        if (_has_debug_suffix) {
+          _build_id_list = []
+          _build_id_list = string_split(_lib_debug_nosuffix, ".build-id/")
+          _is_under_build_id = _build_id_list != [ _lib_debug_nosuffix ]
+          if (_is_under_build_id) {
+            _build_id = _build_id_list[1]
+            _build_id = string_replace(_build_id, "/", "")
+          }
+        }
+        _debug_symbol_files += [
+          {
+            cpu = current_cpu
+            os = current_os
+            label = _label
+            debug = "${_rebased_lib_dir}/${lib.debug}"
+            if (_build_id != "") {
+              elf_build_id = _build_id
+            }
+            if (defined(lib.breakpad)) {
+              breakpad = "${_rebased_lib_dir}/${lib.breakpad}"
+            }
+          },
+        ]
+      }
 
       # On the other hand, only add entries to metadata.distribution_entries
       # for the libraries that really need to be packaged into dependent
@@ -163,8 +194,14 @@ template("_define_runtime_group") {
                              "visibility",
                            ])
     metadata = {
+      # Used by //:binaries build API module
       binaries = _binaries
+
+      # Used by distribution_manifest() template.
       distribution_entries = _distribution_entries
+
+      # Used by //:debug_symbols build API module.
+      debug_symbol_files = _debug_symbol_files
     }
   }
 }

@@ -189,8 +189,6 @@ mod tests {
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
     };
     use futures::StreamExt;
-    use vfs::directory::entry_container::Directory;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::tree_builder::TreeBuilder;
 
@@ -237,22 +235,12 @@ mod tests {
         contents: &'static str,
         name2: &'static str,
         contents2: &'static [u8],
-    ) -> Result<fio::DirectoryProxy, Error> {
+    ) -> fio::DirectoryProxy {
         let mut tree = TreeBuilder::empty_dir();
         tree.add_entry(&name.split("/").collect::<Vec<&str>>(), read_only(contents)).unwrap();
         tree.add_entry(&name2.split("/").collect::<Vec<&str>>(), read_only(contents2)).unwrap();
         let test_dir = tree.build();
-
-        let (test_dir_proxy, test_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        test_dir.open(
-            ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            test_dir_service.into_channel().into(),
-        );
-
-        Ok(test_dir_proxy)
+        vfs::directory::serve_read_only(test_dir)
     }
 
     async fn items_mock(handles: LocalComponentHandles) -> Result<(), Error> {
@@ -285,8 +273,7 @@ mod tests {
                 ALPHA_TXT_FILE_CONTENTS,
                 ALPHA_BIN_FILE_NAME,
                 ALPHA_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }
@@ -305,8 +292,7 @@ mod tests {
                 CAST_TXT_FILE_CONTENTS,
                 CAST_BIN_FILE_NAME,
                 CAST_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }
@@ -322,8 +308,7 @@ mod tests {
                 MISC_TXT_FILE_CONTENTS,
                 MISC_BIN_FILE_NAME,
                 MISC_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }
@@ -341,8 +326,7 @@ mod tests {
                 PLAYREADY_TXT_FILE_CONTENTS,
                 PLAYREADY_BIN_FILE_NAME,
                 PLAYREADY_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }
@@ -358,8 +342,7 @@ mod tests {
                 WEAVE_TXT_FILE_CONTENTS,
                 WEAVE_BIN_FILE_NAME,
                 WEAVE_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }
@@ -375,8 +358,7 @@ mod tests {
                 WIDEVINE_TXT_FILE_CONTENTS,
                 WIDEVINE_BIN_FILE_NAME,
                 WIDEVINE_BIN_FILE_CONTENTS,
-            )
-            .unwrap();
+            );
             proxy.clone(dir.into_channel().into()).unwrap();
         }
     }

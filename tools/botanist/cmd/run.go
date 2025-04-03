@@ -169,7 +169,12 @@ func (r *RunCommand) setupFFX(ctx context.Context, invokeMode ffxutil.FFXInvokeM
 			"ffx.target-list.local-connect": true,
 		},
 	}
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, invokeMode, extraConfigs)
+	// By default, the ssh.priv and ssh.pub values are in $HOME, which had earlier been configured to be a tmpdir.
+	// But in case we're in strict mode, let's be explicit about the path. If there is no pub key, when we will
+	// let the FFXInstance specify the default
+	sshPriv := filepath.Join(os.Getenv("HOME"), ".ssh", "fuchsia_ed25519")
+	sshKeys := ffxutil.SSHInfo{SshPriv: sshPriv}
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", &sshKeys, ffxOutputsDir, invokeMode, extraConfigs)
 	if err != nil {
 		return nil, cleanup, err
 	}
@@ -433,14 +438,8 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	sshKey, err := ffx.GetSshPrivateKey(ctx)
-	if err != nil {
-		return fmt.Errorf("Cannot get ssh private key path. Reason: %s", err)
-	}
-	authorizedKey, err := ffx.GetSshAuthorizedKeys(ctx)
-	if err != nil {
-		return fmt.Errorf("Cannot get authorized key path. Reason: %s", err)
-	}
+	sshKey := ffx.GetSshPrivateKey()
+	authorizedKey := ffx.GetSshAuthorizedKeys()
 
 	// Parse targets out from the target configuration file.
 	baseTargets, fuchsiaTargets, err := r.deriveTargetsFromFile(ctx, targets.Options{

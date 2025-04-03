@@ -384,6 +384,17 @@ def main() -> int:
             for path in sorted_extra_ninja_build_inputs:
                 print(f"  {path}")
 
+        # Write the set of extra inputs to a file, this is used to ensure
+        # that `fx bazel` can invoke regenerator if any of these changes,
+        # independent of Ninja-related changes.
+        log2("- Writing regenerator_inputs.txt")
+        regenerator_inputs_path = (
+            regenerator_outputs_dir / "regenerator_inputs.txt"
+        )
+        with regenerator_inputs_path.open("wt") as f:
+            for input_path in sorted_extra_ninja_build_inputs:
+                f.write(f"{input_path}\n")
+
         # Patch build.ninja.d to ensure that Ninja will re-invoke the script if its
         # own source code, or any other extra implicit input, changes.
         log2("- Patching build.ninja.d")

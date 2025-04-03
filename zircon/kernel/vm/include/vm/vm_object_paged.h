@@ -48,6 +48,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(cow_pages_->lock_ref()) {
     return cow_pages_->lock_ref();
   }
+  uint64_t lock_order() const { return cow_pages_->lock_order(); }
 
   VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
 
@@ -93,6 +94,25 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     }
 
     return user_content_size_->GetContentSize();
+  }
+
+  // Calculates the minimum of the VMO size and the page-aligned user content size.
+  ktl::optional<uint64_t> saturating_content_size_locked() TA_REQ(lock()) {
+    if (!user_content_size_) {
+      return ktl::nullopt;
+    }
+
+    uint64_t user_content_size = user_content_size_->GetContentSize();
+    uint64_t vmo_size = size_locked();
+
+    // If user content size is larger, trim to the VMO.
+    // TODO(https://fxbug.dev/380960681): remove check when stream size <= VMO size invariant is
+    // enforced.
+    if (user_content_size > vmo_size) {
+      return vmo_size;
+    }
+
+    return ROUNDUP_PAGE_SIZE(user_content_size);
   }
 
   bool is_contiguous() const override { return (options_ & kContiguous); }
@@ -285,11 +305,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   uint32_t GetMappingCachePolicyLocked() const override TA_REQ(lock()) { return cache_policy_; }
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
 
-  void DetachSource() override {
-    Guard<VmoLockType> guard{lock()};
-
-    cow_pages_locked()->DetachSourceLocked();
-  }
+  void DetachSource() override { cow_pages_->DetachSource(); }
 
   zx_status_t CreateChildSlice(uint64_t offset, uint64_t size, bool copy_name,
                                fbl::RefPtr<VmObject>* child_vmo) override;

@@ -15,7 +15,6 @@ fidl("fuchsia.developer.ffx") {
     "fastboot.fidl",
     "mdns.fidl",
     "overview.fidl",
-    "repo.fidl",
     "target.fidl",
     "testing.fidl",
     "tracing.fidl",
@@ -37,6 +36,7 @@ fidl("fuchsia.developer.ffx") {
     "//build/sdk/meta:*",
     "//src/developer/ffx/*",
     "//src/sys/pkg/lib/*",
+    "//tools/fidl/fidlgen_python/tests/*",
     "//tools/funnel/*",
   ]
 }

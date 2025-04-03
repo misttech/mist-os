@@ -540,6 +540,15 @@ zx_status_t sys_process_write_memory(zx_handle_t handle, zx_vaddr_t vaddr,
   uint64_t offset;
   {
     Guard<CriticalMutex> guard{vm_mapping->lock()};
+    // TODO(https://fxbug.dev/42106188): Inform the mapping that we are going to ignore its
+    // permissions and perform a write. This provides it the chance to ensure our writes go to a
+    // mapping local clone to avoid corrupting a potentially read-only VMO.
+    status = vm_mapping->ForceWritableLocked();
+    if (status != ZX_OK) {
+      return status;
+    }
+    // |ForceWritableLocked| may have changed vmo, so re-query it.
+    vmo = vm_mapping->vmo_locked();
     offset = vaddr - vm_mapping->base_locked() + vm_mapping->object_offset_locked();
     // TODO(https://fxbug.dev/42106495): While this limits writing to the mapped address space of
     // this VMO, it should be writing to multiple VMOs, not a single one.

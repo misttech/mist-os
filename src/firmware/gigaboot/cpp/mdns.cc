@@ -213,7 +213,7 @@ cpp20::span<const uint8_t> MdnsPacket::Finalize() {
   // Add zero-pad bytes to the header, and add the already network-endian length.
   uint64_t start = htons(static_cast<uint16_t>(kUdpHdr)) + length;
   uint16_t checksum = CalculateChecksum(udp_bytes, start);
-  data_.udp_header.checksum = (checksum != 0xFFFF) ? ~checksum : checksum;
+  data_.udp_header.checksum = (checksum != 0xFFFF) ? static_cast<uint16_t>(~checksum) : checksum;
   return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_), end_ptr);
 }
 

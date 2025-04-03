@@ -102,6 +102,21 @@ impl Borrow<[u8]> for Storage {
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct FlyStr(RawRepr);
 
+#[cfg(feature = "json_schema")]
+impl schemars::JsonSchema for FlyStr {
+    fn schema_name() -> String {
+        str::schema_name()
+    }
+
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        str::json_schema(generator)
+    }
+
+    fn is_referenceable() -> bool {
+        false
+    }
+}
+
 static_assertions::assert_eq_size!(FlyStr, usize);
 
 impl FlyStr {

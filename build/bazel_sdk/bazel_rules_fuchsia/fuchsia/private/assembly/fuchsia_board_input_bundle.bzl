@@ -8,7 +8,7 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
-load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir_with_file")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_input_bundle_impl(ctx):
@@ -47,6 +47,18 @@ def _fuchsia_board_input_bundle_impl(ctx):
     ctx.actions.write(driver_list_file, content)
 
     creation_args = ["--drivers", driver_list_file.path]
+
+    if ctx.attr.version and ctx.file.version_file:
+        fail("Only one of \"version\" or \"version_file\" can be set.")
+        # TODO(https://fxbug.dev/397489730):
+        # Make it required to have exactly one of these set
+        # once these changes have rolled into all downstream repositories.
+
+    if ctx.attr.version:
+        creation_args.extend(["--version", ctx.attr.version])
+    elif ctx.file.version_file:
+        creation_args.extend(["--version-file", ctx.file.version_file.path])
+        creation_inputs.append(ctx.file.version_file)
 
     # Add single-file configs
     for (arg, file) in [
@@ -182,11 +194,18 @@ fuchsia_board_input_bundle = rule(
             default = [],
             allow_files = True,
         ),
+        "version": attr.string(
+            doc = "Release version string",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
+        ),
     } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def _fuchsia_prebuilt_board_input_bundle_impl(ctx):
-    directory = select_root_dir(ctx.files.files)
+    directory = select_root_dir_with_file(ctx.files.files, "board_input_bundle.json")
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardInputBundleInfo(

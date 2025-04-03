@@ -40,7 +40,7 @@ struct Opt {
     #[structopt(
         short = "m",
         long = "mode-hint",
-        parse(try_from_str = "parse_mode_hint"),
+        parse(try_from_str = parse_mode_hint),
         help = "Advertising mode hint (\"fast\", \"slow\", \"very-fast\")"
     )]
     mode_hint: Option<AdvertisingModeHint>,
@@ -53,28 +53,28 @@ struct Opt {
     uris: Vec<String>,
     #[structopt(
         long = "service-data",
-        parse(try_from_str = "parse_service_data"),
+        parse(try_from_str = parse_service_data),
         help = "Service data in the format '<service_uuid>:<string_data>'. \
                 Multiple instances of the flag allowed."
     )]
     service_data: Vec<ServiceData>,
     #[structopt(
         long = "binary-service-data",
-        parse(try_from_str = "parse_binary_service_data"),
+        parse(try_from_str = parse_binary_service_data),
         help = "Service data in the format '<service_uuid>:<base64_data>'. \
                 Multiple instances of the flag allowed."
     )]
     binary_service_data: Vec<ServiceData>,
     #[structopt(
         long = "manufacturer-data",
-        parse(try_from_str = "parse_manufacturer_data"),
+        parse(try_from_str = parse_manufacturer_data),
         help = "Manufacturer specific data in the format '<company_id>:<string_data>'. \
                 Multiple instances of the flag allowed."
     )]
     manufacturer_data: Vec<ManufacturerData>,
     #[structopt(
         long = "binary-manufacturer-data",
-        parse(try_from_str = "parse_binary_manufacturer_data"),
+        parse(try_from_str = parse_binary_manufacturer_data),
         help = "Manufacturer specific data in the format '<company_id>:<base64_data>'. \
                 Multiple instances of the flag allowed."
     )]

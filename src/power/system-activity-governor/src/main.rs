@@ -29,6 +29,7 @@ use {
 
 const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
 const SUSPENDER_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(3);
+const ROLE_NAME: &str = "fuchsia.power.system.activity_governor";
 
 async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
     Service::open(fhsuspend::SuspendServiceMarker)?
@@ -108,6 +109,11 @@ where
 #[fuchsia::main]
 async fn main() -> Result<()> {
     log::info!("started");
+
+    if let Err(e) = fuchsia_scheduler::set_role_for_root_vmar(ROLE_NAME) {
+        log::warn!(e:%; "failed to set vmar role");
+    }
+
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let inspector = fuchsia_inspect::component::inspector();

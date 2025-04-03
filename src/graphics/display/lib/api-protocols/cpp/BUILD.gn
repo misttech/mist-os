@@ -50,6 +50,7 @@ group("test-deps") {
     ":cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fit",
+    "//src/devices/bin/driver_runtime",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",

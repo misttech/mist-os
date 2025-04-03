@@ -677,8 +677,8 @@ zx_status_t Repartition(int argc, char** argv, std::optional<PartitionScheme> sc
             return ZX_ERR_INVALID_ARGS;
           }
           // portions from ParseSize are negative
-          portions[i] = -sz;
-          percent -= -sz;
+          portions[i] = static_cast<uint64_t>(-sz);
+          percent -= static_cast<uint64_t>(-sz);
         }
       }
       for (size_t i = 0; i < num_partitions; i++) {

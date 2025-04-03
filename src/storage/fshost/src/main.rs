@@ -13,6 +13,7 @@ use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{stream, StreamExt};
+use manager::DevicePublisher;
 use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
@@ -74,8 +75,12 @@ async fn main() -> Result<(), Error> {
             Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)) as Box<dyn WatchSource>,
         ];
         sources.extend(
-            fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty())
-                .map(|d| Box::new(DirSource::new(d)) as Box<dyn WatchSource>),
+            fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty()).map(
+                |d| {
+                    Box::new(DirSource::new(d, VOLUME_SERVICE_PATH, /*is_managed=*/ false))
+                        as Box<dyn WatchSource>
+                },
+            ),
         );
         sources
     } else {
@@ -112,7 +117,10 @@ async fn main() -> Result<(), Error> {
         .await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
+    let device_publisher = DevicePublisher::new();
     let export = vfs::pseudo_directory! {
+        "block" => device_publisher.block_dir(),
+        "debug_block" => device_publisher.debug_block_dir(),
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
             "data" => remote_dir(data_exposed_dir),
@@ -150,12 +158,6 @@ async fn main() -> Result<(), Error> {
             .unwrap();
         svc_dir
             .add_entry(
-                fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
-                fxblob::blobfs_verifier_service(),
-            )
-            .unwrap();
-        svc_dir
-            .add_entry(
                 fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker::PROTOCOL_NAME,
                 fxblob::ota_health_check_service(),
             )
@@ -188,7 +190,7 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock);
+    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock, device_publisher);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.

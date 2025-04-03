@@ -31,9 +31,12 @@ impl FhoTargetInfo for TargetInfoHolder {
         let mut addrs = vec![];
         if let Some(address_list) = &self.0.addresses {
             for addr in address_list {
-                let mut address: addr::TargetAddr = addr.into();
+                let Ok(address): Result<addr::TargetIpAddr, _> = addr.try_into() else {
+                    continue;
+                };
+                let mut address: std::net::SocketAddr = address.into();
                 address.set_port(0);
-                addrs.push(address.into());
+                addrs.push(address);
             }
         }
         addrs
@@ -41,7 +44,7 @@ impl FhoTargetInfo for TargetInfoHolder {
 
     fn ssh_address(&self) -> Option<std::net::SocketAddr> {
         if let Some(ssh_address) = &self.0.ssh_address {
-            let address: addr::TargetAddr = ssh_address.into();
+            let address: addr::TargetIpAddr = ssh_address.into();
             Some(address.into())
         } else {
             None
@@ -108,7 +111,7 @@ impl Deref for TargetInfoHolder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_fidl::{TargetAddrInfo, TargetIpPort};
+    use ffx_fidl::{TargetAddrInfo, TargetIpAddrInfo, TargetIpPort};
     use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
     use std::net::SocketAddr;
 
@@ -129,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_ssh_address() {
-        let ssh_addr_info = TargetAddrInfo::IpPort(TargetIpPort {
+        let ssh_addr_info = TargetIpAddrInfo::IpPort(TargetIpPort {
             ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
             port: 2022,
             scope_id: 0,
@@ -150,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_ssh_address_no_port() {
-        let ssh_addr_info = TargetAddrInfo::Ip(fidl_fuchsia_developer_ffx::TargetIp {
+        let ssh_addr_info = TargetIpAddrInfo::Ip(fidl_fuchsia_developer_ffx::TargetIp {
             ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
             scope_id: 0,
         });
@@ -170,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_ssh_address_ipv6() {
-        let ssh_addr_info = TargetAddrInfo::IpPort(TargetIpPort {
+        let ssh_addr_info = TargetIpAddrInfo::IpPort(TargetIpPort {
             ip: IpAddress::Ipv6(Ipv6Address {
                 addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             }),

@@ -62,6 +62,14 @@ void SetTestRegisters(const RegistersValue* value) {
       "movups 16(%0), %%xmm1\n"
       :
       : "r"(value));
+#elif defined(__arm__)
+  asm volatile(
+      "vldr d0, [%0, #0]\n"
+      "vldr d1, [%0, #8]\n"
+      "vldr d2, [%0, #16]\n"
+      "vldr d3, [%0, #24]\n"
+      :
+      : "r"(value));
 #elif defined(__aarch64__)
   asm volatile(
       "ldr q0, [%0, #0]\n"
@@ -95,6 +103,14 @@ RegistersValue GetTestRegisters() {
       "movups %%xmm1, 16(%0)\n"
       :
       : "r"(&value));
+#elif defined(__arm__)
+  asm volatile(
+      "vstr d0, [%0, #0]\n"
+      "vstr d1, [%0, #8]\n"
+      "vstr d2, [%0, #16]\n"
+      "vstr d3, [%0, #24]\n"
+      :
+      : "r"(&value));
 #elif defined(__aarch64__)
   asm volatile(
       "str q0, [%0, #0]\n"
@@ -117,59 +133,6 @@ RegistersValue GetTestRegisters() {
 #endif
 
   return value;
-}
-
-RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
-  RegistersValue result;
-
-#if defined(__x86_64__)
-  auto fpregs = ucontext->uc_mcontext.fpregs;
-  memcpy(&result, reinterpret_cast<void*>(fpregs->_xmm), sizeof(result));
-  auto fpstate_ptr = reinterpret_cast<char*>(fpregs);
-
-  // Bytes 464..512 in the XSAVE area are not used by XSAVE. Linux uses these bytes to store
-  // `struct _fpx_sw_bytes`, which declares the set of extensions that may follow immediately
-  // after `fpstate`. The region is marked with two "magic" values. Check that they are set
-  // correctly.
-  auto sw_bytes = reinterpret_cast<_fpx_sw_bytes*>(fpstate_ptr + 464);
-  EXPECT_EQ(sw_bytes->magic1, FP_XSTATE_MAGIC1);
-  uint32_t* magic2_ptr =
-      reinterpret_cast<uint32_t*>(fpstate_ptr + sw_bytes->extended_size - FP_XSTATE_MAGIC2_SIZE);
-  EXPECT_EQ(*magic2_ptr, FP_XSTATE_MAGIC2);
-#elif defined(__aarch64__)
-  fpsimd_context* fp_context = reinterpret_cast<fpsimd_context*>(ucontext->uc_mcontext.__reserved);
-  EXPECT_EQ(fp_context->head.magic, static_cast<uint32_t>(FPSIMD_MAGIC));
-  EXPECT_EQ(fp_context->head.size, sizeof(fpsimd_context));
-  memcpy(&result, fp_context->vregs, sizeof(result));
-#elif defined(__riscv)
-  // Copy first 2 values from the F registers
-  memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.__fpregs.__d.__f),
-         sizeof(uint64_t) * 2);
-
-  // The header for the first RISC-V context extension is at the end of `uc_mcontext`.
-  riscv_ctx_hdr* hdr = reinterpret_cast<riscv_ctx_hdr*>(&(ucontext->uc_mcontext) + 1) - 1;
-
-  EXPECT_EQ(hdr->magic, RISCV_V_MAGIC);
-  // Assuming VLEN=128 we meed 512 bytes to store 32 V registers.
-  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + 512);
-
-  riscv_v_ext_state* v_state = reinterpret_cast<riscv_v_ext_state*>(hdr + 1);
-  EXPECT_EQ(v_state->vlenb, RISCV_VLEN / 8);
-  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + RISCV_VLEN / 8 * 32);
-  EXPECT_EQ(v_state->datap, v_state + 1);
-
-  // Copy the last 2 values from the V registers.
-  memcpy(&result.x[2], reinterpret_cast<void*>(v_state->datap), sizeof(uint64_t) * 2);
-
-  riscv_ctx_hdr* end_hdr =
-      reinterpret_cast<riscv_ctx_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->size);
-  EXPECT_EQ(end_hdr->size, END_MAGIC);
-  EXPECT_EQ(end_hdr->size, END_HDR_SIZE);
-#else
-#error Add support for this architecture
-#endif
-
-  return result;
 }
 
 // FP/SIMD registers should be initialized to 0 for new processes.
@@ -224,6 +187,70 @@ struct SignalHandlerData {
 
   RegistersValue sigusr1_regs;
 };
+
+#if defined(__arm__)
+// Layout of the ucontext struct that allows access to the pstate
+struct __attribute__((__packed__)) ucontext_with_pstate {
+  char prefix[124];
+  RegistersValue pstate;
+};
+#endif
+
+RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
+  RegistersValue result;
+
+#if defined(__x86_64__)
+  auto fpregs = ucontext->uc_mcontext.fpregs;
+  memcpy(&result, reinterpret_cast<void*>(fpregs->_xmm), sizeof(result));
+  auto fpstate_ptr = reinterpret_cast<char*>(fpregs);
+
+  // Bytes 464..512 in the XSAVE area are not used by XSAVE. Linux uses these bytes to store
+  // `struct _fpx_sw_bytes`, which declares the set of extensions that may follow immediately
+  // after `fpstate`. The region is marked with two "magic" values. Check that they are set
+  // correctly.
+  auto sw_bytes = reinterpret_cast<_fpx_sw_bytes*>(fpstate_ptr + 464);
+  EXPECT_EQ(sw_bytes->magic1, FP_XSTATE_MAGIC1);
+  uint32_t* magic2_ptr =
+      reinterpret_cast<uint32_t*>(fpstate_ptr + sw_bytes->extended_size - FP_XSTATE_MAGIC2_SIZE);
+  EXPECT_EQ(*magic2_ptr, FP_XSTATE_MAGIC2);
+#elif defined(__arm__)
+  ucontext_with_pstate* fp_context = reinterpret_cast<ucontext_with_pstate*>(ucontext);
+  memcpy(&result, &fp_context->pstate, sizeof(result));
+#elif defined(__aarch64__)
+  fpsimd_context* fp_context = reinterpret_cast<fpsimd_context*>(ucontext->uc_mcontext.__reserved);
+  EXPECT_EQ(fp_context->head.magic, static_cast<uint32_t>(FPSIMD_MAGIC));
+  EXPECT_EQ(fp_context->head.size, sizeof(fpsimd_context));
+  memcpy(&result, fp_context->vregs, sizeof(result));
+#elif defined(__riscv)
+  // Copy first 2 values from the F registers
+  memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.__fpregs.__d.__f),
+         sizeof(uint64_t) * 2);
+
+  // The header for the first RISC-V context extension is at the end of `uc_mcontext`.
+  riscv_ctx_hdr* hdr = reinterpret_cast<riscv_ctx_hdr*>(&(ucontext->uc_mcontext) + 1) - 1;
+
+  EXPECT_EQ(hdr->magic, RISCV_V_MAGIC);
+  // Assuming VLEN=128 we meed 512 bytes to store 32 V registers.
+  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + 512);
+
+  riscv_v_ext_state* v_state = reinterpret_cast<riscv_v_ext_state*>(hdr + 1);
+  EXPECT_EQ(v_state->vlenb, RISCV_VLEN / 8);
+  EXPECT_EQ(hdr->size, sizeof(riscv_ctx_hdr) + sizeof(riscv_v_ext_state) + RISCV_VLEN / 8 * 32);
+  EXPECT_EQ(v_state->datap, v_state + 1);
+
+  // Copy the last 2 values from the V registers.
+  memcpy(&result.x[2], reinterpret_cast<void*>(v_state->datap), sizeof(uint64_t) * 2);
+
+  riscv_ctx_hdr* end_hdr =
+      reinterpret_cast<riscv_ctx_hdr*>(reinterpret_cast<uint8_t*>(hdr) + hdr->size);
+  EXPECT_EQ(end_hdr->size, END_MAGIC);
+  EXPECT_EQ(end_hdr->size, END_HDR_SIZE);
+#else
+#error Add support for this architecture
+#endif
+
+  return result;
+}
 
 SignalHandlerData signal_data;
 

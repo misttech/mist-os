@@ -13,6 +13,12 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+#[cfg(feature = "json_schema")]
+use schemars::schema::{
+    InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec,
+    SubschemaValidation,
+};
+
 struct RootVisitor<Key> {
     // Key is unused.
     marker: PhantomData<Key>,
@@ -632,10 +638,74 @@ impl Visitor<'_> for NumericValueVisitor {
     }
 }
 
+// Due to the custom encoding/decoding in use, the json schema does not adhere to the structure of
+// the rust definition, so must be implemented manually here.
+#[cfg(feature = "json_schema")]
+impl<T> schemars::JsonSchema for DiagnosticsHierarchy<T> {
+    fn schema_name() -> String {
+        "DiagnosticsHierarchy".to_owned()
+    }
+
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> Schema {
+        let property_schema = SchemaObject {
+            metadata: Some(Box::new(Metadata {
+                description: Some(
+                    "A property, which can be any standard object, or an array, or a histogram"
+                        .to_owned(),
+                ),
+                ..Default::default()
+            })),
+            subschemas: Some(Box::new(SubschemaValidation {
+                any_of: Some(vec![
+                    String::json_schema(generator),
+                    Vec::<f64>::json_schema(generator),
+                    Vec::<i64>::json_schema(generator),
+                    Vec::<u64>::json_schema(generator),
+                    Vec::<String>::json_schema(generator),
+                    LinearHistogram::<u64>::json_schema(generator),
+                    LinearHistogram::<i64>::json_schema(generator),
+                    LinearHistogram::<f64>::json_schema(generator),
+                    ExponentialHistogram::<u64>::json_schema(generator),
+                    ExponentialHistogram::<i64>::json_schema(generator),
+                    ExponentialHistogram::<f64>::json_schema(generator),
+                    i64::json_schema(generator),
+                    u64::json_schema(generator),
+                    f64::json_schema(generator),
+                    bool::json_schema(generator),
+                    // Includes a recursive self-reference.
+                    SchemaObject {
+                        instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::Object))),
+                        reference: Some(format!("#/definitions/{}", Self::schema_name())),
+                        ..Default::default()
+                    }
+                    .into(),
+                ]),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+        SchemaObject {
+            instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::Object))),
+            object: Some(Box::new(ObjectValidation {
+                min_properties: Some(1),
+                pattern_properties: [("^.*$".to_owned(), property_schema.into())]
+                    .into_iter()
+                    .collect(),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ArrayFormat;
+
+    #[cfg(feature = "json_schema")]
+    use ffx_writer::VerifiedMachineWriter;
 
     #[fuchsia::test]
     fn deserialize_json() {
@@ -646,6 +716,18 @@ mod tests {
         parsed_hierarchy.sort();
         expected_hierarchy.sort();
         assert_eq!(expected_hierarchy, parsed_hierarchy);
+    }
+
+    #[cfg(feature = "json_schema")]
+    #[fuchsia::test]
+    fn verify_schema() {
+        let json_string = get_single_json_hierarchy();
+        let data: serde_json::Value =
+            serde_json::from_str(&json_string).expect("valid json string");
+        let root = data.get("root").expect("expected root node");
+        if let Err(e) = VerifiedMachineWriter::<DiagnosticsHierarchy>::verify_schema(root) {
+            panic!("Error verifying schema of `{data:#?}`: {e:#?}")
+        }
     }
 
     #[fuchsia::test]
@@ -743,6 +825,7 @@ mod tests {
             ],
         )
     }
+
     pub fn get_single_json_hierarchy() -> String {
         "{ \"root\": {
                 \"a\": {

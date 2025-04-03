@@ -41,8 +41,51 @@ ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
 ${FASTBOOT} flash dtbo_a "$DTBO_PATH"
 ${FASTBOOT} flash dtbo_b "$DTBO_PATH"
+
+# Reboot back into the bootloader.
+# Some builds put firmware in the boot image, in which case we reboot here to
+# pick up the new firmware we just flashed. For builds that don't put firmware
+# in boot, this is still fine and just triggers a reboot now rather than at the
+# end of flashing.
+fx-info "Rebooting to bootloader"
+${FASTBOOT} reboot bootloader
+# Pause to make sure fastboot actually drops the device; sometimes without this
+# the next fastboot command will execute before the host realizes the device is
+# gone which causes the command to fail.
+sleep 4
+
+# Attempt to flash SSH keys. This is only supported on devices running custom
+# Fuchsia firmware, so if it doesn't work just log a warning.
+function push_ssh_keys {
+  AUTH_KEYS="$(get-ssh-authkeys)" || {
+    fx-warn "Failed to locate host SSH keys"
+    return 1
+  }
+
+  ${FASTBOOT} stage "${AUTH_KEYS}" oem add-staged-bootloader-file ssh.authorized_keys || {
+    fx-warn "Failed to push SSH keys to fastboot"
+    fx-warn "Device bootloader may not support it"
+    return 1
+  }
+}
+
+if push_ssh_keys; then
+  fx-info "Successfully provisioned SSH keys via bootloader"
+else
+  fx-warn "Skipping bootloader provisioning of SSH keys"
+fi
+
+# Flash the super partition last; some Kola devices exhibit USB instability
+# after flashing large super partition data so we want to do as much as
+# possible before this while the USB is more reliable (b/405436515).
 ${FASTBOOT} flash super "$FVM_PATH"
 
-${FASTBOOT} reboot
+# SSH keys require `fastboot continue`, since they are stored in RAM and would
+# get lost in a reboot. We rebooted earlier to ensure a complete boot chain
+# using the new images.
+${FASTBOOT} continue || {
+  fx-warn "Fastboot got a communication error, but this may be OK"
+  fx-warn "If the device is now booting then flash succeeded (b/405436515)"
+}
 
-echo "Done flashing Kola device."
+fx-info "Done flashing Kola device."

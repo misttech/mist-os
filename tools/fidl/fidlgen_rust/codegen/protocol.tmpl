@@ -136,6 +136,20 @@ impl {{ $protocol.SynchronousProxy }} {
     {{- end }}
     {{- end }}
 }
+
+#[cfg(target_os = "fuchsia")]
+impl From<{{ $protocol.SynchronousProxy }}> for zx::Handle {
+    fn from(value: {{ $protocol.SynchronousProxy }}) -> Self {
+          value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for {{ $protocol.SynchronousProxy }} {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
 {{- end }}
 
 #[derive(Debug, Clone)]

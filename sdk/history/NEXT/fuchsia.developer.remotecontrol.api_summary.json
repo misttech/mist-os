@@ -306,7 +306,7 @@
         "kind": "struct/member",
         "name": "fuchsia.developer.remotecontrol/RemoteControlLogMessageRequest.severity",
         "ordinal": "3",
-        "type": "fuchsia.diagnostics/Severity"
+        "type": "fuchsia.diagnostics.types/Severity"
     },
     {
         "kind": "struct/member",

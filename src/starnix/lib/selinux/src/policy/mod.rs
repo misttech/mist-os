@@ -14,11 +14,11 @@ mod extensible_bitmap;
 mod security_context;
 mod symbols;
 
-pub use arrays::FsUseType;
+pub use arrays::{FsUseType, XpermsBitmap};
 pub use index::FsUseLabelAndType;
 pub use security_context::{SecurityContext, SecurityContextError};
 
-use crate::{self as sc, FileClass, NullessByteStr, ObjectClass};
+use crate::{self as sc, FsNodeClass, NullessByteStr, ObjectClass};
 use anyhow::Context as _;
 use error::ParseError;
 use index::PolicyIndex;
@@ -162,6 +162,35 @@ impl std::ops::SubAssign for AccessVector {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = self.0 ^ (self.0 & rhs.0);
     }
+}
+
+/// Encapsulates the result of an ioctl extended permissions calculation, between source & target
+/// domains, for a specific class, and for a specific ioctl prefix byte. Decisions describe which
+/// 16-bit ioctls are allowed, and whether ioctl permissions should be audit-logged when allowed,
+/// and when denied.
+///
+/// In the language of
+/// https://www.kernel.org/doc/html/latest/userspace-api/ioctl/ioctl-decoding.html, an
+/// `IoctlAccessDecision` provides allow, audit-allow, and audit-deny decisions for the 256 possible
+/// function codes for a particular driver code.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IoctlAccessDecision {
+    pub allow: XpermsBitmap,
+    pub auditallow: XpermsBitmap,
+    pub auditdeny: XpermsBitmap,
+}
+
+impl IoctlAccessDecision {
+    pub const DENY_ALL: Self = Self {
+        allow: XpermsBitmap::NONE,
+        auditallow: XpermsBitmap::NONE,
+        auditdeny: XpermsBitmap::ALL,
+    };
+    pub const ALLOW_ALL: Self = Self {
+        allow: XpermsBitmap::ALL,
+        auditallow: XpermsBitmap::NONE,
+        auditdeny: XpermsBitmap::ALL,
+    };
 }
 
 /// Parses `binary_policy` by value; that is, copies underlying binary data out in addition to
@@ -349,7 +378,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &FileClass,
+        class: &FsNodeClass,
     ) -> SecurityContext {
         self.0.new_file_security_context(source, target, class)
     }
@@ -363,7 +392,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &FileClass,
+        class: &FsNodeClass,
         name: NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
         self.0.new_file_security_context_by_name(source, target, class, name)
@@ -442,6 +471,47 @@ impl<PS: ParseStrategy> Policy<PS> {
             source_context,
             target_context,
             target_class_name,
+        )
+    }
+
+    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
+    /// audited when denied, for a given source context, target context, target class, and ioctl
+    /// prefix byte.
+    pub fn compute_ioctl_access_decision(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        object_class: &sc::ObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        if let Some(target_class) = self.0.class(&object_class) {
+            self.0.parsed_policy().compute_ioctl_access_decision(
+                source_context,
+                target_context,
+                target_class,
+                ioctl_prefix,
+            )
+        } else {
+            IoctlAccessDecision::DENY_ALL
+        }
+    }
+
+    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
+    /// audited when denied, for a given source context, target context, target_class, and ioctl
+    /// prefix byte. This is the "custom" form of this API because `target_class_name` is associated
+    /// with a [`crate::AbstractObjectClass::Custom`] value.
+    pub fn compute_ioctl_access_decision_custom(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class_name: &str,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        self.0.parsed_policy().compute_ioctl_access_decision_custom(
+            source_context,
+            target_context,
+            target_class_name,
+            ioctl_prefix,
         )
     }
 
@@ -889,6 +959,7 @@ pub(super) mod tests {
     };
 
     use serde::Deserialize;
+    use std::ops::Shl;
 
     /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
     /// policy statement.
@@ -964,6 +1035,19 @@ pub(super) mod tests {
                 LocalHandleUnknown::Allow => *other == HandleUnknown::Allow,
             }
         }
+    }
+
+    /// Given a vector of integer (u8) values, returns a bitmap in which the set bits correspond to
+    /// the indices of the provided values.
+    fn xperms_bitmap_from_elements(elements: &[u8]) -> XpermsBitmap {
+        let mut bitmap = [le::U32::ZERO; 8];
+        for element in elements.iter() {
+            let block_index = (*element as usize) / 32;
+            let bit_index = ((*element as usize) % 32) as u32;
+            let bitmask = le::U32::new(1).shl(bit_index);
+            bitmap[block_index] = bitmap[block_index] | bitmask;
+        }
+        XpermsBitmap::new(bitmap)
     }
 
     #[test]
@@ -1280,6 +1364,128 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn compute_ioctl_access_decision_explicitly_allowed() {
+        let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+        let target_context_matched: SecurityContext = source_context.clone();
+
+        // `allowxperm` rules for the `file` class:
+        //
+        // `allowxperm type0 self:file ioctl { 0xabcd };`
+        // `allowxperm type0 self:file ioctl { 0xabef };`
+        // `allowxperm type0 self:file ioctl { 0x1000 - 0x10ff };`
+        //
+        // `auditallowxperm` rules for the `file` class:
+        //
+        // auditallowxperm type0 self:file ioctl { 0xabcd };
+        // auditallowxperm type0 self:file ioctl { 0xabef };
+        // auditallowxperm type0 self:file ioctl { 0x1000 - 0x10ff };
+        //
+        // `dontauditxperm` rules for the `file` class:
+        //
+        // dontauditxperm type0 self:file ioctl { 0xabcd };
+        // dontauditxperm type0 self:file ioctl { 0xabef };
+        // dontauditxperm type0 self:file ioctl { 0x1000 - 0x10ff };
+        let decision_single = policy.compute_ioctl_access_decision(
+            &source_context,
+            &target_context_matched,
+            &ObjectClass::File,
+            0xab,
+        );
+
+        let mut expected_auditdeny =
+            xperms_bitmap_from_elements((0x0..=0xff).collect::<Vec<_>>().as_slice());
+        expected_auditdeny -= &xperms_bitmap_from_elements(&[0xcd, 0xef]);
+
+        let expected_decision_single = IoctlAccessDecision {
+            allow: xperms_bitmap_from_elements(&[0xcd, 0xef]),
+            auditallow: xperms_bitmap_from_elements(&[0xcd, 0xef]),
+            auditdeny: expected_auditdeny,
+        };
+        assert_eq!(decision_single, expected_decision_single);
+
+        let decision_range = policy.compute_ioctl_access_decision(
+            &source_context,
+            &target_context_matched,
+            &ObjectClass::File,
+            0x10,
+        );
+        let expected_decision_range = IoctlAccessDecision {
+            allow: XpermsBitmap::ALL,
+            auditallow: XpermsBitmap::ALL,
+            auditdeny: XpermsBitmap::NONE,
+        };
+        assert_eq!(decision_range, expected_decision_range);
+    }
+
+    #[test]
+    fn compute_ioctl_access_decision_unmatched() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        // No matching ioctl xperm-related statements for this target's type
+        let target_context_unmatched: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type1:s0-s0".into())
+            .expect("create source security context");
+
+        for prefix in 0x0..=0xff {
+            let decision = policy.compute_ioctl_access_decision(
+                &source_context,
+                &target_context_unmatched,
+                &ObjectClass::File,
+                prefix,
+            );
+            assert_eq!(decision, IoctlAccessDecision::ALLOW_ALL);
+        }
+    }
+
+    #[test]
+    fn compute_ioctl_access_decision_custom() {
+        let policy_bytes = include_bytes!("../../testdata/micro_policies/allowxperm_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        // xperm-related rules for `class_two_ioctls_same_range`:
+        //
+        // `allowxperm type0 self:class_two_ioctls_same_range ioctl { 0x1234 0x1256 };`
+        let target_context: SecurityContext = source_context.clone();
+        let decision = policy.compute_ioctl_access_decision_custom(
+            &source_context,
+            &target_context,
+            "class_two_ioctls_same_range",
+            0x12,
+        );
+
+        let expected_decision = IoctlAccessDecision {
+            allow: xperms_bitmap_from_elements(&[0x34, 0x56]),
+            auditallow: XpermsBitmap::NONE,
+            auditdeny: XpermsBitmap::ALL,
+        };
+        assert_eq!(decision, expected_decision);
+    }
+
+    #[test]
     fn new_file_security_context_minimal() {
         let policy_bytes =
             include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
@@ -1294,7 +1500,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1337,7 +1543,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
         let expected: SecurityContext = policy
             .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
             .expect("valid expected security context");
@@ -1383,7 +1589,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:transition_r:target_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1432,7 +1638,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
 
         // TODO(http://b/334968228): Update expectation once role validation is implemented.
         assert!(policy.validate_security_context(&actual).is_err());
@@ -1453,7 +1659,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:transition_t:s0:c0".into())
             .expect("valid expected security context");
@@ -1499,7 +1705,7 @@ pub(super) mod tests {
             .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
             .expect("valid target security context");
 
-        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File.into());
         let expected: SecurityContext = policy
             .parse_security_context(b"source_u:object_r:target_t:s1:c1-s2:c1.c2".into())
             .expect("valid expected security context");

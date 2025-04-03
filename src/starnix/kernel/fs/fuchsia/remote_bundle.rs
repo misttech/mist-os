@@ -287,7 +287,7 @@ impl FileOps for MemoryFile {
         _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        Err(errno!(EPERM))
+        error!(EPERM)
     }
 
     fn get_memory(

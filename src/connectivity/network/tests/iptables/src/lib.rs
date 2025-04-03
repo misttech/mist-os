@@ -10,8 +10,9 @@ use std::pin::pin;
 use component_events::events::{EventStream, ExitStatus, Stopped, StoppedPayload};
 use component_events::matcher::EventMatcher;
 use fidl_fuchsia_net_filter_ext::{
-    Action, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine, IpHook, Matchers,
-    Namespace, NamespaceId, NatHook, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+    Action, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher,
+    IpHook, MarkAction, Matchers, Namespace, NamespaceId, NatHook, Resource, Routine, RoutineId,
+    RoutineType, Rule, RuleId,
 };
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use fuchsia_runtime::{HandleInfo, HandleType};
@@ -19,8 +20,8 @@ use log::info;
 use test_case::test_case;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcomponent_decl,
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_process as fprocess,
 };
 
 const IPTABLES_RESTORE: &'static str = "iptables-restore";
@@ -55,6 +56,9 @@ const MANGLE_TABLE_WITH_CUSTOM_CHAIN: &[&str] = &[
     ":test -",
     "COMMIT",
 ];
+
+const MANGLE_TABLE_WITH_MARK_TARGET: &[&str] =
+    &["*mangle", "-A INPUT -i lo -j MARK --set-mark 0x1/0x3", "COMMIT"];
 
 /// Runs component `name` in Realm collection "test-programs" and with `input_lines` as stdin.
 /// Items in `input_lines` are suffixed with newline character, and sent one line at a time, and
@@ -369,6 +373,35 @@ fn mangle_table_with_custom_chain_resources(namespace: Namespace) -> Vec<Resourc
     ]
 }
 
+fn mangle_table_with_input_marking(namespace: Namespace) -> Vec<Resource> {
+    let namespace_id = namespace.id.clone();
+    let priority = -150;
+    let input_routine_id =
+        RoutineId { namespace: namespace_id.clone(), name: String::from("INPUT") };
+    vec![
+        Resource::Namespace(namespace),
+        // INPUT built-in routine
+        Resource::Routine(Routine {
+            id: input_routine_id.clone(),
+            routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                hook: IpHook::LocalIngress,
+                priority,
+            })),
+        }),
+        Resource::Rule(Rule {
+            id: RuleId { routine: input_routine_id, index: 0 },
+            matchers: Matchers {
+                in_interface: Some(InterfaceMatcher::Name("lo".into())),
+                ..Default::default()
+            },
+            action: Action::Mark {
+                domain: fnet::MarkDomain::Mark1,
+                action: MarkAction::SetMark { clearing_mask: 0x3, mark: 0x1 },
+            },
+        }),
+    ]
+}
+
 enum Ip {
     V4,
     V6,
@@ -415,6 +448,20 @@ enum Ip {
     MANGLE_TABLE_WITH_CUSTOM_CHAIN,
     mangle_table_with_custom_chain_resources;
     "mangle chain ipv6"
+)]
+#[test_case(
+    Ip::V4,
+    "mangle",
+    MANGLE_TABLE_WITH_MARK_TARGET,
+    mangle_table_with_input_marking;
+    "mangle chain mark ipv4"
+)]
+#[test_case(
+    Ip::V6,
+    "mangle",
+    MANGLE_TABLE_WITH_MARK_TARGET,
+    mangle_table_with_input_marking;
+    "mangle chain mark ipv6"
 )]
 #[fuchsia::test]
 async fn create_chain(

@@ -9,14 +9,17 @@ pub mod storage;
 
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use diagnostics_data::logs_legacy::{filter_by_tags, format_log_message};
+use diagnostics_reader::{ArchiveReader, Data, Logs};
 use fidl_fuchsia_component::{BinderMarker, CreateChildArgs, RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode};
+use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
 use fidl_fuchsia_logger as flog;
 use fuchsia_component::client;
-use fuchsia_syslog_listener::LogProcessor;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
-use futures::{Future, FutureExt};
+use futures::{Future, FutureExt, StreamExt};
+use std::collections::HashSet;
 use std::pin::Pin;
 
 const COLLECTION_NAME: &str = "ota";
@@ -154,17 +157,18 @@ pub trait OtaLogListener {
 }
 
 pub struct OtaLogListenerImpl {
-    log_proxy: flog::LogProxy,
+    log_proxy: ArchiveAccessorProxy,
 }
 
 impl OtaLogListenerImpl {
     pub fn new() -> Result<Self, Error> {
-        let log_proxy = client::connect_to_protocol::<flog::LogMarker>()
-            .map_err(|e| format_err!("failed to connect to fuchsia.logger.Log: {:?}", e))?;
+        let log_proxy = client::connect_to_protocol::<ArchiveAccessorMarker>().map_err(|e| {
+            format_err!("failed to connect to fuchsia.diagnostics.ArchiveAccessor: {:?}", e)
+        })?;
         Ok(Self::new_with_proxy(log_proxy))
     }
 
-    pub fn new_with_proxy(log_proxy: flog::LogProxy) -> Self {
+    pub fn new_with_proxy(log_proxy: ArchiveAccessorProxy) -> Self {
         Self { log_proxy }
     }
 }
@@ -172,24 +176,9 @@ impl OtaLogListenerImpl {
 #[async_trait(?Send)]
 impl OtaLogListener for OtaLogListenerImpl {
     async fn listen(&self, handler: LogHandlerFnPtr) -> Result<(), Error> {
-        let options = flog::LogFilterOptions {
-            filter_by_pid: false,
-            pid: 0,
-            min_severity: flog::LogLevelFilter::None,
-            verbosity: 0,
-            filter_by_tid: false,
-            tid: 0,
-            tags: vec![format!("{}:{}", COLLECTION_NAME, CHILD_NAME)],
-        };
-
-        fuchsia_syslog_listener::run_log_listener_with_proxy(
-            &self.log_proxy,
-            LogProcessorFn(handler),
-            Some(&options),
-            false,
-            None,
-        )
-        .await
+        let mut tags = HashSet::new();
+        tags.insert(format!("{}:{}", COLLECTION_NAME, CHILD_NAME));
+        LogProcessorFn(handler).run(tags, self.log_proxy.clone()).await
     }
 }
 
@@ -197,23 +186,35 @@ impl OtaLogListener for OtaLogListenerImpl {
 // To work around this, the FnMut(String) must be wrapped in a local type that implements the trait.
 struct LogProcessorFn(LogHandlerFnPtr);
 
-impl LogProcessor for LogProcessorFn {
-    fn log(&mut self, message: flog::LogMessage) {
-        let tags = message.tags.join(", ");
+impl LogProcessorFn {
+    async fn run(
+        &mut self,
+        tags: HashSet<String>,
+        archive: ArchiveAccessorProxy,
+    ) -> Result<(), Error> {
+        let mut reader = ArchiveReader::logs();
+        reader.with_archive(archive);
+        let mut stream = reader.snapshot_then_subscribe().unwrap();
+
+        while let Some(Ok(log)) = stream.next().await {
+            if !filter_by_tags(&log, &tags) {
+                self.log(&log);
+            }
+        }
+        Ok(())
+    }
+    fn log(&mut self, message: &Data<Logs>) {
+        let tags = message.tags().unwrap_or(&vec![]).join(", ");
 
         let line = format!(
             "[{}][{}] {}: {}",
-            format_time(message.time),
+            format_time(message.metadata.timestamp),
             tags,
-            get_log_level(message.severity),
-            message.msg
+            get_log_level(message.severity() as i32),
+            format_log_message(message)
         );
 
         (self.0)(line);
-    }
-
-    fn done(&mut self) {
-        // No need to do anything since we are streaming rather than requesting a one-time dump.
     }
 }
 
@@ -221,10 +222,14 @@ impl LogProcessor for LogProcessorFn {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::create_proxy_and_stream;
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder};
+    use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
     use fidl_fuchsia_component::{Error, RealmRequest};
+    use fidl_fuchsia_diagnostics::{
+        ArchiveAccessorRequest, BatchIteratorMarker, BatchIteratorRequest, FormattedContent,
+    };
     use fuchsia_async as fasync;
-    use futures::StreamExt;
+    use futures::{StreamExt, TryStreamExt};
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::sync::Arc;
 
@@ -449,15 +454,85 @@ mod tests {
         });
     }
 
+    async fn handle_batch_iterator(
+        data: serde_json::Value,
+        result_stream: ServerEnd<BatchIteratorMarker>,
+    ) {
+        let mut stream = result_stream.into_stream();
+        while let Some(req) = stream.try_next().await.expect("stream request") {
+            match req {
+                BatchIteratorRequest::WaitForReady { responder } => {
+                    let _ = responder.send();
+                }
+                BatchIteratorRequest::GetNext { responder } => {
+                    let content = serde_json::to_string_pretty(&data).expect("json pretty");
+                    let vmo_size = content.len() as u64;
+                    let vmo = zx::Vmo::create(vmo_size).expect("create vmo");
+                    vmo.write(content.as_bytes(), 0).expect("write vmo");
+                    let buffer = fidl_fuchsia_mem::Buffer { vmo, size: vmo_size };
+                    responder
+                        .send(Ok(vec![FormattedContent::Json(buffer)]))
+                        .expect("send response");
+                    break;
+                }
+                BatchIteratorRequest::_UnknownMethod { .. } => {
+                    unreachable!("Unexpected method call");
+                }
+            }
+        }
+    }
+
+    fn spawn_fake_archive(
+        data_to_send: serde_json::Value,
+    ) -> (ArchiveAccessorProxy, impl Future<Output = ()>) {
+        let (proxy, mut stream) =
+            fidl::endpoints::create_proxy_and_stream::<ArchiveAccessorMarker>();
+        let task = async move {
+            while let Some(request) = stream.try_next().await.expect("stream request") {
+                match request {
+                    ArchiveAccessorRequest::StreamDiagnostics { result_stream, .. } => {
+                        let data = data_to_send.clone();
+                        handle_batch_iterator(data, result_stream).await;
+                        break;
+                    }
+                    ArchiveAccessorRequest::WaitForReady { responder, .. } => {
+                        let _ = responder.send();
+                    }
+                    ArchiveAccessorRequest::_UnknownMethod { .. } => {
+                        unreachable!("Unexpected method call");
+                    }
+                }
+            }
+        };
+        (proxy, task)
+    }
+
     #[fuchsia::test]
     async fn test_log_listener_listens() -> Result<(), Error> {
-        let (log_proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<flog::LogMarker>();
-        let listener = OtaLogListenerImpl::new_with_proxy(log_proxy);
         let lines = Arc::new(Mutex::new(Vec::new()));
         let lines2 = lines.clone();
         let expected_msg = "this is a test message".to_string();
+        let (log_proxy, archive_accessor_task) = spawn_fake_archive(
+            serde_json::from_str(
+                &serde_json::to_string(
+                    &LogsDataBuilder::new(BuilderArgs {
+                        component_url: None,
+                        moniker: diagnostics_data::ExtendedMoniker::ComponentManager,
+                        severity: diagnostics_data::Severity::Trace,
+                        timestamp: zx::BootInstant::ZERO,
+                    })
+                    .set_raw_severity(0)
+                    .add_tag(format!("{}:{}", COLLECTION_NAME, CHILD_NAME))
+                    .set_message(expected_msg.clone())
+                    .build(),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        );
 
-        fasync::Task::local(async move {
+        let listener = OtaLogListenerImpl::new_with_proxy(log_proxy);
+        let reader = fasync::Task::local(async move {
             let lines = lines2.clone();
             listener
                 .listen(Box::new(move |line| {
@@ -468,35 +543,11 @@ mod tests {
                 }))
                 .await
                 .unwrap();
-        })
-        .detach();
-
-        let request = stream.next().await.unwrap().unwrap();
-        match request {
-            flog::LogRequest::ListenSafe { log_listener, options, .. } => {
-                let tag = format!("{}:{}", COLLECTION_NAME, CHILD_NAME);
-                assert_eq!(tag, options.unwrap().tags[0]);
-
-                log_listener
-                    .into_proxy()
-                    .log(&flog::LogMessage {
-                        pid: 0,
-                        tid: 0,
-                        time: zx::BootInstant::ZERO,
-                        severity: 0,
-                        dropped_logs: 0,
-                        tags: vec![tag],
-                        msg: expected_msg.clone(),
-                    })
-                    .await
-                    .unwrap();
-            }
-            e => panic!("Unexpected request: {:?}", e),
-        }
-
+        });
+        archive_accessor_task.await;
+        reader.await;
         assert_eq!(1, lines.lock().await.len());
         assert!(lines.lock().await[0].ends_with(&expected_msg));
-
         Ok(())
     }
 }

@@ -73,6 +73,10 @@ pub fn new_netlink_socket(
         NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
         NetlinkFamily::Generic => Box::new(GenericNetlinkSocket::new(kernel)?),
         NetlinkFamily::SockDiag => Box::new(DiagnosticNetlinkSocket::new(kernel)?),
+        NetlinkFamily::Audit => {
+            track_stub!(TODO("https://fxbug.dev/403540244"), "NETLINK_AUDIT");
+            return error!(EPROTONOSUPPORT);
+        }
         _ => Box::new(BaseNetlinkSocket::new(family)),
     };
     Ok(ops)
@@ -330,12 +334,16 @@ impl NetlinkSocketInner {
                 SO_SNDBUF => {
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
+                    // SO_SNDBUF doubles the requested capacity to leave space for bookkeeping.
+                    // See https://man7.org/linux/man-pages/man7/socket.7.html
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
-                    self.set_capacity(requested_capacity as usize);
+                    // SO_RCVBUF doubles the requested capacity to leave space for bookkeeping.
+                    // See https://man7.org/linux/man-pages/man7/socket.7.html
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_PASSCRED => {
                     let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
@@ -355,7 +363,7 @@ impl NetlinkSocketInner {
                     security::check_task_capable(current_task, CAP_NET_ADMIN)?;
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
-                    self.set_capacity(requested_capacity as usize);
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 _ => return error!(ENOSYS),
             },
@@ -540,6 +548,7 @@ impl SocketOps for BaseNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
@@ -733,6 +742,7 @@ impl SocketOps for UEventNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
@@ -755,6 +765,9 @@ impl SocketOps for UEventNetlinkSocket {
 
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext) {
+        let Some(metadata) = &device.metadata else {
+            return;
+        };
         let kobject = device.kobject();
         let subsystem = kobject.parent().unwrap();
         let subsystem = subsystem.name();
@@ -771,10 +784,10 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
             path = kobject.path(),
-            name = device.metadata.devname,
+            name = metadata.devname,
             subsystem = subsystem,
-            major = device.metadata.device_type.major(),
-            minor = device.metadata.device_type.minor(),
+            major = metadata.device_type.major(),
+            minor = metadata.device_type.minor(),
             seqnum = context.seqnum,
         );
         let ancillary_data = AncillaryData::Unix(UnixControlData::Credentials(Default::default()));
@@ -940,10 +953,15 @@ impl SocketOps for RouteNetlinkSocket {
         if let Some(pid) = pid {
             client.set_pid(pid);
         }
-        match client.set_legacy_memberships(LegacyGroups(multicast_groups)) {
-            Err(InvalidLegacyGroupsError {}) => error!(EPERM),
-            Ok(()) => Ok(()),
-        }
+        // This "blocks" in order to synchronize with the internal
+        // state of the rtnetlink worker, but we're not blocking on
+        // the completion of any i/o or any expensive computation,
+        // so there's no need to support interrupts here.
+        client
+            .set_legacy_memberships(LegacyGroups(multicast_groups))
+            .map_err(|InvalidLegacyGroupsError {}| errno!(EPERM))?
+            .wait_until_complete();
+        Ok(())
     }
 
     fn read(
@@ -1058,6 +1076,7 @@ impl SocketOps for RouteNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
@@ -1078,16 +1097,23 @@ impl SocketOps for RouteNetlinkSocket {
             (SOL_NETLINK, NETLINK_ADD_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
                 let group: u32 = current_task.read_object(user_opt.try_into()?)?;
-                client
+                let async_work = client
                     .add_membership(ModernGroup(group))
-                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
+                // This "blocks" in order to synchronize with the internal
+                // state of the rtnetlink worker, but we're not blocking on
+                // the completion of any i/o or any expensive computation,
+                // so there's no need to support interrupts here.
+                async_work.wait_until_complete();
+                Ok(())
             }
             (SOL_NETLINK, NETLINK_DROP_MEMBERSHIP) => {
                 let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
                 let group: u32 = current_task.read_object(user_opt.try_into()?)?;
                 client
                     .del_membership(ModernGroup(group))
-                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))?;
+                Ok(())
             }
             _ => self.inner.lock().setsockopt(current_task, level, optname, user_opt),
         }
@@ -1232,6 +1258,7 @@ impl SocketOps for DiagnosticNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,
@@ -1422,6 +1449,7 @@ impl SocketOps for GenericNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         level: u32,
         optname: u32,
         _optlen: u32,

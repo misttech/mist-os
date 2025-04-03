@@ -47,6 +47,8 @@ __LOCAL decltype(zx_clock_get_boot) CODE_clock_get_boot_via_kernel_ticks;
 __LOCAL decltype(zx_clock_get_monotonic) CODE_clock_get_monotonic_via_kernel_ticks;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_mono;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_ticks;
+__LOCAL decltype(zx_clock_read_mapped) CODE_clock_read_mapped_via_kernel;
+__LOCAL decltype(zx_clock_get_details_mapped) CODE_clock_get_details_mapped_via_kernel;
 
 }  // extern "C"
 

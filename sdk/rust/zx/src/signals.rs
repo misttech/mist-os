@@ -81,6 +81,10 @@ bitflags! {
         const CLOCK_STARTED       = ZX_CLOCK_STARTED;
         const CLOCK_UPDATED       = ZX_CLOCK_UPDATED;
 
+        // Counter
+        const COUNTER_POSITIVE    = ZX_COUNTER_POSITIVE;
+        const COUNTER_NON_POSITIVE    = ZX_COUNTER_NON_POSITIVE;
+
         // Socket
         const SOCKET_READABLE            = ZX_SOCKET_READABLE;
         const SOCKET_WRITABLE            = ZX_SOCKET_WRITABLE;

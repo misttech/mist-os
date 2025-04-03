@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::mem::MaybeUninit;
+
 use munge::munge;
 
 use crate::{
     DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer, WireU64,
+    ZeroPadding,
 };
 
 /// A FIDL table
@@ -15,12 +18,19 @@ pub struct WireTable {
     ptr: WirePointer<WireEnvelope>,
 }
 
+unsafe impl ZeroPadding for WireTable {
+    #[inline]
+    fn zero_padding(_: &mut MaybeUninit<Self>) {
+        // Wire tables have no padding
+    }
+}
+
 impl WireTable {
     /// Encodes that a table contains `len` values in a slot.
     #[inline]
-    pub fn encode_len(slot: Slot<'_, Self>, len: usize) {
-        munge!(let Self { len: mut table_len, ptr } = slot);
-        **table_len = len.try_into().unwrap();
+    pub fn encode_len(out: &mut MaybeUninit<Self>, len: usize) {
+        munge!(let Self { len: table_len, ptr } = out);
+        table_len.write(WireU64(len.try_into().unwrap()));
         WirePointer::encode_present(ptr);
     }
 

@@ -16,6 +16,7 @@ rustc_test("netstack3_filter_integration_test") {
     "//src/connectivity/network/netstack3/core:netstack3-core-testutils",
     "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
     "//src/lib/network/packet",
+    "//third_party/rust_crates:assert_matches",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]

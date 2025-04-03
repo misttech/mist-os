@@ -29,7 +29,7 @@ void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi, ktl::string_vie
     uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy> driver;
     for (auto [header, payload] : view) {
       if (driver.Match(*header, payload.data())) {
-        boot_opts.serial = ktl::move(driver).TakeUart();
+        boot_opts.serial = driver.config();
       }
     }
     view.ignore_error();

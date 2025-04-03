@@ -34,7 +34,7 @@ impl ::fidl_next::Encodable for {{ name }} {
     type Encoded = {{ wire_name }};
 }
 
-impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+unsafe impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
     {% if !is_static %}
@@ -48,9 +48,9 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let {{ wire_name }} { raw } = slot);
+        ::fidl_next::munge!(let {{ wire_name }} { raw } = out);
 
         match self {
             {% for member in union.members %}
@@ -76,7 +76,7 @@ impl ::fidl_next::EncodableOption for Box<{{ name }}> {
     type EncodedOption = WireOptional{{ name }};
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
 where
     ___E: ?Sized,
     {{ name }}: ::fidl_next::Encode<___E>,
@@ -85,18 +85,16 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptional{{ name }} { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptional{{ name }} { raw } = &mut *out);
 
         if let Some(inner) = this {
-            let slot = unsafe {
-                ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast())
-            };
+            let value_out = unsafe { &mut *out.as_mut_ptr().cast() };
             ::fidl_next::Encode::encode(
                 &mut **inner,
                 encoder,
-                slot,
+                value_out,
             )?;
         } else {
             ::fidl_next::RawWireUnion::encode_absent(raw);
@@ -112,7 +110,7 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
         match from.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(::fidl_next::TakeFrom::take_from(
-                    unsafe { from.raw.get().deref_unchecked() }
+                    unsafe { from.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
                 )),
             {% endfor %}
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -135,6 +133,14 @@ impl ::fidl_next::TakeFrom<WireOptional{{ name }}> for Option<Box<{{ name }}>> {
 #[repr(transparent)]
 pub struct {{ wire_name }} {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
+    }
 }
 
 {% let access_params %}
@@ -163,7 +169,7 @@ impl {{ wire_name }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
                 {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name.camel()|ident }}(
-                    unsafe { self.raw.get().deref_unchecked() }
+                    unsafe { self.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
                 ),
             {% endfor %}
             {% if union.is_strict %}
@@ -249,6 +255,14 @@ where
 #[repr(transparent)]
 pub struct WireOptional{{ name }} {
     raw: ::fidl_next::RawWireUnion,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireOptional{{ name }} {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { raw } = out);
+        ::fidl_next::RawWireUnion::zero_padding(raw);
+    }
 }
 
 impl WireOptional{{ name }} {

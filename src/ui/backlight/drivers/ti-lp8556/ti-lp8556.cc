@@ -9,7 +9,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/i2c-channel.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <math.h>
 
 #include <algorithm>
@@ -282,7 +282,7 @@ void Lp8556Device::GetNormalizedBrightnessScale(
 void Lp8556Device::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
   // Only supported on Nelson for now.
   if (board_pid_ == PDEV_PID_NELSON) {
-    completer.ReplySuccess(backlight_power_);
+    completer.ReplySuccess(static_cast<float>(backlight_power_));
   } else {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
@@ -353,11 +353,13 @@ zx_status_t Lp8556Device::Init() {
     return ZX_ERR_BAD_STATE;
   }
 
-  ddk::PDevFidl pdev(parent(), "pdev");
-  if (pdev.is_valid()) {
-    pdev_board_info_t board_info{};
-    if (zx_status_t status = pdev.GetBoardInfo(&board_info); status == ZX_OK) {
-      board_pid_ = board_info.pid;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent(), "pdev");
+  if (pdev_client_end.is_ok()) {
+    fdf::PDev pdev{std::move(pdev_client_end.value())};
+    zx::result board_info = pdev.GetBoardInfo();
+    if (board_info.is_ok()) {
+      board_pid_ = board_info->pid;
     }
   }
 
@@ -561,18 +563,19 @@ zx_status_t Lp8556Device::ReadInitialState() {
 
 zx_status_t ti_lp8556_bind(void* ctx, zx_device_t* parent) {
   // Get platform device protocol
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    LOG_ERROR("Could not get PDEV protocol\n");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, "pdev");
+  if (pdev_client_end.is_error()) {
+    LOG_ERROR("Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Map MMIO
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    LOG_ERROR("Could not map mmio %d\n", status);
-    return status;
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    LOG_ERROR("Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
 
   // Obtain I2C protocol needed to control backlight
@@ -593,7 +596,8 @@ zx_status_t ti_lp8556_bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd(ddk::DeviceAddArgs("ti-lp8556").set_inspect_vmo(dev->InspectVmo()));
+  zx_status_t status =
+      dev->DdkAdd(ddk::DeviceAddArgs("ti-lp8556").set_inspect_vmo(dev->InspectVmo()));
   if (status != ZX_OK) {
     LOG_ERROR("Could not add device\n");
     return status;

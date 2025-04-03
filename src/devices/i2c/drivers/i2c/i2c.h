@@ -35,7 +35,7 @@ class I2cDriver : public fdf::DriverBase {
   static constexpr size_t kInitialOpCount = 16;
   static constexpr size_t kInitialReadBufferSize = 512;
 
-  zx::result<> AddI2cChildren(fuchsia_hardware_i2c_businfo::I2CBusMetadata metadata);
+  zx::result<> AddI2cChildren(const fuchsia_hardware_i2c_businfo::I2CBusMetadata& metadata);
 
   zx_status_t GrowContainersIfNeeded(
       const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions);

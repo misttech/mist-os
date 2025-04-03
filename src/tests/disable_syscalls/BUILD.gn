@@ -16,10 +16,8 @@ group("tests") {
       ":disable_debugging_disable_serial_test($host_toolchain)",
       ":disable_debugging_enable_serial_test($host_toolchain)",
       ":disable_debugging_output_only_serial_test($host_toolchain)",
-      ":disabled_makes_ktrace_fail_test($host_toolchain)",
       ":enable_debugging_test($host_toolchain)",
       ":invalid_serial_setting_test($host_toolchain)",
-      ":ktrace_works_when_enabled_test($host_toolchain)",
     ]
   }
 }
@@ -74,16 +72,10 @@ if (is_linux) {
   split_go_test("disable_debugging_output_only_serial") {
     sources = [ "disable_debugging_output_only_serial_test.go" ]
   }
-  split_go_test("disabled_makes_ktrace_fail") {
-    sources = [ "disabled_makes_ktrace_fail_test.go" ]
-  }
   split_go_test("enable_debugging") {
     sources = [ "enable_debugging_test.go" ]
   }
   split_go_test("invalid_serial_setting") {
     sources = [ "invalid_serial_setting_test.go" ]
-  }
-  split_go_test("ktrace_works_when_enabled") {
-    sources = [ "ktrace_works_when_enabled_test.go" ]
   }
 }

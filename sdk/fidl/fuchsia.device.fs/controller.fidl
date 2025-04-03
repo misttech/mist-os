@@ -12,52 +12,6 @@ const MAX_DEVICE_PATH_LEN uint64 = 1024;
 @available(added=HEAD)
 const MAX_DRIVER_PATH_LEN uint64 = 1024;
 
-/// Interface for manipulating a device in a devhost
-@available(added=HEAD)
-closed protocol Controller {
-    /// Connect to the underlying device's FIDL protocol.
-    /// This connection will not be multiplexed with fuchsia.device.Controller
-    /// or fuchsia.io.Node.
-    strict ConnectToDeviceFidl(resource struct {
-        server zx.Handle:CHANNEL;
-    });
-
-    /// Connect to the same Controller FIDL protocol.
-    strict ConnectToController(resource struct {
-        server server_end:Controller;
-    });
-
-    /// Attempt to bind a driver to this device.
-    /// + request `driver` This represents the suffix of a driver URL (e.g: "fvm.cm").
-    ///            If this is non-empty, then the only drivers that will try to bind
-    ///            are ones that match this url suffix.
-    strict Bind(struct {
-        driver string:MAX_DRIVER_PATH_LEN;
-    }) -> () error zx.Status;
-
-    /// Unbind all the children of this device, and then attempt to bind a driver to the device.
-    /// This will not return until the bind completes.
-    /// + request `driver` This represents the suffix of a driver URL (e.g: "fvm.cm").
-    ///            If this is non-empty, then the only drivers that will try to bind
-    ///            are ones that match this url suffix.
-    strict Rebind(struct {
-        driver string:MAX_DRIVER_PATH_LEN;
-    }) -> () error zx.Status;
-
-    /// This api will unbind all the children of this device synchronously.
-    /// This will avoid watching for device removal by the clients.
-    strict UnbindChildren() -> () error zx.Status;
-
-    /// Disconnect this device and allow its parent to be bound again.
-    /// This may not complete before it returns.
-    strict ScheduleUnbind() -> () error zx.Status;
-
-    /// Return the topological path for this device
-    strict GetTopologicalPath() -> (struct {
-        path string:MAX_DEVICE_PATH_LEN;
-    }) error zx.Status;
-};
-
 // This protocol exists to separate topological paths from the rest of the controller
 // usage.
 @available(added=HEAD)

@@ -9,6 +9,7 @@ product_download.json
 product_get-artifacts.json
 product_get-image-path.json
 product_lookup.json
+log.json
 repository_create.json
 repository_publish.json
 repository_server_start.json

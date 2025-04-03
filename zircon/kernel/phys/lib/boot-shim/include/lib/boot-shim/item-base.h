@@ -102,6 +102,9 @@ class SingleOptionalItem : public ItemBase {
                     : fit::ok();
   }
 
+  constexpr std::optional<Payload>& payload() { return payload_; }
+  constexpr const std::optional<Payload>& payload() const { return payload_; }
+
  private:
   std::optional<Payload> payload_;
 };

@@ -3,12 +3,9 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::SynchronousProxy;
-use fidl::Peered;
 use fidl_fuchsia_hardware_adb as fadb;
 use futures_util::StreamExt;
-use starnix_core::power::{
-    create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
-};
+use starnix_core::power::create_proxy_for_wake_events_counter;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
@@ -16,9 +13,7 @@ use starnix_core::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
-use starnix_logging::{
-    log_error, log_warn, trace_instant, track_stub, TraceScope, CATEGORY_STARNIX,
-};
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
@@ -29,7 +24,6 @@ use starnix_uapi::{
     errno, error, gid_t, ino_t, statfs, uid_t, usb_functionfs_event,
     usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_ENABLE,
 };
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::sync::mpsc;
@@ -54,21 +48,6 @@ const FUNCTIONFS_MAGIC: u32 = 0xa647361;
 
 const ADB_DIRECTORY: &str = "/svc/fuchsia.hardware.adb.Service";
 
-/// Clear our wake proxy signal based on the number of outstanding reads we have.
-pub fn clear_wake_proxy_signal(event: &zx::EventPair, outstanding_reads: i32) {
-    // We only want to let the kernel go to sleep if there is at least one read outstanding.
-    let clear_mask =
-        if outstanding_reads > 0 { RUNNER_PROXY_EVENT_SIGNAL } else { zx::Signals::empty() };
-
-    // We always want to raise the kernel signal so that we will get more FIDL messages.
-    let set_mask = KERNEL_PROXY_EVENT_SIGNAL;
-    trace_instant!(CATEGORY_STARNIX, c"functionfs-signal", TraceScope::Process, "clear_mask" => clear_mask.bits(), "set_mask" => set_mask.bits());
-    match event.signal_peer(clear_mask, set_mask) {
-        Ok(_) => (),
-        Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
-    }
-}
-
 struct ReadCommand {
     response_sender: mpsc::Sender<Result<Vec<u8>, Errno>>,
 }
@@ -88,22 +67,21 @@ struct WriteCommand {
 /// clearing the proxy signal, but only clearing the kernel signal if we have an outstanding read.
 async fn handle_adb(
     proxy: fadb::UsbAdbImpl_Proxy,
-    resume_event: Option<zx::EventPair>,
+    message_counter: Option<zx::Counter>,
     read_commands: async_channel::Receiver<ReadCommand>,
     write_commands: async_channel::Receiver<WriteCommand>,
 ) {
     /// Handle all of the events coming from the ADB device.
     async fn handle_events(
         mut stream: fadb::UsbAdbImpl_EventStream,
-        outstanding_reads: &RefCell<i32>,
-        resume_event: &Option<zx::EventPair>,
+        message_counter: &Option<zx::Counter>,
     ) {
         while let Some(_next) = stream.next().await {
             // We can simply clear this after getting a response because we care about
             // reads. Allow new FIDL messages to come through and only go to sleep if
             // we have an outstanding read.
-            resume_event.as_ref().map(|e| {
-                clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+            message_counter.as_ref().map(|c| {
+                c.add(-1).expect("Failed message decrement");
             });
         }
     }
@@ -111,22 +89,20 @@ async fn handle_adb(
     /// Handle the commands coming from the main thread.
     async fn handle_read_commands(
         proxy: &fadb::UsbAdbImpl_Proxy,
-        outstanding_reads: &RefCell<i32>,
-        resume_event: &Option<zx::EventPair>,
+        message_counter: &Option<zx::Counter>,
         commands: async_channel::Receiver<ReadCommand>,
     ) {
-        let resume_event = resume_event.as_ref();
+        let message_counter = message_counter.as_ref();
         commands
             .for_each(|ReadCommand { response_sender }| async move {
-                outstanding_reads.replace_with(|&mut old| old + 1);
-
-                // Queue up our receive future. We want to do this before we lower the
-                // signal allowing us to go to sleep.
+                // Queue up our receive future. We want to do this before we decrement the counter,
+                // which potentially allows the container to suspend.
                 let receive_future = proxy.receive();
 
-                // Our future is queued, now we can lower our signals.
-                resume_event.as_ref().map(|e| {
-                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                // The message is queued in the channel, so now we can decrement the unhandled
+                // message counter to make sure we aren't preventing the container from suspending.
+                message_counter.as_ref().map(|c| {
+                    c.add(-1).expect("Failed message decrement");
                 });
 
                 let response = match receive_future.await {
@@ -141,12 +117,6 @@ async fn handle_adb(
                     Ok(Ok(payload)) => Ok(payload),
                 };
 
-                outstanding_reads.replace_with(|&mut old| old - 1);
-
-                resume_event.as_ref().map(|e| {
-                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
-                });
-
                 response_sender
                     .send(response)
                     .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
@@ -158,11 +128,9 @@ async fn handle_adb(
     /// Handle the commands coming from the main thread.
     async fn handle_write_commands(
         proxy: &fadb::UsbAdbImpl_Proxy,
-        outstanding_reads: &RefCell<i32>,
-        resume_event: &Option<zx::EventPair>,
+        message_counter: &Option<zx::Counter>,
         commands: async_channel::Receiver<WriteCommand>,
     ) {
-        let resume_event = resume_event.as_ref();
         commands
             .for_each(|WriteCommand { data, response_sender }| async move {
                 let response = match proxy.queue_tx(&data).await {
@@ -177,11 +145,10 @@ async fn handle_adb(
                     Ok(Ok(_)) => Ok(data.len()),
                 };
 
-                // We can simply clear this after getting a response because we care about
-                // reads. Allow new FIDL messages to come through and only go to sleep if
-                // we have an outstanding read.
-                resume_event.as_ref().map(|e| {
-                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                // We can simply decrement this after getting a response because responses to
+                // writes from the container to the host are not expected to wake the container.
+                message_counter.as_ref().map(|c| {
+                    c.add(-1).expect("Failed message decrement");
                 });
                 response_sender
                     .send(response)
@@ -192,12 +159,9 @@ async fn handle_adb(
     }
 
     // Run our three futures at the same time.
-    let outstanding_reads = RefCell::new(0);
-    let event_future = handle_events(proxy.take_event_stream(), &outstanding_reads, &resume_event);
-    let write_commands_future =
-        handle_write_commands(&proxy, &outstanding_reads, &resume_event, write_commands);
-    let read_commands_future =
-        handle_read_commands(&proxy, &outstanding_reads, &resume_event, read_commands);
+    let event_future = handle_events(proxy.take_event_stream(), &message_counter);
+    let write_commands_future = handle_write_commands(&proxy, &message_counter, write_commands);
+    let read_commands_future = handle_read_commands(&proxy, &message_counter, read_commands);
     futures::join!(event_future, write_commands_future, read_commands_future);
 }
 
@@ -298,7 +262,7 @@ pub enum AdbProxyMode {
 fn connect_to_device(
     proxy: AdbProxyMode,
 ) -> Result<
-    (fadb::DeviceSynchronousProxy, fadb::UsbAdbImpl_SynchronousProxy, Option<zx::EventPair>),
+    (fadb::DeviceSynchronousProxy, fadb::UsbAdbImpl_SynchronousProxy, Option<zx::Counter>),
     Errno,
 > {
     let mut dir = std::fs::read_dir(ADB_DIRECTORY).map_err(|_| errno!(EINVAL))?;
@@ -314,13 +278,13 @@ fn connect_to_device(
     let device_proxy = fadb::DeviceSynchronousProxy::new(client_channel);
 
     let (adb_proxy, server_end) = fidl::endpoints::create_sync_proxy::<fadb::UsbAdbImpl_Marker>();
-    let (adb_proxy, adb_proxy_resume_event) = match proxy {
+    let (adb_proxy, message_counter) = match proxy {
         AdbProxyMode::None => (adb_proxy, None),
         AdbProxyMode::WakeContainer => {
-            let (adb_proxy, adb_proxy_resume_event) =
-                create_proxy_for_wake_events(adb_proxy.into_channel(), "adb".to_string());
+            let (adb_proxy, message_counter) =
+                create_proxy_for_wake_events_counter(adb_proxy.into_channel(), "adb".to_string());
             let adb_proxy = fadb::UsbAdbImpl_SynchronousProxy::from_channel(adb_proxy);
-            (adb_proxy, Some(adb_proxy_resume_event))
+            (adb_proxy, Some(message_counter))
         }
     };
 
@@ -333,16 +297,18 @@ fn connect_to_device(
         let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
             .wait_for_event(zx::MonotonicInstant::INFINITE)
             .expect("failed to wait for event");
-        // We want to clear our signals because we we received a FIDL call.
-        // We have no outstanding reads so keep ourselves awake.
-        adb_proxy_resume_event.as_ref().map(|e| {
-            clear_wake_proxy_signal(e, 0);
+
+        // Decrement the counter after we receive a response, since we don't need to schedule
+        // another message before allowing the container to suspend.
+        message_counter.as_ref().map(|c| {
+            c.add(-1).expect("Failed to decrement");
         });
+
         if status == fadb::StatusFlags::ONLINE {
             break;
         }
     }
-    return Ok((device_proxy, adb_proxy, adb_proxy_resume_event));
+    return Ok((device_proxy, adb_proxy, message_counter));
 }
 
 #[derive(Default)]
@@ -359,7 +325,7 @@ impl FunctionFsRootDir {
         if state.has_input_output_endpoints {
             return Ok(());
         }
-        let (device_proxy, adb_proxy, adb_proxy_resume_event) =
+        let (device_proxy, adb_proxy, message_counter) =
             connect_to_device(AdbProxyMode::WakeContainer)?;
         state.device_proxy = Some(device_proxy);
 
@@ -374,13 +340,8 @@ impl FunctionFsRootDir {
             let adb_proxy = fadb::UsbAdbImpl_Proxy::new(fidl::AsyncChannel::from_channel(
                 adb_proxy.into_channel(),
             ));
-            handle_adb(
-                adb_proxy,
-                adb_proxy_resume_event,
-                read_command_receiver,
-                write_command_receiver,
-            )
-            .await
+            handle_adb(adb_proxy, message_counter, read_command_receiver, write_command_receiver)
+                .await
         });
 
         state.has_input_output_endpoints = true;

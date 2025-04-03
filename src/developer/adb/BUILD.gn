@@ -6,10 +6,6 @@ group("adb") {
   deps = [ "bin" ]
 }
 
-group("core_shards") {
-  deps = [ "bin:core_shards" ]
-}
-
 group("drivers") {
   deps = [ "drivers/usb-adb-function" ]
 }

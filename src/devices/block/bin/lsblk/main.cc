@@ -4,7 +4,7 @@
 
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <inttypes.h>
@@ -29,15 +29,16 @@
 #include <gpt/guid.h>
 #include <pretty/hexdump.h>
 
+#include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace fuchsia_block = fuchsia_hardware_block;
-namespace fuchsia_partition = fuchsia_hardware_block_partition;
+namespace fuchsia_volume = fuchsia_hardware_block_volume;
 namespace fuchsia_skipblock = fuchsia_hardware_skipblock;
 
 namespace {
 
-constexpr char DEV_BLOCK[] = "/dev/class/block";
+constexpr char DEV_BLOCK[] = "/block";
 constexpr char DEV_SKIP_BLOCK[] = "/dev/class/skip-block";
 
 char* size_to_cstring(char* str, size_t maxlen, uint64_t size) {
@@ -80,32 +81,13 @@ int cmd_list_blk() {
       continue;
     }
     std::string device_path = fxl::StringPrintf("%s/%s", DEV_BLOCK, de->d_name);
-    std::string controller_path = device_path + "/device_controller";
+    std::string volume_path = device_path + "/fuchsia.hardware.block.volume.Volume";
+    std::string source_path = device_path + "/source";
 
-    std::string topological_path;
-    {
-      zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
-      if (controller.is_error()) {
-        fprintf(stderr, "Error opening %s: %s\n", controller_path.c_str(),
-                controller.status_string());
-        continue;
-      }
-      fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
-      if (!result.ok()) {
-        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
-                result.status_string());
-        continue;
-      }
-      fit::result response = result.value();
-      if (response.is_error()) {
-        fprintf(stderr, "Error getting topological path for %s: %s\n", controller_path.c_str(),
-                zx_status_get_string(response.error_value()));
-        continue;
-      }
-      topological_path = response.value()->path.get();
-    }
+    std::string source;
+    files::ReadFileToString(source_path, &source);
 
-    zx::result device = component::Connect<fuchsia_partition::Partition>(device_path);
+    zx::result device = component::Connect<fuchsia_volume::Volume>(volume_path);
     if (device.is_error()) {
       fprintf(stderr, "Error opening %s: %s\n", device_path.c_str(), device.status_string());
       continue;
@@ -149,7 +131,7 @@ int cmd_list_blk() {
       strlcat(flags, "BP ", sizeof(flags));
     }
     printf("%-3s %4s %-16s %-20s %-6s %s\n", de->d_name, sizestr, type.c_str(), label.c_str(),
-           flags, topological_path.c_str());
+           flags, source.c_str());
   }
   return 0;
 }

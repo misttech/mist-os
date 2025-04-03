@@ -151,11 +151,11 @@ type PixelFormat = flexible enum {
     /// RGB only, 8 bits per each of R/G/B/A sample
     ///
     /// If A is actually X (not set to meaningful values), that can be specified
-    /// by settting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present']
+    /// by settting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present']
     /// to false.
     ///
     /// If A is known to be set to meaningful values, that can be specified by
-    /// setting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] to
+    /// setting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] to
     /// true.
     ///
     /// Compatible with VK_FORMAT_R8G8B8A8_UNORM.
@@ -166,7 +166,7 @@ type PixelFormat = flexible enum {
     /// Compatible with VK_FORMAT_R8G8B8A8_UNORM, when treated as opaque.
     ///
     /// Deprecated. Use `R8G8B8A8` with
-    /// ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] set to false
+    /// ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] set to false
     /// instead.
     @available(added=12, deprecated=24)
     R8G8B8X8 = 119;
@@ -176,11 +176,11 @@ type PixelFormat = flexible enum {
     /// Compatible with VK_FORMAT_B8G8R8A8_UNORM.
     ///
     /// If A is actually X (not set to meaningful values), that can be specified
-    /// by settting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present']
+    /// by settting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present']
     /// to false.
     ///
     /// If A is known to be set to meaningful values, that can be specified by
-    /// setting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] to
+    /// setting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] to
     /// true.
     ///
     /// In sysmem(1), this is BGRA32.
@@ -191,7 +191,7 @@ type PixelFormat = flexible enum {
     /// Compatible with VK_FORMAT_B8G8R8A8_UNORM, when treated as opaque.
     ///
     /// Deprecated. Use `B8G8R8A8` with
-    /// [`fuchsia.sysemm2/ImageFormatConstraints.is_alpha_present`] set to false
+    /// [`fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present`] set to false
     /// instead.
     @available(added=12, deprecated=24)
     B8G8R8X8 = 120;
@@ -253,11 +253,11 @@ type PixelFormat = flexible enum {
     /// Not compatible with any vulkan format.
     ///
     /// If X is actually X (not set to meaningful values), that can be specified
-    /// by settting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present']
+    /// by settting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present']
     /// to false.
     ///
     /// If X is known to be set to meaningful values, that can be specified by
-    /// setting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] to
+    /// setting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] to
     /// true.
     ///
     /// In sysmem(1), this is RGB2220.
@@ -283,11 +283,11 @@ type PixelFormat = flexible enum {
     /// 32bpp RGBA, 1 plane. 2 bits A, 10 bits R/G/B.
     ///
     /// If A is actually X (not set to meaningful values), that can be specified
-    /// by settting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present']
+    /// by settting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present']
     /// to false.
     ///
     /// If A is known to be set to meaningful values, that can be specified by
-    /// setting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] to
+    /// setting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] to
     /// true.
     ///
     /// Compatible with VK_FORMAT_A2R10G10B10_UNORM_PACK32.
@@ -296,11 +296,11 @@ type PixelFormat = flexible enum {
     /// 32bpp BGRA, 1 plane. 2 bits A, 10 bits R/G/B.
     ///
     /// If A is actually X (not set to meaningful values), that can be specified
-    /// by settting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present']
+    /// by settting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present']
     /// to false.
     ///
     /// If A is known to be set to meaningful values, that can be specified by
-    /// setting ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] to
+    /// setting ['fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present'] to
     /// true.
     ///
     /// Compatible with VK_FORMAT_A2B10G10R10_UNORM_PACK32.

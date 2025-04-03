@@ -40,6 +40,7 @@ use log::{debug, error, info, warn};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use time_adjust::Command;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use zx::BootTimeline;
 use {
@@ -48,13 +49,6 @@ use {
 };
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
-
-/// A command sent from various FIDL clients.
-#[derive(Debug)]
-pub enum Command {
-    /// A power management command.
-    PowerManagement,
-}
 
 /// The type union of FIDL messages served by Timekeeper.
 pub enum Rpcs {
@@ -166,6 +160,16 @@ impl Config {
     fn serve_fuchsia_time_external_adjust(&self) -> bool {
         self.source_config.serve_fuchsia_time_external_adjust
     }
+
+    fn max_window_width_past(&self) -> UtcDuration {
+        assert!(self.source_config.utc_max_allowed_delta_past_sec >= 0);
+        UtcDuration::from_seconds(self.source_config.utc_max_allowed_delta_past_sec)
+    }
+
+    fn max_window_width_future(&self) -> UtcDuration {
+        assert!(self.source_config.utc_max_allowed_delta_future_sec >= 0);
+        UtcDuration::from_seconds(self.source_config.utc_max_allowed_delta_future_sec)
+    }
 }
 
 /// A definition which time sources to install, along with the URL and child names for each.
@@ -215,8 +219,14 @@ fn koid_of(c: &UtcClock) -> u64 {
 #[fuchsia::main(logging_tags=["time", "timekeeper"])]
 async fn main() -> Result<()> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-    let config: Arc<Config> =
-        Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
+    // The root inspect node in the inspect hierarchy.
+    let inspector_root = diagnostics::INSPECTOR.root();
+
+    let structured_config_node = inspector_root.create_child("structured_config");
+    let structured_config = timekeeper_config::Config::take_from_startup_handle();
+    structured_config.record_inspect(&structured_config_node);
+
+    let config: Arc<Config> = Arc::new(structured_config.into());
 
     // If we don't get this, timekeeper probably didn't even start.
     debug!("starting timekeeper: config: {:?}", &config);
@@ -251,13 +261,17 @@ async fn main() -> Result<()> {
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
-    // The root inspect node in the inspect hierarchy.
-    let inspector_root = diagnostics::INSPECTOR.root();
+    let enable_user_utc_adjustment = config.serve_fuchsia_time_external_adjust();
 
     info!("initializing diagnostics and serving inspect on servicefs");
     let cobalt_experiment = COBALT_EXPERIMENT;
     let diagnostics = Arc::new(CompositeDiagnostics::new(
-        InspectDiagnostics::new(inspector_root, &primary_track, &monitor_track),
+        InspectDiagnostics::new(
+            inspector_root,
+            &primary_track,
+            &monitor_track,
+            enable_user_utc_adjustment,
+        ),
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
@@ -280,7 +294,6 @@ async fn main() -> Result<()> {
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
-    let serve_adjust = config.serve_fuchsia_time_external_adjust();
     let ps = persistent_state.clone();
 
     if config.has_always_on_counter() {
@@ -349,7 +362,7 @@ async fn main() -> Result<()> {
         fs.dir("svc").add_fidl_service(Rpcs::Wake);
         info!("serving protocol: fuchsia.time.alarms/Wake");
     }
-    if serve_adjust {
+    if enable_user_utc_adjustment {
         fs.dir("svc").add_fidl_service(Rpcs::Adjust);
         info!("serving protocol: fuchsia.time.alarms/Adjust");
     }
@@ -381,7 +394,12 @@ async fn main() -> Result<()> {
 
     let rtc_test_server = Rc::new(rtc_testing::Server::new(persistence_health, persistent_state));
 
-    let adjust_server = Rc::new(if serve_adjust { Some(time_adjust::Server::new()) } else { None });
+    let adjust_server = Rc::new(if enable_user_utc_adjustment {
+        let cmd_send_clone = cmd_send.clone();
+        Some(time_adjust::Server::new(cmd_send_clone))
+    } else {
+        None
+    });
 
     // fuchsia::main can only return () or Result<()>.
     let result = fs
@@ -678,7 +696,9 @@ async fn maintain_utc<R: Rtc, D: 'static>(
 
 // Reexport test config creation to be used in other tests.
 #[cfg(test)]
-use tests::{make_test_config, make_test_config_with_delay};
+use tests::{
+    make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+};
 
 #[cfg(test)]
 mod tests {
@@ -689,10 +709,13 @@ mod tests {
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use fidl_fuchsia_time_external as ftexternal;
     use fuchsia_runtime::{UtcClockUpdate, UtcInstant};
+    use futures::Future;
     use lazy_static::lazy_static;
     use std::matches;
     use std::pin::pin;
+    use std::task::Poll;
     use test_case::test_case;
+    use test_util::assert_leq;
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const OFFSET: zx::BootDuration = zx::BootDuration::from_seconds(1111_000);
@@ -704,6 +727,51 @@ mod tests {
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
+    }
+
+    // Run the future `main_fut` in fake time.  The fake time is being advanced
+    // in relatively small increments until a specified `total_duration` has
+    // elapsed.
+    //
+    // This complication is needed to ensure that any expired
+    // timers are awoken in the correct sequence because the test executor does
+    // not automatically wake the timers. For the fake time execution to
+    // be comparable to a real time execution, we need each timer to have the
+    // chance of waking up, so that we can properly process the consequences
+    // of that timer firing.
+    //
+    // We require that `main_fut` has completed at `total_duration`, and panic
+    // if it has not.  This ensures that we never block forever in fake time.
+    //
+    // This method could possibly be implemented in [TestExecutor] for those
+    // test executor users who do not care to wake the timers in any special
+    // way.
+    pub fn run_in_fake_time<F>(
+        executor: &mut fasync::TestExecutor,
+        main_fut: &mut F,
+        total_duration: fasync::MonotonicDuration,
+    ) -> Poll<()>
+    where
+        F: Future<Output = ()> + Unpin,
+    {
+        const INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1);
+        // Run the loop for a bit longer than the fake time needed to pump all
+        // the events, to allow the event queue to drain.
+        let mut current = zx::MonotonicDuration::from_millis(0);
+        let mut poll_status = Poll::Pending;
+
+        // We run until either the future completes or the timeout is reached,
+        // whichever comes first.
+        // Running the future after it returns Poll::Ready is not allowed, so
+        // we must exit the loop then.
+        while current < total_duration && poll_status == Poll::Pending {
+            let fake_time = executor.now() + INCREMENT;
+            executor.set_fake_time(fake_time.into());
+            executor.wake_expired_timers();
+            poll_status = executor.run_until_stalled(main_fut);
+            current = current + INCREMENT;
+        }
+        poll_status
     }
 
     fn new_state_for_test(value: bool) -> Rc<RefCell<time_persistence::State>> {
@@ -719,12 +787,11 @@ mod tests {
         (Arc::new(clock), initial_update_ticks)
     }
 
-    pub fn make_test_config_with_params(
-        delay: i64,
-        serve_test_protocols: bool,
-        force_start: bool,
-    ) -> Arc<Config> {
-        Arc::new(Config::from(timekeeper_config::Config {
+    pub fn make_test_config_with_fn<T>(adjust_fn: T) -> Arc<Config>
+    where
+        T: FnOnce(timekeeper_config::Config) -> timekeeper_config::Config,
+    {
+        let config = timekeeper_config::Config {
             disable_delays: true,
             oscillator_error_std_dev_ppm: 15,
             max_frequency_error_ppm: 10,
@@ -732,21 +799,36 @@ mod tests {
             initial_frequency_ppm: 1_000_000,
             monitor_uses_pull: false,
             back_off_time_between_pull_samples_sec: 0,
-            first_sampling_delay_sec: delay,
+            first_sampling_delay_sec: 0,
             monitor_time_source_url: "".to_string(),
             primary_uses_pull: false,
-            utc_start_at_startup: force_start,
-            utc_start_at_startup_when_invalid_rtc: force_start,
+            utc_start_at_startup: false,
+            utc_start_at_startup_when_invalid_rtc: false,
             early_exit: false,
             power_topology_integration_enabled: false,
-            serve_test_protocols,
             has_real_time_clock: true,
             serve_fuchsia_time_alarms: false,
             has_always_on_counter: false,
             serve_fuchsia_time_external_adjust: false,
             utc_max_allowed_delta_future_sec: 0,
             utc_max_allowed_delta_past_sec: 0,
-        }))
+            serve_test_protocols: false,
+        };
+        Arc::new(Config::from(adjust_fn(config)))
+    }
+
+    pub fn make_test_config_with_params(
+        delay: i64,
+        serve_test_protocols: bool,
+        force_start: bool,
+    ) -> Arc<Config> {
+        make_test_config_with_fn(|mut config| {
+            config.first_sampling_delay_sec = delay;
+            config.serve_test_protocols = serve_test_protocols;
+            config.utc_start_at_startup = force_start;
+            config.utc_start_at_startup_when_invalid_rtc = force_start;
+            config
+        })
     }
 
     pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
@@ -1048,7 +1130,11 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc_force_start() {
-        let mut executor = fasync::TestExecutor::new();
+        let real_boot_now = zx::MonotonicInstant::get();
+
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time((real_boot_now + zx::MonotonicDuration::from_nanos(1000)).into());
+
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -1074,16 +1160,13 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        // Run beyond first sample update.
+        let _ignore_poll =
+            run_in_fake_time(&mut executor, &mut fut, zx::MonotonicDuration::from_millis(1));
 
         // Checking that the clock has not been updated yet
         let last_value_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
-        assert!(
-            initial_update_ticks < last_value_update_ticks,
-            "initial_update_ticks={}, last_value_update_ticks={}",
-            initial_update_ticks,
-            last_value_update_ticks
-        );
+        assert_leq!(initial_update_ticks, last_value_update_ticks);
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.

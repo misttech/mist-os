@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::atomic_future::AtomicFuture;
-use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
+use super::atomic_future::AtomicFutureHandle;
+use super::common::{EHandle, Executor, ExecutorTime, TaskHandle, MAIN_TASK_ID};
 use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
 use zx::BootDuration;
@@ -67,29 +67,31 @@ impl LocalExecutor {
             "Error: called `run_singlethreaded` on an executor using fake time"
         );
 
-        let Poll::Ready(result) = self.run::</* UNTIL_STALLED: */ false, F::Output>(
-            // SAFETY: This is a singlethreaded executor, so the future will never be sent across
-            // threads.
-            unsafe { AtomicFuture::new_local(main_future, false) }
-        ) else {
+        let Poll::Ready(result) = self.run::</* UNTIL_STALLED: */ false, _>(main_future) else {
             unreachable!()
         };
         result
     }
 
-    fn run<const UNTIL_STALLED: bool, R>(&mut self, main_future: AtomicFuture<'_>) -> Poll<R> {
+    fn run<const UNTIL_STALLED: bool, Fut: Future>(
+        &mut self,
+        main_future: Fut,
+    ) -> Poll<Fut::Output> {
         /// # Safety
         ///
         /// See the comment below.
-        unsafe fn remove_lifetime(obj: AtomicFuture<'_>) -> AtomicFuture<'static> {
+        unsafe fn remove_lifetime(obj: AtomicFutureHandle<'_>) -> TaskHandle {
             std::mem::transmute(obj)
         }
 
+        let scope = &self.ehandle.root_scope;
+        let task = scope.new_local_task(Some(MAIN_TASK_ID), main_future);
+
         // SAFETY: Erasing the lifetime is safe because we make sure to drop the main task within
         // the required lifetime.
-        self.ehandle
-            .inner()
-            .spawn_main(&self.ehandle.root_scope, unsafe { remove_lifetime(main_future) });
+        unsafe {
+            scope.insert_task(remove_lifetime(task), false);
+        }
 
         struct DropMainTask<'a>(&'a EHandle);
         impl Drop for DropMainTask<'_> {
@@ -236,10 +238,7 @@ impl TestExecutor {
             Some(Box::new(UntilStalledData { watcher: None }));
 
         loop {
-            let result = self.local.run::</* UNTIL_STALLED: */ true, F::Output>(
-                // SAFETY: We don't move the main future across threads.
-                unsafe { AtomicFuture::new_local(main_future.as_mut(), false) }
-            );
+            let result = self.local.run::</* UNTIL_STALLED: */ true, _>(main_future.as_mut());
             if result.is_ready() {
                 return result;
             }

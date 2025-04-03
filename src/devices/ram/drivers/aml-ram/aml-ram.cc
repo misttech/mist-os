@@ -8,8 +8,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver-unit-test/utils.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
 
@@ -97,19 +97,28 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
 
 zx::result<std::unique_ptr<AmlRam>> AmlRam::Create(zx_device_t* parent) {
   zx_status_t status;
-  ddk::PDevFidl pdev(parent);
-  std::optional<fdf::MmioBuffer> mmio;
-  if ((status = pdev.MapMmio(0, &mmio)) != ZX_OK) {
-    zxlogf(ERROR, "aml-ram: Failed to map mmio, st = %d", status);
-    return zx::error(status);
+
+  zx::result pdev_client_end =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.take_error();
+  }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.take_error();
   }
 
-  zx::interrupt irq;
-  status = pdev.GetInterrupt(0, 0, &irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-ram: Failed to map interrupt, st = %d", status);
-    return zx::error(status);
+  zx::result irq_result = pdev.GetInterrupt(0);
+  if (irq_result.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupted: %s", irq_result.status_string());
+    return irq_result.take_error();
   }
+  zx::interrupt irq = std::move(irq_result.value());
 
   zx::port port;
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
@@ -124,28 +133,31 @@ zx::result<std::unique_ptr<AmlRam>> AmlRam::Create(zx_device_t* parent) {
     return zx::error(status);
   }
 
-  pdev_device_info_t info;
-  status = pdev.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-ram: Failed to get device info, st = %d", status);
-    return zx::error(status);
+  zx::result info_result = pdev.GetDeviceInfo();
+  if (info_result.is_error()) {
+    zxlogf(ERROR, "Failed to get device info: %s", info_result.status_string());
+    return info_result.take_error();
   }
+  fdf::PDev::DeviceInfo info = std::move(info_result.value());
 
   zx::resource smc_monitor = {};
   if (info.pid == PDEV_PID_AMLOGIC_A5) {
-    status = pdev.GetSmc(0, &smc_monitor);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "unable to get sip monitor handle: %s", zx_status_get_string(status));
-      return zx::error(status);
+    zx::result result = pdev.GetSmc(0);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to get sip monitor handle: %s", result.status_string());
+      return result.take_error();
     }
+    smc_monitor = std::move(result.value());
   }
 
   std::optional<fdf::MmioBuffer> clk_mmio;
   if (info.pid == PDEV_PID_AMLOGIC_A1) {
-    if ((status = pdev.MapMmio(1, &clk_mmio)) != ZX_OK) {
-      zxlogf(ERROR, "Failed to map mmio: %s", zx_status_get_string(status));
-      return zx::error(status);
+    zx::result result = pdev.MapMmio(1);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to map clock mmio: %s", result.status_string());
+      return result.take_error();
     }
+    clk_mmio.emplace(std::move(result.value()));
   }
 
   fbl::AllocChecker ac;

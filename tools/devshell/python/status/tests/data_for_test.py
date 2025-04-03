@@ -17,12 +17,14 @@ universe_package_labels = [
   "//scripts:tests",
   "//tools/devshell/python:tests",
 ]
+developer_test_labels = []
 base_package_labels += ["//src:tests", "//other:tests"]
 base_package_labels -= ["//src:tests"]
 cache_package_labels = ["//src/other:tests"]
+developer_test_labels = ["//src/other:tests"]
 """
 
-# This JSON output results from running `gn format --dump-tree=json`
+# This JSON output results from running `gn format --dump-tree=json --stdin`
 # on the above content. If you change the base template, make sure
 # to update this value.
 ARGS_GN_JSON = r"""
@@ -276,46 +278,28 @@ ARGS_GN_JSON = r"""
          "location": {
             "begin_column": 1,
             "begin_line": 14,
-            "end_column": 20,
+            "end_column": 22,
             "end_line": 14
          },
          "type": "IDENTIFIER",
-         "value": "base_package_labels"
+         "value": "developer_test_labels"
       }, {
          "begin_token": "[",
-         "child": [ {
-            "location": {
-               "begin_column": 25,
-               "begin_line": 14,
-               "end_column": 38,
-               "end_line": 14
-            },
-            "type": "LITERAL",
-            "value": "\"//src:tests\""
-         }, {
-            "location": {
-               "begin_column": 40,
-               "begin_line": 14,
-               "end_column": 55,
-               "end_line": 14
-            },
-            "type": "LITERAL",
-            "value": "\"//other:tests\""
-         } ],
+         "child": [  ],
          "end": {
             "location": {
-               "begin_column": 55,
+               "begin_column": 26,
                "begin_line": 14,
-               "end_column": 56,
+               "end_column": 27,
                "end_line": 14
             },
             "type": "END",
             "value": "]"
          },
          "location": {
-            "begin_column": 24,
+            "begin_column": 25,
             "begin_line": 14,
-            "end_column": 55,
+            "end_column": 26,
             "end_line": 14
          },
          "type": "LIST"
@@ -323,11 +307,11 @@ ARGS_GN_JSON = r"""
       "location": {
          "begin_column": 1,
          "begin_line": 14,
-         "end_column": 55,
+         "end_column": 26,
          "end_line": 14
       },
       "type": "BINARY",
-      "value": "+="
+      "value": "="
    }, {
       "child": [ {
          "location": {
@@ -349,12 +333,21 @@ ARGS_GN_JSON = r"""
             },
             "type": "LITERAL",
             "value": "\"//src:tests\""
+         }, {
+            "location": {
+               "begin_column": 40,
+               "begin_line": 15,
+               "end_column": 55,
+               "end_line": 15
+            },
+            "type": "LITERAL",
+            "value": "\"//other:tests\""
          } ],
          "end": {
             "location": {
-               "begin_column": 38,
+               "begin_column": 55,
                "begin_line": 15,
-               "end_column": 39,
+               "end_column": 56,
                "end_line": 15
             },
             "type": "END",
@@ -363,7 +356,7 @@ ARGS_GN_JSON = r"""
          "location": {
             "begin_column": 24,
             "begin_line": 15,
-            "end_column": 38,
+            "end_column": 55,
             "end_line": 15
          },
          "type": "LIST"
@@ -371,8 +364,56 @@ ARGS_GN_JSON = r"""
       "location": {
          "begin_column": 1,
          "begin_line": 15,
-         "end_column": 38,
+         "end_column": 55,
          "end_line": 15
+      },
+      "type": "BINARY",
+      "value": "+="
+   }, {
+      "child": [ {
+         "location": {
+            "begin_column": 1,
+            "begin_line": 16,
+            "end_column": 20,
+            "end_line": 16
+         },
+         "type": "IDENTIFIER",
+         "value": "base_package_labels"
+      }, {
+         "begin_token": "[",
+         "child": [ {
+            "location": {
+               "begin_column": 25,
+               "begin_line": 16,
+               "end_column": 38,
+               "end_line": 16
+            },
+            "type": "LITERAL",
+            "value": "\"//src:tests\""
+         } ],
+         "end": {
+            "location": {
+               "begin_column": 38,
+               "begin_line": 16,
+               "end_column": 39,
+               "end_line": 16
+            },
+            "type": "END",
+            "value": "]"
+         },
+         "location": {
+            "begin_column": 24,
+            "begin_line": 16,
+            "end_column": 38,
+            "end_line": 16
+         },
+         "type": "LIST"
+      } ],
+      "location": {
+         "begin_column": 1,
+         "begin_line": 16,
+         "end_column": 38,
+         "end_line": 16
       },
       "type": "BINARY",
       "value": "-="
@@ -380,9 +421,9 @@ ARGS_GN_JSON = r"""
       "child": [ {
          "location": {
             "begin_column": 1,
-            "begin_line": 16,
+            "begin_line": 17,
             "end_column": 21,
-            "end_line": 16
+            "end_line": 17
          },
          "type": "IDENTIFIER",
          "value": "cache_package_labels"
@@ -391,9 +432,9 @@ ARGS_GN_JSON = r"""
          "child": [ {
             "location": {
                "begin_column": 25,
-               "begin_line": 16,
+               "begin_line": 17,
                "end_column": 44,
-               "end_line": 16
+               "end_line": 17
             },
             "type": "LITERAL",
             "value": "\"//src/other:tests\""
@@ -401,26 +442,74 @@ ARGS_GN_JSON = r"""
          "end": {
             "location": {
                "begin_column": 44,
-               "begin_line": 16,
+               "begin_line": 17,
                "end_column": 45,
-               "end_line": 16
+               "end_line": 17
             },
             "type": "END",
             "value": "]"
          },
          "location": {
             "begin_column": 24,
-            "begin_line": 16,
+            "begin_line": 17,
             "end_column": 44,
-            "end_line": 16
+            "end_line": 17
          },
          "type": "LIST"
       } ],
       "location": {
          "begin_column": 1,
-         "begin_line": 16,
+         "begin_line": 17,
          "end_column": 44,
-         "end_line": 16
+         "end_line": 17
+      },
+      "type": "BINARY",
+      "value": "="
+   }, {
+      "child": [ {
+         "location": {
+            "begin_column": 1,
+            "begin_line": 18,
+            "end_column": 22,
+            "end_line": 18
+         },
+         "type": "IDENTIFIER",
+         "value": "developer_test_labels"
+      }, {
+         "begin_token": "[",
+         "child": [ {
+            "location": {
+               "begin_column": 26,
+               "begin_line": 18,
+               "end_column": 45,
+               "end_line": 18
+            },
+            "type": "LITERAL",
+            "value": "\"//src/other:tests\""
+         } ],
+         "end": {
+            "location": {
+               "begin_column": 45,
+               "begin_line": 18,
+               "end_column": 46,
+               "end_line": 18
+            },
+            "type": "END",
+            "value": "]"
+         },
+         "location": {
+            "begin_column": 25,
+            "begin_line": 18,
+            "end_column": 45,
+            "end_line": 18
+         },
+         "type": "LIST"
+      } ],
+      "location": {
+         "begin_column": 1,
+         "begin_line": 18,
+         "end_column": 45,
+         "end_line": 18
       },
       "type": "BINARY",
       "value": "="
@@ -428,8 +517,8 @@ ARGS_GN_JSON = r"""
    "location": {
       "begin_column": 1,
       "begin_line": 1,
-      "end_column": 44,
-      "end_line": 16
+      "end_column": 45,
+      "end_line": 18
    },
    "result_mode": "discards_result",
    "type": "BLOCK"

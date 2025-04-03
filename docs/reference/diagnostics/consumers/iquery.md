@@ -121,10 +121,14 @@ core/timekeeper:root/current:utc_nanos
 core/timekeeper:root:start_time_monotonic_nanos
 ```
 
-#### `--component`
+#### `--data`
 
-A fuzzy-search query against running components, including URL and moniker fragments. If this is
-specified, the output only contains monikers for components whose URL contains the specified name.
+A repeatable argument specifying a tree selector. A single positional argument should be used with
+this flag. The positional argument must be be a fuzzy-search query, that will be converted to a
+moniker, and spliced onto the tree selectors to form complete diagnostics selectors.
+
+If this is specified, the output only contains monikers for components whose URL contains the
+specified name.
 
 #### `--help`
 
@@ -152,11 +156,12 @@ core/timekeeper:
       utc_nanos = 1591119246552989779
 ```
 
-#### `--component`
+#### `--data`
 
-A fuzzy-search query that can include URL fragments and moniker fragments. Accompanying positional-
-argument selectors should omit the component selector, as it will be generated from the search
-results.
+A repeatable argumrent specifying a tree selector. A single positional argument should be used
+with this flag. The positional argument must be be a fuzzy-search query, that will be converted to
+a moniker, and spliced onto the tree selectors to form complete diagnostics selectors.
+
 
 #### `--file`
 

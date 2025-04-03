@@ -109,6 +109,7 @@ cc_test_executable("debug_test") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
+    "//src/devices/bin/driver_runtime",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
@@ -126,6 +127,7 @@ cc_test_executable("device_inspect_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
+    "//src/devices/bin/driver_runtime",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/loop_fixture",

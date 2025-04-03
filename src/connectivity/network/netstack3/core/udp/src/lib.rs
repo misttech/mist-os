@@ -14,12 +14,17 @@ extern crate fakealloc as alloc;
 #[path = "."]
 mod internal {
     pub(super) mod base;
+    pub(super) mod counters;
 }
+
+pub use internal::counters::{
+    CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
+};
 
 pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,
     SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext, UdpBindingsTypes,
-    UdpCounters, UdpCountersInner, UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext,
-    UdpRemotePort, UdpSocketId, UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState,
-    UdpStateBuilder, UdpStateContext, UseUdpIpTransportContextBlanket,
+    UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext, UdpRemotePort, UdpSocketId,
+    UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState, UdpStateContext,
+    UseUdpIpTransportContextBlanket,
 };

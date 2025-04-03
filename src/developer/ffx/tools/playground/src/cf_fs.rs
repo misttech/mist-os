@@ -264,9 +264,9 @@ impl CFDirectory {
                     inner.cache = CacheState::NeedsRefresh(Some(got));
                 }
             }
-            object_request.take().handle(|request| {
-                request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
-            });
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, protocols);
             return;
         };
 
@@ -642,7 +642,7 @@ mod test {
             },
             "root_file" => vfs::file::read_only("root file contents"),
         };
-        let core_foo_ns_dir = vfs::directory::spawn_directory(core_foo_ns_dir);
+        let core_foo_ns_dir = vfs::directory::serve_read_only(core_foo_ns_dir);
 
         let instances = vec![
             sys2::Instance {
@@ -678,7 +678,7 @@ mod test {
         );
 
         let root = CFDirectory::new_root(query);
-        let proxy = vfs::directory::spawn_directory(root);
+        let proxy = vfs::directory::serve_read_only(root);
 
         let root_file =
             fuchsia_fs::directory::open_file(&proxy, "/core/foo/:ns/root_file", fio::PERM_READABLE)
@@ -752,7 +752,7 @@ mod test {
         let query = serve_realm_query(instances.clone(), HashMap::new());
 
         let root = CFDirectory::new_root(query);
-        let proxy = vfs::directory::spawn_directory(root);
+        let proxy = vfs::directory::serve_read_only(root);
 
         for instance in &instances {
             let instance_moniker = instance.moniker.as_deref().unwrap();

@@ -30,8 +30,7 @@ zx::result<> AmlCpuDriver::Start() {
     FDF_LOG(ERROR, "Failed to connect to platform device, error = %s", pdev_conn.status_string());
     return zx::error(pdev_conn.take_error());
   }
-
-  ddk::PDevFidl pdev(std::move(pdev_conn.value()));
+  fdf::PDev pdev{std::move(pdev_conn.value())};
 
   auto config = LoadConfiguration(pdev);
   if (config.is_error()) {

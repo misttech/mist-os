@@ -86,7 +86,7 @@ impl FsNodeOps for ZramDeviceDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let mut entries = BlockDeviceDirectory::create_file_ops_entries();
+        let mut entries = self.base_dir.create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"idle".into(),

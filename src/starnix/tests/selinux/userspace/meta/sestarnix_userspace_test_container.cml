@@ -9,6 +9,7 @@
             "container",
             "rootfs_rw",
             "selinux",
+            "selinux_test_suite",
         ],
         init: [],
         kernel_cmdline: "",

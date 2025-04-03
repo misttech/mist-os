@@ -11,6 +11,8 @@ import("//src/developer/ffx/config.gni")
 
 visibility = [ "//src/developer/ffx/*" ]
 
+assert(is_host, "ffx is for use with the host toolchain only")
+
 # A note for developers interested in generating a Cargo.toml file for this tool:
 # FFX generates a `ffx_bin_unversioned` rule, which is what should be used as the target for
 # cargo gen. The appropriate command is:
@@ -138,13 +140,13 @@ group("e2e_tests") {
     # ffx end to end tests, through `ffx self-test` invocations, one includes
     # tests that must have a target present, the other can be run without a
     # target present.
-    ":ffx-e2e-with-target($host_toolchain)",
+    ":ffx-e2e-with-target",
   ]
 }
 
 group("host_tests") {
   testonly = true
-  deps = [ ":ffx-e2e-without-target($host_toolchain)" ]
+  deps = [ ":ffx-e2e-without-target" ]
 }
 
 group("tests") {
@@ -152,6 +154,6 @@ group("tests") {
   public_deps = [
     # Most ffx plugin test suites are included downstream of the group defined
     # by the ffx template above.
-    ":ffx_tests($host_toolchain)",
+    ":ffx_tests",
   ]
 }

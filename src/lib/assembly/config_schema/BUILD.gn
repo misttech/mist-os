@@ -62,11 +62,11 @@ rustc_library("config_schema") {
   sources = [
     "src/assembly_config.rs",
     "src/board_config.rs",
+    "src/board_input_bundle_set.rs",
     "src/common.rs",
     "src/developer_overrides.rs",
     "src/image_assembly_config.rs",
     "src/lib.rs",
-    "src/merge.rs",
     "src/platform_config.rs",
     "src/platform_config/battery_config.rs",
     "src/platform_config/bluetooth_config.rs",

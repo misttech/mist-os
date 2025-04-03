@@ -28,7 +28,7 @@ aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = "0.8.11"
 ansi_term = "0.12.0"
-anyhow = "1.0.95"
+anyhow = "1.0.97"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayref = "0.3.9"
@@ -40,7 +40,6 @@ async-lock = "2.3"
 async-ringbuf  = "0.3.1"
 async-stream = "0.3.5"
 async-trait = "0.1.71"
-atty = "0.2.11"
 base64 = "0.22.1"
 bincode = "1.3"
 bit-set = "0.5.3"
@@ -99,6 +98,7 @@ ecb = "0.1.2"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
 either = "1.14.0"
 elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
+enumn = "0.1.14"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "5.3.1"
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -123,7 +123,7 @@ half = "2.4.1"
 handlebars = "4.3.5"
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
-hkdf = "0.12.3"
+hkdf = "0.12.4"
 hmac = "0.12.1"
 hound = "3.5.1"
 http = "0.2.4"
@@ -134,7 +134,7 @@ humansize = "1.1.1"
 hyper = { version = "0.14.19", default-features = false, features = ["stream", "http1", "client", "server"] }
 indexmap = "1.9.2"
 iota = "0.2.3"
-itertools = "0.10"
+itertools = "0.14"
 itoa = "1.0"
 json5format = "0.2.6"
 lazy_static = "1.4"
@@ -153,7 +153,7 @@ memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
 mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
-munge = "0.4.1"
+munge = "0.4.3"
 nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "8.0.0", default-features = false, features = ["std"] }
 nom-language = "0.1.0"
@@ -191,7 +191,6 @@ rayon = "1.10.0"
 ref-cast = "1.0.23"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
-rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
 ring = "0.17.8"
 rsa = { version = "0.9.7", default-features = false }
 rustc-hash = "1.0.1"
@@ -201,7 +200,7 @@ rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
-scopeguard = "1.1.0"
+scopeguard = "1.2.0"
 scrypt = "0.10.0"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_derive = "1.0.147"
@@ -216,17 +215,17 @@ signature =  "1.4.0"
 simplelog = "0.10.2"
 siphasher = "0.3.10"
 slab = "0.4.9"
-smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union"]}
+smallvec = {version= "1.14.0", features = ["const_generics", "const_new", "union"]}
 socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"
 strsim = "0.11.1"
-structopt = "0.2.14"
+structopt = "0.3.26"
 strum = "0.25.0"
 strum_macros = "0.25.3"
 tempfile = "3.2"
 termion = "1.5.3"
-termtree = "0.4.1"
+termtree = "0.5.1"
 test-case = "3.2.1"
 textwrap = "0.11.0"
 thiserror = "2.0.11"
@@ -251,11 +250,11 @@ utf8parse = "0.2.2"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = "2.4.2"
 vm-device = "0.1.0"
-vte = "0.3"
+vte = "0.15"
 walkdir = "2.2.7"
 which = "4.0.2"
 xml-rs = "0.8"
-zerocopy = { version = "0.8.14", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.25-alpha", features = ["derive", "simd"] }
 zstd = "0.11.2"
 # keep-sorted end
 
@@ -271,7 +270,6 @@ coset = { version = "0.3.8", features = ["std"] }
 # do not add back without verifying certificate transparency is ready to use - see https://fxbug.dev/25100
 # ct-logs = "0.6"
 der = { version = "0.7.9", features = ["alloc", "derive", "flagset", "oid", "zeroize"] }
-enumn = "0.1.14"
 euclid = { version = "0.22.1", features = [ "serde" ] }
 flagset = "0.4.6"
 getopts = "0.2"
@@ -327,10 +325,10 @@ num_cpus = "1.16.0"
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
 parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
-proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
+proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.38"
-rustfix = "0.6.1"
+rustfix = "0.9.0"
 rustls-native-certs = "0.6.3"
 semver = "1.0.23"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
@@ -341,13 +339,13 @@ syn = { version = "2.0.87", features = ["full", "visit", "visit-mut", "extra-tra
 synstructure = "0.12.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
-termios = "0.3.2"
+termios = "0.3.3"
 tinyjson = "2.5.0"
 # TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
 tokio = { version = "=1.38.1", default-features = false }
 tokio-stream = "0.1.14"
-wait-timeout = "0.2.0"
+wait-timeout = "0.2.1"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 # keep-sorted end
 
@@ -499,7 +497,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.ahash."0.8.11".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
-[gn.package.anyhow."1.0.95"]
+[gn.package.anyhow."1.0.97"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
 license_files = ["LICENSE-APACHE"]
@@ -812,11 +810,8 @@ rustflags = ["--cfg=use_fallback"]
 [gn.package.proc-macro-error-attr."1.0.4"]
 rustflags = ["--cfg=use_fallback"]
 
-[gn.package.proc-macro2."0.4.27"]
-rustflags = ["--cfg=u128", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
-
 # cargo-gnaw suggested "--cfg=proc_macro_span" as well but proc_macro_span is still an unstable feature.
-[gn.package.proc-macro2."1.0.86"]
+[gn.package.proc-macro2."1.0.94"]
 rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.pulldown-cmark."0.9.3"]
@@ -979,13 +974,6 @@ rustflags = []
 [gn.package.slab."0.4.9"]
 rustflags = []
 
-[gn.package.syn."0.15.26"]
-rustflags = [
-  "--cfg=feature=\\\"extra-traits\\\"",
-  "--cfg=feature=\\\"full\\\"",
-  "--cfg=feature=\\\"visit\\\"",
-]
-
 [gn.package.syn."1.0.98"]
 # Has build script but no config needed.
 # FIXME(https://fxbug.dev/332277415): temporarily allow legacy targets to
@@ -1036,7 +1024,7 @@ visibility = [
 [gn.package.thiserror."2.0.11"]
 # Has build script but no config needed.
 
-[gn.package.thiserror."1.0.57"]
+[gn.package.thiserror."1.0.69"]
 # Has build script but no config needed.
 
 # Not actually used in the gn build at all, just for the rules_rust bazel rules.
@@ -1133,9 +1121,6 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.unicode-width."0.2.0"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.unicode-xid."0.1.0"]
-license_files = ["LICENSE-APACHE"]
-
 [gn.package.unicode-xid."0.2.0"]
 license_files = ["LICENSE-APACHE"]
 
@@ -1158,7 +1143,7 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.14"]
+[gn.package.zerocopy."0.8.25-alpha"]
 rustflags = [
   "--cfg=zerocopy_core_error_1_81_0",
   "--cfg=zerocopy_diagnostic_on_unimplemented_1_78_0",
@@ -1168,7 +1153,7 @@ rustflags = [
   "--cfg=zerocopy_panic_in_const_and_vec_try_reserve_1_57_0"
 ]
 
-[gn.package.zerocopy-derive."0.8.14"]
+[gn.package.zerocopy-derive."0.8.25-alpha"]
 # See https://github.com/google/zerocopy/issues/1792
 rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 

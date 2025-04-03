@@ -26,6 +26,7 @@ source_set("common") {
 
   public_deps = [
     ":bt_transport_uart_bind",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
@@ -35,6 +36,7 @@ source_set("common") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/outgoing/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",

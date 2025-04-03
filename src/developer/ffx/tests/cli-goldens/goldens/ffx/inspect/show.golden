@@ -14,13 +14,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "component"
+          "arg_name": "data"
         }
       },
-      "optionality": "optional",
-      "long": "--component",
+      "optionality": "repeating",
+      "long": "--data",
       "short": null,
-      "description": "a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping for moniker is needed in this query. Selectors following --component should omit the component selector, as they will be spliced together by the tool with the correct escaping.",
+      "description": "tree selectors to splice onto a component query specified as a positional argument For example, `show foo.cm --data root:bar` becomes the selector `path/to/foo:root:bar`.",
       "hidden": false
     },
     {
@@ -32,7 +32,7 @@
       "optionality": "optional",
       "long": "--accessor",
       "short": null,
-      "description": "A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. This can be copied from the output of `ffx inspect list-accessors`. The selector will be in the form of: <moniker>:fuchsia.diagnostics.ArchiveAccessorName",
+      "description": "string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. This can be copied from the output of `ffx inspect list-accessors`. The selector will be in the form of: <moniker>:fuchsia.diagnostics.ArchiveAccessorName",
       "hidden": false
     },
     {
@@ -53,7 +53,7 @@
   "positionals": [
     {
       "name": "selectors",
-      "description": "queries for accessing Inspect data. If no selectors are provided, Inspect data for the whole system will be returned.",
+      "description": "queries for accessing Inspect data. If no selectors are provided, Inspect data for the whole system will be returned. If --data is specified, this should be exactly one component fuzzy search query.",
       "optionality": "repeating",
       "hidden": false
     }

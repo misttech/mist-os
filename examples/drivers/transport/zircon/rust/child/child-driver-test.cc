@@ -7,6 +7,8 @@
 
 #include <bind/fuchsia/test/cpp/bind.h>
 #include <gtest/gtest.h>
+#include <src/lib/testing/predicates/status.h>
+
 namespace testing {
 
 namespace {
@@ -44,8 +46,7 @@ class ChildDriverTestEnvironment : public fdf_testing::Environment {
             bindings_.CreateHandler(&server_, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                     fidl::kIgnoreBindingClosure),
     });
-    auto result = to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(std::move(handler));
-    EXPECT_EQ(ZX_OK, result.status_value());
+    EXPECT_OK(to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(std::move(handler)));
     return zx::ok();
   }
 
@@ -62,14 +63,8 @@ class TestConfig final {
 
 class ChildDriverTest : public ::testing::Test {
  public:
-  void SetUp() override {
-    zx::result<> result = driver_test.StartDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
-  void TearDown() override {
-    zx::result<> result = driver_test.StopDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
+  void SetUp() override { ASSERT_OK(driver_test.StartDriver()); }
+  void TearDown() override { ASSERT_OK(driver_test.StopDriver()); }
 
  protected:
   fdf_testing::BackgroundDriverTest<TestConfig> driver_test;

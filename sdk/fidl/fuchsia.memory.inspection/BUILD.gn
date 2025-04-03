@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.memory.inspection") {
-  sdk_category = "partner_internal"
+  sdk_category = "host_tool"
   sdk_area = "Diagnostics"
   stable = true
   sources = [ "inspection.fidl" ]

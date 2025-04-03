@@ -47,7 +47,7 @@ async fn read_abi_revision(
     dir: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<AbiRevision, AbiRevisionFileError> {
-    let file = fuchsia_fs::directory::open_file(&dir, path, fio::Flags::PERM_READ).await?;
+    let file = fuchsia_fs::directory::open_file(&dir, path, fio::PERM_READABLE).await?;
     let bytes: [u8; 8] = fuchsia_fs::file::read(&file)
         .await?
         .try_into()
@@ -59,21 +59,8 @@ async fn read_abi_revision(
 mod tests {
     use super::*;
     use fuchsia_fs::directory::open_in_namespace;
-    use std::sync::Arc;
-    use vfs::directory::entry_container::Directory;
     use vfs::file::vmo::read_only;
-    use vfs::{execution_scope, pseudo_directory};
-
-    fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
-        let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        root.open(
-            execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot().into(),
-            fidl::endpoints::ServerEnd::new(dir_server.into_channel()),
-        );
-        dir_proxy
-    }
+    use vfs::pseudo_directory;
 
     fn init_fuchsia_abi_dir(filename: &'static str, content: &'static [u8]) -> fio::DirectoryProxy {
         let dir = pseudo_directory! {
@@ -83,7 +70,7 @@ mod tests {
               }
           }
         };
-        serve_dir(dir)
+        vfs::directory::serve_read_only(dir)
     }
 
     const ABI_REV_MAX: &'static [u8] = &u64::MAX.to_le_bytes();
@@ -134,7 +121,7 @@ mod tests {
     // Read this test package's ABI revision.
     #[fuchsia::test]
     async fn read_test_pkg_abi_revision() -> Result<(), AbiRevisionFileError> {
-        let dir_proxy = open_in_namespace("/pkg", fio::Flags::PERM_READ).unwrap();
+        let dir_proxy = open_in_namespace("/pkg", fio::PERM_READABLE).unwrap();
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");

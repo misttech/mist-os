@@ -4,7 +4,6 @@
 
 import("//build/rust/rustc_library.gni")
 
-# TODO(b/394964930): Enable host-only assert
 assert(is_host, "ffx writer is for host tools only")
 
 rustc_library("lib") {

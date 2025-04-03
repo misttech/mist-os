@@ -350,10 +350,10 @@ impl<T> ::std::cmp::PartialEq for __BindgenUnionField<T> {
     }
 }
 impl<T> ::std::cmp::Eq for __BindgenUnionField<T> {}
+pub const __BITS_PER_LONG_LONG: u32 = 64;
 pub const AF_UNSPEC: u32 = 0;
 pub const AF_INET: u32 = 2;
 pub const AF_INET6: u32 = 10;
-pub const __BITS_PER_LONG_LONG: u32 = 64;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _KERNEL__NSIG: u32 = 64;
 pub const SIGHUP: u32 = 1;
@@ -1481,6 +1481,9 @@ pub const EOWNERDEAD: u32 = 130;
 pub const ENOTRECOVERABLE: u32 = 131;
 pub const ERFKILL: u32 = 132;
 pub const EHWPOISON: u32 = 133;
+pub const F_GETLK64: u32 = 12;
+pub const F_SETLK64: u32 = 13;
+pub const F_SETLKW64: u32 = 14;
 pub const O_ACCMODE: u32 = 3;
 pub const O_RDONLY: u32 = 0;
 pub const O_WRONLY: u32 = 1;
@@ -6287,6 +6290,7 @@ pub const SPLICE_F_MOVE: u32 = 1;
 pub const SPLICE_F_NONBLOCK: u32 = 2;
 pub const SPLICE_F_MORE: u32 = 4;
 pub const SPLICE_F_GIFT: u32 = 8;
+pub type size_t = crate::types::c_ulong;
 pub type wchar_t = crate::types::c_int;
 #[repr(C)]
 #[repr(align(16))]
@@ -6296,22 +6300,24 @@ pub struct max_align_t {
     pub __bindgen_padding_0: [u8; 8usize],
     pub __clang_max_align_nonce2: u128,
 }
-pub type __s8 = crate::types::c_schar;
-pub type __u8 = crate::types::c_uchar;
-pub type __s16 = crate::types::c_short;
-pub type __u16 = crate::types::c_ushort;
-pub type __s32 = crate::types::c_int;
-pub type __u32 = crate::types::c_uint;
-pub type __s64 = crate::types::c_longlong;
-pub type __u64 = crate::types::c_ulonglong;
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
-pub struct __kernel_fd_set {
-    pub fds_bits: [crate::types::c_ulong; 16usize],
-}
-pub type __kernel_sighandler_t = uaddr;
-pub type __kernel_key_t = crate::types::c_int;
-pub type __kernel_mqd_t = crate::types::c_int;
+pub type int_least64_t = i64;
+pub type uint_least64_t = u64;
+pub type int_fast64_t = i64;
+pub type uint_fast64_t = u64;
+pub type int_least32_t = i32;
+pub type uint_least32_t = u32;
+pub type int_fast32_t = i32;
+pub type uint_fast32_t = u32;
+pub type int_least16_t = i16;
+pub type uint_least16_t = u16;
+pub type int_fast16_t = i16;
+pub type uint_fast16_t = u16;
+pub type int_least8_t = i8;
+pub type uint_least8_t = u8;
+pub type int_fast8_t = i8;
+pub type uint_fast8_t = u8;
+pub type intmax_t = crate::types::c_long;
+pub type uintmax_t = crate::types::c_ulong;
 pub type __kernel_long_t = crate::types::c_long;
 pub type __kernel_ulong_t = crate::types::c_ulong;
 pub type __kernel_ino_t = __kernel_ulong_t;
@@ -6346,6 +6352,85 @@ pub type __kernel_clockid_t = crate::types::c_int;
 pub type __kernel_caddr_t = uref<crate::types::c_char>;
 pub type __kernel_uid16_t = crate::types::c_ushort;
 pub type __kernel_gid16_t = crate::types::c_ushort;
+pub type socklen_t = u32;
+#[repr(C)]
+#[derive(
+    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+)]
+pub struct ucred {
+    pub pid: __kernel_pid_t,
+    pub uid: __kernel_uid_t,
+    pub gid: __kernel_gid_t,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct msghdr {
+    pub msg_name: uaddr,
+    pub msg_namelen: socklen_t,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub msg_iov: uref<iovec>,
+    pub msg_iovlen: size_t,
+    pub msg_control: uaddr,
+    pub msg_controllen: size_t,
+    pub msg_flags: crate::types::c_uint,
+    pub __bindgen_padding_1: [u8; 4usize],
+}
+impl Default for msghdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(
+    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+)]
+pub struct cmsghdr {
+    pub cmsg_len: size_t,
+    pub cmsg_level: crate::types::c_uint,
+    pub cmsg_type: crate::types::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct mmsghdr {
+    pub msg_hdr: msghdr,
+    pub msg_len: crate::types::c_uint,
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+impl Default for mmsghdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct linger {
+    pub l_onoff: crate::types::c_int,
+    pub l_linger: crate::types::c_int,
+}
+pub type __s8 = crate::types::c_schar;
+pub type __u8 = crate::types::c_uchar;
+pub type __s16 = crate::types::c_short;
+pub type __u16 = crate::types::c_ushort;
+pub type __s32 = crate::types::c_int;
+pub type __u32 = crate::types::c_uint;
+pub type __s64 = crate::types::c_longlong;
+pub type __u64 = crate::types::c_ulonglong;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct __kernel_fd_set {
+    pub fds_bits: [crate::types::c_ulong; 16usize],
+}
+pub type __kernel_sighandler_t = uaddr;
+pub type __kernel_key_t = crate::types::c_int;
+pub type __kernel_mqd_t = crate::types::c_int;
 pub type __s128 = i128;
 pub type __u128 = u128;
 pub type __le16 = __u16;
@@ -7636,24 +7721,6 @@ pub const DM_DEV_SET_GEOMETRY_CMD: _bindgen_ty_6 = 15;
 pub const DM_DEV_ARM_POLL_CMD: _bindgen_ty_6 = 16;
 pub const DM_GET_TARGET_VERSION_CMD: _bindgen_ty_6 = 17;
 pub type _bindgen_ty_6 = crate::types::c_uint;
-pub type int_least64_t = i64;
-pub type uint_least64_t = u64;
-pub type int_fast64_t = i64;
-pub type uint_fast64_t = u64;
-pub type int_least32_t = i32;
-pub type uint_least32_t = u32;
-pub type int_fast32_t = i32;
-pub type uint_fast32_t = u32;
-pub type int_least16_t = i16;
-pub type uint_least16_t = u16;
-pub type int_fast16_t = i16;
-pub type uint_fast16_t = u16;
-pub type int_least8_t = i8;
-pub type uint_least8_t = u8;
-pub type int_fast8_t = i8;
-pub type uint_fast8_t = u8;
-pub type intmax_t = crate::types::c_long;
-pub type uintmax_t = crate::types::c_ulong;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct epoll_event {
@@ -7672,6 +7739,7 @@ pub struct flock {
     pub l_pid: pid_t,
     pub __bindgen_padding_1: [u8; 4usize],
 }
+pub type flock64 = flock;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct f_owner_ex {
@@ -10381,7 +10449,6 @@ impl Default for ff_effect {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct io_uring_sqe {
     pub opcode: __u8,
     pub flags: __u8,
@@ -10516,11 +10583,11 @@ impl Default for io_uring_sqe__bindgen_ty_5 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub union io_uring_sqe__bindgen_ty_6 {
-    pub __bindgen_anon_1: io_uring_sqe__bindgen_ty_6__bindgen_ty_1,
-    pub optval: __u64,
-    pub cmd: [__u8; 8usize],
+pub struct io_uring_sqe__bindgen_ty_6 {
+    pub __bindgen_anon_1: __BindgenUnionField<io_uring_sqe__bindgen_ty_6__bindgen_ty_1>,
+    pub optval: __BindgenUnionField<__u64>,
+    pub cmd: __BindgenUnionField<[__u8; 0usize]>,
+    pub bindgen_union_field: [u64; 2usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -12061,6 +12128,20 @@ impl Default for xt_tproxy_target_info_v1 {
         }
     }
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct xt_mark_tginfo2 {
+    pub mark: __u32,
+    pub mask: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct xt_mark_mtinfo1 {
+    pub mark: __u32,
+    pub mask: __u32,
+    pub invert: __u8,
+    pub __bindgen_padding_0: [u8; 3usize],
+}
 pub const nf_ip_hook_priorities_NF_IP_PRI_FIRST: nf_ip_hook_priorities = -2147483648;
 pub const nf_ip_hook_priorities_NF_IP_PRI_RAW_BEFORE_DEFRAG: nf_ip_hook_priorities = -450;
 pub const nf_ip_hook_priorities_NF_IP_PRI_CONNTRACK_DEFRAG: nf_ip_hook_priorities = -400;
@@ -12688,7 +12769,7 @@ pub const perf_event_read_format_PERF_FORMAT_LOST: perf_event_read_format = 16;
 pub const perf_event_read_format_PERF_FORMAT_MAX: perf_event_read_format = 32;
 pub type perf_event_read_format = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub struct perf_event_attr {
     pub type_: __u32,
     pub size: __u32,
@@ -12716,7 +12797,7 @@ pub struct perf_event_attr {
     pub config3: __u64,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_1 {
     pub sample_period: __u64,
     pub sample_freq: __u64,
@@ -12731,7 +12812,7 @@ impl Default for perf_event_attr__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_2 {
     pub wakeup_events: __u32,
     pub wakeup_watermark: __u32,
@@ -12746,7 +12827,7 @@ impl Default for perf_event_attr__bindgen_ty_2 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_3 {
     pub bp_addr: __u64,
     pub kprobe_func: __u64,
@@ -12763,7 +12844,7 @@ impl Default for perf_event_attr__bindgen_ty_3 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, Immutable)]
 pub union perf_event_attr__bindgen_ty_4 {
     pub bp_len: __u64,
     pub kprobe_addr: __u64,

@@ -10,7 +10,8 @@ use crate::security;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
+    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
+    ThreadGroup, PR_SET_PTRACER_ANY,
 };
 #[cfg(feature = "starnix_lite")]
 use crate::task::{
@@ -39,13 +40,14 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, UncheckedSignal};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::user_address::{
-    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserCStringPtr, UserRef,
+    ArchSpecific, MappingMultiArchUserRef, MultiArchUserRef, UserAddress, UserCString,
+    UserCStringPtr, UserRef,
 };
 use starnix_uapi::vfs::ResolveFlags;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uapi, uid_t, AT_EMPTY_PATH,
+    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, uapi, uid_t, AT_EMPTY_PATH,
     AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
     CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS,
     CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ,
@@ -80,6 +82,22 @@ use std::cmp;
 use std::ffi::CString;
 use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
+pub type SockFProgPtr =
+    MappingMultiArchUserRef<SockFProg, uapi::sock_fprog, uapi::arch32::sock_fprog>;
+pub type SockFilterPtr = MultiArchUserRef<uapi::sock_filter, uapi::arch32::sock_filter>;
+
+pub struct SockFProg {
+    pub len: u32,
+    pub filter: SockFilterPtr,
+}
+
+uapi::arch_map_data! {
+    BidiTryFrom<SockFProg, sock_fprog> {
+        len = len;
+        filter = filter;
+    }
+}
 
 pub fn do_clone(
     locked: &mut Locked<'_, Unlocked>,
@@ -1336,7 +1354,7 @@ where
                 }
                 Some(new_limit)
             };
-            target_task.thread_group.adjust_rlimits(current_task, resource, new_limit)?
+            ThreadGroup::adjust_rlimits(current_task, &target_task, resource, new_limit)?
         }
     };
     if !old_limit_ref.is_null() {
@@ -1516,12 +1534,13 @@ pub fn sys_seccomp(
             {
                 return error!(EINVAL);
             }
-            let fprog: sock_fprog = current_task.read_object(UserRef::new(args))?;
-            if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+            let fprog =
+                current_task.read_multi_arch_object(SockFProgPtr::new(current_task, args))?;
+            if fprog.len > BPF_MAXINSNS || fprog.len == 0 {
                 return error!(EINVAL);
             }
             let code: Vec<sock_filter> =
-                current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                current_task.read_multi_arch_objects_to_vec(fprog.filter, fprog.len as usize)?;
 
             if !current_task.read().no_new_privs() {
                 security::check_task_capable(current_task, CAP_SYS_ADMIN)
@@ -1888,7 +1907,8 @@ pub fn sys_syslog(
     length: i32,
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
-    let syslog = current_task.kernel().syslog.access(&current_task)?;
+    let syslog =
+        current_task.kernel().syslog.access(&current_task, SyslogAccess::Syscall(action))?;
     match action {
         SyslogAction::Read => {
             if address.is_null() || length < 0 {
@@ -1949,13 +1969,16 @@ pub fn sys_vhangup(
 mod arch32 {
     pub use super::{
         sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
+        sys_getgid as sys_arch32_getgid32, sys_getppid as sys_arch32_getppid,
         sys_getresgid as sys_arch32_getresgid32, sys_getresuid as sys_arch32_getresuid32,
         sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
-        sys_sched_getaffinity as sys_arch32_sched_getaffinity,
-        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
-        sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
-        sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
-        sys_setrlimit as sys_arch32_setrlimit, sys_syslog as sys_arch32_syslog,
+        sys_ptrace as sys_arch32_ptrace, sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity, sys_seccomp as sys_arch32_seccomp,
+        sys_setfsuid as sys_arch32_setfsuid, sys_setfsuid as sys_arch32_setfsuid32,
+        sys_setgroups as sys_arch32_setgroups32, sys_setpgid as sys_arch32_setpgid,
+        sys_setpriority as sys_arch32_setpriority, sys_setresgid as sys_arch32_setresgid32,
+        sys_setresuid as sys_arch32_setresuid32, sys_setrlimit as sys_arch32_setrlimit,
+        sys_setsid as sys_arch32_setsid, sys_syslog as sys_arch32_syslog,
     };
 }
 
@@ -2040,7 +2063,7 @@ mod tests {
             {
                 assert_eq!(result, Ok(SUCCESS));
             } else {
-                assert_eq!(result, Err(errno!(EINVAL)));
+                assert_eq!(result, error!(EINVAL));
             }
         }
     }
@@ -2068,7 +2091,7 @@ mod tests {
                 *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         );
 
         let name_just_long_enough = CString::new(vec![b'a'; 255]).unwrap();
@@ -2111,7 +2134,7 @@ mod tests {
                 *PAGE_SIZE - 1,
                 name_addr.ptr() as u64,
             ),
-            Err(errno!(EINVAL))
+            error!(EINVAL)
         );
 
         // Passing an unaligned length does work, however.

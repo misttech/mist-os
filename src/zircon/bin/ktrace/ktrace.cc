@@ -37,9 +37,9 @@ Options:\n\
 
 void PrintUsage(FILE* f) { fputs(kUsage, f); }
 
-int DoStart(const zx::resource& debug_resource, uint32_t group_mask) {
+int DoStart(const zx::resource& tracing_resource, uint32_t group_mask) {
   if (zx_status_t status =
-          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START, group_mask, nullptr);
+          zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_START, group_mask, nullptr);
       status != ZX_OK) {
     fprintf(stderr, "Error starting ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
@@ -47,8 +47,9 @@ int DoStart(const zx::resource& debug_resource, uint32_t group_mask) {
   return EXIT_SUCCESS;
 }
 
-int DoStop(const zx::resource& debug_resource) {
-  if (zx_status_t status = zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_STOP, 0, nullptr);
+int DoStop(const zx::resource& tracing_resource) {
+  if (zx_status_t status =
+          zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_STOP, 0, nullptr);
       status != ZX_OK) {
     fprintf(stderr, "Error stopping ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
@@ -56,9 +57,9 @@ int DoStop(const zx::resource& debug_resource) {
   return EXIT_SUCCESS;
 }
 
-int DoRewind(const zx::resource& debug_resource) {
+int DoRewind(const zx::resource& tracing_resource) {
   if (zx_status_t status =
-          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr);
+          zx_ktrace_control(tracing_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr);
       status != ZX_OK) {
     fprintf(stderr, "Error rewinding ktrace: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
@@ -66,9 +67,9 @@ int DoRewind(const zx::resource& debug_resource) {
   return EXIT_SUCCESS;
 }
 
-int DoWritten(const zx::resource& debug_resource) {
+int DoWritten(const zx::resource& tracing_resource) {
   uint64_t bytes_written;
-  if (zx_status_t status = zx_ktrace_read(debug_resource.get(), nullptr, 0, 0, &bytes_written);
+  if (zx_status_t status = zx_ktrace_read(tracing_resource.get(), nullptr, 0, 0, &bytes_written);
       status != ZX_OK) {
     fprintf(stderr, "Error getting bytes written: %s(%d)\n", zx_status_get_string(status), status);
     return EXIT_FAILURE;
@@ -77,7 +78,7 @@ int DoWritten(const zx::resource& debug_resource) {
   return EXIT_SUCCESS;
 }
 
-int DoSave(const zx::resource& debug_resource, const char* path) {
+int DoSave(const zx::resource& tracing_resource, const char* path) {
   fbl::unique_fd out_fd(open(path, O_CREAT | O_TRUNC | O_WRONLY, 0666));
   if (!out_fd.is_valid()) {
     fprintf(stderr, "Unable to open file for writing: %s, %s\n", path, strerror(errno));
@@ -90,7 +91,7 @@ int DoSave(const zx::resource& debug_resource, const char* path) {
   uint32_t offset = 0;
   zx_status_t status;
   size_t actual;
-  while ((status = zx_ktrace_read(debug_resource.get(), buf, offset, read_size, &actual)) ==
+  while ((status = zx_ktrace_read(tracing_resource.get(), buf, offset, read_size, &actual)) ==
          ZX_OK) {
     if (actual == 0) {
       break;
@@ -131,20 +132,20 @@ int main(int argc, char** argv) {
   }
   const fbl::String cmd{argv[1]};
 
-  auto debug_client_end = component::Connect<fuchsia_kernel::DebugResource>();
-  if (debug_client_end.is_error()) {
-    fprintf(stderr, "Error in getting debug resource: %s(%d)\n", debug_client_end.status_string(),
-            debug_client_end.status_value());
+  auto tracing_client_end = component::Connect<fuchsia_kernel::TracingResource>();
+  if (tracing_client_end.is_error()) {
+    fprintf(stderr, "Error in getting tracing resource: %s(%d)\n",
+            tracing_client_end.status_string(), tracing_client_end.status_value());
     return 1;
   }
-  auto debug_result = fidl::SyncClient(std::move(*debug_client_end))->Get();
-  if (!debug_result.is_ok()) {
-    fprintf(stderr, "Error in getting debug resource: %s\n",
-            debug_result.error_value().status_string());
+  auto tracing_result = fidl::SyncClient(std::move(*tracing_client_end))->Get();
+  if (!tracing_result.is_ok()) {
+    fprintf(stderr, "Error in getting tracing resource: %s\n",
+            tracing_result.error_value().status_string());
     return 1;
   }
 
-  zx::resource debug_resource = std::move(debug_result->resource());
+  zx::resource tracing_resource = std::move(tracing_result->resource());
 
   if (cmd == "start") {
     EnsureNArgs(cmd, argc, 3);
@@ -153,20 +154,20 @@ int main(int argc, char** argv) {
       fprintf(stderr, "Invalid group mask\n");
       return EXIT_FAILURE;
     }
-    return DoStart(debug_resource, group_mask);
+    return DoStart(tracing_resource, group_mask);
   } else if (cmd == "stop") {
     EnsureNArgs(cmd, argc, 2);
-    return DoStop(debug_resource);
+    return DoStop(tracing_resource);
   } else if (cmd == "rewind") {
     EnsureNArgs(cmd, argc, 2);
-    return DoRewind(debug_resource);
+    return DoRewind(tracing_resource);
   } else if (cmd == "written") {
     EnsureNArgs(cmd, argc, 2);
-    return DoWritten(debug_resource);
+    return DoWritten(tracing_resource);
   } else if (cmd == "save") {
     EnsureNArgs(cmd, argc, 3);
     const char* path = argv[2];
-    return DoSave(debug_resource, path);
+    return DoSave(tracing_resource, path);
   }
 
   PrintUsage(stderr);

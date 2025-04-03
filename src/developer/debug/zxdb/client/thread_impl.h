@@ -10,9 +10,14 @@
 
 #include "gtest/gtest_prod.h"
 #include "src/developer/debug/zxdb/client/thread.h"
-#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
+
+namespace unwinder {
+class Memory;
+class Registers;
+class AsyncUnwinder;
+}  // namespace unwinder
 
 namespace zxdb {
 
@@ -72,6 +77,16 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
   Location GetSymbolizedLocationForAddress(uint64_t address) override;
   void DidUpdateStackFrames() override;
 
+  // Helper for when local unwinding using CFI fails (the local unwinder will only try to use CFI).
+  // This function is called to perform the unwinding on the target which will have synchronous
+  // access to the process's memory, making the unwinding logic much simpler.
+  void SyncFramesFromTarget(fit::callback<void(const Err&)> callback);
+
+  // Uses the given registers to invoke the unwinder with the available local debug info. If
+  // unwinding fails, falls back to unwinding on the target. |cb| is guaranteed to be issued
+  // asynchronously from this function.
+  void UnwindWithRegisters(unwinder::Registers regs, fit::callback<void(const Err&)> cb);
+
   // Invalidates the thread state and cached frames. Used when we know that some operation has
   // invalidated our state but we aren't sure what the new state is yet.
   void ClearState();
@@ -113,6 +128,13 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
   // construction to prevent notifications before the thread is set up and the "new thread"
   // notification has been sent to register it.
   bool allow_notifications_ = false;
+
+  // The unwinder and associated synchronous memory objects. These will typically be pointing to a
+  // pair of ELF files corresponding to a particular module loaded into the process. We need to hold
+  // on to them here to avoid leaking memory if the process dies during the unwinding operation and
+  // prevents the final callbacks from being issued from the unwinder.
+  std::unique_ptr<unwinder::AsyncUnwinder> unwinder_;
+  std::vector<std::unique_ptr<unwinder::Memory>> unwinder_memory_;
 
   fxl::WeakPtrFactory<ThreadImpl> weak_factory_;
 

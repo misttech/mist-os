@@ -626,24 +626,12 @@ closed protocol MLME {
         info DeviceInfo;
     });
 
-    strict QueryDiscoverySupport() -> (struct {
-        resp fuchsia.wlan.common.DiscoverySupport;
-    });
-    strict QueryMacSublayerSupport() -> (struct {
-        resp fuchsia.wlan.common.MacSublayerSupport;
-    });
-    strict QuerySecuritySupport() -> (struct {
-        resp fuchsia.wlan.common.SecuritySupport;
-    });
-    strict QuerySpectrumManagementSupport() -> (struct {
-        resp fuchsia.wlan.common.SpectrumManagementSupport;
-    });
     strict QueryTelemetrySupport() -> (struct {
         resp fuchsia.wlan.stats.TelemetrySupport;
     }) error zx.Status;
 
-    strict GetIfaceCounterStats() -> (struct {
-        resp GetIfaceCounterStatsResponse;
+    strict GetIfaceStats() -> (struct {
+        resp GetIfaceStatsResponse;
     });
     strict GetIfaceHistogramStats() -> (struct {
         resp GetIfaceHistogramStatsResponse;

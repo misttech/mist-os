@@ -108,14 +108,14 @@ impl Parse for DirectoryEntry {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         let mut seen = HashSet::new();
         let mut check_literal = |name: String, span| {
-            if name.len() as u64 > fio::MAX_FILENAME {
+            if name.len() as u64 > fio::MAX_NAME_LENGTH {
                 let message = format!(
                     "Entry name is too long: '{}'\n\
                      Max entry name is {} bytes.\n\
                      This entry is {} bytes.",
                     name,
                     name.len(),
-                    fio::MAX_FILENAME
+                    fio::MAX_NAME_LENGTH
                 );
                 return Err(syn::Error::new(span, message));
             }

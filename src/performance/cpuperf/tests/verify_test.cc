@@ -33,7 +33,8 @@ bool Verifier::VerifyIteration(uint32_t iter) {
   };
 
   std::unique_ptr<perfmon::FileReader> reader;
-  if (!perfmon::FileReader::Create(get_file_name, session_result_spec_->num_traces, &reader)) {
+  if (!perfmon::FileReader::Create(
+          get_file_name, static_cast<uint32_t>(session_result_spec_->num_traces), &reader)) {
     return false;
   }
 
@@ -104,7 +105,7 @@ bool Verifier::VerifyIteration(uint32_t iter) {
 void Verifier::Verify() {
   for (size_t iter = 0; iter < session_result_spec_->num_iterations; ++iter) {
     FX_LOGS(INFO) << "Verifying iteration " << iter;
-    EXPECT_TRUE(VerifyIteration(iter));
+    EXPECT_TRUE(VerifyIteration(static_cast<uint32_t>(iter)));
   }
 }
 

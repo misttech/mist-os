@@ -14,19 +14,21 @@ use net_types::ip::IpVersionMarker;
 use net_types::SpecifiedAddr;
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    Inspectable, InspectableValue, Inspector as _, IpAddressId as _, IpDeviceAddr, WeakIpAddressId,
+    Inspectable, InspectableValue, Inspector as _, IpAddressId as _, IpDeviceAddr, MarkDomain,
+    WeakIpAddressId,
 };
 use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
 use rand::Rng as _;
 
+use crate::actions::MarkAction;
 use crate::conntrack::{
     CompatibleWith, Connection, ConnectionDirection, ConnectionExclusive, Table, TransportProtocol,
 };
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, NatContext};
 use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
 use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _};
-use crate::state::Hook;
+use crate::state::{FilterMarkMetadata, Hook};
 
 /// The NAT configuration for a given conntrack connection.
 ///
@@ -784,6 +786,14 @@ where
     rewrite_packet(conn, direction, N::NAT_TYPE, packet).into()
 }
 
+struct NatMetadata {}
+
+impl FilterMarkMetadata for NatMetadata {
+    fn apply_mark_action(&mut self, domain: MarkDomain, action: MarkAction) {
+        unreachable!("nat is not expected to configure packet marks, got {domain:?} -> {action:?}");
+    }
+}
+
 /// Configure NAT by rewriting the provided reply tuple of a connection.
 ///
 /// Evaluates the NAT routines at the provided hook and, on finding a rule that
@@ -808,7 +818,7 @@ where
 {
     let Hook { routines } = hook;
     for routine in routines {
-        let result = super::check_routine(&routine, packet, &interfaces);
+        let result = super::check_routine(&routine, packet, &interfaces, &mut NatMetadata {});
         match N::evaluate_result(core_ctx, bindings_ctx, table, conn, packet, &interfaces, result) {
             ControlFlow::Break(result) => return result,
             ControlFlow::Continue(()) => {}

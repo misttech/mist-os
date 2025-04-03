@@ -170,7 +170,7 @@ const PERM_EXECUTABLE Flags
 /// "must create" in other contexts is due to the assumption that some POSIX flags are compatible
 /// with the members in `Flags`. In particular the POSIX `O_EXCL` has the same value as
 /// `Flags.FLAG_MUST_CREATE`. We are not able to define different bit members of the same value,
-/// hence it is defined seperately outside of `Flags`.
+/// hence it is defined separately outside of `Flags`.
 @available(added=HEAD)
 const FLAG_TEMPORARY_AS_NOT_LINKABLE Flags = Flags.FLAG_MUST_CREATE;
 
@@ -285,11 +285,6 @@ type ModeType = strict bits : uint32 {
 /// The maximal buffer size which can be transmitted for buffered operations.
 /// This capacity is currently set somewhat arbitrarily.
 const MAX_BUF uint64 = 8192;
-/// The maximum length, in bytes, of a filesystem string.
-@available(deprecated=11, removed=12, note="Use MAX_PATH_LENGTH or Path (for strings) instead.")
-const MAX_PATH uint64 = 4096;
-/// The maximum length, in bytes, of a single filesystem component.
-const MAX_FILENAME uint64 = 255;
 
 // Dirent type information associated with the results of ReadDirents.
 // The following values are aligned with the values from libc's "dirent.h" "DT_...".
@@ -390,10 +385,7 @@ open protocol Directory {
     strict Open(resource struct {
         flags OpenFlags;
         mode ModeType;
-        @available(deprecated=11, replaced=12)
-        path string:MAX_PATH;
-        @available(added=12)
-        path string:MAX_PATH_LENGTH;
+        path Path;
         object server_end:Node;
     });
 
@@ -406,7 +398,7 @@ open protocol Directory {
     strict DeprecatedOpen(resource struct {
         flags OpenFlags;
         mode ModeType;
-        path string:MAX_PATH_LENGTH;
+        path Path;
         object server_end:Node;
     });
 
@@ -511,9 +503,9 @@ open protocol Directory {
     /// atomically in an unspecified order.
     @selector("fuchsia.io1/Directory.Link")
     strict Link(resource struct {
-        src string:MAX_FILENAME;
+        src Name;
         dst_parent_token zx.Handle;
-        dst string:MAX_FILENAME;
+        dst Name;
     }) -> (struct {
         s zx.Status;
     });

@@ -17,5 +17,6 @@
     ],
     "configuration": {
         "cpu_manager": "configuration/cpu_manager/config_data.json"
-    }
+    },
+    "release_version": "fake_version_123"
 }

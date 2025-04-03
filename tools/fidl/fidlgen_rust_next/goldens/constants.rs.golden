@@ -23,7 +23,7 @@ impl ::fidl_next::Encodable for Bits {
     type Encoded = WireBits;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Bits
+unsafe impl<___E> ::fidl_next::Encode<___E> for Bits
 where
     ___E: ?Sized,
 {
@@ -31,10 +31,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireBits { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(self.bits());
+        ::fidl_next::munge!(let WireBits { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(self.bits()));
         Ok(())
     }
 }
@@ -57,6 +57,13 @@ impl ::fidl_next::TakeFrom<WireBits> for Bits {
 #[repr(transparent)]
 pub struct WireBits {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireBits {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
@@ -109,7 +116,7 @@ impl ::fidl_next::Encodable for BitsType {
     type Encoded = WireBitsType;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for BitsType
+unsafe impl<___E> ::fidl_next::Encode<___E> for BitsType
 where
     ___E: ?Sized,
 {
@@ -117,10 +124,10 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireBitsType { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(self.bits());
+        ::fidl_next::munge!(let WireBitsType { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(self.bits()));
         Ok(())
     }
 }
@@ -143,6 +150,13 @@ impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
 #[repr(transparent)]
 pub struct WireBitsType {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire bits have no padding
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBitsType
@@ -182,7 +196,7 @@ impl ::fidl_next::Encodable for Enum {
     type Encoded = WireEnum;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Enum
+unsafe impl<___E> ::fidl_next::Encode<___E> for Enum
 where
     ___E: ?Sized,
 {
@@ -190,12 +204,12 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireEnum { mut value } = slot);
-        *value = ::fidl_next::WireU32::from(match *self {
+        ::fidl_next::munge!(let WireEnum { value } = out);
+        let _ = value.write(::fidl_next::WireU32::from(match *self {
             Self::E => 170,
-        });
+        }));
 
         Ok(())
     }
@@ -223,6 +237,13 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[repr(transparent)]
 pub struct WireEnum {
     value: ::fidl_next::WireU32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEnum {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireEnum {
@@ -267,7 +288,7 @@ impl ::fidl_next::Encodable for EnumType {
     type Encoded = WireEnumType;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for EnumType
+unsafe impl<___E> ::fidl_next::Encode<___E> for EnumType
 where
     ___E: ?Sized,
 {
@@ -275,14 +296,14 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireEnumType { mut value } = slot);
-        *value = ::fidl_next::WireI32::from(match *self {
+        ::fidl_next::munge!(let WireEnumType { value } = out);
+        let _ = value.write(::fidl_next::WireI32::from(match *self {
             Self::Value => 3,
 
             Self::SecondValue => 4,
-        });
+        }));
 
         Ok(())
     }
@@ -312,6 +333,13 @@ impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
 #[repr(transparent)]
 pub struct WireEnumType {
     value: ::fidl_next::WireI32,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
+    #[inline]
+    fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
+        // Wire enums have no padding
+    }
 }
 
 impl WireEnumType {
@@ -380,7 +408,7 @@ impl ::fidl_next::Encodable for Struct {
     type Encoded = WireStruct;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for Struct
+unsafe impl<___E> ::fidl_next::Encode<___E> for Struct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 
@@ -390,7 +418,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -400,7 +428,7 @@ where
                 enum_with_default,
                 bits_with_default,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.int64_with_default, encoder, int64_with_default)?;
@@ -421,7 +449,7 @@ impl ::fidl_next::EncodableOption for Box<Struct> {
     type EncodedOption = ::fidl_next::WireBox<WireStruct>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<Struct>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Struct>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Struct: ::fidl_next::Encode<___E>,
@@ -430,13 +458,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -460,7 +488,7 @@ impl ::fidl_next::TakeFrom<WireStruct> for Struct {
     }
 }
 
-/// The wire type corersponding to [`Struct`].
+/// The wire type corresponding to [`Struct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStruct {
@@ -473,6 +501,19 @@ pub struct WireStruct {
     pub enum_with_default: crate::WireEnum,
 
     pub bits_with_default: crate::WireBits,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireStruct {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        unsafe {
+            out.as_mut_ptr().cast::<u8>().add(36).write_bytes(0, 4);
+        }
+
+        unsafe {
+            out.as_mut_ptr().cast::<u8>().add(25).write_bytes(0, 3);
+        }
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct
@@ -528,8 +569,57 @@ pub const OR_RESULT: crate::BitsType = crate::BitsType::from_bits_retain(7);
 
 pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireBits> for ::fidl_test_constants::Bits {
+        #[inline]
+        fn take_from(from: &crate::WireBits) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_constants::BitsType {
+        #[inline]
+        fn take_from(from: &crate::WireBitsType) -> Self {
+            Self::from_bits_retain(from.value.into())
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnum> for ::fidl_test_constants::Enum {
+        #[inline]
+        fn take_from(from: &crate::WireEnum) -> Self {
+            match crate::Enum::from(*from) {
+                crate::Enum::E => Self::E,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireEnumType> for ::fidl_test_constants::EnumType {
+        #[inline]
+        fn take_from(from: &crate::WireEnumType) -> Self {
+            match crate::EnumType::from(*from) {
+                crate::EnumType::Value => Self::Value,
+
+                crate::EnumType::SecondValue => Self::SecondValue,
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireStruct> for ::fidl_test_constants::Struct {
+        #[inline]
+        fn take_from(from: &crate::WireStruct) -> Self {
+            Self {
+                int64_with_default: ::fidl_next::TakeFrom::take_from(&from.int64_with_default),
+
+                string_with_default: ::fidl_next::TakeFrom::take_from(&from.string_with_default),
+
+                bool_with_default: ::fidl_next::TakeFrom::take_from(&from.bool_with_default),
+
+                enum_with_default: ::fidl_next::TakeFrom::take_from(&from.enum_with_default),
+
+                bits_with_default: ::fidl_next::TakeFrom::take_from(&from.bits_with_default),
+            }
+        }
+    }
+}

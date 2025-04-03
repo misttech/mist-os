@@ -29,8 +29,8 @@ static_assert(fio::wire::kOpenFlagsAllowedWithNodeReference ==
               "OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE value mismatch");
 static_assert(PATH_MAX == fio::wire::kMaxPathLength + 1,
               "POSIX PATH_MAX inconsistent with Fuchsia MAX_PATH_LENGTH");
-static_assert(NAME_MAX == fio::wire::kMaxFilename,
-              "POSIX NAME_MAX inconsistent with Fuchsia MAX_FILENAME");
+static_assert(NAME_MAX == fio::wire::kMaxNameLength,
+              "POSIX NAME_MAX inconsistent with Fuchsia MAX_NAME_LENGTH");
 
 namespace fs::internal {
 

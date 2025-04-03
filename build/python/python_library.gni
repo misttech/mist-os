@@ -215,6 +215,7 @@ template("python_library") {
                              "assert_no_deps",
                              "testonly",
                              "visibility",
+                             "data_deps",
                            ])
     deps = [ ":${_labels.input_group}" ]
     if (_enable_mypy) {

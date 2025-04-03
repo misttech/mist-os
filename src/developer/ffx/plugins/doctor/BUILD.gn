@@ -40,6 +40,7 @@ ffx_plugin("ffx_doctor") {
   ]
   test_deps = [
     "//src/developer/ffx/plugins/doctor/test_utils:lib",
+    "//src/lib/fidl/rust/fidl_test_util",
     "//third_party/rust_crates:tempfile",
   ]
 

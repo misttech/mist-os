@@ -148,7 +148,7 @@ TEST(RamCrashlogTestCase, IntegrityChecks) {
   // Corrupt the payload and verify that the log is still recoverable, but that
   // it clearly indicates that the payload portion of the log may have been
   // damaged.
-  payload[0] = ~payload[0];
+  payload[0] = static_cast<uint8_t>(~payload[0]);
   res = ram_crashlog_recover(crashlog_buffer, sizeof(crashlog_buffer), &rlog);
   ASSERT_OK(res);
   EXPECT_EQ(TEST_LOG.hdr[0].uptime, rlog.uptime);

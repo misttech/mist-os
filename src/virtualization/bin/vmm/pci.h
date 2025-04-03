@@ -178,7 +178,7 @@ class PciDevice {
   explicit PciDevice(const Attributes& attrs);
   virtual ~PciDevice() = default;
 
-  // Install the given POD type as a PCI capability.
+  // Install the given standard layout, trivially copyable type as a PCI capability.
   //
   // Capabilities types must have a size aligned to 32-bits.
   //
@@ -187,7 +187,8 @@ class PciDevice {
   template <typename T>
   zx_status_t AddCapability(const T& capability) {
     static_assert(sizeof(T) >= kPciCapMinSize, "Caps must be at least kPciCapMinSize bytes.");
-    static_assert(std::is_pod<T>::value, "Type T should be POD.");
+    static_assert(std::is_standard_layout<T>::value && std::is_trivially_copyable<T>::value,
+                  "Type T should be a standard layout type and trivially copyable.");
     static_assert(std::has_unique_object_representations<T>::value,
                   "Type T should not contain implicit padding.");
     return AddCapability(cpp20::span(reinterpret_cast<const uint8_t*>(&capability), sizeof(T)));

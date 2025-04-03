@@ -152,13 +152,12 @@ impl<D> ClientMlme<D> {
         &mut self.ctx.seq_mgr
     }
 
-    fn on_sme_get_iface_counter_stats(
+    fn on_sme_get_iface_stats(
         &self,
-        responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceCounterStatsResponse>,
+        responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceStatsResponse>,
     ) -> Result<(), Error> {
         // TODO(https://fxbug.dev/42119762): Implement stats
-        let resp =
-            fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
+        let resp = fidl_mlme::GetIfaceStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
         responder.respond(resp);
         Ok(())
     }
@@ -291,14 +290,11 @@ impl<D: DeviceOps> ClientMlme<D> {
             // Handle non station specific MLME messages first (Join, Scan, etc.)
             Req::Scan(req) => Ok(self.on_sme_scan(req).await),
             Req::Connect(req) => self.on_sme_connect(req).await,
-            Req::GetIfaceCounterStats(responder) => self.on_sme_get_iface_counter_stats(responder),
+            Req::GetIfaceStats(responder) => self.on_sme_get_iface_stats(responder),
             Req::GetIfaceHistogramStats(responder) => {
                 self.on_sme_get_iface_histogram_stats(responder)
             }
             Req::QueryDeviceInfo(responder) => self.on_sme_query_device_info(responder).await,
-            Req::QueryDiscoverySupport(responder) => {
-                self.on_sme_query_discovery_support(responder).await
-            }
             Req::QueryMacSublayerSupport(responder) => {
                 self.on_sme_query_mac_sublayer_support(responder).await
             }
@@ -459,15 +455,6 @@ impl<D: DeviceOps> ClientMlme<D> {
             device::try_query(&mut self.ctx.device).await?,
         )?;
         responder.respond(info);
-        Ok(())
-    }
-
-    async fn on_sme_query_discovery_support(
-        &mut self,
-        responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
-    ) -> Result<(), Error> {
-        let support = device::try_query_discovery_support(&mut self.ctx.device).await?;
-        responder.respond(support);
         Ok(())
     }
 
@@ -2327,7 +2314,7 @@ mod tests {
         let received_key = &m.fake_device_state.lock().keys[0];
         assert_eq!(received_key.key, Some(sent_key.key));
         assert_eq!(received_key.key_idx, Some(sent_key.key_id as u8));
-        assert_eq!(received_key.key_type, Some(fidl_common::WlanKeyType::Pairwise));
+        assert_eq!(received_key.key_type, Some(fidl_ieee80211::KeyType::Pairwise));
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -2579,20 +2566,6 @@ mod tests {
                 qos_capable: false,
             }
         );
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn mlme_respond_to_query_discovery_support() {
-        let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme().await;
-
-        let (responder, receiver) = Responder::new();
-        me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder))
-            .await
-            .expect("Failed to send MlmeRequest::Connect");
-        let resp = receiver.await.unwrap();
-        assert_eq!(resp.scan_offload.supported, true);
-        assert_eq!(resp.probe_response_offload.supported, false);
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -3150,17 +3123,17 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn mlme_respond_to_get_iface_counter_stats_with_error_status() {
+    async fn mlme_respond_to_get_iface_stats_with_error_status() {
         let mut m = MockObjects::new().await;
         let mut me = m.make_mlme().await;
 
         let (responder, receiver) = Responder::new();
-        me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceCounterStats(responder))
+        me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceStats(responder))
             .await
-            .expect("Failed to send MlmeRequest::GetIfaceCounterStats.");
+            .expect("Failed to send MlmeRequest::GetIfaceStats.");
         assert_eq!(
             receiver.await,
-            Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED))
+            Ok(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED))
         );
     }
 

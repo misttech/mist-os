@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/test.gni")
 
 source_set("src") {
@@ -60,7 +59,7 @@ executable("bin") {
   deps = [
     ":src",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/bin/driver_runtime",
   ]
 }
 

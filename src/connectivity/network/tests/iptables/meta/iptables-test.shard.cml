@@ -10,6 +10,18 @@
     program: {
         binary: "bin/iptables_test",
     },
+    capabilities: [
+        {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            value: [ "netstack_mark" ],
+        },
+    ],
     use: [
         { event_stream: "stopped" },
     ],
@@ -41,6 +53,11 @@
             // These services replace the directory capabilities above.
             service: [ "fuchsia.gpu.magma.Service" ],
             from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            from: "self",
             to: "#realm_builder",
         },
     ],

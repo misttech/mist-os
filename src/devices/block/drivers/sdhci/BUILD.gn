@@ -45,7 +45,7 @@ source_set("sdhci-driver-source") {
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/fbl",
   ]
   public_deps = [

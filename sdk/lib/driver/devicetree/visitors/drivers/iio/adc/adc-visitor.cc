@@ -64,8 +64,7 @@ bool AdcVisitor::is_match(fdf_devicetree::Node& node) {
 }
 
 AdcVisitor::AdcController& AdcVisitor::GetController(uint32_t node_id) {
-  auto controller_iter = controllers_.find(node_id);
-  if (controller_iter == controllers_.end()) {
+  if (!controllers_.contains(node_id)) {
     controllers_[node_id] = AdcController();
   }
   return controllers_[node_id];

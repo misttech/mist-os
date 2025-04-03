@@ -551,18 +551,17 @@ async fn test_wpa2_connect_request_success() {
     // Check that PTK received by driver matches the authenticator's PTK
     let driver_ptk_req =
         assert_variant!(&fullmac_request_history[3], FullmacRequest::SetKeys(req) => req.clone());
-    assert_eq!(driver_ptk_req.keylist.as_ref().unwrap().len(), 1);
-    let driver_ptk = driver_ptk_req.keylist.as_ref().unwrap();
+    assert_eq!(driver_ptk_req.key_descriptors.as_ref().unwrap().len(), 1);
+    let driver_ptk = driver_ptk_req.key_descriptors.as_ref().unwrap();
     let auth_ptk =
         assert_variant!(&auth_update_sink[0], SecAssocUpdate::Key(Key::Ptk(ptk)) => ptk.clone());
 
     assert_eq!(
         &driver_ptk[0],
-        &fidl_common::WlanKeyConfig {
-            key_type: Some(fidl_common::WlanKeyType::Pairwise),
-            key_idx: Some(0),
+        &fidl_ieee80211::SetKeyDescriptor {
+            key_type: Some(fidl_ieee80211::KeyType::Pairwise),
+            key_id: Some(0),
             peer_addr: Some(COMPATIBLE_WPA2_BSS.bssid.to_array()),
-            protection: Some(fidl_common::WlanProtection::RxTx),
             cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
             cipher_oui: Some(auth_ptk.cipher.oui.into()),
             key: Some(auth_ptk.tk().to_vec()),
@@ -574,18 +573,17 @@ async fn test_wpa2_connect_request_success() {
     // Check that GTK received by driver matches the authenticator's GTK
     let driver_gtk_req =
         assert_variant!(&fullmac_request_history[4], FullmacRequest::SetKeys(req) => req);
-    assert_eq!(driver_gtk_req.keylist.as_ref().unwrap().len(), 1);
-    let driver_gtk = driver_gtk_req.keylist.clone().unwrap();
+    assert_eq!(driver_gtk_req.key_descriptors.as_ref().unwrap().len(), 1);
+    let driver_gtk = driver_gtk_req.key_descriptors.clone().unwrap();
     let auth_gtk =
         assert_variant!(&auth_update_sink[1], SecAssocUpdate::Key(Key::Gtk(gtk)) => gtk.clone());
 
     assert_eq!(
         &driver_gtk[0],
-        &fidl_common::WlanKeyConfig {
-            key_type: Some(fidl_common::WlanKeyType::Group),
-            key_idx: Some(auth_gtk.key_id()),
+        &fidl_ieee80211::SetKeyDescriptor {
+            key_type: Some(fidl_ieee80211::KeyType::Group),
+            key_id: Some(auth_gtk.key_id().into()),
             peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
-            protection: Some(fidl_common::WlanProtection::RxTx),
             cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
             cipher_oui: Some(auth_gtk.cipher().oui.into()),
             key: Some(auth_gtk.tk().to_vec()),
@@ -801,18 +799,17 @@ async fn test_wpa3_connect_success() {
     // Check that PTK received by driver matches the authenticator's PTK
     let driver_ptk_req =
         assert_variant!(&fullmac_request_history[6], FullmacRequest::SetKeys(req) => req.clone());
-    assert_eq!(driver_ptk_req.keylist.as_ref().unwrap().len(), 1);
-    let driver_ptk = driver_ptk_req.keylist.unwrap();
+    assert_eq!(driver_ptk_req.key_descriptors.as_ref().unwrap().len(), 1);
+    let driver_ptk = driver_ptk_req.key_descriptors.unwrap();
     let auth_ptk =
         assert_variant!(&auth_update_sink[0], SecAssocUpdate::Key(Key::Ptk(ptk)) => ptk.clone());
 
     assert_eq!(
         driver_ptk[0],
-        fidl_common::WlanKeyConfig {
-            key_type: Some(fidl_common::WlanKeyType::Pairwise),
-            key_idx: Some(0),
+        fidl_ieee80211::SetKeyDescriptor {
+            key_type: Some(fidl_ieee80211::KeyType::Pairwise),
+            key_id: Some(0),
             peer_addr: Some(COMPATIBLE_WPA2_BSS.bssid.to_array()),
-            protection: Some(fidl_common::WlanProtection::RxTx),
             cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
             cipher_oui: Some(auth_ptk.cipher.oui.into()),
             key: Some(auth_ptk.tk().to_vec()),
@@ -824,18 +821,17 @@ async fn test_wpa3_connect_success() {
     // Check that GTK received by driver matches the authenticator's GTK
     let driver_gtk_req =
         assert_variant!(&fullmac_request_history[7], FullmacRequest::SetKeys(req) => req);
-    assert_eq!(driver_gtk_req.keylist.as_ref().unwrap().len(), 1);
-    let driver_gtk = &driver_gtk_req.keylist.clone().unwrap();
+    assert_eq!(driver_gtk_req.key_descriptors.as_ref().unwrap().len(), 1);
+    let driver_gtk = &driver_gtk_req.key_descriptors.clone().unwrap();
     let auth_gtk =
         assert_variant!(&auth_update_sink[1], SecAssocUpdate::Key(Key::Gtk(gtk)) => gtk.clone());
 
     assert_eq!(
         driver_gtk[0],
-        fidl_common::WlanKeyConfig {
-            key_type: Some(fidl_common::WlanKeyType::Group),
-            key_idx: Some(auth_gtk.key_id()),
+        fidl_ieee80211::SetKeyDescriptor {
+            key_type: Some(fidl_ieee80211::KeyType::Group),
+            key_id: Some(auth_gtk.key_id().into()),
             peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
-            protection: Some(fidl_common::WlanProtection::RxTx),
             cipher_type: Some(fidl_ieee80211::CipherSuiteType::Ccmp128),
             cipher_oui: Some(auth_gtk.cipher().oui.into()),
             key: Some(auth_gtk.tk().to_vec()),
@@ -847,17 +843,16 @@ async fn test_wpa3_connect_success() {
     // Check that IGTK received by driver matches the authenticator's IGTK
     let driver_igtk_req =
         assert_variant!(&fullmac_request_history[8], FullmacRequest::SetKeys(req) => req);
-    let driver_igtk = driver_igtk_req.keylist.clone().unwrap();
+    let driver_igtk = driver_igtk_req.key_descriptors.clone().unwrap();
     let auth_igtk =
         assert_variant!(&auth_update_sink[2], SecAssocUpdate::Key(Key::Igtk(igtk)) => igtk.clone());
 
     assert_eq!(
         driver_igtk[0],
-        fidl_common::WlanKeyConfig {
-            key_type: Some(fidl_common::WlanKeyType::Igtk),
-            key_idx: Some(auth_igtk.key_id.try_into().unwrap()),
+        fidl_ieee80211::SetKeyDescriptor {
+            key_type: Some(fidl_ieee80211::KeyType::Igtk),
+            key_id: Some(auth_igtk.key_id.try_into().unwrap()),
             peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
-            protection: Some(fidl_common::WlanProtection::RxTx),
             cipher_type: Some(fidl_ieee80211::CipherSuiteType::BipCmac128),
             cipher_oui: Some(auth_igtk.cipher.oui.into()),
             key: Some(auth_igtk.tk().to_vec()),

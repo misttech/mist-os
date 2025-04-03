@@ -56,7 +56,7 @@ def _fuchsia_hybrid_board_configuration_test_impl(ctx):
         # This is a prebuilt board config.
         config_dir = board_config.directory
 
-    relative_path = "input_bundles/bib/board_input_bundle.json"
+    relative_path = ctx.attr.relative_path_of_board_input_bundle + "/board_input_bundle.json"
     return [create_validation_script_provider(
         ctx,
         config_dir,
@@ -79,6 +79,10 @@ fuchsia_hybrid_board_configuration_test = rule(
         "golden_bib": attr.label(
             doc = "Golden BIB file to match against",
             allow_single_file = True,
+            mandatory = True,
+        ),
+        "relative_path_of_board_input_bundle": attr.string(
+            doc = "The path inside hyrid_board_config of the board input bundle to check",
             mandatory = True,
         ),
     } | CREATE_VALIDATION_SCRIPT_ATTRS,

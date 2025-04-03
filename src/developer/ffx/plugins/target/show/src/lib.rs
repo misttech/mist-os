@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::show::TargetData;
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::{anyhow, bail, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
 use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool};
 use fidl_fuchsia_buildinfo::ProviderProxy;
-use fidl_fuchsia_developer_ffx::TargetAddrInfo;
+use fidl_fuchsia_developer_ffx::TargetIpAddrInfo;
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
 use fidl_fuchsia_hwinfo::{Architecture, BoardProxy, DeviceProxy, ProductProxy};
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
@@ -108,10 +108,10 @@ async fn gather_target_info_from_daemon(
     let addr_info = timeout(Duration::from_secs(1), target_proxy.get_ssh_address())
         .await?
         .map_err(|e| anyhow!("Failed to get ssh address: {:?}", e))?;
-    let addr = TargetAddr::from(&addr_info);
+    let addr = TargetIpAddr::from(&addr_info);
     let port = match addr_info {
-        TargetAddrInfo::Ip(_info) => 22,
-        TargetAddrInfo::IpPort(info) => info.port,
+        TargetIpAddrInfo::Ip(_info) => 22,
+        TargetIpAddrInfo::IpPort(info) => info.port,
     };
     let ssh_address = match addr.ip() {
         IpAddr::V4(ip) => AddressData { host: ip.to_string(), port },
@@ -263,7 +263,7 @@ mod tests {
     use ffx_target::{FidlPipe, TargetProxy};
     use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
-    use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
+    use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_developer_remotecontrol::{
         IdentifyHostResponse, RemoteControlProxy, RemoteControlRequest,
     };
@@ -331,7 +331,7 @@ mod tests {
             fake_proxy::<TargetProxy>(move |req| match req {
                 TargetRequest::GetSshAddress { responder, .. } => {
                     responder
-                        .send(&TargetAddrInfo::Ip(TargetIp {
+                        .send(&TargetIpAddrInfo::Ip(TargetIp {
                             ip: IpAddress::Ipv4(Ipv4Address { addr: IPV4_ADDR }),
                             scope_id: 1,
                         }))

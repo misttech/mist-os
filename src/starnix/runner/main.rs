@@ -7,6 +7,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use kernel_manager::kernels::Kernels;
+use kernel_manager::proxy::run_proxy_thread;
 use kernel_manager::serve_starnix_manager;
 use kernel_manager::suspend::SuspendContext;
 use log::{error, info, warn};
@@ -51,7 +52,7 @@ async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
 
     let (sender, receiver) = async_channel::unbounded();
-    kernel_manager::run_proxy_thread(receiver);
+    run_proxy_thread(receiver);
 
     fs.dir("svc").add_fidl_service(Services::ComponentRunner);
     fs.dir("svc").add_fidl_service(Services::StarnixManager);

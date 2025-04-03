@@ -13,7 +13,7 @@ basic_toolchain("fidling") {
 }
 
 # A generated file that lists the IR files for all FIDL libraries in the IDK
-# (and "partner_internal" SDK category).
+# (and the "prebuilt" and "host_tool" SDK categories).
 generated_file("sdk_fidl") {
   # Ensure that the `..._sdk` target for all relevant FIDL libraries have been
   # built since that is how `sdk_fidl_json_data` is populated.

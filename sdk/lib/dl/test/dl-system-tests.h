@@ -24,7 +24,6 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // This test fixture does not need to match on exact error text, since the
   // error message can vary between different system implementations.
   static constexpr bool kCanMatchExactError = false;
-
 #ifdef __Fuchsia__
   // Musl always prioritizes a loaded module for symbol lookup.
   static constexpr bool kStrictLoadOrderPriority = true;
@@ -57,6 +56,10 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
   void CleanUpOpenedFile(void* ptr) override { ASSERT_TRUE(DlClose(ptr).is_ok()); }
+
+  // This function is a no-op for system tests, since they manage their own TLS
+  // setup.
+  void PrepareForTlsAccess() {}
 
  private:
   // This will call the system dlopen in an OS-specific context. This method is

@@ -17,6 +17,7 @@ fidl("fuchsia.driver.test") {
     "//sdk/fidl/fuchsia.component.resolution",
     "//sdk/fidl/fuchsia.component.test",
     "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]

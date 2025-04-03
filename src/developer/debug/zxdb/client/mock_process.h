@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 
+#include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/target.h"
@@ -58,6 +59,16 @@ class MockProcess : public Process {
                    fit::callback<void(const Err&)> callback) override;
   void LoadInfoHandleTable(
       fit::callback<void(ErrOr<std::vector<debug_ipc::InfoHandle>> handles)> callback) override;
+
+  // unwinder::AsyncMemory::Delegate implementation.
+  void FetchMemoryRanges(std::vector<std::pair<uint64_t, uint32_t>> ranges,
+                         fit::callback<void()> done) override {
+    FX_NOTIMPLEMENTED();
+  }
+  unwinder::Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override {
+    FX_NOTIMPLEMENTED();
+    return unwinder::Success();
+  }
 
  private:
   Target* target_ = nullptr;

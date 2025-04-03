@@ -56,17 +56,17 @@ template("fidl_rust") {
                          ])
 
   if (fdomain) {
-    crate_name = "fdomain_" + string_replace(library_name, ".", "_")
+    _crate_name = "fdomain_" + string_replace(library_name, ".", "_")
   } else {
-    crate_name = "fidl_" + string_replace(library_name, ".", "_")
+    _crate_name = "fidl_" + string_replace(library_name, ".", "_")
   }
   if (common) {
-    crate_name = crate_name + "_common"
+    _crate_name = _crate_name + "_common"
   }
-  file_stem = "$fidl_gen_dir/$crate_name"
+  file_stem = "${fidl_gen_dir}/${_crate_name}"
 
   if (is_fidl_toolchain) {
-    filename = "$file_stem.rs"
+    filename = "${file_stem}.rs"
     compiled_action(generation_target) {
       forward_variables_from(invoker,
                              [
@@ -151,7 +151,7 @@ template("fidl_rust") {
                                "disable_rustdoc",
                              ])
 
-      name = crate_name
+      name = _crate_name
       output_dir = "$target_out_dir/$target_name"
       version = "0.1.0"
       edition = "2018"

@@ -300,7 +300,7 @@ mod testutil {
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
     use net_types::{MulticastAddr, SpecifiedAddr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
-    use netstack3_base::{CoreTimerContext, CounterContext, CtxPair, FrameDestination};
+    use netstack3_base::{CoreTimerContext, CounterContext, CtxPair, FrameDestination, Marks};
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, InnerPacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
@@ -308,7 +308,6 @@ mod testutil {
     use crate::device::IpDeviceSendContext;
     use crate::internal::base::DeviceIpLayerMetadata;
     use crate::internal::icmp::{IcmpErrorHandler, IcmpHandlerIpExt};
-    use crate::internal::routing::rules::Marks;
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState, MulticastRouteTable,

@@ -38,6 +38,10 @@
 #include "misc.h"
 #include "openthread-system.h"
 
+#ifdef OPENTHREAD_250225
+#include "spinel_manager.h"
+#endif  // OPENTHREAD_250225
+
 void platformSimInit(void);
 extern "C" void platformRadioInit(const char *aUrl);
 
@@ -49,6 +53,9 @@ const char *radio_url_string =
     "spinel+vendor+spi:///dev/class/ot-radio/000?baudrate=115200&no-reset&enable-coex";
 
 void otSysInit(otPlatformConfig *a_platform_config) {
+#ifdef OPENTHREAD_250225
+  platformSpinelManagerInit(radio_url_string);
+#endif  // OPENTHREAD_250225
   platformRadioInit(radio_url_string);
   platformRandomInit();
 }

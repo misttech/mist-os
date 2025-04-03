@@ -77,7 +77,7 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
 
     // Before serving previous data, wait until the post-boot system update check has finished.
-    // Note: We're already accepting persist requess. If we receive a request, store
+    // Note: We're already accepting persist requests. If we receive a request, store
     // some data, and then cache is cleared after data is persisted, that data will be lost. This
     // is correct behavior - we don't want to remember anything from before the cache was cleared.
     let publish_fut = async move {
@@ -101,12 +101,7 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
         // Start serving previous boot data
         info!("...Update check has completed; publishing previous boot data");
         inspector.root().record_child(PERSIST_NODE_NAME, |node| {
-            inspect_server::serve_persisted_data(node).unwrap_or_else(|e| {
-                error!(
-                    "{} {} {:?}",
-                    "Serving persisted data experienced critical failure.", "No data available:", e,
-                )
-            });
+            inspect_server::serve_persisted_data(node);
             component::health().set_ok();
             info!("Diagnostics Persistence Service ready");
         });

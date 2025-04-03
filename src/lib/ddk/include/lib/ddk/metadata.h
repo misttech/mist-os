@@ -64,9 +64,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: fuchsia_hardware_thermal_ThermalDeviceInfo
 #define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
 
-// type: FIDL fuchsia.hardware.pinimpl/Metadata
-#define DEVICE_METADATA_GPIO_CONTROLLER 0x43495047  // GPIC
-
 // type: FIDL fuchsia.hardware.power/DomainMetadata
 #define DEVICE_METADATA_POWER_DOMAINS 0x52574F50  // POWR
 
@@ -75,12 +72,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 
 // type: vendor specific Wifi configuration
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI
-
-// type: FIDL fuchsia.hardware.i2c/I2CBusMetadata
-#define DEVICE_METADATA_I2C_CHANNELS 0x43433249  // I2CC
-
-// type: FIDL fuchsia.hardware.spi.SpiBusMetadata
-#define DEVICE_METADATA_SPI_CHANNELS 0x43495053  // SPIC
 
 // type: display_panel_t (defined in //src/graphics/display/lib/
 // device-protocol-display/include/lib/device-protocol/display-panel.h)
@@ -101,9 +92,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 
 // Type: FIDL fuchsia.hardware.trippoint/TripDeviceMetadata
 #define DEVICE_METADATA_TRIP 0x50495254  // TRIP
-
-// type: FIDL fuchsia.scheduler/RoleName
-#define DEVICE_METADATA_SCHEDULER_ROLE_NAME 0x454C4F52  // ROLE
 
 // Metadata types that have least significant byte set to lowercase 'd'
 // signify private driver data.

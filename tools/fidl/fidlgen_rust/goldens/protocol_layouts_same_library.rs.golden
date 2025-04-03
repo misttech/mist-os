@@ -189,6 +189,20 @@ impl ComposedProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<ComposedProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: ComposedProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for ComposedProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ComposedProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -1403,6 +1417,20 @@ impl MainProtocolSynchronousProxy {
             ___deadline,
         )?;
         Ok(_response.map(|x| x))
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<MainProtocolSynchronousProxy> for zx::Handle {
+    fn from(value: MainProtocolSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for MainProtocolSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 

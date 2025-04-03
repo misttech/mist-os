@@ -132,12 +132,24 @@ zx::result<> BtTransportUart::Start() {
   }
 
   // Start compat device server to forward metadata.
-  zx::result compat_server_result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), "bt-transport-uart",
-                                compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+  zx::result compat_server_result = compat_server_.Initialize(
+      incoming(), outgoing(), node_name(), "bt-transport-uart",
+      // TODO(b/355242959): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer used.
+      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
   if (compat_server_result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize device server: %s", compat_server_result.status_string());
     return compat_server_result.take_error();
+  }
+
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = mac_address_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to server mac address metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   // Add child node for the vendor driver to bind.
@@ -147,6 +159,7 @@ zx::result<> BtTransportUart::Start() {
   auto offers = compat_server_.CreateOffers2(args_arena);
   offers.push_back(fdf::MakeOffer2<fhbt::HciService>(args_arena));
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(args_arena));
+  offers.push_back(mac_address_metadata_server_.MakeOffer(arena));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
                   .name("bt-transport-uart")

@@ -147,6 +147,7 @@ fn is_device_category_valid(
     device_category: &CmlDeviceCategory,
 ) -> StaticCheckResult {
     if let Some(json_category) = fhcp_schema.device_category_types.get(&device_category.category) {
+        #[allow(clippy::map_entry)] // TODO(https://fxbug.dev/407087100)
         if json_category.contains_key(&device_category.subcategory) {
             Ok(StaticCheckPass {})
         } else {

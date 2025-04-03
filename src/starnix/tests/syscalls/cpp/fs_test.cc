@@ -888,9 +888,17 @@ class OtmpfileTest : public ::testing::Test {
 };
 
 void CheckLinkCount(int fd, unsigned count) {
+  uint64_t nlink = 0;
   struct stat s;
-  ASSERT_EQ(fstat(fd, &s), 0);
-  ASSERT_EQ(s.st_nlink, count);
+  if (fstat(fd, &s) == 0) {
+    nlink = s.st_nlink;
+  } else {
+    ASSERT_EQ(errno, EOVERFLOW);
+    struct stat64 s;
+    ASSERT_EQ(fstat64(fd, &s), 0);
+    nlink = s.st_nlink;
+  }
+  ASSERT_EQ(nlink, count);
 }
 
 TEST_F(OtmpfileTest, TmpFileLinkIntoAfter) {

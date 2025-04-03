@@ -7,9 +7,6 @@
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
-
-    // Two children: a server and client. "echo_client" has "eager" startup so it
-    // will be started along with the realm.
     children: [
         {
             name: "echo_reporter",
@@ -17,21 +14,8 @@
             startup: "eager",
             environment: "#elf-env",
         },
-        {
-            name: "echo_client",
-            url: "#meta/echo_client.cm",
-            startup: "eager",
-            environment: "#elf-env",
-        },
     ],
-
-    // Route Echo service from server to client.
     offer: [
-        {
-            protocol: "fidl.examples.routing.echo.Echo",
-            from: "#echo_reporter",
-            to: "#echo_client",
-        },
         {
             event_stream: [
                 "started",
@@ -39,10 +23,7 @@
             ],
             from: "parent",
             to: "#echo_reporter",
-            scope: [
-                "#echo_client",
-                "#echo_reporter",
-            ],
+            scope: [ "#echo_reporter" ],
         },
     ],
 }

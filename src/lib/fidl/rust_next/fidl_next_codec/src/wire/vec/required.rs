@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::mem::needs_drop;
+use core::mem::{needs_drop, MaybeUninit};
 use core::ops::Deref;
 use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{fmt, slice};
@@ -12,13 +12,21 @@ use munge::munge;
 use super::raw::RawWireVector;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError, Encoder,
-    EncoderExt as _, Slot, TakeFrom, WirePointer,
+    EncoderExt as _, Slot, TakeFrom, WirePointer, ZeroPadding,
 };
 
 /// A FIDL vector
 #[repr(transparent)]
 pub struct WireVector<T> {
     raw: RawWireVector<T>,
+}
+
+unsafe impl<T> ZeroPadding for WireVector<T> {
+    #[inline]
+    fn zero_padding(out: &mut MaybeUninit<Self>) {
+        munge!(let Self { raw } = out);
+        RawWireVector::<T>::zero_padding(raw);
+    }
 }
 
 impl<T> Drop for WireVector<T> {
@@ -33,8 +41,8 @@ impl<T> Drop for WireVector<T> {
 
 impl<T> WireVector<T> {
     /// Encodes that a vector is present in a slot.
-    pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
-        munge!(let Self { raw } = slot);
+    pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
+        munge!(let Self { raw } = out);
         RawWireVector::encode_present(raw, len);
     }
 
@@ -118,11 +126,11 @@ impl<T: Encodable> Encodable for Vec<T> {
     type Encoded = WireVector<T::Encoded>;
 }
 
-impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
+unsafe impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded>,
+        out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
         if T::COPY_OPTIMIZATION.is_enabled() {
             let bytes =
@@ -131,7 +139,7 @@ impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
         } else {
             encoder.encode_next_slice(self.as_mut_slice())?;
         }
-        WireVector::encode_present(slot, self.len() as u64);
+        WireVector::encode_present(out, self.len() as u64);
         Ok(())
     }
 }

@@ -63,9 +63,6 @@ if (is_host) {
       "//tools/fidlcat:lib",
       "//zircon/system/public",
     ]
-
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-conversion" ]
   }
 
   source_set("host_tests") {
@@ -81,9 +78,6 @@ if (is_host) {
       "//third_party/protobuf:protobuf_full",
       "//third_party/rapidjson",
     ]
-
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-conversion" ]
   }
 
   proto_library("session_proto") {

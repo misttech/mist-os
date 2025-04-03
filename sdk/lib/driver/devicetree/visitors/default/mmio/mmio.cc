@@ -79,7 +79,7 @@ zx::result<> MmioVisitor::RegPropertyParser(Node& node,
 
 zx::result<> MmioVisitor::MemoryRegionParser(Node& node,
                                              fdf_devicetree::PropertyValues& parsed_props) {
-  if (parsed_props.find(kMemoryRegionProp) == parsed_props.end()) {
+  if (!parsed_props.contains(kMemoryRegionProp)) {
     return zx::ok();
   }
   size_t count = parsed_props[kMemoryRegionProp].size();

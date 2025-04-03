@@ -4,8 +4,10 @@
 # found in the LICENSE file.
 
 import unittest
+from pathlib import Path
 
 import build_summary
+import textpb
 
 
 class LabelsToDictTests(unittest.TestCase):
@@ -1076,12 +1078,115 @@ machine_info: {
 build_latency: 28
 """
 
+RBE_METRICS_TXT_LINES = RBE_METRICS_TXT_DATA.split("\n")
 
-class PrintBuildSummarySmokeTest(unittest.TestCase):
+
+class BuildSummaryTestBase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.parsed_input = textpb.parse(RBE_METRICS_TXT_LINES)
+
+
+class LoadRbeMetricsTest(BuildSummaryTestBase):
+    def test_load(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        self.assertEqual(
+            rbe_data.status_metrics["CompletionStatus"]["cxx"][
+                "STATUS_NON_ZERO_EXIT"
+            ],
+            2,
+        )
+        self.assertEqual(
+            rbe_data.bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"][
+                "cxx"
+            ],
+            35608332,
+        )
+
+
+class PrepareSummaryTableTest(BuildSummaryTestBase):
+    def test_prepare(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        table = build_summary.prepare_summary_table(rbe_data)
+        found_bytes_downloaded = False
+        for row in table:
+            if row[0] == "BytesDownloaded":
+                self.assertEqual(row[1], "34.0 MiB")  # formatted
+                found_bytes_downloaded = True
+
+        self.assertTrue(found_bytes_downloaded)
+
+
+EXPECTED_BUILD_SUMMARY = """=== Remote build summary (from: build/rbe/build_summary.py reproxy_logdir)
+[by action type]                cxx       all
+CompletionStatus
+  STATUS_NON_ZERO_EXIT            2         2
+  STATUS_REMOTE_EXECUTION        45        45
+total                            47        47
+
+OutputBytes                34.1 MiB  34.1 MiB
+BytesDownloaded            34.0 MiB  34.0 MiB
+BytesUploaded             319.4 KiB 319.4 KiB
+"""
+
+
+class PrintBuildSummaryTest(BuildSummaryTestBase):
     def test_build_summary(self) -> None:
-        # Smoke test that `print_build_summary()` does not error.
-        lines = RBE_METRICS_TXT_DATA.split("\n")
-        build_summary.print_build_summary(lines, "reproxy_logdir")
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        # Ignore the === line because {script_rel} is different in .pyz.
+        self.assertEqual(
+            [
+                line.strip()
+                for line in build_summary.build_summary_lines(
+                    rbe_data, "reproxy_logdir"
+                )
+            ][1:],
+            [line.strip() for line in EXPECTED_BUILD_SUMMARY.splitlines()][1:],
+        )
+
+
+class ArrangeMetricsJsonTest(BuildSummaryTestBase):
+    def test_metrics(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
+        json_data = build_summary.arrange_metrics_json(rbe_data)
+        self.assertEqual(
+            json_data,
+            {
+                "execution_statuses": {
+                    "all": {
+                        "STATUS_NON_ZERO_EXIT": 2,
+                        "STATUS_REMOTE_EXECUTION": 45,
+                    },
+                    "cxx": {
+                        "STATUS_NON_ZERO_EXIT": 2,
+                        "STATUS_REMOTE_EXECUTION": 45,
+                    },
+                },
+                "data_sizes_bytes": {
+                    "TotalOutputBytes": {"all": 35777071, "cxx": 35777071},
+                    "LogicalBytesDownloaded": {
+                        "all": 35608332,
+                        "cxx": 35608332,
+                    },
+                    "LogicalBytesUploaded": {"all": 327048, "cxx": 327048},
+                    "RealBytesDownloaded": {"all": 35608332, "cxx": 35608332},
+                    "RealBytesUploaded": {"all": 327048, "cxx": 327048},
+                },
+            },
+        )
+
+
+class MainArgsParsingTest(unittest.TestCase):
+    def test_logdir(self) -> None:
+        log_dir = "/tmp/foo/bar/reproxy.logs"
+        args = build_summary._MAIN_ARG_PARSER.parse_args([log_dir])
+        self.assertEqual(args.reproxy_logdir, Path(log_dir))
+
+    def test_format_json(self) -> None:
+        log_dir = "/tmp/foo/bar/reproxy.logs"
+        args = build_summary._MAIN_ARG_PARSER.parse_args(
+            ["--format=json", log_dir]
+        )
+        self.assertEqual(args.format, "json")
 
 
 if __name__ == "__main__":

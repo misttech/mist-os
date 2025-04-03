@@ -5714,11 +5714,10 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnPartialVmoWrite, 0) {
   ASSERT_TRUE(pager.FailPages(src_vmo, 1, 1));
   ASSERT_TRUE(t.WaitForFailure());
 
-  // The write partially succeeded, so the VMO should be modified.
-  ASSERT_TRUE(pager.VerifyModified(vmo));
+  // The write will have failed, so VMO should not be marked as modified.
+  ASSERT_FALSE(pager.VerifyModified(vmo));
 
   // Verify dirty pages and contents.
-  src_vmo->GenerateBufferContents(expected.data(), 1, 0);
   ASSERT_TRUE(check_buffer_data(vmo, 0, 2, expected.data(), true));
   // We mark pages dirty when they are looked up, i.e. *before* writing to them, so they will still
   // be reported as dirty.

@@ -3,13 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 source_set("lib") {
   sources = [
     "high_water.cc",
     "high_water.h",
+    "imminent_oom_observer.cc",
+    "imminent_oom_observer.h",
     "logger.cc",
     "logger.h",
     "metrics.cc",

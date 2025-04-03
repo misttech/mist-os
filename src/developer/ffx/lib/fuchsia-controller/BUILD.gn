@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/fidl/fidl.gni")
+import("//build/python/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
@@ -10,13 +12,7 @@ import("//sdk/categories/compatibility.gni")
 import("//src/tests/fidl/conformance_suite/gidl-conformance-suite.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
-assert(is_host)
-
-visibility = [
-  ":*",
-  "cpp:*",
-  "tests:*",
-]
+assert(is_host, "The fuchsia-controller framework is for host tools only")
 
 conformance_test_source = "$target_gen_dir/conformance_test.py"
 
@@ -29,9 +25,6 @@ gidl("conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
   libraries = [
     ":fidl_bindings",
     ":fuchsia_controller_py",
@@ -39,13 +32,12 @@ python_host_test("fuchsia_controller_conformance_tests") {
   deps = [ ":conformance_tests_py" ]
   test_data_deps = [
     "tests:fuchsia_controller_host_test_data",
-    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data(${toolchain_variant.base})",
+    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data",
   ]
   main_source = conformance_test_source
 }
 
 rustc_staticlib("lib") {
-  test_visibility = [ "*" ]
   output_name = "fuchsia_controller"
   edition = "2021"
   with_unit_tests = true
@@ -86,7 +78,6 @@ rustc_staticlib("lib") {
 }
 
 python_library("fuchsia_controller_py") {
-  visibility += [ "tests:*" ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
@@ -101,16 +92,11 @@ python_library("fuchsia_controller_py") {
   # Ensure all FIDL dependencies meet the compatibility and stability
   # requirements.
   # There are currently exceptions - see https://fxbug.dev/42081073.
-  assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
+  # Host tools in the IDK can depend on SDK categories up to "host_tool".
+  assert_no_deps = markers_partner_idk_host_tools_must_not_depend_on
 }
 
 python_library("fidl_bindings") {
-  visibility += [
-    "./*",
-    "tests:*",
-    "//src/testing/end_to_end/honeydew:*",
-  ]
-
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
@@ -130,6 +116,25 @@ python_library("fidl_bindings") {
   ]
 }
 
+static_conformance_test_source = "$target_gen_dir/static_conformance_test.py"
+
+gidl("static_conformance_tests_py") {
+  type = "conformance"
+  language = "python"
+  inputs = conformance_suite_gidl_files
+  fidl = conformance_suite_fidl_target
+  output = static_conformance_test_source
+}
+
+python_host_test("fuchsia_controller_static_conformance_tests") {
+  libraries = [ ":fuchsia_controller_py" ]
+  deps = [
+    ":static_conformance_tests_py",
+    "//src/tests/fidl/conformance_suite:conformance_fidl_python",
+  ]
+  main_source = static_conformance_test_source
+}
+
 python_binary("example") {
   testonly = true
   main_source = "python/example.py"
@@ -143,7 +148,6 @@ python_binary("example") {
 
 group("fuchsia-controller") {
   testonly = true
-  visibility += [ "//src/developer/ffx/lib" ]
   deps = [
     ":example",
     ":fuchsia_controller_py",
@@ -153,10 +157,6 @@ group("fuchsia-controller") {
 
 group("tests") {
   testonly = true
-
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
 
   deps = [
     ":lib_test",
@@ -169,12 +169,15 @@ group("tests") {
   if (host_os != "mac") {
     deps += [
       ":fuchsia_controller_conformance_tests",
+      ":fuchsia_controller_static_conformance_tests",
       "tests:fuchsia_controller_errors_test",
       "tests:fuchsia_controller_fidl_channel_test",
       "tests:fuchsia_controller_fidl_client_test",
       "tests:fuchsia_controller_fidl_common_test",
       "tests:fuchsia_controller_fidl_construct_test",
+      "tests:fuchsia_controller_fidl_reserved_names_test",
       "tests:fuchsia_controller_fidl_server_test",
+      "tests:fuchsia_controller_fidl_union_test",
       "tests:fuchsia_controller_importing_test",
       "tests:fuchsia_controller_isolate_directory_test",
       "tests:fuchsia_controller_socket_test",
@@ -183,9 +186,6 @@ group("tests") {
 }
 
 group("host_tests") {
-  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
-  visibility = []
-  visibility = [ "*" ]
   testonly = true
   deps = []
 

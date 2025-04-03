@@ -60,7 +60,6 @@ rustc_library("input") {
   ]
 
   test_deps = [
-    "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",

@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+# This is a cross toolchain library - used by //src/developer/ffx/command/error
+
 rustc_library("lib") {
   name = "errors"
   version = "0.1.0"

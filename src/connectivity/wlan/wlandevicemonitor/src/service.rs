@@ -150,10 +150,6 @@ pub(crate) async fn handle_monitor_request(
             let result = get_sme_telemetry(ifaces, iface_id, telemetry_server).await;
             responder.send(result.map_err(|e| e.into_raw()))?;
         }
-        DeviceMonitorRequest::GetFeatureSupport { iface_id, feature_support_server, responder } => {
-            let result = get_feature_support(ifaces, iface_id, feature_support_server).await;
-            responder.send(result.map_err(|e| e.into_raw()))?;
-        }
     }
     Ok(())
 }
@@ -557,21 +553,6 @@ async fn get_sme_telemetry(
         error!("Failed to request SME telemetry: {}", e);
         zx::Status::INTERNAL
     })?;
-    result.map_err(zx::Status::from_raw)
-}
-
-async fn get_feature_support(
-    ifaces: &IfaceMap,
-    id: u16,
-    feature_support_server: fidl::endpoints::ServerEnd<fidl_sme::FeatureSupportMarker>,
-) -> Result<(), zx::Status> {
-    info!("get_feature_support(id = {})", id);
-    let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
-    let result =
-        iface.generic_sme.get_feature_support(feature_support_server).await.map_err(|e| {
-            error!("Failed to request feature support: {}", e);
-            zx::Status::INTERNAL
-        })?;
     result.map_err(zx::Status::from_raw)
 }
 
@@ -2224,40 +2205,6 @@ mod tests {
         let req_fut = super::get_client_sme(&test_values.ifaces, 1337, client_sme_server);
         let mut req_fut = pin!(req_fut);
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
-    }
-
-    #[fuchsia::test]
-    fn get_feature_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let test_values = test_setup();
-        let (phy, _phy_stream) = fake_phy();
-        let phy_id = 10u16;
-        test_values.phys.insert(phy_id, phy);
-        let (generic_sme_proxy, mut generic_sme_stream) =
-            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>();
-
-        let (_feature_support_proxy, feature_support_server) =
-            create_proxy::<fidl_sme::FeatureSupportMarker>();
-
-        test_values.ifaces.insert(
-            42,
-            device::IfaceDevice {
-                phy_ownership: PhyOwnership { phy_id: 10, phy_assigned_id: 0 },
-                generic_sme: generic_sme_proxy,
-            },
-        );
-
-        let req_fut = super::get_feature_support(&test_values.ifaces, 42, feature_support_server);
-        let mut req_fut = pin!(req_fut);
-        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut req_fut));
-
-        // Respond to a feature support request with a feature support endpoint.
-        assert_variant!(exec.run_until_stalled(&mut generic_sme_stream.next()),
-            Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::GetFeatureSupport { responder, .. }))) => {
-                responder.send(Ok(())).expect("Failed to send response");
-            }
-        );
-        assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(_)));
     }
 
     #[fuchsia::test]

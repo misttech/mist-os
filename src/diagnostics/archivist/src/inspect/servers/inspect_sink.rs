@@ -150,15 +150,14 @@ mod tests {
     use crate::pipeline::StaticHierarchyAllowlist;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_json_diff;
-    use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
+    use fidl::endpoints::{create_proxy_and_stream, ClientEnd};
     use fidl_fuchsia_inspect::{
         InspectSinkMarker, InspectSinkProxy, InspectSinkPublishRequest, TreeMarker,
     };
-    use fuchsia_async::Task;
     use fuchsia_inspect::reader::read;
     use fuchsia_inspect::Inspector;
     use futures::Future;
-    use inspect_runtime::service::spawn_tree_server_with_stream;
+    use inspect_runtime::service::spawn_tree_server;
     use inspect_runtime::TreeServerSendPreference;
     use selectors::VerboseError;
     use std::sync::Arc;
@@ -178,7 +177,7 @@ mod tests {
         koids: Vec<zx::Koid>,
 
         /// The servers for each component's Tree protocol
-        tree_pairs: Vec<(Arc<ComponentIdentity>, Option<Task<()>>)>,
+        tree_pairs: Vec<(Arc<ComponentIdentity>, Option<fasync::Scope>)>,
 
         scope: Option<fasync::Scope>,
     }
@@ -244,24 +243,24 @@ mod tests {
             inspector: Inspector,
             settings: TreeServerSendPreference,
         ) -> ClientEnd<TreeMarker> {
-            let (tree, request_stream) = create_request_stream::<TreeMarker>();
-            let server = spawn_tree_server_with_stream(inspector, settings, request_stream);
-            self.tree_pairs.push((component, Some(server)));
+            let child = fasync::Scope::new();
+            let tree = spawn_tree_server(inspector, settings, &child);
+            self.tree_pairs.push((component, Some(child)));
             tree
         }
 
         /// Drop the server(s) associated with `component`, as initialized by `serve`.
-        fn drop_tree_servers(&mut self, component: &Arc<ComponentIdentity>) {
-            for (id, ref mut server) in &mut self.tree_pairs {
+        async fn drop_tree_servers(&mut self, component: &Arc<ComponentIdentity>) {
+            for (id, ref mut scope) in &mut self.tree_pairs {
                 if id != component {
                     continue;
                 }
 
-                if server.is_none() {
+                if scope.is_none() {
                     continue;
                 }
 
-                server.take();
+                scope.take().unwrap().cancel().await;
             }
         }
 
@@ -506,7 +505,7 @@ mod tests {
         })
         .await;
 
-        test.drop_tree_servers(&identity);
+        test.drop_tree_servers(&identity).await;
 
         // this executing to completion means the identity is not there anymore; we know
         // it previously was present

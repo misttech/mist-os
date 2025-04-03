@@ -225,7 +225,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
         (ktl::clamp<uint64_t>(cnt, 0, 0xFF) << 20) | ((fair ? 1 : 0) << 28) |
         ((eligible ? 1 : 0) << 29) | ((thread->IsIdle() ? 1 : 0) << 30);
 
-    ktrace_probe(TraceAlways, TraceContext::Cpu, name, arg0, arg1);
+    KTrace::Probe(KTrace::Context::Cpu, name, arg0, arg1);
   }
 }
 
@@ -1813,7 +1813,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     if constexpr (SCHEDULER_QUEUE_TRACING_ENABLED) {
       const uint64_t arg0 = 0;
       const uint64_t arg1 = (ktl::clamp<uint64_t>(this_cpu_, 0, 0xF) << 16);
-      ktrace_probe(TraceAlways, TraceContext::Cpu, "tqe_afinish"_intern, arg0, arg1);
+      KTrace::Probe(KTrace::Context::Cpu, "tqe_afinish"_intern, arg0, arg1);
     }
 
     // Remember the pointer to the current thread's active ChainLockTransaction.

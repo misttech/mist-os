@@ -26,7 +26,7 @@ impl SignalFd {
         if flags & SFD_NONBLOCK != 0 {
             open_flags |= OpenFlags::NONBLOCK;
         }
-        Anon::new_file(
+        Anon::new_private_file(
             current_task,
             Box::new(SignalFd { mask: Mutex::new(mask) }),
             open_flags,

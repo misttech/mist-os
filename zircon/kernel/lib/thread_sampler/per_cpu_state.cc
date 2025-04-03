@@ -47,8 +47,9 @@ zx::result<> PerCpuState::SetUp(const zx_sampler_config_t& config, PinnedVmObjec
   // claim the PendingWrite.
   uint64_t expected = write_state_.load(ktl::memory_order_relaxed);
   // Ensure we preserve the kPendingTimer bit
-  uint64_t desired = expected | kPendingWrite | kWritesEnabled;
+  uint64_t desired;
   do {
+    desired = expected | kPendingWrite | kWritesEnabled;
     // We should never have multiple writes on the same cpu occur at once.
     DEBUG_ASSERT((expected & kPendingWrite) == 0);
     // Are writes enabled?
@@ -125,14 +126,13 @@ void PerCpuState::SetTimer() {
   // We could be racing with a "DisableWrites" here. We need to atomically set the kPendingTimer
   // bit, but only if someone hasn't come along and reset the kWritesEnabled bit from under us.
   uint64_t expected = write_state_.load(ktl::memory_order_relaxed);
-
-  // Even though there can only be one write at a time per cpu, and we set the timer on the same cpu
-  // as it triggers on, there could still be a pending write on this cpu. Since we are
-  // setting/handling this timer in interrupt context, we may have started writing on the cpu and
-  // then got interrupted by the timer and ended up here. Thus we need to be careful here to
-  // preserve the kPendingWrite bit.
-  uint64_t desired = expected | kPendingTimer | kWritesEnabled;
+  const uint64_t desired = kPendingTimer | kWritesEnabled;
   do {
+    // Writers disable interrupts while they are writing, we should never observe a kPendingWrite
+    // bit unless we read the atomic from a different CPU than the writer. Since we set the timer on
+    // the same CPU the writer is on, we should never see this set.
+    ZX_ASSERT((expected & kPendingWrite) == 0);
+
     // If writes aren't enabled, we need to reset the kPendingTimerBit so that the stop operation
     // knows there are no more timers on this cpu.
     if ((expected & kWritesEnabled) != kWritesEnabled) {

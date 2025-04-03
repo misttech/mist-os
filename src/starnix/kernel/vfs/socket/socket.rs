@@ -9,6 +9,7 @@ use super::{
 };
 use crate::mm::MemoryAccessorExt;
 use crate::security;
+use crate::syscalls::time::TimeValPtr;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
@@ -16,6 +17,8 @@ use crate::vfs::buffers::{
 use crate::vfs::socket::SocketShutdownFlags;
 use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
 use byteorder::{ByteOrder as _, NativeEndian};
+use starnix_uapi::user_address::ArchSpecific;
+use starnix_uapi::{arch_struct_with_union, AF_INET};
 
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
@@ -33,13 +36,12 @@ use starnix_uapi::errors::{Errno, ErrnoCode};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::union::struct_with_union_into_bytes;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_char, errno, error, ifreq, in_addr, sockaddr, sockaddr_in, ucred, AF_INET, SIOCGIFADDR,
-    SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNETMASK, SIOCSIFADDR,
-    SIOCSIFFLAGS, SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO,
-    SO_SNDTIMEO, SO_TYPE,
+    arch_union_wrapper, c_char, errno, error, uapi, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
+    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS, SIOCSIFNETMASK,
+    SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
 use std::collections::VecDeque;
@@ -54,6 +56,85 @@ pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 
 /// The size of a buffer suitable to carry netlink route messages.
 const NETLINK_ROUTE_BUF_SIZE: usize = 1024;
+
+arch_union_wrapper! {
+    pub IfReq(ifreq);
+}
+
+impl IfReq {
+    fn new_with_sockaddr<Arch: ArchSpecific>(
+        arch: &Arch,
+        name: &[uapi::c_char; 16],
+        sockaddr: uapi::sockaddr,
+    ) -> Self {
+        Self(arch_struct_with_union!(arch, ifreq {
+            ifr_ifrn.ifrn_name: name.clone(),
+            ifr_ifru.ifru_addr: zerocopy::transmute!(sockaddr),
+        }))
+    }
+
+    fn new_with_i32<Arch: ArchSpecific>(
+        arch: &Arch,
+        name: &[uapi::c_char; 16],
+        value: i32,
+    ) -> Self {
+        Self(arch_struct_with_union!(arch, ifreq {
+            ifr_ifrn.ifrn_name: name.clone(),
+            ifr_ifru.ifru_ivalue: value,
+        }))
+    }
+
+    fn new_with_flags<Arch: ArchSpecific>(
+        arch: &Arch,
+        name: &[uapi::c_char; 16],
+        flags: i16,
+    ) -> Self {
+        Self(arch_struct_with_union!(arch, ifreq {
+            ifr_ifrn.ifrn_name: name.clone(),
+            ifr_ifru.ifru_flags: flags,
+        }))
+    }
+
+    fn name(&self) -> &[uapi::c_char; 16] {
+        // SAFETY Union is read with zerocopy, so all bytes are set.
+        match self.inner() {
+            IfReqInner::Arch64(ifreq) => unsafe { &ifreq.ifr_ifrn.ifrn_name },
+            IfReqInner::Arch32(ifreq) => unsafe { &ifreq.ifr_ifrn.ifrn_name },
+        }
+    }
+
+    pub fn name_as_str(&self) -> Result<&str, Errno> {
+        let bytes: &[u8; 16] = zerocopy::transmute_ref!(self.name());
+        let zero = bytes.iter().position(|x| *x == 0).ok_or_else(|| errno!(EINVAL))?;
+        // SAFETY: This is safe as the zero was checked on the previous line.
+        unsafe { CStr::from_bytes_with_nul_unchecked(&bytes[..zero + 1]) }
+            .to_str()
+            .map_err(|_| errno!(EINVAL))
+    }
+
+    fn ifru_addr(&self) -> &uapi::sockaddr {
+        // SAFETY Union is read with zerocopy, so all bytes are set.
+        match self.inner() {
+            IfReqInner::Arch64(ifreq) => unsafe { &ifreq.ifr_ifru.ifru_addr },
+            IfReqInner::Arch32(ifreq) => unsafe {
+                zerocopy::transmute_ref!(&ifreq.ifr_ifru.ifru_addr)
+            },
+        }
+    }
+
+    fn ifru_netmask(&self) -> &uapi::sockaddr {
+        // All sockaddr are equivalent
+        self.ifru_addr()
+    }
+
+    pub fn ifru_flags(&self) -> i16 {
+        // SAFETY Union is read with zerocopy, so all bytes are set.
+        match self.inner() {
+            IfReqInner::Arch64(ifreq) => unsafe { ifreq.ifr_ifru.ifru_flags },
+            IfReqInner::Arch32(ifreq) => unsafe { ifreq.ifr_ifru.ifru_flags },
+        }
+    }
+}
 
 pub trait SocketOps: Send + Sync + AsAny {
     /// Returns the domain, type and protocol of the socket. This is only used for socket that are
@@ -81,7 +162,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         backlog: i32,
-        credentials: ucred,
+        credentials: uapi::ucred,
     ) -> Result<(), Errno>;
 
     /// Returns the eariest socket on the accept queue of this
@@ -226,6 +307,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
+        _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
         _optlen: u32,
@@ -386,18 +468,26 @@ impl Socket {
     /// - `kernel`: The kernel that is used to fetch `SocketFs`, to store the created socket node.
     /// - `socket`: The socket to store in the `FsNode`.
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
-    pub fn new_file(
+    pub fn new_file<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
-    ) -> FileHandle {
+    ) -> FileHandle
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let fs = socket_fs(current_task.kernel());
+        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
+        security::file_system_resolve_security(locked, &current_task, &fs)
+            .expect("resolve fs security");
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,
             Anon::default(),
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
+        security::socket_post_create(&socket, &node);
         FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)
     }
 
@@ -443,8 +533,9 @@ impl Socket {
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let read_timeval = || {
-            let timeval_ref = user_opt.try_into()?;
-            let duration = duration_from_timeval(current_task.read_object(timeval_ref)?)?;
+            let timeval_ref = TimeValPtr::new_with_ref(current_task, user_opt)?;
+            let duration =
+                duration_from_timeval(current_task.read_multi_arch_object(timeval_ref)?)?;
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
@@ -472,6 +563,7 @@ impl Socket {
     pub fn getsockopt<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         optlen: u32,
@@ -490,16 +582,20 @@ impl Socket {
                 SO_PROTOCOL => self.protocol.as_raw().to_ne_bytes().to_vec(),
                 SO_RCVTIMEO => {
                     let duration = self.receive_timeout().unwrap_or_default();
-                    timeval_from_duration(duration).as_bytes().to_owned()
+                    TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
+                        .map_err(|_| errno!(EINVAL))?
                 }
                 SO_SNDTIMEO => {
                     let duration = self.send_timeout().unwrap_or_default();
-                    timeval_from_duration(duration).as_bytes().to_owned()
+                    TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
+                        .map_err(|_| errno!(EINVAL))?
                 }
                 SO_MARK => self.state.lock().mark.as_bytes().to_owned(),
-                _ => self.ops.getsockopt(&mut locked, self, level, optname, optlen)?,
+                _ => {
+                    self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?
+                }
             },
-            _ => self.ops.getsockopt(&mut locked, self, level, optname, optlen)?,
+            _ => self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?,
         };
         Ok(value)
     }
@@ -535,13 +631,14 @@ impl Socket {
         //     the family or type.
         match request {
             SIOCGIFADDR => {
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, address_msgs, _if_index) =
                     get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
                 let mut maybe_errno = None;
                 let ifru_addr = {
-                    let mut addr = sockaddr::default();
+                    let mut addr = uapi::sockaddr::default();
                     let s_addr = address_msgs
                         .into_iter()
                         .next()
@@ -577,32 +674,31 @@ impl Socket {
                     if let Some(errno) = maybe_errno {
                         return errno;
                     }
-                    let _ = sockaddr_in {
+                    let _ = uapi::sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
-                        sin_addr: in_addr { s_addr },
+                        sin_addr: uapi::in_addr { s_addr },
                         __pad: Default::default(),
                     }
                     .write_to_prefix(addr.as_mut_bytes());
                     addr
                 };
 
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
-                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    ifr_ifru.ifru_addr: ifru_addr,
-                });
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                let out_ifreq = IfReq::new_with_sockaddr(current_task, in_ifreq.name(), ifru_addr);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFNETMASK => {
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, address_msgs, _if_index) =
                     get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
 
                 let mut maybe_errno = None;
                 let ifru_netmask = {
-                    let mut addr = sockaddr::default();
+                    let mut addr = uapi::sockaddr::default();
                     let s_addr = address_msgs
                         .into_iter()
                         .next()
@@ -625,22 +721,20 @@ impl Socket {
                         return errno;
                     }
 
-                    let _ = sockaddr_in {
+                    let _ = uapi::sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
-                        sin_addr: in_addr { s_addr },
+                        sin_addr: uapi::in_addr { s_addr },
                         __pad: Default::default(),
                     }
                     .write_to_prefix(addr.as_mut_bytes());
                     addr
                 };
 
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(
-                ifreq {
-                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    ifr_ifru.ifru_netmask: ifru_netmask,
-                });
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                let out_ifreq =
+                    IfReq::new_with_sockaddr(current_task, in_ifreq.name(), ifru_netmask);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCSIFADDR => {
@@ -648,7 +742,8 @@ impl Socket {
                     return error!(EPERM, "tried to SIOCSIFADDR without CAP_NET_ADMIN");
                 }
 
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (socket, address_msgs, if_index) =
                     get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
@@ -699,14 +794,12 @@ impl Socket {
                 }
 
                 // Next, add the requested address.
-                const_assert!(size_of::<sockaddr_in>() <= size_of::<sockaddr>());
-                let addr = sockaddr_in::read_from_prefix(
-                    unsafe { in_ifreq.ifr_ifru.ifru_addr }.as_bytes(),
-                )
-                .expect("sockaddr_in is smaller than sockaddr")
-                .0
-                .sin_addr
-                .s_addr;
+                const_assert!(size_of::<uapi::sockaddr_in>() <= size_of::<uapi::sockaddr>());
+                let addr = uapi::sockaddr_in::read_from_prefix(in_ifreq.ifru_addr().as_bytes())
+                    .expect("sockaddr_in is smaller than sockaddr")
+                    .0
+                    .sin_addr
+                    .s_addr;
                 if addr != 0 {
                     let resp = send_netlink_msg_and_wait_response(
                         locked,
@@ -746,15 +839,14 @@ impl Socket {
                     return error!(EPERM, "tried to SIOCSIFNETMASK without CAP_NET_ADMIN");
                 }
 
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
-                const_assert!(size_of::<sockaddr_in>() <= size_of::<sockaddr>());
-                let addr = sockaddr_in::read_from_prefix(
-                    unsafe { in_ifreq.ifr_ifru.ifru_netmask }.as_bytes(),
-                )
-                .expect("sockaddr_in is smaller than sockaddr")
-                .0
-                .sin_addr
-                .s_addr;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
+                const_assert!(size_of::<uapi::sockaddr_in>() <= size_of::<uapi::sockaddr>());
+                let addr = uapi::sockaddr_in::read_from_prefix(in_ifreq.ifru_netmask().as_bytes())
+                    .expect("sockaddr_in is smaller than sockaddr")
+                    .0
+                    .sin_addr
+                    .s_addr;
                 let prefix_len = addr.count_ones() as u8;
                 // Check that the subnet is valid. The netmask is already in network byte order.
                 match net_types::ip::Subnet::new(
@@ -843,7 +935,8 @@ impl Socket {
             }
             SIOCGIFHWADDR => {
                 let user_addr = UserAddress::from(arg);
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
@@ -859,85 +952,82 @@ impl Socket {
                     })
                 };
 
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(
-                    ifreq {
-                        // Safety: The `ifr_ifrn` union only has one field, so it
-                        // must be `ifrn_name`.
-                        ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                        ifr_ifru.ifru_hwaddr: hw_addr_and_type.map(|(addr_bytes, sa_family)| {
-                            let mut addr = sockaddr {
-                                sa_family:sa_family.into(),
-                                sa_data: Default::default(),
-                            };
-                            // We need to manually assign from one to the other
-                            // because we may be copying a vector of `u8` into
-                            // an array of `i8` and regular `copy_from_slice`
-                            // expects both src/dst slices to have the same
-                            // element type.
-                            //
-                            // See /src/starnix/lib/linux_uapi/src/types.rs,
-                            // `c_char` is an `i8` on `x86_64` and a `u8` on
-                            // `arm64` and `riscv`.
-                            addr.sa_data.iter_mut().zip(addr_bytes)
-                                .for_each(|(sa_data_byte, link_addr_byte): (&mut c_char, u8)| {
-                                    *sa_data_byte = link_addr_byte as c_char;
-                                });
-                            addr
-                        }).unwrap_or_else(Default::default),
-                    }
-                );
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                let ifru_hwaddr = hw_addr_and_type
+                    .map(|(addr_bytes, sa_family)| {
+                        let mut addr = uapi::sockaddr {
+                            sa_family: sa_family.into(),
+                            sa_data: Default::default(),
+                        };
+                        // We need to manually assign from one to the other
+                        // because we may be copying a vector of `u8` into
+                        // an array of `i8` and regular `copy_from_slice`
+                        // expects both src/dst slices to have the same
+                        // element type.
+                        //
+                        // See /src/starnix/lib/linux_uapi/src/types.rs,
+                        // `c_char` is an `i8` on `x86_64` and a `u8` on
+                        // `arm64` and `riscv`.
+                        addr.sa_data.iter_mut().zip(addr_bytes).for_each(
+                            |(sa_data_byte, link_addr_byte): (&mut c_char, u8)| {
+                                *sa_data_byte = link_addr_byte as c_char;
+                            },
+                        );
+                        addr
+                    })
+                    .unwrap_or_else(Default::default);
+
+                let out_ifreq =
+                    IfReq::new_with_sockaddr(current_task, in_ifreq.name(), ifru_hwaddr);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFINDEX => {
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
-                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    ifr_ifru.ifru_ivalue: {
-                        let index: u32 = link_msg.header.index;
-                        i32::try_from(index).expect("interface ID should fit in an i32")
-                    },
-                });
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                let index = i32::try_from(link_msg.header.index)
+                    .expect("interface ID should fit in an i32");
+                let out_ifreq = IfReq::new_with_i32(current_task, in_ifreq.name(), index);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFMTU => {
                 track_stub!(TODO("https://fxbug.dev/297369462"), "return actual socket MTU");
                 let ifru_mtu = 1280; /* IPv6 MIN MTU */
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
-                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    ifr_ifru.ifru_mtu: ifru_mtu,
-                });
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
+                let out_ifreq = IfReq::new_with_i32(current_task, in_ifreq.name(), ifru_mtu);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCGIFFLAGS => {
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
-                let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
-                    ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    ifr_ifru.ifru_flags: {
-                        // Perform an `as` cast rather than `try_into` because:
-                        //   - flags are a bit mask and should not be
-                        //     interpreted as negative,
-                        //   - SIOCGIFFLAGS returns a subset of the flags
-                        //     returned by netlink; the flags lost by truncating
-                        //     from 32 to 16 bits is expected.
-                        link_msg.header.flags.bits() as i16
-                    },
-                });
-                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
+                // Perform an `as` cast rather than `try_into` because:
+                //   - flags are a bit mask and should not be
+                //     interpreted as negative,
+                //   - SIOCGIFFLAGS returns a subset of the flags
+                //     returned by netlink; the flags lost by truncating
+                //     from 32 to 16 bits is expected.
+                let flags_as_i16 = link_msg.header.flags.bits() as i16;
+
+                let out_ifreq = IfReq::new_with_flags(current_task, in_ifreq.name(), flags_as_i16);
+                current_task
+                    .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCSIFFLAGS => {
                 let user_addr = UserAddress::from(arg);
-                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
+                let in_ifreq: IfReq =
+                    current_task.read_multi_arch_object(IfReqPtr::new(current_task, user_addr))?;
                 set_netlink_interface_flags(locked, current_task, &in_ifreq).map(|()| SUCCESS)
             }
             _ => self.ops.ioctl(locked, self, file, current_task, request, arg),
@@ -1100,16 +1190,15 @@ impl AcceptQueue {
 fn get_netlink_interface_info<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    in_ifreq: &ifreq,
+    in_ifreq: &IfReq,
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, LinkMessage), Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
-        .to_str()
-        .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
+    let iface_name = in_ifreq.name_as_str()?;
     let socket = new_socket_file(
+        locked,
         current_task,
         SocketDomain::Netlink,
         SocketType::Datagram,
@@ -1158,15 +1247,15 @@ where
 fn get_netlink_ipv4_addresses<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    in_ifreq: &ifreq,
+    in_ifreq: &IfReq,
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<FileOpsCore>,
 {
-    let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
-    if sa_family != AF_INET {
+    let uapi::sockaddr { sa_family, sa_data: _ } = in_ifreq.ifru_addr();
+    if *sa_family != AF_INET {
         return error!(EINVAL);
     }
 
@@ -1222,22 +1311,21 @@ where
 fn set_netlink_interface_flags<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    in_ifreq: &ifreq,
+    in_ifreq: &IfReq,
 ) -> Result<(), Errno>
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<FileOpsCore>,
 {
-    let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
-        .to_str()
-        .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
-    let flags: i16 = unsafe { in_ifreq.ifr_ifru.ifru_flags };
+    let iface_name = in_ifreq.name_as_str()?;
+    let flags: i16 = in_ifreq.ifru_flags();
     // Perform an `as` cast rather than `try_into` because:
     //   - flags are a bit mask and should not be interpreted as negative,
     //   - no loss in precision when upcasting 16 bits to 32 bits.
     let flags: u32 = flags as u32;
 
     let socket = new_socket_file(
+        locked,
         current_task,
         SocketDomain::Netlink,
         SocketType::Datagram,
@@ -1314,6 +1402,7 @@ mod tests {
     use super::*;
     use crate::testing::{create_kernel_task_and_unlocked, map_memory};
     use crate::vfs::UnixControlData;
+    use starnix_uapi::user_address::UserRef;
     use starnix_uapi::SO_PASSCRED;
 
     #[::fuchsia::test]
@@ -1368,7 +1457,7 @@ mod tests {
         assert_eq!(1, read_info.ancillary_data.len());
         assert_eq!(
             read_info.ancillary_data[0],
-            AncillaryData::Unix(UnixControlData::Credentials(ucred {
+            AncillaryData::Unix(UnixControlData::Credentials(uapi::ucred {
                 pid: current_task.get_pid(),
                 uid: 0,
                 gid: 0

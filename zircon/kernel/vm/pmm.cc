@@ -191,10 +191,6 @@ void pmm_checker_check_all_free_pages() { Pmm::Node().CheckAllFreePages(); }
 void pmm_asan_poison_all_free_pages() { Pmm::Node().PoisonAllFreePages(); }
 #endif
 
-int64_t pmm_get_alloc_failed_count() { return PmmNode::get_alloc_failed_count(); }
-
-bool pmm_has_alloc_failed_no_mem() { return PmmNode::has_alloc_failed_no_mem(); }
-
 static void pmm_checker_enable(size_t fill_size, CheckFailAction action) {
   // Enable filling of pages going forward.
   if (!Pmm::Node().EnableFreePageFilling(fill_size, action)) {
@@ -397,8 +393,6 @@ void pmm_print_physical_page_borrowing_stats() {
       used_loaned_pages, used_loaned_pages * PAGE_SIZE / MB, loan_cancelled_pages,
       loan_cancelled_pages * PAGE_SIZE / MB, total_bytes / PAGE_SIZE, total_bytes / MB);
 }
-
-void pmm_report_alloc_failure() { Pmm::Node().ReportAllocFailure(); }
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("pmm", "physical memory manager", &cmd_pmm, CMD_AVAIL_ALWAYS)

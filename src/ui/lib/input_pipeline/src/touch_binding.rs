@@ -776,7 +776,7 @@ mod tests {
     use crate::utils::Position;
     use assert_matches::assert_matches;
     use diagnostics_assertions::AnyProperty;
-    use fidl::endpoints::spawn_stream_handler;
+    use fidl_test_util::spawn_stream_handler;
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use pretty_assertions::assert_eq;

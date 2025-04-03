@@ -138,6 +138,9 @@ import("//build/testing/host_test_data.gni")
 #   enable_rust_next (optional flag, default to false)
 #     Set to true to enable next-generation Rust bindings for this library
 #
+#   rust_next_emit_compat (optional flag, default to true)
+#     Set to false to disable compatibility with existing Rust bindings for this library
+#
 #   enable_zither (optional flag, default to false)
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
@@ -166,10 +169,7 @@ template("fidl") {
   assert(defined(invoker.sdk_category) == defined(invoker.stable),
          "`stable` must be specified when specifying `sdk_category`.")
   assert(!defined(invoker.sdk_category) || invoker.stable == true ||
-             invoker.sdk_category == "partner" ||
-             # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk"
-             # exception when fuchsia.boot is promoted.
-             target_name == "fuchsia.boot",
+             invoker.sdk_category == "partner",
          "`stable` must be true unless the category is 'partner'.")
 
   # Define values that will be used to generate other variables here so that
@@ -206,6 +206,7 @@ template("fidl") {
   enable_cpp = !defined(invoker.enable_cpp) || invoker.enable_cpp
   enable_rust = !defined(invoker.enable_rust) || invoker.enable_rust
   enable_fdomain = enable_rust
+  enable_python = !defined(invoker.enable_python) || invoker.enable_python
   if (defined(invoker.enable_fdomain)) {
     enable_fdomain = invoker.enable_fdomain
   }
@@ -231,6 +232,7 @@ template("fidl") {
                "enable_rust_next",
                "enable_banjo",
                "enable_hlcpp",
+               "enable_python",
                "enable_zither",
              ])
 
@@ -241,11 +243,8 @@ template("fidl") {
 
   # Use SDK category markers to enable detection of targets that use FIDL
   # libraries in non-permissible categories.
-  # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk" exception
-  # when fuchsia.boot is promoted.
   _not_in_sdk_category = "not-in-idk"
-  if (defined(invoker.sdk_category) &&
-      invoker.sdk_category != "internal_only_idk") {
+  if (defined(invoker.sdk_category)) {
     if (invoker.stable) {
       marker_category = invoker.sdk_category
       not_needed([ "_not_in_sdk_category" ])
@@ -581,9 +580,16 @@ template("fidl") {
         forward_variables_from(common_parameters, "*")
         deps = [ "//sdk/categories:marker-${marker_category}" ]
         fidl_gen_dir += "/rust_next"
+        if (!defined(invoker.rust_next_emit_compat) ||
+            invoker.rust_next_emit_compat) {
+          emit_compat = true
+          assert(enable_rust)
+          deps += [ ":${invoker.target_name}_rust" ]
+        }
+        if (!is_host && enable_rust_drivers) {
+          forward_variables_from(invoker, [ "contains_drivers" ])
+        }
       }
-    } else {
-      not_needed(invoker, [ "disable_rustdoc" ])
     }
 
     if (enable_bindlib) {
@@ -663,5 +669,23 @@ template("fidl") {
         (is_host && current_toolchain == toolchain_variant.base) ||
         (enable_rust && toolchain_variant.supports_rust))) {
     not_needed([ "marker_category" ])
+  }
+
+  if (enable_python && (is_fidl_toolchain || is_host)) {
+    import("//build/python/fidl_python.gni")
+
+    # Define the Python bindings.
+    fidl_python("${target_name}_python") {
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                               "visibility",
+                               "public_deps",
+                             ])
+      forward_variables_from(common_parameters, "*")
+      fidl_target = _fidl_target_name
+      fidl_gen_dir += "/python"
+    }
   }
 }

@@ -289,15 +289,9 @@
                 // capability.
                 "fuchsia.power.CollaborativeRebootInitiator",
                 "fuchsia.power.internal.CollaborativeRebootScheduler",
-                "fuchsia.update.verify.BlobfsVerifier",
                 "fuchsia.update.verify.HealthVerification",
             ],
             from: "parent",
-            to: "#system-update",
-        },
-        {
-            protocol: [ "fuchsia.update.verify.NetstackVerifier" ],
-            from: "#network",
             to: "#system-update",
         },
         {
@@ -345,11 +339,19 @@
             to: "#cobalt_system_metrics",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-thermal",
             to: "#cobalt_system_metrics",
             subdir: "thermal",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.thermal.Service",
+            from: "parent",
+            to: "#cobalt_system_metrics",
         },
         {
             directory: "root-ssl-certificates",
@@ -518,6 +520,8 @@
             to: "#vulkan_loader",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-rtc",
@@ -525,12 +529,26 @@
             subdir: "rtc",
         },
         {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.rtc.Service",
+            from: "parent",
+            to: "#timekeeper",
+        },
+        {
             // For wake alarms programming.
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-hrtimer",
             to: "#timekeeper",
             subdir: "hrtimer",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.hrtimer.Service",
+            from: "parent",
+            to: "#timekeeper",
         },
         {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",

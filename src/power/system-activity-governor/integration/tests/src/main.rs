@@ -148,7 +148,7 @@ macro_rules! block_until_inspect_matches {
         let mut reader = ArchiveReader::inspect();
 
         reader
-            .select_all_for_moniker(&format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
+            .select_all_for_component(format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
             .with_minimum_schema_count(1);
 
         for i in 1.. {
@@ -259,6 +259,12 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
+                "0": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "1": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -313,24 +319,42 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "2": {
-                    ref fobs::SUSPEND_LAST_TIMESTAMP: AnyProperty,
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
                 "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
                 "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "5": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: AnyProperty,
+                },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "9": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "13": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -387,37 +411,30 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "2": {
-                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
-                },
-                "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                },
-                "4": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "5": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "6": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                 },
-                "7": {
+                "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
-                "8": {
+                "16": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "17": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "18": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "19": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "20": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "9": {
+                "21": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -481,6 +498,12 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
+                "0": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "1": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -521,24 +544,42 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
-                "1": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "2": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
                 "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
                 "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
+                },
                 "5": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "9": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "13": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -601,6 +642,12 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
+                "0": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "1": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -641,23 +688,41 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
-                "1": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
                 "2": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
                 "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
                 "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
+                 },
                 "5": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "9": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "13": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -707,36 +772,30 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
-                "1": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "2": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
-                },
-                "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                },
-                "4": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "5": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "6": {
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
-                "7": {
+                "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
-                "8": {
+                "16": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "17": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "18": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "19": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "20": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                  },
-                "9": {
+                "21": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -828,9 +887,22 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "1": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+
+                "2": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "3": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "5": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -894,24 +966,30 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "2": {
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
-                "3": {
+                "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
-                "4": {
+                "8": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "9": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "5": {
+                "13": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -1155,19 +1233,33 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
+            // Events 0 and 1 are resume callback phase start/end
+            // arising from Execution State initially exiting level 0.
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "2": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "3": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                  },
-                "1": {
+                "5": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "2": {
+                "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
-                "3": {
+                "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
+                "8": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "9": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
                  },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -1221,32 +1313,31 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                  },
-                "1": {
+                "13": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "2": {
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
-                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
-                },
-                "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                 },
-                "4": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                 },
-                "5": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "6": {
+                "14": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
-                "7": {
+                "15": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
+                "16": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "17": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
                  },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -1301,6 +1392,12 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
+                "0": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "1": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -1340,11 +1437,17 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "2": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "3": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "5": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 }
             },
@@ -1855,7 +1958,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
     let mut reader = ArchiveReader::inspect();
 
     reader
-        .select_all_for_moniker(&format!(
+        .select_all_for_component(format!(
             "{}/{}",
             REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
         ))
@@ -1932,7 +2035,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
     let mut reader = ArchiveReader::inspect();
 
     reader
-        .select_all_for_moniker(&format!(
+        .select_all_for_component(format!(
             "{}/{}",
             REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
         ))
@@ -2294,42 +2397,60 @@ async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
                     power_level: 0u64,
                 },
             },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "2": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "3": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "5": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "2": {
+                "6": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                 },
-                "3": {
+                "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
-                "4": {
+                "8": {
                     ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
                 },
-                "5": {
+                "9": {
                     ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
                 },
-                "6": {
+                "10": {
+                    ref fobs::RESUME_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::RESUME_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
                     ref fobs::WAKE_LEASE_SATISFIED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
                 },
-                "7": {
+                "13": {
                     ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
                 },
-                "8": {
+                "14": {
                     ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
                 },
-                "9": {
+                "15": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "16": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "17": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "10": {
+                "18": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -2379,10 +2500,10 @@ async fn test_last_wake_lease_blocks_suspend_lifo() -> Result<()> {
                 },
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
+                "2": {
                     ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "3": {
                     ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
                 },
@@ -2414,16 +2535,9 @@ async fn test_last_wake_lease_blocks_suspend_lifo() -> Result<()> {
                 },
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
-                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                // Events 2-4 cover the creation and satisfaction of the two
+                // Events 4-6 cover the creation and satisfaction of the two
                 // wake leases. These events could occur in any order.
-                "5": {
+                "7": {
                     ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
                 },
@@ -2448,30 +2562,23 @@ async fn test_last_wake_lease_blocks_suspend_lifo() -> Result<()> {
             },
             ref fobs::WAKE_LEASES_NODE: {},
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
-                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                // Events 2-4 cover the creation and satisfaction of the two
-                // wake leases. These events could occur in any order.
-                "5": {
-                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
-                },
-                "6": {
-                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                "7": {
-                    ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
-                },
                 "8": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
                 },
                 "9": {
+                    ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
+                },
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "13": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
@@ -2521,14 +2628,14 @@ async fn test_last_wake_lease_blocks_suspend_fifo() -> Result<()> {
                 },
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
+                "2": {
                     ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "3": {
                     ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
                 },
-                // Events 2-4 cover the creation and satisfaction of the two
+                // Events 4-6 cover the creation and satisfaction of the two
                 // wake leases. These events could occur in any order.
             },
             config: {
@@ -2556,16 +2663,7 @@ async fn test_last_wake_lease_blocks_suspend_fifo() -> Result<()> {
                 },
             },
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
-                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                // Events 2-4 cover the creation and satisfaction of the two
-                // wake leases. These events could occur in any order.
-                "5": {
+                "7": {
                     ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
                 },
@@ -2590,30 +2688,23 @@ async fn test_last_wake_lease_blocks_suspend_fifo() -> Result<()> {
             },
             ref fobs::WAKE_LEASES_NODE: {},
             ref fobs::SUSPEND_EVENTS_NODE: contains {
-                "0": {
-                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
-                },
-                "1": {
-                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                // Events 2-4 cover the creation and satisfaction of the two
-                // wake leases. These events could occur in any order.
-                "5": {
-                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
-                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
-                },
-                "6": {
+                "8": {
                     ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
                     ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
                 },
-                "7": {
+                "9": {
                     ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
                 },
-                "8": {
+                "10": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_START_AT: AnyProperty,
+                 },
+                "11": {
+                    ref fobs::SUSPEND_CALLBACK_PHASE_END_AT: AnyProperty,
+                 },
+                "12": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "9": {
+                "13": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },

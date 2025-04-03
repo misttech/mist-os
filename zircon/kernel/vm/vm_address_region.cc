@@ -281,7 +281,8 @@ zx::result<VmAddressRegion::MapResult> VmAddressRegion::CreateVmMapping(
 
   // Check that only allowed flags have been set
   if (vmar_flags & ~(VMAR_FLAG_SPECIFIC | VMAR_FLAG_SPECIFIC_OVERWRITE | VMAR_CAN_RWX_FLAGS |
-                     VMAR_FLAG_OFFSET_IS_UPPER_LIMIT | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING)) {
+                     VMAR_FLAG_OFFSET_IS_UPPER_LIMIT | VMAR_FLAG_DEBUG_DYNAMIC_KERNEL_MAPPING |
+                     VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE)) {
     return zx::error{ZX_ERR_INVALID_ARGS};
   }
 
@@ -303,6 +304,12 @@ zx::result<VmAddressRegion::MapResult> VmAddressRegion::CreateVmMapping(
   if (vmo_offset + mapping_size < vmo_offset) {
     return zx::error{ZX_ERR_OUT_OF_RANGE};
   }
+
+  // Can't create fault-beyond-stream-size mapping of physical or contiguous VMOs. There is
+  // currently no use case for this as the stream size of these VMOs is always zero, so the mapping
+  // would always fault. In this case, sys_vmar_map should have returned  ZX_ERR_NOT_SUPPORTED.
+  DEBUG_ASSERT(!(vmar_flags & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE) ||
+               (vmo->is_paged() && !vmo->is_contiguous()));
 
   // If we're mapping it with a specific permission, we should allow
   // future Protect() calls on the mapping to keep that permission.
@@ -698,6 +705,25 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
         mapping->parent_ != this) {
       return ZX_ERR_INVALID_ARGS;
     }
+
+    // For fault-beyond-stream-size mappings, ensure there are no gaps due to the stream size being
+    // less than the end of the mapping. User synchronisation is required for the observable result
+    // to be defined, as the stream size is a user managed property & not guaranteed atomic to the
+    // VMO.
+    if (mapping->flags_ & VMAR_FLAG_FAULT_BEYOND_STREAM_SIZE) {
+      VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(vmo.get());
+      DEBUG_ASSERT(paged);
+      {
+        Guard<VmoLockType> vmo_guard{paged->lock()};
+
+        auto stream_size = paged->saturating_content_size_locked();
+        DEBUG_ASSERT(stream_size);
+        if (size > *stream_size - vmo_offset) {
+          return ZX_ERR_OUT_OF_RANGE;
+        }
+      }
+    }
+
     guard.CallUnlocked([&result, &vmo, &mapping, op, mapping_offset, vmo_offset, size] {
       switch (op) {
         case RangeOpType::Commit:

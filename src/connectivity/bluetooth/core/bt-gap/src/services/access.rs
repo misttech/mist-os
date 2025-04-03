@@ -9,7 +9,8 @@ use fuchsia_bluetooth::types::pairing_options::{BondableMode, PairingOptions};
 use fuchsia_bluetooth::types::{Peer, PeerId, Technology};
 use fuchsia_sync::Mutex;
 use futures::future::{pending, BoxFuture};
-use futures::{select, FutureExt, Stream, StreamExt};
+use futures::stream::{Count, FuturesUnordered, Stream, StreamExt};
+use futures::{select, FutureExt};
 use log::{debug, info, trace, warn};
 use std::collections::HashMap;
 use std::mem;
@@ -21,6 +22,9 @@ use crate::watch_peers::PeerWatcher;
 #[derive(Default)]
 struct AccessSession {
     peers_seen: Arc<Mutex<HashMap<PeerId, Peer>>>,
+    /// Active `sys.Access` clients that are requesting to suppress connections. Connections will be
+    /// suppressed as long as there is one or more outstanding `ProcedureToken`.
+    suppress_connections_sessions: FuturesUnordered<Count<sys::ProcedureTokenRequestStream>>,
     /// Only one discovery session is stored per Access session at a time;
     /// if an Access client requests discovery while holding an existing session token,
     /// the old session is replaced, and the old session token is invalidated.
@@ -40,6 +44,13 @@ pub async fn run(hd: HostDispatcher, mut stream: AccessRequestStream) -> Result<
                 match event_opt {
                     Some(event) => handler(hd.clone(), &mut watch_peers_subscriber, &mut session, event?).await?,
                     None => break,
+                }
+            }
+            _token_dropped = session.suppress_connections_sessions.select_next_some() => {
+                // If this was the last token to be dropped, make the active host connectable again.
+                if session.suppress_connections_sessions.is_empty() {
+                    let res = hd.set_connectable(/*connectable=*/ true).await;
+                    trace!("Last suppress connections token dropped. Setting connectable: {res:?}");
                 }
             }
             _ = session.discovery_session.as_mut().unwrap_or(&mut discovery_pending).fuse() => {
@@ -83,7 +94,7 @@ async fn handler(
             Ok(())
         }
         AccessRequest::MakeDiscoverable { token, responder } => {
-            info!("fuchsia.bluetooth.sys.Access.MakeDiscoverable()");
+            info!("fuchsia.bluetooth.sys.Access.MakeDiscoverable(..)");
             let stream = token.into_stream(); // into_stream never fails
             let result = hd
                 .set_discoverable()
@@ -95,8 +106,23 @@ async fn handler(
                 .map_err(Into::into);
             responder.send(result).map_err(Error::from)
         }
+        AccessRequest::SetConnectionPolicy { payload, responder } => {
+            info!("fuchsia.bluetooth.sys.Access.SetConnectionPolicy(..)");
+            let Some(stream) = payload.suppress_bredr_connections.map(|token| token.into_stream())
+            else {
+                return responder.send(Err(sys::Error::InvalidArguments)).map_err(Error::from);
+            };
+            let result = hd
+                .set_connectable(/*connectable=*/ false)
+                .await
+                .map(|_| {
+                    session.suppress_connections_sessions.push(stream.count());
+                })
+                .map_err(Into::into);
+            responder.send(result).map_err(Error::from)
+        }
         AccessRequest::StartDiscovery { token, responder } => {
-            info!("fuchsia.bluetooth.sys.Access.StartDiscovery()");
+            info!("fuchsia.bluetooth.sys.Access.StartDiscovery(..)");
             let stream = token.into_stream(); // into_stream never fails
             let result = hd.start_discovery().await.map(|discovery_session| {
                 debug!("StartDiscovery: discovery started");

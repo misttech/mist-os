@@ -102,6 +102,9 @@ class AddressSpace {
   // operated upon separately.
   static constexpr bool kDualSpaces = !ktl::is_same_v<LowerPaging, UpperPaging>;
 
+  static_assert(LowerPaging::kExecuteOnlyAllowed == UpperPaging::kExecuteOnlyAllowed);
+  static constexpr bool kExecuteOnlyAllowed = LowerPaging::kExecuteOnlyAllowed;
+
   static MapSettings MmioMapSettings() {
     return {
         .access = {.readable = true, .writable = true},
@@ -234,9 +237,6 @@ class AddressSpace {
       *LowerPaging::kLowerVirtualAddressRangeEnd;
   static constexpr uint64_t kUpperVirtualAddressRangeStart =
       *UpperPaging::kUpperVirtualAddressRangeStart;
-
-  static_assert(LowerPaging::kExecuteOnlyAllowed == UpperPaging::kExecuteOnlyAllowed);
-  static constexpr bool kExecuteOnlyAllowed = LowerPaging::kExecuteOnlyAllowed;
 
   void AllocateRootPageTables();
   void IdentityMapRam();

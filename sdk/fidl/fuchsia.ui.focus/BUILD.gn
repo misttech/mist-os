@@ -7,7 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.ui.focus") {
   sdk_category = "compat_test"
   stable = true
-  sdk_area = "View System"
+  sdk_area = "UI"
 
   # TODO(https://fxbug.dev/42111344): Remove lint exclusions by fixing known FIDL lint violations in this target
   excluded_checks = [ "vector-bounds-not-specified" ]

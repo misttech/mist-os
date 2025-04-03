@@ -22,7 +22,7 @@ use starnix_uapi::{errno, error, rlimit};
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
-pub fn update_state_on_exec(
+pub(in crate::security) fn update_state_on_exec(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
     elf_security_state: &ResolvedElfState,
@@ -129,12 +129,12 @@ fn maybe_reset_rlimits(
 }
 
 /// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.
-pub fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
+pub(in crate::security) fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
     parent.security_state.lock().clone()
 }
 
 /// Checks if creating a task is allowed.
-pub fn check_task_create_access(
+pub(in crate::security) fn check_task_create_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
@@ -145,7 +145,7 @@ pub fn check_task_create_access(
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
 /// elf if all required permissions are allowed.
-pub fn check_exec_access(
+pub(in crate::security) fn check_exec_access(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
     executable_node: &FsNode,
@@ -227,7 +227,7 @@ pub fn check_exec_access(
 /// Checks if source with `source_sid` may exercise the "getsched" permission on target with
 /// `target_sid` according to SELinux server status `status` and permission checker
 /// `permission`.
-pub fn check_getsched_access(
+pub(in crate::security) fn check_getsched_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -246,7 +246,7 @@ pub fn check_getsched_access(
 
 /// Checks if the task with `source_sid` is allowed to set scheduling parameters for the task with
 /// `target_sid`.
-pub fn check_setsched_access(
+pub(in crate::security) fn check_setsched_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -265,7 +265,7 @@ pub fn check_setsched_access(
 
 /// Checks if the task with `source_sid` is allowed to get the process group ID of the task with
 /// `target_sid`.
-pub fn check_getpgid_access(
+pub(in crate::security) fn check_getpgid_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -284,7 +284,7 @@ pub fn check_getpgid_access(
 
 /// Checks if the task with `source_sid` is allowed to set the process group ID of the task with
 /// `target_sid`.
-pub fn check_setpgid_access(
+pub(in crate::security) fn check_setpgid_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -303,7 +303,7 @@ pub fn check_setpgid_access(
 
 /// Checks if the task with `source_sid` has permission to read the session Id from a task with `target_sid`.
 /// Corresponds to the `task_getsid` LSM hook.
-pub fn check_task_getsid(
+pub(in crate::security) fn check_task_getsid(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -321,7 +321,7 @@ pub fn check_task_getsid(
 }
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
-pub fn check_signal_access(
+pub(in crate::security) fn check_signal_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -368,7 +368,7 @@ pub fn check_signal_access(
 }
 
 /// Returns the serialized Security Context associated with the specified task.
-pub fn task_get_context(
+pub(in crate::security) fn task_get_context(
     security_server: &SecurityServer,
     _current_task: &CurrentTask,
     target: &Task,
@@ -381,6 +381,7 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
     // TODO: https://fxbug.dev/297313673 - CapClass::CapUserns will play a role here if-and-after
     // user namespaces are implemented in Starnix.
     match capabilities {
+        // Mappings of capabilities to SELinux "cap" class permissions.
         starnix_uapi::auth::CAP_AUDIT_CONTROL => {
             CommonCapPermission::AuditControl.for_class(CapClass::Capability)
         }
@@ -469,12 +470,15 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
         starnix_uapi::auth::CAP_SYS_TTY_CONFIG => {
             CommonCapPermission::SysTtyConfig.for_class(CapClass::Capability)
         }
+
+        // Mappings of capabilities to SELinux "cap2" class permissions.
         starnix_uapi::auth::CAP_AUDIT_READ => {
             CommonCap2Permission::AuditRead.for_class(Cap2Class::Capability2)
         }
         starnix_uapi::auth::CAP_BLOCK_SUSPEND => {
             CommonCap2Permission::BlockSuspend.for_class(Cap2Class::Capability2)
         }
+        starnix_uapi::auth::CAP_BPF => CommonCap2Permission::Bpf.for_class(Cap2Class::Capability2),
         starnix_uapi::auth::CAP_MAC_ADMIN => {
             CommonCap2Permission::MacAdmin.for_class(Cap2Class::Capability2)
         }
@@ -487,13 +491,14 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
         starnix_uapi::auth::CAP_WAKE_ALARM => {
             CommonCap2Permission::WakeAlarm.for_class(Cap2Class::Capability2)
         }
+
         _ => {
             panic!("Unrecognized capabilities \"{:?}\" passed to check_capable!", capabilities)
         }
     }
 }
 
-pub fn is_task_capable_noaudit(
+pub(in crate::security) fn is_task_capable_noaudit(
     permission_check: &PermissionCheck<'_>,
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
@@ -503,7 +508,7 @@ pub fn is_task_capable_noaudit(
     permission_check.has_permission(sid, sid, permission).permit
 }
 
-pub fn check_task_capable(
+pub(in crate::security) fn check_task_capable(
     permission_check: &PermissionCheck<'_>,
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
@@ -514,7 +519,7 @@ pub fn check_task_capable(
 }
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.
-pub fn task_prlimit(
+pub(in crate::security) fn task_prlimit(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
@@ -545,8 +550,31 @@ pub fn task_prlimit(
     Ok(())
 }
 
+/// Check permission before setting the max resource limits of `target` from `old_limit` to `new_limit`.
+pub fn task_setrlimit(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    target: &Task,
+    old_limit: rlimit,
+    new_limit: rlimit,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+    let source_sid = current_task.security_state.lock().current_sid;
+    let target_sid = target.security_state.lock().current_sid;
+    if new_limit.rlim_max != old_limit.rlim_max {
+        check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SetRlimit,
+            audit_context,
+        )?;
+    }
+    Ok(())
+}
+
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
-pub fn ptrace_access_check(
+pub(in crate::security) fn ptrace_access_check(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     tracee: &Task,
@@ -565,7 +593,7 @@ pub fn ptrace_access_check(
 
 /// Returns the Security Context associated with the `name`ed entry for the specified `target` task.
 /// `source` describes the calling task, `target` the state of the task for which to return the attribute.
-pub fn get_procattr(
+pub(in crate::security) fn get_procattr(
     security_server: &SecurityServer,
     _current_task: &CurrentTask,
     task: &Task,
@@ -587,7 +615,7 @@ pub fn get_procattr(
 }
 
 /// Sets the Security Context associated with the `attr` entry in the task security state.
-pub fn set_procattr(
+pub(in crate::security) fn set_procattr(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
     attr: ProcAttr,
@@ -692,7 +720,7 @@ pub fn set_procattr(
 }
 
 /// Sets the sid of `fs_node` to be that of `task`.
-pub fn fs_node_init_with_task(task: &TempRef<'_, Task>, fs_node: &FsNode) {
+pub(in crate::security) fn fs_node_init_with_task(task: &TempRef<'_, Task>, fs_node: &FsNode) {
     fs_node_ensure_class(fs_node).unwrap();
     fs_node_set_label_with_task(fs_node, task.into());
 }

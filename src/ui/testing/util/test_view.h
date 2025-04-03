@@ -110,10 +110,10 @@ class TestView final : public fuchsia::ui::app::ViewProvider,
   // (x, y, z) specifies the top-left corner of the rect.
   // (width, height) specifies the rect's dimensions.
   // (red, green, blue, alpha) specifies the color.
-  virtual void DrawRectangle(int32_t x, int32_t y, int32_t z, uint32_t width, uint32_t height,
-                             uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
+  void DrawRectangle(int32_t x, int32_t y, int32_t z, uint32_t width, uint32_t height, uint8_t red,
+                     uint8_t green, uint8_t blue, uint8_t alpha);
 
-  virtual void PresentChanges();
+  void PresentChanges();
   void ResizeChildViewport();
 
   async_dispatcher_t* dispatcher_ = nullptr;

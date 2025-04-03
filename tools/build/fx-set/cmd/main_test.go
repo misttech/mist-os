@@ -74,23 +74,23 @@ func TestParseArgsAndEnv(t *testing.T) {
 			},
 		},
 		{
-			name: "base packages",
-			args: []string{"core.x64", "--with-base", "b1,b2", "--with-base", "b3,b4"},
-			expected: setArgs{
-				product:       "core",
-				board:         "x64",
-				includeClippy: true,
-				basePackages:  []string{"b1", "b2", "b3", "b4"},
-			},
+			name:      "base packages not allowed",
+			args:      []string{"core.x64", "--with-base", "u1"},
+			expectErr: true,
 		},
 		{
-			name: "cache packages",
-			args: []string{"core.x64", "--with-cache", "c1,c2", "--with-cache", "c3,c4"},
+			name:      "cache packages not allowed",
+			args:      []string{"core.x64", "--with-cache", "u1"},
+			expectErr: true,
+		},
+		{
+			name: "tests",
+			args: []string{"core.x64", "--with-test", "b1,b2", "--with-test", "b3,b4"},
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
 				includeClippy: true,
-				cachePackages: []string{"c1", "c2", "c3", "c4"},
+				testLabels:    []string{"b1", "b2", "b3", "b4"},
 			},
 		},
 		{
@@ -350,8 +350,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				board:            "arm64",
 				product:          "bringup",
 				isRelease:        true,
-				basePackages:     []string{"base"},
-				cachePackages:    []string{"cache"},
 				universePackages: []string{"universe"},
 				hostLabels:       []string{"host"},
 				variants:         []string{"variant"},
@@ -364,8 +362,6 @@ func TestConstructStaticSpec(t *testing.T) {
 				Board:            "boards/arm64.gni",
 				Product:          "products/bringup.gni",
 				CompilationMode:  fintpb.Static_COMPILATION_MODE_RELEASE,
-				BasePackages:     []string{"base"},
-				CachePackages:    []string{"cache"},
 				UniversePackages: []string{"universe"},
 				HostLabels:       []string{"host"},
 				Variants:         []string{"variant"},
@@ -496,13 +492,11 @@ func TestConstructStaticSpec(t *testing.T) {
 		{
 			name: "cargo toml gen",
 			args: &setArgs{
-				basePackages:  []string{"foo"},
 				cargoTOMLGen:  true,
 				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				BasePackages: []string{"foo"},
-				HostLabels:   []string{"//build/rust:cargo_toml_gen"},
+				HostLabels: []string{"//build/rust:cargo_toml_gen"},
 			},
 		},
 	}

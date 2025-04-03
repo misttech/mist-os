@@ -33,6 +33,8 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
                       SetVoltageStepCompleter::Sync& completer) override;
   void GetVoltageStep(GetVoltageStepCompleter::Sync& completer) override;
   void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override;
+  void Enable(EnableCompleter::Sync& completer) override;
+  void Disable(DisableCompleter::Sync& completer) override;
 
  private:
   const std::string name_;

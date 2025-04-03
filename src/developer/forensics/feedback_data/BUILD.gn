@@ -11,8 +11,6 @@ source_set("constants") {
   sources = [ "constants.h" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
-    "//src/developer/forensics/feedback/annotations",
     "//src/developer/forensics/utils:storage_size",
     "//src/developer/forensics/utils/cobalt",
   ]
@@ -35,7 +33,6 @@ source_set("data_provider") {
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/feedback/annotations",
     "//src/developer/forensics/feedback/attachments",
-    "//src/developer/forensics/utils:fidl_oneshot",
     "//src/developer/forensics/utils/cobalt",
     "//src/developer/forensics/utils/redact",
     "//src/lib/timekeeper:system",
@@ -46,10 +43,8 @@ source_set("data_provider") {
     ":constants",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
-    "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/utils:archive",
     "//src/lib/fsl",
-    "//src/lib/fxl",
     "//src/lib/uuid",
   ]
 }
@@ -90,16 +85,17 @@ source_set("log_source") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/async",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/diagnostics/accessor2logger",
     "//src/lib/fxl",
   ]
 
   deps = [
     ":constants",
     "//sdk/lib/syslog/cpp",
+    "//src/lib/diagnostics/accessor2logger",
   ]
 }
 
@@ -120,6 +116,7 @@ source_set("metadata") {
   deps = [
     ":constants",
     ":errors",
+    "//src/developer/forensics/feedback/annotations",
     "//src/developer/forensics/utils:errors",
     "//third_party/rapidjson",
   ]

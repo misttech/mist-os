@@ -18,13 +18,21 @@
     capabilities: [
         {
             service: [
+                "fuchsia.boot.metadata.MacAddressMetadata",
+                "fuchsia.boot.metadata.SerialNumberMetadata",
                 "fuchsia.hardware.usb.function.UsbFunctionService",
                 "fuchsia.hardware.usb.peripheral.Service",
             ],
         },
     ],
     use: [
-        { service: "fuchsia.hardware.usb.dci.UsbDciService" },
+        {
+            service: [
+                "fuchsia.boot.metadata.MacAddressMetadata",
+                "fuchsia.boot.metadata.SerialNumberMetadata",
+                "fuchsia.hardware.usb.dci.UsbDciService",
+            ],
+        },
         {
             config: "fuchsia.usb.PeripheralConfig.Functions",
             availability: "optional",
@@ -41,6 +49,8 @@
     expose: [
         {
             service: [
+                "fuchsia.boot.metadata.MacAddressMetadata",
+                "fuchsia.boot.metadata.SerialNumberMetadata",
                 "fuchsia.hardware.usb.function.UsbFunctionService",
                 "fuchsia.hardware.usb.peripheral.Service",
             ],

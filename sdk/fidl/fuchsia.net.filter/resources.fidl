@@ -372,6 +372,38 @@ type Action = flexible union {
         /// range of possible values to which the source port can be rewritten.
         1: src_port PortRange;
     };
+    /// Applies the mark action to the given mark domain.
+    ///
+    /// This is a non-terminal action for both routines and hooks. This is also
+    /// only available in [`IpRoutines`] because [`NatRoutines`] only runs on
+    /// the first packet in a connection and it is likely a misconfiguration
+    /// that packets after the first are marked differently or unmarked.
+    ///
+    /// Note: If we find use cases that justify this being in [`NatRoutines`] we
+    /// should relax this limitation and support it.
+    ///
+    /// This is analogous to the `mark` statement in Netfilter.
+    8: mark @generated_name("Mark") struct {
+        /// The domain to apply the mark action.
+        domain fuchsia.net.MarkDomain;
+        /// The action to apply.
+        action MarkAction;
+    };
+};
+
+/// An action that can be applied to a mark.
+type MarkAction = flexible union {
+    /// This action sets the mark specified by the `mark` and `clearing_mask`.
+    ///
+    /// If the current mark is [`None`], it sets it to `mark`.
+    1: set_mark struct {
+        /// The bits specified by this mask are cleared out from the existing
+        /// mark.
+        clearing_mask uint32;
+        /// This value is combined with the result of the masking using a
+        /// bitwise OR to get the final mark.
+        mark uint32;
+    };
 };
 
 /// A rule is a set of criteria (matchers) and a resultant action.

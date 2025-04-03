@@ -52,11 +52,11 @@
         {{/if}}
         "-machine",
         {{#if (eq device.cpu.architecture "arm64")}}
-            "virt-2.12",
+            "virt-9.2",
             {{#if (eq host.architecture "arm64")}}
-                "-machine", "gic-version=host",
+                "-machine", "gic-version=host,highmem-ecam=off",
             {{else}}
-                "-machine", "virtualization=true", "-cpu", "max",
+                "-machine", "virtualization=true,highmem-ecam=off", "-cpu", "max",
             {{/if}}
         {{else}} {{! architecture == x64 }}
             {{#if (eq runtime.engine_type "qemu")}}

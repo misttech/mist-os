@@ -20,20 +20,11 @@ fuchsia_hardware_i2c_businfo::I2CChannel CreateChannel(uint32_t address, uint32_
       .did = did,
   }};
 }
-
-fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata CreateMetadata(
-    fidl::AnyArena& arena, std::vector<fuchsia_hardware_i2c_businfo::I2CChannel> channels,
-    uint32_t bus_id) {
-  return fidl::ToWire(arena, fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
-                                 .channels = channels,
-                                 .bus_id = bus_id,
-                             }});
-}
 }  // namespace
 
 class I2cDriverTest : public ::testing::Test {
  public:
-  void Init(fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata) {
+  void Init(const fuchsia_hardware_i2c_businfo::I2CBusMetadata& metadata) {
     test_runner.RunInEnvironmentTypeContext(
         [metadata](TestEnvironment& env) { env.AddMetadata(metadata); });
     EXPECT_TRUE(test_runner.StartDriver().is_ok());
@@ -52,8 +43,10 @@ TEST_F(I2cDriverTest, OneChannel) {
   const fuchsia_hardware_i2c_businfo::I2CChannel kChannel = CreateChannel(5, 10, 2, 4, 6);
   const uint32_t kBusId = 32;
 
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {kChannel}, kBusId));
+  Init(fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
+      .channels{{kChannel}},
+      .bus_id = kBusId,
+  }});
 
   test_runner.RunInNodeContext([](fdf_testing::TestNode& node) {
     ASSERT_EQ(1u, node.children().count("i2c"));
@@ -71,8 +64,10 @@ TEST_F(I2cDriverTest, MultipleChannels) {
   const fuchsia_hardware_i2c_businfo::I2CChannel kChannel2 = CreateChannel(15, 30, 3, 6, 9);
   const uint32_t kBusId = 32;
 
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {kChannel1, kChannel2}, kBusId));
+  Init(fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
+      .channels{{kChannel1, kChannel2}},
+      .bus_id = kBusId,
+  }});
 
   test_runner.RunInNodeContext([](fdf_testing::TestNode& node) {
     ASSERT_EQ(1u, node.children().count("i2c"));
@@ -92,8 +87,10 @@ TEST_F(I2cDriverTest, GetName) {
 
   constexpr uint32_t kBusId = 16;
 
-  fidl::Arena arena;
-  Init(CreateMetadata(arena, {channel}, kBusId));
+  Init(fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
+      .channels{{channel}},
+      .bus_id = kBusId,
+  }});
 
   test_runner.RunInNodeContext([expected_name = kTestChildName](fdf_testing::TestNode& node) {
     ASSERT_EQ(1u, node.children().count("i2c"));

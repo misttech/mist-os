@@ -57,6 +57,10 @@ _platform_configuration_base = {
   setui = {
   }
 
+  storage = {
+    storage_host_enabled = true
+  }
+
   ui = {
     supported_input_devices = [
       "button",
@@ -108,6 +112,19 @@ _storage_minfs = {
   }
 }
 
+_storage_storage_host = {
+  storage = {
+    mutable_storage_garbage_collection = true
+    storage_host_enabled = true
+  }
+}
+
+_driver_host_rust = {
+  driver_framework = {
+    use_rust_driver_host = true
+  }
+}
+
 _base_packages = [
   {
     # Provides font assets for `platform.fonts.font_collection` above.
@@ -119,6 +136,7 @@ product_assembly_configuration("core") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_driver_host_rust, "*")
   }
   product = {
     build_info = default_product_build_info
@@ -132,6 +150,7 @@ product_assembly_configuration("core_with_f2fs") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_driver_host_rust, "*")
     forward_variables_from(_storage_f2fs, "*")
   }
   product = {
@@ -146,7 +165,22 @@ product_assembly_configuration("core_with_minfs") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_driver_host_rust, "*")
     forward_variables_from(_storage_minfs, "*")
+  }
+  product = {
+    build_info = default_product_build_info
+  }
+
+  base_packages = _base_packages
+  deps = [ "//build/info:build_info_files" ]
+}
+
+product_assembly_configuration("core_with_storage_host") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_storage_storage_host, "*")
   }
   product = {
     build_info = default_product_build_info
@@ -162,6 +196,7 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
     forward_variables_from(_platform_configuration_base, "*")
 
     driver_framework = {
+      use_rust_driver_host = true
       test_fuzzing_config = {
         enable_load_fuzzer = true
         max_load_delay_ms = 300

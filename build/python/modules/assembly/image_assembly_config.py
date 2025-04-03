@@ -8,7 +8,7 @@ schema as `//src/developer/ffx/plugins/assembly`.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, TypeVar
+from typing import Optional, TypeVar
 
 import serialization
 
@@ -26,7 +26,7 @@ class KernelInfo:
     """Information about the kernel"""
 
     path: Optional[FilePath] = None
-    args: Set[str] = field(default_factory=set)
+    args: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -46,15 +46,15 @@ class ImageAssemblyConfig:
     that are to be combined into a complete set of assembled product images.
     """
 
-    base: Set[FilePath] = field(default_factory=set)
-    cache: Set[FilePath] = field(default_factory=set)
-    on_demand: Set[FilePath] = field(default_factory=set)
-    system: Set[FilePath] = field(default_factory=set)
+    base: set[FilePath] = field(default_factory=set)
+    cache: set[FilePath] = field(default_factory=set)
+    on_demand: set[FilePath] = field(default_factory=set)
+    system: set[FilePath] = field(default_factory=set)
     kernel: KernelInfo = field(default_factory=KernelInfo)
     qemu_kernel: Optional[FilePath] = None
-    boot_args: Set[str] = field(default_factory=set)
-    bootfs_files: Set[FileEntry] = field(default_factory=set)
-    bootfs_packages: Set[FilePath] = field(default_factory=set)
+    boot_args: set[str] = field(default_factory=set)
+    bootfs_files: set[FileEntry] = field(default_factory=set)
+    bootfs_packages: set[FilePath] = field(default_factory=set)
     board_driver_arguments: Optional[BoardDriverArguments] = None
     devicetree: Optional[FilePath] = None
     devicetree_overlay: Optional[FilePath] = None
@@ -63,7 +63,7 @@ class ImageAssemblyConfig:
     image_mode: str = None
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
-    images_config: Dict[str, List[str]] = field(default_factory=dict)
+    images_config: dict[str, list[str]] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""

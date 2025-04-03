@@ -214,6 +214,7 @@ AUTO_DERIVE_TRAITS = [
         r"nf_nat(_ipv4)?(_multi)?_range(_compat)?",
         ["KnownLayout", "FromBytes", "Immutable"],
     ),
+    (r"perf_event_attr", ["FromBytes", "Immutable"]),
     (r"robust_list_head", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"robust_list", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"sigevent", ["KnownLayout", "FromBytes", "Immutable"]),
@@ -229,6 +230,28 @@ AUTO_DERIVE_TRAITS = [
     ),
     (r"xt_counters_info", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"xt_tproxy_target_info_v1", ["KnownLayout", "FromBytes", "Immutable"]),
+    (
+        r"ucred",
+        [
+            "KnownLayout",
+            "IntoBytes",
+            "FromBytes",
+            "Immutable",
+            "Eq",
+            "PartialEq",
+        ],
+    ),
+    (
+        r"cmsghdr",
+        [
+            "KnownLayout",
+            "IntoBytes",
+            "FromBytes",
+            "Immutable",
+            "Eq",
+            "PartialEq",
+        ],
+    ),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -272,6 +295,8 @@ REPLACEMENTS = [
     (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
     # Remove __bindgen_missing from the start of constants defined in missing_includes.h
     (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
+    # Workaround for https://github.com/rust-lang/rust-bindgen/issues/3068.
+    (r"pub __bindgen_padding_0: \[u8; 1844[0-9]+usize\],\n", ""),
 ]
 
 REPLACEMENTS_PTR = [
@@ -370,6 +395,7 @@ bindgen.type_blocklist = TYPE_BLOCKLIST
 bindgen.no_debug_types = NO_DEBUG_TYPES
 bindgen.no_copy_types = NO_COPY_TYPES
 bindgen.enable_stdlib_include_dirs = False
+bindgen.size_t_is_usize = False
 
 for arch in ARCH_INFO:
     bindgen.raw_lines = RAW_LINES

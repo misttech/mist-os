@@ -992,12 +992,12 @@ using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
 // used to fill the payload.
 //
 // See '<lib/boot-shim/watchdog.h>' for Watchdog Item API contract.
-template <Watchdog... Watchdogs>
+template <WatchdogMmioHelper MmioHelper, Watchdog<MmioHelper>... Watchdogs>
 class GenericWatchdogItemBase
-    : public DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>,
+    : public DevicetreeItemBase<GenericWatchdogItemBase<MmioHelper, Watchdogs...>, 1>,
       public SingleOptionalItem<zbi_dcfg_generic32_watchdog_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG> {
-  using Base = DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>;
+  using Base = DevicetreeItemBase<GenericWatchdogItemBase<MmioHelper, Watchdogs...>, 1>;
 
  public:
   template <typename Shim>
@@ -1018,6 +1018,14 @@ class GenericWatchdogItemBase
       auto result = (Match<Watchdogs>(compatible, decoder) || ...);
       // Matched and maybe filled the payload.
       if (result) {
+        if (payload() && payload()->enable_action.addr != 0) {
+          const zbi_dcfg_generic32_watchdog_action_t& enable_action = payload()->enable_action;
+          bool enabled = (MmioHelper::Read(enable_action.addr) & enable_action.set_mask) ==
+                         enable_action.set_mask;
+          if (enabled) {
+            payload()->flags |= ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG_FLAGS_ENABLED;
+          }
+        }
         return devicetree::ScanState::kDone;
       }
     }
@@ -1032,7 +1040,8 @@ class GenericWatchdogItemBase
   bool Match(std::string_view compatible, const devicetree::PropertyDecoder& decoder) {
     for (std::string_view device_compatible : Watchdog::kCompatibleDevices) {
       if (device_compatible == compatible) {
-        if (auto payload = Watchdog::MaybeCreate(decoder, mmio_observer_); payload) {
+        if (auto payload = Watchdog::template MaybeCreate<MmioHelper>(decoder, mmio_observer_);
+            payload) {
           set_payload(*payload);
         }
         return true;
@@ -1044,7 +1053,8 @@ class GenericWatchdogItemBase
   const DevicetreeBootShimMmioObserver* mmio_observer_ = nullptr;
 };
 
-using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
+template <WatchdogMmioHelper MmioHelper>
+using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase, MmioHelper>;
 using NvramItem = SingleOptionalItem<zbi_nvram_t, ZBI_TYPE_NVRAM>;
 
 // Serial number can be provided as "serial-number" property in the root node, or as a boot argument

@@ -10,13 +10,13 @@ use io_conformance_util::*;
 /// Verify allowed file operations map to the rights of the connection (when connection was opened
 /// with Open1).
 #[fuchsia::test]
-async fn get_connection_info_file_using_open_deprecated() {
+async fn get_connection_info_file_using_deprecated_open() {
     let harness = TestHarness::new().await;
 
     for file_flags in harness.file_rights.combinations_deprecated() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
 
         // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
         let mut expected_operations = fio::Operations::GET_ATTRIBUTES;
@@ -47,9 +47,9 @@ async fn get_connection_info_file() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let file = dir
-            .open3_node::<fio::FileMarker>(TEST_FILE, fio::Flags::PROTOCOL_FILE | file_flags, None)
+            .open_node::<fio::FileMarker>(TEST_FILE, fio::Flags::PROTOCOL_FILE | file_flags, None)
             .await
-            .expect("open3 failed");
+            .expect("open failed");
 
         assert_eq!(
             file.get_connection_info().await.unwrap(),
@@ -88,13 +88,13 @@ async fn get_connection_info_file_with_directory_rights() {
         let entries = vec![file(TEST_FILE, vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let file = dir
-            .open3_node::<fio::FileMarker>(
+            .open_node::<fio::FileMarker>(
                 TEST_FILE,
                 fio::Flags::PROTOCOL_FILE | directory_flags,
                 None,
             )
             .await
-            .expect("open3 failed");
+            .expect("open failed");
 
         let expected_file_rights = fio::Operations::from_bits_truncate(directory_flags.bits())
             .intersection(FILE_ALLOWED_RIGHTS);
@@ -114,7 +114,8 @@ async fn get_connection_info_file_node_reference_deprecated() {
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file = open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+    let file =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
     // Node references should only have the ability to get attributes.
     // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
     assert_eq!(
@@ -135,7 +136,7 @@ async fn get_connection_info_file_node_reference() {
     // This will return combinations of rights, including empty rights
     for rights in node_allowed_rights.rights_combinations() {
         let file = dir
-            .open3_node::<fio::FileMarker>(
+            .open_node::<fio::FileMarker>(
                 TEST_FILE,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::PROTOCOL_NODE
@@ -143,7 +144,7 @@ async fn get_connection_info_file_node_reference() {
                 None,
             )
             .await
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Note that in Open3, unless the connection was opened with GET_ATTRIBUTES rights, we do
         // not expect the connection to have that right. This is different from Open1 where
@@ -159,13 +160,13 @@ async fn get_connection_info_file_node_reference() {
 /// Verify allowed operations for a direct connection to a directory (when connection was opened
 /// with Open1).
 #[fuchsia::test]
-async fn get_connection_info_directory_using_open_deprecated() {
+async fn get_connection_info_directory_using_deprecated_open() {
     let harness = TestHarness::new().await;
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
+        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, it is always requested when
         // opening nodes via Open1.
@@ -196,13 +197,13 @@ async fn get_connection_info_directory() {
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let dir = dir
-            .open3_node::<fio::DirectoryMarker>(
+            .open_node::<fio::DirectoryMarker>(
                 "dir",
                 fio::Flags::PROTOCOL_DIRECTORY | dir_flags,
                 None,
             )
             .await
-            .expect("open3 failed");
+            .expect("open failed");
 
         assert_eq!(
             dir.get_connection_info().await.unwrap(),
@@ -218,12 +219,12 @@ async fn get_connection_info_directory() {
 /// Verify allowed operations for a node reference connection to a directory (when connection was
 /// opened with Open1).
 #[fuchsia::test]
-async fn get_connection_info_directory_node_reference_using_open_deprecated() {
+async fn get_connection_info_directory_node_reference_using_deprecated_open() {
     let harness = TestHarness::new().await;
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir = open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+    let dir = deprecated_open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
     assert_eq!(
         dir.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }
@@ -242,7 +243,7 @@ async fn get_connection_info_directory_node_reference() {
     // This will return combinations of rights, including empty rights
     for rights in node_allowed_rights.rights_combinations() {
         let dir = dir
-            .open3_node::<fio::DirectoryMarker>(
+            .open_node::<fio::DirectoryMarker>(
                 "dir",
                 fio::Flags::PROTOCOL_DIRECTORY
                     | fio::Flags::PROTOCOL_NODE
@@ -250,7 +251,7 @@ async fn get_connection_info_directory_node_reference() {
                 None,
             )
             .await
-            .expect("open3 failed");
+            .expect("open failed");
 
         // Note that in Open3, unless the connection was opened with GET_ATTRIBUTES rights, we do
         // not expect the connection to have that right. This is different from Open1 where

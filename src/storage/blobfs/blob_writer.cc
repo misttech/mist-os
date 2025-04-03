@@ -89,6 +89,14 @@ const size_t kSystemPageSize = zx_system_get_page_size();
 Blob::Writer::Writer(const Blob& blob, bool is_delivery_blob)
     : blob_(blob), is_delivery_blob_(is_delivery_blob) {}
 
+Blob::Writer::~Writer() {
+  if (to_overwrite_.has_value()) {
+    zx_status_t status = to_overwrite_.value()->ClearOverwriting();
+    ZX_DEBUG_ASSERT(status == ZX_OK);
+    to_overwrite_ = std::nullopt;
+  }
+}
+
 zx::result<Blob::WrittenBlob> Blob::Writer::WriteNullBlob(Blob& blob) {
   ZX_DEBUG_ASSERT(&blob_ == &blob);
 
@@ -111,8 +119,22 @@ zx::result<Blob::WrittenBlob> Blob::Writer::WriteNullBlob(Blob& blob) {
   if (zx::result status = WriteMetadata(transaction); status.is_error()) {
     return status.take_error();
   }
-  transaction.Commit(*blobfs().GetJournal(), {},
-                     [blob = fbl::RefPtr(&blob)]() { blob->CompleteSync(); });
+  auto transaction_completion = [&transaction, &journal = *blobfs().GetJournal(),
+                                 &blob]() -> zx::result<> {
+    transaction.Commit(journal, {}, [blob = fbl::RefPtr(&blob)]() { blob->CompleteSync(); });
+
+    return zx::ok();
+  };
+
+  if (to_overwrite_.has_value()) {
+    if (zx::result result = to_overwrite_.value()->ReplaceBlob(
+            transaction, map_index_, blob_layout_->TotalBlockCount(), transaction_completion);
+        result.is_error()) {
+      return result.take_error();
+    }
+  } else if (zx::result<> result = transaction_completion(); result.is_error()) {
+    return result.take_error();
+  }
 
   return zx::ok(WrittenBlob{.map_index = map_index_, .layout = std::move(blob_layout_)});
 }
@@ -599,18 +621,31 @@ zx::result<> Blob::Writer::FlushData(Blob& blob) {
   if (zx::result status = WriteMetadata(transaction); status.is_error()) {
     return status.take_error();
   }
-  transaction.Commit(*blobfs().GetJournal(), std::move(write_all_data),
-                     [self = fbl::RefPtr(&blob)]() {});
 
-  // It's not safe to continue until all data has been written because we might need to reload it
-  // (e.g. if the blob is immediately read after writing), and the journal caches data in ring
-  // buffers, so wait until that has happened.  We don't need to wait for the metadata because we
-  // cache that.
-  sync_completion_wait(&data_written, ZX_TIME_INFINITE);
-  if (data_status != ZX_OK) {
-    return zx::error(data_status);
+  auto completion = [&journal = *blobfs().GetJournal(), &write_all_data, &transaction, &blob,
+                     &data_written, &data_status]() -> zx::result<> {
+    transaction.Commit(journal, std::move(write_all_data), [self = fbl::RefPtr(&blob)]() {});
+
+    // It's not safe to continue until all data has been written because we might need to reload it
+    // (e.g. if the blob is immediately read after writing), and the journal caches data in ring
+    // buffers, so wait until that has happened.  We don't need to wait for the metadata because we
+    // cache that.
+    sync_completion_wait(&data_written, ZX_TIME_INFINITE);
+    if (data_status != ZX_OK) {
+      return zx::error(data_status);
+    }
+    return zx::ok();
+  };
+
+  if (to_overwrite_.has_value()) {
+    if (zx::result<> result = to_overwrite_.value()->ReplaceBlob(
+            transaction, map_index_, blob_layout_->TotalBlockCount(), completion);
+        result.is_error()) {
+      return result.take_error();
+    }
+  } else {
+    return completion();
   }
-
   return zx::ok();
 }
 
@@ -900,6 +935,10 @@ zx::result<> Blob::Writer::ParseDeliveryBlob() {
   data_format_ = metadata_.IsCompressed() ? CompressionAlgorithm::kChunked
                                           : CompressionAlgorithm::kUncompressed;
   return zx::ok();
+}
+
+void Blob::Writer::SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) {
+  to_overwrite_ = std::move(to_overwrite);
 }
 
 }  // namespace blobfs

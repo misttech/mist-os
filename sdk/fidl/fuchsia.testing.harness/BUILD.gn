@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.testing.harness") {
+  testonly = true
   sdk_category = "compat_test"
   sdk_area = "Testing"
   stable = true

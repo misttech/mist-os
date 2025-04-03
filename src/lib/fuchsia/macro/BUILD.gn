@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
 
@@ -11,11 +12,18 @@ if (is_host) {
     source_root = "src/transformer.rs"
     sources = [ "src/transformer.rs" ]
     deps = [
-      "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
       "//third_party/rust_crates:proc-macro2",
       "//third_party/rust_crates:quote",
       "//third_party/rust_crates:syn",
     ]
+
+    if (current_build_target_api_level_as_integer <= 26) {
+      deps += [ "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust" ]
+    } else {
+      deps += [
+        "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types_rust",
+      ]
+    }
   }
 }
 

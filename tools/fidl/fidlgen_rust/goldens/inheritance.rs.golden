@@ -85,6 +85,20 @@ impl SubSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl From<SubSynchronousProxy> for zx::Handle {
+    fn from(value: SubSynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for SubSynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SubProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -496,6 +510,20 @@ impl Super_SynchronousProxy {
             ___deadline,
         )?;
         Ok(_response.y)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<Super_SynchronousProxy> for zx::Handle {
+    fn from(value: Super_SynchronousProxy) -> Self {
+        value.into_channel().into()
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl From<fidl::Channel> for Super_SynchronousProxy {
+    fn from(value: fidl::Channel) -> Self {
+        Self::new(value)
     }
 }
 

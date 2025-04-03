@@ -158,16 +158,14 @@ fn use_directory_or_storage(
     target: &Arc<ComponentInstance>,
 ) -> Capability {
     let flags = match &request {
-        UseDirectoryOrStorage::Directory(decl) => Rights::from(decl.rights).into_legacy(),
-        UseDirectoryOrStorage::Storage(_) => {
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
-        }
+        UseDirectoryOrStorage::Directory(decl) => Rights::from(decl.rights).into(),
+        UseDirectoryOrStorage::Storage(_) => fio::PERM_READABLE | fio::PERM_WRITABLE,
     };
 
     // Specify that the capability must be opened as a directory. In particular, this affects
     // how a devfs-based capability will handle the open call. If this flag is not specified,
     // devfs attempts to open the directory as a service, which is not what is desired here.
-    let flags = flags | fio::OpenFlags::DIRECTORY;
+    let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
     #[derive(Debug)]
     struct RouteDirectory {
@@ -224,7 +222,7 @@ fn use_directory_or_storage(
     struct DirectorySender {
         dir_entry: Arc<RouteDirectory>,
         scope: ExecutionScope,
-        flags: fio::OpenFlags,
+        flags: fio::Flags,
     }
 
     #[async_trait]

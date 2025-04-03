@@ -6,7 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/ui/scenic/lib/utils/math.h"
+#include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace {
 
@@ -84,8 +84,8 @@ bool Snapshot::IsDescendant(zx_koid_t descendant_koid, zx_koid_t ancestor_koid) 
 }
 
 std::vector<zx_koid_t> Snapshot::GetAncestorsOf(zx_koid_t koid) const {
-  // TODO(https://fxbug.dev/42050703): Turn this back into a DCHECK once we solve the ViewTree-flakiness
-  // issue.
+  // TODO(https://fxbug.dev/42050703): Turn this back into a DCHECK once we solve the
+  // ViewTree-flakiness issue.
   if (view_tree.count(koid) == 0) {
     FX_LOGS(ERROR) << "Tried to GetAncestorsOf() a koid not in the ViewTree";
     return {};

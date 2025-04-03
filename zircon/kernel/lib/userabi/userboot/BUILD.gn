@@ -34,16 +34,7 @@ if (current_toolchain == default_toolchain) {
         os = "fuchsia"
       }
       environment = "userboot"
-      configs = [
-        "//zircon/kernel/lib/userabi/userboot:userboot_config",
-
-        # TODO(https://fxbug.dev/42125366): This is needed pervasively and not just
-        # in the linking target so its compile-time flags can
-        # work around https://fxbug.dev/42125366.  It's separate from
-        # userboot_config so it can be removed by other links
-        # reusing this environment, e.g. hermetic_module().
-        "//build/config/zircon:rodso",
-      ]
+      configs = [ "//zircon/kernel/lib/userabi/userboot:userboot_config" ]
       source_deps = [ "${configs[0]}_deps" ]
 
       with_shared = false
@@ -115,6 +106,7 @@ if (toolchain_environment == "userboot") {
     ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
 
+    configs += [ "//build/config/zircon:rodso" ]
     ldflags = [
       "-Wl,-e,_start",
       "-nostartfiles",

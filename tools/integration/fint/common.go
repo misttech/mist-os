@@ -28,15 +28,6 @@ func thirdPartyPrebuilt(checkoutDir, platform, name string) string {
 	return filepath.Join(checkoutDir, "prebuilt", "third_party", name, platform, name)
 }
 
-func contains(items []string, target string) bool {
-	for _, item := range items {
-		if item == target {
-			return true
-		}
-	}
-	return false
-}
-
 // makeAbsolute takes a root directory and a list of relative paths of files
 // within that directory, and returns a list of absolute paths to those files.
 func makeAbsolute(rootDir string, paths []string) []string {

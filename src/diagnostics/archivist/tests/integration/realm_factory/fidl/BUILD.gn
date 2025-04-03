@@ -18,6 +18,7 @@ fidl("fuchsia.archivist.test") {
   public_deps = [
     "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.diagnostics.types",
     "//sdk/fidl/fuchsia.inspect",
     "//sdk/fidl/fuchsia.testing.harness",
   ]

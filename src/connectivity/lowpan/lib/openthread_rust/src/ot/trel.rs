@@ -142,15 +142,15 @@ impl<'a> PlatTrelPeerInfo<'a> {
 /// [1]: https://openthread.io/reference/group/plat-trel
 pub trait PlatTrel {
     /// This function is a callback from platform to notify of a received TREL UDP packet.
-    fn plat_trel_handle_received(&self, packet: &[u8]);
+    fn plat_trel_handle_received(&self, packet: &[u8], sock_addr: &ot::SockAddr);
 
     /// This is a callback function from platform layer to report a discovered TREL peer info.
     fn plat_trel_handle_discovered_peer_info(&self, peer_info: &PlatTrelPeerInfo<'_>);
 }
 
 impl<T: PlatTrel + Boxable> PlatTrel for ot::Box<T> {
-    fn plat_trel_handle_received(&self, packet: &[u8]) {
-        self.as_ref().plat_trel_handle_received(packet);
+    fn plat_trel_handle_received(&self, packet: &[u8], sock_addr: &ot::SockAddr) {
+        self.as_ref().plat_trel_handle_received(packet, sock_addr);
     }
 
     fn plat_trel_handle_discovered_peer_info(&self, peer_info: &PlatTrelPeerInfo<'_>) {
@@ -159,13 +159,14 @@ impl<T: PlatTrel + Boxable> PlatTrel for ot::Box<T> {
 }
 
 impl PlatTrel for Instance {
-    fn plat_trel_handle_received(&self, packet: &[u8]) {
+    fn plat_trel_handle_received(&self, packet: &[u8], sock_addr: &ot::SockAddr) {
         unsafe {
             otPlatTrelHandleReceived(
                 self.as_ot_ptr(),
                 // TODO(https://fxbug.dev/42175496): Make sure they won't actually mutate.
                 packet.as_ptr() as *mut u8,
                 packet.len().try_into().unwrap(),
+                sock_addr.as_ot_ptr(),
             )
         }
     }

@@ -59,9 +59,7 @@ impl RemoteClient {
         &mut self,
         ctx: &mut Context,
         aid_map: &mut aid::Map,
-        ap_capabilities: CapabilityInfo,
         client_capabilities: u16,
-        ap_rates: &[SupportedRate],
         client_rates: &[SupportedRate],
         rsn_cfg: &Option<RsnCfg>,
         s_rsne: Option<Vec<u8>>,
@@ -72,9 +70,7 @@ impl RemoteClient {
                 self,
                 ctx,
                 aid_map,
-                ap_capabilities,
                 client_capabilities,
-                ap_rates,
                 client_rates,
                 rsn_cfg,
                 s_rsne,
@@ -217,7 +213,6 @@ mod tests {
     use crate::{test_utils, MlmeSink, MlmeStream};
     use futures::channel::mpsc;
     use lazy_static::lazy_static;
-    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
     use wlan_common::{assert_variant, timer};
 
     lazy_static! {
@@ -231,15 +226,9 @@ mod tests {
 
     fn make_env() -> (Context, MlmeStream, timer::EventStream<Event>) {
         let device_info = test_utils::fake_device_info(*AP_ADDR);
-        let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
-        let ctx = Context {
-            device_info,
-            mac_sublayer_support,
-            mlme_sink: MlmeSink::new(mlme_sink),
-            timer,
-        };
+        let ctx = Context { device_info, mlme_sink: MlmeSink::new(mlme_sink), timer };
         (ctx, mlme_stream, time_stream)
     }
 
@@ -272,9 +261,7 @@ mod tests {
         r_sta.handle_assoc_ind(
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,
@@ -291,9 +278,7 @@ mod tests {
         r_sta.handle_assoc_ind(
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,
@@ -311,9 +296,7 @@ mod tests {
         r_sta.handle_assoc_ind(
             &mut ctx,
             &mut aid_map,
-            CapabilityInfo(0).with_short_preamble(true),
             CapabilityInfo(0).with_short_preamble(true).raw(),
-            &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
             None,

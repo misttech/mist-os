@@ -332,7 +332,10 @@ void heap_page_free(void* _ptr, size_t pages) {
   pmm_free(&list);
 }
 
-void heap_report_alloc_failure() { pmm_report_alloc_failure(); }
+void heap_report_alloc_failure(size_t size) {
+  Pmm::Node().ReportAllocFailure(
+      PmmNode::AllocFailure{.type = PmmNode::AllocFailure::Type::Heap, .size = size});
+}
 
 #include <lib/console.h>
 

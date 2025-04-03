@@ -1,6 +1,7 @@
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import("//build/toolchain/ifs_shared_library.gni")
 
 shared_library("driver") {
   sources = [ "api.cc" ]
@@ -273,8 +274,8 @@ shared_library("driver") {
   ]
 }
 
-group("driver_runtime") {
-  deps = [ "//src/devices/bin/driver_runtime" ]
+ifs_shared_library("driver_runtime") {
+  abi = "//src/devices/bin/driver_runtime/driver_runtime.ifs"
 }
 
 group("tests") {

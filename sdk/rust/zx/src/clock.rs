@@ -96,6 +96,23 @@ impl<Reference: Timeline, Output: Timeline> Clock<Reference, Output> {
         Ok(Instant::<Output>::from_nanos(now))
     }
 
+    /// Perform a basic read of a mapped clock. Wraps the [zx_clock_read_mapped] syscall.
+    ///
+    /// # Safety
+    ///
+    /// |zx_clock_get_details_mapped| must only be called using a |clock_addr| which is the address
+    /// of a clock's state currently mapped into the caller's address space using
+    /// |zx_vmar_map_clock|.  Attempting to get_details from any other address, or from a clock
+    /// mapping which has been unmapped (completely or partially) will result in undefined behavior.
+    ///
+    /// [zx_clock_read]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_read_mapped
+    pub unsafe fn read_mapped(clock_addr: *const u8) -> Result<Instant<Output>, Status> {
+        let mut now = 0;
+        let status = unsafe { sys::zx_clock_read_mapped(clock_addr, &mut now) };
+        ok(status)?;
+        Ok(Instant::<Output>::from_nanos(now))
+    }
+
     /// Get low level details of this clock's current status. Wraps the
     /// [zx_clock_get_details] syscall. Requires `ZX_RIGHT_READ`.
     ///
@@ -105,6 +122,33 @@ impl<Reference: Timeline, Output: Timeline> Clock<Reference, Output> {
         let status = unsafe {
             sys::zx_clock_get_details(
                 self.raw_handle(),
+                sys::ZX_CLOCK_ARGS_VERSION_1,
+                out_details.as_mut_ptr().cast::<u8>(),
+            )
+        };
+        ok(status)?;
+        let out_details = unsafe { out_details.assume_init() };
+        Ok(out_details.into())
+    }
+
+    /// Get low level details of a mapped clock's current status. Wraps the
+    /// [zx_clock_get_details_mapped] syscall.
+    ///
+    /// # Safety
+    ///
+    /// |zx_clock_get_details_mapped| must only be called using a |clock_addr| which is the address
+    /// of a clock's state currently mapped into the caller's address space using
+    /// |zx_vmar_map_clock|.  Attempting to get_details from any other address, or from a clock
+    /// mapping which has been unmapped (completely or partially) will result in undefined behavior.
+    ///
+    /// [zx_clock_get_details_mapped]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_details_mapped
+    pub unsafe fn get_details_mapped(
+        clock_addr: *const u8,
+    ) -> Result<ClockDetails<Reference, Output>, Status> {
+        let mut out_details = MaybeUninit::<sys::zx_clock_details_v1_t>::uninit();
+        let status = unsafe {
+            sys::zx_clock_get_details_mapped(
+                clock_addr,
                 sys::ZX_CLOCK_ARGS_VERSION_1,
                 out_details.as_mut_ptr().cast::<u8>(),
             )
@@ -184,8 +228,12 @@ bitflags! {
         /// other options, the handle rights, and the backstop time of the clock.
         const AUTO_START = sys::ZX_CLOCK_OPT_AUTO_START;
 
-        // When set, creates a clock object that uses the boot timeline as its reference timeline.
+        /// When set, creates a clock object that uses the boot timeline as its reference timeline.
         const BOOT = sys::ZX_CLOCK_OPT_BOOT;
+
+        /// When set, creates a clock whose state may be mapped into a VMAR, allowing the state to
+        /// be used with calls to |zx_clock_read_mapped| and |zx_clock_get_details_mapped|.
+        const MAPPABLE = sys::ZX_CLOCK_OPT_MAPPABLE;
     }
 }
 

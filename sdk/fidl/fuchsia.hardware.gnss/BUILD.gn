@@ -12,7 +12,7 @@ fidl("fuchsia.hardware.gnss") {
   # TODO(https://fxbug.dev/396653562): Stabilize the FIDL
   stable = false
   public_deps = [
-    "//sdk/fidl/fuchsia.gnss.types",
+    "//sdk/fidl/fuchsia.location.gnss.types",
     "//zircon/vdso/zx",
   ]
 }

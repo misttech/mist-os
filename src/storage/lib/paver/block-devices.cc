@@ -21,9 +21,7 @@ namespace paver {
 
 namespace {
 
-// Connects to the volume protocol in an instance of fuchsia.storage.partitions.PartitionService.
-zx::result<std::unique_ptr<VolumeConnector>> CreateServiceBasedVolumeConnector(
-    int dir_fd, const std::string& filename) {
+zx::result<fbl::unique_fd> open_in_dir(int dir_fd, const std::string& filename) {
   zx::channel partition_local, partition_remote;
   if (zx_status_t status = zx::channel::create(0, &partition_local, &partition_remote);
       status != ZX_OK) {
@@ -36,7 +34,7 @@ zx::result<std::unique_ptr<VolumeConnector>> CreateServiceBasedVolumeConnector(
       status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(std::make_unique<ServiceBasedVolumeConnector>(std::move(fd)));
+  return zx::ok(std::move(fd));
 }
 
 zx::result<std::unique_ptr<VolumeConnector>> CreateDevfsVolumeConnector(int dir_fd,
@@ -89,19 +87,20 @@ fidl::ClientEnd<fuchsia_device::Controller> DevfsVolumeConnector::TakeController
   return controller_.TakeClientEnd();
 }
 
-ServiceBasedVolumeConnector::ServiceBasedVolumeConnector(fbl::unique_fd service_dir)
-    : service_dir_(std::move(service_dir)) {}
+DirBasedVolumeConnector::DirBasedVolumeConnector(fbl::unique_fd dir,
+                                                 std::string volume_connector_path)
+    : dir_(std::move(dir)), volume_connector_path_(std::move(volume_connector_path)) {}
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>>
-ServiceBasedVolumeConnector::Connect() const {
-  fdio_cpp::UnownedFdioCaller caller(service_dir_);
+DirBasedVolumeConnector::Connect() const {
+  fdio_cpp::UnownedFdioCaller caller(dir_);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
   auto [client, server] = std::move(*endpoints);
-  if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), "volume",
-                                                   server.TakeChannel().release());
+  if (zx_status_t status = fdio_service_connect_at(
+          caller.borrow_channel(), volume_connector_path_.c_str(), server.TakeChannel().release());
       status != ZX_OK) {
     LOG("Failed to connect to volume service: %s\n", zx_status_get_string(status));
     return zx::error(status);
@@ -110,8 +109,25 @@ ServiceBasedVolumeConnector::Connect() const {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>>
-ServiceBasedVolumeConnector::PartitionManagement() const {
-  fdio_cpp::UnownedFdioCaller caller(service_dir_);
+DirBasedVolumeConnector::PartitionManagement() const {
+  ZX_ASSERT_MSG(false, "Called PartitionManagement on a VolumeServiceBasedVolumeConnector");
+}
+
+fidl::UnownedClientEnd<fuchsia_device::Controller> DirBasedVolumeConnector::Controller() const {
+  ZX_ASSERT_MSG(false, "Called Controller on a non-DevfsVolumeConnector");
+}
+
+fidl::ClientEnd<fuchsia_device::Controller> DirBasedVolumeConnector::TakeController() {
+  ZX_ASSERT_MSG(false, "Called TakeController on a non-DevfsVolumeConnector");
+}
+
+PartitionServiceBasedVolumeConnector::PartitionServiceBasedVolumeConnector(
+    fbl::unique_fd service_dir)
+    : DirBasedVolumeConnector(std::move(service_dir), std::string("volume")) {}
+
+zx::result<fidl::ClientEnd<fuchsia_storage_partitions::Partition>>
+PartitionServiceBasedVolumeConnector::PartitionManagement() const {
+  fdio_cpp::UnownedFdioCaller caller(dir_);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_storage_partitions::Partition>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
@@ -126,16 +142,8 @@ ServiceBasedVolumeConnector::PartitionManagement() const {
   return zx::ok(std::move(client));
 }
 
-fidl::UnownedClientEnd<fuchsia_device::Controller> ServiceBasedVolumeConnector::Controller() const {
-  ZX_ASSERT_MSG(false, "Called Controller on a non-DevfsVolumeConnector");
-}
-
-fidl::ClientEnd<fuchsia_device::Controller> ServiceBasedVolumeConnector::TakeController() {
-  ZX_ASSERT_MSG(false, "Called TakeController on a non-DevfsVolumeConnector");
-}
-
-BlockDevices::BlockDevices(fbl::unique_fd devfs_root, fbl::unique_fd partitions_root)
-    : devfs_root_(std::move(devfs_root)), partitions_root_(std::move(partitions_root)) {}
+BlockDevices::BlockDevices(fbl::unique_fd root, Variant variant)
+    : root_(std::move(root)), variant_(variant) {}
 
 zx::result<BlockDevices> BlockDevices::CreateDevfs(fbl::unique_fd devfs_root) {
   if (!devfs_root) {
@@ -146,7 +154,20 @@ zx::result<BlockDevices> BlockDevices::CreateDevfs(fbl::unique_fd devfs_root) {
       return zx::error(status);
     }
   }
-  return zx::ok(BlockDevices(std::move(devfs_root), {}));
+  return zx::ok(BlockDevices(std::move(devfs_root), Variant::kDevfs));
+}
+
+zx::result<BlockDevices> BlockDevices::CreateFromFshostBlockDir(fbl::unique_fd block_dir) {
+  if (!block_dir) {
+    if (zx_status_t status =
+            fdio_open3_fd("/block", static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                          block_dir.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Failed to open /block: %s\n", zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
+  return zx::ok(BlockDevices(std::move(block_dir), Variant::kFshostBlockDir));
 }
 
 zx::result<BlockDevices> BlockDevices::CreateFromPartitionService(
@@ -169,16 +190,14 @@ zx::result<BlockDevices> BlockDevices::CreateFromPartitionService(
       status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(BlockDevices({}, std::move(partition_dir)));
+  return zx::ok(BlockDevices(std::move(partition_dir), Variant::kPartitionService));
 }
 
 BlockDevices BlockDevices::CreateEmpty() { return BlockDevices({}, {}); }
 
-BlockDevices BlockDevices::Duplicate() const {
-  return BlockDevices(devfs_root_.duplicate(), partitions_root_.duplicate());
-}
+BlockDevices BlockDevices::Duplicate() const { return BlockDevices(root_.duplicate(), variant_); }
 
-bool BlockDevices::IsStorageHost() const { return partitions_root_.is_valid(); }
+bool BlockDevices::IsStorageHost() const { return variant_ != Variant::kDevfs; }
 
 zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllPartitions(
     fit::function<bool(const zx::channel&)> filter) const {
@@ -199,14 +218,13 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::OpenPartition(
 
 zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllPartitionsInner(
     fit::function<bool(const zx::channel&)> filter, size_t limit) const {
-  if (!partitions_root_ && !devfs_root_) {
+  if (!root_) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   const char* path = ".";
-  int parent_fd = partitions_root_.get();
-  if (parent_fd < 0) {
+  int parent_fd = root_.get();
+  if (variant_ == Variant::kDevfs) {
     path = "class/block";
-    parent_fd = devfs_root_.get();
   }
   fbl::unique_fd dir_fd;
   if (zx_status_t status =
@@ -230,18 +248,40 @@ zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllP
       continue;
     }
     std::string filename(de->d_name, strnlen(de->d_name, sizeof(de->d_name)));
-    zx::result connector = partitions_root_.is_valid()
-                               ? CreateServiceBasedVolumeConnector(dir_fd.get(), filename)
-                               : CreateDevfsVolumeConnector(dir_fd.get(), filename);
-    if (connector.is_error()) {
-      return connector.take_error();
+    std::unique_ptr<VolumeConnector> connector;
+    switch (variant_) {
+      case Variant::kDevfs: {
+        zx::result result = CreateDevfsVolumeConnector(dir_fd.get(), filename);
+        if (result.is_error()) {
+          return result.take_error();
+        }
+        connector = *std::move(result);
+        break;
+      }
+      case Variant::kFshostBlockDir: {
+        zx::result fd = open_in_dir(dir_fd.get(), filename);
+        if (fd.is_error()) {
+          return fd.take_error();
+        }
+        connector = std::make_unique<DirBasedVolumeConnector>(
+            *std::move(fd), std::string("fuchsia.hardware.block.volume.Volume"));
+        break;
+      }
+      case Variant::kPartitionService: {
+        zx::result fd = open_in_dir(dir_fd.get(), filename);
+        if (fd.is_error()) {
+          return fd.take_error();
+        }
+        connector = std::make_unique<PartitionServiceBasedVolumeConnector>(*std::move(fd));
+        break;
+      }
     }
     zx::result partition = connector->Connect();
     if (partition.is_error()) {
       return partition.take_error();
     }
     if (filter(partition->channel())) {
-      results.push_back(std::move(*connector));
+      results.push_back(std::move(connector));
     }
   }
   return zx::ok(std::move(results));
@@ -250,19 +290,19 @@ zx::result<std::vector<std::unique_ptr<VolumeConnector>>> BlockDevices::OpenAllP
 zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
     fit::function<bool(const zx::channel&)> filter, zx_duration_t timeout,
     const char* devfs_suffix) const {
-  if (!partitions_root_ && !devfs_root_) {
+  if (!root_) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   struct CallbackInfo {
     std::unique_ptr<VolumeConnector> out_partition;
     fit::function<bool(const zx::channel&)> filter;
-    bool is_partitions_dir;
+    Variant variant;
   };
 
   CallbackInfo info = {
       .out_partition = {},
       .filter = std::move(filter),
-      .is_partitions_dir = partitions_root_.is_valid(),
+      .variant = variant_,
   };
 
   auto cb = [](int dirfd, int event, const char* filename, void* cookie) {
@@ -273,36 +313,58 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
       return ZX_OK;
     }
     auto info = static_cast<CallbackInfo*>(cookie);
-    zx::result connector = info->is_partitions_dir
-                               ? CreateServiceBasedVolumeConnector(dirfd, filename)
-                               : CreateDevfsVolumeConnector(dirfd, filename);
-    if (connector.is_error()) {
-      return connector.status_value();
+    std::unique_ptr<VolumeConnector> connector;
+    switch (info->variant) {
+      case Variant::kDevfs: {
+        zx::result result = CreateDevfsVolumeConnector(dirfd, filename);
+        if (result.is_error()) {
+          return result.status_value();
+        }
+        connector = *std::move(result);
+        break;
+      }
+      case Variant::kFshostBlockDir: {
+        zx::result fd = open_in_dir(dirfd, filename);
+        if (fd.is_error()) {
+          return fd.status_value();
+        }
+        connector = std::make_unique<DirBasedVolumeConnector>(
+            *std::move(fd), std::string("fuchsia.hardware.block.volume.Volume"));
+        break;
+      }
+      case Variant::kPartitionService: {
+        zx::result fd = open_in_dir(dirfd, filename);
+        if (fd.is_error()) {
+          return fd.status_value();
+        }
+        connector = std::make_unique<PartitionServiceBasedVolumeConnector>(*std::move(fd));
+        break;
+      }
     }
-    zx::result partition = connector->Connect();
-    if (partition.is_error()) {
-      return connector.status_value();
+    zx::result volume = connector->Connect();
+    if (volume.is_error()) {
+      return volume.status_value();
     }
-    if (!info->filter(partition->channel())) {
+    if (!info->filter(volume->channel())) {
       // ZX_OK means keep going
       return ZX_OK;
     }
 
-    info->out_partition = std::move(*connector);
+    info->out_partition = std::move(connector);
     return ZX_ERR_STOP;
   };
 
   fbl::unique_fd dir_fd;
-  if (partitions_root_) {
-    dir_fd = partitions_root_.duplicate();
-  } else {
-    if (zx_status_t status = fdio_open3_fd_at(devfs_root_.get(), devfs_suffix,
+  if (variant_ == Variant::kDevfs) {
+    if (zx_status_t status = fdio_open3_fd_at(root_.get(), devfs_suffix,
                                               static_cast<uint64_t>(fuchsia_io::kPermReadable),
                                               dir_fd.reset_and_get_address());
         status != ZX_OK) {
       ERROR("Failed to open /dev/%s: %s\n", devfs_suffix, zx_status_get_string(status));
       return zx::error(status);
     }
+  } else {
+    dir_fd = root_.duplicate();
   }
 
   zx_time_t deadline = zx_deadline_after(timeout);

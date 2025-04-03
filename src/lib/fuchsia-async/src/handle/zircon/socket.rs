@@ -57,6 +57,9 @@ impl Socket {
     /// Attempt to read from the socket, registering for wakeup if the socket doesn't have any
     /// contents available. Used internally in the `AsyncRead` implementation, exposed for users
     /// who know the concrete type they're using and don't want to pin the socket.
+    ///
+    /// Note: this function will never return `PEER_CLOSED` as an error. Instead, it will return
+    /// `Ok(0)` when the peer closes, to match the contract of `std::io::Read`.
     pub fn poll_read_ref(
         &self,
         cx: &mut Context<'_>,
@@ -165,6 +168,8 @@ impl fmt::Debug for Socket {
 }
 
 impl AsyncRead for Socket {
+    /// Note: this function will never return `PEER_CLOSED` as an error. Instead, it will return
+    /// `Ok(0)` when the peer closes, to match the contract of `std::io::Read`.
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -193,6 +198,8 @@ impl AsyncWrite for Socket {
 }
 
 impl<'a> AsyncRead for &'a Socket {
+    /// Note: this function will never return `PEER_CLOSED` as an error. Instead, it will return
+    /// `Ok(0)` when the peer closes, to match the contract of `std::io::Read`.
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,

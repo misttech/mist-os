@@ -17,6 +17,7 @@ source_set("mock-ddk") {
   deps = [
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//src/devices/bin/driver_runtime",
     "//src/lib/ddk",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/syslog",

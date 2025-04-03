@@ -79,8 +79,7 @@ TEST(PidFdTest, CanPollProcessExit) {
 
   close(r_fd);
 
-  int pid_fd = DoPidFdOpen(pid);
-  ASSERT_GE(pid_fd, 0);
+  int pid_fd = SAFE_SYSCALL(DoPidFdOpen(pid));
 
   // Verify that poll does not return POLLIN while the process is running.
   pollfd pfd = {.fd = pid_fd, .events = POLLIN};

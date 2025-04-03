@@ -24,7 +24,7 @@ pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>
     let mut file =
         std::fs::File::open(path).with_context(|| format!("Unable to open `{:?}'", path))?;
     let reader = if sparse::is_sparse_image(&mut file) {
-        Box::new(IoAdapter::new(SparseReader::new(Box::new(file))?)) as Box<dyn Reader>
+        Box::new(IoAdapter::new(SparseReader::new(file)?)) as Box<dyn Reader>
     } else {
         Box::new(IoAdapter::new(file)) as Box<dyn Reader>
     };

@@ -10,9 +10,10 @@ use anyhow::Error;
 use fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter};
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{MonotonicInstant, Task, Timer};
+use fuchsia_sync::{Mutex, MutexGuard};
 use std::marker::PhantomPinned;
 use std::pin::Pin;
-use std::sync::{Arc, LockResult, Mutex, MutexGuard};
+use std::sync::Arc;
 use zx::{AsHandleRef, Event, MonotonicDuration, Status};
 
 pub struct FatFilesystemInner {
@@ -118,8 +119,8 @@ impl FatFilesystem {
         FatDirectory::new(dir, None, self, "/".to_owned())
     }
 
-    /// Try and lock the underlying filesystem. Returns a LockResult, see `Mutex::lock`.
-    pub fn lock(&self) -> LockResult<MutexGuard<'_, FatFilesystemInner>> {
+    /// Lock the underlying filesystem.
+    pub fn lock(&self) -> MutexGuard<'_, FatFilesystemInner> {
         self.inner.lock()
     }
 
@@ -127,7 +128,7 @@ impl FatFilesystem {
     /// one second, and cancel any previous pending flushes.
     pub fn mark_dirty(self: &Pin<Arc<Self>>) {
         let deadline = MonotonicInstant::after(MonotonicDuration::from_seconds(1));
-        match &mut *self.dirty_task.lock().unwrap() {
+        match &mut *self.dirty_task.lock() {
             Some((time, _)) => *time = deadline,
             x @ None => {
                 let this = self.clone();
@@ -137,7 +138,7 @@ impl FatFilesystem {
                         loop {
                             let deadline;
                             {
-                                let mut task = this.dirty_task.lock().unwrap();
+                                let mut task = this.dirty_task.lock();
                                 deadline = task.as_ref().unwrap().0;
                                 if MonotonicInstant::now() >= deadline {
                                     *task = None;
@@ -146,7 +147,7 @@ impl FatFilesystem {
                             }
                             Timer::new(deadline).await;
                         }
-                        let _ = this.lock().unwrap().filesystem.as_ref().map(|f| f.flush());
+                        let _ = this.lock().filesystem.as_ref().map(|f| f.flush());
                     }),
                 ));
             }
@@ -154,7 +155,7 @@ impl FatFilesystem {
     }
 
     pub fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        let fs_lock = self.lock().unwrap();
+        let fs_lock = self.lock();
 
         let cluster_size = fs_lock.cluster_size() as u64;
         let total_clusters = fs_lock.total_clusters()? as u64;
@@ -200,8 +201,8 @@ mod tests {
 
         let fs = disk.into_fatfs();
         let dir = fs.get_fatfs_root();
-        dir.open_ref(&fs.filesystem().lock().unwrap()).unwrap();
-        defer! { dir.close_ref(&fs.filesystem().lock().unwrap()) };
+        dir.open_ref(&fs.filesystem().lock()).unwrap();
+        defer! { dir.close_ref(&fs.filesystem().lock()) };
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
@@ -212,11 +213,11 @@ mod tests {
             server_end,
         );
 
-        assert!(fs.filesystem().dirty_task.lock().unwrap().is_none());
+        assert!(fs.filesystem().dirty_task.lock().is_none());
         let file = fio::FileProxy::new(proxy.into_channel().unwrap());
         file.write("hello there".as_bytes()).await.unwrap().map_err(Status::from_raw).unwrap();
         {
-            let fs_lock = fs.filesystem().lock().unwrap();
+            let fs_lock = fs.filesystem().lock();
             // fs should be dirty until the timer expires.
             assert!(fs_lock.filesystem.as_ref().unwrap().is_dirty());
         }
@@ -224,7 +225,7 @@ mod tests {
         // the flush will get stuck waiting on the lock.
         Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(1500))).await;
         {
-            let fs_lock = fs.filesystem().lock().unwrap();
+            let fs_lock = fs.filesystem().lock();
             assert_eq!(fs_lock.filesystem.as_ref().unwrap().is_dirty(), false);
         }
     }

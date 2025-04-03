@@ -316,10 +316,15 @@ while [[ $# -ne 0 ]]; do
       # LINT.IfChange
       export FUCHSIA_NODENAME="$1"
       # LINT.ThenChange(/src/developer/ffx/data/config.json)
+      # Set this flag so downstream scripts can check it.
+      # LINT.IfChange
+      export FUCHSIA_NODENAME_SET_BY_FX_FLAG="FUCHSIA_NODENAME_SET_BY_FX_FLAG"
+      # LINT.ThenChange(//tools/devshell/lib/vars.sh)
       _check_default_target="true"
       ;;
     -i)
       declare iterative=1
+      export FUCHSIA_FX_ITERATIVE=1
       ;;
     -x)
       export FUCHSIA_DEVSHELL_VERBOSITY=1

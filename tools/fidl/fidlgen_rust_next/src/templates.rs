@@ -5,6 +5,9 @@
 // Templates generate a lot of code which have tendencies to trip lints.
 #![expect(clippy::diverging_sub_expression, dead_code, unreachable_code)]
 
+use core::fmt;
+use std::collections::BTreeSet;
+
 use askama::Template;
 
 use crate::config::Config;
@@ -21,6 +24,10 @@ pub struct Context {
 impl Context {
     pub fn new(schema: Schema, config: Config) -> Self {
         Self { schema, config }
+    }
+
+    fn compat_crate_name(&self) -> String {
+        format!("fidl_{}", self.schema.name.replace('.', "_"))
     }
 
     fn natural_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
@@ -49,6 +56,114 @@ impl Context {
 
     fn compat(&self) -> CompatTemplate<'_> {
         CompatTemplate { context: self }
+    }
+
+    fn rust_bindings_restriction(&self, ident: &CompId) -> BindingsRestriction {
+        self.rust_bindings_restriction_inner(ident, None)
+    }
+
+    fn rust_bindings_restriction_inner(
+        &self,
+        ident: &CompId,
+        next: Option<&str>,
+    ) -> BindingsRestriction {
+        fn denylist_contains_rust(attributes: &Attributes) -> bool {
+            attributes
+                .attributes
+                .get("bindings_denylist")
+                .is_some_and(|attr| attr.args["value"].value.value.split(", ").any(|x| x == "rust"))
+        }
+
+        let (attributes, naming_context) = match self.schema.declarations[ident] {
+            DeclType::Bits => {
+                let bits = &self.schema.bits_declarations[ident];
+                (&bits.attributes, &bits.naming_context)
+            }
+            DeclType::Enum => {
+                let enm = &self.schema.enum_declarations[ident];
+                (&enm.attributes, &enm.naming_context)
+            }
+            DeclType::Struct => {
+                let strct = &self.schema.struct_declarations[ident];
+                (&strct.attributes, &strct.naming_context)
+            }
+            DeclType::Table => {
+                let table = &self.schema.table_declarations[ident];
+                (&table.attributes, &table.naming_context)
+            }
+            DeclType::Union => {
+                let union = &self.schema.union_declarations[ident];
+                (&union.attributes, &union.naming_context)
+            }
+            DeclType::Protocol => {
+                let protocol = &self.schema.protocol_declarations[ident];
+
+                let is_method_denylisted = next.is_some_and(|next| {
+                    protocol.methods.iter().any(|m| {
+                        m.name.non_canonical() == next && denylist_contains_rust(&m.attributes)
+                    })
+                });
+                if denylist_contains_rust(&protocol.attributes) || is_method_denylisted {
+                    return BindingsRestriction::Never;
+                }
+
+                return match protocol.transport() {
+                    Some("Syscall") => BindingsRestriction::Never,
+                    Some("Driver") => BindingsRestriction::CfgDriver,
+                    _ => BindingsRestriction::Always,
+                };
+            }
+            _ => return BindingsRestriction::Always,
+        };
+
+        if denylist_contains_rust(attributes) {
+            BindingsRestriction::Never
+        } else {
+            self.rust_bindings_naming_context_restriction(naming_context)
+        }
+    }
+
+    fn rust_bindings_naming_context_restriction(
+        &self,
+        naming_context: &[String],
+    ) -> BindingsRestriction {
+        let mut aggregate = format!("{}/", self.schema.name);
+        let mut result = BindingsRestriction::Always;
+
+        for (name, next) in naming_context.iter().zip(naming_context.iter().skip(1)) {
+            aggregate = format!("{aggregate}{name}");
+            let comp_ident = CompIdent::new(aggregate.clone());
+            if self.schema.declarations.contains_key(&comp_ident) {
+                result = result.max(self.rust_bindings_restriction_inner(&comp_ident, Some(next)));
+            }
+        }
+        result
+    }
+}
+
+enum BindingsRestriction {
+    Always,
+    CfgDriver,
+    Never,
+}
+
+impl BindingsRestriction {
+    fn max(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Always, x) | (x, Self::Always) => x,
+            (Self::CfgDriver, Self::CfgDriver) => Self::CfgDriver,
+            _ => Self::Never,
+        }
+    }
+}
+
+impl fmt::Display for BindingsRestriction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Always => Ok(()),
+            Self::CfgDriver => write!(f, "#[cfg(feature = \"driver\")]"),
+            Self::Never => panic!("attempted to emit a bindings restriction of 'never'"),
+        }
     }
 }
 
@@ -118,6 +233,7 @@ template!(enm(enm: Enum) -> EnumTemplate = "enum.askama");
 template!(protocol(protocol: Protocol) -> ProtocolTemplate = "protocol.askama");
 template!(service(service: Service) -> ServiceTemplate = "service.askama");
 template!(strct(strct: Struct) -> StructTemplate = "struct.askama");
+template!(empty_success_struct(strct: Struct) -> EmptySuccessStructTemplate = "empty_success_struct.askama");
 template!(table(table: Table) -> TableTemplate = "table.askama");
 template!(union(union: Union) -> UnionTemplate = "union.askama");
 
@@ -134,6 +250,64 @@ impl BitsTemplate<'_> {
             panic!("invalid non-integral primitive subtype for bits");
         };
         *subtype
+    }
+}
+
+impl ProtocolTemplate<'_> {
+    fn prelude_method_type_idents(&self) -> BTreeSet<CompIdent> {
+        let mut result = BTreeSet::new();
+
+        fn get_identifier(ty: &Type) -> Option<CompIdent> {
+            if let Type { kind: TypeKind::Identifier { identifier, .. }, .. } = ty {
+                Some(identifier.clone())
+            } else {
+                None
+            }
+        }
+
+        for method in self.protocol.methods.iter() {
+            // We always include the request payload in the prelude if there is one
+            if let Some(request) = method.maybe_request_payload.as_deref() {
+                result.extend(get_identifier(request));
+            }
+
+            if let Some(success) = method.maybe_response_success_type.as_deref() {
+                // The response type is a result, so we only want to include the success and error
+                // types in the prelude
+                result.extend(get_identifier(success));
+
+                if let Some(error) = method.maybe_response_err_type.as_deref() {
+                    result.extend(get_identifier(error));
+                }
+            } else if let Some(response) = method.maybe_response_payload.as_deref() {
+                // The response type is not a result, so we want to include the response payload
+                // type in the prelude
+                result.extend(get_identifier(response));
+            }
+        }
+
+        result
+    }
+}
+
+struct ZeroPaddingRange {
+    offset: u32,
+    width: u32,
+}
+
+impl StructTemplate<'_> {
+    fn zero_padding_ranges(&self) -> Vec<ZeroPaddingRange> {
+        let mut ranges = Vec::new();
+        let mut end = self.strct.shape.inline_size;
+        for member in self.strct.members.iter().rev() {
+            let padding = member.field_shape.padding;
+            if padding != 0 {
+                ranges.push(ZeroPaddingRange { offset: end - padding, width: padding });
+            }
+            end = member.field_shape.offset;
+        }
+
+        ranges
     }
 }
 
@@ -166,6 +340,9 @@ mod filters {
     use std::sync::LazyLock;
 
     use core::fmt::Display;
+
+    use crate::id::IdExt;
+    use crate::ir::Id;
 
     pub fn ident<T: Display>(value: T) -> askama::Result<String> {
         let string = value.to_string();
@@ -224,7 +401,6 @@ mod filters {
         "try",
         "type",
         "typeof",
-        "union",
         "unsafe",
         "unsized",
         "use",
@@ -233,4 +409,28 @@ mod filters {
         "while",
         "yield",
     ];
+
+    pub fn compat_snake(value: &Id) -> askama::Result<String> {
+        compat_with(value, IdExt::snake)
+    }
+
+    pub fn compat_camel(value: &Id) -> askama::Result<String> {
+        compat_with(value, IdExt::camel)
+    }
+
+    fn compat_with(value: &Id, case: impl Fn(&Id) -> String) -> askama::Result<String> {
+        if compat_conflicts(value.non_canonical()) {
+            Ok(format!("{}_", case(value)))
+        } else {
+            Ok(case(value))
+        }
+    }
+
+    fn compat_conflicts(value: &str) -> bool {
+        KEYWORDS.contains(value)
+            || COMPAT_RESERVED_SUFFIX_LIST.iter().any(|suffix| value.ends_with(suffix))
+    }
+
+    const COMPAT_RESERVED_SUFFIX_LIST: &[&str] =
+        &["Impl", "Marker", "Proxy", "ProxyProtocol", "ControlHandle", "Responder", "Server"];
 }

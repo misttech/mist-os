@@ -8,7 +8,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, ChildRef, RealmBuilder};
 use futures::prelude::*;
 use std::fs;
-use vfs::directory::{spawn_directory_with_options, DirectoryOptions};
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
 use vfs::test_utils::assertions::reexport::StreamExt;
@@ -26,9 +25,9 @@ pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRe
         .add_local_child(
             "config-data-server",
             move |handles| {
-                let proxy = spawn_directory_with_options(
+                let proxy = vfs::directory::serve(
                     config_data_dir.clone(),
-                    DirectoryOptions::new(fio::R_STAR_DIR | fio::W_STAR_DIR),
+                    fio::PERM_READABLE | fio::PERM_WRITABLE,
                 );
                 async move {
                     let mut fs = ServiceFs::new();

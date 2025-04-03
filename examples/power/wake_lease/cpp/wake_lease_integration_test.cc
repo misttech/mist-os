@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+#include <src/lib/testing/predicates/status.h>
 
 #include "examples/power/wake_lease/cpp/wake_lease.h"
 
@@ -47,7 +48,7 @@ class WakeLeaseIntegrationTest : public gtest::RealLoopFixture {
   template <typename Protocol>
   fidl::Client<Protocol> Connect() {
     zx::result<fidl::ClientEnd<Protocol>> result = component::Connect<Protocol>();
-    EXPECT_TRUE(result.is_ok()) << result.status_string();
+    EXPECT_OK(result);
     return fidl::Client(std::move(*result), dispatcher());
   }
 };
@@ -62,13 +63,11 @@ class ApplicationActivityElement {
         lessor_endpoints_(fidl::CreateEndpoints<Lessor>().value()),
         required_level_endpoints_(fidl::CreateEndpoints<RequiredLevel>().value()) {
     activity_governor->GetPowerElements().Then([&](auto& result) {
-      EXPECT_TRUE(result.is_ok());
+      EXPECT_OK(result);
       DependencyToken token =
           std::move(result->application_activity().value().assertive_dependency_token().value());
       ElementSchema schema = BuildAssertiveApplicationActivitySchema(name, std::move(token));
-      topology->AddElement(std::move(schema)).Then([](auto& result) {
-        EXPECT_TRUE(result.is_ok());
-      });
+      topology->AddElement(std::move(schema)).Then([](auto& result) { EXPECT_OK(result); });
     });
   }
 
@@ -119,7 +118,7 @@ TEST_F(WakeLeaseIntegrationTest, DISABLED_WakeLeaseBlocksSuspend) {
   bool lease_completed = false;
   activity_lessor->Lease(fidl::ToUnderlying(ApplicationActivityLevel::kActive))
       .Then([&](auto& result) {
-        EXPECT_TRUE(result.is_ok()) << result.error_value();
+        EXPECT_OK(result);
         lease_completed = true;
         activity_lease_control->Bind(std::move(result.value().lease_control()), dispatcher());
       });
@@ -158,7 +157,7 @@ TEST_F(WakeLeaseIntegrationTest, DISABLED_WakeLeaseBlocksSuspend) {
   // is active.
   activity_element.reset();
   activity_lease_control.reset();
-  EXPECT_TRUE(activity_lessor.UnbindMaybeGetEndpoint().is_ok());
+  EXPECT_OK(activity_lessor.UnbindMaybeGetEndpoint());
   RunLoopUntilIdle();
   ASSERT_FALSE(listener.SuspendStarted());
 

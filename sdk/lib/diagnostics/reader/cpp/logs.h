@@ -5,6 +5,7 @@
 #ifndef LIB_DIAGNOSTICS_READER_CPP_LOGS_H_
 #define LIB_DIAGNOSTICS_READER_CPP_LOGS_H_
 
+#include <fidl/fuchsia.diagnostics.types/cpp/fidl.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/fpromise/bridge.h>
@@ -48,7 +49,7 @@ class LogsData {
   struct Metadata final {
     std::string component_url;
     uint64_t timestamp;
-    fuchsia_diagnostics::Severity severity;
+    fuchsia_diagnostics_types::Severity severity;
     std::vector<std::string> tags;
     std::optional<uint64_t> pid;
     std::optional<uint64_t> tid;

@@ -1,7 +1,10 @@
 {
     "url": "ta-noop#meta/ta-runtime.cm",
-    "singleInstance": false,
-    "multiSession": false,
-    "instanceKeepAlive": false,
+    "config": {
+        "type": "globalPlatform",
+        "singleInstance": false,
+        "multiSession": false,
+        "instanceKeepAlive": false
+    },
     "capabilities": []
 }

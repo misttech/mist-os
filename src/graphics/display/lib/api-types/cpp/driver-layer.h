@@ -42,6 +42,12 @@ class DriverLayer {
   // `banjo_layer` must be convertible to a valid DriverLayer.
   explicit constexpr DriverLayer(const layer_t& banjo_layer);
 
+  constexpr DriverLayer(const DriverLayer&) noexcept = default;
+  constexpr DriverLayer(DriverLayer&&) noexcept = default;
+  constexpr DriverLayer& operator=(const DriverLayer&) noexcept = default;
+  constexpr DriverLayer& operator=(DriverLayer&&) noexcept = default;
+  ~DriverLayer() = default;
+
   friend constexpr bool operator==(const DriverLayer& lhs, const DriverLayer& rhs);
   friend constexpr bool operator!=(const DriverLayer& lhs, const DriverLayer& rhs);
 

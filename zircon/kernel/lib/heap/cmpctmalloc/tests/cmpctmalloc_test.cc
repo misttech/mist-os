@@ -137,7 +137,7 @@ void heap_page_free(void* ptr, size_t pages) {
   ZX_ASSERT(page_manager != nullptr);
   page_manager->FreePages(ptr, pages);
 }
-void heap_report_alloc_failure() {
+void heap_report_alloc_failure(size_t size) {
   ZX_ASSERT(page_manager != nullptr);
   page_manager->IncFailuresReported();
 }

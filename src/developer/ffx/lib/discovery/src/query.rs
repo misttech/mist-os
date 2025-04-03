@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 use crate::desc::Description;
 use crate::DiscoverySources;
-use addr::TargetAddr;
-use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetIpPort};
-use fidl_fuchsia_net as net;
-use std::net::{IpAddr, Ipv6Addr, SocketAddr, SocketAddrV6};
+use addr::{TargetAddr, TargetIpAddr};
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIpAddrInfo, TargetIpPort};
+use std::net::SocketAddr;
 
 #[derive(Debug, Clone)]
 pub enum TargetInfoQuery {
@@ -15,6 +14,8 @@ pub enum TargetInfoQuery {
     NodenameOrSerial(String),
     Serial(String),
     Addr(SocketAddr),
+    /// Match a target which has a VSock address with the given CID.
+    VSock(u32),
     First,
 }
 
@@ -77,8 +78,9 @@ impl TargetInfoQuery {
             Self::Addr(addr) => t
                 .addresses
                 .iter()
-                .map(SocketAddr::from)
-                .any(|ref mut a| address_matcher(addr, a, t.ssh_port.unwrap_or(22))),
+                .filter_map(|x| TargetIpAddr::try_from(x).ok())
+                .any(|a| address_matcher(addr, &mut a.into(), t.ssh_port.unwrap_or(22))),
+            Self::VSock(cid) => t.addresses.iter().filter_map(|x| x.cid()).any(|x| x == *cid),
             Self::First => true,
         }
     }
@@ -113,16 +115,32 @@ impl TargetInfoQuery {
                 .as_ref()
                 .map(|addresses| {
                     addresses.iter().any(|a| {
-                        let mut a = target_addr_info_to_socket(a);
-                        let ssh_port =
-                            if let Some(TargetAddrInfo::IpPort(TargetIpPort { port: tp, .. })) =
-                                t.ssh_address
-                            {
-                                tp
-                            } else {
-                                22
-                            };
-                        address_matcher(addr, &mut a, ssh_port)
+                        let Ok(a) = TargetIpAddr::try_from(TargetAddr::from(a)) else {
+                            return false;
+                        };
+                        let ssh_port = if let Some(TargetIpAddrInfo::IpPort(TargetIpPort {
+                            port: tp,
+                            ..
+                        })) = t.ssh_address
+                        {
+                            tp
+                        } else {
+                            22
+                        };
+                        address_matcher(addr, &mut a.into(), ssh_port)
+                    })
+                })
+                .unwrap_or(false),
+            Self::VSock(cid) => t
+                .addresses
+                .as_ref()
+                .map(|addresses| {
+                    addresses.iter().any(|a| {
+                        if let TargetAddrInfo::Vsock(a) = a {
+                            a.cid == *cid
+                        } else {
+                            false
+                        }
                     })
                 })
                 .unwrap_or(false),
@@ -190,39 +208,27 @@ impl From<String> for TargetInfoQuery {
         // This does mean it might be possible to include arbitrary inaccurate scope names for
         // looking up a target, however (like `fe80::1%nonsense`).
         let scope = scope.map(|s| netext::get_verified_scope_id(s).unwrap_or(0)).unwrap_or(0);
-        Self::Addr(TargetAddr::new(addr, scope, port.unwrap_or(0)).into())
+        let addr = TargetIpAddr::new(addr, scope, port.unwrap_or(0)).into();
+        Self::Addr(addr)
     }
 }
 
 impl From<TargetAddr> for TargetInfoQuery {
     fn from(t: TargetAddr) -> Self {
-        Self::Addr(t.into())
+        match t {
+            TargetAddr::Net(socket_addr) => Self::Addr(socket_addr),
+            TargetAddr::VSockCtx(cid) => Self::VSock(cid),
+        }
     }
-}
-
-pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
-    let (target_ip, port) = match ti {
-        TargetAddrInfo::Ip(a) => (a.clone(), 0),
-        TargetAddrInfo::IpPort(ip) => (TargetIp { ip: ip.ip, scope_id: ip.scope_id }, ip.port),
-    };
-    let socket = match target_ip {
-        TargetIp { ip: net::IpAddress::Ipv4(net::Ipv4Address { addr }), .. } => {
-            SocketAddr::new(IpAddr::from(addr), port)
-        }
-        TargetIp { ip: net::IpAddress::Ipv6(net::Ipv6Address { addr }), scope_id, .. } => {
-            SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::from(addr), port, 0, scope_id))
-        }
-    };
-    socket
 }
 
 /// Convert a TargetAddrInfo to a SocketAddr preserving the port number if
 /// provided, otherwise the returned SocketAddr will have port number 0.
-pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
-    let mut sa = SocketAddr::from(TargetAddr::from(&tai));
+pub fn target_addr_info_to_socketaddr(tai: TargetIpAddrInfo) -> SocketAddr {
+    let mut sa = SocketAddr::from(TargetIpAddr::from(&tai));
     // TODO(raggi): the port special case needed here indicates a general problem in our
     // addressing strategy that is worth reviewing.
-    if let TargetAddrInfo::IpPort(ref ipp) = tai {
+    if let TargetIpAddrInfo::IpPort(ref ipp) = tai {
         sa.set_port(ipp.port)
     }
     sa
@@ -231,6 +237,8 @@ pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl_fuchsia_developer_ffx::TargetIp;
+    use fidl_fuchsia_net as net;
 
     #[test]
     fn test_discovery_sources() {
@@ -270,7 +278,7 @@ mod test {
 
     #[test]
     fn test_target_addr_info_to_socketaddr() {
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+        let tai = TargetIpAddrInfo::IpPort(TargetIpPort {
             ip: net::IpAddress::Ipv4(net::Ipv4Address { addr: [127, 0, 0, 1] }),
             port: 8022,
             scope_id: 0,
@@ -280,7 +288,7 @@ mod test {
 
         assert_eq!(target_addr_info_to_socketaddr(tai), sa);
 
-        let tai = TargetAddrInfo::Ip(TargetIp {
+        let tai = TargetIpAddrInfo::Ip(TargetIp {
             ip: net::IpAddress::Ipv4(net::Ipv4Address { addr: [127, 0, 0, 1] }),
             scope_id: 0,
         });
@@ -289,7 +297,7 @@ mod test {
 
         assert_eq!(target_addr_info_to_socketaddr(tai), sa);
 
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+        let tai = TargetIpAddrInfo::IpPort(TargetIpPort {
             ip: net::IpAddress::Ipv6(net::Ipv6Address {
                 addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             }),
@@ -301,7 +309,7 @@ mod test {
 
         assert_eq!(target_addr_info_to_socketaddr(tai), sa);
 
-        let tai = TargetAddrInfo::Ip(TargetIp {
+        let tai = TargetIpAddrInfo::Ip(TargetIp {
             ip: net::IpAddress::Ipv6(net::Ipv6Address {
                 addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             }),
@@ -312,7 +320,7 @@ mod test {
 
         assert_eq!(target_addr_info_to_socketaddr(tai), sa);
 
-        let tai = TargetAddrInfo::IpPort(TargetIpPort {
+        let tai = TargetIpAddrInfo::IpPort(TargetIpPort {
             ip: net::IpAddress::Ipv6(net::Ipv6Address {
                 addr: [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             }),

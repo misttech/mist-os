@@ -27,7 +27,7 @@ impl ::fidl_next::Encodable for AllInstants {
     type Encoded = WireAllInstants;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for AllInstants
+unsafe impl<___E> ::fidl_next::Encode<___E> for AllInstants
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
@@ -35,7 +35,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -44,7 +44,7 @@ where
                 monotonic_ticks,
                 boot_ticks,
 
-            } = slot;
+            } = out;
         }
 
         ::fidl_next::Encode::encode(&mut self.monotonic, encoder, monotonic)?;
@@ -63,7 +63,7 @@ impl ::fidl_next::EncodableOption for Box<AllInstants> {
     type EncodedOption = ::fidl_next::WireBox<WireAllInstants>;
 }
 
-impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     AllInstants: ::fidl_next::Encode<___E>,
@@ -72,13 +72,13 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
-            ::fidl_next::WireBox::encode_present(slot);
+            ::fidl_next::WireBox::encode_present(out);
         } else {
-            ::fidl_next::WireBox::encode_absent(slot);
+            ::fidl_next::WireBox::encode_absent(out);
         }
 
         Ok(())
@@ -109,7 +109,7 @@ impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
     }
 }
 
-/// The wire type corersponding to [`AllInstants`].
+/// The wire type corresponding to [`AllInstants`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireAllInstants {
@@ -120,6 +120,11 @@ pub struct WireAllInstants {
     pub monotonic_ticks: ::fidl_next::WireI64,
 
     pub boot_ticks: ::fidl_next::WireI64,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireAllInstants {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireAllInstants
@@ -189,7 +194,7 @@ impl ::fidl_next::Encodable for ComplexInstants {
     type Encoded = WireComplexInstants;
 }
 
-impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
+unsafe impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
@@ -197,28 +202,29 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded>,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComplexInstants { table } = slot);
+        ::fidl_next::munge!(let WireComplexInstants { table } = out);
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
-            let mut slot = ::fidl_next::Slot::new(&mut backing);
             match i {
                 4 => {
                     if let Some(boot_ticks) = &mut self.boot_ticks {
                         ::fidl_next::WireEnvelope::encode_value(
                             boot_ticks,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -227,10 +233,10 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic_ticks,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -239,10 +245,10 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             boot,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
@@ -251,16 +257,18 @@ where
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic,
                             preallocated.encoder,
-                            slot.as_mut(),
+                            &mut out,
                         )?;
                     } else {
-                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
                     }
                 }
 
-                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
             }
-            preallocated.write_next(slot);
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
         }
 
         ::fidl_next::WireTable::encode_len(table, max_ord);
@@ -288,6 +296,14 @@ impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
 #[repr(C)]
 pub struct WireComplexInstants {
     table: ::fidl_next::WireTable,
+}
+
+unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
+    #[inline]
+    fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
+        ::fidl_next::munge!(let Self { table } = out);
+        ::fidl_next::WireTable::zero_padding(table);
+    }
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants
@@ -375,8 +391,38 @@ impl ::core::fmt::Debug for WireComplexInstants {
     }
 }
 
-/// Commonly-used items that should usually be in scope, such as extension traits.
-pub mod prelude {}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {}
+pub mod compat {
+
+    impl ::fidl_next::TakeFrom<crate::WireAllInstants> for ::fidl_test_time::AllInstants {
+        #[inline]
+        fn take_from(from: &crate::WireAllInstants) -> Self {
+            Self {
+                monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
+
+                boot: ::fidl_next::TakeFrom::take_from(&from.boot),
+
+                monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
+
+                boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
+            }
+        }
+    }
+
+    impl ::fidl_next::TakeFrom<crate::WireComplexInstants> for ::fidl_test_time::ComplexInstants {
+        #[inline]
+        fn take_from(from: &crate::WireComplexInstants) -> Self {
+            Self {
+                monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
+
+                boot: from.boot().map(::fidl_next::TakeFrom::take_from),
+
+                monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
+
+                boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
+
+                __source_breaking: ::fidl::marker::SourceBreaking,
+            }
+        }
+    }
+}

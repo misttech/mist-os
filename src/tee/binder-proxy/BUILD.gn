@@ -34,12 +34,14 @@ rustc_binary("bin") {
     ":android_system_microfuchsia_trusted_app",
     ":android_system_microfuchsia_vm_service",
     ":binder_proxy_config",
+    "//sdk/fidl/fuchsia.hardware.virtio.pmem:fuchsia.hardware.virtio.pmem_rust",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
     "//sdk/rust/zx",
     "//src/lib/android/binder/rust:binder",
     "//src/lib/android/binder/rust/rpcbinder",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
     "//src/paravirtualization/lib/vsock/vsock_sys",
@@ -49,9 +51,6 @@ rustc_binary("bin") {
     "//third_party/rust_crates:log",
   ]
   test_deps = [ "//third_party/rust_crates:test-case" ]
-
-  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
-  exclude_toolchain_tags = [ "profile" ]
 }
 
 trusted_app_aidl_interface_files = [

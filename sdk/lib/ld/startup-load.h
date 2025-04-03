@@ -53,8 +53,9 @@ struct StartupLoadResult {
   size_t needed_count = 0;
 
   // These are only of interest for the main executable.
-  uintptr_t entry = 0;               // Runtime entry point address.
-  std::optional<size_t> stack_size;  // Requested initial stack size.
+  uintptr_t entry = 0;                  // Runtime entry point address.
+  std::span<const Addr> preinit_array;  // DT_PREINIT_ARRAY
+  std::optional<size_t> stack_size;     // Requested initial stack size.
 };
 
 inline constexpr LocalRuntimeTlsDescResolver kTlsDescResolver{};
@@ -74,6 +75,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   using PreloadedModulesList = std::pair<List, std::span<const Dyn>>;
 
   using NeededCountObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
+
+  using PreinitObserver = elfldltl::DynamicPreinitObserver<Elf>;
 
   StartupLoadModule() = delete;
 
@@ -132,7 +135,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     StartupLoadResult result;
     if (auto decode_result = decoded().DecodeFromMemory(  //
             diag, memory(), loader_.page_size(), *headers, max_tls_modid,
-            NeededCountObserver(result.needed_count))) [[likely]] {
+            NeededCountObserver(result.needed_count), PreinitObserver(result.preinit_array)))
+        [[likely]] {
       // Save the span of Dyn entries for LoadDeps to scan later.  With that,
       // everything is now prepared to proceed with loading dependencies and
       // performing relocation.

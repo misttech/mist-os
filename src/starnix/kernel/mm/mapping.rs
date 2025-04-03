@@ -4,7 +4,7 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
-    FaultRegisterMode, MappingOptions, ProtectionFlags, UserFault,
+    FaultRegisterMode, MappingOptions, MlockMapping, ProtectionFlags, UserFault,
     GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS, PAGE_SIZE,
 };
 use crate::vfs::aio::AioContext;
@@ -48,6 +48,8 @@ pub struct Mapping {
 
     /// Lock guard held to prevent this file from being written while it's being executed.
     file_write_guard: FileWriteGuardRef,
+
+    mlock: Option<Box<MlockMapping>>,
 }
 
 impl Mapping {
@@ -86,6 +88,8 @@ impl Mapping {
             name,
             userfault: None,
             file_write_guard,
+            // Memory locks are not inherited.
+            mlock: None,
         }
     }
 
@@ -133,6 +137,16 @@ impl Mapping {
         self.userfault = None;
     }
 
+    pub fn set_mlock(&mut self, mlock: Option<MlockMapping>) {
+        self.flags |= MappingFlags::LOCKED;
+        self.mlock = mlock.map(Box::new);
+    }
+
+    pub fn clear_mlock(&mut self) {
+        self.flags = self.flags.difference(MappingFlags::LOCKED);
+        self.mlock = None;
+    }
+
     #[cfg(feature = "alternate_anon_allocs")]
     pub fn new_private_anonymous(flags: MappingFlags, name: MappingName) -> Mapping {
         Mapping {
@@ -142,6 +156,7 @@ impl Mapping {
             name,
             userfault: None,
             file_write_guard: FileWriteGuardRef(None),
+            mlock: None,
         }
     }
 
@@ -231,6 +246,9 @@ impl Mapping {
         // pf   -   pure PFN range
         // dw   -   disabled write to the mapped file
         // lo   -   pages are locked in memory
+        if self.flags.contains(MappingFlags::LOCKED) {
+            string.push_str("lo ");
+        }
         // io   -   memory mapped I/O area
         // sr   -   sequential read advise provided
         // rr   -   random read advise provided
@@ -427,6 +445,7 @@ bitflags! {
         const WIPEONFORK  = 1 <<  9;
         const DONT_SPLIT  = 1 << 10;
         const DONT_EXPAND = 1 << 11;
+        const LOCKED      = 1 << 12;
     }
 }
 

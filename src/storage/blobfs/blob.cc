@@ -20,6 +20,7 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -178,7 +179,7 @@ zx_status_t Blob::ReadInternal(void* data, size_t len, size_t off, size_t* actua
   // can easily forget to open the blob before trying to read.
   ZX_DEBUG_ASSERT(open_count() > 0);
 
-  if (state_ != BlobState::kReadable)
+  if (state_ != BlobState::kReadable || is_corrupt_)
     return ZX_ERR_BAD_STATE;
 
   if (!IsDataLoaded()) {
@@ -222,6 +223,12 @@ zx_status_t Blob::ReadInternal(void* data, size_t len, size_t off, size_t* actua
 
 zx_status_t Blob::LoadPagedVmosFromDisk() {
   ZX_ASSERT_MSG(!IsDataLoaded(), "Data VMO is not loaded.");
+
+  // Do not attempt to load anything from disk if this blob is marked corrupted, as it may be the
+  // metadata that is corrupted and we may start taking unexpected paths.
+  if (is_corrupt_) {
+    return ZX_ERR_IO_DATA_INTEGRITY;
+  }
 
   // If there is an overridden cache policy for pager-backed blobs, apply it now. Otherwise the
   // system-wide default will be used.
@@ -786,6 +793,72 @@ zx::result<zx::vmo> Blob::GetVmoForBlobReader() {
 bool Blob::IsReadable() {
   std::lock_guard lock(mutex_);
   return state_ == BlobState::kReadable;
+}
+
+zx::result<> Blob::ReplaceBlob(BlobTransaction& transaction, uint32_t map_index,
+                               uint64_t block_count,
+                               const std::function<zx::result<>()>& transaction_completion) {
+  std::lock_guard l(mutex_);
+
+  if (zx_status_t status = blobfs_.FreeInode(map_index_, transaction); status != ZX_OK) {
+    FailedReplacement();
+    return zx::error(status);
+  }
+
+  if (zx::result<> result = transaction_completion(); result.is_error()) {
+    FailedReplacement();
+    return result.take_error();
+  }
+
+  if (zx::result<> result = CompleteReplacement(map_index, block_count); result.is_error()) {
+    FailedReplacement();
+    return result.take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> Blob::CompleteReplacement(uint32_t map_index, uint64_t block_count) {
+  // Don't keep the loader info in memory if this blob isn't currently loaded.
+  if (loader_info_.layout) {
+    zx::result<LoaderInfo> load_info_or = blobfs_.loader().LoadBlob(map_index);
+    if (load_info_or.is_error()) {
+      return load_info_or.take_error();
+    }
+    loader_info_ = std::move(load_info_or.value());
+  }
+  block_count_ = block_count;
+  map_index_ = map_index;
+  return zx::ok();
+}
+
+void Blob::FailedReplacement() { is_corrupt_.store(true, std::memory_order_relaxed); }
+
+zx_status_t Blob::SetOverwriting() {
+  std::lock_guard lock(mutex_);
+  if (being_overwritten_) {
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+  being_overwritten_ = true;
+  return ZX_OK;
+}
+
+zx_status_t Blob::ClearOverwriting() {
+  std::lock_guard lock(mutex_);
+  if (!being_overwritten_) {
+    return ZX_ERR_BAD_STATE;
+  }
+  being_overwritten_ = false;
+  // This may be queued for deletion that was previously blocked by `being_overwritten_`.
+  return TryPurge();
+}
+
+void Blob::SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) {
+  std::lock_guard lock(mutex_);
+  ZX_DEBUG_ASSERT(writer_);
+  if (writer_) {
+    writer_->SetBlobToOverwrite(std::move(to_overwrite));
+  }
 }
 
 }  // namespace blobfs

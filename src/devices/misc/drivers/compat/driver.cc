@@ -668,6 +668,9 @@ zx::result<> Driver::LoadDriver(std::string_view module_name, zx::vmo driver_vmo
 }
 
 zx::result<> Driver::TryRunUnitTests() {
+  if (record_->ops->run_unit_tests == nullptr) {
+    return zx::ok();
+  }
   auto getvar_bool = [this](const char* key, bool default_value) {
     zx::result value = GetVariable(key);
     if (value.is_error()) {
@@ -681,8 +684,7 @@ zx::result<> Driver::TryRunUnitTests() {
 
   bool default_opt = getvar_bool("driver.tests.enable", false);
   auto variable_name = std::string("driver.") + driver_name_ + ".tests.enable";
-  bool should_run_unittests = getvar_bool(variable_name.c_str(), default_opt);
-  if (should_run_unittests && record_->ops->run_unit_tests != nullptr) {
+  if (getvar_bool(variable_name.c_str(), default_opt)) {
     zx::channel test_input, test_output;
     zx_status_t status = zx::channel::create(0, &test_input, &test_output);
     ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create failed with %s",

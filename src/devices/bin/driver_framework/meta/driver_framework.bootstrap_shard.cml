@@ -32,7 +32,10 @@
     ],
     collections: [
         {
+            // LINT.IfChange
             name: "driver-hosts",
+
+            // LINT.ThenChange(//src/developer/forensics/exceptions/handler/component_lookup.cc)
             environment: "#driver-host-env",
             durability: "single_run",
         },
@@ -406,6 +409,10 @@
             from: "#driver_manager",
         },
         {
+            protocol: "fuchsia.driver.crash.CrashIntrospect",
+            from: "#driver_manager",
+        },
+        {
             protocol: "fuchsia.driver.registrar.DriverRegistrar",
             from: "#driver_index",
         },
@@ -456,7 +463,7 @@
                 "fuchsia.hardware.goldfish.ControllerService",
                 "fuchsia.hardware.goldfish.ControlService",
                 "fuchsia.hardware.goldfish.SyncService",
-                "fuchsia.hardware.gpu.mali.Service",
+                "fuchsia.hardware.gpu.mali.UtilsService",
                 "fuchsia.hardware.hrtimer.Service",
                 "fuchsia.hardware.i2c.Service",
                 "fuchsia.hardware.input.Service",
@@ -473,7 +480,7 @@
                 "fuchsia.hardware.registers.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sdio.DriverService",
-                "fuchsia.hardware.Serial.ProxyService",
+                "fuchsia.hardware.serial.Service",
                 "fuchsia.hardware.skipblock.Service",
                 "fuchsia.hardware.spi.ControllerService",
                 "fuchsia.hardware.tee.Service",

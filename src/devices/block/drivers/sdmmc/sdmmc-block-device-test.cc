@@ -2105,6 +2105,19 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   ASSERT_NOT_NULL(io_retries);
   EXPECT_EQ(io_retries->value(), 0);
 
+  const auto* clock_rate = root->node().get_property<inspect::UintPropertyValue>("clock_rate");
+  ASSERT_NOT_NULL(clock_rate);
+  EXPECT_EQ(clock_rate->value(), 26'000'000);
+
+  const auto* bus_width_bits =
+      root->node().get_property<inspect::UintPropertyValue>("bus_width_bits");
+  ASSERT_NOT_NULL(bus_width_bits);
+  EXPECT_EQ(bus_width_bits->value(), 1);
+
+  const auto* timing = root->node().get_property<inspect::StringPropertyValue>("timing");
+  ASSERT_NOT_NULL(timing);
+  EXPECT_EQ(timing->value(), "Legacy");
+
   const auto* type_a_lifetime =
       root->node().get_property<inspect::UintPropertyValue>("type_a_lifetime_used");
   ASSERT_NOT_NULL(type_a_lifetime);

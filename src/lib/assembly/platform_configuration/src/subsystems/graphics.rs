@@ -74,7 +74,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 
         builder.set_config_capability("fuchsia.virtcon.FontSize", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.KeepLogVisible", Config::new_void())?;
-
+        builder.set_config_capability("fuchsia.virtcon.ShowLogo", Config::new_bool(true))?;
         if let Some(keymap) = &virtcon_config.keymap {
             builder.set_config_capability(
                 "fuchsia.virtcon.KeyMap",

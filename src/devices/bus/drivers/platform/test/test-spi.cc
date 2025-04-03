@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -33,21 +34,19 @@ zx_status_t TestBoard::SpiInit() {
   spi_dev.pid() = PDEV_PID_PBUS_TEST;
   spi_dev.did() = PDEV_DID_TEST_SPI;
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(0, spi_channels);
-  if (spi_status.is_error()) {
-    zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
-           spi_status.error_value());
-    return spi_status.error_value();
+  std::vector<uint8_t> persisted_spi_bus_metadata;
+  {
+    zx::result result = fidl_metadata::spi::SpiChannelsToFidl(0, spi_channels);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to convert spi channels to fidl: %s", result.status_string());
+      return result.error_value();
+    }
+    persisted_spi_bus_metadata = std::move(result.value());
   }
-  auto& data = spi_status.value();
 
   std::vector<fuchsia_hardware_platform_bus::Metadata> metadata{
-      [&]() {
-        fuchsia_hardware_platform_bus::Metadata ret;
-        ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS), ret.data() = std::move(data);
-        return ret;
-      }(),
-  };
+      {{.id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
+        .data = std::move(persisted_spi_bus_metadata)}}};
 
   spi_dev.metadata() = std::move(metadata);
 

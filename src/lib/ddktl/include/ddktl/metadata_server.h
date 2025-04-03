@@ -247,6 +247,47 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     return ZX_OK;
   }
 
+  // Similar to `ForwardMetadata()` except that it will return false if it fails to connect to the
+  // incoming metadata server or if the incoming metadata server does not have metadata to provide.
+  // Returns true otherwise.
+  zx::result<bool> ForwardMetadataIfExists(
+      zx_device_t* device,
+      const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+    fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
+    {
+      zx::result result = ConnectToMetadataServer<FidlType>(device, instance_name);
+      if (result.is_error()) {
+        zxlogf(DEBUG, "Failed to connect to metadata server: %s", result.status_string());
+        return zx::ok(false);
+      }
+      client.Bind(std::move(result.value()));
+    }
+
+    fidl::WireResult result = client->GetPersistedMetadata();
+    if (!result.ok()) {
+      // We assume that the metadata does not exist because we assume that the FIDL server does
+      // not exist because we received a peer closed status.
+      zxlogf(DEBUG, "Failed to send GetPersistedMetadata request: %s", result.status_string());
+      return zx::ok(false);
+    }
+    if (result->is_error()) {
+      if (result->error_value() == ZX_ERR_NOT_FOUND) {
+        zxlogf(DEBUG, "Failed to get persisted metadata: %s",
+               zx_status_get_string(result->error_value()));
+        return zx::ok(false);
+      }
+      zxlogf(ERROR, "Failed to get persisted metadata: %s",
+             zx_status_get_string(result->error_value()));
+      return result->take_error();
+    }
+    cpp20::span<uint8_t> metadata = result.value()->persisted_metadata.get();
+    std::vector<uint8_t> copy;
+    copy.insert(copy.begin(), metadata.begin(), metadata.end());
+    persisted_metadata_.emplace(std::move(copy));
+
+    return zx::ok(true);
+  }
+
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
   // `ddk::MetadataServer::kFidlServiceName` and instance name
   // `ddk::MetadataServer::instance_name_`.

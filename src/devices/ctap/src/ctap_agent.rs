@@ -83,16 +83,14 @@ impl CtapAgent {
                 }
             };
 
-            let dir_proxy = match fuchsia_fs::directory::open_in_namespace(
-                CTAPHID_PATH,
-                fio::OpenFlags::RIGHT_READABLE,
-            ) {
-                Ok(dir_proxy) => dir_proxy,
-                Err(err) => {
-                    error!("Unable to open fido report directory. {:?}", err);
-                    return;
-                }
-            };
+            let dir_proxy =
+                match fuchsia_fs::directory::open_in_namespace(CTAPHID_PATH, fio::PERM_READABLE) {
+                    Ok(dir_proxy) => dir_proxy,
+                    Err(err) => {
+                        error!("Unable to open fido report directory. {:?}", err);
+                        return;
+                    }
+                };
 
             let mut device_watcher = agent_ref.device_watcher.lock().await;
             *device_watcher = Some(DeviceWatcher {
@@ -305,33 +303,11 @@ mod tests {
         dir: std::sync::Arc<Simple<ImmutableConnection>>,
     ) -> (Watcher, DirectoryProxy) {
         // Create a watcher on the pseudo directory.
-        let pseudo_dir_clone = dir.clone();
-        let (dir_proxy_for_watcher, dir_server_for_watcher) =
-            create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_watcher = dir_server_for_watcher.into_channel().into();
-        let scope_for_watcher = ExecutionScope::new();
-        dir.open(
-            scope_for_watcher,
-            fio::OpenFlags::RIGHT_READABLE,
-            0,
-            Path::dot(),
-            server_end_for_watcher,
-        );
-        let device_watcher = Watcher::new(dir_proxy_for_watcher).await.unwrap();
-
+        let device_watcher =
+            Watcher::new(vfs::directory::serve_read_only(dir.clone())).await.unwrap();
         // Get a proxy to the pseudo directory for the ctap agent. The ctap agent may use this
         // proxy to get connections to ctaphid devices.
-        let (dir_proxy_for_agent, dir_server_for_agent) = create_proxy::<fio::DirectoryMarker>();
-        let server_end_for_agent = dir_server_for_agent.into_channel().into();
-        let scope_for_agent = ExecutionScope::new();
-        pseudo_dir_clone.open(
-            scope_for_agent,
-            fio::OpenFlags::RIGHT_READABLE,
-            0,
-            Path::dot(),
-            server_end_for_agent,
-        );
-
+        let dir_proxy_for_agent = vfs::directory::serve_read_only(dir);
         (device_watcher, dir_proxy_for_agent)
     }
 

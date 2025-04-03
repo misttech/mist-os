@@ -4,8 +4,9 @@
 
 use anyhow::{anyhow, Context as _, Error};
 use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
+use fuchsia_sync::Mutex;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zerocopy::{FromBytes as _, IntoBytes as _};
 
 pub mod format;
@@ -345,7 +346,7 @@ impl Gpt {
     /// Returns None if there's already a pending transaction.
     pub fn create_transaction(&self) -> Option<Transaction> {
         {
-            let mut state = self.transaction_state.lock().unwrap();
+            let mut state = self.transaction_state.lock();
             if state.pending_id != u64::MAX {
                 return None;
             } else {
@@ -487,7 +488,7 @@ impl std::fmt::Debug for Transaction {
 
 impl Drop for Transaction {
     fn drop(&mut self) {
-        let mut state = self.transaction_state.lock().unwrap();
+        let mut state = self.transaction_state.lock();
         debug_assert!(state.pending_id != u64::MAX);
         state.pending_id = u64::MAX;
     }

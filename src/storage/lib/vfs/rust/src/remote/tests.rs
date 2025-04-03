@@ -17,8 +17,9 @@ use crate::path::Path;
 use crate::{file, ObjectRequestRef};
 
 use fidl::endpoints::{create_proxy, ServerEnd};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use zx_status::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -187,7 +188,7 @@ async fn lazy_remote() {
             _path: Path,
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            self.0.lock().unwrap().take().unwrap().send(()).unwrap();
+            self.0.lock().take().unwrap().send(()).unwrap();
         }
 
         fn open3(
@@ -197,7 +198,7 @@ async fn lazy_remote() {
             _flags: fio::Flags,
             _object_request: ObjectRequestRef<'_>,
         ) -> Result<(), Status> {
-            self.0.lock().unwrap().take().unwrap().send(()).unwrap();
+            self.0.lock().take().unwrap().send(()).unwrap();
             Ok(())
         }
 

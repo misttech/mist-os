@@ -18,4 +18,16 @@ pub enum EncodeError {
     /// Attempted to encode a value larger than 4 bytes in an inline envelope
     #[error("cannot encode a {0}-byte value in a 4-byte inline envelope")]
     ExpectedInline(usize),
+
+    /// Attempted to encode a driver handle with an encoder that does not support them.
+    #[error("cannot encode driver handles with this encoder")]
+    DriverHandlesUnsupported,
+
+    /// Expected a driver handle but was given a normal zircon handle
+    #[error("expected a driver handle but was given a zircon handle")]
+    ExpectedDriverHandle,
+
+    /// Expected a zircon handle but was given a driver handle
+    #[error("expected a zircon handle but was given a driver handle")]
+    ExpectedZirconHandle,
 }

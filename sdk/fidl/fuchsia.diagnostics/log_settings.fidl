@@ -4,16 +4,28 @@
 
 library fuchsia.diagnostics;
 
+using fuchsia.diagnostics.types;
+
 /// Max number of LogInterestSelectors that can be specified via a listener.
 const MAX_LOG_SELECTORS uint8 = 64;
 
 /// A specified Interest coupled with its designated target,
+@available(replaced=NEXT)
 type LogInterestSelector = struct {
     /// Matches the components for which the interest will be requested.
     selector ComponentSelector;
 
     /// The interest level that will be sent to components matching the selector.
     interest Interest;
+};
+
+@available(added=NEXT)
+type LogInterestSelector = struct {
+    /// Matches the components for which the interest will be requested.
+    selector ComponentSelector;
+
+    /// The interest level that will be sent to components matching the selector.
+    interest fuchsia.diagnostics.types.Interest;
 };
 
 /// This protocol allows clients to modify the logging behavior of components

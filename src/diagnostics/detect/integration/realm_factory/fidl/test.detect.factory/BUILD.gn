@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fidl") {
+  testonly = true
   name = "test.detect.factory"
   sources = [ "detect.test.fidl" ]
   public_deps = [

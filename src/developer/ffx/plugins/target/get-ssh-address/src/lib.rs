@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::TargetIpAddr;
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
@@ -10,7 +10,7 @@ use ffx_get_ssh_address_args::GetSshAddressCommand;
 use ffx_writer::SimpleWriter;
 use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{
-    DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
+    DaemonError, TargetCollectionProxy, TargetIpAddrInfo, TargetMarker, TargetQuery,
 };
 use std::io::Write;
 use std::net::IpAddr;
@@ -67,12 +67,12 @@ async fn get_ssh_address_impl<W: Write>(
     .map_err(|_| FfxTargetError::DaemonError { err: DaemonError::Timeout, target: ts_clone })??;
 
     let (addr, port) = match res {
-        TargetAddrInfo::Ip(ref _info) => {
-            let target = TargetAddr::from(&res);
+        TargetIpAddrInfo::Ip(ref _info) => {
+            let target = TargetIpAddr::from(&res);
             (target, 0)
         }
-        TargetAddrInfo::IpPort(ref info) => {
-            let target = TargetAddr::from(&res);
+        TargetIpAddrInfo::IpPort(ref info) => {
+            let target = TargetIpAddr::from(&res);
             (target, info.port)
         }
     };

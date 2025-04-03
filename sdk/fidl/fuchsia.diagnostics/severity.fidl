@@ -13,6 +13,7 @@ library fuchsia.diagnostics;
 // Note that these severities correspond to and must match the values defined in
 // fuchsia.logger.LogLevelFilter.
 // TODO(https://fxbug.dev/42055808): Change this from `strict` to `flexible` #strictaudit
+@available(removed=NEXT)
 type Severity = strict enum : uint8 {
     /// Trace records include detailed information about program execution.
     TRACE = 0x10;

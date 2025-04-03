@@ -19,7 +19,7 @@ class ScopedTrace final {
     zxtest::Runner::GetInstance()->PushTrace(&trace_);
   }
 
-  virtual ~ScopedTrace() final { zxtest::Runner::GetInstance()->PopTrace(); }
+  ~ScopedTrace() { zxtest::Runner::GetInstance()->PopTrace(); }
 
  private:
   zxtest::Message trace_;

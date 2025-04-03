@@ -18,7 +18,6 @@ use fidl_fuchsia_logger::{
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
-use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
 use futures::channel::mpsc;
 use futures::prelude::*;
 use std::collections::VecDeque;
@@ -580,41 +579,6 @@ impl LogSinkHelper {
     pub fn kill_log_sink(&mut self) {
         self.log_sink.take();
     }
-}
-
-struct Listener {
-    send_logs: mpsc::UnboundedSender<String>,
-}
-
-impl LogProcessor for Listener {
-    fn log(&mut self, message: LogMessage) {
-        self.send_logs.unbounded_send(message.msg).unwrap();
-    }
-
-    fn done(&mut self) {
-        panic!("this should not be called");
-    }
-}
-
-pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceiver<String> {
-    let log_proxy = connect_to_protocol_at_dir_svc::<LogMarker>(directory)
-        .expect("cannot connect to log proxy");
-    let (send_logs, recv_logs) = mpsc::unbounded();
-    let options = LogFilterOptions {
-        filter_by_pid: false,
-        pid: 0,
-        min_severity: LogLevelFilter::None,
-        verbosity: 0,
-        filter_by_tid: false,
-        tid: 0,
-        tags: vec![],
-    };
-    let l = Listener { send_logs };
-    fasync::Task::spawn(async move {
-        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await.unwrap();
-    })
-    .detach();
-    recv_logs
 }
 
 pub fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {

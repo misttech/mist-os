@@ -37,8 +37,7 @@ class AmlTrip final : public fdf::DriverBase {
 
   std::unique_ptr<AmlTripDevice> device_;
   fidl::ServerBindingGroup<fuchsia_hardware_trippoint::TripPoint> trippoint_bindings_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  fdf::OwnedChildNode child_;
   driver_devfs::Connector<fuchsia_hardware_trippoint::TripPoint> devfs_connector_;
 };
 

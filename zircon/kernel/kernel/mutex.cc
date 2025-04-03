@@ -73,7 +73,7 @@ template <KernelMutexTracingLevel Level>
 class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contested) ||
                                       (Level == KernelMutexTracingLevel::All)>> {
  public:
-  KTracer() : ts_(ktrace_timestamp()) {}
+  KTracer() : ts_(KTrace::Timestamp()) {}
 
   void KernelMutexUncontestedAcquire(const void* mutex_id) {
     if constexpr (Level == KernelMutexTracingLevel::All) {
@@ -98,7 +98,7 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
  private:
   void KernelMutexTrace(const fxt::InternedString& event_name, const void* mutex_id,
                         const Thread* t, uint32_t waiter_count) {
-    if (ktrace_thunks::category_enabled("kernel:sched"_category)) {
+    if (KTrace::CategoryEnabled("kernel:sched"_category)) {
       auto tid_type = fxt::StringRef{(t == nullptr                  ? "none"_intern
                                       : t->user_thread() == nullptr ? "kernel_mode"_intern
                                                                     : "user_mode"_intern)};
@@ -110,12 +110,14 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
       fxt::Argument tid_type_arg{"tid_type"_intern, tid_type};
       fxt::Argument wait_count_arg{"waiter_count"_intern, waiter_count};
 
-      fxt_duration_complete("kernel:sched"_category, ts_, t->fxt_ref(), fxt::StringRef{event_name},
-                            ts_ + 50, mutex_id_arg, tid_name_arg, tid_type_arg, wait_count_arg);
+      KTrace::EmitComplete(
+          "kernel:sched"_category, fxt::StringRef{event_name}, ts_, ts_ + 50,
+          KTrace::Context::Thread,
+          ktl::make_tuple(mutex_id_arg, tid_name_arg, tid_type_arg, wait_count_arg));
     }
   }
 
-  const uint64_t ts_;
+  const zx_instant_boot_ticks_t ts_;
 };
 }  // namespace
 

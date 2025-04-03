@@ -22,12 +22,14 @@ Symbols:
   - { Name: fdf_dispatcher_get_options, Type: Func }
   - { Name: fdf_dispatcher_seal, Type: Func }
   - { Name: fdf_dispatcher_shutdown_async, Type: Func }
+  - { Name: fdf_env_add_allowed_scheduler_role_for_driver, Type: Func }
   - { Name: fdf_env_destroy_all_dispatchers, Type: Func }
   - { Name: fdf_env_dispatcher_create_with_owner, Type: Func }
   - { Name: fdf_env_dispatcher_dump, Type: Func }
   - { Name: fdf_env_dispatcher_get_dump_deprecated, Type: Func }
   - { Name: fdf_env_dispatcher_has_queued_tasks, Type: Func }
   - { Name: fdf_env_get_current_driver, Type: Func }
+  - { Name: fdf_env_get_driver_on_tid, Type: Func }
   - { Name: fdf_env_get_thread_limit, Type: Func }
   - { Name: fdf_env_register_driver_entry, Type: Func }
   - { Name: fdf_env_register_driver_exit, Type: Func }

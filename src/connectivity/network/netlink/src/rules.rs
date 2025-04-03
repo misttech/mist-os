@@ -721,6 +721,7 @@ impl<I: IpExt> RulesWorker<I> {
 mod tests {
     use super::*;
 
+    use fuchsia_async as fasync;
     use ip_test_macro::ip_test;
     use linux_uapi::{
         rt_class_t_RT_TABLE_COMPAT, AF_INET, AF_INET6, FR_ACT_TO_TBL, FR_ACT_UNREACHABLE,
@@ -957,8 +958,10 @@ mod tests {
     #[test_case(<Ipv6 as Ip>::VERSION_MARKER; "v6")]
     #[fuchsia::test]
     async fn test_rule_table<I: IpExt>(ip_version_marker: IpVersionMarker<I>) {
-        let (mut sink, client) =
+        let scope = fasync::Scope::new();
+        let (mut sink, client, async_work_drain_task) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
         let _serve_task = fuchsia_async::Task::local(
             fnet_routes_ext::testutil::rules::serve_noop_rule_set::<I>(server_end),
@@ -1157,6 +1160,8 @@ mod tests {
             cleanup,
             Some(TableNeedsCleanup(MANAGED_FIDL_TABLE_ID, MANAGED_NETLINK_TABLE_ID))
         );
+        drop(client);
+        scope.join().await;
     }
 
     #[test_case(<Ipv4 as Ip>::VERSION_MARKER; "v4")]
@@ -1165,8 +1170,10 @@ mod tests {
     async fn test_rule_table_new_rule_already_exists<I: IpExt>(
         ip_version_marker: IpVersionMarker<I>,
     ) {
-        let (mut sink, client) =
+        let (mut sink, client, async_work_drain_task) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let scope = fasync::Scope::new();
+        let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
         let _serve_task = fuchsia_async::Task::local(
             fnet_routes_ext::testutil::rules::serve_noop_rule_set::<I>(server_end),
@@ -1251,6 +1258,8 @@ mod tests {
             )
             .await;
         assert_eq!(result, Err(Errno::EEXIST));
+        drop(client);
+        scope.join().await;
     }
 
     // Conversions are safe as these constants fit into a u8.
@@ -1268,8 +1277,10 @@ mod tests {
         error: Errno,
         ip_version_marker: IpVersionMarker<I>,
     ) {
-        let (mut sink, client) =
+        let (mut sink, client, async_work_drain_task) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let scope = fasync::Scope::new();
+        let _join_handle = scope.spawn(async_work_drain_task);
         let (rule_set, _server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
         let mut table = RulesWorker::new(rule_set);
         assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..], &[]);
@@ -1282,19 +1293,23 @@ mod tests {
                     args: RuleRequestArgs::Del(pattern),
                     _ip_version_marker: ip_version_marker,
                     sequence_number: 0,
-                    client: client,
+                    client,
                 },
                 &mut route_table_map,
                 &EMPTY_INTERFACE_PROPERTIES,
             )
             .await;
         assert_eq!(result, Err(error));
+        scope.join().await;
     }
 
     #[ip_test(I)]
-    fn test_default_rules<I: IpExt>() {
-        let (mut sink, client) =
+    #[fuchsia::test]
+    async fn test_default_rules<I: IpExt>() {
+        let scope = fasync::Scope::new();
+        let (mut sink, client, async_work_drain_task) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+        let _join_handle = scope.spawn(async_work_drain_task);
 
         let mut table = RuleTable::<I>::new_with_defaults();
 
@@ -1350,6 +1365,8 @@ mod tests {
                     ]
                 );
             },
-        )
+        );
+        drop(client);
+        scope.join().await;
     }
 }

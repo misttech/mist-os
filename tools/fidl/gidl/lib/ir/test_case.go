@@ -80,6 +80,7 @@ const (
 	LanguageGo                Language = "go"
 	LanguageHlcpp             Language = "hlcpp"
 	LanguageLlcpp             Language = "llcpp"
+	LanguagePython            Language = "python"
 	LanguageReference         Language = "reference"
 	LanguageRust              Language = "rust"
 	LanguageRustCodec         Language = "rust_codec"
@@ -97,6 +98,7 @@ func AllLanguages() []Language {
 		LanguageGo,
 		LanguageHlcpp,
 		LanguageLlcpp,
+		LanguagePython,
 		LanguageReference,
 		LanguageRust,
 	}

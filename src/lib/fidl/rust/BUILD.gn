@@ -53,6 +53,8 @@ group("tests") {
     "fidl:tests",
     "fidl-contrib:tests",
     "fidl_driver:tests",
+    "fidl_test_util:tests",
+    "fidl_test_util:tests($host_toolchain)",
     "handle_tests",
   ]
 }

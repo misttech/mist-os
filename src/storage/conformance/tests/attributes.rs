@@ -19,7 +19,7 @@ async fn set_attr_file_with_sufficient_rights() {
     {
         let entries = vec![file("file", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_flags, "file").await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, "file").await;
 
         let (status, old_attr) = file.get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
@@ -57,7 +57,7 @@ async fn set_attr_file_with_insufficient_rights() {
     {
         let entries = vec![file("file", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let file = open_file_with_flags(&dir, file_flags, "file").await;
+        let file = deprecated_open_file_with_flags(&dir, file_flags, "file").await;
 
         let status = file
             .set_attr(
@@ -86,7 +86,7 @@ async fn set_attr_directory_with_sufficient_rights() {
     {
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
+        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         let (status, old_attr) = dir.get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
@@ -123,7 +123,7 @@ async fn set_attr_directory_with_insufficient_rights() {
     for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let entries = vec![directory("dir", vec![])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let dir = open_dir_with_flags(&dir, dir_flags, "dir").await;
+        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         let status = dir
             .set_attr(
@@ -145,7 +145,8 @@ async fn get_attributes_query_none() {
     let harness = TestHarness::new().await;
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
     // fuchsia.io/Node.GetAttributes
     // Node attributes that were not requested should return None
@@ -165,13 +166,16 @@ async fn get_attributes_file_query_all() {
 
     let entries = vec![file(TEST_FILE, FILE_CONTENTS.to_owned())];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
     // fuchsia.io/Node.GetAttributes
     // All of the attributes are requested. Filesystems are allowed to return None for attributes
     // they don't support.
     let (mutable_attrs, immutable_attrs) = file_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .unwrap()
         .expect("get_attributes failed");
@@ -233,13 +237,16 @@ async fn get_attributes_directory_query_all() {
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
     // fuchsia.io/Node.GetAttributes
     // All of the attributes are requested. Filesystems are allowed to return None for attributes
     // they don't support.
     let (mutable_attrs, immutable_attrs) = dir_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .unwrap()
         .expect("get_attributes failed");
@@ -292,7 +299,8 @@ async fn update_attributes_file_unsupported() {
     }
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
         file_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap(),
@@ -309,7 +317,8 @@ async fn update_attributes_file_with_insufficient_rights() {
 
     let entries = vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
     let status = file_proxy
         .update_attributes(&fio::MutableNodeAttributes {
@@ -328,11 +337,14 @@ async fn update_attributes_file_with_sufficient_rights() {
     if !harness.supports_mutable_attrs() {
         return;
     }
-    let supported_attrs = harness.config.supported_attributes;
+    // Don't want to test for `fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE` in this test.
+    let supported_attrs =
+        harness.config.supported_attributes - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE;
 
     let entries = vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
 
     let new_attrs = fio::MutableNodeAttributes {
         creation_time: supported_attrs
@@ -397,7 +409,8 @@ async fn get_attributes_file_node_reference() {
     let harness = TestHarness::new().await;
     let entries = vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_vec())];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
 
     // fuchsia.io/Node.GetAttributes
     let (_mutable_attributes, immutable_attributes) = file_proxy
@@ -413,7 +426,8 @@ async fn update_attributes_file_node_reference_not_allowed() {
     let harness = TestHarness::new().await;
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let file_proxy = open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+    let file_proxy =
+        deprecated_open_file_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
 
     // Node references does not support fuchsia.io/Node.UpdateAttributes
     assert_eq!(
@@ -427,7 +441,8 @@ async fn get_attributes_directory() {
     let harness = TestHarness::new().await;
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
     let (_mutable_attributes, immutable_attributes) = dir_proxy
         .get_attributes(fio::NodeAttributesQuery::PROTOCOLS)
@@ -446,7 +461,8 @@ async fn update_attributes_directory_unsupported() {
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
 
     // fuchsia.io/Node.UpdateAttributes
     assert_eq!(
@@ -464,7 +480,8 @@ async fn update_attributes_directory_with_insufficient_rights() {
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
     let status = dir_proxy
         .update_attributes(&fio::MutableNodeAttributes {
@@ -487,7 +504,8 @@ async fn update_attributes_directory_with_sufficient_rights() {
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::RIGHT_WRITABLE, "dir").await;
 
     let new_attrs = fio::MutableNodeAttributes {
         creation_time: supported_attrs
@@ -516,7 +534,9 @@ async fn update_attributes_directory_with_sufficient_rights() {
         .expect("update_attributes failed");
 
     let (mutable_attrs, _) = dir_proxy
-        .get_attributes(fio::NodeAttributesQuery::all())
+        .get_attributes(
+            fio::NodeAttributesQuery::all() - fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+        )
         .await
         .expect("FIDL call failed")
         .map_err(zx::Status::from_raw)
@@ -553,7 +573,8 @@ async fn get_attributes_directory_node_reference() {
     let harness = TestHarness::new().await;
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
 
     // fuchsia.io/Node.GetAttributes
     let (_mutable_attributes, immutable_attributes) = dir_proxy
@@ -569,7 +590,8 @@ async fn update_attributes_directory_node_reference_not_allowed() {
     let harness = TestHarness::new().await;
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let dir_proxy = open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+    let dir_proxy =
+        deprecated_open_dir_with_flags(&dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
 
     // Node reference doesn't allow for updating attributes
     assert_eq!(

@@ -222,7 +222,7 @@ go_binary(
 	}
 }
 
-func TestVisibility(t *testing.T) {
+func TestVisibilityConversion(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		bazel  string
@@ -285,6 +285,46 @@ func TestVisibility(t *testing.T) {
   visibility = [
     "//path/to/foo:*",
     "//path/to/bar:bar",
+  ]
+}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
+			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
+				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
+			}
+		})
+	}
+}
+
+func TestDepsConversion(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bazel  string
+		wantGN string
+	}{
+		{
+			name: "rust third-party",
+			bazel: `go_library(
+  name = "test",
+  deps = [
+    "//third_party/rust_crates/vendor:foo",
+    "//third_party/rust_crates/ask2patch:bar",
+    "//third_party/rust_crates/forks/baz-v0.4.2:baz",
+    "//path/to/dep",
+  ],
+)`,
+			wantGN: `go_library("test") {
+  deps = [
+    "//third_party/rust_crates:foo",
+    "//third_party/rust_crates:bar",
+    "//third_party/rust_crates:baz",
+    "//path/to/dep",
   ]
 }`,
 		},

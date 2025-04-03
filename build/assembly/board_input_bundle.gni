@@ -5,6 +5,7 @@
 import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
 import("//build/group_with_inputs.gni")
+import("//build/info/info.gni")
 import("//build/python/python_action.gni")
 
 # Creates a Board Input Bundle, which provides packages and drivers to
@@ -71,6 +72,16 @@ import("//build/python/python_action.gni")
 #      output filename of the form
 #      {target_out_dir}/{target_name}.format_costs_persistent_fidl.
 #
+#  version (optional)
+#    [string] String representing the release version for this board config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
+#    must be set.
+#
+#  version_file (optional)
+#    [string] Path to a file containing the release version for this config.
+#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
+#    be set.
+#
 #  Outputs
 #    A directory structure and manifest
 #
@@ -108,6 +119,20 @@ template("board_input_bundle") {
   creation_deps = []
   creation_inputs = []
   creation_args = []
+
+  if (defined(invoker.version) && invoker.version != "") {
+    creation_args += [
+      "--version",
+      invoker.version,
+    ]
+  }
+  if (defined(invoker.version_file) && invoker.version_file != "") {
+    creation_inputs += [ invoker.version_file ]
+    creation_args += [
+      "--version-file",
+      rebase_path(invoker.version_file, root_build_dir),
+    ]
+  }
 
   # Iterate over any provided drivers, and add them to the bundle, validating
   # that they are package targets using a group_with_inputs().
@@ -357,22 +382,6 @@ template("board_input_bundle") {
              "--depfile",
              rebase_path(depfile, root_build_dir),
            ] + creation_args
-
-    metadata = {
-      board_input_bundles = [
-        {
-          label =
-              get_label_info(":${labels.main_target}", "label_with_toolchain")
-          outdir = rebase_path(files.bundle_dir, root_build_dir)
-        },
-      ]
-      board_assembly_artifacts = [
-        {
-          source = rebase_path(files.bundle_dir, root_build_dir)
-          destination = "built/artifacts/$source"
-        },
-      ]
-    }
   }
 
   bazel_input_directory(labels.bazel_inputs) {

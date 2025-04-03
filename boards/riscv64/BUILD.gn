@@ -4,6 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
+import("//build/info/info.gni")
 
 assert(current_toolchain == default_toolchain,
        "The riscv64 board can only be defined in the default toolchain.")
@@ -42,6 +43,7 @@ board_configuration("riscv64") {
     fxfs = {
     }
   }
+  version = build_info_version
 }
 
 board_input_bundle("main_bundle") {
@@ -61,4 +63,5 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/qemu-riscv64.cm" ]
     },
   ]
+  version = build_info_version
 }

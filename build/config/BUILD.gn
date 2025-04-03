@@ -391,6 +391,15 @@ variant("linker_gc") {
     ldflags = [ "-Wl,/opt:ref" ]
   } else {
     ldflags = [ "-Wl,--gc-sections" ]
+
+    # rustc driver invokes LLD directly when targeting Fuchsia, so we need to
+    # use the linker spelling of this flag, whereas on other targets rustc
+    # invokes Clang so we use the same spelling as for C/C++.
+    if (is_fuchsia) {
+      rustflags = [ "-Clink-arg=--gc-sections" ]
+    } else {
+      rustflags = [ "-Clink-arg=-Wl,--gc-sections" ]
+    }
   }
 }
 
@@ -403,6 +412,9 @@ config("linker_gc.compiler") {
 
   # Just to be safe, pass them to the linker too.
   ldflags = cflags
+
+  # `-Zfunction-sections` flag controls both text and data sections.
+  rustflags = [ "-Zfunction-sections" ]
 }
 
 config("default_linker_gc") {
@@ -867,6 +879,11 @@ config("Wno-unused-function") {
     "//zircon/third_party/ulib/musl/src/network",
     "//zircon/third_party/ulib/musl/src/time",
   ]
+}
+
+config("Wno-deprecated-declarations") {
+  visibility = [ "//third_party/boringssl:*" ]
+  cflags = [ "-Wno-deprecated-declarations" ]
 }
 
 config("Wno-strict-prototypes") {
@@ -1514,7 +1531,7 @@ if (current_toolchain == default_toolchain) {
   # The largest LTO link actions may fall into this category.
   # See https://fxbug.dev/42062387 for context.
   pool("highmem") {
-    depth = 1
+    depth = default_concurrent_jobs.highmem
   }
 }
 

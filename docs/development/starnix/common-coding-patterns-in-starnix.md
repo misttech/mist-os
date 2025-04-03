@@ -272,6 +272,9 @@ from overflowing arithmetic in the kernel.
 
 ## Using FIDL proxies in Starnix {:#using-fidl-proxies-in-starnix}
 
+Note: The topic in this section is covered in more detail in
+[IPC patterns in Starnix][ipc-patterns-in-starnix].
+
 This section explains why Starnix, unlike some Fuchsia components, typically
 uses synchronous proxies when interacting with FIDL protocols.
 
@@ -298,3 +301,4 @@ To learn more about the execution model for Starnix, please see
 
 [starnix-concepts]: /docs/concepts/starnix/README.md
 [restricted-mode]: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md#running-a-linux-program-in-restricted-mode
+[ipc-patterns-in-starnix]: ipc_patterns_in_starnix.md

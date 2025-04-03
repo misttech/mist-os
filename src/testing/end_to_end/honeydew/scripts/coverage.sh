@@ -42,7 +42,7 @@ fi
 
 echo "Configuring environment..."
 OLD_PYTHONPATH=$PYTHONPATH
-PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$PYTHONPATH
+PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/$BUILD_DIR/host_x64/gen/src/developer/ffx/lib/fuchsia-controller/cpp:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$PYTHONPATH
 
 echo "Running coverage tool..."
 HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH coverage \

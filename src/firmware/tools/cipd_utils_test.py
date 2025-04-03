@@ -8,6 +8,7 @@
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
 
+import json
 import os
 import subprocess
 import tempfile
@@ -37,7 +38,7 @@ def get_run_commands(mock_run: mock.MagicMock) -> list[list[str]]:
 class GitTests(unittest.TestCase):
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_git_command(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/to/repo/")
+        git = cipd_utils.Git("path/to/repo/", "")
 
         git.git(["foo", "bar"])
 
@@ -50,7 +51,7 @@ class GitTests(unittest.TestCase):
 
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_changelog(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/")
+        git = cipd_utils.Git("path/", "")
         mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog("start_revision", "end_revision")
@@ -72,7 +73,7 @@ class GitTests(unittest.TestCase):
 
     @mock.patch.object(subprocess, "run", autospec=True)
     def test_changelog_no_start(self, mock_run: mock.MagicMock) -> None:
-        git = cipd_utils.Git("path/")
+        git = cipd_utils.Git("path/", "")
         mock_run.return_value = subprocess.CompletedProcess("", 0, "fake log")
 
         result = git.changelog(None, "end_revision")
@@ -168,6 +169,64 @@ class RepoTests(unittest.TestCase):
             cipd_utils.Repo(
                 "/repo/root", spec={"foo": "same_alias", "baz": "same_alias"}
             )
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest(self, mock_run: mock.MagicMock) -> None:
+        # First call should be `repo info`, then `repo status`.
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            subprocess.CompletedProcess([], 0, ""),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+        self.assertEqual(
+            repo.manifest(allow_dirty=False),
+            {
+                "foo": "foo_revision",
+                "bar/baz": "baz_revision",
+            },
+        )
+
+        # Verify we made the calls that we expected.
+        self.assertEqual(
+            get_run_commands(mock_run),
+            [
+                ["repo", "info", "--local-only"],
+                ["repo", "status", "--quiet"],
+            ],
+        )
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest_dirty(self, mock_run: mock.MagicMock) -> None:
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            # Any output from `repo status --quiet` means dirty repo.
+            subprocess.CompletedProcess([], 0, "--dirty--"),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+        with self.assertRaises(ValueError):
+            repo.manifest(allow_dirty=False)
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_repo_manifest_allow_dirty(self, mock_run: mock.MagicMock) -> None:
+        # First call should be `repo info`, then `repo status`.
+        mock_run.side_effect = [
+            subprocess.CompletedProcess([], 0, _FAKE_REPO_INFO),
+            # Any output from `repo status --quiet` means dirty repo.
+            subprocess.CompletedProcess([], 0, "--dirty--"),
+        ]
+
+        repo = cipd_utils.Repo("/repo/root")
+
+        # With allow_dirty, we should be able to produce a manifest on a dirty repo.
+        self.assertEqual(
+            repo.manifest(allow_dirty=True),
+            {
+                "foo": "foo_revision",
+                "bar/baz": "baz_revision",
+            },
+        )
 
 
 class CipdTests(unittest.TestCase):
@@ -535,6 +594,120 @@ class CopyTests(unittest.TestCase):
                     "tag2:bar",
                     "-tag",
                     "copied_from:source_name/source_version",
+                ]
+            ],
+        )
+
+
+def write_json_fake_subprocess_run(
+    contents: dict[str, Any],
+) -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Returns a fake subprocess.run() to write `contents` to -json-output."""
+
+    def fake_run(
+        command: list[str], *_args: Any, **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        # Find the file path which follows the "-json-output" arg.
+        path = command[command.index("-json-output") + 1]
+
+        # Write the desired contents.
+        with open(path, "w") as file:
+            json.dump(contents, file)
+
+        return subprocess.CompletedProcess(command, 0, None)
+
+    return fake_run
+
+
+class UploadTests(unittest.TestCase):
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_upload(self, mock_run: mock.MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Set up a fake `cipd` command to write the expected output to the
+            # -json-output path.
+            mock_run.side_effect = write_json_fake_subprocess_run(
+                {"result": {"instance_id": "fake_version_out"}}
+            )
+
+            with open(os.path.join(temp_dir, "manifest.json"), "w") as file:
+                json.dump(
+                    {
+                        "foo": "bar",
+                        "abc": "123",
+                    },
+                    file,
+                )
+
+            self.assertEqual(
+                cipd_utils.upload("test/package", temp_dir), "fake_version_out"
+            )
+
+        self.assertEqual(
+            get_run_commands(mock_run),
+            [
+                [
+                    cipd_utils.CIPD_TOOL,
+                    "create",
+                    "-name",
+                    "test/package",
+                    "-in",
+                    temp_dir,
+                    "-install-mode",
+                    "copy",
+                    "-ref",
+                    "latest",
+                    "-json-output",
+                    mock.ANY,
+                    "-tag",
+                    "foo:bar",
+                    "-tag",
+                    "abc:123",
+                ]
+            ],
+        )
+
+    @mock.patch.object(subprocess, "run", autospec=True)
+    def test_tag_sanitizer(self, mock_run: mock.MagicMock) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mock_run.side_effect = write_json_fake_subprocess_run(
+                {"result": {"instance_id": "fake_version_out"}}
+            )
+
+            with open(os.path.join(temp_dir, "manifest.json"), "w") as file:
+                json.dump(
+                    {
+                        # Slashes should be replaced with underscores in CIPD tags.
+                        "foo/bar": "baz",
+                        "a/b/c": "123",
+                    },
+                    file,
+                )
+
+            self.assertEqual(
+                cipd_utils.upload("test/package", temp_dir), "fake_version_out"
+            )
+
+        self.assertEqual(
+            get_run_commands(mock_run),
+            [
+                [
+                    cipd_utils.CIPD_TOOL,
+                    "create",
+                    "-name",
+                    "test/package",
+                    "-in",
+                    temp_dir,
+                    "-install-mode",
+                    "copy",
+                    "-ref",
+                    "latest",
+                    "-json-output",
+                    mock.ANY,
+                    # Make sure these tags have properly substituted underscores.
+                    "-tag",
+                    "foo_bar:baz",
+                    "-tag",
+                    "a_b_c:123",
                 ]
             ],
         )

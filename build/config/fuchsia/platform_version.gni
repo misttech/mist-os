@@ -29,7 +29,7 @@ declare_args() {
   # Overrides the set of API levels for which this build will provide build-time
   # support in the IDK/SDK. The default (`false`) set is all `supported` and
   # `in development` non-special API levels in //sdk/version_history.json.
-  # Other valid values are a list containing a subset of the default set.If
+  # Other valid values are a list containing a subset of the default set. If
   # empty, only targets for which the IDK contains artifacts built at "PLATFORM"
   # will be built.
   #

@@ -36,7 +36,8 @@ namespace explicit_memory {
 // This class guarantees that the wrapped array will be filled with zeroes when
 // the wrapping ZeroDtor object goes out of scope.  See mandatory_memset() for
 // discussion on what this guarantee entails.
-template <typename T, typename = typename std::enable_if<std::is_pod<T>::value>::type>
+template <typename T>
+  requires(std::is_standard_layout_v<T> && std::is_trivially_copyable_v<T>)
 class ZeroDtor {
  public:
   ZeroDtor(T* array, size_t len) : array_(array), len_(len) {}

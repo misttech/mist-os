@@ -26,7 +26,7 @@ namespace pwm {
 class AmlPwm;
 class AmlPwmDevice;
 using AmlPwmDeviceType = ddk::Device<AmlPwmDevice>;
-constexpr size_t kPwmPairCount = 2;
+constexpr uint32_t kPwmPairCount = 2;
 
 class AmlPwm {
  public:
@@ -35,7 +35,7 @@ class AmlPwm {
       : channels_{channel1, channel2}, enabled_{false, false}, mmio_(std::move(mmio)) {}
 
   void Init() {
-    for (size_t i = 0; i < kPwmPairCount; i++) {
+    for (uint32_t i = 0; i < kPwmPairCount; i++) {
       mode_configs_[i].mode = Mode::kOff;
       mode_configs_[i].regular = {};
       configs_[i] = {.polarity = channels_[i].polarity().value_or(false),
@@ -115,7 +115,7 @@ class AmlPwmDevice : public AmlPwmDeviceType,
 
   std::vector<std::unique_ptr<AmlPwm>> pwms_;
 
-  uint32_t max_pwm_id_ = 0;
+  size_t max_pwm_id_ = 0;
 };
 
 }  // namespace pwm

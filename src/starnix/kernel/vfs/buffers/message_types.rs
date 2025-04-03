@@ -2,25 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt::Debug;
-use std::sync::Arc;
-
-use byteorder::{ByteOrder, NativeEndian};
-use zerocopy::{FromBytes, IntoBytes};
-
 use crate::mm::VmsplicePayload;
 use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
+use crate::vfs::socket::syscalls::CMsgHdrPtr;
 use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString};
+use byteorder::{ByteOrder, NativeEndian};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 use starnix_uapi::{
-    c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, sockaddr_in,
-    timespec, timeval, ucred, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_RECVORIGDSTADDR, IP_TOS,
-    IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP,
-    SO_TIMESTAMPNS,
+    c_int, errno, error, uapi, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_RECVORIGDSTADDR,
+    IP_TOS, IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET,
+    SO_TIMESTAMP, SO_TIMESTAMPNS,
 };
+use std::fmt::Debug;
+use std::sync::Arc;
+use zerocopy::{FromBytes, IntoBytes};
+
+uapi::check_arch_independent_layout! {
+    in6_pktinfo {
+        ipi6_addr,
+        ipi6_ifindex,
+    }
+}
+
+pub type UcredPtr = MultiArchUserRef<uapi::ucred, uapi::arch32::ucred>;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
 #[derive(Clone, Debug)]
@@ -77,15 +85,30 @@ impl<D: MessageData> From<D> for Message<D> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ControlMsg {
-    pub header: cmsghdr,
+    pub level: u32,
+    pub r#type: u32,
     pub data: Vec<u8>,
 }
 
 impl ControlMsg {
-    pub fn new(cmsg_level: u32, cmsg_type: u32, data: Vec<u8>) -> ControlMsg {
-        let cmsg_len = std::mem::size_of::<cmsghdr>() + data.len();
-        let header = cmsghdr { cmsg_len, cmsg_level, cmsg_type };
-        ControlMsg { header, data }
+    pub fn new(level: u32, r#type: u32, data: Vec<u8>) -> Self {
+        Self { level, r#type, data }
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.data.truncate(len)
+    }
+
+    fn into_bytes<A: ArchSpecific>(self, a: &A) -> Result<Vec<u8>, ()> {
+        let ControlMsg { level, r#type, mut data } = self;
+        let header_size = CMsgHdrPtr::size_of_object_for(a);
+        let cmsg_len = (header_size + data.len()) as u64;
+        let mut bytes = CMsgHdrPtr::into_bytes(
+            a,
+            uapi::cmsghdr { cmsg_len, cmsg_level: level, cmsg_type: r#type },
+        )?;
+        bytes.append(&mut data);
+        return Ok(bytes);
     }
 }
 
@@ -118,7 +141,7 @@ impl AncillaryData {
     /// - `current_task`: The current task. Used to interpret SCM_RIGHTS messages.
     /// - `message`: The message header to parse.
     pub fn from_cmsg(current_task: &CurrentTask, message: ControlMsg) -> Result<Self, Errno> {
-        match (message.header.cmsg_level, message.header.cmsg_type) {
+        match (message.level, message.r#type) {
             (SOL_SOCKET, SCM_RIGHTS | SCM_CREDENTIALS) => {
                 Ok(AncillaryData::Unix(UnixControlData::new(current_task, message)?))
             }
@@ -130,7 +153,7 @@ impl AncillaryData {
             ))),
             (SOL_IP, IP_RECVORIGDSTADDR) => {
                 Ok(AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(
-                    <[u8; size_of::<sockaddr_in>()]>::read_from_prefix(&message.data[..])
+                    <[u8; size_of::<uapi::sockaddr_in>()]>::read_from_prefix(&message.data[..])
                         .map_err(|_| errno!(EINVAL))?
                         .0,
                 )))
@@ -144,8 +167,8 @@ impl AncillaryData {
                 )))
             }
             (SOL_IPV6, IPV6_PKTINFO) => {
-                let (pktinfo, _) =
-                    in6_pktinfo::read_from_prefix(&message.data[..]).map_err(|_| errno!(EINVAL))?;
+                let (pktinfo, _) = uapi::in6_pktinfo::read_from_prefix(&message.data[..])
+                    .map_err(|_| errno!(EINVAL))?;
                 Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo {
                     local_addr: pktinfo
                         .ipi6_addr
@@ -185,27 +208,29 @@ impl AncillaryData {
                 ControlMsg::new(SOL_IPV6, IPV6_HOPLIMIT, (value as c_int).as_bytes().to_vec()),
             )),
             AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo { iface, local_addr }) => {
-                let pktinfo = in6_pktinfo {
-                    ipi6_addr: in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: local_addr } },
+                let pktinfo = uapi::in6_pktinfo {
+                    ipi6_addr: uapi::in6_addr {
+                        in6_u: uapi::in6_addr__bindgen_ty_1 { u6_addr8: local_addr },
+                    },
                     ipi6_ifindex: iface as i32,
                 };
                 Ok(Some(ControlMsg::new(SOL_IPV6, IPV6_PKTINFO, pktinfo.as_bytes().to_vec())))
             }
             AncillaryData::Ip(syncio::ControlMessage::Timestamp { sec, usec }) => {
-                let time = timeval { tv_sec: sec, tv_usec: usec };
+                let time = uapi::timeval { tv_sec: sec, tv_usec: usec };
                 Ok(Some(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMP, time.as_bytes().to_vec())))
             }
             AncillaryData::Ip(syncio::ControlMessage::TimestampNs { sec, nsec }) => {
-                let time = timespec { tv_sec: sec, tv_nsec: nsec };
+                let time = uapi::timespec { tv_sec: sec, tv_nsec: nsec };
                 Ok(Some(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMPNS, time.as_bytes().to_vec())))
             }
         }
     }
 
     /// Returns the total size of all data in this message.
-    pub fn total_size(&self) -> usize {
+    pub fn total_size(&self, current_task: &CurrentTask) -> usize {
         match self {
-            AncillaryData::Unix(control) => control.total_size(),
+            AncillaryData::Unix(control) => control.total_size(current_task),
             AncillaryData::Ip(msg) => msg.get_data_size(),
         }
     }
@@ -225,7 +250,7 @@ impl AncillaryData {
         flags: SocketMessageFlags,
         space_available: usize,
     ) -> Result<Vec<u8>, Errno> {
-        let header_size = std::mem::size_of::<cmsghdr>();
+        let header_size = CMsgHdrPtr::size_of_object_for(current_task);
         let minimum_data_size = self.minimum_size();
 
         if space_available < header_size + minimum_data_size {
@@ -236,11 +261,8 @@ impl AncillaryData {
 
         let cmsg = self.into_controlmsg(current_task, flags)?;
         if let Some(mut cmsg) = cmsg {
-            let cmsg_len = std::cmp::min(header_size + cmsg.data.len(), space_available);
-            cmsg.header.cmsg_len = cmsg_len;
-            let mut bytes = cmsg.header.as_bytes().to_owned();
-            bytes.extend_from_slice(&cmsg.data[..cmsg_len - header_size]);
-            return Ok(bytes);
+            cmsg.truncate(space_available - header_size);
+            cmsg.into_bytes(current_task).map_err(|_| errno!(EINVAL))
         } else {
             return Ok(vec![]);
         }
@@ -260,7 +282,7 @@ pub enum UnixControlData {
     /// passed as a struct ucred ancillary message."
     ///
     /// See https://man7.org/linux/man-pages/man7/unix.7.html.
-    Credentials(ucred),
+    Credentials(uapi::ucred),
 
     /// "Receive the SELinux security context (the security label) of the peer socket. The received
     /// ancillary data is a null-terminated string containing the security context."
@@ -297,7 +319,7 @@ impl UnixControlData {
     /// Creates a new `UnixControlData` instance for the provided `message_header`. This includes
     /// reading the associated data from the `task` (e.g., files from file descriptors).
     pub fn new(current_task: &CurrentTask, message: ControlMsg) -> Result<Self, Errno> {
-        match message.header.cmsg_type {
+        match message.r#type {
             SCM_RIGHTS => {
                 // Compute the number of file descriptors that fit in the provided bytes.
                 let bytes_per_file_descriptor = std::mem::size_of::<FdNumber>();
@@ -319,13 +341,12 @@ impl UnixControlData {
                 Ok(UnixControlData::Rights(files))
             }
             SCM_CREDENTIALS => {
-                if message.data.len() < std::mem::size_of::<ucred>() {
+                if message.data.len() < UcredPtr::size_of_object_for(current_task) {
                     return error!(EINVAL);
                 }
 
-                let credentials =
-                    ucred::read_from_bytes(&message.data[..std::mem::size_of::<ucred>()])
-                        .map_err(|_| errno!(EINVAL))?;
+                let credentials = UcredPtr::read_from_prefix(current_task, &message.data)
+                    .map_err(|_| errno!(EINVAL))?;
                 Ok(UnixControlData::Credentials(credentials))
             }
             SCM_SECURITY => Ok(UnixControlData::Security(message.data.into())),
@@ -337,7 +358,7 @@ impl UnixControlData {
     /// credentials were sent.
     pub fn unknown_creds() -> Self {
         const NOBODY: u32 = 65534;
-        let credentials = ucred { pid: 0, uid: NOBODY, gid: NOBODY };
+        let credentials = uapi::ucred { pid: 0, uid: NOBODY, gid: NOBODY };
         UnixControlData::Credentials(credentials)
     }
 
@@ -373,19 +394,22 @@ impl UnixControlData {
                 }
                 (SCM_RIGHTS, fds.as_bytes().to_owned())
             }
-            UnixControlData::Credentials(credentials) => {
-                (SCM_CREDENTIALS, credentials.as_bytes().to_owned())
-            }
+            UnixControlData::Credentials(credentials) => (
+                SCM_CREDENTIALS,
+                UcredPtr::into_bytes(current_task, credentials).map_err(|_| errno!(EINVAL))?,
+            ),
             UnixControlData::Security(string) => (SCM_SECURITY, string.as_bytes().to_owned()),
         };
         Ok(Some(ControlMsg::new(SOL_SOCKET, msg_type, data)))
     }
 
     /// Returns the total size of all data in this message.
-    pub fn total_size(&self) -> usize {
+    pub fn total_size(&self, current_task: &CurrentTask) -> usize {
         match self {
             UnixControlData::Rights(files) => files.len() * std::mem::size_of::<FdNumber>(),
-            UnixControlData::Credentials(_credentials) => std::mem::size_of::<ucred>(),
+            UnixControlData::Credentials(_credentials) => {
+                UcredPtr::size_of_object_for(current_task)
+            }
             UnixControlData::Security(string) => string.len(),
         }
     }

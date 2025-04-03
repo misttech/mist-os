@@ -64,9 +64,8 @@ tables_generator_tests_*.txt
 # instead of adding new top-level files, to avoid cluttering this .gitignore
 # file and the top level of local checkouts.
 /.fx/
+!/.fx/config/README.md
 .fx-build-dir
-.fx-build-profile-config
-.fx-build-metrics-config
 .fx-metrics-config
 .fx-multi-list
 .fx-remote-config
@@ -74,7 +73,6 @@ tables_generator_tests_*.txt
 .fx-sync-from-stem.cache
 
 ### Checkout generated files
-/build/checkout.gni
 /build/cipd.gni
 
 ### Infra files

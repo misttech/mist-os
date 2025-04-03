@@ -11,12 +11,12 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fake-bti/bti.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <zircon/errors.h>
@@ -56,7 +56,9 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
 
   void InitResources() {
     EXPECT_EQ(ZX_OK, zx::vmo::create(kMmioSize, 0, &mmio_));
-    fake_bti_create(bti_.reset_and_get_address());
+    zx::result bti = fake_bti::CreateFakeBti();
+    EXPECT_EQ(ZX_OK, bti.status_value());
+    bti_ = std::move(bti.value());
   }
 
   cpp20::span<uint32_t> mmio() {

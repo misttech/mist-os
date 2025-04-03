@@ -123,14 +123,14 @@ zx_status_t Sherlock::SpiInit() {
       }}),
   }}));
 
-  std::vector<uint8_t> encoded_spi_bus_metadata;
+  std::vector<uint8_t> persisted_spi_bus_metadata;
   {
     zx::result result = fidl_metadata::spi::SpiChannelsToFidl(SHERLOCK_SPICC0, spi_channels);
     if (result.is_error()) {
-      zxlogf(ERROR, "Failed to encode spi channels to fidl: %s", result.status_string());
+      zxlogf(ERROR, "Failed to convert spi channels to fidl: %s", result.status_string());
       return result.error_value();
     }
-    encoded_spi_bus_metadata = std::move(result.value());
+    persisted_spi_bus_metadata = std::move(result.value());
   }
 
   std::vector<fpbus::Metadata> spi_metadata{
@@ -138,10 +138,8 @@ zx_status_t Sherlock::SpiInit() {
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&spi_config),
             reinterpret_cast<const uint8_t*>(&spi_config) + sizeof(spi_config))}},
-      // TODO(b/392676138): Remove once no longer referenced.
-      {{.id = std::to_string(DEVICE_METADATA_SPI_CHANNELS), .data = encoded_spi_bus_metadata}},
       {{.id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
-        .data = std::move(encoded_spi_bus_metadata)}},
+        .data = std::move(persisted_spi_bus_metadata)}},
   };
 
   fpbus::Node spi_dev;

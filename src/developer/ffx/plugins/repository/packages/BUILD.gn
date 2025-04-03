@@ -32,7 +32,8 @@ ffx_plugin("ffx_repository_packages") {
     "//src/developer/ffx/lib/pkg:empty-repo-metadata",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/plugins/package/archive:lib",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
+    "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]

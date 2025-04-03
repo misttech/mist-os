@@ -200,14 +200,14 @@ zx_status_t Nelson::Spi0Init() {
   gpio_init_steps_.push_back(
       SpiPin(GPIO_SOC_SPI_A_SCLK, 5, fuchsia_hardware_pin::Pull::kDown));  // SCLK
 
-  std::vector<uint8_t> encoded_spi_bus_metadata;
+  std::vector<uint8_t> persisted_spi_bus_metadata;
   {
     zx::result result = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC0, spi_0_channels);
     if (result.is_error()) {
-      zxlogf(ERROR, "Failed to encode spi channels to fidl: %s", result.status_string());
+      zxlogf(ERROR, "Failed to convert spi channels to fidl: %s", result.status_string());
       return result.error_value();
     }
-    encoded_spi_bus_metadata = std::move(result.value());
+    persisted_spi_bus_metadata = std::move(result.value());
   }
 
   std::vector<fpbus::Metadata> spi_0_metadata{
@@ -215,10 +215,8 @@ zx_status_t Nelson::Spi0Init() {
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&spi_0_config),
             reinterpret_cast<const uint8_t*>(&spi_0_config) + sizeof(spi_0_config))}},
-      // TODO(b/392676138): Remove once no longer referenced.
-      {{.id = std::to_string(DEVICE_METADATA_SPI_CHANNELS), .data = encoded_spi_bus_metadata}},
       {{.id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
-        .data = std::move(encoded_spi_bus_metadata)}},
+        .data = std::move(persisted_spi_bus_metadata)}},
   };
 
   spi_0_dev.metadata() = std::move(spi_0_metadata);
@@ -321,20 +319,14 @@ zx_status_t Nelson::Spi1Init() {
   }());
 
   {
-    const fuchsia_scheduler::RoleName role(kSpi1SchedulerRole);
+    const fuchsia_scheduler::RoleName kRoleName(kSpi1SchedulerRole);
 
-    fit::result persisted = fidl::Persist(role);
+    fit::result persisted = fidl::Persist(kRoleName);
     if (persisted.is_error()) {
-      zxlogf(ERROR, "Failed to persist scheduler role: %s",
+      zxlogf(ERROR, "Failed to persist scheduler role name: %s",
              persisted.error_value().FormatDescription().c_str());
       return persisted.error_value().status();
     }
-
-    // TODO(b/395140408): Remove once no longer retrieved.
-    spi_1_metadata.emplace_back(fpbus::Metadata{{
-        .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
-        .data = persisted.value(),
-    }});
 
     spi_1_metadata.emplace_back(fpbus::Metadata{{
         .id = fuchsia_scheduler::RoleName::kSerializableName,
@@ -342,20 +334,19 @@ zx_status_t Nelson::Spi1Init() {
     }});
   }
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC1, spi_1_channels);
-  if (spi_status.is_error()) {
-    zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
-           spi_status.error_value());
-    return spi_status.error_value();
+  std::vector<uint8_t> persisted_spi_bus_metadata;
+  {
+    zx::result result = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC1, spi_1_channels);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to convert spi channels to fidl: %s", result.status_string());
+      return result.error_value();
+    }
+    persisted_spi_bus_metadata = std::move(result.value());
   }
-  auto& data = spi_status.value();
 
-  spi_1_metadata.emplace_back([&]() {
-    fpbus::Metadata ret;
-    ret.id() = std::to_string(DEVICE_METADATA_SPI_CHANNELS);
-    ret.data() = std::move(data);
-    return ret;
-  }());
+  spi_1_metadata.emplace_back(
+      fpbus::Metadata{{.id = fuchsia_hardware_spi_businfo::SpiBusMetadata::kSerializableName,
+                       .data = std::move(persisted_spi_bus_metadata)}});
 
   spi_1_dev.metadata() = std::move(spi_1_metadata);
 

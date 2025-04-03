@@ -412,7 +412,7 @@ job_count: "$concurrency"
       fi
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       local -a gn_labels  # define variable to quiet shellcheck
-      fx-command-stdout-to-array gn_labels fx-build-api-client fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}"
+      fx-command-stdout-to-array gn_labels fx-build-api-client fx_build_args_to_labels --allow-targets --args "${fuchsia_targets[@]}"
 
       # Convert GN labels to Ninja targets now.
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.

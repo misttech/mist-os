@@ -18,9 +18,7 @@ use derivative::Derivative;
 use either::Either;
 use lock_order::lock::{DelegatedOrderedLockAccess, OrderedLockAccess, OrderedLockRef};
 use log::{debug, trace};
-use net_types::ip::{
-    GenericOverIp, Ip, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4, Ipv6,
-};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv6};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_base::socket::{
     AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
@@ -32,11 +30,11 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    trace_duration, AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, Counter,
-    CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext,
-    LocalAddressError, Mark, MarkDomain, PortAllocImpl, ReferenceNotifiers,
-    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
-    TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, CounterContext,
+    DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
+    MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
+    ResourceCounterContext as _, RngContext, SocketError, StrongDeviceIdentifier,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
@@ -60,56 +58,15 @@ use netstack3_ip::{
     MulticastMembershipHandler, ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };
+use netstack3_trace::trace_duration;
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
 
-/// A builder for UDP layer state.
-#[derive(Clone)]
-pub struct UdpStateBuilder {
-    send_port_unreachable: bool,
-}
-
-impl Default for UdpStateBuilder {
-    fn default() -> UdpStateBuilder {
-        UdpStateBuilder { send_port_unreachable: false }
-    }
-}
-
-impl UdpStateBuilder {
-    /// Enable or disable sending ICMP Port Unreachable messages in response to
-    /// inbound UDP packets for which a corresponding local socket does not
-    /// exist (default: disabled).
-    ///
-    /// Responding with an ICMP Port Unreachable error is a vector for reflected
-    /// Denial-of-Service (DoS) attacks. The attacker can send a UDP packet to a
-    /// closed port with the source address set to the address of the victim,
-    /// and ICMP response will be sent there.
-    ///
-    /// According to [RFC 1122 Section 4.1.3.1], "\[i\]f a datagram arrives
-    /// addressed to a UDP port for which there is no pending LISTEN call, UDP
-    /// SHOULD send an ICMP Port Unreachable message." Since an ICMP response is
-    /// not mandatory, and due to the security risks described, responses are
-    /// disabled by default.
-    ///
-    /// [RFC 1122 Section 4.1.3.1]: https://tools.ietf.org/html/rfc1122#section-4.1.3.1
-    pub fn send_port_unreachable(&mut self, send_port_unreachable: bool) -> &mut Self {
-        self.send_port_unreachable = send_port_unreachable;
-        self
-    }
-
-    /// Builds a new [`UdpState`] for IP version `I`.
-    pub fn build<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
-        self,
-    ) -> UdpState<I, D, BT> {
-        UdpState {
-            sockets: Default::default(),
-            send_port_unreachable: self.send_port_unreachable,
-            counters: Default::default(),
-        }
-    }
-}
+use crate::internal::counters::{
+    CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
+};
 
 /// Convenience alias to make names shorter.
 pub(crate) type UdpBoundSocketMap<I, D, BT> =
@@ -156,49 +113,16 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>
 /// The state associated with the UDP protocol.
 ///
 /// `D` is the device ID type.
-#[derive(GenericOverIp)]
+#[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
+#[derivative(Default(bound = ""))]
 pub struct UdpState<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> {
     /// System's UDP sockets.
     pub sockets: Sockets<I, D, BT>,
-    /// Whether or not the stack is configured to send UDP port unreachable.
-    pub send_port_unreachable: bool,
-    /// Stack-wide UDP counters.
-    pub counters: UdpCounters<I>,
-}
-
-impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Default for UdpState<I, D, BT> {
-    fn default() -> UdpState<I, D, BT> {
-        UdpStateBuilder::default().build()
-    }
-}
-
-/// Counters for the UDP layer.
-pub type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
-
-/// Counters for the UDP layer.
-#[derive(Default)]
-pub struct UdpCountersInner {
-    /// Count of ICMP error messages received.
-    pub rx_icmp_error: Counter,
-    /// Count of UDP datagrams received from the IP layer, including error
-    /// cases.
-    pub rx: Counter,
-    /// Count of incoming UDP datagrams dropped because it contained a mapped IP
-    /// address in the header.
-    pub rx_mapped_addr: Counter,
-    /// Count of incoming UDP datagrams dropped because of an unknown
-    /// destination port.
-    pub rx_unknown_dest_port: Counter,
-    /// Count of incoming UDP datagrams dropped because their UDP header was in
-    /// a malformed state.
-    pub rx_malformed: Counter,
-    /// Count of outgoing UDP datagrams sent from the socket layer, including
-    /// error cases.
-    pub tx: Counter,
-    /// Count of outgoing UDP datagrams which failed to be sent out of the
-    /// transport layer.
-    pub tx_error: Counter,
+    /// Stack-wide UDP "with socket" counters.
+    pub counters_with_socket: UdpCountersWithSocket<I>,
+    /// Stack-wide UDP "without socket" counters.
+    pub counters_without_socket: UdpCountersWithoutSocket<I>,
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
@@ -570,6 +494,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     type SerializeError = UdpSerializeError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Counters<I: Ip> = UdpCountersWithSocket<I>;
     type SocketWritableListener = BT::SocketWritableListener;
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
@@ -1061,6 +986,12 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, 
         let Self(rc) = self;
         rc.external_data()
     }
+
+    /// Returns the counters tracked for this socket.
+    pub fn counters(&self) -> &UdpCountersWithSocket<I> {
+        let Self(rc) = self;
+        rc.counters()
+    }
 }
 
 /// A weak reference to a UDP socket.
@@ -1167,7 +1098,6 @@ pub trait UdpBindingsTypes: DatagramBindingsTypes + Sized + 'static {
 pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     InstantContext
     + RngContext
-    + TracingContext
     + UdpReceiveBindingsContext<I, D>
     + ReferenceNotifiers
     + UdpBindingsTypes
@@ -1177,7 +1107,6 @@ impl<
         I: IpExt,
         BC: InstantContext
             + RngContext
-            + TracingContext
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
             + UdpBindingsTypes,
@@ -1293,9 +1222,6 @@ pub trait StateContext<I: IpExt, BC: UdpBindingsContext<I, Self::DeviceId>>:
         cb: F,
     ) -> O;
 
-    /// Returns true if UDP may send a port unreachable ICMP error message.
-    fn should_send_port_unreachable(&mut self) -> bool;
-
     /// Call `f` with each socket's state.
     fn for_each_socket<
         F: FnMut(
@@ -1378,7 +1304,10 @@ fn receive_ip_packet<
     B: BufferMut,
     H: IpHeaderInfo<I>,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
-    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
+    CC: StateContext<I, BC>
+        + StateContext<I::OtherVersion, BC>
+        + UdpCounterContext<I, CC::WeakDeviceId, BC>
+        + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1391,8 +1320,8 @@ fn receive_ip_packet<
     let LocalDeliveryPacketInfo { meta, header_info, marks: _ } = info;
     let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
 
-    trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
-    core_ctx.counters().rx.increment();
+    trace_duration!(c"udp::receive_ip_packet");
+    CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx.increment();
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();
 
@@ -1403,7 +1332,7 @@ fn receive_ip_packet<
     } else {
         // There isn't much we can do if the UDP packet is
         // malformed.
-        core_ctx.counters().rx_malformed.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_malformed.increment();
         return Ok(());
     };
 
@@ -1411,7 +1340,9 @@ fn receive_ip_packet<
         match src_ip.try_into() {
             Ok(addr) => Some(addr),
             Err(AddrIsMappedError {}) => {
-                core_ctx.counters().rx_mapped_addr.increment();
+                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+                    .rx_mapped_addr
+                    .increment();
                 trace!("udp::receive_ip_packet: mapped source address");
                 return Ok(());
             }
@@ -1429,7 +1360,9 @@ fn receive_ip_packet<
     let delivery_ip = match delivery_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
-            core_ctx.counters().rx_mapped_addr.increment();
+            CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+                .rx_mapped_addr
+                .increment();
             trace!("udp::receive_ip_packet: mapped destination address");
             return Ok(());
         }
@@ -1493,9 +1426,11 @@ fn receive_ip_packet<
         was_delivered | delivered
     });
 
-    if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(core_ctx) {
+    if !was_delivered {
         buffer.undo_parse(parse_meta);
-        core_ctx.counters().rx_unknown_dest_port.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx)
+            .rx_unknown_dest_port
+            .increment();
         Err((buffer, TransportReceiveError::PortUnreachable))
     } else {
         Ok(())
@@ -1505,7 +1440,7 @@ fn receive_ip_packet<
 /// Tries to deliver the given UDP packet to the given UDP socket.
 fn try_deliver<
     I: IpExt,
-    CC: StateContext<I, BC>,
+    CC: StateContext<I, BC> + UdpCounterContext<I, CC::WeakDeviceId, BC>,
     BC: UdpBindingsContext<I, CC::DeviceId>,
     B: BufferMut,
 >(
@@ -1517,7 +1452,7 @@ fn try_deliver<
     require_transparent: bool,
     buffer: &B,
 ) -> bool {
-    core_ctx.with_socket_state(&id, |core_ctx, state| {
+    let delivered = core_ctx.with_socket_state(&id, |core_ctx, state| {
         let should_deliver = match state {
             DatagramSocketState::Bound(DatagramBoundSocketState {
                 socket_type,
@@ -1554,7 +1489,12 @@ fn try_deliver<
             bindings_ctx.receive_udp(id, device_id, meta, buffer);
         }
         should_deliver
-    })
+    });
+
+    if delivered {
+        core_ctx.increment_both(id, |c| &c.rx_delivered);
+    }
+    delivered
 }
 
 /// A wrapper for [`try_deliver`] that supports dual stack delivery.
@@ -1562,7 +1502,10 @@ fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
-    CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC>,
+    CC: StateContext<I, BC>
+        + StateContext<I::OtherVersion, BC>
+        + UdpCounterContext<I, CC::WeakDeviceId, BC>
+        + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1644,7 +1587,8 @@ impl<
         CC: StateContext<I, BC>
             + StateContext<I::OtherVersion, BC>
             + UseUdpIpTransportContextBlanket
-            + CounterContext<UdpCounters<I>>,
+            + UdpCounterContext<I, CC::WeakDeviceId, BC>
+            + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
     > IpTransportContext<I, BC, CC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
@@ -1656,7 +1600,7 @@ impl<
         _original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
-        core_ctx.counters().rx_icmp_error.increment();
+        CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_icmp_error.increment();
         // NB: At the moment bindings has no need to consume ICMP errors, so we
         // swallow them here.
         // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
@@ -1749,7 +1693,11 @@ where
     I: IpExt,
     C: ContextPair,
     C::CoreContext: StateContext<I, C::BindingsContext>
-        + CounterContext<UdpCounters<I>>
+        + UdpCounterContext<
+            I,
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            C::BindingsContext,
+        >
         // NB: This bound is somewhat redundant to StateContext but it helps the
         // compiler know we're using UDP datagram sockets.
         + DatagramStateContext<I, C::BindingsContext, Udp<C::BindingsContext>>,
@@ -2428,9 +2376,9 @@ where
         id: &UdpApiSocketId<I, C>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
-        self.core_ctx().counters().tx.increment();
+        self.core_ctx().increment_both(id, |c| &c.tx);
         self.datagram().send_conn(id, body).map_err(|err| {
-            self.core_ctx().counters().tx_error.increment();
+            self.core_ctx().increment_both(id, |c| &c.tx_error);
             match err {
                 DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
                 DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
@@ -2472,9 +2420,9 @@ where
             UdpRemotePort::Set(_) => {}
         }
 
-        self.core_ctx().counters().tx.increment();
+        self.core_ctx().increment_both(id, |c| &c.tx);
         self.datagram().send_to(id, remote_ip, remote_port, body).map_err(|e| {
-            self.core_ctx().counters().tx_error.increment();
+            self.core_ctx().increment_both(id, |c| &c.tx_error);
             match e {
                 Either::Left(e) => Either::Left(e),
                 Either::Right(e) => {
@@ -2514,9 +2462,19 @@ where
     where
         N: Inspector
             + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        for<'a> N::ChildInspector<'a>:
+            InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         DatagramStateContext::for_each_socket(self.core_ctx(), |_ctx, socket_id, socket_state| {
-            socket_state.record_common_info(inspector, socket_id);
+            inspector.record_debug_child(socket_id, |inspector| {
+                socket_state.record_common_info(inspector);
+                inspector.record_child("Counters", |inspector| {
+                    inspector.delegate_inspectable(&CombinedUdpCounters {
+                        with_socket: socket_id.counters(),
+                        without_socket: None,
+                    });
+                });
+            });
         });
     }
 }
@@ -2766,7 +2724,8 @@ mod tests {
         TestIpExt as _,
     };
     use netstack3_base::{
-        CtxPair, RemoteAddressError, SendFrameErrorReason, UninstantiableWrapper,
+        CtxPair, RemoteAddressError, ResourceCounterContext, SendFrameErrorReason,
+        UninstantiableWrapper,
     };
     use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_ip::device::IpDeviceStateIpExt;
@@ -2774,8 +2733,11 @@ mod tests {
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
     use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
     use packet::Buf;
-
     use test_case::test_case;
+
+    use crate::internal::counters::testutil::{
+        CounterExpectationsWithSocket, CounterExpectationsWithoutSocket,
+    };
 
     use super::*;
 
@@ -3039,10 +3001,6 @@ mod tests {
             cb(&mut self.bound_sockets)
         }
 
-        fn should_send_port_unreachable(&mut self) -> bool {
-            false
-        }
-
         fn for_each_socket<
             F: FnMut(
                 &mut Self::SocketStateCtx<'_>,
@@ -3220,8 +3178,10 @@ mod tests {
     struct FakeDualStackSocketState<D: StrongDeviceIdentifier> {
         v4: UdpSocketSet<Ipv4, D::Weak, FakeUdpBindingsCtx<D>>,
         v6: UdpSocketSet<Ipv6, D::Weak, FakeUdpBindingsCtx<D>>,
-        udpv4_counters: UdpCounters<Ipv4>,
-        udpv6_counters: UdpCounters<Ipv6>,
+        udpv4_counters_with_socket: UdpCountersWithSocket<Ipv4>,
+        udpv6_counters_with_socket: UdpCountersWithSocket<Ipv6>,
+        udpv4_counters_without_socket: UdpCountersWithoutSocket<Ipv4>,
+        udpv6_counters_without_socket: UdpCountersWithoutSocket<Ipv6>,
     }
 
     impl<D: StrongDeviceIdentifier> FakeDualStackSocketState<D> {
@@ -3235,8 +3195,19 @@ mod tests {
             I::map_ip_out(self, |dual| &mut dual.v4, |dual| &mut dual.v6)
         }
 
-        fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-            I::map_ip_out(self, |dual| &dual.udpv4_counters, |dual| &dual.udpv6_counters)
+        fn udp_counters_with_socket<I: Ip>(&self) -> &UdpCountersWithSocket<I> {
+            I::map_ip_out(
+                self,
+                |dual| &dual.udpv4_counters_with_socket,
+                |dual| &dual.udpv6_counters_with_socket,
+            )
+        }
+        fn udp_counters_without_socket<I: Ip>(&self) -> &UdpCountersWithoutSocket<I> {
+            I::map_ip_out(
+                self,
+                |dual| &dual.udpv4_counters_without_socket,
+                |dual| &dual.udpv6_counters_without_socket,
+            )
         }
     }
     struct FakeUdpCoreCtx<D: FakeStrongDeviceId> {
@@ -3246,9 +3217,31 @@ mod tests {
         all_sockets: FakeDualStackSocketState<D>,
     }
 
-    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpCoreCtx<D> {
-        fn counters(&self) -> &UdpCounters<I> {
-            &self.all_sockets.udp_counters()
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCountersWithSocket<I>> for FakeUdpCoreCtx<D> {
+        fn counters(&self) -> &UdpCountersWithSocket<I> {
+            &self.all_sockets.udp_counters_with_socket()
+        }
+    }
+
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCountersWithoutSocket<I>>
+        for FakeUdpCoreCtx<D>
+    {
+        fn counters(&self) -> &UdpCountersWithoutSocket<I> {
+            &self.all_sockets.udp_counters_without_socket()
+        }
+    }
+
+    impl<I: DualStackIpExt, D: FakeStrongDeviceId>
+        ResourceCounterContext<
+            UdpSocketId<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>,
+            UdpCountersWithSocket<I>,
+        > for FakeUdpCoreCtx<D>
+    {
+        fn per_resource_counters<'a>(
+            &'a self,
+            resource: &'a UdpSocketId<I, FakeWeakDeviceId<D>, FakeUdpBindingsCtx<D>>,
+        ) -> &'a UdpCountersWithSocket<I> {
+            resource.counters()
         }
     }
 
@@ -3305,7 +3298,8 @@ mod tests {
         device: D,
         meta: UdpPacketMeta<I>,
         body: &[u8],
-    ) where
+    ) -> Result<(), TransportReceiveError>
+    where
         UdpIpTransportContext: IpTransportContext<I, FakeUdpBindingsCtx<D>, CC>,
     {
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, dscp_and_ecn } = meta;
@@ -3328,7 +3322,7 @@ mod tests {
                 ..Default::default()
             },
         )
-        .expect("Receive IP packet succeeds");
+        .map_err(|(_buffer, e)| e)
     }
 
     const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
@@ -3372,6 +3366,41 @@ mod tests {
         I: TestIpExt,
     {
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: None }, device }.into()
+    }
+
+    #[track_caller]
+    fn assert_counters<
+        'a,
+        I: IpExt,
+        D: WeakDeviceIdentifier,
+        BT: UdpBindingsTypes,
+        CC: UdpCounterContext<I, D, BT>,
+    >(
+        core_ctx: &CC,
+        with_socket_expects: CounterExpectationsWithSocket,
+        without_socket_expects: CounterExpectationsWithoutSocket,
+        per_socket_expects: impl IntoIterator<
+            Item = (&'a UdpSocketId<I, D, BT>, CounterExpectationsWithSocket),
+        >,
+    ) {
+        assert_eq!(
+            CounterExpectationsWithSocket::from(
+                CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).as_ref()
+            ),
+            with_socket_expects
+        );
+        assert_eq!(
+            CounterExpectationsWithoutSocket::from(
+                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).as_ref()
+            ),
+            without_socket_expects
+        );
+        for (id, expects) in per_socket_expects.into_iter() {
+            assert_eq!(
+                CounterExpectationsWithSocket::from(core_ctx.per_resource_counters(id).as_ref()),
+                expects
+            );
+        }
     }
 
     #[ip_test(I)]
@@ -3444,7 +3473,8 @@ mod tests {
             dst_port: LOCAL_PORT,
             dscp_and_ecn: DscpAndEcn::default(),
         };
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body[..])
+            .expect("receive udp packet should succeed");
 
         assert_eq!(
             bindings_ctx.state.received::<I>(),
@@ -3521,7 +3551,10 @@ mod tests {
             dscp_and_ecn: DscpAndEcn::default(),
         };
         let body = [1, 2, 3, 4, 5];
-        receive_udp_packet(&mut core_ctx, &mut bindings_ctx, FakeDeviceId, meta, &body[..]);
+        assert_matches!(
+            receive_udp_packet(&mut core_ctx, &mut bindings_ctx, FakeDeviceId, meta, &body[..]),
+            Err(TransportReceiveError::PortUnreachable)
+        );
         assert_eq!(&bindings_ctx.state.socket_data::<I>(), &HashMap::new());
     }
 
@@ -3553,7 +3586,8 @@ mod tests {
         };
         let body = [1, 2, 3, 4, 5];
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body[..])
+            .expect("receive udp packet should succeed");
 
         assert_eq!(
             bindings_ctx.state.socket_data(),
@@ -3586,6 +3620,15 @@ mod tests {
         assert_eq!(udp_packet.src_port().unwrap(), LOCAL_PORT);
         assert_eq!(udp_packet.dst_port(), REMOTE_PORT);
         assert_eq!(udp_packet.body(), &body[..]);
+
+        let expects_with_socket =
+            || CounterExpectationsWithSocket { rx_delivered: 1, tx: 1, ..Default::default() };
+        assert_counters(
+            api.core_ctx(),
+            expects_with_socket(),
+            CounterExpectationsWithoutSocket { rx: 1, ..Default::default() },
+            [(&socket, expects_with_socket())],
+        )
     }
 
     /// Tests that UDP connections fail with an appropriate error for
@@ -3964,6 +4007,15 @@ mod tests {
         // Now try to send something over this new connection:
         let send_err = api.send(&socket, Buf::new(Vec::new(), ..)).unwrap_err();
         assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
+
+        let expects_with_socket =
+            || CounterExpectationsWithSocket { tx: 1, tx_error: 1, ..Default::default() };
+        assert_counters(
+            api.core_ctx(),
+            expects_with_socket(),
+            Default::default(),
+            [(&socket, expects_with_socket())],
+        )
     }
 
     #[ip_test(I)]
@@ -4069,7 +4121,8 @@ mod tests {
         let packet = [1, 1, 1, 1];
         let (core_ctx, bindings_ctx) = api.contexts();
 
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &packet[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &packet[..])
+            .expect("receive udp packet should succeed");
 
         assert_eq!(
             bindings_ctx.state.socket_data(),
@@ -4077,7 +4130,10 @@ mod tests {
         );
         api.shutdown(&socket, which).expect("is connected");
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &packet[..]);
+        assert_matches!(
+            receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &packet[..]),
+            Err(TransportReceiveError::PortUnreachable)
+        );
         assert_eq!(
             bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
@@ -4086,7 +4142,10 @@ mod tests {
         // Calling shutdown for the send direction doesn't change anything.
         api.shutdown(&socket, ShutdownType::Send).expect("is connected");
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &packet[..]);
+        assert_matches!(
+            receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &packet[..]),
+            Err(TransportReceiveError::PortUnreachable)
+        );
         assert_eq!(
             bindings_ctx.state.socket_data(),
             HashMap::from([(socket.downgrade(), vec![&packet[..]])])
@@ -4146,7 +4205,8 @@ mod tests {
         };
         let body_conn1 = [1, 1, 1, 1];
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_conn1[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_conn1[..])
+            .expect("receive udp packet should succeed");
         expectations
             .entry(conn1.downgrade())
             .or_default()
@@ -4162,7 +4222,8 @@ mod tests {
             dscp_and_ecn: DscpAndEcn::default(),
         };
         let body_conn2 = [2, 2, 2, 2];
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_conn2[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_conn2[..])
+            .expect("receive udp packet should succeed");
         expectations
             .entry(conn2.downgrade())
             .or_default()
@@ -4178,7 +4239,8 @@ mod tests {
             dscp_and_ecn: DscpAndEcn::default(),
         };
         let body_list1 = [3, 3, 3, 3];
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_list1[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_list1[..])
+            .expect("receive udp packet should succeed");
         expectations
             .entry(list1.downgrade())
             .or_default()
@@ -4194,7 +4256,8 @@ mod tests {
             dscp_and_ecn: DscpAndEcn::default(),
         };
         let body_list2 = [4, 4, 4, 4];
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_list2[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body_list2[..])
+            .expect("receive udp packet should succeed");
         expectations
             .entry(list2.downgrade())
             .or_default()
@@ -4216,7 +4279,8 @@ mod tests {
             FakeDeviceId,
             meta.clone(),
             &body_wildcard_list[..],
-        );
+        )
+        .expect("receive udp packet should succeed");
         expectations
             .entry(wildcard_list.downgrade())
             .or_default()
@@ -4247,7 +4311,8 @@ mod tests {
             dst_port: LOCAL_PORT,
             dscp_and_ecn: DscpAndEcn::default(),
         };
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta_1.clone(), &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta_1.clone(), &body[..])
+            .expect("receive udp packet should succeed");
 
         // Receive into a different local IP.
         let meta_2 = UdpPacketMeta {
@@ -4257,7 +4322,8 @@ mod tests {
             dst_port: LOCAL_PORT,
             dscp_and_ecn: DscpAndEcn::default(),
         };
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta_2.clone(), &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta_2.clone(), &body[..])
+            .expect("receive udp packet should succeed");
 
         // Check that we received both packets for the listener.
         assert_eq!(
@@ -4292,7 +4358,8 @@ mod tests {
         };
 
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta.clone(), &body[..])
+            .expect("receive udp packet should succeed");
         // Check that we received both packets for the listener.
         assert_eq!(
             bindings_ctx.state.received(),
@@ -4320,7 +4387,8 @@ mod tests {
         };
         let body = [];
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body[..])
+            .expect("receive udp packet should succeed");
         // Check that we received the packet on the listener.
         assert_eq!(
             bindings_ctx.state.socket_data(),
@@ -4407,6 +4475,7 @@ mod tests {
             };
             let body = [body];
             receive_udp_packet(core_ctx, bindings_ctx, FakeDeviceId, meta, &body)
+                .expect("receive udp packet should succeed")
         };
 
         // These packets should be received by all listeners.
@@ -4424,6 +4493,26 @@ mod tests {
                 (any_listener.downgrade(), vec![&[1], &[2], &[3]]),
             ]),
         );
+
+        assert_counters(
+            api.core_ctx(),
+            CounterExpectationsWithSocket { rx_delivered: 7, ..Default::default() },
+            CounterExpectationsWithoutSocket { rx: 3, ..Default::default() },
+            [
+                (
+                    &any_listener,
+                    CounterExpectationsWithSocket { rx_delivered: 3, ..Default::default() },
+                ),
+                (
+                    &specific_listeners[0],
+                    CounterExpectationsWithSocket { rx_delivered: 2, ..Default::default() },
+                ),
+                (
+                    &specific_listeners[1],
+                    CounterExpectationsWithSocket { rx_delivered: 2, ..Default::default() },
+                ),
+            ],
+        )
     }
 
     type UdpMultipleDevicesCtx = FakeUdpCtx<MultipleDevicesId>;
@@ -4492,11 +4581,13 @@ mod tests {
         };
         let body = [1, 2, 3, 4, 5];
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_udp_packet(core_ctx, bindings_ctx, MultipleDevicesId::A, meta.clone(), &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, MultipleDevicesId::A, meta.clone(), &body[..])
+            .expect("receive udp packet should succeed");
 
         // A second packet received on `MultipleDevicesId::B` will go to the
         // second socket.
-        receive_udp_packet(core_ctx, bindings_ctx, MultipleDevicesId::B, meta, &body[..]);
+        receive_udp_packet(core_ctx, bindings_ctx, MultipleDevicesId::B, meta, &body[..])
+            .expect("receive udp packet should succeed");
         assert_eq!(
             bindings_ctx.state.socket_data(),
             HashMap::from([
@@ -4564,7 +4655,7 @@ mod tests {
         core_ctx: &mut UdpMultipleDevicesCoreCtx,
         bindings_ctx: &mut UdpMultipleDevicesBindingsCtx,
         device: MultipleDevicesId,
-    ) {
+    ) -> Result<(), TransportReceiveError> {
         let meta = UdpPacketMeta::<I> {
             src_ip: I::get_other_remote_ip_address(1).get(),
             src_port: Some(REMOTE_PORT),
@@ -4592,14 +4683,18 @@ mod tests {
 
         // Since it is bound, it does not receive a packet from another device.
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
+        assert_matches!(
+            receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B),
+            Err(TransportReceiveError::PortUnreachable)
+        );
         let received = &bindings_ctx.state.socket_data::<I>();
         assert_eq!(received, &HashMap::new());
 
         // When unbound, the socket can receive packets on the other device.
         api.set_device(&socket, None).expect("clearing bound device failed");
         let (core_ctx, bindings_ctx) = api.contexts();
-        receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B);
+        receive_packet_on::<I>(core_ctx, bindings_ctx, MultipleDevicesId::B)
+            .expect("receive udp packet should succeed");
         let received = bindings_ctx.state.received::<I>().iter().collect::<Vec<_>>();
         let (rx_socket, socket_received) =
             assert_matches!(received[..], [(rx_socket, packets)] => (rx_socket, packets));
@@ -4722,6 +4817,7 @@ mod tests {
             };
             let body = vec![index_for_device(device)];
             receive_udp_packet(core_ctx, bindings_ctx, device, meta, &body)
+                .expect("receive udp packet should succeed")
         };
 
         // Receive packets from the remote IP on each device (2 packets total).
@@ -6229,7 +6325,8 @@ mod tests {
                 dscp_and_ecn: DscpAndEcn::default(),
             },
             BODY,
-        );
+        )
+        .expect("receive udp packet should succeed");
 
         assert_eq!(
             bindings_ctx.state.received::<Ipv6>(),
@@ -7076,7 +7173,12 @@ mod tests {
         where
             I: TestIpExt,
             C: ContextPair,
-            C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
+            C::CoreContext: StateContext<I, C::BindingsContext>
+                + UdpCounterContext<
+                    I,
+                    <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                    C::BindingsContext,
+                >,
             C::BindingsContext:
                 UdpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
             <C::BindingsContext as UdpBindingsTypes>::ExternalData<I>: Default,

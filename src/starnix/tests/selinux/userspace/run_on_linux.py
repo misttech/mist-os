@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 
-SUCCESS_RE = re.compile("^TEST SUCCESS$", re.MULTILINE)
+SUCCESS_RE = re.compile("TEST SUCCESS$", re.MULTILINE)
 
 
 def parse_manifest(
@@ -76,7 +76,7 @@ def build_initrd(
         shutil.copy(output_path, initrd_dir / dest_path)
 
     subprocess.run(
-        "find . | cpio --quiet -H newc -o | gzip -9 -n > ../initrd.img",
+        "find . | cpio --quiet -R +0:+0 -H newc -o | gzip -9 -n > ../initrd.img",
         shell=True,
         check=True,
         cwd=initrd_dir,
@@ -179,7 +179,11 @@ def build_and_run_tests(
 
     print("Re-building tests...")
     subprocess.run(
-        ["fx", "build", "sestarnix_userspace_tests"],
+        [
+            "fx",
+            "build",
+            "//src/starnix/tests/selinux/userspace:sestarnix_userspace_tests",
+        ],
         check=True,
         cwd=fuchsia_dir,
     )

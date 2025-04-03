@@ -63,6 +63,9 @@ pub enum MetadataError {
 
     #[error("while interfacing with policy")]
     Policy(#[source] PolicyError),
+
+    #[error("the commit timed out")]
+    Timeout,
 }
 
 /// Helper to convert fidl's nested errors.

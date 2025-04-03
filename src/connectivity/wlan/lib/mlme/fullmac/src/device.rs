@@ -18,7 +18,6 @@ pub trait DeviceOps {
         fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
     ) -> Result<fidl::Channel, zx::Status>;
     fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse>;
-    fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport>;
     fn query_spectrum_management_support(
         &self,
@@ -40,7 +39,7 @@ pub trait DeviceOps {
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
-    fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
+    fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse>;
     fn get_iface_histogram_stats(
         &self,
     ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
@@ -96,13 +95,6 @@ impl DeviceOps for FullmacDevice {
             .query(zx::MonotonicInstant::INFINITE)
             .context("FIDL error on QueryDeviceInfo")?
             .map_err(|e| format_err!("Driver returned error on QueryDeviceInfo: {}", e))
-    }
-
-    fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
-        self.fullmac_impl_sync_proxy
-            .query_mac_sublayer_support(zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on QueryMacSublayerSupport")?
-            .map_err(|e| format_err!("Driver returned error on QueryMacSublayerSupport: {}", e))
     }
 
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport> {
@@ -195,14 +187,14 @@ impl DeviceOps for FullmacDevice {
             .eapol_tx(&req, zx::MonotonicInstant::INFINITE)
             .context("FIDL error on EapolTx")
     }
-    fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
+    fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse> {
         match self
             .fullmac_impl_sync_proxy
-            .get_iface_counter_stats(zx::MonotonicInstant::INFINITE)
-            .context("FIDL error on GetIfaceCounterStats")?
+            .get_iface_stats(zx::MonotonicInstant::INFINITE)
+            .context("FIDL error on GetIfaceStats")?
         {
-            Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats)),
-            Err(e) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(e)),
+            Ok(stats) => Ok(fidl_mlme::GetIfaceStatsResponse::Stats(stats)),
+            Err(e) => Ok(fidl_mlme::GetIfaceStatsResponse::ErrorStatus(e)),
         }
     }
     fn get_iface_histogram_stats(
@@ -268,7 +260,7 @@ pub mod test_utils {
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         QueryTelemetrySupport,
-        GetIfaceCounterStats,
+        GetIfaceStats,
         GetIfaceHistogramStats,
         SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
         SaeFrameTx { frame: fidl_fullmac::SaeFrame },
@@ -285,13 +277,12 @@ pub mod test_utils {
         // If any of the query mocks are None, then an Err is returned from DeviceOps with an empty
         // error message.
         pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacImplQueryResponse>,
-        pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
         pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
         pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
         pub query_telemetry_support_mock: Option<Result<fidl_stats::TelemetrySupport, i32>>,
 
         pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
-        pub get_iface_counter_stats_mock: Option<fidl_mlme::GetIfaceCounterStatsResponse>,
+        pub get_iface_stats_mock: Option<fidl_mlme::GetIfaceStatsResponse>,
         pub get_iface_histogram_stats_mock: Option<fidl_mlme::GetIfaceHistogramStatsResponse>,
 
         pub fullmac_ifc_client_end: Option<ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>>,
@@ -332,19 +323,6 @@ pub mod test_utils {
                         band_caps: Some(vec![]),
                         ..Default::default()
                     }),
-                    query_mac_sublayer_support_mock: Some(fidl_common::MacSublayerSupport {
-                        rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
-                            supported: false,
-                        },
-                        data_plane: fidl_common::DataPlaneExtension {
-                            data_plane_type: fidl_common::DataPlaneType::GenericNetworkDevice,
-                        },
-                        device: fidl_common::DeviceExtension {
-                            is_synthetic: true,
-                            mac_implementation_type: fidl_common::MacImplementationType::Fullmac,
-                            tx_status_report_supported: false,
-                        },
-                    }),
                     query_security_support_mock: Some(fidl_common::SecuritySupport {
                         sae: fidl_common::SaeFeature {
                             driver_handler_supported: false,
@@ -361,7 +339,7 @@ pub mod test_utils {
                         ..Default::default()
                     })),
                     set_keys_resp_mock: None,
-                    get_iface_counter_stats_mock: None,
+                    get_iface_stats_mock: None,
                     get_iface_histogram_stats_mock: None,
                 })),
             };
@@ -388,15 +366,6 @@ pub mod test_utils {
 
         fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacImplQueryResponse> {
             self.mocks.lock().unwrap().query_device_info_mock.clone().ok_or(format_err!(""))
-        }
-
-        fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
-            self.mocks
-                .lock()
-                .unwrap()
-                .query_mac_sublayer_support_mock
-                .clone()
-                .ok_or(format_err!(""))
         }
 
         fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport> {
@@ -498,12 +467,10 @@ pub mod test_utils {
             self.driver_call_sender.send(DriverCall::EapolTx { req });
             Ok(())
         }
-        fn get_iface_counter_stats(
-            &self,
-        ) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
-            self.driver_call_sender.send(DriverCall::GetIfaceCounterStats);
-            Ok(self.mocks.lock().unwrap().get_iface_counter_stats_mock.clone().unwrap_or(
-                fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED),
+        fn get_iface_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceStatsResponse> {
+            self.driver_call_sender.send(DriverCall::GetIfaceStats);
+            Ok(self.mocks.lock().unwrap().get_iface_stats_mock.clone().unwrap_or(
+                fidl_mlme::GetIfaceStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED),
             ))
         }
         fn get_iface_histogram_stats(

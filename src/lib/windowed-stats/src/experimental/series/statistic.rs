@@ -189,8 +189,36 @@ impl Statistic for ArithmeticMean<f32> {
     fn aggregation(&self) -> Option<Self::Aggregation> {
         // This is lossy and lossiness correlates to the magnitude of `n`. See details of
         // `u64 as f32` casts.
-        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f32));
-        aggregation
+        (self.n > 0).then(|| self.sum / (self.n as f32))
+    }
+}
+
+impl Sampler<i64> for ArithmeticMean<i64> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: i64) -> Result<(), Self::Error> {
+        // TODO(https://fxbug.dev/351848566): On overflow, either saturate `self.n` or leave both
+        //                                    `self.sum` and `self.n` unchanged (here and in
+        //                                    `Sampler::fold` and `Fill::fill` implementations; see
+        //                                    below).
+        self.sum = self.sum.checked_add(sample).ok_or(OverflowError)?;
+        self.increment(1)
+    }
+}
+
+impl Statistic for ArithmeticMean<i64> {
+    type Semantic = Gauge;
+    type Sample = i64;
+    type Aggregation = f32;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        // This is lossy and lossiness correlates to the magnitude of `n`. See details of
+        // `i64 as f32` casts.
+        (self.n > 0).then(|| self.sum as f32 / (self.n as f32))
     }
 }
 
@@ -199,8 +227,6 @@ impl Statistic for ArithmeticMean<f32> {
 /// The sum directly computes the aggregation in the domain of samples.
 ///
 /// This statistic is sensitive to overflow in the sum of samples.
-///
-/// TODO(https://fxbug.dev/370821318): Implement Statistic for Sum<i64>
 #[derive(Clone, Debug)]
 pub struct Sum<T> {
     /// The sum of samples.
@@ -262,6 +288,85 @@ impl Statistic for Sum<u64> {
     }
 }
 
+impl Sampler<i64> for Sum<i64> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: i64) -> Result<(), Self::Error> {
+        // TODO(https://fxbug.dev/351848566): Saturate `self.sum` on overflow.
+        self.sum.checked_add(sample).inspect(|sum| self.sum = *sum).map(|_| ()).ok_or(OverflowError)
+    }
+}
+
+impl Statistic for Sum<i64> {
+    type Semantic = Gauge;
+    type Sample = i64;
+    type Aggregation = i64;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        let sum = self.sum;
+        Some(sum)
+    }
+}
+
+/// Minimum statistic.
+#[derive(Clone, Debug, Default)]
+pub struct Min<T> {
+    /// The minimum of samples.
+    min: Option<T>,
+}
+
+impl<T> Min<T> {
+    pub fn with_min(min: T) -> Self {
+        Min { min: Some(min) }
+    }
+}
+
+impl<T> Fill<T> for Min<T>
+where
+    Self: Sampler<T, Error = OverflowError>,
+    T: Num + NumCast,
+{
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl<T> Sampler<T> for Min<T>
+where
+    T: Ord + Copy + Num,
+{
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
+        self.min = Some(match self.min {
+            Some(min) => cmp::min(min, sample),
+            _ => sample,
+        });
+        Ok(())
+    }
+}
+
+impl<T> Statistic for Min<T>
+where
+    T: Ord + Copy + Zero + Num + NumCast + Default,
+{
+    type Semantic = Gauge;
+    type Sample = T;
+    type Aggregation = T;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.min
+    }
+}
+
 /// Maximum statistic.
 #[derive(Clone, Debug, Default)]
 pub struct Max<T> {
@@ -314,6 +419,58 @@ where
 
     fn aggregation(&self) -> Option<Self::Aggregation> {
         self.max
+    }
+}
+
+/// Statistic for keeping the most recent sample.
+#[derive(Clone, Debug, Default)]
+pub struct Last<T> {
+    /// The most recent sample.
+    last: Option<T>,
+}
+
+impl<T> Last<T> {
+    pub fn with_sample(sample: T) -> Self {
+        Last { last: Some(sample) }
+    }
+}
+
+impl<T> Fill<T> for Last<T>
+where
+    Self: Sampler<T, Error = OverflowError>,
+    T: Num + NumCast,
+{
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl<T> Sampler<T> for Last<T>
+where
+    T: Copy + Num,
+{
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
+        self.last = Some(sample);
+        Ok(())
+    }
+}
+
+impl<T> Statistic for Last<T>
+where
+    T: Copy + Zero + Num + NumCast + Default,
+{
+    type Semantic = Gauge;
+    type Sample = T;
+    type Aggregation = T;
+
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.last
     }
 }
 
@@ -580,7 +737,8 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Reset, Statistic, Sum, Union,
+        ArithmeticMean, Last, LatchMax, Max, Min, OverflowError, PostAggregation, Reset, Statistic,
+        Sum, Union,
     };
     use crate::experimental::series::{Fill, Sampler};
 
@@ -617,6 +775,45 @@ mod tests {
     }
 
     #[test]
+    fn arithmetic_mean_i64_aggregation() {
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fold(1).unwrap();
+        mean.fold(1).unwrap();
+        mean.fold(1).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fold(0).unwrap();
+        mean.fold(1).unwrap();
+        mean.fold(2).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_aggregation_fill() {
+        let mut mean = ArithmeticMean::<i64>::default();
+        mean.fill(1, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = mean.aggregation().unwrap();
+        assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_sum_overflow() {
+        let mut mean = ArithmeticMean::<i64> { sum: i64::MAX, n: 1 };
+        let result = mean.fold(1);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn arithmetic_mean_i64_count_overflow() {
+        let mut mean = ArithmeticMean::<i64> { sum: 1, n: u64::MAX };
+        let result = mean.fold(1);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
     fn sum_aggregation() {
         let mut sum = Sum::<u64>::default();
         sum.fold(1).unwrap();
@@ -649,6 +846,56 @@ mod tests {
     }
 
     #[test]
+    fn sum_i64_aggregation() {
+        let mut sum = Sum::<i64>::default();
+        sum.fold(1).unwrap();
+        sum.fold(1).unwrap();
+        sum.fold(1).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 3);
+
+        let mut sum = Sum::<i64>::default();
+        sum.fold(0).unwrap();
+        sum.fold(1).unwrap();
+        sum.fold(2).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 3);
+    }
+
+    #[test]
+    fn sum_i64_aggregation_fill() {
+        let mut sum = Sum::<i64>::default();
+        sum.fill(10, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = sum.aggregation().unwrap();
+        assert_eq!(aggregation, 10_000);
+    }
+
+    #[test]
+    fn sum_i64_overflow() {
+        let mut sum = Sum::<i64> { sum: i64::MAX };
+        let result = sum.fold(1);
+        assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn min_aggregation() {
+        let mut min = Min::<u64>::default();
+        min.fold(10).unwrap();
+        min.fold(1337).unwrap();
+        min.fold(42).unwrap();
+        let aggregation = min.aggregation().unwrap();
+        assert_eq!(aggregation, 10);
+    }
+
+    #[test]
+    fn min_aggregation_fill() {
+        let mut min = Min::<u64>::default();
+        min.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = min.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
+    }
+
+    #[test]
     fn max_aggregation() {
         let mut max = Max::<u64>::default();
         max.fold(0).unwrap();
@@ -663,6 +910,24 @@ mod tests {
         let mut max = Max::<u64>::default();
         max.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = max.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn last_aggregation() {
+        let mut last = Last::<u64>::default();
+        last.fold(0).unwrap();
+        last.fold(1337).unwrap();
+        last.fold(42).unwrap();
+        let aggregation = last.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn last_aggregation_fill() {
+        let mut last = Last::<u64>::default();
+        last.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
+        let aggregation = last.aggregation().unwrap();
         assert_eq!(aggregation, 42);
     }
 

@@ -23,11 +23,9 @@
             to: "#brightness_manager",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.backlight.Service",
             from: "parent",
-            as: "dev-backlight",
             to: "#brightness_manager",
-            subdir: "backlight",
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have

@@ -7,6 +7,12 @@ library fuchsia.io;
 using fuchsia.unknown;
 using zx;
 
+/// Information that describes the target node.
+@available(added=NEXT)
+type NodeInfo = table {
+    1: attributes NodeAttributes2;
+};
+
 /// The maximum size for an extended attribute name.
 @available(added=18)
 const MAX_ATTRIBUTE_NAME uint64 = 255;
@@ -110,6 +116,29 @@ type NodeAttributesQuery = flexible bits : uint64 {
     /// fscrypt attribute.
     @available(added=HEAD)
     WRAPPING_KEY_ID = 0x80000;
+
+    /// When this is queried in [`fuchsia.io/Node.GetAttributes`], it indicates to the filesystem
+    /// that this node has been accessed and is pending an access time update given that any one of
+    /// the following conditions are met:
+    ///   * current_access_time <= current_modification_time
+    ///   * current_access_time <= current_change_time
+    ///   * current_access_time < current_time - duration(1 day)
+    ///
+    /// If any of the above conditions are met, `access_time` is updated to the current time before
+    /// any queried node attributes are returned.
+    ///
+    /// This is compatible with Linux relatime mount.
+    ///
+    /// The rationale behind adding this `NodeAttributesQuery` is that some filesystems, e.g. Fxfs,
+    /// are unable to identify when a file access has occured and thus update the access time. We
+    /// allow for clients to communicate to the underlying filesystem that a file access has
+    /// occurred and that it awaits for an update to access time.
+    ///
+    /// WARNING: If this is queried without a prior file access, as long as the above conditions
+    /// are met, the node's access time will be updated. Not all filesystems will support this. The
+    /// query will be ignored if the filesystem does not support this.
+    @available(added=HEAD)
+    PENDING_ACCESS_TIME_UPDATE = 0x100000;
 };
 
 type MutableNodeAttributes = table {
@@ -148,10 +177,10 @@ type MutableNodeAttributes = table {
     /// implementations. The value can only be set or returned if it is
     /// [`MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN`] characters or less to constrain the size of the
     /// response. If the value is not currently found on the node the response the field will not
-    /// be included in the repsonse. If the value is found on the node but the server is not
+    /// be included in the response. If the value is found on the node but the server is not
     /// returning it here due to size or implementation, then it will return
     /// `use_extended_attributes` to indicate using the ['fuchsia.io/Node.GetExtendedAttribute`]
-    /// to retreive it.
+    /// to retrieve it.
     ///
     /// ZX_ERR_INVALID_ARGS will be returned if there is an attempt set this attribute with the
     /// `use_extended_attributes` member.
@@ -514,59 +543,33 @@ open protocol Node {
         }>;
     });
 
-    /// An event produced eagerly by the server if requested by
-    /// [`NodeFlags.GET_REPRESENTATION`]. This event will be the first message
-    /// from the server, and is sent exactly once.
+    /// An event produced eagerly by the server if requested by [`Flags.FLAG_SEND_REPRESENTATION`].
+    /// This event will be sent as the first message from the server, and is sent exactly once.
     ///
-    /// The active variant corresponds to one of the supported protocols of
-    /// the node, and represents the result of the connection-time
-    /// negotiation. Provides auxiliary handles if applicable.
-    ///
-    /// If the client specified more than one protocol in `protocols` during
-    /// [`Directory.Open`], the [`Representation`] carries additionally the
-    /// result of the connection-time negotiation via its tag.
-    ///
-    /// The elements have one-to-one correspondence with the members of
-    /// [`NodeProtocolKinds`].
-    ///
-    /// This is a special case of [`fuchsia.unknown/Queryable.Query`] +
-    /// inherent `Describe` methods on the specific protocols. It exists as
-    /// an optimization to avoid an additional round trip.
+    /// The active variant corresponds to the negotiated protocol for the target node (i.e. the
+    /// protocol which this channel now speaks). Additionally, auxiliary handles and requested
+    /// attributes are also returned in the event.
     @selector("fuchsia.io/Node.OnRepresentation")
     strict -> OnRepresentation(@generated_name("Representation") flexible resource union {
-        /// Auxiliary data for the connector representation of a node, used
-        /// for protocol discovery and connection.
-        ///
-        /// It supports connecting to arbitrary protocols exported by the
-        /// filesystem server at a path, including ones that do not compose
-        /// [`Node2`].
-        ///
-        /// See [`NodeProtocolKinds.CONNECTOR`].
+        /// The [`Node`] protocol was negotiated for this connection.
+        @available(replaced=NEXT, renamed="node")
         1: connector @generated_name("ConnectorInfo") table {
             /// Requested attributes for the object. This is only populated if requested.
             @available(added=18)
             1: attributes NodeAttributes2;
         };
 
-        /// Auxiliary data for the directory representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`Directory`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.DIRECTORY`].
+        /// The [`Node`] protocol was negotiated for this connection.
+        @available(added=NEXT)
+        1: node NodeInfo;
+
+        /// The [`File`] protocol was negotiated for this connection.
         2: directory DirectoryInfo;
 
-        /// Auxiliary data for the file representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`File`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.FILE`].
+        /// The [`File`] protocol was negotiated for this connection.
         3: file FileInfo;
 
-        /// Auxilliary data for the symlink representation of a node. The
-        /// selection of this variant in [`Representation`] implies that the
-        /// connection speaks the [`Symlink`] protocol.
-        ///
-        /// See [`NodeProtocolKinds.SYMLINK`].
+        /// The [`Symlink`] protocol was negotiated for this connection.
         @available(added=18)
         4: symlink SymlinkInfo;
     });

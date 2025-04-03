@@ -21,7 +21,7 @@ use netstack3_base::{Instant, Mss, SeqNum, WindowSize};
 // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-3.2):
 ///   The fast retransmit algorithm uses the arrival of 3 duplicate ACKs (...)
 ///   as an indication that a segment has been lost.
-const DUP_ACK_THRESHOLD: u8 = 3;
+pub(crate) const DUP_ACK_THRESHOLD: u8 = 3;
 
 /// Holds the parameters of congestion control that are common to algorithms.
 #[derive(Debug)]
@@ -69,7 +69,7 @@ impl CongestionControlParams {
 /// - Fast retransmit
 /// - Fast recovery: https://datatracker.ietf.org/doc/html/rfc5681#section-3
 #[derive(Debug)]
-pub(super) struct CongestionControl<I> {
+pub(crate) struct CongestionControl<I> {
     params: CongestionControlParams,
     algorithm: LossBasedAlgorithm<I>,
     /// The connection is in fast recovery when this field is a [`Some`].
@@ -195,6 +195,10 @@ impl<I: Instant> CongestionControl<I> {
         cwnd
     }
 
+    pub(super) fn slow_start_threshold(&self) -> u32 {
+        self.params.ssthresh
+    }
+
     /// Returns the starting sequence number of the segment that needs to be
     /// retransmitted, if any.
     pub(super) fn fast_retransmit(&mut self) -> Option<SeqNum> {
@@ -211,6 +215,27 @@ impl<I: Instant> CongestionControl<I> {
 
     pub(super) fn mss(&self) -> Mss {
         self.params.mss
+    }
+
+    pub(super) fn update_mss(&mut self, mss: Mss) {
+        // From [RFC 5681 section 3.1]:
+        //
+        //    When initial congestion windows of more than one segment are
+        //    implemented along with Path MTU Discovery [RFC1191], and the MSS
+        //    being used is found to be too large, the congestion window cwnd
+        //    SHOULD be reduced to prevent large bursts of smaller segments.
+        //    Specifically, cwnd SHOULD be reduced by the ratio of the old segment
+        //    size to the new segment size.
+        //
+        // [RFC 5681 section 3.1]: https://datatracker.ietf.org/doc/html/rfc5681#section-3.1
+        if self.params.ssthresh == u32::MAX {
+            self.params.cwnd = self
+                .params
+                .cwnd
+                .saturating_div(u32::from(self.params.mss))
+                .saturating_mul(u32::from(mss));
+        }
+        self.params.mss = mss;
     }
 
     /// Returns true if this [`CongestionControl`] is in fast recovery.
@@ -279,7 +304,7 @@ impl FastRecovery {
                 //   cwnd MUST be incremented by SMSS. This artificially inflates
                 //   the congestion window in order to reflect the additional
                 //   segment that has left the network.
-                params.cwnd += u32::from(params.mss);
+                params.cwnd = params.cwnd.saturating_add(u32::from(params.mss));
             }
         }
     }

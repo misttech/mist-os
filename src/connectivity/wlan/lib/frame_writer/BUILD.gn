@@ -22,6 +22,7 @@ rustc_library("wlan-frame-writer") {
   test_deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//src/connectivity/wlan/lib/ieee80211",
+    "//src/devices/bin/driver_runtime",
   ]
 
   sources = [ "src/lib.rs" ]

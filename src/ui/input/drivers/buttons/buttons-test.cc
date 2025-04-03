@@ -124,13 +124,22 @@ class FakeSystemActivityGovernor
                                    fidl::kIgnoreBindingClosure);
   }
 
-  void TakeWakeLease(TakeWakeLeaseRequest& request,
-                     TakeWakeLeaseCompleter::Sync& completer) override {
+  zx::eventpair AcquireWakeLease() {
     has_wake_lease_been_taken_ = true;
     zx::eventpair wake_lease_remote, wake_lease_local;
     zx::eventpair::create(0, &wake_lease_local, &wake_lease_remote);
     wake_leases_.push_back(std::move(wake_lease_local));
-    completer.Reply(std::move(wake_lease_remote));
+    return wake_lease_remote;
+  }
+
+  void AcquireWakeLease(AcquireWakeLeaseRequest& request,
+                        AcquireWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(AcquireWakeLease()));
+  }
+
+  void TakeWakeLease(TakeWakeLeaseRequest& request,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    completer.Reply(AcquireWakeLease());
   }
 
   void RegisterListener(RegisterListenerRequest& request,

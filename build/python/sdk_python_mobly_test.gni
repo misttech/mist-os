@@ -137,6 +137,9 @@ template("sdk_python_mobly_test") {
     # requirements.
     # There are currently exceptions for host tests: https://fxbug.dev/326090508.
     assert(invoker.category == "partner")
-    assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
+
+    # Since these tests can depend on ffx, allow use of APIs from the
+    # "host_tool" category.
+    assert_no_deps = markers_partner_idk_host_tools_must_not_depend_on
   }
 }

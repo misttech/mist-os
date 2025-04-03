@@ -11,14 +11,14 @@ use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
-    ClassPermissionId, FsUseLabelAndType, FsUseType, Policy,
+    ClassPermissionId, FsUseLabelAndType, FsUseType, IoctlAccessDecision, Policy,
 };
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
-    AbstractObjectClass, ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme,
-    FileSystemMountOptions, InitialSid, NullessByteStr, ObjectClass, Permission, SeLinuxStatus,
-    SeLinuxStatusPublisher, SecurityId,
+    AbstractObjectClass, ClassPermission, FileSystemLabel, FileSystemLabelingScheme,
+    FileSystemMountOptions, FsNodeClass, InitialSid, NullessByteStr, ObjectClass, Permission,
+    SeLinuxStatus, SeLinuxStatusPublisher, SecurityId,
 };
 
 use crate::FileSystemMountSids;
@@ -477,7 +477,7 @@ impl SecurityServer {
 
     /// Returns the security identifier (SID) with which to label a new object of `target_class`,
     /// based on the specified source & target security SIDs.
-    /// For file-like classes the `compute_new_file_sid*()` APIs should be used instead.
+    /// For file-like classes the `compute_new_fs_node_sid*()` APIs should be used instead.
     // TODO: Move this API to sit alongside the other `compute_*()` APIs.
     pub fn compute_new_sid(
         &self,
@@ -505,7 +505,7 @@ impl SecurityServer {
 }
 
 impl Query for SecurityServer {
-    fn query(
+    fn compute_access_decision(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -544,11 +544,11 @@ impl Query for SecurityServer {
         }
     }
 
-    fn compute_new_file_sid(
+    fn compute_new_fs_node_sid(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
+        fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
 
@@ -562,7 +562,7 @@ impl Query for SecurityServer {
         let new_file_context = active_policy.parsed.new_file_security_context(
             source_context,
             target_context,
-            &file_class,
+            &fs_node_class,
         );
 
         active_policy
@@ -572,12 +572,12 @@ impl Query for SecurityServer {
             .context("computing new file security context from policy")
     }
 
-    fn compute_new_file_sid_with_name(
+    fn compute_new_fs_node_sid_with_name(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        file_class: FileClass,
-        file_name: NullessByteStr<'_>,
+        fs_node_class: FsNodeClass,
+        fs_node_name: NullessByteStr<'_>,
     ) -> Option<SecurityId> {
         let mut locked_state = self.state.lock();
 
@@ -590,11 +590,51 @@ impl Query for SecurityServer {
         let new_file_context = active_policy.parsed.new_file_security_context_by_name(
             source_context,
             target_context,
-            &file_class,
-            file_name,
+            &fs_node_class,
+            fs_node_name,
         )?;
 
         active_policy.sid_table.security_context_to_sid(&new_file_context).ok()
+    }
+
+    fn compute_ioctl_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+        ioctl_prefix: u8,
+    ) -> IoctlAccessDecision {
+        let locked_state = self.state.lock();
+
+        let active_policy = match &locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
+            None => return IoctlAccessDecision::ALLOW_ALL,
+        };
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        match target_class {
+            AbstractObjectClass::System(target_class) => {
+                active_policy.parsed.compute_ioctl_access_decision(
+                    &source_context,
+                    &target_context,
+                    &target_class,
+                    ioctl_prefix,
+                )
+            }
+            AbstractObjectClass::Custom(target_class) => {
+                active_policy.parsed.compute_ioctl_access_decision_custom(
+                    &source_context,
+                    &target_context,
+                    &target_class,
+                    ioctl_prefix,
+                )
+            }
+            // No meaningful policy can be determined without target class.
+            _ => IoctlAccessDecision::DENY_ALL,
+        }
     }
 }
 
@@ -634,7 +674,9 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFsNodePermission, DirPermission, FilePermission, ProcessPermission};
+    use crate::{
+        CommonFsNodePermission, DirPermission, FileClass, FilePermission, ProcessPermission,
+    };
     use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
@@ -659,7 +701,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.query(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.compute_access_decision(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -746,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_no_defaults() {
+    fn compute_new_fs_node_sid_no_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_no_defaults_policy.pp").to_vec();
@@ -761,7 +803,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -773,7 +815,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_source_defaults() {
+    fn compute_new_fs_node_sid_source_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
@@ -788,7 +830,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -800,7 +842,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_target_defaults() {
+    fn compute_new_fs_node_sid_target_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
@@ -815,7 +857,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -826,7 +868,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_source_low_default() {
+    fn compute_new_fs_node_sid_range_source_low_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_policy.pp").to_vec();
@@ -841,7 +883,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -852,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_source_low_high_default() {
+    fn compute_new_fs_node_sid_range_source_low_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_high_policy.pp")
@@ -868,7 +910,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -879,7 +921,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_source_high_default() {
+    fn compute_new_fs_node_sid_range_source_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_high_policy.pp").to_vec();
@@ -894,7 +936,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -905,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_target_low_default() {
+    fn compute_new_fs_node_sid_range_target_low_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_policy.pp").to_vec();
@@ -920,7 +962,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -931,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_target_low_high_default() {
+    fn compute_new_fs_node_sid_range_target_low_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_high_policy.pp")
@@ -947,7 +989,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -958,7 +1000,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_range_target_high_default() {
+    fn compute_new_fs_node_sid_range_target_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_high_policy.pp").to_vec();
@@ -973,7 +1015,7 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, "".into())
+            .compute_new_fs_node_sid(source_sid, target_sid, FileClass::File.into(), "".into())
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -984,7 +1026,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_new_file_sid_with_name() {
+    fn compute_new_fs_node_sid_with_name() {
         let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/composite_policies/compiled/type_transition_policy.pp")
@@ -1001,7 +1043,12 @@ mod tests {
         const SPECIAL_FILE_NAME: &[u8] = b"special_file";
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, SPECIAL_FILE_NAME.into())
+            .compute_new_fs_node_sid(
+                source_sid,
+                target_sid,
+                FileClass::File.into(),
+                SPECIAL_FILE_NAME.into(),
+            )
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)
@@ -1012,10 +1059,10 @@ mod tests {
 
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(
+            .compute_new_fs_node_sid(
                 source_sid,
                 target_sid,
-                FileClass::Character,
+                FileClass::Character.into(),
                 SPECIAL_FILE_NAME.into(),
             )
             .expect("new sid computed");
@@ -1030,7 +1077,12 @@ mod tests {
         const OTHER_FILE_NAME: &[u8] = b"other_file";
         let computed_sid = security_server
             .as_permission_check()
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File, OTHER_FILE_NAME.into())
+            .compute_new_fs_node_sid(
+                source_sid,
+                target_sid,
+                FileClass::File.into(),
+                OTHER_FILE_NAME.into(),
+            )
             .expect("new sid computed");
         let computed_context = security_server
             .sid_to_security_context(computed_sid)

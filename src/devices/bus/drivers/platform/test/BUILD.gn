@@ -54,6 +54,7 @@ fuchsia_cc_driver("test-board-driver") {
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
@@ -100,7 +101,7 @@ fuchsia_cc_driver("test-gpio-driver") {
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
-    "//src/lib/ddk:ddk_metadata",
+    "//sdk/lib/driver/metadata/cpp",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -165,9 +166,11 @@ fuchsia_cc_driver("test-spi-driver") {
   sources = [ "test/spi.cc" ]
   deps = [
     ":test-spi-bind",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/zx",
   ]
@@ -329,8 +332,7 @@ fuchsia_cc_driver("test-bti-driver") {
   deps = [
     ":fuchsia.hardware.btitest_cpp",
     ":test-bti-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

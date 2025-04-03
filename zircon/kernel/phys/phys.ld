@@ -130,6 +130,13 @@ SECTIONS {
   }
   ASSERT(SIZEOF(.init_array) == 0, "no static constructors allowed")
 
+  .fini_array : {
+    KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
+    KEEP(*(SORT_BY_INIT_PRIORITY(.dtors.*)))
+    KEEP(*(.fini_array))
+  }
+  ASSERT(SIZEOF(.fini_array) == 0, "no static destructors allowed")
+
   /*
    * Global offset table entries.
    *

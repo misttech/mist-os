@@ -25,6 +25,12 @@ python_binary("generate_platform_artifacts") {
   deps = [ "//build/python/modules/depfile" ]
 }
 
+python_host_test("generate_platform_artifacts_test") {
+  main_source = "generate_platform_artifacts_test.py"
+  sources = [ "generate_platform_artifacts.py" ]
+  libraries = [ "//build/python/modules/depfile" ]
+}
+
 python_binary("generated_assembly_inputs") {
   main_source = "generated_assembly_inputs.py"
   deps = [ "//build/python/modules/assembly" ]
@@ -78,27 +84,8 @@ python_binary("hermetic_inputs_from_assembly_outputs") {
   ]
 }
 
-python_binary("make_legacy_config") {
-  main_source = "make_legacy_config.py"
-  deps = [
-    "//build/python/modules/assembly",
-    "//build/python/modules/depfile",
-    "//build/python/modules/serialization",
-  ]
-}
-
 python_binary("package_list") {
   main_source = "package_list.py"
-}
-
-python_host_test("test_make_legacy_config") {
-  main_source = "test_make_legacy_config.py"
-  sources = [ "make_legacy_config.py" ]
-  libraries = [
-    "//build/python/modules/assembly",
-    "//build/python/modules/serialization",
-    "//build/python/tests/fast_copy_mock",
-  ]
 }
 
 python_binary("assembly_input_bundle_tool") {
@@ -130,11 +117,6 @@ python_binary("product_def_gn_arg_validator") {
   deps = [ "//build/python/modules/depfile" ]
 }
 
-python_binary("validate_config_data_is_empty") {
-  main_source = "validate_config_data_entries_is_empty.py"
-  deps = [ "//build/python/modules/serialization" ]
-}
-
 python_binary("developer_overrides") {
   main_source = "developer_overrides.py"
   deps = [
@@ -158,6 +140,6 @@ group("tests") {
     ":check_size_hermetic_inputs_test",
     ":compare_json_list_test",
     ":convert_size_limits_test",
-    ":test_make_legacy_config",
+    ":generate_platform_artifacts_test",
   ]
 }

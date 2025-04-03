@@ -10,10 +10,8 @@ Run on Starnix with:
 fx test sestarnix_userspace_tests
 ```
 
-Compare with the results on Linux with:
-```
-$FUCHSIA_DIR/src/starnix/tests/selinux/userspace/run_on_linux.py
-```
+For running the tests on Linux please see [//vendor/google/starnix/tests/selinux/userspace/README.md](../../../../../vendor/google/starnix/tests/selinux/userspace/README.md).
+
 
 ### Writing a test
 

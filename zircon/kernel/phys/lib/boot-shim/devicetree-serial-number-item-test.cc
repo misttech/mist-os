@@ -6,6 +6,7 @@
 
 #include <lib/boot-shim/devicetree.h>
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
+#include <lib/boot-shim/uart.h>
 #include <lib/fit/defer.h>
 
 namespace {
@@ -102,6 +103,28 @@ TEST_F(DevicetreeSerialNumberItemTest, SerialNumberBootargs) {
     }
   }
   ASSERT_TRUE(present);
+}
+
+TEST_F(DevicetreeSerialNumberItemTest, SerialNumberSmallCmdline) {
+  constexpr std::string_view kCmdline = "small=1";
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::DevicetreeSerialNumberItem> shim("test", fdt);
+  shim.set_cmdline(kCmdline);
+  ASSERT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_SERIAL_NUMBER) {
+      present = true;
+    }
+  }
+  ASSERT_FALSE(present);
 }
 
 TEST_F(DevicetreeSerialNumberItemTest, BananaPiF3) {

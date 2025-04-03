@@ -115,6 +115,7 @@ func BaseTestResultFromTest(test testsharder.Test) *TestResult {
 		Result:    runtests.TestFailure,
 		DataSinks: runtests.DataSinkReference{},
 		Tags:      test.Tags,
+		Metadata:  test.Metadata,
 	}
 }
 
@@ -517,12 +518,12 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 type FFXInstance interface {
 	Run(ctx context.Context, args ...string) error
 	RunWithTarget(ctx context.Context, args ...string) error
-	RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error
+	TestEarlyBootProfile(ctx context.Context, outDir string) error
 	SetTarget(target string)
 	Stdout() io.Writer
 	Stderr() io.Writer
 	SetStdoutStderr(stdout, stderr io.Writer)
-	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
+	TestRun(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
 	Stop() error
 	TargetWait(ctx context.Context, args ...string) error
@@ -637,7 +638,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 		extraArgs = append(extraArgs, "--experimental-parallel-execution", "8")
 	}
 	startTime := clock.Now(ctx)
-	runResult, err := t.ffx.Test(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
+	runResult, err := t.ffx.TestRun(ctx, build.TestList{Data: testDef, SchemaID: build.TestListSchemaIDExperimental}, outDir, extraArgs...)
 	if runResult == nil && err == nil {
 		err = fmt.Errorf("no test result was found")
 	}
@@ -910,7 +911,7 @@ func (t *FFXTester) getEarlyBootProfiles(ctx context.Context, sinksPerTest map[s
 	if err := os.MkdirAll(testOutDir, os.ModePerm); err != nil {
 		return err
 	}
-	if err := t.ffx.RunWithTargetAndTimeout(ctx, 0, "test", "early-boot-profile", "--output-directory", testOutDir); err != nil {
+	if err := t.ffx.TestEarlyBootProfile(ctx, testOutDir); err != nil {
 		return err
 	}
 	return t.getSinks(ctx, testOutDir, sinksPerTest, false)
@@ -1115,6 +1116,19 @@ func NewFuchsiaSerialTester(ctx context.Context, serialSocketPath string) (Teste
 	socket, err := serial.NewSocket(ctx, serialSocketPath)
 	if err != nil {
 		return nil, err
+	}
+
+	// Test logs get interleaved with other serial logs and while most can be parsed
+	// out by the parseOutKernelReader, that assumes the log starts with a timestamp
+	// which some of the early logs at bootup don't have. For that reason, try to
+	// wait until most of those logs are written to serial before starting to run tests.
+	// In the case that the search string was already written before we started searching
+	// for it, don't fail if we time out looking for it.
+	socket.SetIOTimeout(30 * time.Second)
+	startedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if _, err := iomisc.ReadUntilMatchString(startedCtx, socket, "[driver_manager.cm] INFO: Bootup completed"); err != nil {
+		logger.Debugf(ctx, "%s", err)
 	}
 	return &FuchsiaSerialTester{socket: socket}, nil
 }

@@ -101,8 +101,10 @@ test_scripts = [
   "tests/subcommands/fx_ota_test",
   "tests/subcommands/fx_remote_test",
   "tests/subcommands/fx_set_test",
+  "tests/subcommands/fx_set_device_test",
   "tests/subcommands/fx_setup_go_test",
   "tests/subcommands/fx_ssh_test",
+  "tests/subcommands/fx_unset_device_test",
 
   # tests that currently can't be included in automation.
   # use 'fx self-test' to run them manually:
@@ -203,7 +205,6 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/set",
         "//tools/devshell/set-device",
         "//tools/devshell/shell",
-        "//tools/devshell/symbolize",
         "//tools/devshell/test",
         "//tools/devshell/tests/subcommands/data/fx_format_code_test/fidl.test.fidl",
         "//tools/devshell/tests/subcommands/data/fx_format_code_test/cml.cml",
@@ -223,6 +224,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_hashfile/out/default/amber-files/repository/targets.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_multiple_in_package.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_package_server_integration.json",
+        "//tools/devshell/unset-device",
         "//tools/devshell/vendor",
       ]
     },

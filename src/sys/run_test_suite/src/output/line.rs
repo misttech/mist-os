@@ -7,7 +7,7 @@ use crate::output::{
     ReportedOutcome, Reporter, Timestamp,
 };
 use std::io::{Error, Write};
-use vte::{Parser, Perform};
+use vte::{Params, Parser, Perform};
 
 /// A reporter that composes an inner reporter. Filters out ANSI in artifact output.
 pub(crate) struct AnsiFilterReporter<R: Reporter> {
@@ -99,7 +99,7 @@ impl<W: Write> Write for AnsiFilterWriter<W> {
 
         for (idx, byte) in bytes.iter().enumerate() {
             let mut found = FoundChars::Nothing;
-            self.parser.advance(&mut found, *byte);
+            self.parser.advance(&mut found, &[*byte]);
             if let &FoundChars::PrintableChars('\n') = &found {
                 self.parser = Parser::new();
             }
@@ -187,12 +187,12 @@ impl Perform for FoundChars {
             *self = Self::PrintableChars(code.into());
         }
     }
-    fn hook(&mut self, _: &[i64], _: &[u8], _: bool) {}
+    fn hook(&mut self, _: &Params, _: &[u8], _: bool, _: char) {}
     fn put(&mut self, _: u8) {}
     fn unhook(&mut self) {}
-    fn osc_dispatch(&mut self, _: &[&[u8]]) {}
-    fn csi_dispatch(&mut self, _: &[i64], _: &[u8], _: bool, _: char) {}
-    fn esc_dispatch(&mut self, _: &[i64], _: &[u8], _: bool, _: u8) {}
+    fn osc_dispatch(&mut self, _: &[&[u8]], _: bool) {}
+    fn csi_dispatch(&mut self, _: &Params, _: &[u8], _: bool, _: char) {}
+    fn esc_dispatch(&mut self, _: &[u8], _: bool, _: u8) {}
 }
 
 #[cfg(test)]
@@ -295,9 +295,9 @@ mod test {
         const FOUR_BYTE: [u8; 4] = [0xF0u8, 0xA0u8, 0x82u8, 0xC2u8];
 
         let cases = vec![
-            ([b"string".as_slice(), TWO_BYTE.as_slice()].concat(), "string�"),
-            ([b"string".as_slice(), THREE_BYTE.as_slice()].concat(), "string�"),
-            ([b"string".as_slice(), FOUR_BYTE.as_slice()].concat(), "string�"),
+            ([b"string".as_slice(), TWO_BYTE.as_slice()].concat(), "string��"),
+            ([b"string".as_slice(), THREE_BYTE.as_slice()].concat(), "string��"),
+            ([b"string".as_slice(), FOUR_BYTE.as_slice()].concat(), "string��"),
             ([TWO_BYTE.as_slice(), b"string".as_slice()].concat(), "�string"),
             ([THREE_BYTE.as_slice(), b"string".as_slice()].concat(), "�string"),
             ([FOUR_BYTE.as_slice(), b"string".as_slice()].concat(), "�string"),

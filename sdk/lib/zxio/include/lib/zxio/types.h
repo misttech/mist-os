@@ -342,6 +342,7 @@ typedef struct zxio_node_attr {
     bool casefold;
     bool wrapping_key_id;
     bool selinux_context;
+    bool pending_access_time_update;
   } has;
 } zxio_node_attributes_t;
 
@@ -375,7 +376,7 @@ typedef struct zxio_dirent_iterator {
   uint8_t opaque[ZX_CHANNEL_MAX_MSG_BYTES + 48];
 } zxio_dirent_iterator_t;
 
-// Matches fuchsia.io/MAX_FILENAME
+// Matches fuchsia.io/MAX_NAME_LENGTH
 #define ZXIO_MAX_FILENAME 255
 
 // An entry in a directory.

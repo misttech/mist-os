@@ -30,7 +30,6 @@ BT_MOCKED_TOOLS=(
   "tools/devshell/is-package-server-running"
   "tools/devshell/update-if-in-base"
   "tools/devshell/shell"
-  "tools/devshell/symbolize"
   "tools/devshell/lib/metrics_custom_report.sh"
 )
 

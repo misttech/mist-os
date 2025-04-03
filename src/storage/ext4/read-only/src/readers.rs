@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_sync::Mutex;
 use log::error;
 use std::io::{Read, Seek, SeekFrom};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 #[cfg(target_os = "fuchsia")]
@@ -49,7 +50,7 @@ impl<T> IoAdapter<T> {
 
 impl<T: Read + Seek + Send + Sync> Reader for IoAdapter<T> {
     fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
-        let mut reader = self.0.lock().unwrap();
+        let mut reader = self.0.lock();
         reader.seek(SeekFrom::Start(offset)).map_err(|_| ReaderError::Read(offset))?;
         reader.read_exact(data).map_err(|_| ReaderError::Read(offset))
     }
@@ -93,8 +94,9 @@ mod fuchsia {
     use block_client::{Cache, RemoteBlockClientSync};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_hardware_block::BlockMarker;
+    use fuchsia_sync::Mutex;
     use log::error;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     pub struct VmoReader {
         vmo: Arc<zx::Vmo>,
@@ -125,7 +127,7 @@ mod fuchsia {
 
     impl Reader for BlockDeviceReader {
         fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
-            self.block_cache.lock().unwrap().read_at(data, offset).map_err(|e| {
+            self.block_cache.lock().read_at(data, offset).map_err(|e| {
                 error!("Encountered error while reading block device: {}", e);
                 ReaderError::Read(offset)
             })

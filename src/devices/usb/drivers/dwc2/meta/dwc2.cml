@@ -13,6 +13,7 @@
         colocate: "true",
         compat: "driver/dwc2.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        allowed_scheduler_roles: [ "fuchsia.devices.usb.drivers.dwc2.interrupt" ],
         fallback: "false",
     },
     capabilities: [

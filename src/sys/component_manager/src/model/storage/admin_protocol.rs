@@ -691,7 +691,7 @@ mod tests {
     use vfs::directory::traversal_position::TraversalPosition;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
-    use vfs::{ObjectRequestRef, ToObjectRequest};
+    use vfs::ObjectRequestRef;
 
     #[test_case(
         "aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900",
@@ -1049,14 +1049,12 @@ mod tests {
     impl Directory for FakeDir {
         fn open(
             self: Arc<Self>,
-            scope: ExecutionScope,
-            flags: fio::OpenFlags,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
             _path: Path,
-            server_end: ServerEnd<fio::NodeMarker>,
+            _server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            flags.to_object_request(server_end).handle(|object_request| {
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
+            panic!("fuchsia.io/Directory.DeprecatedOpen should not be called from these tests")
         }
 
         fn open3(
@@ -1066,9 +1064,9 @@ mod tests {
             flags: fio::Flags,
             object_request: ObjectRequestRef<'_>,
         ) -> Result<(), zx::Status> {
-            object_request.take().handle(|object_request| {
-                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
-            });
+            object_request
+                .take()
+                .create_connection_sync::<ImmutableConnection<_>, _>(scope, self, flags);
             Ok(())
         }
 
@@ -1096,23 +1094,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_get_storage_utilization() {
-        let execution_scope = ExecutionScope::new();
-        let (client, server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-
         let used = 10;
         let total = 1000;
         let fake_dir = Arc::new(FakeDir { used, total });
-
-        fake_dir.open(
-            execution_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
-
-        let storage_admin = client.into_proxy();
+        let storage_admin = vfs::directory::serve_read_only(fake_dir);
         let status = StorageAdmin::get_storage_status(&storage_admin).await.unwrap();
-
         assert_eq!(status.used_size.unwrap(), used);
         assert_eq!(status.total_size.unwrap(), total);
     }

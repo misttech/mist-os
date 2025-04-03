@@ -41,6 +41,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
+                "fuchsia.vsock.Connector",
             ],
             availability: "optional",
         },

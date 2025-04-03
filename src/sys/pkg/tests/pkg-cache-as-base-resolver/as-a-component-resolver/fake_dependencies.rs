@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd};
 use futures::stream::TryStreamExt as _;
 use log::info;
 use mock_metrics::MockMetricEventLoggerFactory;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
+use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics};
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
@@ -22,6 +23,9 @@ static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation = blobfs_ramdisk::Imp
 #[cfg(not(feature = "use_fxblob"))]
 static BLOB_IMPLEMENTATION: blobfs_ramdisk::Implementation =
     blobfs_ramdisk::Implementation::CppBlobfs;
+
+const OUT_DIR_FLAGS: fio::Flags =
+    fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
 
 #[fuchsia::main]
 async fn main() {
@@ -48,7 +52,7 @@ async fn main() {
     let the_subpackage = fuchsia_pkg_testing::Package::from_dir("/the-subpackage").await.unwrap();
     let () = the_subpackage.write_to_blobfs(&blobfs).await;
 
-    // Use VFS because ServiceFs does not support OPEN_RIGHT_EXECUTABLE, but /blob needs it.
+    // Use VFS because ServiceFs does not support PERM_EXECUTABLE, but /blob needs it.
     let system_image_hash = *system_image.hash();
     let out_dir = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
@@ -75,16 +79,13 @@ async fn main() {
     }
 
     let scope = vfs::execution_scope::ExecutionScope::new();
-    out_dir.open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
+    let dir_server: ServerEnd<fio::DirectoryProxy> =
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .unwrap()
-            .into(),
-    );
+            .into();
+    OUT_DIR_FLAGS
+        .to_object_request(dir_server)
+        .handle(|request| out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request));
     let () = scope.wait().await;
 }
 

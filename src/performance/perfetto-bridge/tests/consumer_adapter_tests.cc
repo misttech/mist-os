@@ -9,6 +9,7 @@
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
+#include <lib/trace-provider/provider.h>
 #include <lib/zx/time.h>
 
 #include <deque>
@@ -23,11 +24,13 @@
 #include <perfetto/tracing/platform.h>
 #include <rapidjson/document.h>
 
-#include "lib/trace-provider/provider.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/performance/perfetto-bridge/consumer_adapter.h"
 
+#include <third_party/perfetto/protos/perfetto/common/trace_stats.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/chrome/chrome_config.gen.h>
+#include <third_party/perfetto/protos/perfetto/config/data_source_config.gen.h>
+#include <third_party/perfetto/protos/perfetto/config/trace_config.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/track_event/track_event_config.gen.h>
 
 using testing::ElementsAre;
@@ -112,7 +115,7 @@ class FakeConsumerEndpoint : public perfetto::ConsumerEndpoint {
   }
   void StartTracing() override { RecordObservedCall(CallType::START_TRACING); }
   void DisableTracing() override { RecordObservedCall(CallType::DISABLE_TRACING); }
-  void Flush(uint32_t timeout_ms, FlushCallback callback) override {
+  void Flush(uint32_t timeout_ms, FlushCallback callback, perfetto::FlushFlags flags) override {
     flush_cb_ = callback;
     RecordObservedCall(CallType::FLUSH);
   }
@@ -125,9 +128,12 @@ class FakeConsumerEndpoint : public perfetto::ConsumerEndpoint {
   void Detach(const std::string& key) override { FX_NOTREACHED(); }
   void Attach(const std::string& key) override { FX_NOTREACHED(); }
   void ObserveEvents(uint32_t events_mask) override { FX_NOTREACHED(); }
-  void QueryServiceState(QueryServiceStateCallback) override { FX_NOTREACHED(); }
+  void QueryServiceState(QueryServiceStateArgs, QueryServiceStateCallback) override {
+    FX_NOTREACHED();
+  }
   void QueryCapabilities(QueryCapabilitiesCallback) override { FX_NOTREACHED(); }
   void SaveTraceForBugreport(SaveTraceForBugreportCallback) override { FX_NOTREACHED(); }
+  void CloneSession(CloneSessionArgs) override { FX_NOTREACHED(); }
 
   perfetto::TraceConfig config_;
   std::deque<CallType> expected_calls_;

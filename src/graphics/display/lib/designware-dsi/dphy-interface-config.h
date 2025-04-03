@@ -205,11 +205,28 @@ constexpr bool DphyInterfaceConfig::IsValid() const {
     return false;
   }
 
-  if (high_speed_mode_data_lane_bytes_per_second() % escape_mode_clock_lane_frequency_hz != 0) {
+  // `high_speed_mode_data_lane_bytes_per_second` and `escape_mode_clock_lane_frequency_hz`
+  // calculation may introduce rounding errors, so the clock frequency ratio
+  // might not be integer and we need to round it to its nearest integral
+  // value. We add a small threshold (1 / 10000) for the ratio ensure that
+  // the error is not too large.
+  constexpr double kHighSpeedByteClockToEscapeLockFrequencyRatioErrorThreshold = 1.0 / 10000;
+
+  const double actual_high_speed_byte_clock_to_escape_clock_frequency_ratio =
+      static_cast<double>(high_speed_mode_data_lane_bytes_per_second()) /
+      static_cast<double>(escape_mode_clock_lane_frequency_hz);
+
+  // round(a / b) = (a + b div 2) div b
+  const int64_t high_speed_byte_clock_to_escape_clock_frequency_ratio =
+      (high_speed_mode_data_lane_bytes_per_second() + escape_mode_clock_lane_frequency_hz / 2) /
+      escape_mode_clock_lane_frequency_hz;
+
+  if (fabs(static_cast<double>(high_speed_byte_clock_to_escape_clock_frequency_ratio) -
+           actual_high_speed_byte_clock_to_escape_clock_frequency_ratio) >
+      kHighSpeedByteClockToEscapeLockFrequencyRatioErrorThreshold) {
     return false;
   }
-  const int64_t high_speed_byte_clock_to_escape_clock_frequency_ratio =
-      high_speed_mode_data_lane_bytes_per_second() / escape_mode_clock_lane_frequency_hz;
+
   if (high_speed_byte_clock_to_escape_clock_frequency_ratio >
       kMaxHighSpeedByteClockToEscapeClockFrequencyRatio) {
     return false;

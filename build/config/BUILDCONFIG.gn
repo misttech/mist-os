@@ -1725,7 +1725,7 @@ declare_args() {
     {
       configs = [ "//build/config/profile:coverage-rust" ]
       tags = [
-        # Note this does not incluhde "llvm-profdata" because that is only
+        # Note this does not include "llvm-profdata" because that is only
         # actually used to check if C++ code will use such instrumentation.
         "coverage",
         "debugdata",
@@ -1758,9 +1758,11 @@ declare_args() {
     {
       configs = [ "//build/config/profile:profile-rust" ]
       tags = [
+        # Note that this list, as for coverage-rust above, does not include
+        # "llvm-profdata" because that is only actually used to check if C++
+        # code will use such instrumentation.
         "debugdata",
         "instrumented",
-        "llvm-profdata",
         "needs-writable-globals",
         "profile",
       ]
@@ -3058,11 +3060,15 @@ template("_fuchsia_shared_library") {
     _link_output_dir =
         rebase_path(get_path_info(link_output_file, "dir"), root_build_dir)
 
+    _label = get_label_info(":$target_name", "label_with_toolchain")
+
     # Note: the manifest-related metadata is added to the builder target as
     # some targets (e.g. drivers) depend on it directly in the builder
     # toolchain.
     metadata = {
       binaries = []
+
+      debug_symbol_files = []
 
       libprefix = [ toolchain_variant.libprefix ]
 
@@ -3083,7 +3089,7 @@ template("_fuchsia_shared_library") {
           {
             source = rebased_output_file
             destination = "lib/${toolchain_variant.libprefix}$install_name"
-            label = get_label_info(":$target_name", "label_with_toolchain")
+            label = _label
           },
         ]
       } else {
@@ -3094,7 +3100,7 @@ template("_fuchsia_shared_library") {
       if (!defined(sdk_runtime_deps)) {
         sdk_runtime_deps = [
           {
-            label = get_label_info(":$target_name", "label_with_toolchain")
+            label = _label
             source = rebased_output_file
           },
         ]
@@ -3104,7 +3110,7 @@ template("_fuchsia_shared_library") {
       binaries += [
         {
           type = "shared_library"
-          label = get_label_info(":$target_name", "label_with_toolchain")
+          label = _label
           cpu = current_cpu
           os = current_os
           debug = rebase_path(link_output_file, root_build_dir)
@@ -3114,6 +3120,39 @@ template("_fuchsia_shared_library") {
           }
           if (output_breakpad_syms &&
               (current_os == "fuchsia" || current_os == "mistos")) {
+            breakpad = rebased_output_file + ".sym"
+          }
+        },
+      ]
+
+      # Used by the //:debug_symbols target
+      debug_symbol_files += [
+        {
+          label = _label
+          os = current_os
+          cpu = current_cpu
+          debug = rebase_path(link_output_file, root_build_dir)
+          if (current_os != "mac" && current_os != "win") {
+            elf_build_id = rebased_output_file + ".build-id.stamp"
+          }
+          if (output_breakpad_syms &&
+              (current_os == "fuchsia" || current_os == "mistos")) {
+            breakpad = rebased_output_file + ".sym"
+          }
+        },
+      ]
+
+      # Used by the //:debug_symbols target
+      debug_symbol_files += [
+        {
+          label = _label
+          os = current_os
+          cpu = current_cpu
+          debug = rebase_path(link_output_file, root_build_dir)
+          if (current_os != "mac" && current_os != "win") {
+            elf_build_id = rebased_output_file + ".build-id.stamp"
+          }
+          if (output_breakpad_syms && current_os == "fuchsia") {
             breakpad = rebased_output_file + ".sym"
           }
         },
@@ -3517,8 +3556,13 @@ template("executable") {
       deps += [ "//src/sys/fuzzing/realmfuzzer/target" ]
     }
 
+    _label = get_label_info(":$target_name", "label_with_toolchain")
+    _rebased_elf_build_id_file =
+        rebase_path("${output_file}.build-id.stamp", root_build_dir)
+
     metadata = {
       binaries = []
+      debug_symbol_files = []
 
       # Used by link_output_rspfile(), see its documentation for details.
       link_output_path = [ rebased_link_output_file ]
@@ -3528,21 +3572,37 @@ template("executable") {
         forward_variables_from(invoker.metadata, "*")
       }
 
+      # Used by //:binaries target
       binaries += [
         {
           type = "executable"
-          label = get_label_info(":$target_name", "label_with_toolchain")
+          label = _label
           cpu = current_cpu
           os = current_os
           debug = rebased_debug_file
           dist = rebased_output_file
           if (current_os != "mac") {
-            elf_build_id =
-                rebase_path("$output_file.build-id.stamp", root_build_dir)
+            elf_build_id = _rebased_elf_build_id_file
           }
           if (output_breakpad_syms &&
               (current_os == "fuchsia" || current_os == "mistos")) {
-            breakpad = rebase_path("$output_file.sym", root_build_dir)
+            breakpad = rebase_path("${output_file}.sym", root_build_dir)
+          }
+        },
+      ]
+
+      # Used by //:debug_symbols target
+      debug_symbol_files += [
+        {
+          label = _label
+          cpu = current_cpu
+          os = current_os
+          debug = rebased_debug_file
+          if (current_os != "mac") {
+            elf_build_id_file = _rebased_elf_build_id_file
+          }
+          if (output_breakpad_syms && (current_os == "fuchsia" || current_os == "mistos")) {
+            breakpad = rebase_path("${output_file}.sym", root_build_dir)
           }
         },
       ]
@@ -3685,8 +3745,13 @@ template("loadable_module") {
     rebased_output_file = rebase_path(output_file, root_build_dir)
     rebased_link_output_file = rebase_path(link_output_file, root_build_dir)
 
+    _label = get_label_info(":$target_name", "label_with_toolchain")
+    _rebased_elf_build_id_file =
+        rebase_path("${output_file}.build-id.stamp", root_build_dir)
+
     metadata = {
       binaries = []
+      debug_symbol_files = []
 
       # Used by link_output_rspfile()
       link_output_path = [ rebased_link_output_file ]
@@ -3696,21 +3761,39 @@ template("loadable_module") {
         forward_variables_from(invoker.metadata, "*")
       }
 
+      # Used by //:binaries target
       binaries += [
         {
           type = "loadable_module"
-          label = get_label_info(":$target_name", "label_with_toolchain")
+          label = _label
           cpu = current_cpu
           os = current_os
           debug = rebased_link_output_file
           dist = rebased_output_file
           if (current_os != "mac" && current_os != "win") {
             elf_build_id =
-                rebase_path("$output_file.build-id.stamp", root_build_dir)
+                rebase_path("${output_file}.build-id.stamp", root_build_dir)
           }
           if (output_breakpad_syms &&
               (current_os == "fuchsia" || current_os == "mistos")) {
-            breakpad = rebase_path("$output_file.sym", root_build_dir)
+            breakpad = rebase_path("${output_file}.sym", root_build_dir)
+          }
+        },
+      ]
+
+      # Used by //:debug_symbols target
+      debug_symbol_files += [
+        {
+          label = _label
+          cpu = current_cpu
+          os = current_os
+          debug = rebased_link_output_file
+          if (current_os != "mac" && current_os != "win") {
+            elf_build_id_file = _rebased_elf_build_id_file
+            rebase_path("${output_file}.build-id.stamp", root_build_dir)
+          }
+          if (output_breakpad_syms && (current_os == "fuchsia" || current_os == "mistos")) {
+            breakpad = rebase_path("${output_file}.sym", root_build_dir)
           }
         },
       ]
@@ -3867,23 +3950,6 @@ template("rust_library") {
   }
   _rlib_path = "${_searchdir_path}/lib${invoker.output_name}.rlib"
 
-  _define_aux_deps = include_rustdoc
-  if (defined(invoker.define_aux_deps)) {
-    _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
-  }
-  if (_define_aux_deps) {
-    _rust_auxiliary_name = "${target_name}.aux"
-    rust_aux_deps(_rust_auxiliary_name) {
-      forward_variables_from(invoker,
-                             [
-                               "deps",
-                               "data_deps",
-                               "public_deps",
-                               "testonly",
-                             ])
-    }
-  }
-
   _rust_library_internal_wrapper(target_name) {
     forward_variables_from(invoker,
                            "*",
@@ -3913,13 +3979,6 @@ template("rust_library") {
 
     _rlib_path = rebase_path(_rlib_path, root_build_dir)
     _searchdir_path = rebase_path(_searchdir_path, root_build_dir)
-
-    if (_define_aux_deps) {
-      if (!defined(public_deps)) {
-        public_deps = []
-      }
-      public_deps += [ ":${_rust_auxiliary_name}" ]
-    }
 
     metadata = {
       if (defined(invoker.metadata)) {
@@ -3969,24 +4028,6 @@ template("rust_proc_macro") {
     }
     _rlib_path = "$_searchdir_path/lib${invoker.output_name}.$_output_extension"
 
-    _define_aux_deps = include_rustdoc
-    if (defined(invoker.define_aux_deps)) {
-      _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
-    }
-    if (_define_aux_deps) {
-      # Reuse the name (without .actual) defined in rustc_artifact.gni
-      _rust_auxiliary_name = "${target_name}.aux"
-      rust_aux_deps(_rust_auxiliary_name) {
-        forward_variables_from(invoker,
-                               [
-                                 "deps",
-                                 "data_deps",
-                                 "public_deps",
-                                 "testonly",
-                               ])
-      }
-    }
-
     _rust_proc_macro_internal_wrapper(target_name) {
       forward_variables_from(invoker,
                              "*",
@@ -4014,11 +4055,6 @@ template("rust_proc_macro") {
 
       if (!defined(public_deps)) {
         public_deps = []
-      }
-      if (_define_aux_deps) {
-        public_deps += [ ":${_rust_auxiliary_name}" ]
-      } else {
-        not_needed(invoker, [ "_rust_auxiliary_name" ])
       }
       metadata = {
         if (defined(invoker.metadata)) {

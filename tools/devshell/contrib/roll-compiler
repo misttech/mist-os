@@ -181,7 +181,7 @@ before commands are run for any package.
         [tag] = [
             tag["tag"]
             for tag in package["tags"]
-            if tag["tag"].startswith(args.tag + ":")
+            if tag["tag"].startswith(args.tag)
         ]
         return tag
 

@@ -2,21 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "//src/graphics/drivers/msd-vsi-vip/meta/msd_vsi.shard.cml" ],
     program: {
-        runner: "driver",
         binary: "driver/libmsd_vsi.so",
-        bind: "meta/bind/msd_vsi_bind.bindbc",
-        colocate: "true",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
-    use: [
-        { protocol: "fuchsia.scheduler.RoleManager" },
-        { service: "fuchsia.hardware.platform.device.Service" },
-        { service: "fuchsia.driver.compat.Service" },
-    ],
 }

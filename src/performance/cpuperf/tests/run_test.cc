@@ -101,7 +101,7 @@ static zx_status_t WaitAndGetExitCode(const std::string& program_name, const zx:
   if (proc_info.return_code != 0) {
     FX_LOGS(ERROR) << program_name << " exited with exit code " << proc_info.return_code;
   }
-  *out_exit_code = proc_info.return_code;
+  *out_exit_code = static_cast<int>(proc_info.return_code);
   return ZX_OK;
 }
 

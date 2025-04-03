@@ -16,7 +16,7 @@ use explicit::UnreachableExt as _;
 
 use crate::{
     BidirectionalConverter, CoreTimerContext, CoreTxMetadataContext, CounterContext, Device,
-    DeviceIdContext, TimerBindingsTypes, TxMetadataBindingsTypes,
+    DeviceIdContext, ResourceCounterContext, TimerBindingsTypes, TxMetadataBindingsTypes,
 };
 
 /// An uninstantiable type.
@@ -66,6 +66,12 @@ where
 
 impl<P, C> CounterContext<C> for UninstantiableWrapper<P> {
     fn counters(&self) -> &C {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<P, R, C> ResourceCounterContext<R, C> for UninstantiableWrapper<P> {
+    fn per_resource_counters(&self, _resource: &R) -> &C {
         self.uninstantiable_unreachable()
     }
 }

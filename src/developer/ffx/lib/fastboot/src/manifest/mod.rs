@@ -137,7 +137,7 @@ impl FlashManifestVersion {
         bootstrap_partitions.extend_from_slice(bootloader_partitions.as_slice());
 
         // Create a map from slot to available images by name (zbi, vbmeta, fvm).
-        let mut image_map = PartitionImageMapper::new(product_bundle.partitions.clone());
+        let mut image_map = PartitionImageMapper::new(product_bundle.partitions.clone())?;
         if let Some(manifest) = &product_bundle.system_a {
             let slot = Slot::A;
             tracing::debug!("Mapping images: {:?} to slot: {}", manifest, slot);

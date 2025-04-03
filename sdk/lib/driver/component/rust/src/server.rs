@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 use log::{debug, warn};
 use zx::Status;
 
-use fdf::{Channel, DispatcherBuilder, DispatcherRef};
+use fdf::{Channel, Dispatcher, DispatcherBuilder, DispatcherRef};
 use fidl_fuchsia_driver_framework::DriverRequest;
 
 use fdf::{fdf_handle_t, DriverHandle, Message};
@@ -79,17 +79,19 @@ impl<T: Driver> DriverServer<T> {
             .post_task_sync(move |status| {
                 // bail immediately if we were somehow cancelled before we started
                 let Status::OK = status else { return };
-                // create and run a fuchsia-async executor, giving it the "root" dispatcher to actually
-                // execute driver tasks on, as this thread will be effectively blocked by the reactor
-                // loop.
-                let mut executor = fuchsia_async::LocalExecutor::new();
-                executor.run_singlethreaded(async move {
-                    server.message_loop(root_dispatcher.clone()).await;
-                    // take the server handle so it can drop after the async block is done,
-                    // which will signal to the driver host that the driver has finished shutdown,
-                    // so that we are can guarantee that when `destroy` is called, we are not still
-                    // using `server`.
-                    server.server_handle.take()
+                Dispatcher::override_current(root_dispatcher.clone(), || {
+                    // create and run a fuchsia-async executor, giving it the "root" dispatcher to
+                    // actually execute driver tasks on, as this thread will be effectively blocked
+                    // by the reactor loop.
+                    let mut executor = fuchsia_async::LocalExecutor::new();
+                    executor.run_singlethreaded(async move {
+                        server.message_loop(root_dispatcher).await;
+                        // take the server handle so it can drop after the async block is done,
+                        // which will signal to the driver host that the driver has finished
+                        // shutdown, so that we are can guarantee that when `destroy` is called, we
+                        // are not still using `server`.
+                        server.server_handle.take()
+                    });
                 });
             })
             .expect("failure spawning main event loop for rust async dispatch");
@@ -199,10 +201,9 @@ impl<T: Driver> DriverServer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc;
 
-    use fdf::test::with_raw_dispatcher;
-    use fdf::Arena;
+    use fdf::{Arena, CurrentDispatcher};
+    use fdf_env::test::spawn_in_driver;
     use zx::Status;
 
     #[derive(Default)]
@@ -232,42 +233,27 @@ mod tests {
         let initialize_func = __fuchsia_driver_registration__.v1.initialize.expect("initializer");
         let destroy_func = __fuchsia_driver_registration__.v1.destroy.expect("destroy function");
 
-        let (fin_tx, fin_rx) = mpsc::channel();
         let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
-        with_raw_dispatcher("driver registration", move |dispatcher| {
-            let dispatcher = dispatcher.clone();
-            dispatcher
-                .clone()
-                .spawn_task(async move {
-                    let channel_handle = server_chan.into_driver_handle().into_raw().get();
-                    let driver_server = unsafe { initialize_func(channel_handle) } as usize;
-                    assert_ne!(driver_server, 0);
+        spawn_in_driver("driver registration", async move {
+            let channel_handle = server_chan.into_driver_handle().into_raw().get();
+            let driver_server = unsafe { initialize_func(channel_handle) } as usize;
+            assert_ne!(driver_server, 0);
 
-                    let start_msg = DriverRequest::start_as_message(
-                        Arena::new(),
-                        DriverStartArgs::default(),
-                        1,
-                    )
+            let start_msg =
+                DriverRequest::start_as_message(Arena::new(), DriverStartArgs::default(), 1)
                     .unwrap();
-                    client_chan.write(start_msg).unwrap();
-                    let _ = client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await.unwrap();
+            client_chan.write(start_msg).unwrap();
+            let _ = client_chan.read_bytes(CurrentDispatcher).await.unwrap();
 
-                    let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
-                    client_chan.write(stop_msg).unwrap();
-                    let Err(Status::PEER_CLOSED) =
-                        client_chan.read_bytes(dispatcher.as_dispatcher_ref()).await
-                    else {
-                        panic!("expected peer closed from driver server after end message");
-                    };
+            let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
+            client_chan.write(stop_msg).unwrap();
+            let Err(Status::PEER_CLOSED) = client_chan.read_bytes(CurrentDispatcher).await else {
+                panic!("expected peer closed from driver server after end message");
+            };
 
-                    unsafe {
-                        destroy_func(driver_server as *mut c_void);
-                    }
-
-                    fin_tx.send(()).unwrap();
-                })
-                .unwrap();
-            fin_rx.recv().unwrap();
+            unsafe {
+                destroy_func(driver_server as *mut c_void);
+            }
         });
     }
 }

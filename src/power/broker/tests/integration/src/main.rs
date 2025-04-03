@@ -39,9 +39,11 @@ mod tests {
         CurrentLevelMarker, ElementControlMarker, ElementRunnerMarker, ElementRunnerRequestStream,
         LessorMarker, RequiredLevelMarker,
     };
+    use futures_util::stream::TryNext;
 
+    // TODO(b/401594227): Remove this test once level_control has been removed.
     #[test]
-    fn test_direct() -> Result<()> {
+    fn test_direct_level_control() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
@@ -288,12 +290,13 @@ mod tests {
         Ok(())
     }
 
-    async fn handle_set_level(stream: &mut ElementRunnerRequestStream) -> Result<u8, Error> {
-        if let Some(request) = stream.try_next().await.unwrap() {
+    async fn handle_set_level(
+        next: TryNext<'_, ElementRunnerRequestStream>,
+    ) -> Result<(u8, fpb::ElementRunnerSetLevelResponder), Error> {
+        if let Some(request) = next.await.unwrap() {
             match request {
                 fpb::ElementRunnerRequest::SetLevel { level, responder } => {
-                    responder.send().expect("failed to send set level response");
-                    return Ok(level);
+                    return Ok((level, responder));
                 }
                 fidl_fuchsia_power_broker::ElementRunnerRequest::_UnknownMethod { .. } => {
                     return Err(Error::msg("ElementRunnerRequest::_UnknownMethod received"));
@@ -302,6 +305,18 @@ mod tests {
         } else {
             return Err(Error::msg("ElementRunnerRequest::_UnknownMethod received"));
         }
+    }
+
+    /// Verifies that the next ElementRunnerRequest matches the expected required level.
+    /// Returns the ElementRunnerSetLevelResponder so that a response can be sent, confirming
+    /// the current level.
+    async fn assert_set_level_required_eq_and_return_responder(
+        next: TryNext<'_, ElementRunnerRequestStream>,
+        expect_required: u8,
+    ) -> fpb::ElementRunnerSetLevelResponder {
+        let (required, current) = handle_set_level(next).await.unwrap();
+        assert_eq!(required, expect_required);
+        current
     }
 
     #[test]
@@ -338,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn test_element_runner_direct() -> Result<()> {
+    fn test_direct() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
@@ -413,14 +428,18 @@ mod tests {
         // Initial required level for P & C should be OFF.
         // Update P & C's current level to OFF with PowerBroker.
         executor.run_singlethreaded(async {
-            assert_eq!(
-                handle_set_level(&mut parent_element_runner).await.unwrap(),
-                BinaryPowerLevel::Off.into_primitive()
-            );
-            assert_eq!(
-                handle_set_level(&mut child_element_runner).await.unwrap(),
-                BinaryPowerLevel::Off.into_primitive()
-            );
+            let parent_current = assert_set_level_required_eq_and_return_responder(
+                parent_element_runner.try_next(),
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await;
+            let child_current = assert_set_level_required_eq_and_return_responder(
+                child_element_runner.try_next(),
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await;
+            parent_current.send().expect("set_level resp failed");
+            child_current.send().expect("set_level resp failed");
             assert_eq!(
                 parent_status.watch_power_level().await.unwrap(),
                 Ok(BinaryPowerLevel::Off.into_primitive())
@@ -448,6 +467,15 @@ mod tests {
                 .expect("Lease response not ok")
                 .into_proxy()
         });
+        let parent_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                parent_element_runner.try_next(),
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut child_element_runner_next = child_element_runner.try_next();
+        assert!(executor.run_until_stalled(&mut child_element_runner_next).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
                 lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
@@ -459,23 +487,22 @@ mod tests {
         // P's required level should remain ON.
         // C's required level should become ON.
         executor.run_singlethreaded(async {
-            assert_eq!(
-                handle_set_level(&mut parent_element_runner).await.unwrap(),
-                BinaryPowerLevel::On.into_primitive()
-            );
-            assert_eq!(
-                parent_status.watch_power_level().await.unwrap(),
-                Ok(BinaryPowerLevel::On.into_primitive())
-            );
+            parent_current.send().expect("set_level resp failed");
+        });
+        let mut parent_element_runner_next = parent_element_runner.try_next();
+        assert!(executor.run_until_stalled(&mut parent_element_runner_next).is_pending());
+        let child_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                child_element_runner.try_next(),
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
         });
 
         // Update C's current level to ON.
         // Lease should become satisfied.
         executor.run_singlethreaded(async {
-            assert_eq!(
-                handle_set_level(&mut child_element_runner).await.unwrap(),
-                BinaryPowerLevel::On.into_primitive()
-            );
+            child_current.send().expect("set_level resp failed");
             assert_eq!(
                 child_status.watch_power_level().await.unwrap(),
                 Ok(BinaryPowerLevel::On.into_primitive())
@@ -488,29 +515,33 @@ mod tests {
 
         // Drop lease.
         // C's required level should become OFF.
-        executor.run_singlethreaded(async {
+        let child_current = executor.run_singlethreaded(async {
             drop(lease);
+            assert_set_level_required_eq_and_return_responder(
+                child_element_runner.try_next(),
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
         });
 
         // Update C's current level to OFF.
         // P's required level should become OFF.
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                handle_set_level(&mut child_element_runner).await.unwrap(),
-                BinaryPowerLevel::Off.into_primitive()
-            );
+        let parent_current = executor.run_singlethreaded(async {
+            child_current.send().expect("set_level resp failed");
             assert_eq!(
                 child_status.watch_power_level().await.unwrap(),
                 Ok(BinaryPowerLevel::Off.into_primitive())
             );
+            assert_set_level_required_eq_and_return_responder(
+                parent_element_runner.try_next(),
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
         });
 
         // Update P's current level to OFF.
         executor.run_singlethreaded(async {
-            assert_eq!(
-                handle_set_level(&mut parent_element_runner).await.unwrap(),
-                BinaryPowerLevel::Off.into_primitive()
-            );
+            parent_current.send().expect("set_level resp failed");
             assert_eq!(
                 parent_status.watch_power_level().await.unwrap(),
                 Ok(BinaryPowerLevel::Off.into_primitive())
@@ -533,8 +564,9 @@ mod tests {
         Ok(())
     }
 
+    // TODO(b/401594227): Remove this test once level_control has been removed.
     #[test]
-    fn test_transitive() -> Result<()> {
+    fn test_transitive_level_control() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
@@ -879,7 +911,324 @@ mod tests {
     }
 
     #[test]
-    fn test_shared() -> Result<()> {
+    fn test_transitive() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+
+        // Create a four element topology with the following dependencies:
+        // C depends on B, which in turn depends on A.
+        // D has no dependencies or dependents.
+        // A <- B <- C   D
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let element_a_token = zx::Event::create();
+        let (element_a_runner_client, element_a_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_a_runner = element_a_runner_server.into_stream();
+        let (element_a_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("A".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_a_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(element_a_element_control
+                .register_dependency_token(
+                    element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let element_a_status = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_a_element_control.open_status_channel(server)?;
+            client.into_proxy()
+        };
+        let element_b_token = zx::Event::create();
+        let (element_b_runner_client, element_b_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_b_runner = element_b_runner_server.into_stream();
+        let (element_b_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("B".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: element_a_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
+                    }]),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_b_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(element_b_element_control
+                .register_dependency_token(
+                    element_b_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let element_b_status: fpb::StatusProxy = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_b_element_control.open_status_channel(server)?;
+            client.into_proxy()
+        };
+        let (element_c_runner_client, element_c_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_c_runner = element_c_runner_server.into_stream();
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (element_c_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("C".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: element_b_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
+                    }]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_c_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+        let element_c_status: fpb::StatusProxy = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_c_element_control.open_status_channel(server)?;
+            client.into_proxy()
+        };
+        let (element_d_runner_client, element_d_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_d_runner = element_d_runner_server.into_stream();
+        let (element_d_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("D".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_d_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+        let element_d_status: fpb::StatusProxy = {
+            let (client, server) = create_endpoints::<StatusMarker>();
+            element_d_element_control.open_status_channel(server)?;
+            client.into_proxy()
+        };
+
+        // Initial required level for each element should be OFF.
+        // Set managed elements' current level to OFF.
+        for (status, runner) in [
+            (&element_a_status, &mut element_a_runner),
+            (&element_b_status, &mut element_b_runner),
+            (&element_c_status, &mut element_c_runner),
+            (&element_d_status, &mut element_d_runner),
+        ] {
+            executor.run_singlethreaded(async {
+                let current = assert_set_level_required_eq_and_return_responder(
+                    runner.try_next(),
+                    BinaryPowerLevel::Off.into_primitive(),
+                )
+                .await;
+                current.send().expect("set_level resp failed");
+                let power_level =
+                    status.watch_power_level().await.unwrap().expect("watch_power_level failed");
+                assert_eq!(power_level, BinaryPowerLevel::Off.into_primitive());
+            });
+        }
+        let element_a_runner_next = element_a_runner.try_next();
+        let mut element_b_runner_next = element_b_runner.try_next();
+        let mut element_c_runner_next = element_c_runner.try_next();
+        let mut element_d_runner_next = element_d_runner.try_next();
+
+        // Acquire lease for C.
+        // A's required level should become ON.
+        // B's required level should remain OFF because A is not yet ON.
+        // C's required level should remain OFF because B is not yet ON.
+        // D's required level should remain OFF.
+        let lease = executor.run_singlethreaded(async {
+            element_c_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        });
+        let element_a_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_a_runner_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_a_runner_next = element_a_runner.try_next();
+        assert!(executor.run_until_stalled(&mut element_b_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_c_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update A's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should become ON because A is now ON.
+        // C's required level should remain OFF because B is not yet ON.
+        // D's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_a_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_a_runner_next).is_pending());
+        let element_b_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_b_runner_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_b_runner_next = element_b_runner.try_next();
+        assert!(executor.run_until_stalled(&mut element_c_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+
+        // Update B's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should become ON because B is now ON.
+        // D's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_b_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_a_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_b_runner_next).is_pending());
+        let element_c_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_c_runner_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_c_runner_next = element_c_runner.try_next();
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+
+        // Update C's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain ON.
+        // D's required level should remain OFF.
+        // Lease should become satisfied.
+        executor.run_singlethreaded(async {
+            element_c_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_a_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_b_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_c_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop lease for C.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should become OFF because the lease was dropped.
+        // D's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            drop(lease);
+        });
+        assert!(executor.run_until_stalled(&mut element_a_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_b_runner_next).is_pending());
+        let element_c_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_c_runner_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_c_runner_next = element_c_runner.try_next();
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+
+        // Lower C's current level to OFF.
+        // A's required level should remain ON.
+        // B's required level should become OFF.
+        // C's required level should remain OFF.
+        // D's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_c_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_a_runner_next).is_pending());
+        let element_b_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_b_runner_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_b_runner_next = element_b_runner.try_next();
+        assert!(executor.run_until_stalled(&mut element_c_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+
+        // Lower B's current level to OFF.
+        // A's required level should become OFF because B is no longer dependent.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF.
+        // D's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_b_current.send().expect("set_level resp failed");
+        });
+        executor.run_singlethreaded(async {
+            let current = assert_set_level_required_eq_and_return_responder(
+                element_a_runner_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await;
+            current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_b_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_c_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_d_runner_next).is_pending());
+
+        Ok(())
+    }
+
+    // TODO(b/401594227): Remove this test once level_control has been removed.
+    #[test]
+    fn test_shared_level_control() -> Result<()> {
         // Create a topology of two child elements (C1 & C2) with a shared
         // parent (P) and grandparent (GP)
         // C1 \
@@ -1139,7 +1488,7 @@ mod tests {
         assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
-                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                lease_child_1.watch_status(LeaseStatus::Pending).await.unwrap(),
                 LeaseStatus::Satisfied
             );
         });
@@ -1189,7 +1538,7 @@ mod tests {
                 LeaseStatus::Satisfied
             );
             assert_eq!(
-                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                lease_child_2.watch_status(LeaseStatus::Pending).await.unwrap(),
                 LeaseStatus::Satisfied
             );
         });
@@ -1338,7 +1687,449 @@ mod tests {
     }
 
     #[test]
-    fn test_required_most_recent() -> Result<()> {
+    fn test_shared() -> Result<()> {
+        // Create a topology of two child elements (C1 & C2) with a shared
+        // parent (P) and grandparent (GP)
+        // C1 \
+        //     > P -> GP
+        // C2 /
+        // Child 1 requires Parent at 50 to support its own level of 5.
+        // Parent requires Grandparent at 200 to support its own level of 50.
+        // C1 -> P -> GP
+        //  5 -> 50 -> 200
+        // Child 2 requires Parent at 30 to support its own level of 3.
+        // Parent requires Grandparent at 90 to support its own level of 30.
+        // C2 -> P -> GP
+        //  3 -> 30 -> 90
+        // Grandparent has a default minimum level of 10.
+        // All other elements have a default of 0.
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let grandparent_token = zx::Event::create();
+        let (grandparent_runner_client, grandparent_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut grandparent_runner = grandparent_runner_server.into_stream();
+        let (grandparent_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("GP".into()),
+                    initial_current_level: Some(10),
+                    valid_levels: Some(vec![10, 90, 200]),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(grandparent_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(grandparent_element_control
+                .register_dependency_token(
+                    grandparent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let parent_token = zx::Event::create();
+        let (parent_runner_client, parent_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut parent_runner = parent_runner_server.into_stream();
+        let (parent_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("P".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 30, 50]),
+                    dependencies: Some(vec![
+                        LevelDependency {
+                            dependency_type: DependencyType::Assertive,
+                            dependent_level: 50,
+                            requires_token: grandparent_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            requires_level_by_preference: vec![200],
+                        },
+                        LevelDependency {
+                            dependency_type: DependencyType::Assertive,
+                            dependent_level: 30,
+                            requires_token: grandparent_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            requires_level_by_preference: vec![90],
+                        },
+                    ]),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(parent_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(parent_element_control
+                .register_dependency_token(
+                    parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let (child1_runner_client, child1_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut child1_runner = child1_runner_server.into_stream();
+        let (child1_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_child1_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("C1".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 5]),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: 5,
+                        requires_token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level_by_preference: vec![50],
+                    }]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(child1_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+        let (child2_runner_client, child2_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut child2_runner = child2_runner_server.into_stream();
+        let (child2_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_child2_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("C2".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 3]),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: 3,
+                        requires_token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level_by_preference: vec![30],
+                    }]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(child2_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+
+        // GP should have a initial required level of 10
+        // P, C1 and C2 should have initial required levels of 0.
+        executor.run_singlethreaded(async {
+            let grandparent_current = assert_set_level_required_eq_and_return_responder(
+                grandparent_runner.try_next(),
+                10,
+            )
+            .await;
+            grandparent_current.send().expect("set_level resp failed");
+
+            let parent_current =
+                assert_set_level_required_eq_and_return_responder(parent_runner.try_next(), 0)
+                    .await;
+            parent_current.send().expect("set_level resp failed");
+
+            let child1_current =
+                assert_set_level_required_eq_and_return_responder(child1_runner.try_next(), 0)
+                    .await;
+            child1_current.send().expect("set_level resp failed");
+
+            let child2_current =
+                assert_set_level_required_eq_and_return_responder(child2_runner.try_next(), 0)
+                    .await;
+            child2_current.send().expect("set_level resp failed");
+        });
+        let grandparent_runner_next = grandparent_runner.try_next();
+        let mut parent_runner_next = parent_runner.try_next();
+        let mut child1_runner_next = child1_runner.try_next();
+        let mut child2_runner_next = child2_runner.try_next();
+
+        // Acquire lease for C1 @ 5.
+        // GP's required level should become 200 because C1 @ 5 has a
+        // dependency on P @ 50 and P @ 50 has a dependency on GP @ 200.
+        // GP @ 200 has no dependencies so its level should be raised first.
+        // P's required level should remain 0 because GP is not yet at 200.
+        // C1's required level should remain 0 because P is not yet at 50.
+        // C2's required level should remain 0.
+        let lease_child_1 = executor.run_singlethreaded(async {
+            child1_lessor.lease(5).await.unwrap().expect("Lease response not ok").into_proxy()
+        });
+        let grandparent_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(grandparent_runner_next, 200).await
+        });
+        let mut grandparent_runner_next = grandparent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Raise GP's current level to 200.
+        // GP's required level should remain 200.
+        // P's required level should become 50 because GP is now at 200.
+        // C1's required level should remain 0 because P is not yet at 50.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            grandparent_current.send().expect("set_level resp failed");
+        });
+        let parent_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(parent_runner_next, 50).await
+        });
+        let mut parent_runner_next = parent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update P's current level to 50.
+        // GP's required level should remain 200.
+        // P's required level should remain 50.
+        // C1's required level should become 5 because P is now at 50.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            parent_current.send().expect("set_level resp failed");
+        });
+        let child1_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(child1_runner_next, 5).await
+        });
+        let mut child1_runner_next = child1_runner.try_next();
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+
+        // Update C1's current level to 5.
+        // GP's required level should remain 200.
+        // P's required level should remain 50.
+        // C1's required level should remain 5.
+        // C2's required level should remain 0.
+        // C1's lease @ 5 is now satisfied.
+        executor.run_singlethreaded(async {
+            child1_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Pending).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Acquire lease for C2 @ 3.
+        // Though C2 @ 3 has nominal requirements of P @ 30 and GP @ 90,
+        // they are superseded by C1's requirements of 50 and 200.
+        // GP's required level should remain 200.
+        // P's required level should remain 50.
+        // C1's required level should remain 5.
+        // C2's required level should become 3 because its dependencies are already satisfied.
+        // C1's lease @ 5 is still satisfied.
+        let lease_child_2 = executor.run_singlethreaded(async {
+            child2_lessor.lease(3).await.unwrap().expect("Lease response not ok").into_proxy()
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        let child2_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(child2_runner_next, 3).await
+        });
+        let mut child2_runner_next = child2_runner.try_next();
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Update C2's current level to 3.
+        // GP's required level should remain 200.
+        // P's required level should remain 50.
+        // C1's required level should remain 5.
+        // C2's required level should remain 0.
+        // C1's lease @ 5 is still satisfied.
+        // C2's lease @ 3 is now satisfied.
+        executor.run_singlethreaded(async {
+            child2_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Pending).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+        // Drop lease for C1.
+        // GP's required level should remain 200.
+        // P's required level should remain 50.
+        // C1's required level should become 0 because its lease has been dropped.
+        // C2's required level should remain 3.
+        // C2's lease @ 3 is still satisfied.
+        let child1_current = executor.run_singlethreaded(async {
+            drop(lease_child_1);
+            assert_set_level_required_eq_and_return_responder(child1_runner_next, 0).await
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        let mut child1_runner_next = child1_runner.try_next();
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Lower C1's current level to 0.
+        // GP's required level should remain 200.
+        // P's required level should become 30.
+        // C1's required level should remain 0.
+        // C2's required level should remain 3.
+        // C2's lease @ 3 is still satisfied.
+        let parent_current = executor.run_singlethreaded(async {
+            child1_current.send().expect("set_level resp failed");
+            assert_set_level_required_eq_and_return_responder(parent_runner_next, 30).await
+        });
+        let mut parent_runner_next = parent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Lower Parent's current level to 30.
+        // GP's required level should become 90 because P has dropped to 30.
+        // P's required level should remain 30.
+        // C1's required level should remain 0.
+        // C2's required level should remain 3.
+        // C2's lease @ 3 is still satisfied.
+        let grandparent_current = executor.run_singlethreaded(async {
+            parent_current.send().expect("set_level resp failed");
+            assert_set_level_required_eq_and_return_responder(grandparent_runner_next, 90).await
+        });
+        let mut grandparent_runner_next = grandparent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop lease for Child 2.
+        // GP's required level should remain 90 because P is still at 30.
+        // P's required level should remain 30.
+        // C1's required level should remain 0.
+        // C2's required level should become 0 because its lease has been dropped.
+        let child2_current = executor.run_singlethreaded(async {
+            drop(lease_child_2);
+            assert_set_level_required_eq_and_return_responder(child2_runner_next, 0).await
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        let mut child2_runner_next = child2_runner.try_next();
+
+        // Lower GP's current level to 90.
+        // GP's required level should remain 90 because P is still at 30.
+        // P's required level should remain 30.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            grandparent_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+
+        // Lower C2's current level to 0.
+        // GP's required level should remain 90 because P is still at 30.
+        // P's required level should become 0.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        let parent_current = executor.run_singlethreaded(async {
+            child2_current.send().expect("set_level resp failed");
+            assert_set_level_required_eq_and_return_responder(parent_runner_next, 0).await
+        });
+        let mut parent_runner_next = parent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+
+        // Lower Parent's current level to 0.
+        // GP's required level should become its minimum level of 10 because P is now at 0.
+        // P's required level should remain 0.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        let grandparent_current = executor.run_singlethreaded(async {
+            parent_current.send().expect("set_level resp failed");
+            assert_set_level_required_eq_and_return_responder(grandparent_runner_next, 10).await
+        });
+        let mut grandparent_runner_next = grandparent_runner.try_next();
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+
+        // Lower GP's current level to 10.
+        // GP's required level should remain 10.
+        // P's required level should remain 0.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            grandparent_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_runner_next).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_runner_next).is_pending());
+
+        Ok(())
+    }
+
+    // TODO(b/401594227): Remove this test once level_control has been removed.
+    #[test]
+    fn test_required_most_recent_level_control() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
@@ -1585,8 +2376,9 @@ mod tests {
         Ok(())
     }
 
+    // TODO(b/401594227): Remove this test once level_control has been removed.
     #[test]
-    fn test_opportunistic() -> Result<()> {
+    fn test_opportunistic_level_control() -> Result<()> {
         // B has an assertive dependency on A.
         // C has an opportunistic dependency on B (and transitively, an opportunistic dependency on A)
         //   and an assertive dependency on E.
@@ -2130,6 +2922,557 @@ mod tests {
         assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_opportunistic() -> Result<()> {
+        // B has an assertive dependency on A.
+        // C has an opportunistic dependency on B (and transitively, an opportunistic dependency on A)
+        //   and an assertive dependency on E.
+        // D has an assertive dependency on B (and transitively, an assertive dependency on A).
+        //  A     B     C     D     E
+        // ON <= ON
+        //       ON <- ON =======> ON
+        //       ON <======= ON
+        let mut executor = fasync::TestExecutor::new();
+        let realm =
+            executor.run_singlethreaded(async { build_power_broker_realm().await }).unwrap();
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let token_a = zx::Event::create();
+        let (element_runner_a_client, element_runner_a_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_runner_a = element_runner_a_server.into_stream();
+        let (element_control_a, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("A".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_a_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(element_control_a
+                .register_dependency_token(
+                    token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let token_b_assertive = zx::Event::create();
+        let token_b_opportunistic = zx::Event::create();
+        let (element_runner_b_client, element_runner_b_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_runner_b = element_runner_b_server.into_stream();
+        let (element_control_b, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("B".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
+                    }]),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_b_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(element_control_b
+                .register_dependency_token(
+                    token_b_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+            assert!(element_control_b
+                .register_dependency_token(
+                    token_b_opportunistic
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Opportunistic,
+                )
+                .await
+                .is_ok());
+        });
+        let token_e_assertive = zx::Event::create();
+        let (element_runner_e_client, element_runner_e_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_runner_e = element_runner_e_server.into_stream();
+        let (element_control_e, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("E".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_e_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(element_control_e
+                .register_dependency_token(
+                    token_e_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let (element_runner_c_client, element_runner_c_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_runner_c = element_runner_c_server.into_stream();
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_element_control_c, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("C".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![
+                        LevelDependency {
+                            dependency_type: DependencyType::Opportunistic,
+                            dependent_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_token: token_b_opportunistic
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .unwrap(),
+                            requires_level_by_preference: vec![
+                                BinaryPowerLevel::On.into_primitive()
+                            ],
+                        },
+                        LevelDependency {
+                            dependency_type: DependencyType::Assertive,
+                            dependent_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_token: token_e_assertive
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .unwrap(),
+                            requires_level_by_preference: vec![
+                                BinaryPowerLevel::On.into_primitive()
+                            ],
+                        },
+                    ]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_c_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+        let (element_runner_d_client, element_runner_d_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut element_runner_d = element_runner_d_server.into_stream();
+        let (element_d_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (_element_control_d, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("D".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: token_b_assertive
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .unwrap(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
+                    }]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_d_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        executor.run_singlethreaded(async {
+            for runner in [
+                element_runner_a.try_next(),
+                element_runner_b.try_next(),
+                element_runner_c.try_next(),
+                element_runner_d.try_next(),
+                element_runner_e.try_next(),
+            ] {
+                let current = assert_set_level_required_eq_and_return_responder(
+                    runner,
+                    BinaryPowerLevel::Off.into_primitive(),
+                )
+                .await;
+                current.send().expect("set_level resp failed");
+            }
+        });
+        let mut element_runner_a_next = element_runner_a.try_next();
+        let mut element_runner_b_next = element_runner_b.try_next();
+        let mut element_runner_c_next = element_runner_c.try_next();
+        let mut element_runner_d_next = element_runner_d.try_next();
+        let mut element_runner_e_next = element_runner_e.try_next();
+
+        // Lease C.
+        // A & B's required level should remain OFF because C's opportunistic claim
+        // does not raise the level of A or B.
+        // C's required level should remain OFF because its lease is still pending.
+        // D's required level should remain OFF.
+        // E's required level should remain OFF because C's opportunistic claim on B
+        // has no other assertive claims to satisfy it (the lease is contingent)
+        // and hence its assertive claim on E should remain pending and should not
+        // raise the level of E.
+        // Lease C should be Pending.
+        let lease_c = executor.run_singlethreaded(async {
+            element_c_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Lease D.
+        // A's required level should become ON because of D's transitive assertive claim.
+        // B's required level should remain OFF because A is not yet ON.
+        // C's required level should remain OFF because B and E are not yet ON.
+        // D's required level should remain OFF because B is not yet ON.
+        // E's required level should become ON because it C's lease is no longer
+        // contingent on an assertive claim that would satisfy its opportunistic claim.
+        // Lease C & D should be pending.
+        let lease_d = executor.run_singlethreaded(async {
+            element_d_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        });
+        let element_runner_a_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_a_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_a_next = element_runner_a.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        let element_runner_e_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_e_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_e_next = element_runner_e.try_next();
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update A's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should become ON because of D's assertive claim and
+        // its dependency on A being satisfied.
+        // C's required level should remain OFF because B and E are not yet ON.
+        // D's required level should remain OFF because B is not yet ON.
+        // E's required level should remain ON.
+        // Lease C & D should remain pending.
+        executor.run_singlethreaded(async {
+            element_runner_a_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        let element_runner_b_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_b_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_b_next = element_runner_b.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update B's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain OFF because E is not yet ON.
+        // D's required level should become ON.
+        // E's required level should remain ON.
+        // Lease C should remain pending.
+        // Lease D should remain pending.
+        executor.run_singlethreaded(async {
+            element_runner_b_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        let element_runner_d_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_d_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_d_next = element_runner_d.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+        // Update E's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should become ON because E is now ON.
+        // D's required level should remain ON.
+        // E's required level should remain ON.
+        // Lease C should remain pending.
+        // Lease D should remain pending.
+        executor.run_singlethreaded(async {
+            element_runner_e_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        let element_runner_c_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_c_next,
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_c_next = element_runner_c.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update C's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should become ON because E is now ON.
+        // D's required level should remain ON.
+        // E's required level should remain ON.
+        // Lease C should become satisfied.
+        // Lease D should remain pending.
+        executor.run_singlethreaded(async {
+            element_runner_c_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update D's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain ON.
+        // D's required level should remain ON.
+        // E's required level should remain ON.
+        // Lease C should remain satisfied.
+        // Lease D should become satisfied.
+        executor.run_singlethreaded(async {
+            element_runner_d_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+            assert_eq!(
+                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop Lease on D.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should become OFF because its lease is now pending and contingent.
+        // D's required level should become OFF because its lease was dropped.
+        // E's required level should remain ON.
+        // Lease C should now be Pending.
+        // A, B & E's required level should remain ON.
+        drop(lease_d);
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        let element_runner_c_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_c_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_c_next = element_runner_c.try_next();
+        let element_runner_d_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_d_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_d_next = element_runner_d.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Drop Lease on C.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain OFF because its lease was dropped.
+        // D's required level should remain OFF.
+        // E's required level should remain OFF.
+        drop(lease_c);
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+
+        // Update C's current level to OFF.
+        // A's required level should remain ON.
+        // B's required level should remain ON, D is still ON.
+        // C's required level should remain OFF.
+        // D's required level should remain OFF.
+        // E's required level should become OFF.
+        executor.run_singlethreaded(async {
+            element_runner_c_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        let element_runner_e_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_e_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_e_next = element_runner_e.try_next();
+
+        // Update D's current level to OFF.
+        // A's required level should remain ON.
+        // B's required level should become OFF.
+        // C's required level should remain OFF.
+        // D's required level should remain OFF.
+        // E's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_runner_d_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_a_next).is_pending());
+        let element_runner_b_current = executor.run_singlethreaded(async {
+            assert_set_level_required_eq_and_return_responder(
+                element_runner_b_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await
+        });
+        let mut element_runner_b_next = element_runner_b.try_next();
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+
+        // Update B's current level to OFF.
+        // A's required level should become OFF.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF.
+        // D's required level should remain OFF.
+        // E's required level should remain OFF.
+        executor.run_singlethreaded(async {
+            element_runner_b_current.send().expect("set_level resp failed");
+            let element_runner_a_current = assert_set_level_required_eq_and_return_responder(
+                element_runner_a_next,
+                BinaryPowerLevel::Off.into_primitive(),
+            )
+            .await;
+            element_runner_a_current.send().expect("set_level resp failed");
+        });
+        assert!(executor.run_until_stalled(&mut element_runner_b_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_c_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_d_next).is_pending());
+        assert!(executor.run_until_stalled(&mut element_runner_e_next).is_pending());
+        executor.run_singlethreaded(async {
+            element_runner_e_current.send().expect("set_level resp failed");
+        });
 
         Ok(())
     }

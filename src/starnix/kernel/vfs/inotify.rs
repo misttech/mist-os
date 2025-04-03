@@ -103,7 +103,7 @@ impl InotifyFileObject {
         let max_queued_events =
             current_task.kernel().system_limits.inotify.max_queued_events.load(Ordering::Relaxed);
         assert!(max_queued_events >= 0);
-        Anon::new_file(
+        Anon::new_private_file(
             current_task,
             Box::new(InotifyFileObject {
                 state: InotifyState {
@@ -129,7 +129,7 @@ impl InotifyFileObject {
         inotify_file: &FileHandle,
     ) -> Result<WdNumber, Errno> {
         let weak_key = WeakKey::from(inotify_file);
-        if let Some(watch_id) = dir_entry.node.watchers.maybe_update(mask, &weak_key)? {
+        if let Some(watch_id) = dir_entry.node.ensure_watchers().maybe_update(mask, &weak_key)? {
             return Ok(watch_id);
         }
 
@@ -139,7 +139,7 @@ impl InotifyFileObject {
             watch_id = state.next_watch_id();
             state.watches.insert(watch_id, dir_entry.clone());
         }
-        dir_entry.node.watchers.add(mask, watch_id, weak_key);
+        dir_entry.node.ensure_watchers().add(mask, watch_id, weak_key);
         Ok(watch_id)
     }
 
@@ -158,7 +158,7 @@ impl InotifyFileObject {
                 FsString::default(),
             ));
         }
-        dir_entry.node.watchers.remove(&WeakKey::from(file));
+        dir_entry.node.ensure_watchers().remove(&WeakKey::from(file));
         Ok(())
     }
 
@@ -299,7 +299,7 @@ impl FileOps for InotifyFileObject {
         };
 
         for dir_entry in dir_entries {
-            dir_entry.node.watchers.remove_by_ref(file);
+            dir_entry.node.ensure_watchers().remove_by_ref(file);
         }
     }
 }
@@ -731,18 +731,12 @@ mod tests {
         assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
         }
 
         // Generate 1 event.
-        root.node.watchers.notify(
-            InotifyMask::ACCESS,
-            0,
-            Default::default(),
-            FileMode::IFREG,
-            false,
-        );
+        root.node.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG, false);
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
@@ -752,13 +746,7 @@ mod tests {
         }
 
         // Generate another event.
-        root.node.watchers.notify(
-            InotifyMask::ATTRIB,
-            0,
-            Default::default(),
-            FileMode::IFREG,
-            false,
-        );
+        root.node.notify(InotifyMask::ATTRIB, 0, Default::default(), FileMode::IFREG, false);
 
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {
@@ -804,20 +792,14 @@ mod tests {
         assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
         }
 
-        root.node.watchers.notify(
-            InotifyMask::DELETE_SELF,
-            0,
-            Default::default(),
-            FileMode::IFREG,
-            false,
-        );
+        root.node.notify(InotifyMask::DELETE_SELF, 0, Default::default(), FileMode::IFREG, false);
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 0);
         }
 
@@ -857,7 +839,7 @@ mod tests {
             .is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
         }
@@ -866,7 +848,7 @@ mod tests {
         assert!(inotify.add_watch(root.clone(), InotifyMask::ACCESS, &file).is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::ACCESS));
             assert!(!watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
@@ -878,7 +860,7 @@ mod tests {
             .is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::ACCESS));
             assert!(watchers.get(&file_key).unwrap().mask.contains(InotifyMask::MODIFY));
@@ -898,25 +880,13 @@ mod tests {
         assert!(inotify.add_watch(root.clone(), InotifyMask::ALL_EVENTS, &file).is_ok());
 
         {
-            let watchers = root.node.watchers.watchers.lock();
+            let watchers = root.node.ensure_watchers().watchers.lock();
             assert_eq!(watchers.len(), 1);
         }
 
         // Generate 2 identical events. They should combine into 1.
-        root.node.watchers.notify(
-            InotifyMask::ACCESS,
-            0,
-            Default::default(),
-            FileMode::IFREG,
-            false,
-        );
-        root.node.watchers.notify(
-            InotifyMask::ACCESS,
-            0,
-            Default::default(),
-            FileMode::IFREG,
-            false,
-        );
+        root.node.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG, false);
+        root.node.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG, false);
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {

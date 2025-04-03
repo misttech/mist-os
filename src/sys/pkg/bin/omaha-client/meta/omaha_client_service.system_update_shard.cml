@@ -114,6 +114,7 @@
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Listener",
                 "fuchsia.update.Manager",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "#omaha-client-service",
         },

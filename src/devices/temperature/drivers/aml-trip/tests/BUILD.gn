@@ -10,13 +10,9 @@ import("//build/testing/cc_test_executable.gni")
 cc_test_executable("aml-trip-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
-  sources = [
-    "../aml-trip-device.cc",
-    "../aml-trip.cc",
-    "../util.cc",
-    "aml-trip-test.cc",
-  ]
+  sources = [ "aml-trip-test.cc" ]
   deps = [
+    "..:common",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
@@ -25,23 +21,19 @@ cc_test_executable("aml-trip-test-bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/logging/cpp:cpp",
+    "//sdk/lib/driver/fake-mmio-reg/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-mmio-reg",
+    "//src/devices/lib/mmio:test_helper",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

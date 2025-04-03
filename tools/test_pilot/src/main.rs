@@ -5,19 +5,24 @@
 mod builder;
 mod env;
 mod errors;
+mod invocation_log;
 mod logger;
 mod name;
 mod parsers;
+mod run_tests;
 mod schema;
+mod std_writer;
 mod test_config;
+mod test_output;
 
 use crate::env::{ActualEnv, EnvLike};
 use crate::logger::{RetainingLogger, StderrLogger};
 use crate::schema::Schema;
+use crate::test_output::OutputDirectory;
 use std::fs;
 
 const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
-const TEST_CONFIG_FILE_PATH: &str = "test_config.json";
+const ENV_PATH: &str = "PATH";
 
 // We need multiple threads to stream stdout/err in parallel until we can switch this to use tokio.
 #[fuchsia::main(threads = 2)]
@@ -52,7 +57,9 @@ async fn main() {
 
     match test_config_result {
         Ok(test_config) => {
-            if let Err(e) = fs::create_dir_all(test_config.output_directory.clone()) {
+            let outdir = OutputDirectory::new(&test_config.output_directory);
+
+            if let Err(e) = fs::create_dir_all(&test_config.output_directory) {
                 eprintln!(
                     "Error creating output directory {}: {}",
                     test_config.output_directory.display(),
@@ -61,13 +68,14 @@ async fn main() {
                 std::process::exit(INVALID_ARGS_CONFIG_EXIT_CODE);
             }
 
-            let mut param_file_path = test_config.output_directory.clone();
-            param_file_path.push(TEST_CONFIG_FILE_PATH);
-            if let Err(e) = fs::write(
-                param_file_path.to_str().unwrap(),
-                serde_json::to_string_pretty(&test_config).unwrap(),
-            ) {
-                eprintln!("Error writing test parameters to {}: {}", param_file_path.display(), e);
+            if let Err(e) =
+                fs::write(outdir.test_config(), serde_json::to_string_pretty(&test_config).unwrap())
+            {
+                eprintln!(
+                    "Error writing test parameters to {}: {}",
+                    outdir.test_config().display(),
+                    e
+                );
                 std::process::exit(INVALID_ARGS_CONFIG_EXIT_CODE);
             }
 
@@ -76,7 +84,20 @@ async fn main() {
                 serde_json::to_string_pretty(&test_config).unwrap()
             );
 
-            // run tests, etc
+            // TODO(b/294567715): Map error to output format.
+            match run_tests::run_test(
+                &test_config,
+                &outdir,
+                std::env::var(ENV_PATH).unwrap().as_str(),
+            )
+            .await
+            {
+                Ok(exit_code) => std::process::exit(exit_code.code().unwrap()),
+                Err(e) => {
+                    eprintln!("Error running test: {}", e);
+                    std::process::exit(INVALID_ARGS_CONFIG_EXIT_CODE);
+                }
+            }
         }
         Err(error) => {
             match error {

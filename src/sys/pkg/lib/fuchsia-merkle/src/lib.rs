@@ -15,7 +15,7 @@ pub use fuchsia_hash::{Hash, HASH_SIZE};
 pub const BLOCK_SIZE: usize = 8192;
 
 mod util;
-pub use crate::util::{crypto_library_init, hash_block};
+pub use crate::util::hash_block;
 
 mod tree;
 pub use crate::tree::MerkleTree;

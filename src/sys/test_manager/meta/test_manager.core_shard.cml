@@ -240,6 +240,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.TracingResource",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
@@ -471,11 +472,19 @@
             subdir: "tee",
         },
         {
+            // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
+            // been migrated to services. The service capability has been added below.
             directory: "dev-class",
             from: "parent",
             as: "dev-securemem",
             to: "#test_manager",
             subdir: "securemem",
+        },
+        {
+            // This service replaces the directory capability above.
+            service: "fuchsia.hardware.securemem.Service",
+            from: "parent",
+            to: "#test_manager",
         },
 
         // Tests of the media system want to test against the real hardware

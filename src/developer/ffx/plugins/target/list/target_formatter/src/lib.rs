@@ -40,14 +40,16 @@ impl<'a, T: Copy + IntoIterator<Item = &'a TargetAddr>> SshAddrFetcher for &'a T
     fn to_ssh_addr(self) -> Option<TargetAddr> {
         let mut res: Option<TargetAddr> = None;
         for addr in self.into_iter() {
-            let is_valid_local_addr = addr.ip().is_local_addr()
-                && (addr.ip().is_ipv4()
-                    || !(addr.ip().is_link_local_addr() && addr.scope_id() == 0));
+            let Some(ip) = addr.ip() else {
+                continue;
+            };
+            let is_valid_local_addr = ip.is_local_addr()
+                && (ip.is_ipv4() || !(ip.is_link_local_addr() && addr.scope_id() == 0));
 
             if res.is_none() || is_valid_local_addr {
                 res.replace(addr.clone());
             }
-            if addr.ip().is_ipv6() && is_valid_local_addr {
+            if ip.is_ipv6() && is_valid_local_addr {
                 res.replace(addr.clone());
                 break;
             }
@@ -83,6 +85,7 @@ fn is_ipv4(info: &ffx::TargetAddrInfo) -> bool {
     let ip = match info {
         ffx::TargetAddrInfo::Ip(ip) => ip.ip,
         ffx::TargetAddrInfo::IpPort(ip) => ip.ip,
+        ffx::TargetAddrInfo::Vsock(_) => return false,
     };
     match ip {
         IpAddress::Ipv4(_) => true,
@@ -389,17 +392,20 @@ macro_rules! make_structs_and_support_functions {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
-pub struct JsonTargetAddress {
-    ip: String,
-    ssh_port: u16,
+pub enum JsonTargetAddress {
+    Ip { ip: String, ssh_port: u16 },
+    VSock { cid: u32 },
 }
 
 impl From<ffx::TargetAddrInfo> for JsonTargetAddress {
     fn from(info: ffx::TargetAddrInfo) -> Self {
         let tai: TargetAddr = info.into();
-        JsonTargetAddress {
-            ip: tai.to_string(), // May include scope name
-            ssh_port: tai.port(),
+
+        match &tai {
+            TargetAddr::Net(_) => {
+                JsonTargetAddress::Ip { ip: tai.to_string(), ssh_port: tai.port().unwrap() }
+            }
+            TargetAddr::VSockCtx(cid) => JsonTargetAddress::VSock { cid: *cid },
         }
     }
 }

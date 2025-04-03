@@ -16,7 +16,9 @@ closed protocol Connector {
     strict EstablishCircuit(resource struct {
         id uint64;
         socket zx.Handle:SOCKET;
-    }) -> ();
+    }) -> (struct {
+        overnet_id uint64;
+    });
 
     // Get a socket connected to an FDomain which has the toolbox as its
     // namespace. Messages received through the socket will have a little endian

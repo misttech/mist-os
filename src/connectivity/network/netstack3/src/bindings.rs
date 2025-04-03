@@ -36,10 +36,8 @@ mod health_check_worker;
 mod time;
 mod timers;
 mod util;
-mod verifier_worker;
 
 use std::convert::Infallible as Never;
-use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
 use std::ops::Deref;
@@ -106,7 +104,7 @@ use netstack3_core::udp::{
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
     IpExt, ReferenceNotifiers, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
-    TimerContext, TimerId, TracingContext, TxMetadata, TxMetadataBindingsTypes,
+    TimerContext, TimerId, TxMetadata, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -420,29 +418,6 @@ impl InstantContext for BindingsCtx {
         StackTime::now()
     }
 }
-
-impl TracingContext for BindingsCtx {
-    type DurationScope = fuchsia_trace::DurationScope<'static>;
-
-    fn duration(&self, name: &'static CStr) -> fuchsia_trace::DurationScope<'static> {
-        fuchsia_trace::duration(c"net", name, &[])
-    }
-}
-
-/// Convenience wrapper around the [`fuchsia_trace::duration`] macro that always
-/// uses the "net" tracing category.
-///
-/// [`fuchsia_trace::duration`] uses RAII to begin and end the duration by tying
-/// the scope of the duration to the lifetime of the object it returns. This
-/// macro encapsulates that logic such that the trace duration will end when the
-/// scope in which the macro is called ends.
-macro_rules! trace_duration {
-    ($name:expr) => {
-        fuchsia_trace::duration!(c"net", $name);
-    };
-}
-
-pub(crate) use trace_duration;
 
 impl FilterBindingsTypes for BindingsCtx {
     type DeviceClass = fidl_fuchsia_net_interfaces::PortClass;
@@ -1250,7 +1225,6 @@ pub(crate) enum Service {
     RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
-    Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
 }
 
 trait RequestStreamExt: RequestStream {
@@ -1760,9 +1734,6 @@ impl NetstackSeed {
                                     neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
                                 })
                                 .await
-                        }
-                        Service::Verifier(verifier) => {
-                            verifier.serve_with(|rs| verifier_worker::serve(rs)).await
                         }
                         Service::HealthCheck(health_check) => {
                             health_check.serve_with(|rs| health_check_worker::serve(rs)).await

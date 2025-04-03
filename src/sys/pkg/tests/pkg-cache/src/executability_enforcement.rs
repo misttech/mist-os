@@ -5,19 +5,17 @@
 use crate::TestEnv;
 use fidl_fuchsia_io as fio;
 use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
-use zx::Status;
 
 /// Test executability enforcement of fuchsia.pkg/PackageCache.{Get|Open}, i.e. whether the
-/// handle to the package directory has RIGHT_EXECUTABLE.
+/// handle to the package directory has [`fio::PERM_EXECUTABLE`]. Enforcement is enabled by default.
 ///
-/// If executability enforcement is enabled (the default), the handle should have RIGHT_EXECUTABLE
-/// if and only if the package is a base package (e.g. being in the cache or retained indices
-/// should not affect executability).
+/// When enabled, the handle should have [`fio::PERM_EXECUTABLE`] if and only if the package is a
+/// base package (e.g. being in the cache or retained indices should not affect executability).
 ///
 /// If executability enforcement is disabled (by the presence of file
 /// data/pkgfs_disable_executability_restrictions in the meta.far of the system_image package
 /// (just the meta.far, the blob can be missing from blobfs)) then the handle should always have
-/// RIGHT_EXECUTABLE.
+/// [`fio::PERM_EXECUTABLE`].
 
 #[derive(Debug, Clone, Copy)]
 enum IsRetained {
@@ -32,7 +30,7 @@ async fn verify_package_executability(
     pkg: Package,
     system_image: SystemImageBuilder,
     is_retained: IsRetained,
-    expected_flags: fio::OpenFlags,
+    expected_flags: fio::Flags,
     superpackage: Package,
     subpackage_url: String,
 ) {
@@ -51,10 +49,8 @@ async fn verify_package_executability(
         .await;
     }
 
-    async fn verify_flags(dir: &fio::DirectoryProxy, expected_flags: fio::OpenFlags) {
-        // TODO(https://fxbug.dev/376509077): Transition to use fuchsia.io/Node.GetFlags.
-        let (status, flags) = dir.deprecated_get_flags().await.unwrap();
-        let () = Status::ok(status).unwrap();
+    async fn verify_flags(dir: &fio::DirectoryProxy, expected_flags: fio::Flags) {
+        let flags = dir.get_flags().await.unwrap().unwrap() & fio::MASK_KNOWN_PERMISSIONS;
         assert_eq!(flags, expected_flags);
     }
 
@@ -87,7 +83,7 @@ async fn base_package_executable() {
         pkg,
         system_image,
         IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         superpkg,
         "my-subpackage".into(),
     )
@@ -105,7 +101,7 @@ async fn cache_package_not_executable() {
         pkg,
         system_image,
         IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
         superpkg,
         "my-subpackage".into(),
     )
@@ -123,7 +119,7 @@ async fn retained_index_package_not_executable() {
         pkg,
         system_image,
         IsRetained::True,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
         superpkg,
         "my-subpackage".into(),
     )
@@ -143,7 +139,7 @@ async fn enforcement_disabled_cache_package_executable() {
         pkg,
         system_image,
         IsRetained::False,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         superpkg,
         "my-subpackage".into(),
     )
@@ -161,7 +157,7 @@ async fn enforcement_disabled_retained_index_package_executable() {
         pkg,
         system_image,
         IsRetained::True,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         superpkg,
         "my-subpackage".into(),
     )

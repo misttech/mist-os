@@ -39,7 +39,8 @@ pub struct OptionBody<B = Vec<u8>> {
 }
 
 impl<B> OptionBody<B> {
-    fn into_inner(self) -> B {
+    /// Returns the internal bytes storage of the `OptionBody`.
+    pub fn into_inner(self) -> B {
         self.bytes
     }
 }

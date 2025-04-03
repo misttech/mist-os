@@ -23,8 +23,11 @@
 #include <zircon/types.h>
 
 #include <fbl/algorithm.h>
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
+#include <phys/handoff.h>
 #include <vm/init.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -42,43 +45,89 @@
 vm_page_t* zero_page;
 paddr_t zero_page_paddr;
 
-// construct an array of kernel program segment descriptors for use here
-// and elsewhere
 namespace {
 
-const ktl::array _kernel_regions = {
-    kernel_region{
-        .name = "kernel_code",
-        .base = (vaddr_t)__code_start,
-        .size = ROUNDUP((uintptr_t)__code_end - (uintptr_t)__code_start, PAGE_SIZE),
-        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE,
-    },
-    kernel_region{
-        .name = "kernel_rodata",
-        .base = (vaddr_t)__rodata_start,
-        .size = ROUNDUP((uintptr_t)__rodata_end - (uintptr_t)__rodata_start, PAGE_SIZE),
-        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
-    },
-    kernel_region{
-        .name = "kernel_relro",
-        .base = (vaddr_t)__relro_start,
-        .size = ROUNDUP((uintptr_t)__relro_end - (uintptr_t)__relro_start, PAGE_SIZE),
-        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
-    },
-    kernel_region{
-        .name = "kernel_data_bss",
-        .base = (vaddr_t)__data_start,
-        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__data_start, PAGE_SIZE),
-        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-    },
-};
+// The initialized VMARs described in the phys hand-off.
+fbl::Vector<fbl::RefPtr<VmAddressRegion>> handoff_vmars;
 
-// The VMAR containing the kernel's load image and the physmap, respectively.
-fbl::RefPtr<VmAddressRegion> kernel_image_vmar, physmap_vmar;
+constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
+  uint32_t flags = VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC;
+  if (perms.readable()) {
+    flags |= VMAR_FLAG_CAN_MAP_READ;
+  }
+  if (perms.writable()) {
+    flags |= VMAR_FLAG_CAN_MAP_WRITE;
+  }
+  if (perms.executable()) {
+    flags |= VMAR_FLAG_CAN_MAP_EXECUTE;
+  }
+  return flags;
+}
+
+constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms) {
+  uint flags = 0;
+  if (perms.readable()) {
+    flags |= ARCH_MMU_FLAG_PERM_READ;
+  }
+  if (perms.writable()) {
+    flags |= ARCH_MMU_FLAG_PERM_WRITE;
+  }
+  if (perms.executable()) {
+    flags |= ARCH_MMU_FLAG_PERM_EXECUTE;
+  }
+  return flags;
+}
+
+constexpr ktl::array<char, 4> PermissionsName(PhysMapping::Permissions perms) {
+  ktl::array<char, 4> name{};
+  size_t idx = 0;
+  if (perms.readable()) {
+    name[idx++] = 'r';
+  }
+  if (perms.writable()) {
+    name[idx++] = 'w';
+  }
+  if (perms.executable()) {
+    name[idx++] = 'x';
+  }
+  return name;
+}
+
+void RegisterMappings(ktl::span<const PhysMapping> mappings, fbl::RefPtr<VmAddressRegion> vmar) {
+  for (const PhysMapping& mapping : mappings) {
+    dprintf(ALWAYS,
+            "VM: * mapping: %s (%s): [%#" PRIxPTR ", %#" PRIxPTR ") -> [%#" PRIxPTR ", %#" PRIxPTR
+            ")\n",
+            mapping.name.data(), PermissionsName(mapping.perms).data(), mapping.paddr,
+            mapping.paddr_end(), mapping.vaddr, mapping.vaddr_end());
+    zx_status_t status = vmar->ReserveSpace(mapping.name.data(), mapping.vaddr, mapping.size,
+                                            ToArchMmuFlags(mapping.perms));
+    ASSERT(status == ZX_OK);
+
+#if __has_feature(address_sanitizer)
+    if (mapping.kasan_shadow) {
+      asan_map_shadow_for(mapping.vaddr, mapping.size);
+    }
+#endif  // __has_feature(address_sanitizer)
+  }
+}
+
+fbl::RefPtr<VmAddressRegion> RegisterVmar(const PhysVmar& phys_vmar) {
+  fbl::RefPtr<VmAddressRegion> root_vmar = VmAspace::kernel_aspace()->RootVmar();
+
+  dprintf(ALWAYS, "VM: handing off VMAR from phys: %s @ [%#" PRIxPTR ", %#" PRIxPTR ")\n",
+          phys_vmar.name.data(), phys_vmar.base, phys_vmar.end());
+  fbl::RefPtr<VmAddressRegion> vmar;
+  zx_status_t status =
+      root_vmar->CreateSubVmar(phys_vmar.base - root_vmar->base(), phys_vmar.size, 0,
+                               ToVmarFlags(phys_vmar.permissions()), phys_vmar.name.data(), &vmar);
+  ASSERT(status == ZX_OK);
+  RegisterMappings(phys_vmar.mappings.get(), vmar);
+
+  return vmar;
+}
 
 }  // namespace
-
-const ktl::span<const kernel_region> kernel_regions{_kernel_regions};
 
 void vm_init_preheap() {}
 
@@ -101,46 +150,14 @@ void vm_init() {
 
   arch_zero_page(ptr);
 
-  fbl::RefPtr<VmAddressRegion> root_vmar = VmAspace::kernel_aspace()->RootVmar();
-
-  // Full RWX permissions, to be refined by individual kernel regions.
-  constexpr uint32_t kKernelVmarFlags =
-      VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_CAN_RWX_FLAGS;
-
-  // |kernel_image_size| is the size in bytes of the region of memory occupied by the kernel
-  // program's various segments (code, rodata, data, bss, etc.), inclusive of any gaps between
-  // them.
-  const size_t kernel_image_size = get_kernel_size();
-  const uintptr_t kernel_vaddr = reinterpret_cast<uintptr_t>(__executable_start);
-  status = root_vmar->CreateSubVmar(kernel_vaddr - root_vmar->base(), kernel_image_size, 0,
-                                    kKernelVmarFlags, "kernel region vmar", &kernel_image_vmar);
-  ASSERT(status == ZX_OK);
-
-  // Finish reserving the sections in the kernel_region
-  for (const auto& region : kernel_regions) {
-    if (region.size == 0) {
-      continue;
-    }
-
-    ASSERT(IS_PAGE_ALIGNED(region.base));
-
-    dprintf(ALWAYS,
-            "VM: reserving kernel region [%#" PRIxPTR ", %#" PRIxPTR ") flags %#x name '%s'\n",
-            region.base, region.base + region.size, region.arch_mmu_flags, region.name);
-    status = kernel_image_vmar->ReserveSpace(region.name, region.base, region.size,
-                                             region.arch_mmu_flags);
-    ASSERT(status == ZX_OK);
-
-#if __has_feature(address_sanitizer)
-    asan_map_shadow_for(region.base, region.size);
-#endif  // __has_feature(address_sanitizer)
+  fbl::AllocChecker ac;
+  handoff_vmars.reserve(gPhysHandoff->vmars.size(), &ac);
+  ASSERT(ac.check());
+  for (const PhysVmar& phys_vmar : gPhysHandoff->vmars.get()) {
+    fbl::RefPtr<VmAddressRegion> vmar = RegisterVmar(phys_vmar);
+    handoff_vmars.push_back(ktl::move(vmar), &ac);
+    ASSERT(ac.check());
   }
-
-  constexpr uint32_t kPhysmapVmarFlags = VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC |
-                                         VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE;
-  status = root_vmar->CreateSubVmar(PHYSMAP_BASE - root_vmar->base(), PHYSMAP_SIZE, 0,
-                                    kPhysmapVmarFlags, "physmap", &physmap_vmar);
-  ASSERT(status == ZX_OK);
 
   // Protect the regions of the physmap that are not backed by normal memory.
   //

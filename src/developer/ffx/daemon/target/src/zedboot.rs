@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{anyhow, bail, Context as _, Result};
 use ffx_daemon_core::events;
 use ffx_daemon_events::{DaemonEvent, TryIntoTargetEventInfo, WireTrafficType};
@@ -245,7 +245,7 @@ async fn make_sender_socket(addr: SocketAddr) -> Result<UdpSocket> {
     Ok(result)
 }
 
-async fn send(opcode: Opcode, body: &str, to_addr: TargetAddr) -> Result<()> {
+async fn send(opcode: Opcode, body: &str, to_sock: TargetIpAddr) -> Result<()> {
     const BUFFER_SIZE: usize = 512;
     const COOKIE: u32 = 1;
     const ARG: u32 = 0;
@@ -254,7 +254,7 @@ async fn send(opcode: Opcode, body: &str, to_addr: TargetAddr) -> Result<()> {
         .encapsulate(NetbootPacketBuilder::new(opcode.into(), COOKIE, ARG))
         .serialize_no_alloc_outer()
         .expect("failed to serialize");
-    let mut to_sock: SocketAddr = to_addr.into();
+    let mut to_sock: SocketAddr = to_sock.into();
     to_sock.set_port(SERVER_PORT.get());
     tracing::info!("Sending {:?} {} to {}", opcode, body, to_sock);
     let sock = make_sender_socket(to_sock).await?;
@@ -267,14 +267,14 @@ async fn send(opcode: Opcode, body: &str, to_addr: TargetAddr) -> Result<()> {
     })
 }
 
-pub async fn reboot(to_addr: TargetAddr) -> Result<()> {
+pub async fn reboot(to_addr: TargetIpAddr) -> Result<()> {
     send(Opcode::Reboot, "", to_addr).await
 }
 
-pub async fn reboot_to_bootloader(to_addr: TargetAddr) -> Result<()> {
+pub async fn reboot_to_bootloader(to_addr: TargetIpAddr) -> Result<()> {
     send(Opcode::ShellCmd, "dm reboot-bootloader\0", to_addr).await
 }
 
-pub async fn reboot_to_recovery(to_addr: TargetAddr) -> Result<()> {
+pub async fn reboot_to_recovery(to_addr: TargetIpAddr) -> Result<()> {
     send(Opcode::ShellCmd, "dm reboot-recovery\0", to_addr).await
 }

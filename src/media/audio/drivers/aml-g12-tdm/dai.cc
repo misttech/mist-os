@@ -27,7 +27,7 @@ enum {
   FRAGMENT_COUNT,
 };
 
-AmlG12TdmDai::AmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev)
+AmlG12TdmDai::AmlG12TdmDai(zx_device_t* parent, fdf::PDev pdev)
     : AmlG12TdmDaiDeviceType(parent),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       pdev_(std::move(pdev)) {
@@ -112,16 +112,17 @@ zx_status_t AmlG12TdmDai::InitPDev() {
   }
   InitDaiFormats();
 
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not obtain bti %d", status);
-    return status;
+  zx::result bti = pdev_.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev_.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not get mmio %d", status);
-    return status;
+  bti_ = std::move(bti.value());
+
+  zx::result mmio = pdev_.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
   aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, *std::move(mmio));
   if (aml_audio_ == nullptr) {
@@ -443,11 +444,15 @@ static zx_status_t dai_bind(void* ctx, zx_device_t* device) {
     zxlogf(ERROR, "device_get_fragment_metadata failed %d", status);
     return status;
   }
-  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(device);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "could not get pdev");
-    return ZX_ERR_NO_RESOURCES;
+
+  zx::result pdev_client_end = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(device, "pdev");
+  if (pdev_client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client_end.status_string());
+    return pdev_client_end.status_value();
   }
+  fdf::PDev pdev{std::move(pdev_client_end.value())};
+
   auto dai = std::make_unique<audio::aml_g12::AmlG12TdmDai>(device, std::move(pdev));
   if (dai == nullptr) {
     zxlogf(ERROR, "Could not create DAI driver");

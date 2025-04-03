@@ -6,7 +6,7 @@
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import fidl.fuchsia_bluetooth as f_bt
 import fidl.fuchsia_bluetooth_sys as f_btsys_controller
@@ -151,14 +151,14 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             )
 
         assert self._access_controller_proxy is None
-        self._access_controller_proxy = f_btsys_controller.Access.Client(
+        self._access_controller_proxy = f_btsys_controller.AccessClient(
             self._fc_transport.connect_device_proxy(
                 _FCBluetoothProxies.BT_SYS_ACCESS
             )
         )
         assert self._host_watcher_controller_proxy is None
         self._host_watcher_controller_proxy = (
-            f_btsys_controller.HostWatcher.Client(
+            f_btsys_controller.HostWatcherClient(
                 self._fc_transport.connect_device_proxy(
                     _FCBluetoothProxies.BT_SYS_HOST_WATCHER
                 )
@@ -166,7 +166,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         )
 
         assert self._pairing_controller_proxy is None
-        self._pairing_controller_proxy = f_btsys_controller.Pairing.Client(
+        self._pairing_controller_proxy = f_btsys_controller.PairingClient(
             self._fc_transport.connect_device_proxy(
                 _FCBluetoothProxies.BT_SYS_PAIRING
             )
@@ -178,12 +178,14 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         self,
         input_mode: BluetoothAcceptPairing,
         output_mode: BluetoothAcceptPairing,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
             input_mode: input mode of device
             output_mode: output mode of device
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -194,7 +196,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
                     self._accept_pairing(
                         input_mode=input_mode, output_mode=output_mode
                     ),
-                    ASYNC_OP_TIMEOUT,
+                    timeout_sec,
                 )
             )
         except Exception as e:
@@ -224,20 +226,24 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         )
         assert self._pairing_controller_proxy is not None
         self._pairing_controller_proxy.set_pairing_delegate(
-            input=_FC_DELEGATES[input_mode],
+            input_=_FC_DELEGATES[input_mode],
             output=_FC_DELEGATES[output_mode],
             delegate=tx.take(),
         )
         _LOGGER.debug("Pairing Delegate has been set.")
 
     def connect_device(
-        self, identifier: str, connection_type: BluetoothConnectionType = 1
+        self,
+        identifier: str,
+        connection_type: BluetoothConnectionType = 1,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Connect to a peer device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of Bluetooth connection
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -246,8 +252,8 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         try:
             self.loop.run_until_complete(
                 asyncio.wait_for(
-                    self._access_controller_proxy.connect(id=peer_id),
-                    ASYNC_OP_TIMEOUT,
+                    self._access_controller_proxy.connect(id_=peer_id),
+                    timeout_sec,
                 )
             )
             # TODO: b/342432248 - Reduce sleep values to minimum stables values
@@ -257,11 +263,14 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
                 f"Failed to complete Bluetooth connect FIDL call on {self._device_name}."
             ) from e
 
-    def forget_device(self, identifier: str) -> None:
+    def forget_device(
+        self, identifier: str, timeout_sec: Optional[int | None] = None
+    ) -> None:
         """Forget and delete peer device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: On failure.
@@ -270,8 +279,8 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         try:
             self.loop.run_until_complete(
                 asyncio.wait_for(
-                    self._access_controller_proxy.forget(id=peer_id),
-                    ASYNC_OP_TIMEOUT,
+                    self._access_controller_proxy.forget(id_=peer_id),
+                    timeout_sec,
                 )
             )
         except Exception as e:
@@ -279,8 +288,13 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
                 f"Failed to complete Bluetooth forget FIDL call on {self._device_name}."
             ) from e
 
-    def get_active_adapter_address(self) -> str:
+    def get_active_adapter_address(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> str:
         """Retrieves the active adapter mac address
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Sample result:
             {"result": "[address (public) 20:1F:3B:62:E9:D2]"}
@@ -292,7 +306,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         """
         try:
             return self.loop.run_until_complete(
-                asyncio.wait_for(self._get_active_address(), ASYNC_OP_TIMEOUT)
+                asyncio.wait_for(self._get_active_address(), timeout_sec)
             )
         except Exception as e:
             raise bluetooth_errors.BluetoothError(
@@ -316,7 +330,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             for host in hosts:
                 if host.addresses:
                     res = host.addresses[0]
-                    return res.bytes
+                    return res.bytes_
         raise bluetooth_errors.BluetoothStateError(
             "No Bluetooth addresses found on {self._device_name} in FIDL response: {hosts_response}"
         )
@@ -336,8 +350,13 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
                 connected_devices.append(value["id"])
         return connected_devices
 
-    def get_known_remote_devices(self) -> dict[str, Any]:
+    def get_known_remote_devices(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> dict[str, Any]:
         """Retrieves all known remote devices received by device.
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Returns:
             A dict of all known remote devices.
@@ -347,7 +366,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             results = self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.watch_peers(),
-                    ASYNC_OP_TIMEOUT,
+                    timeout_sec,
                 )
             )
         except TimeoutError:
@@ -356,12 +375,12 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             )
             return self.known_devices
         for p in results.updated:
-            self.known_devices[str(p.id.value)] = {
-                "address": p.address.bytes,
+            self.known_devices[str(p.id_.value)] = {
+                "address": p.address.bytes_,
                 "appearance": p.appearance,
                 "bonded": p.bonded,
                 "connected": p.connected,
-                "id": p.id.value,
+                "id": p.id_.value,
                 "name": p.name,
                 "rssi": p.rssi,
                 "services": p.services,
@@ -371,13 +390,17 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
         return self.known_devices
 
     def pair_device(
-        self, identifier: Any, connection_type: BluetoothConnectionType = 1
+        self,
+        identifier: Any,
+        connection_type: BluetoothConnectionType = 1,
+        timeout_sec: Optional[int | None] = None,
     ) -> None:
         """Initiate pairing with peer device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
             connection_type: type of Bluetooth connection
+            timeout_sec: timeout duration in seconds
         """
         peer_id = f_bt.PeerId(value=identifier)
         options = f_btsys_controller.PairingOptions()
@@ -385,9 +408,9 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.pair(
-                        id=peer_id, options=options
+                        id_=peer_id, options=options
                     ),
-                    ASYNC_OP_TIMEOUT,
+                    timeout_sec,
                 )
             )
             # TODO: b/342432248 - Reduce sleep values to minimum stables values
@@ -460,8 +483,13 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             ) from e
         self.discoverable_token = client
 
-    def run_pairing_delegate(self) -> None:
+    def run_pairing_delegate(
+        self, timeout_sec: Optional[int | None] = None
+    ) -> None:
         """Function to run pairing delegate server calls.
+
+        Args:
+            timeout_sec: timeout duration in seconds
 
         Raises:
             BluetoothError: If token is initialized.
@@ -473,9 +501,7 @@ class BluetoothCommonUsingFc(bluetooth_common.BluetoothCommon):
             )
         try:
             self.loop.run_until_complete(
-                asyncio.wait_for(
-                    self._pairing_delegate_server, ASYNC_OP_TIMEOUT
-                )
+                asyncio.wait_for(self._pairing_delegate_server, timeout_sec)
             )
         except Exception as e:
             raise bluetooth_errors.BluetoothError(

@@ -6,12 +6,12 @@ use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
 use block_client::{
-    AsBlockProxy, BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId,
-    WriteOptions,
+    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
 };
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 
+use fidl::endpoints::ServerEnd;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt as _;
 use std::collections::BTreeMap;
@@ -76,6 +76,27 @@ impl GptPartition {
 
     pub async fn detach_vmo(&self, vmoid: VmoId) -> Result<(), zx::Status> {
         self.block_client.detach_vmo(vmoid).await
+    }
+
+    pub fn open_passthrough_session(&self, session: ServerEnd<fblock::SessionMarker>) {
+        if let Some(gpt) = self.gpt.upgrade() {
+            let mappings = [fblock::BlockOffsetMapping {
+                source_block_offset: 0,
+                target_block_offset: self.block_range.start,
+                length: self.block_count(),
+            }];
+            if let Err(err) =
+                gpt.block_proxy.open_session_with_offset_map(session, None, Some(&mappings[..]))
+            {
+                // Client errors normally come back on `session` but that was already consumed.  The
+                // client will get a PEER_CLOSED without an epitaph.
+                log::warn!(err:?; "Failed to open passthrough session");
+            }
+        } else {
+            if let Err(err) = session.close_with_epitaph(zx::Status::BAD_STATE) {
+                log::warn!(err:?; "Failed to send session epitaph");
+            }
+        }
     }
 
     pub async fn get_info(&self) -> Result<block_server::DeviceInfo, zx::Status> {
@@ -259,6 +280,7 @@ impl Inner {
 
 /// Runs a GPT device.
 pub struct GptManager {
+    block_proxy: fblock::BlockProxy,
     block_size: u32,
     block_count: u64,
     inner: Mutex<Inner>,
@@ -276,16 +298,17 @@ impl std::fmt::Debug for GptManager {
 
 impl GptManager {
     pub async fn new(
-        block: impl AsBlockProxy,
+        block_proxy: fblock::BlockProxy,
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
         log::info!("Binding to GPT");
-        let client = Arc::new(RemoteBlockClient::new(block).await?);
+        let client = Arc::new(RemoteBlockClient::new(block_proxy.clone()).await?);
         let block_size = client.block_size();
         let block_count = client.block_count();
         let gpt = gpt::Gpt::open(client).await.context("Failed to load GPT")?;
 
         let this = Arc::new(Self {
+            block_proxy,
             block_size,
             block_count,
             inner: Mutex::new(Inner {
@@ -485,7 +508,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use vfs::directory::entry_container::Directory as _;
-    use vfs::execution_scope::ExecutionScope;
     use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -641,20 +663,11 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
-            )
-            .unwrap();
+        let proxy = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
         let block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
                 .expect("Failed to open block service");
@@ -829,20 +842,11 @@ mod tests {
 
         let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
-            )
-            .unwrap();
+        let proxy = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
         let block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
                 .expect("Failed to open block service");
@@ -1040,20 +1044,11 @@ mod tests {
         partitions_dir.get_entry("part-001").map(|_| ()).expect_err("Extra entry found");
         partitions_dir.get_entry("part-002").expect("No entry found");
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
-            )
-            .unwrap();
+        let proxy = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
         let block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
                 .expect("Failed to open block service");
@@ -1191,20 +1186,11 @@ mod tests {
         runner.add_partition(request).await.expect("add_partition failed");
         runner.commit_transaction(transaction).await.expect("add_partition failed");
 
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
-            )
-            .unwrap();
+        let proxy = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
         let block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
                 .expect("Failed to open block service");
@@ -1245,20 +1231,11 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (part_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
-            )
-            .unwrap();
+        let part_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
         let part_block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&part_dir, "volume")
                 .expect("Failed to open Volume service");
@@ -1275,6 +1252,171 @@ mod tests {
         assert_eq!(metadata.start_block_offset, Some(4));
         assert_eq!(metadata.num_blocks, Some(1));
         assert_eq!(metadata.flags, Some(0xabcd));
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn nested_gpt() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "part";
+
+        let vmo = zx::Vmo::create(64 * 512).unwrap();
+        let vmo_clone = vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0).unwrap();
+        let (outer_block_device, outer_partitions_dir) = setup_with_options(
+            FakeServerOptions {
+                vmo: Some(vmo_clone),
+                block_size: 512,
+                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                ..Default::default()
+            },
+            vec![PartitionInfo {
+                label: PART_NAME.to_string(),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 4,
+                num_blocks: 16,
+                flags: 0xabcd,
+            }],
+        )
+        .await;
+
+        let outer_partitions_dir_clone = outer_partitions_dir.clone();
+        let outer_runner =
+            GptManager::new(outer_block_device.block_proxy(), outer_partitions_dir_clone)
+                .await
+                .expect("load should succeed");
+
+        let outer_part_dir = vfs::serve_directory(
+            outer_partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+        let part_block =
+            connect_to_named_protocol_at_dir_root::<fblock::BlockMarker>(&outer_part_dir, "volume")
+                .expect("Failed to open Block service");
+
+        let client = Arc::new(RemoteBlockClient::new(part_block.clone()).await.unwrap());
+        let _ = gpt::Gpt::format(
+            client,
+            vec![PartitionInfo {
+                label: PART_NAME.to_string(),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 5,
+                num_blocks: 1,
+                flags: 0xabcd,
+            }],
+        )
+        .await
+        .unwrap();
+
+        let partitions_dir = vfs::directory::immutable::simple();
+        let partitions_dir_clone = partitions_dir.clone();
+        let runner =
+            GptManager::new(part_block, partitions_dir_clone).await.expect("load should succeed");
+        let part_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+        let inner_part_block =
+            connect_to_named_protocol_at_dir_root::<fblock::BlockMarker>(&part_dir, "volume")
+                .expect("Failed to open Block service");
+
+        let client =
+            RemoteBlockClient::new(inner_part_block).await.expect("Failed to create block client");
+        assert_eq!(client.block_count(), 1);
+        assert_eq!(client.block_size(), 512);
+
+        let buffer = vec![0xaa; 512];
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.unwrap();
+        client
+            .write_at(BufferSlice::Memory(&buffer), 512)
+            .await
+            .expect_err("Write past end should fail");
+        client.flush().await.unwrap();
+
+        runner.shutdown().await;
+        outer_runner.shutdown().await;
+
+        // Check that the write targeted the correct block (4 + 5 = 9)
+        let data = vmo.read_to_vec(9 * 512, 512).unwrap();
+        assert_eq!(&data[..], &buffer[..]);
+    }
+
+    #[fuchsia::test]
+    async fn offset_map_does_not_allow_partition_overwrite() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "part";
+
+        let (block_device, partitions_dir) = setup_with_options(
+            FakeServerOptions {
+                block_count: Some(16),
+                block_size: 512,
+                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                ..Default::default()
+            },
+            vec![PartitionInfo {
+                label: PART_NAME.to_string(),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 4,
+                num_blocks: 2,
+                flags: 0xabcd,
+            }],
+        )
+        .await;
+
+        let partitions_dir_clone = partitions_dir.clone();
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+            .await
+            .expect("load should succeed");
+
+        let part_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+
+        // Open a session that shifts all block offsets by one.  The apparent range of the partition
+        // should be [0..512) bytes (which corresponds to [512..1024) in the partition), because
+        // bytes [512..1024) would be mapped to [1024..1536) which exceeds the partition's limit.
+        let part_block =
+            connect_to_named_protocol_at_dir_root::<fblock::BlockMarker>(&part_dir, "volume")
+                .expect("Failed to open Block service");
+        let info = part_block.get_info().await.expect("FIDL error").expect("get_info failed");
+        let (session, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
+        part_block
+            .open_session_with_offset_map(
+                server_end,
+                None,
+                Some(&[fblock::BlockOffsetMapping {
+                    source_block_offset: 0,
+                    target_block_offset: 1,
+                    length: 2,
+                }]),
+            )
+            .expect("FIDL error");
+
+        let client = Arc::new(RemoteBlockClient::from_session(info, session).await.unwrap());
+        let mut buffer = vec![0xaa; 512];
+        client.flush().await.expect("Flush should succeed");
+        client
+            .read_at(MutableBufferSlice::Memory(&mut buffer), 0)
+            .await
+            .expect("Read should succeed");
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.expect("Write should succeed");
+        client
+            .read_at(MutableBufferSlice::Memory(&mut buffer), 512)
+            .await
+            .expect_err("Read past end should fail");
+        client
+            .write_at(BufferSlice::Memory(&buffer), 512)
+            .await
+            .expect_err("Write past end should fail");
 
         runner.shutdown().await;
     }

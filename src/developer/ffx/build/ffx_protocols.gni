@@ -33,6 +33,14 @@ template("ffx_protocols") {
     deps = protocol_deps
   }
 
+  # Default visibility is everything, then override
+  # it if the invoker passes visibility.
+  _visibility = [ "*" ]
+  if (defined(invoker.visibility)) {
+    _visibility = []
+    _visibility = invoker.visibility
+  }
+
   protocol_deps += [ ":" + protocols_gen ]
 
   protocols_macro_lib = output_name + "_macros"
@@ -40,6 +48,7 @@ template("ffx_protocols") {
     output_name = protocols_macro_lib
     version = protocol_version
     edition = "2018"
+    visibility = _visibility
     source_root = "$target_gen_dir/macros.rs"
     sources = [ "$target_gen_dir/macros.rs" ]
     deps = protocol_deps + [
@@ -55,6 +64,7 @@ template("ffx_protocols") {
     version = protocol_version
     edition = "2018"
     with_unit_tests = true
+    visibility = _visibility
     deps = protocol_deps + [ ":" + protocols_macro_lib ] + [
              "//src/developer/ffx/lib/protocols:lib",
              "//src/lib/fidl/rust/fidl",

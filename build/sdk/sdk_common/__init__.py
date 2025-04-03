@@ -97,7 +97,8 @@ def detect_collisions(atoms: Sequence[Atom]) -> Iterator[str]:
 CATEGORIES = [
     "internal",
     "compat_test",
-    "partner_internal",
+    "host_tool",
+    "prebuilt",
     "partner",
 ]
 

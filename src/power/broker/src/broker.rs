@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::inspect::{
+    AddElementInspectWriter, EagerInspectWriter, InspectAddDependency, InspectUpdateLevel,
+    UpdateLevelInspectWriter,
+};
 use anyhow::{anyhow, Context, Error};
 use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_power_broker::{
@@ -17,6 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
+use std::ops;
 use uuid::Uuid;
 
 use crate::credentials::*;
@@ -262,25 +267,24 @@ impl Broker {
                         .into_iter()
                         .chain(self.catalog.opportunistic_claims.activated.for_lease(&lease_id))
                         .filter(|c| c.dependency == claim.dependency)
-                        .collect::<Vec<_>>()
-                        .into_iter()
                         .for_each(|c| {
-                            // Immediately deactivate these claims, instead of simply
+                            // Eagerly deactivate these claims, instead of simply
                             // marking them for deactivation. This ensures that they
                             // drop their level immediately.
                             if !claim_on_broken_element {
                                 self.catalog.assertive_claims.deactivate_claim(&c.id);
                             }
                             self.catalog.opportunistic_claims.deactivate_claim(&c.id);
-                            affected_elements.insert(c.requires().element_id.clone());
+                            affected_elements.insert(c.requires().element_id);
                             affected_leases.insert(lease_id.clone());
                         });
                 }
             });
         affected_elements.remove(&element_id);
-        self.update_required_levels(&affected_elements.iter().collect());
+        let affected_elements = affected_elements.into_iter().collect::<Vec<_>>();
+        self.update_required_levels(affected_elements.iter(), &mut EagerInspectWriter);
         if affected_elements.len() > 1 {
-            self.update_required_level(&element_id, prev_level.clone());
+            self.update_required_level(&element_id, prev_level.clone(), &mut EagerInspectWriter);
         }
         for lease in affected_leases {
             self.update_lease_status(&lease);
@@ -293,7 +297,11 @@ impl Broker {
             .required
             .get(&element_id)
             .is_some_and(|prev_required_level| !level.satisfies(prev_required_level));
-        let prev_level = self.update_current_level_internal(element_id, level);
+
+        let mut inspect_writer = UpdateLevelInspectWriter::default();
+        let prev_level = self.update_current_level_internal(element_id, level, &mut inspect_writer);
+        inspect_writer.commit(&self.catalog.topology);
+
         if prev_level.as_ref() == Some(&level) {
             log::debug!("update_current_level({element_id}): level unchanged from {prev_level:?}");
             return;
@@ -428,11 +436,15 @@ impl Broker {
             .new_subscriber()
     }
 
-    fn update_current_level_internal(
+    fn update_current_level_internal<I>(
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
-    ) -> Option<IndexedPowerLevel> {
+        inspect_writer: &mut I,
+    ) -> Option<IndexedPowerLevel>
+    where
+        I: InspectUpdateLevel,
+    {
         let previous = self.get_current_level(element_id);
         if previous == Some(level) {
             return previous;
@@ -445,9 +457,7 @@ impl Broker {
             self.current.insert(element_id.clone(), level_admin);
         }
 
-        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-            elem_inspect.borrow_mut().meta().set("current_level", level.level);
-        }
+        inspect_writer.update_current_level(&self.catalog.topology, *element_id, level.level);
 
         fuchsia_trace::counter!(
             c"power-broker", c"current_level", 0,
@@ -460,7 +470,7 @@ impl Broker {
                     "update_current_level_internal({element_id}): transitioned to {level:?}"
                 );
                 self.in_transition.remove(element_id);
-                self.update_required_levels(&vec![element_id]);
+                self.update_required_levels([element_id].into_iter(), inspect_writer);
             }
         }
         previous
@@ -477,11 +487,15 @@ impl Broker {
         self.required.subscribe(element_id)
     }
 
-    fn update_required_level(
+    fn update_required_level<I>(
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
-    ) -> Option<IndexedPowerLevel> {
+        inspect_writer: &mut I,
+    ) -> Option<IndexedPowerLevel>
+    where
+        I: InspectUpdateLevel,
+    {
         let previous = self.get_required_level(element_id);
         if previous == Some(level) {
             return previous;
@@ -496,9 +510,7 @@ impl Broker {
                 self.in_transition.insert(element_id.clone(), level);
             }
         }
-        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
-            elem_inspect.borrow_mut().meta().set("required_level", level.level);
-        }
+        inspect_writer.update_required_level(&self.catalog.topology, *element_id, level.level);
         fuchsia_trace::counter!(
             c"power-broker", c"required_level", 0,
             &self.lookup_name(&element_id) => level.level as u32
@@ -528,6 +540,7 @@ impl Broker {
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> Result<Lease, fpb::LeaseError> {
         log::debug!("acquire_lease({element_id}@{level})");
         let counter = self.adjust_lease_counter(element_id, level.level, 1) as i64;
@@ -536,7 +549,8 @@ impl Broker {
             &self.lookup_name(element_id) => counter
         );
 
-        let (lease, assertive_claims) = self.catalog.create_lease_and_claims(element_id, level);
+        let (lease, assertive_claims) =
+            self.catalog.create_lease_and_claims(element_id, level, lease_control);
         if self.is_lease_contingent(&lease.id) {
             // Lease is blocked on opportunistic claims, update status and return.
             log::debug!(
@@ -744,7 +758,7 @@ impl Broker {
 
     /// For each supportive claim, determine the leases that have opportunistic claims
     /// that depend on this supportive claim.
-    fn update_opportunistic_leases(&mut self, assertive_claims: &Vec<Claim>) {
+    fn update_opportunistic_leases(&mut self, assertive_claims: &[Claim]) {
         let mut opportunistic_leases: HashSet<LeaseID> = HashSet::new();
         for assertive_claim in assertive_claims {
             let requires_element = &assertive_claim.requires().element_id;
@@ -793,19 +807,13 @@ impl Broker {
             }
             None => unreachable!("The lease must be present when updating the status."),
         };
-        self.update_required_levels(&vec![&synthetic_element_id]);
+        self.update_required_levels([synthetic_element_id].iter(), &mut EagerInspectWriter);
         if prev_status.as_ref() != Some(&status) {
-            if let Some(elem_inspect) =
-                self.catalog.topology.inspect_for_element(&underlying_element_id)
-            {
-                let level = match self.catalog.leases.get(lease_id) {
-                    Some(lease) => lease.underlying_element_level,
-                    None => unreachable!("The lease must be present when updating the status."),
+            if let Some(element) = self.catalog.topology.get_element(&underlying_element_id) {
+                let Some(lease) = self.catalog.leases.get(lease_id) else {
+                    unreachable!("The lease must be present when updating the status.");
                 };
-                elem_inspect.borrow_mut().meta().set_and_track(
-                    format!("lease_status_{lease_id}@level_{level}"),
-                    format!("{status:?}"),
-                );
+                self.catalog.topology.inspect().on_update_lease_status(&element, &lease, &status);
             }
         }
         // If the lease is contingent, we know that it must be pending and must have
@@ -842,11 +850,17 @@ impl Broker {
         self.catalog.watch_lease_status(lease_id)
     }
 
-    fn update_required_levels(&mut self, element_ids: &Vec<&ElementID>) {
+    fn update_required_levels<'a, I>(
+        &mut self,
+        element_ids: impl Iterator<Item = &'a ElementID>,
+        inspect_writer: &mut I,
+    ) where
+        I: InspectUpdateLevel,
+    {
         for element_id in element_ids {
             let new_required_level = self.catalog.calculate_required_level(element_id);
             log::debug!("update required level({:?}, {:?})", element_id, new_required_level);
-            self.update_required_level(element_id, new_required_level);
+            self.update_required_level(element_id, new_required_level, inspect_writer);
         }
     }
 
@@ -888,7 +902,10 @@ impl Broker {
         for claim in &claims_to_activate {
             self.catalog.assertive_claims.activate_claim(&claim.id);
         }
-        self.update_required_levels(&element_ids_required_by_claims(&claims_to_activate));
+        self.update_required_levels(
+            element_ids_required_by_claims(&claims_to_activate),
+            &mut EagerInspectWriter,
+        );
     }
 
     /// Examines the direct assertive and opportunistic dependencies of an element level
@@ -913,7 +930,7 @@ impl Broker {
 
     /// Examines a Vec of claims and returns any that no longer have any
     /// other claims within their lease that require their dependent.
-    fn find_claims_to_drop_or_deactivate(&mut self, claims: &Vec<Claim>) -> Vec<Claim> {
+    fn find_claims_to_drop_or_deactivate(&mut self, claims: &[Claim]) -> Vec<Claim> {
         log::debug!("find_claims_to_drop_or_deactivate: [{}]", claims.iter().join("; "));
         let mut claims_to_drop_or_deactivate = Vec::new();
 
@@ -1000,7 +1017,7 @@ impl Broker {
     /// Takes a Vec of assertive claims, deactivates them if their lease is open,
     /// or drops them if their lease has been dropped. Then updates lease
     /// status of leases affected and required levels of elements affected.
-    fn drop_or_deactivate_assertive_claims(&mut self, claims: &Vec<Claim>) {
+    fn drop_or_deactivate_assertive_claims(&mut self, claims: &[Claim]) {
         for claim in claims {
             log::debug!("deactivate assertive claim: {claim}");
             if self.catalog.is_lease_dropped(&claim.lease_id) {
@@ -1009,8 +1026,11 @@ impl Broker {
                 self.catalog.assertive_claims.deactivate_claim(&claim.id);
             }
         }
-        let element_ids_affected = element_ids_required_by_claims(claims);
-        self.update_required_levels(&element_ids_affected);
+        let element_ids_affected = element_ids_required_by_claims(claims).collect::<Vec<_>>();
+        self.update_required_levels(
+            element_ids_affected.iter().map(|id| *id),
+            &mut EagerInspectWriter,
+        );
         // Update the status of all leases with opportunistic claims no longer satisfied.
         let mut leases_affected = HashSet::new();
         for element_id in element_ids_affected {
@@ -1018,11 +1038,11 @@ impl Broker {
             // determine if there are still any assertive claims that would
             // satisfy these opportunistic claims.
             let max_required_by_assertive = max_level_required_by_claims(
-                &self.catalog.assertive_claims.activated.for_required_element(element_id),
+                &self.catalog.assertive_claims.activated.for_required_element(&element_id),
             )
-            .unwrap_or_else(|| self.catalog.minimum_level(element_id));
+            .unwrap_or_else(|| self.catalog.minimum_level(&element_id));
             for opportunistic_claim in
-                self.catalog.opportunistic_claims.activated.for_required_element(element_id)
+                self.catalog.opportunistic_claims.activated.for_required_element(&element_id)
             {
                 if !max_required_by_assertive.satisfies(opportunistic_claim.requires().level) {
                     log::debug!("opportunistic_claim {opportunistic_claim} no longer satisfied, must reevaluate lease {}", opportunistic_claim.lease_id);
@@ -1041,7 +1061,7 @@ impl Broker {
     /// Takes a Vec of opportunistic claims, deactivates them if their lease is open,
     /// or drops them if their lease has been dropped. Then updates required
     /// levels of elements affected.
-    fn drop_or_deactivate_opportunistic_claims(&mut self, claims: &Vec<Claim>) {
+    fn drop_or_deactivate_opportunistic_claims(&mut self, claims: &[Claim]) {
         for claim in claims {
             if self.catalog.is_lease_dropped(&claim.lease_id) {
                 log::debug!("drop opportunistic claim: {claim}");
@@ -1051,7 +1071,10 @@ impl Broker {
                 self.catalog.opportunistic_claims.deactivate_claim(&claim.id);
             }
         }
-        self.update_required_levels(&element_ids_required_by_claims(claims));
+        self.update_required_levels(
+            element_ids_required_by_claims(claims),
+            &mut EagerInspectWriter,
+        );
     }
 
     pub fn add_element(
@@ -1070,20 +1093,17 @@ impl Broker {
             .topology
             .get_level_index(&id, &initial_current_level)
             .ok_or(AddElementError::Invalid)?;
-        let current_level = initial_current_level.level;
-        self.update_current_level_internal(&id, initial_current_level);
+
+        let mut inspect_writer = AddElementInspectWriter::new(id);
+        self.update_current_level_internal(&id, initial_current_level, &mut inspect_writer);
         let minimum_level = self.catalog.topology.minimum_level(&id);
-        self.update_required_level(&id, minimum_level);
-        self.catalog.topology.initialize_element_inspect(
-            &id,
-            valid_levels,
-            current_level,
-            minimum_level.level,
-        );
+        self.update_required_level(&id, minimum_level, &mut inspect_writer);
+
         for dependency in level_dependencies {
             let requires_token = dependency.requires_token.into();
             let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
                 // Clean up by removing the element we just added.
+                inspect_writer.commit(&mut self.catalog.topology);
                 self.remove_element(&id);
                 return Err(AddElementError::NotAuthorized);
             };
@@ -1099,8 +1119,10 @@ impl Broker {
                 dependency.dependent_level,
                 requires_token,
                 requires_level.level,
+                &mut inspect_writer,
             ) {
                 // Clean up by removing the element we just added.
+                inspect_writer.commit(&mut self.catalog.topology);
                 self.remove_element(&id);
                 return Err(match err {
                     ModifyDependencyError::AlreadyExists => AddElementError::Invalid,
@@ -1110,6 +1132,7 @@ impl Broker {
                 });
             };
         }
+        inspect_writer.commit(&mut self.catalog.topology);
         Ok(id)
     }
 
@@ -1149,14 +1172,18 @@ impl Broker {
 
     /// Checks authorization from requires_token, and if valid, adds an assertive
     /// or opportunistic dependency to the Topology, according to dependency_type.
-    pub fn add_dependency(
+    pub fn add_dependency<I>(
         &mut self,
         element_id: &ElementID,
         dependency_type: DependencyType,
         dependent_level: fpb::PowerLevel,
         requires_token: Token,
         requires_level: fpb::PowerLevel,
-    ) -> Result<(), ModifyDependencyError> {
+        inspect_writer: &mut I,
+    ) -> Result<(), ModifyDependencyError>
+    where
+        I: InspectAddDependency,
+    {
         let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
             return Err(ModifyDependencyError::NotAuthorized);
         };
@@ -1182,20 +1209,34 @@ impl Broker {
                 if !requires_cred.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
-                self.catalog.topology.add_assertive_dependency(&dependency)
+                self.catalog.topology.add_assertive_dependency(&dependency, inspect_writer)
             }
             DependencyType::Opportunistic => {
                 if !requires_cred.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
-                self.catalog.topology.add_opportunistic_dependency(&dependency)
+                self.catalog.topology.add_opportunistic_dependency(&dependency, inspect_writer)
             }
             _ => todo!("Support other dependency types"),
         }
     }
 }
 
-pub type LeaseID = String;
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct LeaseID(u64);
+
+impl fmt::Display for LeaseID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for LeaseID {
+    type Target = u64;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
@@ -1214,12 +1255,10 @@ impl Lease {
         underlying_element_id: &ElementID,
         level: IndexedPowerLevel,
         underlying_element_level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> Self {
-        let uuid = LeaseID::from(Uuid::new_v4().as_simple().to_string());
-        let id =
-            if ID_DEBUG_MODE { format!("{synthetic_element_id}@{level}:{uuid:.6}") } else { uuid };
         Lease {
-            id: id,
+            id: LeaseID(lease_control.raw_koid()),
             synthetic_element_id: synthetic_element_id.clone(),
             underlying_element_id: underlying_element_id.clone(),
             level: level.clone(),
@@ -1228,7 +1267,21 @@ impl Lease {
     }
 }
 
-type ClaimID = String;
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ClaimID(String);
+
+impl fmt::Display for ClaimID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ops::Deref for ClaimID {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct Claim {
@@ -1245,11 +1298,8 @@ impl fmt::Display for Claim {
 
 impl Claim {
     fn new(dependency: Dependency, lease_id: &LeaseID) -> Self {
-        let mut id = ClaimID::from(Uuid::new_v4().as_simple().to_string());
-        if ID_DEBUG_MODE {
-            id = format!("{id:.6}");
-        }
-        Claim { id, dependency, lease_id: lease_id.clone() }
+        let id = Uuid::new_v4().as_simple().to_string();
+        Claim { id: ClaimID(id), dependency, lease_id: lease_id.clone() }
     }
 
     fn dependent(&self) -> &ElementLevel {
@@ -1262,12 +1312,14 @@ impl Claim {
 }
 
 /// Returns a Vec of unique ElementIDs required by claims.
-fn element_ids_required_by_claims(claims: &Vec<Claim>) -> Vec<&ElementID> {
-    claims.into_iter().map(|c| &c.requires().element_id).unique().collect()
+fn element_ids_required_by_claims<'a>(
+    claims: &'a [Claim],
+) -> impl Iterator<Item = &'a ElementID> + use<'a> {
+    claims.into_iter().map(|c| &c.requires().element_id).unique()
 }
 
 /// Returns the maximum level required by claims, or None if empty.
-fn max_level_required_by_claims(claims: &Vec<Claim>) -> Option<IndexedPowerLevel> {
+fn max_level_required_by_claims(claims: &[Claim]) -> Option<IndexedPowerLevel> {
     claims.into_iter().map(|x| x.requires().level).max()
 }
 
@@ -1302,10 +1354,7 @@ struct Catalog {
 impl Catalog {
     fn new(inspect_parent: &INode) -> Self {
         Catalog {
-            topology: Topology::new(
-                inspect_parent.create_child("topology"),
-                INSPECT_GRAPH_EVENT_BUFFER_SIZE,
-            ),
+            topology: Topology::new(inspect_parent, INSPECT_GRAPH_EVENT_BUFFER_SIZE),
             leases: HashMap::new(),
             lease_status: SubscribeMap::new(Some(inspect_parent.create_child("leases"))),
             lease_contingent: HashMap::new(),
@@ -1346,18 +1395,19 @@ impl Catalog {
         &self,
         element_id: &ElementID,
     ) -> Option<IndexedPowerLevel> {
-        self.satisfied_leases_for_element(element_id).iter().map(|l| l.level).max()
+        self.satisfied_leases_for_element(element_id).map(|l| l.level).max()
     }
 
     /// Returns all satisfied leases for an element.
-    fn satisfied_leases_for_element(&self, element_id: &ElementID) -> Vec<Lease> {
+    fn satisfied_leases_for_element<'a>(
+        &'a self,
+        element_id: &'a ElementID,
+    ) -> impl Iterator<Item = &Lease> + 'a {
         // TODO(336609941): Consider optimizing this.
         self.leases
             .values()
             .filter(|l| l.synthetic_element_id == *element_id)
             .filter(|l| self.get_lease_status(&l.id) == Some(LeaseStatus::Satisfied))
-            .cloned()
-            .collect()
     }
 
     // Given a set of assertive and opportunistic claims, filter out any redundant claims. A claim
@@ -1365,11 +1415,9 @@ impl Catalog {
     // at an *equal or higher level*.
     fn filter_out_redundant_claims(
         &self,
-        redundant_assertive_claims: &Vec<Claim>,
-        redudnant_opportunistic_claims: &Vec<Claim>,
+        mut assertive_claims: Vec<Claim>,
+        mut opportunistic_claims: Vec<Claim>,
     ) -> (Vec<Claim>, Vec<Claim>) {
-        let mut assertive_claims: Vec<Claim> = redundant_assertive_claims.clone();
-        let mut opportunistic_claims: Vec<Claim> = redudnant_opportunistic_claims.clone();
         let mut essential_assertive_claims: Vec<Claim> = Vec::new();
         let mut essential_opportunistic_claims: Vec<Claim> = Vec::new();
         let mut observed_pairs: HashMap<(ElementID, ElementID), ElementLevel> = HashMap::new();
@@ -1431,21 +1479,23 @@ impl Catalog {
                 &valid_levels,
             )
             .expect("Failed to create lease element");
-        self.topology.initialize_element_inspect(
-            &lease_element_id,
-            valid_levels,
-            0, /* unused */
-            0, /* unused */
-        );
+        let mut inspect_writer = AddElementInspectWriter::new(lease_element_id);
         self.topology
-            .add_assertive_dependency(&Dependency {
-                dependent: ElementLevel {
-                    element_id: lease_element_id.clone(),
-                    level: IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
+            .add_assertive_dependency(
+                &Dependency {
+                    dependent: ElementLevel {
+                        element_id: lease_element_id.clone(),
+                        level: IndexedPowerLevel {
+                            level: LeasePowerLevel::Satisfied as u8,
+                            index: 1,
+                        },
+                    },
+                    requires: ElementLevel { element_id: element_id.clone(), level: level.clone() },
                 },
-                requires: ElementLevel { element_id: element_id.clone(), level: level.clone() },
-            })
+                &mut inspect_writer,
+            )
             .expect("Failed to attach assertive dependency to lease element");
+        inspect_writer.commit(&mut self.topology);
         lease_element_id
     }
 
@@ -1456,6 +1506,7 @@ impl Catalog {
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
+        lease_control: zx::Koid,
     ) -> (Lease, Vec<Claim>) {
         log::debug!("create_lease_and_claims({element_id}@{level})");
 
@@ -1469,13 +1520,10 @@ impl Catalog {
             &element_id,
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
             level,
+            lease_control,
         );
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&element_id) {
-            let elem_readable_name = self.topology.element_name(&element_id);
-            elem_inspect.borrow_mut().meta().set_and_track(
-                format!("lease_{}@level_{}", lease.id, level), // for example, lease_ffff@level_1
-                format!("level_{level}@{elem_readable_name}"), // for example, level_1@elem_name
-            );
+        if let Some(element) = self.topology.get_element(element_id) {
+            self.topology.inspect().on_create_lease_and_claims(element, lease.id, level.level);
         }
         self.leases.insert(lease.id.clone(), lease.clone());
 
@@ -1496,12 +1544,12 @@ impl Catalog {
             .collect::<Vec<Claim>>();
         // Filter claims down to only the essential (i.e. non-redundant) claims.
         let (essential_assertive_claims, essential_opportunistic_claims) =
-            self.filter_out_redundant_claims(&assertive_claims, &opportunistic_claims);
+            self.filter_out_redundant_claims(assertive_claims, opportunistic_claims);
         for claim in &essential_assertive_claims {
             self.assertive_claims.pending.add(claim.clone());
         }
-        for claim in &essential_opportunistic_claims {
-            self.opportunistic_claims.pending.add(claim.clone());
+        for claim in essential_opportunistic_claims {
+            self.opportunistic_claims.pending.add(claim);
         }
         (lease, essential_assertive_claims)
     }
@@ -1515,17 +1563,8 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or_else(|| anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         self.lease_contingent.remove(lease_id);
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.underlying_element_id)
-        {
-            elem_inspect.borrow_mut().meta().remove_and_track(
-                format!("lease_{}@level_{}", lease.id, lease.underlying_element_level).as_str(),
-            );
-            elem_inspect.borrow_mut().meta().remove(
-                format!("lease_status_{}@level_{}", lease.id, lease.underlying_element_level)
-                    .as_str(),
-            );
-            // lease_ drop events are useful as part of understanding lifecycle.
-            // lease_status_ drop events are redundant with lease_ drops, so we don't record them.
+        if let Some(element) = self.topology.get_element(&lease.underlying_element_id) {
+            self.topology.inspect().on_drop_lease(&element, &lease);
         }
         log::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
@@ -1740,7 +1779,7 @@ impl ClaimLookup {
         }
     }
 
-    fn for_claim_ids(&self, claim_ids: &Vec<ClaimID>) -> Vec<Claim> {
+    fn for_claim_ids(&self, claim_ids: &[ClaimID]) -> Vec<Claim> {
         claim_ids.iter().map(|id| self.claims.get(id)).filter_map(|f| f).cloned().collect()
     }
 
@@ -1783,7 +1822,7 @@ impl Inspectable for &ElementID {
 impl Inspectable for &LeaseID {
     type Value = LeaseStatus;
     fn track_inspect_with(&self, value: Self::Value, parent: &INode) -> Box<dyn IType> {
-        Box::new(parent.create_string(*self, format!("{:?}", value)))
+        Box::new(parent.create_string(format!("{self}"), format!("{:?}", value)))
     }
 }
 
@@ -2015,42 +2054,48 @@ mod tests {
     fn test_levels() {
         let mut levels = SubscribeMap::<ElementID, IndexedPowerLevel>::new(None);
 
-        levels.update(&"A".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(ON));
-        assert_eq!(levels.get(&"B".into()), None);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        levels.update(&element_a, ON);
+        assert_eq!(levels.get(&element_a), Some(ON));
+        assert_eq!(levels.get(&element_b), None);
 
-        levels.update(&"A".into(), OFF);
-        levels.update(&"B".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(OFF));
-        assert_eq!(levels.get(&"B".into()), Some(ON));
+        levels.update(&element_a, OFF);
+        levels.update(&element_b, ON);
+        assert_eq!(levels.get(&element_a), Some(OFF));
+        assert_eq!(levels.get(&element_b), Some(ON));
 
-        levels.update(&"UD1".into(), IndexedPowerLevel::from_same_level_and_index(145));
+        let element_ud1 = ElementID::new(3);
+        let element_ud2 = ElementID::new(4);
+        levels.update(&element_ud1, IndexedPowerLevel::from_same_level_and_index(145));
         assert_eq!(
-            levels.get(&"UD1".into()),
+            levels.get(&element_ud1),
             Some(IndexedPowerLevel::from_same_level_and_index(145))
         );
-        assert_eq!(levels.get(&"UD2".into()), None);
+        assert_eq!(levels.get(&element_ud2), None);
 
-        levels.update(&"A".into(), ON);
-        levels.remove(&"B".into());
-        assert_eq!(levels.get(&"B".into()), None);
+        levels.update(&element_a, ON);
+        levels.remove(&element_b);
+        assert_eq!(levels.get(&element_b), None);
     }
 
     #[fuchsia::test]
     fn test_levels_subscribe() {
         let mut levels = SubscribeMap::<ElementID, IndexedPowerLevel>::new(None);
 
-        let mut receiver_a = levels.subscribe(&"A".into());
-        let mut receiver_b = levels.subscribe(&"B".into());
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let mut receiver_a = levels.subscribe(&element_a);
+        let mut receiver_b = levels.subscribe(&element_b);
 
-        levels.update(&"A".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(ON));
-        assert_eq!(levels.get(&"B".into()), None);
+        levels.update(&element_a, ON);
+        assert_eq!(levels.get(&element_a), Some(ON));
+        assert_eq!(levels.get(&element_b), None);
 
-        levels.update(&"A".into(), OFF);
-        levels.update(&"B".into(), ON);
-        assert_eq!(levels.get(&"A".into()), Some(OFF));
-        assert_eq!(levels.get(&"B".into()), Some(ON));
+        levels.update(&element_a, OFF);
+        levels.update(&element_b, ON);
+        assert_eq!(levels.get(&element_a), Some(OFF));
+        assert_eq!(levels.get(&element_b), Some(ON));
 
         let mut received_a = Vec::new();
         while let Ok(Some(level)) = receiver_a.try_next() {
@@ -2081,7 +2126,7 @@ mod tests {
                     level: IndexedPowerLevel::from_same_level_and_index(requires_element_level),
                 },
             },
-            &LeaseID::new(),
+            &LeaseID(0),
         )
     }
 
@@ -2089,13 +2134,15 @@ mod tests {
     fn test_claim_lookup_add_remove() {
         let mut lookup = ClaimLookup::new(DependencyType::Assertive, ClaimStatus::Activated);
 
-        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
-        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let claim_a_1_b_1 = create_test_claim(element_a, 1, element_b, 1);
+        let claim_a_2_b_2 = create_test_claim(element_a, 2, element_b, 2);
 
         lookup.add(claim_a_1_b_1.clone());
         lookup.add(claim_a_2_b_2.clone());
 
-        lookup.mark_to_deactivate(&claim_a_2_b_2.id);
+        lookup.mark_to_deactivate(&claim_a_2_b_2.lease_id);
 
         assert_eq!(lookup.remove(&claim_a_1_b_1.id), Some(claim_a_1_b_1.clone()));
         assert_eq!(lookup.remove(&claim_a_2_b_2.id), Some(claim_a_2_b_2.clone()));
@@ -2109,23 +2156,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_out_redundant_claims() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let broker = Broker::new(inspect.root().create_child("test"));
 
-        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
-        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
-        let claim_a_1_c_1 = create_test_claim("A".into(), 1, "C".into(), 1);
-        let claim_b_1_c_1 = create_test_claim("B".into(), 1, "C".into(), 1);
-        let claim_a_2_c_2 = create_test_claim("A".into(), 2, "C".into(), 2);
+        let element_a = ElementID::new(1);
+        let element_b = ElementID::new(2);
+        let element_c = ElementID::new(3);
+        let claim_a_1_b_1 = create_test_claim(element_a, 1, element_b, 1);
+        let claim_a_2_b_2 = create_test_claim(element_a, 2, element_b, 2);
+        let claim_a_1_c_1 = create_test_claim(element_a, 1, element_c, 1);
+        let claim_b_1_c_1 = create_test_claim(element_b, 1, element_c, 1);
+        let claim_a_2_c_2 = create_test_claim(element_a, 2, element_c, 2);
 
         //  A     B
         //  1 ==> 1 (redundant with A@2=>B@2)
         //  2 ==> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
-                &vec![],
+                vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
+                vec![],
             );
         assert_eq!(essential_assertive_claims, vec![claim_a_2_b_2.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![]);
@@ -2133,22 +2182,18 @@ mod tests {
         //  A     B
         //  1 --> 1 (redundant with A@2=>B@2)
         //  2 ==> 2
-        let (essential_assertive_claims, essential_opportunistic_claims) =
-            broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_2_b_2.clone()],
-                &vec![claim_a_1_b_1.clone()],
-            );
+        let (essential_assertive_claims, essential_opportunistic_claims) = broker
+            .catalog
+            .filter_out_redundant_claims(vec![claim_a_2_b_2.clone()], vec![claim_a_1_b_1.clone()]);
         assert_eq!(essential_assertive_claims, vec![claim_a_2_b_2.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![]);
 
         //  A     B
         //  1 ==> 1 (not redundant, opportunistic claims cannot satisfy assertive claims)
         //  2 --> 2
-        let (essential_assertive_claims, essential_opportunistic_claims) =
-            broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone()],
-                &vec![claim_a_2_b_2.clone()],
-            );
+        let (essential_assertive_claims, essential_opportunistic_claims) = broker
+            .catalog
+            .filter_out_redundant_claims(vec![claim_a_1_b_1.clone()], vec![claim_a_2_b_2.clone()]);
         assert_eq!(essential_assertive_claims, vec![claim_a_1_b_1.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![claim_a_2_b_2.clone()]);
 
@@ -2157,8 +2202,8 @@ mod tests {
         //  2 --> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![],
-                &vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
+                vec![],
+                vec![claim_a_1_b_1.clone(), claim_a_2_b_2.clone()],
             );
         assert_eq!(essential_assertive_claims, vec![]);
         assert_eq!(essential_opportunistic_claims, vec![claim_a_2_b_2.clone()]);
@@ -2168,8 +2213,8 @@ mod tests {
         //  2 ==> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
-                &vec![],
+                vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
+                vec![],
             );
         assert_eq!(essential_assertive_claims, vec![claim_a_2_b_2.clone(), claim_a_1_c_1.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![]);
@@ -2179,8 +2224,8 @@ mod tests {
         //  2 --> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![],
-                &vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
+                vec![],
+                vec![claim_a_1_c_1.clone(), claim_a_2_b_2.clone()],
             );
         assert_eq!(essential_assertive_claims, vec![]);
         assert_eq!(
@@ -2193,8 +2238,8 @@ mod tests {
         //  2 ========> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
-                &vec![],
+                vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
+                vec![],
             );
         assert_eq!(
             essential_assertive_claims,
@@ -2207,8 +2252,8 @@ mod tests {
         //  2 ========> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone()],
-                &vec![claim_b_1_c_1.clone()],
+                vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone()],
+                vec![claim_b_1_c_1.clone()],
             );
         assert_eq!(essential_assertive_claims, vec![claim_a_1_b_1.clone(), claim_a_2_c_2.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![claim_b_1_c_1.clone()]);
@@ -2218,8 +2263,8 @@ mod tests {
         //  2 --------> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone()],
-                &vec![claim_a_2_c_2.clone()],
+                vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone()],
+                vec![claim_a_2_c_2.clone()],
             );
         assert_eq!(essential_assertive_claims, vec![claim_a_1_b_1.clone(), claim_b_1_c_1.clone()]);
         assert_eq!(essential_opportunistic_claims, vec![claim_a_2_c_2.clone()]);
@@ -2229,8 +2274,8 @@ mod tests {
         //  2 --------> 2
         let (essential_assertive_claims, essential_opportunistic_claims) =
             broker.catalog.filter_out_redundant_claims(
-                &vec![claim_a_1_b_1.clone()],
-                &vec![claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
+                vec![claim_a_1_b_1.clone()],
+                vec![claim_b_1_c_1.clone(), claim_a_2_c_2.clone()],
             );
         assert_eq!(essential_assertive_claims, vec![claim_a_1_b_1.clone()]);
         assert_eq!(
@@ -2241,7 +2286,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_initialize_current_and_broker_status() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let latinum = broker
@@ -2267,7 +2312,25 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: {
+                        "0": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                element_id: *broker.get_unsatisfiable_element_id(),
+                                current_level: "unset",
+                                required_level: "unset",
+                            }
+                        },
+                        "1": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                element_id: *latinum,
+                                current_level: 7u64,
+                                required_level: 5u64,
+                            }
+                        },
+                    },
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2276,6 +2339,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2285,37 +2349,17 @@ mod tests {
                                     valid_levels: vec![5u64, 2u64, 7u64],
                                     current_level: 7u64,
                                     required_level: 5u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
-                            },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: 7u64,
-                                    required_level: 5u64,
-                                },
-                            },
-                        },
-                        stats: contains {},
         }}}});
     }
 
     #[fuchsia::test]
     fn test_current_required_level_inspect() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let latinum =
@@ -2327,10 +2371,10 @@ mod tests {
         broker.update_current_level(&latinum, ZERO);
 
         // Update required level to 1.
-        broker.update_required_level(&latinum, ONE);
+        broker.update_required_level(&latinum, ONE, &mut EagerInspectWriter);
 
         // Update required level to 1 again, should have no additional effect.
-        broker.update_required_level(&latinum, ONE);
+        broker.update_required_level(&latinum, ONE, &mut EagerInspectWriter);
 
         // Update current level to 1.
         // This should drop the current required level to ZERO, because there
@@ -2341,88 +2385,81 @@ mod tests {
         broker.update_current_level(&latinum, ONE);
 
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {},
                             },
-                            latinum.to_string() => {
-                                meta: {
-                                    name: "Latinum",
-                                    valid_levels: vec![0u64, 1u64, 2u64],
-                                    current_level: 1u64,
-                                    required_level: 0u64,
-                                },
-                                relationships: {},
-                            },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
+                        latinum.to_string() => {
+                            meta: {
+                                name: "Latinum",
+                                valid_levels: vec![0u64, 1u64, 2u64],
+                                current_level: 1u64,
+                                required_level: 0u64,
+                                leases: {},
                             },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: 2u64,
-                                    required_level: 0u64,
-                                },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 0u64,
-                            },
-                            "3": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 1u64,
-                            },
-                            "4": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 1u64,
-                            },
-                            "5": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 0u64,
-                            },
+                            relationships: {},
                         },
-                        stats: contains {},
-        }}}});
+                    },
+                },
+                stats: contains {},
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *broker.get_unsatisfiable_element_id(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *latinum,
+                            current_level: 2u64,
+                            required_level: 0u64,
+                        }
+                    },
+                    "2": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: *latinum,
+                            current_level: 0u64,
+                        }
+                    },
+                    "3": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: *latinum,
+                            required_level: 1u64,
+                        }
+                    },
+                    "4": {
+                        "@time": AnyProperty,
+                        update_level: {
+                            element_id: *latinum,
+                            current_level: 1u64,
+                            required_level: 0u64,
+                        }
+                    },
+                },
+            }}});
     }
 
     #[fuchsia::test]
     fn test_add_element_dependency_never_and_unregistered() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();
         let never_registered_token = DependencyToken::create();
         let mithril = broker
@@ -2440,7 +2477,8 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2449,6 +2487,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2458,12 +2497,11 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
                     },
                 },
         }});
@@ -2501,48 +2539,55 @@ mod tests {
             )
             .expect("add_element failed");
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                events: contains {},
+                stats: contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
-                            mithril.to_string() => {
-                                meta: {
-                                    name: "Mithril",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {},
+                            relationships: {}
+                        },
+                        mithril.to_string() => {
+                            meta: {
+                                name: "Mithril",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
                             },
-                            silver.to_string() => {
-                                meta: {
-                                    name: "Silver",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {
-                                    mithril.to_string() => {
-                                        edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                            relationships: {},
+                        },
+                        silver.to_string() => {
+                            meta: {
+                                name: "Silver",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
+                            },
+                            relationships: {
+                                mithril.to_string() => {
+                                    edge_id: AnyProperty,
+                                    meta: {
+                                      "1": {
+                                          required_level: 1u64,
+                                      },
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
-        }}}});
+                    },
+                }
+            }}});
 
         // Unregister token_mithril, then try to add again, which should fail.
         broker
@@ -2571,7 +2616,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_remove_element() {
-        let inspect = fuchsia_inspect::component::inspector();
+        let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let unobtanium = broker
@@ -2580,101 +2625,103 @@ mod tests {
         assert_eq!(broker.element_exists(&unobtanium), true);
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
-                            unobtanium.to_string() => {
-                                meta: {
-                                    name: "Unobtainium",
-                                    valid_levels: v01.clone(),
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                                relationships: {},
-                            },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
+                        unobtanium.to_string() => {
+                            meta: {
+                                name: "Unobtainium",
+                                valid_levels: v01.clone(),
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                leases: {}
                             },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                            },
+                            relationships: {},
                         },
-                        stats: contains {},
                     },
-        }}});
+                },
+                stats: contains {},
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *broker.get_unsatisfiable_element_id(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *unobtanium,
+                            current_level: OFF.level as u64,
+                            required_level: OFF.level as u64,
+                        }
+                    },
+                },
+            }
+        }});
 
         broker.remove_element(&unobtanium);
         assert_eq!(broker.element_exists(&unobtanium), false);
         assert_data_tree!(inspect, root: {
-            test: {
-                leases: {},
-                topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
-                    "fuchsia.inspect.Graph": {
-                        topology: {
-                            broker.get_unsatisfiable_element_id().to_string() => {
-                                meta: {
-                                    name: broker.get_unsatisfiable_element_name(),
-                                    valid_levels: broker.get_unsatisfiable_element_levels(),
-                                    required_level: "unset",
-                                    current_level: "unset",
-                                },
-                                relationships: {}
+        test: {
+            leases: {},
+            topology: {
+                events: {
+                    "0": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *broker.get_unsatisfiable_element_id(),
+                            current_level: "unset",
+                            required_level: "unset",
+                        }
+                    },
+                    "1": {
+                        "@time": AnyProperty,
+                        add_element: {
+                            element_id: *unobtanium,
+                            current_level: OFF.level as u64,
+                            required_level: OFF.level as u64,
+                        }
+                    },
+                    "2": {
+                        "@time": AnyProperty,
+                        rm_element: {
+                            element_id: *unobtanium,
+                            name: "Unobtainium",
+                            valid_levels: v01.clone(),
+                        }
+                    },
+                },
+                stats: contains {},
+                "fuchsia.inspect.Graph": {
+                    topology: {
+                        broker.get_unsatisfiable_element_id().to_string() => {
+                            meta: {
+                                name: broker.get_unsatisfiable_element_name(),
+                                valid_levels: broker.get_unsatisfiable_element_levels(),
+                                required_level: "unset",
+                                current_level: "unset",
+                                leases: {}
                             },
+                            relationships: {}
                         },
-                        events: {
-                            "0": {
-                                "@time": AnyProperty,
-                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
-                                },
-                            },
-                            "1": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "add_vertex",
-                                meta: {
-                                    current_level: OFF.level as u64,
-                                    required_level: OFF.level as u64,
-                                },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "remove_vertex",
-                            },
-                        },
-                        stats: contains {},
-        }}}});
+                    },
+                }
+            }}});
     }
 
     struct BrokerStatusMatcher {
@@ -2759,9 +2806,8 @@ mod tests {
     #[fuchsia::test]
     fn test_broker_adjust_lease_counter() {
         // Create a broker that has nothing since the test is just about the counter
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let a = broker
             .add_element("a", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -2796,9 +2842,8 @@ mod tests {
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct assertive dependencies.
         // P1 <= C => P2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let parent1_token = DependencyToken::create();
         let parent1: ElementID = broker
             .add_element("P1", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -2860,7 +2905,8 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2869,6 +2915,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -2878,6 +2925,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -2887,6 +2935,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -2896,21 +2945,28 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {
                                     parent1.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        },
                                     },
                                     parent2.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        },
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
                     },
         }}});
 
@@ -2918,7 +2974,8 @@ mod tests {
         // P1's required level should become ON.
         // P2's required level should become ON.
         // The lease should be pending, as C isn't ON yet.
-        let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&parent1, ON);
         broker_status.required_level.update(&parent2, ON);
         broker_status.lease.update(&lease.id, LeaseStatus::Pending, false);
@@ -2943,13 +3000,49 @@ mod tests {
         broker_status.lease.update(&lease.id, LeaseStatus::Satisfied, false);
         broker_status.assert_matches(&broker);
 
+        // We expect one synthetic element.
+        let mut synthetic_elements =
+            broker.catalog.topology.elements.iter().filter(|(_, e)| e.synthetic);
+        let (_, synthetic) = synthetic_elements.next().unwrap();
+        assert!(synthetic_elements.next().is_none());
+
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
-                    lease.id.clone() => "Satisfied",
+                    lease.id.to_string() => "Satisfied",
                 },
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    // TODO(b/348700341): Re-enable this section of the data tree
+                    // when we can avoid explicitly marking the event number. As
+                    // broker changes, the exact order of creation / status
+                    // update events cannot be guaranteed.
+                    events: contains {},
+                    /*
+                    events: contains {
+                        "14": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_{}", lease.id),
+                            update: "level_1@C",
+                            vertex_id: child.to_string()
+                        },
+                        "17": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_status_{}", lease.id),
+                            update: "Pending",
+                            vertex_id: child.to_string()
+                        },
+                        "21": {
+                            "@time": AnyProperty,
+                            event: "update_key",
+                            key: format!("lease_status_{}", lease.id),
+                            update: "Satisfied",
+                            vertex_id: child.to_string()
+                        }
+                    },
+                    */
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2958,8 +3051,18 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
+                            },
+                            synthetic.id.to_string() => {
+                                meta: {
+                                    name: synthetic.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
                             },
                             parent1.to_string() => {
                                 meta: {
@@ -2967,6 +3070,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -2976,6 +3080,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -2985,52 +3090,33 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease.id.clone()) => "level_1@C",
-                                    format!("lease_status_{}@level_1", lease.id.clone()) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease.id) => {
+                                            level: 1u64,
+                                            status: 2u64,
+                                        }
+                                    }
                                 },
                                 relationships: {
                                     parent1.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                     parent2.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        // TODO(b/348700341): Re-enable this section of the data tree
-                        // when we can avoid explicitly marking the event number. As
-                        // broker changes, the exact order of creation / status
-                        // update events cannot be guaranteed.
-                        events: contains {},
-                        /*
-                        events: contains {
-                            "14": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_{}", lease.id),
-                                update: "level_1@C",
-                                vertex_id: child.to_string()
-                            },
-                            "17": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_status_{}", lease.id),
-                                update: "Pending",
-                                vertex_id: child.to_string()
-                            },
-                            "21": {
-                                "@time": AnyProperty,
-                                event: "update_key",
-                                key: format!("lease_status_{}", lease.id),
-                                update: "Satisfied",
-                                vertex_id: child.to_string()
-                            }
-                        },
-                        */
-                        stats: contains {},
                     },
         }}});
 
@@ -3071,9 +3157,8 @@ mod tests {
         // Create a topology of a child element with two chained transitive
         // dependencies.
         // C => P => GP
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3124,6 +3209,7 @@ mod tests {
                     .expect("dup failed")
                     .into(),
                 ON.level,
+                &mut EagerInspectWriter,
             )
             .expect("add_dependency failed");
         let mut broker_status = BrokerStatusMatcher::new();
@@ -3138,7 +3224,8 @@ mod tests {
         // dependency and GP as the transitive dependency.
         // P's required level should remain OFF, it depends on GP.
         // GP's required level should become ON.
-        let lease = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3150,7 +3237,7 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Raise P's level to ON.
-        // GP's required level should become ON.
+        // C's required level should become ON.
         broker.update_current_level(&parent, ON);
         broker_status.required_level.update(&child, ON);
         broker_status.assert_matches(&broker);
@@ -3202,9 +3289,8 @@ mod tests {
         //  3 => 30 => 90
         // Grandparent has a minimum required level of 10.
         // All other elements have a minimum of 0.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID =
             broker.add_element("GP", 10, vec![10, 90, 200], vec![]).expect("add_element failed");
@@ -3300,7 +3386,7 @@ mod tests {
         // dependency on Grandparent. Grandparent has no dependencies so its
         // level should be raised first.
         let lease1 = broker
-            .acquire_lease(&child1, IndexedPowerLevel { level: 5, index: 1 })
+            .acquire_lease(&child1, IndexedPowerLevel { level: 5, index: 1 }, zx::Koid::from_raw(1))
             .expect("acquire failed");
         broker_status
             .required_level
@@ -3331,7 +3417,7 @@ mod tests {
         // requirements of Parent at 30 and Grandparent at 100, they are
         // superseded by Child 1's requirements of 50 and 200.
         let lease2 = broker
-            .acquire_lease(&child2, IndexedPowerLevel { level: 3, index: 1 })
+            .acquire_lease(&child2, IndexedPowerLevel { level: 3, index: 1 }, zx::Koid::from_raw(2))
             .expect("acquire failed");
         broker_status.required_level.update(&child2, IndexedPowerLevel { level: 3, index: 1 });
         broker_status.lease.update(&lease2.id, LeaseStatus::Pending, false);
@@ -3411,9 +3497,8 @@ mod tests {
         // Child 2 ON requires Parent ON.
         // Parent ON requires Grandparent ON.
         // C2 =>  P => GP
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3494,7 +3579,8 @@ mod tests {
         // should have required level ON because Child 1 has a dependency
         // on Parent and Parent has a dependency on Grandparent. Grandparent
         // has no dependencies so its level should be raised first.
-        let lease1 = broker.acquire_lease(&child1, ON).expect("acquire failed");
+        let lease1 =
+            broker.acquire_lease(&child1, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease1.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3520,7 +3606,8 @@ mod tests {
 
         // Acquire a lease for Child 2. Child 2 requires Parent and
         // Grandparent ON, which is already met by Child 1's requirements.
-        let lease2 = broker.acquire_lease(&child2, ON).expect("acquire failed");
+        let lease2 =
+            broker.acquire_lease(&child2, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&child2, ON);
         broker_status.lease.update(&lease2.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3584,9 +3671,8 @@ mod tests {
         // Child ON requires Parent 1 ON and Parent 2 ON.
         // Parent 1 ON requires Grandparent ON.
         // Parent 2 ON requires Grandparent ON.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -3682,7 +3768,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for Child.
-        let lease1 = broker.acquire_lease(&child, ON).expect("acquire failed");
+        let lease1 =
+            broker.acquire_lease(&child, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&grandparent, ON);
         broker_status.lease.update(&lease1.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -3752,9 +3839,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -3830,7 +3916,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because the lease is still Pending.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -3841,7 +3928,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but is no longer contingent because
         // B's assertive claim unblocks C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -3865,14 +3953,23 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
+
+        // We expect two synthetic elements.
+        let mut synthetic_elements =
+            broker.catalog.topology.elements.iter().filter(|(_, e)| e.synthetic);
+        let (_, synthetic_1) = synthetic_elements.next().unwrap();
+        let (_, synthetic_2) = synthetic_elements.next().unwrap();
+        assert!(synthetic_elements.next().is_none());
+
         assert_data_tree!(inspect, root: {
             test: {
                 leases: {
-                    lease_b.id.clone() => "Satisfied",
-                    lease_c.id.clone() => "Satisfied",
+                    lease_b.id.to_string() => "Satisfied",
+                    lease_c.id.to_string() => "Satisfied",
                 },
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -3881,8 +3978,27 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
+                            },
+                            synthetic_1.id.to_string() => {
+                                meta: {
+                                    name: synthetic_1.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
+                            },
+                            synthetic_2.id.to_string() => {
+                                meta: {
+                                    name: synthetic_2.name.clone(),
+                                    synthetic: true,
+                                    leases: {},
+                                    valid_levels: vec![0u64, 255],
+                                },
+                                relationships: {},
                             },
                             element_a.to_string() => {
                                 meta: {
@@ -3890,6 +4006,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -3899,13 +4016,21 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease_b.id) => "level_1@B",
-                                    format!("lease_status_{}@level_1", lease_b.id) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease_b.id) => {
+                                            level: 1u64,
+                                            status: fpb::LeaseStatus::Satisfied.into_primitive() as u64,
+                                        }
+                                    },
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
@@ -3915,24 +4040,33 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}@level_1", lease_c.id) => "level_1@C",
-                                    format!("lease_status_{}@level_1", lease_c.id) => "Satisfied",
+                                    leases: {
+                                        format!("{}", lease_c.id) => {
+                                            level: 1u64,
+                                            status: fpb::LeaseStatus::Satisfied.into_primitive() as u64,
+                                        }
+                                    },
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1p" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                                opportunistic: true,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
 
         // Drop Lease on B.
-        // B's required level should be OFF because the lease was dropped.
         // A's required level should remain ON until B is OFF.
+        // B's required level should become OFF because the lease was dropped.
+        // C's required level should become OFF because its passive claims are no
+        // longer supported by an active lease.
         // Lease C should now be pending and contingent.
         broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_b, OFF);
@@ -3943,13 +4077,13 @@ mod tests {
 
         // Update B's current level to OFF.
         // A's required level should remain ON, until C is OFF.
-        // C's required level should remain ON, to preserve ordering.
+        // C's required level should remain OFF.
         broker.update_current_level(&element_b, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop Lease on C.
-        // C's required level should be OFF because the lease was dropped.
         // A's required level should remain ON until C is OFF.
+        // C's required level should remain OFF.
         broker.drop_lease(&lease_c.id).expect("drop_lease failed");
         broker_status.lease.remove(&lease_c.id);
         broker_status.assert_matches(&broker);
@@ -3973,7 +4107,8 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: contains {},
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -3982,6 +4117,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {},
                                 },
                                 relationships: {}
                             },
@@ -3991,6 +4127,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {},
                             },
@@ -4000,11 +4137,17 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" }},
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
+                                    },
                                 },
                             },
                             element_c.to_string() => {
@@ -4013,17 +4156,21 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {},
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1p" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                                opportunistic: true,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
     }
 
@@ -4039,9 +4186,8 @@ mod tests {
         //
         //  A     B     C
         // ON => ON <- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_b_assertive = DependencyToken::create();
         let token_b_opportunistic = DependencyToken::create();
         let element_b = broker
@@ -4117,7 +4263,8 @@ mod tests {
         // Lease C.
         // All required levels should be OFF, as B is not on and opportunistic.
         // Lease C should be pending and contingent.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
@@ -4127,7 +4274,8 @@ mod tests {
         // A and C's required levels should be OFF.
         // Lease A should be pending and non-contingent.
         // Lease C should be pending and non-contingent.
-        let lease_a = broker.acquire_lease(&element_a, ON).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_b, ON);
         broker_status.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_a.id), Some(LeaseStatus::Pending));
@@ -4172,9 +4320,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4252,7 +4399,8 @@ mod tests {
         // B's required level should be OFF because A is not yet on.
         // C's required level should remain OFF.
         // Lease B should be pending.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4278,7 +4426,8 @@ mod tests {
         // C's required level should become ON because its dependencies are
         // already satisfied.
         // Lease B should still be satisfied.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_c, ON);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4292,7 +4441,8 @@ mod tests {
         // Drop Lease on B.
         // A's required level should remain ON.
         // B's required level should become OFF because it is no longer leased.
-        // C's required level should remain OFF as its passive claims are not covered by an active lease.
+        // C's required level should become OFF because its passive claims are no
+        // longer supported by an active lease.
         // Lease C is now pending and contingent.
         broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_b, OFF);
@@ -4345,9 +4495,8 @@ mod tests {
         // ON <= ON
         // ON <------- ON -------> ON
         //                   ON => ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4478,7 +4627,8 @@ mod tests {
         // A's required level should become ON because of B's assertive claim.
         // B, C, D & E's required levels should remain OFF.
         // Lease B should be pending.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -4505,7 +4655,8 @@ mod tests {
         // Lease C should be contingent because while B's assertive claim on
         // A satisfies C's opportunistic claim on A, nothing satisfies C's opportunistic
         // claim on E.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4516,7 +4667,8 @@ mod tests {
         // Lease B should still be satisfied.
         // Lease C should be pending, but no longer contingent.
         // Lease D should be pending and not contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_e, ON);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, false);
@@ -4608,9 +4760,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4686,7 +4837,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4697,7 +4849,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -4756,7 +4909,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // The lease on C should remain Pending and contingent even though A's current level is ON.
-        let lease_c_reacquired = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c_reacquired =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.lease.update(&lease_c_reacquired.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4787,9 +4941,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -4861,7 +5014,8 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF because its lease is pending and contingent.
         // Lease C should be pending and contingent on its opportunistic claim.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -4872,7 +5026,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -4953,7 +5108,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should remain pending but no longer contingent because
         // B's assertive claim would satisfy C's opportunistic claim.
-        let lease_b_reacquired = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b_reacquired =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_b_reacquired.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, false);
@@ -5020,9 +5176,8 @@ mod tests {
         //  3 <== 1
         //  2 <-------- 1
         //  1 <============== 1
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a =
@@ -5110,7 +5265,8 @@ mod tests {
         broker.update_current_level(&element_d, ZERO);
 
         // Lease C.
-        let lease_c = broker.acquire_lease(&element_c, ONE).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ONE, zx::Koid::from_raw(1)).expect("acquire failed");
         // A's required level should remain 0 despite C's opportunistic claim.
         // B's required level should remain 0.
         // C's required level should remain 0 because its lease is pending and contingent.
@@ -5120,7 +5276,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Lease B.
-        let lease_b = broker.acquire_lease(&element_b, ONE).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ONE, zx::Koid::from_raw(2)).expect("acquire failed");
         // A's required level should become 3 because of B's assertive claim.
         // B's required level should remain 0 because its dependency is not yet satisfied.
         // C's required level should remain 0 because its dependency is not yet satisfied.
@@ -5193,7 +5350,8 @@ mod tests {
 
         // Reacquire Lease on C.
         // The lease on C should remain Pending even though A's current level is 2.
-        let lease_c_reacquired = broker.acquire_lease(&element_c, ONE).expect("acquire failed");
+        let lease_c_reacquired =
+            broker.acquire_lease(&element_c, ONE, zx::Koid::from_raw(3)).expect("acquire failed");
         // A's required level should remain 0 despite C's new opportunistic claim.
         // B's required level should remain 0.
         // C's required level should remain 0.
@@ -5206,7 +5364,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire Lease on D.
-        let lease_d = broker.acquire_lease(&element_d, ONE).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ONE, zx::Koid::from_raw(4)).expect("acquire failed");
         // A's required level should become 1, but this is not enough to
         // satisfy C's opportunistic claim.
         // B's required level should remain 0.
@@ -5277,9 +5436,8 @@ mod tests {
         //  2 <= 20
         //  1 <= 10
         //  2 <-------- 5
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a =
@@ -5366,7 +5524,11 @@ mod tests {
         // C's required level should remain 0 because its lease is pending and contingent.
         // Lease C should be pending because it is contingent on an opportunistic claim.
         let lease_c = broker
-            .acquire_lease(&element_c, IndexedPowerLevel { level: 5, index: 1 })
+            .acquire_lease(
+                &element_c,
+                IndexedPowerLevel { level: 5, index: 1 },
+                zx::Koid::from_raw(1),
+            )
             .expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
@@ -5378,7 +5540,11 @@ mod tests {
         // Lease B @ 10 should be pending.
         // Lease C should remain pending because A @ 1 does not satisfy its claim.
         let lease_b_10 = broker
-            .acquire_lease(&element_b, IndexedPowerLevel { level: 10, index: 1 })
+            .acquire_lease(
+                &element_b,
+                IndexedPowerLevel { level: 10, index: 1 },
+                zx::Koid::from_raw(2),
+            )
             .expect("acquire failed");
         broker_status.required_level.update(&element_a, ONE);
         broker_status.lease.update(&lease_b_10.id, LeaseStatus::Pending, false);
@@ -5408,7 +5574,11 @@ mod tests {
         // Lease C should remain pending because A is not yet at 2, but
         // should no longer be contingent on its opportunistic claim.
         let lease_b_20 = broker
-            .acquire_lease(&element_b, IndexedPowerLevel { level: 20, index: 2 })
+            .acquire_lease(
+                &element_b,
+                IndexedPowerLevel { level: 20, index: 2 },
+                zx::Koid::from_raw(3),
+            )
             .expect("acquire failed");
         broker_status.required_level.update(&element_a, TWO);
         broker_status.lease.update(&lease_b_20.id, LeaseStatus::Pending, false);
@@ -5509,9 +5679,8 @@ mod tests {
         //  A     B     C     D
         // ON <= ON
         // ON <------- ON => ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -5618,7 +5787,8 @@ mod tests {
         // no other assertive claims that would satisfy it.
         // Lease C should be pending and contingent because its opportunistic
         // claim has no other assertive claim that would satisfy it.
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5631,7 +5801,8 @@ mod tests {
         // Lease B should be pending.
         // Lease C should be pending but no longer contingent because B's
         // assertive claim would satisfy C's opportunistic claim.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.required_level.update(&element_d, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
@@ -5739,9 +5910,8 @@ mod tests {
         // ON <============= ON
         //             ON <- ON
         // ON <------------------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -5883,7 +6053,8 @@ mod tests {
         // A's required level should remain OFF because of E's opportunistic claim.
         // B, C, D & E's required level are unaffected and should remain OFF.
         // Lease E should be pending and contingent on its opportunistic claim.
-        let lease_e = broker.acquire_lease(&element_e, ON).expect("acquire failed");
+        let lease_e =
+            broker.acquire_lease(&element_e, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5895,7 +6066,8 @@ mod tests {
         // Lease D should be pending and contingent on its opportunistic claim.
         // Lease E should be pending and contingent on its opportunistic claim, which is not satisfied
         // by Lease D's assertive claim, as Lease D is contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -5906,7 +6078,8 @@ mod tests {
         // Lease B should be pending and not contingent.
         // Lease D should be pending and not contingent.
         // Lease E should be pending and not contingent.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.required_level.update(&element_c, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, false);
@@ -6017,9 +6190,8 @@ mod tests {
         // ON <= ON
         //       ON <- ON <======= ON
         //       ON <======= ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a = DependencyToken::create();
         let element_a = broker
             .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -6150,7 +6322,8 @@ mod tests {
         // D's required level should remain OFF.
         // E's required level should remain OFF because its lease is pending and contingent.
         // Lease E should be pending and contingent on its opportunistic claim.
-        let lease_e = broker.acquire_lease(&element_e, ON).expect("acquire failed");
+        let lease_e =
+            broker.acquire_lease(&element_e, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -6162,7 +6335,8 @@ mod tests {
         // E's required level should remain OFF because C is not yet ON.
         // Lease D should be pending.
         // Lease E should remain pending but is no longer contingent.
-        let lease_d = broker.acquire_lease(&element_d, ON).expect("acquire failed");
+        let lease_d =
+            broker.acquire_lease(&element_d, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_a, ON);
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_e.id, LeaseStatus::Pending, false);
@@ -6283,9 +6457,8 @@ mod tests {
         //  A     B     C
         //  1 ==> 1
         //  2 ========> 1
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v012_u8: Vec<u8> = vec![0, 1, 2];
 
@@ -6363,7 +6536,8 @@ mod tests {
         // B and C's required level should be 1.
         //
         // A's lease is pending and not contingent.
-        let lease_a = broker.acquire_lease(&element_a, TWO).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, TWO, zx::Koid::from_raw(1)).expect("acquire failed");
         let lease_a_id = lease_a.id.clone();
         broker_status.required_level.update(&element_b, ONE);
         broker_status.required_level.update(&element_c, ONE);
@@ -6437,9 +6611,8 @@ mod tests {
         //        1 <-------- 1
         //  2 --------> 1 <============== 1
         //  3 ==> 2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
 
@@ -6619,7 +6792,8 @@ mod tests {
         // A, B, C, D, E and F's required levels should not change.
         //
         // A's lease is pending and contingent.
-        let lease_a = broker.acquire_lease(&element_a, THREE).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, THREE, zx::Koid::from_raw(1)).expect("acquire failed");
         broker_status.lease.update(&lease_a.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
@@ -6634,7 +6808,8 @@ mod tests {
         //
         // A's lease is pending and not contingent.
         // F's lease is pending and not contingent.
-        let lease_f = broker.acquire_lease(&element_f, ONE).expect("acquire failed");
+        let lease_f =
+            broker.acquire_lease(&element_f, ONE, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&element_b, TWO);
         broker_status.required_level.update(&element_c, ONE);
         broker_status.required_level.update(&element_e, ONE);
@@ -6738,9 +6913,8 @@ mod tests {
         //  1 --> 1
         //  2 ==> 2 --> 1
         //  3 ========> 2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let v0123_u8: Vec<u8> = vec![0, 1, 2, 3];
 
@@ -6861,7 +7035,8 @@ mod tests {
         // A and B's required level should not change.
         //
         // A's lease should be pending and not contingent.
-        let lease_a = broker.acquire_lease(&element_a, THREE).expect("acquire failed");
+        let lease_a =
+            broker.acquire_lease(&element_a, THREE, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element_c, TWO);
         broker_status.lease.update(&lease_a.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
@@ -6938,9 +7113,8 @@ mod tests {
         // HW -> ES(WH)
         // WOR => WH(A)
         // WH(A) => ES(WH)
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_sag_es_assertive = DependencyToken::create();
         let token_sag_es_opportunistic = DependencyToken::create();
         let sag_es = broker
@@ -7041,14 +7215,16 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Create Persistent Lease for HW.
-        let lease_hw = broker.acquire_lease(&storage_hw, ON).expect("acquire failed");
+        let lease_hw =
+            broker.acquire_lease(&storage_hw, ON, zx::Koid::from_raw(1)).expect("acquire failed");
         // Required levels should not have changed.
         // Lease is contingent on the opportunistic dependency on ES(WH).
         broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
         // Create Lease for WOR.
-        let lease_wor1 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor1 =
+            broker.acquire_lease(&storage_wor, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker_status.required_level.update(&sag_es, ON);
         // Lease is no longer contingent because the opportunistic dependency
         // on ES(WH) is supported by WH's assertive dependency.
@@ -7098,7 +7274,8 @@ mod tests {
 
         // Create new Lease for WOR.
         // HW lease is pending because HW is not yet ON.
-        let lease_wor2 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor2 =
+            broker.acquire_lease(&storage_wor, ON, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&sag_wh, ON);
         broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_wor2.id, LeaseStatus::Pending, false);
@@ -7167,9 +7344,8 @@ mod tests {
         //  A     B     C
         // ON <= ON
         // ON <------- ON
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
@@ -7250,8 +7426,10 @@ mod tests {
         // B & C's required level should remain OFF.
         // Both leases should be pending and contingent, as they should
         // have a new opportunistic dependency on the topology unsatisfiable element.
-        let lease_b = broker.acquire_lease(&element_b, ON).expect("acquire failed");
-        let lease_c = broker.acquire_lease(&element_c, ON).expect("acquire failed");
+        let lease_b =
+            broker.acquire_lease(&element_b, ON, zx::Koid::from_raw(1)).expect("acquire failed");
+        let lease_c =
+            broker.acquire_lease(&element_c, ON, zx::Koid::from_raw(2)).expect("acquire failed");
         broker.update_current_level(&element_a, ON);
         broker_status.lease.update(&lease_b.id, LeaseStatus::Pending, true);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
@@ -7271,9 +7449,8 @@ mod tests {
     #[fuchsia::test]
     fn test_required_level() {
         // Create a topology of one element.
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let element =
             broker.add_element("E", 0, vec![0, 1, 2], vec![]).expect("add_element failed");
         let mut broker_status = BrokerStatusMatcher::new();
@@ -7283,7 +7460,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for level 1.
-        let lease = broker.acquire_lease(&element, ONE).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, ONE, zx::Koid::from_raw(1)).expect("acquire failed");
         // Required level should become 1.
         broker_status.required_level.update(&element, ONE);
         broker_status.assert_matches(&broker);
@@ -7300,7 +7478,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire and drop a level 2 lease.
-        let lease = broker.acquire_lease(&element, TWO).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, TWO, zx::Koid::from_raw(2)).expect("acquire failed");
         broker.drop_lease(&lease.id).expect("drop failed");
         // Required level should stay 0, to preserve orderly transition.
         broker_status.assert_matches(&broker);
@@ -7311,7 +7490,8 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Acquire lease for level 1 and check required level.
-        let lease = broker.acquire_lease(&element, ONE).expect("acquire failed");
+        let lease =
+            broker.acquire_lease(&element, ONE, zx::Koid::from_raw(3)).expect("acquire failed");
         broker_status.required_level.update(&element, ONE);
         broker_status.assert_matches(&broker);
 
@@ -7329,9 +7509,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_add_element_dependency_list_of_levels() {
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();
         let mithril = broker
             .add_element("Mithril", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
@@ -7367,7 +7546,40 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
-                    "fuchsia.inspect.synthetic.Graph": contains {},
+                    events: {
+                        "0": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: "unset",
+                                required_level: "unset",
+                                element_id: *broker.get_unsatisfiable_element_id(),
+                            }
+                        },
+                        "1": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                element_id: *mithril,
+                            }
+                        },
+                        "2": {
+                            "@time": AnyProperty,
+                            add_element: {
+                                current_level: OFF.level as u64,
+                                required_level: OFF.level as u64,
+                                element_id: *silver,
+                                dependencies: {
+                                    "0": {
+                                        dependent_level: ON.level as u64,
+                                        required_element: *mithril,
+                                        required_level: ON.level as u64,
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    stats: contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -7376,6 +7588,7 @@ mod tests {
                                     valid_levels: broker.get_unsatisfiable_element_levels(),
                                     required_level: "unset",
                                     current_level: "unset",
+                                    leases: {}
                                 },
                                 relationships: {}
                             },
@@ -7385,6 +7598,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {},
                             },
@@ -7394,17 +7608,20 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: OFF.level as u64,
+                                    leases: {}
                                 },
                                 relationships: {
                                     mithril.to_string() => {
                                         edge_id: AnyProperty,
-                                        meta: { "1": "1" },
+                                        meta: {
+                                            "1": {
+                                                required_level: 1u64,
+                                            }
+                                        }
                                     },
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
         }}}});
     }
 
@@ -7428,9 +7645,8 @@ mod tests {
         //         X
         // C4 \   / \
         // C3 = P2   GP2
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
+        let inspect = fuchsia_inspect::Inspector::default();
+        let mut broker = Broker::new(inspect.root().create_child("test"));
 
         let token_gp1 = DependencyToken::create();
         let token_gp2 = DependencyToken::create();
@@ -7648,11 +7864,16 @@ mod tests {
         let mut broker_status = BrokerStatusMatcher::new();
 
         // Grab all required leases and power on all elements.
-        let lease_gp2 = broker.acquire_lease(&element_gp2, ON).expect("acquire failed");
-        let lease_c1 = broker.acquire_lease(&element_c1, ON).expect("acquire failed");
-        let lease_c2 = broker.acquire_lease(&element_c2, ON).expect("acquire failed");
-        let lease_c3 = broker.acquire_lease(&element_c3, ON).expect("acquire failed");
-        let lease_c4 = broker.acquire_lease(&element_c4, ON).expect("acquire failed");
+        let lease_gp2 =
+            broker.acquire_lease(&element_gp2, ON, zx::Koid::from_raw(1)).expect("acquire failed");
+        let lease_c1 =
+            broker.acquire_lease(&element_c1, ON, zx::Koid::from_raw(2)).expect("acquire failed");
+        let lease_c2 =
+            broker.acquire_lease(&element_c2, ON, zx::Koid::from_raw(3)).expect("acquire failed");
+        let lease_c3 =
+            broker.acquire_lease(&element_c3, ON, zx::Koid::from_raw(4)).expect("acquire failed");
+        let lease_c4 =
+            broker.acquire_lease(&element_c4, ON, zx::Koid::from_raw(5)).expect("acquire failed");
         broker.update_current_level(&element_gp1, ON);
         broker.update_current_level(&element_gp2, ON);
         broker.update_current_level(&element_x, ON);

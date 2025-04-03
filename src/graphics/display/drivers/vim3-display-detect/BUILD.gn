@@ -24,8 +24,8 @@ fuchsia_cc_driver("vim3-display-detect-driver") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 

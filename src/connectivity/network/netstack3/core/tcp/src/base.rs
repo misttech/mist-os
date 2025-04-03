@@ -7,14 +7,13 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
-use net_types::ip::{GenericOverIp, Ip, IpMarked, Mtu};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
-    Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
+    IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, Marks, Mms, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
-use netstack3_ip::Marks;
 use packet_formats::icmp::{
     Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode,
 };
@@ -23,6 +22,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::buffer::BufferLimits;
+use crate::internal::counters::{TcpCountersWithSocket, TcpCountersWithoutSocket};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
@@ -59,95 +59,109 @@ pub enum ConnectionError {
     ProtocolError,
 }
 
-impl ConnectionError {
+/// The meaning of a particular ICMP error to a TCP socket.
+pub(crate) enum IcmpErrorResult {
+    /// There has been an error on the connection that must be handled.
+    ConnectionError(ConnectionError),
+    /// The PMTU used by the connection has been updated.
+    PmtuUpdate(Mms),
+}
+
+impl IcmpErrorResult {
     // Notes: the following mappings are guided by the packetimpact test here:
     // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
-    pub(crate) fn try_from_icmp_error(err: IcmpErrorCode) -> Option<Self> {
+    pub(crate) fn try_from_icmp_error(err: IcmpErrorCode) -> Option<IcmpErrorResult> {
         match err {
-            IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
-                Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
-                    Some(ConnectionError::NetworkUnreachable)
+            IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code, message)) => {
+                match code {
+                    Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestHostUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestProtocolUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestPortUnreachable => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::PortUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::SourceRouteFailed => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::SourceRouteFailed))
+                    }
+                    Icmpv4DestUnreachableCode::DestNetworkUnknown => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::DestHostUnknown => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::DestinationHostDown))
+                    }
+                    Icmpv4DestUnreachableCode::SourceHostIsolated => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::SourceHostIsolated))
+                    }
+                    Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::NetworkUnreachableForToS => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::NetworkUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostUnreachableForToS => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::HostPrecedenceViolation => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => {
+                        Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
+                    }
+                    Icmpv4DestUnreachableCode::FragmentationRequired => {
+                        let mtu = message.next_hop_mtu().expect("stack should always fill in MTU");
+                        let mtu = Mtu::new(mtu.get().into());
+                        let mms = Mms::from_mtu::<Ipv4>(mtu, 0 /* no IP options used */)?;
+                        Some(IcmpErrorResult::PmtuUpdate(mms))
+                    }
                 }
-                Icmpv4DestUnreachableCode::DestHostUnreachable => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestProtocolUnreachable => {
-                    Some(ConnectionError::ProtocolUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestPortUnreachable => {
-                    Some(ConnectionError::PortUnreachable)
-                }
-                // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
-                Icmpv4DestUnreachableCode::FragmentationRequired => None,
-                Icmpv4DestUnreachableCode::SourceRouteFailed => {
-                    Some(ConnectionError::SourceRouteFailed)
-                }
-                Icmpv4DestUnreachableCode::DestNetworkUnknown => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::DestHostUnknown => {
-                    Some(ConnectionError::DestinationHostDown)
-                }
-                Icmpv4DestUnreachableCode::SourceHostIsolated => {
-                    Some(ConnectionError::SourceHostIsolated)
-                }
-                Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::NetworkUnreachableForToS => {
-                    Some(ConnectionError::NetworkUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostUnreachableForToS => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::HostPrecedenceViolation => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-            },
+            }
             IcmpErrorCode::V4(Icmpv4ErrorCode::ParameterProblem(_)) => {
-                Some(ConnectionError::ProtocolError)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolError))
             }
             IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
                 Icmpv4TimeExceededCode::TtlExpired,
-            )) => Some(ConnectionError::HostUnreachable),
+            )) => Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable)),
             IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
                 Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded,
-            )) => Some(ConnectionError::TimedOut),
+            )) => Some(IcmpErrorResult::ConnectionError(ConnectionError::TimedOut)),
             IcmpErrorCode::V4(Icmpv4ErrorCode::Redirect(_)) => None,
-            IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => match code {
-                Icmpv6DestUnreachableCode::NoRoute => Some(ConnectionError::NetworkUnreachable),
-                Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::PermissionDenied)
-                }
-                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::HostUnreachable),
-                Icmpv6DestUnreachableCode::AddrUnreachable => {
-                    Some(ConnectionError::HostUnreachable)
-                }
-                Icmpv6DestUnreachableCode::PortUnreachable => {
-                    Some(ConnectionError::PortUnreachable)
-                }
-                Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
-                    Some(ConnectionError::PermissionDenied)
-                }
-                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::PermissionDenied),
-            },
+            IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => {
+                Some(IcmpErrorResult::ConnectionError(match code {
+                    Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable,
+                    Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
+                        ConnectionError::PermissionDenied
+                    }
+                    Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::HostUnreachable,
+                    Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable,
+                    Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable,
+                    Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
+                        ConnectionError::PermissionDenied
+                    }
+                    Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::PermissionDenied,
+                }))
+            }
             IcmpErrorCode::V6(Icmpv6ErrorCode::ParameterProblem(_)) => {
-                Some(ConnectionError::ProtocolError)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::ProtocolError))
             }
             IcmpErrorCode::V6(Icmpv6ErrorCode::TimeExceeded(_)) => {
-                Some(ConnectionError::HostUnreachable)
+                Some(IcmpErrorResult::ConnectionError(ConnectionError::HostUnreachable))
             }
-            // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
-            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig) => None,
+            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig(mtu)) => {
+                let mms = Mms::from_mtu::<Ipv6>(mtu, 0 /* no IP options used */)?;
+                Some(IcmpErrorResult::PmtuUpdate(mms))
+            }
         }
     }
 }
@@ -160,8 +174,10 @@ pub struct TcpState<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsT
     pub isn_generator: IsnGenerator<BT::Instant>,
     /// TCP sockets state.
     pub sockets: Sockets<I, D, BT>,
-    /// TCP counters.
-    pub counters: TcpCounters<I>,
+    /// TCP counters that cannot be attributed to a specific socket.
+    pub counters_without_socket: TcpCountersWithoutSocket<I>,
+    /// TCP counters that can be attributed to a specific socket.
+    pub counters_with_socket: TcpCountersWithSocket<I>,
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<I, D, BT> {
@@ -170,7 +186,8 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<
         Self {
             isn_generator: IsnGenerator::new(now, rng),
             sockets: Sockets::new(),
-            counters: Default::default(),
+            counters_without_socket: Default::default(),
+            counters_with_socket: Default::default(),
         }
     }
 }
@@ -355,89 +372,6 @@ impl Default for KeepAlive {
             enabled: false,
         }
     }
-}
-
-/// TCP Counters.
-///
-/// Accrued for the entire stack, rather than on a per connection basis.
-///
-/// Note that for dual stack sockets, all events will be attributed to the IPv6
-/// counters.
-pub type TcpCounters<I> = IpMarked<I, TcpCountersInner>;
-
-/// The IP agnostic version of [`TcpCounters`].
-#[derive(Default)]
-// TODO(https://fxbug.dev/42052878): Add counters for SYN cookies.
-// TODO(https://fxbug.dev/42078221): Add counters for SACK.
-pub struct TcpCountersInner {
-    /// Count of received IP packets that were dropped because they had
-    /// unexpected IP addresses (either src or dst).
-    pub invalid_ip_addrs_received: Counter,
-    /// Count of received TCP segments that were dropped because they could not
-    /// be parsed.
-    pub invalid_segments_received: Counter,
-    /// Count of received TCP segments that were valid.
-    pub valid_segments_received: Counter,
-    /// Count of received TCP segments that were successfully dispatched to a
-    /// socket.
-    pub received_segments_dispatched: Counter,
-    /// Count of received TCP segments that were not associated with any
-    /// existing sockets.
-    pub received_segments_no_dispatch: Counter,
-    /// Count of received TCP segments that were dropped because the listener
-    /// queue was full.
-    pub listener_queue_overflow: Counter,
-    /// Count of TCP segments that failed to send.
-    pub segment_send_errors: Counter,
-    /// Count of TCP segments that were sent.
-    pub segments_sent: Counter,
-    /// Count of passive open attempts that failed because the stack doesn't
-    /// have route to the peer.
-    pub passive_open_no_route_errors: Counter,
-    /// Count of passive connections that have been opened.
-    pub passive_connection_openings: Counter,
-    /// Count of active open attempts that have failed because the stack doesn't
-    /// have a route to the peer.
-    pub active_open_no_route_errors: Counter,
-    /// Count of active connections that have been opened.
-    pub active_connection_openings: Counter,
-    /// Count of all failed connection attempts, including both passive and
-    /// active opens.
-    pub failed_connection_attempts: Counter,
-    /// Count of port reservation attempts that failed.
-    pub failed_port_reservations: Counter,
-    /// Count of received segments whose checksums were invalid.
-    pub checksum_errors: Counter,
-    /// Count of received segments with the RST flag set.
-    pub resets_received: Counter,
-    /// Count of sent segments with the RST flag set.
-    pub resets_sent: Counter,
-    /// Count of received segments with the SYN flag set.
-    pub syns_received: Counter,
-    /// Count of sent segments with the SYN flag set.
-    pub syns_sent: Counter,
-    /// Count of received segments with the FIN flag set.
-    pub fins_received: Counter,
-    /// Count of sent segments with the FIN flag set.
-    pub fins_sent: Counter,
-    /// Count of retransmission timeouts.
-    pub timeouts: Counter,
-    /// Count of retransmissions of segments.
-    pub retransmits: Counter,
-    /// Count of retransmissions of segments while in slow start.
-    pub slow_start_retransmits: Counter,
-    /// Count of retransmissions of segments while in fast recovery.
-    pub fast_retransmits: Counter,
-    /// Count of times fast recovery was initiated to recover from packet loss.
-    pub fast_recovery: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED.
-    pub established_closed: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED due
-    /// to a RST segment.
-    pub established_resets: Counter,
-    /// Count of times an established TCP connection transitioned to CLOSED due
-    /// to a timeout (e.g. a keep-alive or retransmit timeout).
-    pub established_timedout: Counter,
 }
 
 #[cfg(test)]

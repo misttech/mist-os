@@ -1329,7 +1329,7 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
         Nl80211BssAttr::Bssid(result.bss_description.bssid),
         Nl80211BssAttr::Frequency(center_freq),
         Nl80211BssAttr::InformationElement(result.bss_description.ies),
-        Nl80211BssAttr::LastSeenBoottime(fasync::MonotonicInstant::now().into_nanos() as u64),
+        Nl80211BssAttr::LastSeenBoottime(fasync::BootInstant::now().into_nanos() as u64),
         Nl80211BssAttr::SignalMbm(result.bss_description.rssi_dbm as i32 * 100),
         Nl80211BssAttr::Capability(result.bss_description.capability_info),
         Nl80211BssAttr::Status(0),
