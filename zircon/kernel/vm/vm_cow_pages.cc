@@ -446,10 +446,10 @@ void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page) {
 void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
   if (page->is_loaned()) {
     Pmm::Node().BeginFreeLoanedPage(
-        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, ops.Flph(this));
+        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, ops.FreedList(this).Flph());
   } else {
     pmm_page_queues()->Remove(page);
-    list_add_tail(ops.FreeList(this).List(), &page->queue_node);
+    list_add_tail(ops.FreedList(this).List(), &page->queue_node);
   }
 }
 
@@ -708,7 +708,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
   if (!is_hidden()) {
     // Clear out all content that we can see. This means dropping references to any pages in our
     // parents, as well as removing any pages in our own page list.
-    ScopedPageFreedList freed_list;
+    __UNINITIALIZED ScopedPageFreedList freed_list;
     ReleaseOwnedPagesLocked(0, parent, freed_list);
     freed_list.FreePages(this);
 
@@ -3292,7 +3292,7 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
     RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap, &deferred);
   }
 
-  ScopedPageFreedList freed_list;
+  __UNINITIALIZED ScopedPageFreedList freed_list;
   __UNINITIALIZED BatchPQRemove page_remover(freed_list);
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
@@ -4562,7 +4562,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     // size (which is `start`).
     DEBUG_ASSERT(parent_limit_ <= end);
 
-    ScopedPageFreedList freed_list;
+    __UNINITIALIZED ScopedPageFreedList freed_list;
     ReleaseOwnedPagesLocked(start, LockedPtr(), freed_list);
     freed_list.FreePages(this);
 
@@ -5824,7 +5824,7 @@ void VmCowPages::DetachSourceLocked() {
     RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::Unmap, &deferred);
   }
 
-  ScopedPageFreedList freed_list;
+  __UNINITIALIZED ScopedPageFreedList freed_list;
   __UNINITIALIZED BatchPQRemove page_remover(freed_list);
 
   // Remove all clean (or untracked) pages.
@@ -7081,18 +7081,14 @@ VmCowPages::DeferredOps::~DeferredOps() {
     if (range_op_.has_value()) {
       self_->RangeChangeUpdateCowChildrenLocked(range_op_->range, range_op_->op);
     }
-    free_list_.FreePages(self_);
+    freed_list_.FreePages(self_);
   } else {
     if (range_op_.has_value()) {
       LockedPtr self(self_, VmLockAcquireMode::First);
       VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
     }
     // The pages must be freed *after* any range update is performed.
-    free_list_.FreePages(self_);
-  }
-  // The loaned pages must be freed *after* any range update is performed.
-  if (flph_.has_value()) {
-    Pmm::Node().FinishFreeLoanedPages(*flph_);
+    freed_list_.FreePages(self_);
   }
 }
 
@@ -7112,14 +7108,6 @@ void VmCowPages::DeferredOps::AddRange(VmCowPages* self, VmCowRange range, Range
   } else {
     range_op_ = DeferredRangeOp{.op = op, .range = range};
   }
-}
-
-FreeLoanedPagesHolder& VmCowPages::DeferredOps::Flph(VmCowPages* self) {
-  DEBUG_ASSERT(self == self_);
-  if (!flph_.has_value()) {
-    flph_.emplace();
-  }
-  return *flph_;
 }
 
 void VmCowPages::InitializePageCache(uint32_t level) {

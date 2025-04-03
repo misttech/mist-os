@@ -2043,11 +2043,23 @@ class ScopedPageFreedList {
     if (!list_is_empty(&list_)) {
       cow_pages->FreePages(&list_);
     }
+    if (flph_.has_value()) {
+      Pmm::Node().FinishFreeLoanedPages(*flph_);
+    }
   }
   list_node_t* List() { return &list_; }
+  FreeLoanedPagesHolder& Flph() {
+    if (!flph_.has_value()) {
+      flph_.emplace();
+    }
+    return *flph_;
+  }
 
  private:
   list_node_t list_;
+  // The FLPH is a moderately large object and is wrapped in an optional to defer its construction
+  // unless it is actually needed.
+  ktl::optional<FreeLoanedPagesHolder> flph_;
 };
 
 // Helper object for finishing VmCowPages operations that must occur after the lock is dropped. This
@@ -2094,11 +2106,10 @@ class VmCowPages::DeferredOps {
 
   // Retrieves the underlying resource containers. Any pages (loaned or otherwise) that are added
   // will be freed *after* any range change operations are first performed.
-  ScopedPageFreedList& FreeList(VmCowPages* self) {
+  ScopedPageFreedList& FreedList(VmCowPages* self) {
     DEBUG_ASSERT(self == self_);
-    return free_list_;
+    return freed_list_;
   }
-  FreeLoanedPagesHolder& Flph(VmCowPages* self);
 
   // TODO(https://fxbug.dev/338300943): Tracks whether the locked temporary constructor was used.
   bool locked_range_update_ = false;
@@ -2114,10 +2125,7 @@ class VmCowPages::DeferredOps {
   ktl::optional<DeferredRangeOp> range_op_;
 
   // Track any resources that need to be freed after the range change update.
-  ScopedPageFreedList free_list_;
-  // The FLPH is a moderately large object and is wrapped in an optional to defer its construction
-  // unless it is actually needed.
-  ktl::optional<FreeLoanedPagesHolder> flph_;
+  ScopedPageFreedList freed_list_;
 
   // When operating on a VMO from a hierarchy that has a page source the page source lock is held
   // over both the operation and our deferred operations. This serves to serialize operations
