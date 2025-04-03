@@ -92,7 +92,7 @@ KTraceState::~KTraceState() {
   }
 }
 
-void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
+void KTraceState::Init(uint32_t target_bufsize, bool start_tracing) {
   Guard<Mutex> guard(&lock_);
   ASSERT_MSG(target_bufsize_ == 0,
              "Double init of KTraceState instance (tgt_bs %u, new tgt_bs %u)!", target_bufsize_,
@@ -102,7 +102,7 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Allocations are rounded up to the nearest page size.
   target_bufsize_ = fbl::round_up(target_bufsize, static_cast<uint32_t>(PAGE_SIZE));
 
-  if (initial_groups == 0) {
+  if (!start_tracing) {
     // Writes should be disabled and there should be no in-flight writes.
     [[maybe_unused]] uint64_t observed;
     DEBUG_ASSERT_MSG((observed = write_state_.load(ktl::memory_order_acquire)) == 0, "0x%lx",
@@ -118,17 +118,11 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Now that writes have been enabled, we can report the names.
   ReportStaticNames();
   ReportThreadProcessNames();
-  // Finally, set the group mask to allow non-name writes to proceed.
-  SetGroupMask(initial_groups);
   is_started_ = true;
 }
 
-zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
+zx_status_t KTraceState::Start(StartMode mode) {
   Guard<Mutex> guard(&lock_);
-
-  if (groups == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
 
   if (zx_status_t status = AllocBuffer(); status != ZX_OK) {
     return status;
@@ -171,15 +165,6 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   // It's possible that a |ReserveRaw| failure may have disabled writes so make
   // sure they are enabled.
   EnableWrites();
-  SetGroupMask(groups);
-
-  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", groups);
-  DiagsPrintf(INFO, "Trace category states:\n");
-  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
-    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
-                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
-  }
-
   return ZX_OK;
 }
 
@@ -190,7 +175,7 @@ zx_status_t KTraceState::Stop() {
   // new writers from starting write operations.  The non-write lock prevents
   // another thread from starting another trace session until we have finished
   // the stop operation.
-  ClearMaskDisableWrites();
+  DisableWrites();
 
   // Now wait until any lingering write operations have finished.  This
   // should never take any significant amount of time.  If it does, we are
@@ -588,6 +573,29 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 // The global ktrace state.
 KTrace KTrace::instance_;
 
+zx_status_t KTrace::Start(uint32_t categories, internal::KTraceState::StartMode start_mode) {
+  if (categories == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  const zx_status_t status = internal_state_.Start(start_mode);
+  if (status != ZX_OK) {
+    return status;
+  }
+  // We need to set the categories bitmask after calling internal_state_.Start because that
+  // method emits a bunch of static metadata that should not be interspersed with arbitrary
+  // trace records.
+  set_categories_bitmask(categories);
+
+  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", categories);
+  DiagsPrintf(INFO, "Trace category states:\n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
+                KTrace::CategoryEnabled(category) ? "enabled" : "disabled");
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
   using StartMode = ::internal::KTraceState::StartMode;
   switch (action) {
@@ -595,10 +603,11 @@ zx_status_t KTrace::Control(uint32_t action, uint32_t options) {
     case KTRACE_ACTION_START_CIRCULAR: {
       const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-      return internal_state_.Start(options ? options : KTRACE_GRP_ALL, start_mode);
+      return Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:
+      set_categories_bitmask(0u);
       return internal_state_.Stop();
 
     case KTRACE_ACTION_REWIND:

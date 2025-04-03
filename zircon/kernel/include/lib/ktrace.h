@@ -631,9 +631,10 @@ class KTrace {
   void Init(uint32_t bufsize, uint32_t initial_grpmask) {
     cpu_context_map_.Init();
     internal_state_.Init(bufsize, initial_grpmask);
+    set_categories_bitmask(initial_grpmask);
   }
 
-  // Control is responsible for probing, starting, stopping, or rewinding the ktrace buffer.
+  // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
   // then the options field functions as the group mask.
@@ -674,7 +675,7 @@ class KTrace {
   static zx_instant_boot_ticks_t Timestamp() { return current_boot_ticks(); }
 
   static bool CategoryEnabled(const fxt::InternedCategory& category) {
-    return GetInstance().internal_state_.IsCategoryEnabled(category);
+    return GetInstance().IsCategoryEnabled(category);
   }
 
   // Generates an instant event record that contains the given arguments if the kernel:probe
@@ -846,10 +847,13 @@ class KTrace {
   constexpr static fxt::Koid kNoProcess{0u};
 
  private:
+  friend class KTraceTests;
+
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
   // * Preventing copies and moves
-  constexpr KTrace() = default;
+  constexpr explicit KTrace(bool disable_diagnostic_logs = false)
+      : disable_diagnostic_logs_(disable_diagnostic_logs) {}
   ~KTrace() = default;
   KTrace(const KTrace&) = delete;
   KTrace& operator=(const KTrace&) = delete;
@@ -899,10 +903,52 @@ class KTrace {
   // The global KTrace singleton.
   static KTrace instance_;
 
+  // A small printf stand-in which gives tests the ability to disable diagnostic
+  // printing during testing.
+  int DiagsPrintf(int level, const char* fmt, ...) const __PRINTFLIKE(3, 4) {
+    if (!disable_diagnostic_logs_ && DPRINTF_ENABLED_FOR_LEVEL(level)) {
+      va_list args;
+      va_start(args, fmt);
+      int result = vprintf(fmt, args);
+      va_end(args);
+      return result;
+    }
+    return 0;
+  }
+
+  // Starts tracing with the given categories.
+  zx_status_t Start(uint32_t categories, internal::KTraceState::StartMode start_mode);
+
+  // Returns true if the given category is enabled for tracing.
+  bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
+    const uint32_t bit_number = category.index();
+    if (bit_number == fxt::InternedCategory::kInvalidIndex) {
+      return false;
+    }
+    const uint32_t bitmask = 1u << bit_number;
+    return (bitmask & categories_bitmask()) != 0;
+  }
+
+  // Getter and setter for the categories bitmask.
+  // These use relaxed semantics because reading the bitmask does not need to synchronize memory
+  // operations across threads. Said another way, memory side effects of the release sequence
+  // headed by set_categories_bitmask do not need to be observable after a thread calls
+  // categories_bitmask.
+  uint32_t categories_bitmask() const {
+    return categories_bitmask_.load(ktl::memory_order_relaxed);
+  }
+  void set_categories_bitmask(uint32_t new_mask) {
+    categories_bitmask_.store(new_mask, ktl::memory_order_relaxed);
+  }
+
   // The internal ring buffer implementation. It also currently Stops, Starts, and Rewinds tracing.
   internal::KTraceState internal_state_;
   // A mapping of KOIDs to CPUs, used to annotate trace records.
   CpuContextMap cpu_context_map_;
+  // A bitmask of categories to trace. Bits set to 1 indicate a category that should be traced.
+  ktl::atomic<uint32_t> categories_bitmask_{0};
+  // True if diagnostic log messages should not be printed. Set to true in tests to avoid logspam.
+  const bool disable_diagnostic_logs_{false};
 };
 
 void ktrace_report_live_threads();

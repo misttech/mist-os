@@ -42,15 +42,13 @@ class TestKTraceState : public ::internal::KTraceState {
   static bool InitStartTest() {
     BEGIN_TEST;
 
-    constexpr uint32_t kAllGroups = KTRACE_GRP_ALL;
-
     {
-      // Construct a ktrace state and initialize it, providing no group mask.
+      // Construct a ktrace state and initialize it, but do not start tracing.
       // No buffer should be allocated, and no calls should be made to any of
       // the report hooks.  The only thing which should stick during this
       // operation is our target bufsize.
       TestKTraceState state;
-      ASSERT_TRUE(state.Init(kDefaultBufferSize, 0));
+      ASSERT_TRUE(state.Init(kDefaultBufferSize, false));
       {
         Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
         EXPECT_NULL(state.buffer_);
@@ -58,17 +56,12 @@ class TestKTraceState : public ::internal::KTraceState {
         EXPECT_EQ(kDefaultBufferSize, state.target_bufsize_);
         EXPECT_EQ(0u, state.static_name_report_count_);
         EXPECT_EQ(0u, state.thread_name_report_count_);
-        EXPECT_EQ(0u, state.grpmask());
       }
-
-      // Attempting to start with no groups specified is not allowed.  We should
-      // get "INVALID_ARGS" back.
-      ASSERT_EQ(ZX_ERR_INVALID_ARGS, state.Start(0, StartMode::Saturate));
 
       // Now go ahead and call start.  This should cause the buffer to become
       // allocated, and for both static and thread names to be reported (static
       // before thread)
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Saturate));
+      ASSERT_OK(state.Start(StartMode::Saturate));
       {
         Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
         EXPECT_NONNULL(state.buffer_);
@@ -78,15 +71,13 @@ class TestKTraceState : public ::internal::KTraceState {
         EXPECT_EQ(1u, state.static_name_report_count_);
         EXPECT_EQ(1u, state.thread_name_report_count_);
         EXPECT_LE(state.last_static_name_report_time_, state.last_thread_name_report_time_);
-        EXPECT_EQ(kAllGroups, state.grpmask());
       }
     }
 
     {
-      // Perform a similar test, but this time passing a non-zero group mask to
-      // init.  This should cause tracing to go live immediately.
+      // Perform a similar test, but this start tracing in Init.
       TestKTraceState state;
-      ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
+      ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
       {
         Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
@@ -97,7 +88,6 @@ class TestKTraceState : public ::internal::KTraceState {
         EXPECT_EQ(1u, state.static_name_report_count_);
         EXPECT_EQ(1u, state.thread_name_report_count_);
         EXPECT_LE(state.last_static_name_report_time_, state.last_thread_name_report_time_);
-        EXPECT_EQ(kAllGroups, state.grpmask());
       }
     }
 
@@ -105,21 +95,21 @@ class TestKTraceState : public ::internal::KTraceState {
       // Initialize a trace, then start it in circular mode.
       TestKTraceState state;
       ASSERT_TRUE(state.Init(kDefaultBufferSize, 0));
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Circular));
+      ASSERT_OK(state.Start(StartMode::Circular));
 
       // Stopping and starting the trace again in circular mode should be OK.
       ASSERT_OK(state.Stop());
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Circular));
+      ASSERT_OK(state.Start(StartMode::Circular));
 
       // Stopping and starting the trace again in saturate mode should be an
       // error.
       ASSERT_OK(state.Stop());
-      ASSERT_EQ(ZX_ERR_BAD_STATE, state.Start(kAllGroups, StartMode::Saturate));
+      ASSERT_EQ(ZX_ERR_BAD_STATE, state.Start(StartMode::Saturate));
 
       // Rewinding the buffer should fix the issue.
       // error.
       ASSERT_OK(state.Rewind());
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Saturate));
+      ASSERT_OK(state.Start(StartMode::Saturate));
     }
 
     END_TEST;
@@ -129,9 +119,8 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     // Create a small trace buffer and initialize it.
-    constexpr uint32_t kGroups = 0x3;
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, kGroups));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
     ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
     fxt::WriteInstantEventRecord(&state, 0xAAAA'AAAA'AAAA'AAAA, fxt::ThreadRef{0x0A},
@@ -168,9 +157,8 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     // Create a small trace buffer and initialize it.
-    constexpr uint32_t kGroups = KTRACE_GRP_PROBE;
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, kGroups));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
     // Write the (max - 1) 32 byte records to the buffer, then write a single 24 byte record.
     for (uint32_t i = 0; i + 2 < kMaxWords; i += 2) {
@@ -182,21 +170,18 @@ class TestKTraceState : public ::internal::KTraceState {
     // The buffer will not think that it is full just yet.
     uint32_t rcnt = 0;
     auto checker = [&](const uint64_t* hdr) -> bool { return true; };
-    EXPECT_EQ(kGroups, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_TRUE(state.CheckExpectedOffset(kDefaultBufferSize - 8));
     EXPECT_EQ(kMaxWords / 2, rcnt);
 
     // Now write one more record, this time with a different payload.
-    ASSERT_OK(state.Start(kGroups, internal::KTraceState::StartMode::Saturate));
+    ASSERT_OK(state.Start(internal::KTraceState::StartMode::Saturate));
     fxt::WriteInstantEventRecord(&state, 0xABCDABCD, fxt::ThreadRef{0x0B}, fxt::StringRef{0x3},
                                  fxt::StringRef{0x4});
 
-    // The buffer should now think that it is full (the group mask will be
-    // cleared), and all of the original records should be present (but not the
-    // new one).
-    EXPECT_EQ(0u, state.grpmask());
+    // The buffer should now think that it is full (writes should be disabled), and all of the
+    // original records should be present (but not the new one).
     ASSERT_OK(state.Stop());
 
     auto payload_checker = [&](const uint64_t* hdr) -> bool {
@@ -220,9 +205,8 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     // Create a small trace buffer and initialize it.
-    constexpr uint32_t kGroups = KTRACE_GRP_PROBE;
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, kGroups));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
     ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
 
@@ -237,7 +221,6 @@ class TestKTraceState : public ::internal::KTraceState {
     uint32_t rcnt = 0;
     auto checker = [&](const uint64_t* hdr) -> bool { return true; };
     EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset, CheckOp::LT));
-    EXPECT_EQ(kGroups, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(2u, rcnt);
@@ -246,17 +229,15 @@ class TestKTraceState : public ::internal::KTraceState {
     // should be no records in the buffer.
     ASSERT_OK(state.Rewind());
     EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset));
-    EXPECT_EQ(0u, state.grpmask());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(0u, rcnt);
 
     // Start again, and this time saturate the buffer
-    ASSERT_OK(state.Start(kGroups, StartMode::Saturate));
+    ASSERT_OK(state.Start(StartMode::Saturate));
     for (uint32_t i = 0; i <= kMaxWords; i += 2) {
       fxt::WriteInstantEventRecord(&state, 0, fxt::ThreadRef{0x0A}, fxt::StringRef{0x1},
                                    fxt::StringRef{0x2});
     }
-    EXPECT_EQ(0u, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(kMaxWords / 2, rcnt);
@@ -265,7 +246,6 @@ class TestKTraceState : public ::internal::KTraceState {
     // beginning, and there should be no records in the buffer.
     ASSERT_OK(state.Rewind());
     EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset));
-    EXPECT_EQ(0u, state.grpmask());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(0u, rcnt);
 
@@ -275,42 +255,28 @@ class TestKTraceState : public ::internal::KTraceState {
   static bool StateCheckTest() {
     BEGIN_TEST;
 
-    constexpr uint32_t kAllGroups = KTRACE_GRP_ALL;
-    constexpr uint32_t kSomeGroups = 0x3;
-
     {
       TestKTraceState state;
-      ASSERT_TRUE(state.Init(kDefaultBufferSize, 0));
+      ASSERT_TRUE(state.Init(kDefaultBufferSize, false));
 
-      // We didn't provide a non-zero initial set of groups, so the trace should
-      // not be started right now.  Stopping, rewinding, and reading are all
-      // legal (although, stopping does nothing).  We have not allocated our
-      // buffer yet, so not even the static metadata should be available to
-      // read.
+      // We didn't start tracing in Init, so the trace should not be started now.
+      // Stopping, rewinding, and reading are all legal (although, stopping does nothing).
+      // We have not allocated our buffer yet, so not even the static metadata should be
+      // available to read.
       ASSERT_OK(state.Stop());
       ASSERT_EQ(0u, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
       ASSERT_OK(state.Rewind());
-      ASSERT_EQ(0u, state.grpmask());
 
       // Starting should succeed.
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Saturate));
-      ASSERT_EQ(kAllGroups, state.grpmask());
+      ASSERT_OK(state.Start(StartMode::Saturate));
 
       // Now that we are started, rewinding or should fail because of the state
       // check.
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.Rewind());
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
-      ASSERT_EQ(kAllGroups, state.grpmask());
 
-      // Starting while already started should succeed, but change the active
-      // group mask.
-      ASSERT_OK(state.Start(kSomeGroups, StartMode::Saturate));
-      ASSERT_EQ(kSomeGroups, state.grpmask());
-
-      // Stopping is still OK, and actually does something now (it clears the
-      // group mask).
+      // Stopping is still OK, and actually stops the trace.
       ASSERT_OK(state.Stop());
-      ASSERT_EQ(0u, state.grpmask());
 
       // Now that we are stopped, we can read, rewind, and stop again.  Since we
       // have started before, we expect that the amount of data available to
@@ -322,24 +288,17 @@ class TestKTraceState : public ::internal::KTraceState {
 
     {
       // Same checks as before, but this time start in the started state after
-      // init by providing a non-zero set of groups.
+      // init by passing start_tracing=true.
       TestKTraceState state;
-      ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
-      ASSERT_EQ(kAllGroups, state.grpmask());
+      ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
       // We are started, so rewinding or reading should fail because of the
       // state check.
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.Rewind());
       ASSERT_EQ(ZX_ERR_BAD_STATE, state.ReadUser(user_out_ptr<void>(nullptr), 0, 0));
-      ASSERT_EQ(kAllGroups, state.grpmask());
-
-      // "Restarting" should change the active group mask.
-      ASSERT_OK(state.Start(kSomeGroups, StartMode::Saturate));
-      ASSERT_EQ(kSomeGroups, state.grpmask());
 
       // Stopping should work.
       ASSERT_OK(state.Stop());
-      ASSERT_EQ(0u, state.grpmask());
 
       // Stopping again, rewinding, and reading are all OK now.
       const ssize_t expected_size = sizeof(uint64_t) * 3;
@@ -356,7 +315,6 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     enum class Padding { Needed, NotNeeded };
-    constexpr uint32_t kAllGroups = KTRACE_GRP_ALL;
     constexpr ktl::array kPasses = {Padding::Needed, Padding::NotNeeded};
 
     // Define a couple of lambdas and small amount of state which we will be
@@ -458,7 +416,7 @@ class TestKTraceState : public ::internal::KTraceState {
       // Allocate our trace buffer and auto-start it during init in non-circular
       // mode.
       TestKTraceState state;
-      ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
+      ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
       // In order to run this test, we need enough space in our buffer after the
       // 3 reserved metadata words for a least two "static" records, and a
@@ -500,7 +458,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
       // OK, now restart in circular mode, and write the maximum number of 32
       // byte records we can, without causing a wrap.
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Circular));
+      ASSERT_OK(state.Start(StartMode::Circular));
       for (uint32_t i = 0; i < kMaxCircular32bRecords; ++i) {
         const uint32_t ndx = i;
         EXPECT_EQ(ZX_OK,
@@ -521,7 +479,7 @@ class TestKTraceState : public ::internal::KTraceState {
       // record if (and only if) this is the padding pass.  Our first "circular"
       // record should start with a payload index equal to the number of extra
       // records we wrote.
-      ASSERT_OK(state.Start(kAllGroups, StartMode::Circular));
+      ASSERT_OK(state.Start(StartMode::Circular));
       for (uint32_t i = 0; i < kExtraRecords; ++i) {
         const uint32_t ndx = i + kMaxCircular32bRecords;
         EXPECT_EQ(ZX_OK,
@@ -549,11 +507,9 @@ class TestKTraceState : public ::internal::KTraceState {
   static bool FxtCompatWriterTest() {
     BEGIN_TEST;
 
-    constexpr uint32_t kAllGroups = KTRACE_GRP_ALL;
-
     // Create a small trace buffer and initialize it.
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
 
     ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
 
@@ -609,7 +565,7 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
     uint32_t expected_offset = kInitialOffset;
     ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
 
@@ -627,7 +583,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
     // With writes disabled, this Reserve() call should return an
     // error without advancing the buffer offset.
-    state.ClearMaskDisableWrites();
+    state.DisableWrites();
     {
       zx::result<PendingCommit> reservation = state.Reserve(fxt_header);
       ASSERT_EQ(reservation.status_value(), ZX_ERR_BAD_STATE);
@@ -647,7 +603,7 @@ class TestKTraceState : public ::internal::KTraceState {
     BEGIN_TEST;
 
     TestKTraceState state;
-    ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, true));
     constexpr uint64_t fxt_header = fxt::MakeHeader(fxt::RecordType::kMetadata, fxt::WordSize(1));
 
     {
@@ -656,7 +612,7 @@ class TestKTraceState : public ::internal::KTraceState {
       reservation->WriteBytes("0123456789ABCDEF", 16);
 
       ASSERT_EQ(1u, state.inflight_writes());
-      state.ClearMaskDisableWrites();
+      state.DisableWrites();
       reservation->Commit();
     }
     ASSERT_EQ(0u, state.inflight_writes());
@@ -685,7 +641,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
   // We interpose ourselves in the Init path so that we can allocate the side
   // buffer we will use for validation.
-  [[nodiscard]] bool Init(uint32_t target_bufsize, uint32_t initial_groups) {
+  [[nodiscard]] bool Init(uint32_t target_bufsize, bool start_tracing) {
     BEGIN_TEST;
 
     // Tests should always be allocating in units of page size.
@@ -698,7 +654,7 @@ class TestKTraceState : public ::internal::KTraceState {
     ASSERT_TRUE(ac.check());
     validation_buffer_size_ = target_bufsize;
 
-    KTraceState::Init(target_bufsize, initial_groups);
+    KTraceState::Init(target_bufsize, start_tracing);
 
     // Make sure that the buffer size we requested was allocated exactly.
     {
