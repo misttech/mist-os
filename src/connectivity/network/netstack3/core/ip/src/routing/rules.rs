@@ -67,6 +67,26 @@ pub enum RuleAction<Lookup> {
     Lookup(Lookup),
 }
 
+/// Matcher for the bound device of locally generated traffic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundDeviceMatcher {
+    /// The packet is bound to a device which is matched by the matcher.
+    DeviceName(DeviceNameMatcher),
+    /// There is no bound device.
+    Unbound,
+}
+
+impl<'a, D: DeviceWithName> Matcher<Option<&'a D>> for BoundDeviceMatcher {
+    fn matches(&self, actual: &Option<&'a D>) -> bool {
+        match self {
+            BoundDeviceMatcher::DeviceName(name_matcher) => {
+                name_matcher.required_matches(actual.as_deref())
+            }
+            BoundDeviceMatcher::Unbound => actual.is_none(),
+        }
+    }
+}
+
 /// Matches with [`PacketOrigin`].
 ///
 /// Note that this matcher doesn't specify the source address/bound address like [`PacketOrigin`]
@@ -78,7 +98,7 @@ pub enum TrafficOriginMatcher {
     /// can be used to match what device is bound to by `SO_BINDTODEVICE`.
     Local {
         /// The matcher for the bound device.
-        bound_device_matcher: Option<DeviceNameMatcher>,
+        bound_device_matcher: Option<BoundDeviceMatcher>,
     },
     /// This only matches non-local packets. The packets must be received from the network.
     NonLocal,
@@ -103,7 +123,7 @@ impl<'a, I: Ip, D: DeviceWithName> Matcher<PacketOrigin<I, &'a D>> for TrafficOr
             (
                 TrafficOriginMatcher::Local { bound_device_matcher },
                 PacketOrigin::Local { bound_address: _, bound_device },
-            ) => bound_device_matcher.required_matches(*bound_device),
+            ) => bound_device_matcher.matches(bound_device),
             (
                 TrafficOriginMatcher::NonLocal,
                 PacketOrigin::NonLocal { source_address: _, incoming_device: _ },
@@ -229,17 +249,27 @@ mod test {
     #[ip_test(I)]
     #[test_case(None, None => true)]
     #[test_case(None, Some(MultipleDevicesId::A) => true)]
-    #[test_case(Some("A"), None => false)]
-    #[test_case(Some("A"), Some(MultipleDevicesId::A) => true)]
-    #[test_case(Some("A"), Some(MultipleDevicesId::B) => false)]
-    fn rule_matcher_matches_device_name<I: TestIpExt>(
-        device_name: Option<&str>,
+    #[test_case(
+        Some(BoundDeviceMatcher::Unbound),
+        None => true)]
+    #[test_case(
+        Some(BoundDeviceMatcher::Unbound),
+        Some(MultipleDevicesId::A) => false)]
+    #[test_case(
+        Some(BoundDeviceMatcher::DeviceName(DeviceNameMatcher("A".into()))),
+        None => false)]
+    #[test_case(
+        Some(BoundDeviceMatcher::DeviceName(DeviceNameMatcher("A".into()))),
+        Some(MultipleDevicesId::A) => true)]
+    #[test_case(
+        Some(BoundDeviceMatcher::DeviceName(DeviceNameMatcher("A".into()))),
+        Some(MultipleDevicesId::B) => false)]
+    fn rule_matcher_matches_bound_device<I: TestIpExt>(
+        bound_device_matcher: Option<BoundDeviceMatcher>,
         bound_device: Option<MultipleDevicesId>,
     ) -> bool {
         let matcher = RuleMatcher::<I> {
-            traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
-                bound_device_matcher: device_name.map(|name| DeviceNameMatcher(name.into())),
-            }),
+            traffic_origin_matcher: Some(TrafficOriginMatcher::Local { bound_device_matcher }),
             ..RuleMatcher::match_all_packets()
         };
         let input = RuleInput {
@@ -344,7 +374,9 @@ mod test {
         let matcher = RuleMatcher::<I> {
             source_address_matcher: Some(SubnetMatcher(I::TEST_ADDRS.subnet)),
             traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
-                bound_device_matcher: Some(DeviceNameMatcher("A".into())),
+                bound_device_matcher: Some(BoundDeviceMatcher::DeviceName(DeviceNameMatcher(
+                    "A".into(),
+                ))),
             }),
             ..RuleMatcher::match_all_packets()
         };

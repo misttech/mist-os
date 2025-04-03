@@ -542,7 +542,10 @@ mod test {
         .matcher
         .bound_device;
 
-        bound_device.map(|fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name)| name)
+        bound_device.map(|bound_device| match bound_device {
+            fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name) => name,
+            fnet_routes_ext::rules::InterfaceMatcher::Unbound => panic!("unexpected variant"),
+        })
     }
 
     #[ip_test(I)]

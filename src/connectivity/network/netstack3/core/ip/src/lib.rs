@@ -245,7 +245,8 @@ pub use internal::local_delivery::{
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{
-    MarkMatcher, MarkMatchers, Rule, RuleAction, RuleMatcher, RulesTable, TrafficOriginMatcher,
+    BoundDeviceMatcher, MarkMatcher, MarkMatchers, Rule, RuleAction, RuleMatcher, RulesTable,
+    TrafficOriginMatcher,
 };
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
