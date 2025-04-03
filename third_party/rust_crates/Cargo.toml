@@ -325,7 +325,7 @@ num_cpus = "1.16.0"
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
 parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
-proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
+proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.38"
 rustfix = "0.9.0"
@@ -811,7 +811,7 @@ rustflags = ["--cfg=use_fallback"]
 rustflags = ["--cfg=use_fallback"]
 
 # cargo-gnaw suggested "--cfg=proc_macro_span" as well but proc_macro_span is still an unstable feature.
-[gn.package.proc-macro2."1.0.86"]
+[gn.package.proc-macro2."1.0.94"]
 rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.pulldown-cmark."0.9.3"]

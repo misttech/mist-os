@@ -84,7 +84,7 @@ rust_proc_macro(
         "//third_party/rust_crates/vendor/basic-toml-0.1.9:basic_toml",
         "//third_party/rust_crates/vendor/mime-0.3.17:mime",
         "//third_party/rust_crates/vendor/mime_guess-2.0.5:mime_guess",
-        "//third_party/rust_crates/vendor/proc-macro2-1.0.86:proc_macro2",
+        "//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2",
         "//third_party/rust_crates/vendor/quote-1.0.38:quote",
         "//third_party/rust_crates/vendor/serde-1.0.204:serde",
         "//third_party/rust_crates/vendor/syn-2.0.87:syn",
