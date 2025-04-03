@@ -1374,15 +1374,7 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<VmoLockType> guard{lock()};
-
-  zx_status_t status = cow_pages_locked()->ResizeLocked(s);
-  if (status != ZX_OK) {
-    return status;
-  }
-  // We were able to successfully resize. Mark as modified.
-  mark_modified_locked();
-  return ZX_OK;
+  return cow_pages_->Resize(s);
 }
 
 // perform some sort of copy in/out on a range of the object using a passed in lambda for the copy

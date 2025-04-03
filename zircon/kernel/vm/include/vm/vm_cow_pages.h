@@ -361,7 +361,7 @@ class VmCowPages final : public VmHierarchyBase,
   void DetachSourceLocked() TA_REQ(lock());
 
   // Resizes the range of this cow pages. |size| must be a multiple of the page size.
-  zx_status_t ResizeLocked(uint64_t size) TA_REQ(lock());
+  zx_status_t Resize(uint64_t size);
 
   // See VmObject::Lookup
   zx_status_t LookupLocked(VmCowRange range, VmObject::LookupFunction lookup_fn) TA_REQ(lock());

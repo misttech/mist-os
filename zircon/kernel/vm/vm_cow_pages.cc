@@ -4488,10 +4488,13 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
   DEBUG_ASSERT(status == ZX_OK);
 }
 
-zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
+zx_status_t VmCowPages::Resize(uint64_t s) {
   canary_.Assert();
 
   LTRACEF("vmcp %p, size %" PRIu64 "\n", this, s);
+
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   // make sure everything is aligned before we get started
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
@@ -4510,10 +4513,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     }
 
     // unmap all of the pages in this range on all the mapping regions
-    {
-      __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-    }
+    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
 
     // Resolve any outstanding page requests tracked by the page source that are now out-of-bounds.
     if (page_source_) {
@@ -4560,9 +4560,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     // size (which is `start`).
     DEBUG_ASSERT(parent_limit_ <= end);
 
-    __UNINITIALIZED ScopedPageFreedList freed_list;
-    ReleaseOwnedPagesLocked(start, LockedPtr(), freed_list);
-    freed_list.FreePages(this);
+    ReleaseOwnedPagesLocked(start, LockedPtr(), deferred.FreedList(this));
 
     // If the tail of a parent disappears, the children shouldn't be able to see that region again,
     // even if the parent is later reenlarged. So update the children's parent limits.
@@ -4589,10 +4587,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     const uint64_t len = end - start;
 
     // inform all our children or mapping that there's new bits
-    {
-      __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-    }
+    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
 
     // If pager-backed, need to insert a dirty zero interval beyond the old size.
     if (is_source_preserving_page_content()) {
@@ -4607,6 +4602,9 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
   // save bytewise size
   size_ = s;
+
+  // We were able to successfully resize. Mark as modified.
+  mark_modified_locked();
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
