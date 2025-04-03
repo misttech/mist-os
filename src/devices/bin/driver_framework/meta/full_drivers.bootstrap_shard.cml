@@ -172,7 +172,7 @@
                 "fuchsia.hardware.registers.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sdio.DriverService",
-                "fuchsia.hardware.Serial.ProxyService",
+                "fuchsia.hardware.serial.Service",
                 "fuchsia.hardware.skipblock.Service",
                 "fuchsia.hardware.spi.ControllerService",
                 "fuchsia.hardware.tee.Service",
