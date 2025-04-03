@@ -306,7 +306,7 @@ void Dwc2::HandleOutEpInterrupt() {
         DOEPINT::Get(ep_num).ReadFrom(mmio).set_setup(1).WriteTo(mmio);
 
         memcpy(&cur_setup_, ep0_buffer_.virt(), sizeof(cur_setup_));
-        zxlogf(INFO,
+        zxlogf(DEBUG,
                "SETUP bm_request_type: 0x%02x b_request: %u w_value: %u w_index: %u "
                "w_length: %u\n",
                cur_setup_.bm_request_type, cur_setup_.b_request, cur_setup_.w_value,
