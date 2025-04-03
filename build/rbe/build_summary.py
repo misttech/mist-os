@@ -8,10 +8,11 @@
 import argparse
 import collections
 import dataclasses
+import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Optional, Sequence
 
 import tablefmt
 
@@ -25,6 +26,15 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Display RBE metrics from a build.",
         argument_default=None,
+    )
+
+    parser.add_argument(
+        "--format",
+        type=str,
+        help="Style of output.  {table: human-readable text, json: JSON}",
+        default="table",
+        choices=["table", "json"],
+        metavar="STYLE",
     )
 
     # Positional args
@@ -65,7 +75,7 @@ def get_action_category_from_labels(labels: str) -> str:
     return action_toolname or "other"
 
 
-def get_action_category_and_metric(text: str) -> Tuple[str | None, str]:
+def get_action_category_and_metric(text: str) -> tuple[str | None, str]:
     if not text.startswith("["):
         return None, text
     if "]." not in text:
@@ -157,26 +167,6 @@ def build_metric_row(
     return [row]
 
 
-def main(argv: Sequence[str]) -> int:
-    args = _MAIN_ARG_PARSER.parse_args(argv)
-
-    rbe_metrics_txt = args.reproxy_logdir / "rbe_metrics.txt"
-    if not rbe_metrics_txt.exists():
-        print("No RBE metrics found.")
-        return 0
-
-    with open(rbe_metrics_txt) as f:
-        data = textpb.parse(f)
-
-    if "stats" not in data:
-        return 0
-
-    rbe_data = load_rbe_metrics(data)
-
-    # TODO(b/405231158): output alternative formats
-    return print_build_summary(rbe_data, args.reproxy_logdir)
-
-
 @dataclasses.dataclass
 class RbeMetrics(object):
     status_metrics: dict[str, dict[str, Any]]
@@ -218,15 +208,15 @@ def load_rbe_metrics(data: dict[str, Any]) -> RbeMetrics:
     )
 
 
-def print_build_summary(rbe_data: RbeMetrics, reproxy_logdir: str) -> int:
+def build_summary_lines(
+    rbe_data: RbeMetrics, reproxy_logdir: str
+) -> Iterable[str]:
     joint_table = prepare_summary_table(rbe_data)
 
     # Render multi-table.
     script_rel = os.path.relpath(str(_SCRIPT), start=os.curdir)
-    print(f"=== Remote build summary (from: {script_rel} {reproxy_logdir})")
-    for row in tablefmt.format_numeric_table(joint_table):
-        print(row)
-    return 0
+    yield f"=== Remote build summary (from: {script_rel} {reproxy_logdir})"
+    yield from tablefmt.format_numeric_table(joint_table)
 
 
 def _format_num_bytes(x: int) -> str:
@@ -284,6 +274,50 @@ def prepare_summary_table(
         ),
     ]
     return joint_table
+
+
+def arrange_metrics_json(rbe_metrics: RbeMetrics) -> dict[str, Any]:
+    return {
+        "execution_statuses": rbe_metrics.status_metrics["CompletionStatus"],
+        "data_sizes_bytes": {
+            k.removeprefix("RemoteMetadata."): v
+            for k, v in rbe_metrics.bandwidth_metrics.items()
+        },
+    }
+
+
+def main(argv: Sequence[str]) -> int:
+    args = _MAIN_ARG_PARSER.parse_args(argv)
+
+    rbe_metrics_txt = args.reproxy_logdir / "rbe_metrics.txt"
+    if not rbe_metrics_txt.exists():
+        print("No RBE metrics found.")
+        return 0
+
+    with open(rbe_metrics_txt) as f:
+        data = textpb.parse(f)
+
+    if "stats" not in data:
+        return 0
+
+    rbe_data = load_rbe_metrics(data)
+
+    def text_table_formatter(rbe_metrics: RbeMetrics) -> Iterable[str]:
+        yield from build_summary_lines(rbe_metrics, args.reproxy_logdir)
+
+    def json_lines_formatter(rbe_metrics: RbeMetrics) -> Iterable[str]:
+        yield from json.dumps(
+            arrange_metrics_json(rbe_metrics), indent="  "
+        ).splitlines()
+
+    output_formatters = {
+        "table": text_table_formatter,
+        "json": json_lines_formatter,
+    }
+    for line in output_formatters[args.format](rbe_data):
+        print(line)
+
+    return 0
 
 
 if __name__ == "__main__":
