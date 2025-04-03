@@ -114,7 +114,6 @@ group("no_e2e_dep") {
     "//build:tests",
     "//examples:tests",
     "//scripts:tests",
-    "//scripts/sdk/gn:tests",
     "//src/diagnostics:tests",
     "//src/media/bundles:services",
     "//third_party:tests",

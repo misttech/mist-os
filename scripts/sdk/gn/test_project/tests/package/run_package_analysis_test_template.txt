@@ -1,7 +1,0 @@
-#!/bin/bash
-
-if [[ "{manifest_name}" != .manifest_name. ]]; then
-    {script_path} {far_bin_path} {package_name}.far {manifest_name}
-else
-    {script_path} {far_bin_path} {package_name}.far
-fi
