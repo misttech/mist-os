@@ -1822,11 +1822,8 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<VmoLockType> guard{lock()};
-
     uint64_t taken_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->TakePagesLocked(range, pages, &taken_len, &page_request);
+    zx_status_t status = cow_pages_->TakePages(range, pages, &taken_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1842,7 +1839,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     range = range.TrimedFromStart(taken_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
+      status = page_request.Wait();
       if (status != ZX_OK) {
         return status;
       }

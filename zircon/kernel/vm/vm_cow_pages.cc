@@ -4715,7 +4715,7 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
 }
 
 zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
-                                                  uint64_t* taken_len,
+                                                  uint64_t* taken_len, DeferredOps& deferred,
                                                   MultiPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
@@ -4817,7 +4817,6 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
   }
 
   if (new_pages_len) {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
     RangeChangeUpdateLocked(range.WithLength(new_pages_len), RangeChangeOp::Unmap, &deferred);
   }
 
@@ -4833,11 +4832,14 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
   return status;
 }
 
-zx_status_t VmCowPages::TakePagesLocked(VmCowRange range, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, MultiPageRequest* page_request) {
+zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
+                                  MultiPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(range.is_page_aligned());
+
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   if (!range.IsBoundedBy(size_)) {
     pages->Finalize();
@@ -4856,7 +4858,7 @@ zx_status_t VmCowPages::TakePagesLocked(VmCowRange range, VmPageSpliceList* page
 
   // If this is a child of any other kind, we need to handle it specially.
   if (parent_) {
-    return TakePagesWithParentLocked(range, pages, taken_len, page_request);
+    return TakePagesWithParentLocked(range, pages, taken_len, deferred, page_request);
   }
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
@@ -4906,7 +4908,6 @@ zx_status_t VmCowPages::TakePagesLocked(VmCowRange range, VmPageSpliceList* page
   }
 
   *taken_len = range.len;
-  __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
   RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());

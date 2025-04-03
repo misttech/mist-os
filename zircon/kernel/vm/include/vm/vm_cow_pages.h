@@ -385,8 +385,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // |taken_len| is always filled with the amount of |len| that has been processed to allow for
   // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
-  zx_status_t TakePagesLocked(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
-                              MultiPageRequest* page_request) TA_REQ(lock());
+  zx_status_t TakePages(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
+                        MultiPageRequest* page_request);
 
   // See VmObject::SupplyPages
   //
@@ -884,8 +884,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // A private helper that takes pages if this VmCowPages has a parent.
   zx_status_t TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, MultiPageRequest* page_request)
-      TA_REQ(lock());
+                                        uint64_t* taken_len, DeferredOps& deferred,
+                                        MultiPageRequest* page_request) TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
   friend class LockedParentWalker;
