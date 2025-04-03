@@ -5795,8 +5795,11 @@ fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
   return parent_;
 }
 
-void VmCowPages::DetachSourceLocked() {
+void VmCowPages::DetachSource() {
   canary_.Assert();
+
+  __UNINITIALIZED DeferredOps deferred(this);
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
@@ -5815,13 +5818,9 @@ void VmCowPages::DetachSourceLocked() {
   // optimization. Only the userpager is expected to access (dirty) pages beyond this point, in
   // order to write back their contents, where the cost of the writeback is presumably much larger
   // than page faults to update hardware page table mappings for resident pages.
-  {
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
-    RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::Unmap, &deferred);
-  }
+  RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::Unmap, &deferred);
 
-  __UNINITIALIZED ScopedPageFreedList freed_list;
-  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+  __UNINITIALIZED BatchPQRemove page_remover(deferred.FreedList(this));
 
   // Remove all clean (or untracked) pages.
   // TODO(rashaeqbal): Pages that linger after this will be written back and marked clean at some
@@ -5862,7 +5861,6 @@ void VmCowPages::DetachSourceLocked() {
       0, size_);
 
   page_remover.Flush();
-  freed_list.FreePages(this);
 }
 
 void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op,

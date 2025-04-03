@@ -305,11 +305,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   uint32_t GetMappingCachePolicyLocked() const override TA_REQ(lock()) { return cache_policy_; }
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
 
-  void DetachSource() override {
-    Guard<VmoLockType> guard{lock()};
-
-    cow_pages_locked()->DetachSourceLocked();
-  }
+  void DetachSource() override { cow_pages_->DetachSource(); }
 
   zx_status_t CreateChildSlice(uint64_t offset, uint64_t size, bool copy_name,
                                fbl::RefPtr<VmObject>* child_vmo) override;

@@ -358,7 +358,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   uint64_t ReclamationEventCountLocked() const TA_REQ(lock()) { return reclamation_event_count_; }
 
-  void DetachSourceLocked() TA_REQ(lock());
+  void DetachSource();
 
   // Resizes the range of this cow pages. |size| must be a multiple of the page size.
   zx_status_t Resize(uint64_t size);
