@@ -9,9 +9,42 @@ import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/testing/environments.gni")
 import("../libc.gni")
 
+group("test") {
+  testonly = true
+  deps = [ ":tests" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":libc-tests",
+    "dlsym-circular-deps",
+  ]
+}
+
+group("boot_tests") {
+  testonly = true
+  deps = [ ":boot-libc-unittests" ]
+}
+
 # We want to run these tests on every kind of hardware as well as emulators.
 libc_test_specs = {
   environments = all_fuchsia_envs
+}
+
+libc_component_tests = []
+libc_test_manifests = []
+
+# noop-test is a basic test that verifies that C library initialization
+# and process startup work correctly. Same as "hello world" without
+# a printed output.
+#
+# This is particularly useful to verify that a variant works correctly
+# (i.e. all runtime dependencies are installed and loaded properly).
+libc_component_tests += [ "noop-test" ]
+test("noop-test") {
+  sources = [ "noop-test.cc" ]
+  deps = [ "//src/sys/testing/elftest" ]
 }
 
 default_stack_size_cases = [
@@ -28,6 +61,7 @@ default_stack_size_cases = [
 ]
 
 foreach(case, default_stack_size_cases) {
+  libc_component_tests += [ "default-stack-size-${case.name}" ]
   test("default-stack-size-${case.name}") {
     if (is_fuchsia) {
       fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -46,29 +80,28 @@ foreach(case, default_stack_size_cases) {
       ldflags = [ "-Wl,-z,stack-size=${case.size}" ]
     }
   }
-
-  fuchsia_unittest_package("default-stack-size-${case.name}-pkg") {
-    deps = [ ":default-stack-size-${case.name}" ]
-  }
 }
 
 executable("debugdata-test-helper") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
-
   testonly = true
+
   sources = [ "debugdata-test-helper.cc" ]
   deps = [ "//zircon/system/ulib/zx" ]
 
   # Don't use instrumentation that emits debugdata, so only the expected test
   # data is published.
   exclude_toolchain_tags = [ "debugdata" ]
+
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
 }
 
+libc_component_tests += [ "cdebugdata-test" ]
+libc_test_manifests += [ "cdebugdata-test" ]
 test("cdebugdata-test") {
   sources = [ "debugdata.cc" ]
   data_deps = [ ":debugdata-test-helper" ]
@@ -80,6 +113,7 @@ test("cdebugdata-test") {
   ]
 }
 
+libc_component_tests += [ "posix-clocks-test" ]
 test("posix-clocks-test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -96,6 +130,7 @@ test("posix-clocks-test") {
   ]
 }
 
+libc_component_tests += [ "pthread-detach-idempotent-test" ]
 test("pthread-detach-idempotent-test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -112,6 +147,7 @@ test("pthread-detach-idempotent-test") {
   ]
 }
 
+libc_component_tests += [ "atexit-test" ]
 test("atexit-test") {
   if (is_fuchsia) {
     configs += [ "//build/config:all_source" ]
@@ -129,62 +165,45 @@ test("atexit-test") {
   ]
 }
 
-group("test") {
-  testonly = true
+libc_component_tests += [ "gwp-asan-test" ]
+libc_test_manifests += [ "gwp-asan-test" ]
+test("gwp-asan-test") {
+  # Whether GWP-ASan is enabled.
+  has_gwp_asan = !variant_replaces_allocator
+
+  sources = [ "gwp-asan-test.cc" ]
+  defines = [ "HAS_GWP_ASAN=$has_gwp_asan" ]
   deps = [
-    ":atexit-test-pkg",
-    ":cdebugdata-test-pkg",
-    ":gwp-asan-test-pkg",
-    ":libc-unittests-pkg",
-    ":posix-clocks-test-pkg",
-    ":pthread-detach-idempotent-test-pkg",
-    "dlsym-circular-deps",
-    "ldso-xom:tests",
-    "noop:tests",
+    "//sdk/lib/fdio",
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/c/scudo:gwp-asan-common",
+    "//zircon/system/ulib/elf-search",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
   ]
-  foreach(case, default_stack_size_cases) {
-    deps += [ ":default-stack-size-${case.name}-pkg" ]
+  data_deps = [ ":gwp-asan-test-use-after-free" ]
+}
+
+if (current_cpu == "arm64") {
+  libc_component_tests += [ "ldso-xom-test" ]
+  test("ldso-xom-test") {
+    sources = [ "ldso-xom-test.c" ]
+    deps = [
+      ":xom-test-lib",
+      "//zircon/system/ulib/zxtest",
+    ]
+    configs += [ ":execute-only" ]
   }
-}
 
-group("tests") {
-  testonly = true
-  deps = [ ":test" ]
-}
+  shared_library("xom-test-lib") {
+    testonly = true
+    sources = [ "xom-test-lib.c" ]
+    configs += [ ":execute-only" ]
+  }
 
-group("boot_tests") {
-  testonly = true
-  deps = [ ":boot-libc-unittests" ]
-}
-
-fuchsia_unittest_package("atexit-test-pkg") {
-  deps = [ ":atexit-test" ]
-  test_specs = libc_test_specs
-}
-
-fuchsia_unittest_package("cdebugdata-test-pkg") {
-  manifest = "cdebugdata-test.cml"
-  deps = [ ":cdebugdata-test" ]
-  test_specs = libc_test_specs
-}
-
-fuchsia_unittest_package("posix-clocks-test-pkg") {
-  deps = [ ":posix-clocks-test" ]
-  test_specs = libc_test_specs
-}
-
-fuchsia_unittest_package("pthread-detach-idempotent-test-pkg") {
-  deps = [ ":pthread-detach-idempotent-test" ]
-  test_specs = libc_test_specs
-}
-
-test("libc-unittests") {
-  deps = [ "..:unittests" ]
-}
-
-fuchsia_unittest_package("libc-unittests-pkg") {
-  deps = [ ":libc-unittests" ]
-  test_specs = libc_test_specs
+  config("execute-only") {
+    ldflags = [ "-Wl,--execute-only" ]
+  }
 }
 
 # This set of tests serve as a good smoke test for libc itself and essential
@@ -207,21 +226,28 @@ kernel_zbi_test("boot-libc-unittests") {
   }
 }
 
-test("gwp-asan-test") {
-  # Whether GWP-ASan is enabled.
-  has_gwp_asan = !variant_replaces_allocator
+test("libc-unittests") {
+  deps = [ "..:unittests" ]
+}
 
-  sources = [ "gwp-asan-test.cc" ]
-  defines = [ "HAS_GWP_ASAN=$has_gwp_asan" ]
-  deps = [
-    "//sdk/lib/fdio",
-    "//sdk/lib/fit",
-    "//zircon/system/ulib/c/scudo:gwp-asan-common",
-    "//zircon/system/ulib/elf-search",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
-  data_deps = [ ":gwp-asan-test-use-after-free" ]
+libc_test_components = [ ":libc-unittests-test" ]
+fuchsia_unittest_component("libc-unittests-test") {
+  deps = [ ":libc-unittests" ]
+}
+
+foreach(test, libc_component_tests) {
+  libc_test_components += [ ":libc-$test" ]
+  fuchsia_unittest_component("libc-$test") {
+    deps = [ ":$test" ]
+    if (libc_test_manifests + [ test ] - [ test ] != libc_test_manifests) {
+      manifest = "$test.cml"
+    }
+  }
+}
+
+fuchsia_test_package("libc-tests") {
+  test_components = libc_test_components
+  test_specs = libc_test_specs
 }
 
 template("executable_with_backtrace") {
@@ -260,10 +286,4 @@ executable_with_backtrace("gwp-asan-test-buffer-overflow") {
 executable_with_backtrace("gwp-asan-test-buffer-underflow") {
   testonly = true
   sources = [ "gwp-asan-test-buffer-underflow.cc" ]
-}
-
-fuchsia_unittest_package("gwp-asan-test-pkg") {
-  manifest = "gwp-asan-test.cml"
-  deps = [ ":gwp-asan-test" ]
-  test_specs = libc_test_specs
 }
