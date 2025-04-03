@@ -132,12 +132,16 @@ zx_library("lwip") {
   ]
 
   deps += [
+    "//vendor/misttech/src/connectivity/lib/network-device/cpp",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/init",
   ]
 
   sources = [
     "debugcommands.cc",
+    "inferfaces_admin.cc",
     "sys_arch.cc",
   ]
+
+  configs += [ "//build/config:default_include_dirs" ]
 }
