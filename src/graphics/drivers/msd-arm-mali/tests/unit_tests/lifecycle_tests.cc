@@ -4,15 +4,15 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/fake-resource/cpp/fake-resource.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fake-resource/resource.h>
 #include <lib/zx/result.h>
 
 #include <gtest/gtest.h>
-#include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
 #include "src/graphics/drivers/msd-arm-mali/config.h"
 #include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"
@@ -53,7 +53,7 @@ class FakeInfoResource : public fidl::testing::WireTestBase<fuchsia_kernel::Info
 
 class TestEnvironmentWrapper {
  public:
-  fdf::DriverStartArgs Setup(fake_pdev::FakePDevFidl::Config pdev_config) {
+  fdf::DriverStartArgs Setup(fdf_fake::FakePDev::Config pdev_config) {
     zx::result start_args_result = node_.CreateStartArgsAndServe();
     EXPECT_EQ(ZX_OK, start_args_result.status_value());
 
@@ -79,7 +79,7 @@ class TestEnvironmentWrapper {
  private:
   fdf_testing::TestNode node_{"root"};
   fdf_testing::internal::TestEnvironment env_;
-  fake_pdev::FakePDevFidl pdev_;
+  fdf_fake::FakePDev pdev_;
 };
 
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
@@ -94,7 +94,7 @@ TEST(MsdArmDFv2, LoadDriver) {
   // Initialize MMIOs and IRQs needed by the device.
   zx::interrupt gpu_interrupt;
   zx::result<fdf::MmioBuffer> mmio_buffer;
-  fake_pdev::FakePDevFidl::Config config{.use_fake_bti = true, .use_fake_irq = true};
+  fdf_fake::FakePDev::Config config{.use_fake_bti = true, .use_fake_irq = true};
   {
     ASSERT_EQ(ZX_OK,
               zx::interrupt::create(zx::resource(0), 0, ZX_INTERRUPT_VIRTUAL, &gpu_interrupt));
@@ -110,7 +110,7 @@ TEST(MsdArmDFv2, LoadDriver) {
     mmio_buffer =
         fdf::MmioBuffer::Create(0, kMmioSize, std::move(dup_vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
     ASSERT_EQ(ZX_OK, mmio_buffer.status_value());
-    config.mmios[0] = fake_pdev::MmioInfo{.vmo = std::move(vmo), .size = kMmioSize};
+    config.mmios[0] = fdf::PDev::MmioInfo{.size = kMmioSize, .vmo = std::move(vmo)};
   }
 
   async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment{
