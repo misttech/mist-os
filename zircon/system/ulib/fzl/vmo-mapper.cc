@@ -217,15 +217,15 @@ zx_status_t VmoMapper::InternalMap(const fbl::RefPtr<VmObjectDispatcher>& vmo, u
     return ZX_ERR_INVALID_ARGS;
   }
 
-  bool do_map_range = false;
-  if (map_options & ZX_VM_MAP_RANGE) {
-    do_map_range = true;
-    map_options &= ~ZX_VM_MAP_RANGE;
-  }
+  // bool do_map_range = false;
+  // if (map_options & ZX_VM_MAP_RANGE) {
+  //   do_map_range = true;
+  //   map_options &= ~ZX_VM_MAP_RANGE;
+  // }
 
-  if (do_map_range && (map_options & ZX_VM_SPECIFIC_OVERWRITE)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+  // if (do_map_range && (map_options & ZX_VM_SPECIFIC_OVERWRITE)) {
+  //   return ZX_ERR_INVALID_ARGS;
+  // }
 
   // Usermode is not allowed to specify these flags on mappings, though we may
   // set them below.
@@ -292,7 +292,7 @@ zx_status_t VmoMapper::InternalMap(const fbl::RefPtr<VmObjectDispatcher>& vmo, u
       (vmar_manager == nullptr) ? VmAspace::kernel_aspace()->RootVmar() : vmar_manager->vmar();
 
   zx::result<VmAddressRegionDispatcher::MapResult> map_result = vmar->CreateVmMapping(
-      0, size, PAGE_SIZE_SHIFT, vmar_flags, vmo->vmo(), offset, arch_mmu_flags, "vmo-mapper");
+      0, size, alignment, vmar_flags, vmo->vmo(), offset, arch_mmu_flags, "vmo-mapper");
 
   if (map_result.is_error()) {
     return map_result.status_value();

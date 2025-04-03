@@ -7,7 +7,6 @@
 
 #include <zircon/types.h>
 
-#include <memory>
 #include <utility>
 
 #include <fbl/macros.h>
