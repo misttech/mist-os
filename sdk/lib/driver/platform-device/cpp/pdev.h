@@ -141,10 +141,9 @@ namespace internal {
 //    return zx::ok(test_harness->fake_mmio());
 //  }
 //
-//  Note that if you are using `//src/devices/testing/fake-pdev`, it provides and implementation of
-//  this functionality for you and you should instead invoke it's
-//  `set_mmio(uint32_t index, fdf::MmioBuffer mmio)` method instead.
-//
+// Note that if you are using `//sdk/lib/driver/fake-platform-device/cpp`, it provides an
+// implementation of this functionality for you and you should instead invoke it's
+// `set_mmio(uint32_t index, fdf::MmioBuffer mmio)` method.
 zx::result<fdf::MmioBuffer> PDevMakeMmioBufferWeak(PDev::MmioInfo& pdev_mmio,
                                                    uint32_t cache_policy);
 }  // namespace internal
