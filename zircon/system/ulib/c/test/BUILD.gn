@@ -24,7 +24,7 @@ group("tests") {
 
 group("bootfs-tests") {
   testonly = true
-  deps = [ "sanitizer" ]
+  deps = [ "sanitizer:bootfs-tests" ]
 }
 
 group("boot_tests") {

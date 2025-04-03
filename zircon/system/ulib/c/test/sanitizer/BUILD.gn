@@ -5,89 +5,10 @@
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
-# Define a target that expects the lsan runtime to be provided. If the lsan
-# runtime is provided, this will create the target type normally and append
-# various deps to the targets current deps. See below for what extra deps
-# can be defined. The lsan runtime is provided if either the target is built
-# using a toolchain with the "lsan" variant tag (meaning the lsan runtime is
-# already provided), or both the "lsan" and "replaces-allocator" tags are not
-# in the toolchain variant tags (meaning the lsan isn't present, but this lsan
-# can be explicitly added as a config).
-#
-# Parameters:
-#
-#   target_type:
-#     Required: Name of the GN template that will be invoked to instantiate
-#     this target ("test", "executable", etc.).
-#
-template("lsan_target") {
-  # These are the deps that will be forwarded if lsan can be used.
-  _extra_deps = [
-    "data_deps",
-    "sources",
-  ]
-  _configs = []
+bootfs_tests = []
 
-  if (toolchain_variant.tags + [ "lsan" ] - [ "lsan" ] !=
-      toolchain_variant.tags) {
-    # The variant has lsan.
-    using_lsan = true
-  } else if (toolchain_variant.tags + [ "replaces-allocator" ] -
-             [ "replaces-allocator" ] != toolchain_variant.tags) {
-    # The variant does not have lsan but replaces C/C++ memory allocation APIs.
-    # HWASan falls under this case.
-    using_lsan = false
-  } else {
-    # Neither replaces-allocator not lsan is defined. We can just add the lsan
-    # config and build the test normally.
-    _configs += [ "//build/config/sanitizers:lsan" ]
-    using_lsan = true
-  }
-
-  # LSan requires frame pointers.  First make sure that none of the related
-  # configs is in the list, then add the one enabling frame pointers.
-  if (using_lsan) {
-    fp_configs = [
-      "//build/config:default_frame_pointers",
-      "//build/config:frame_pointers",
-      "//build/config:no_frame_pointers",
-    ]
-    _configs += fp_configs
-    _configs -= fp_configs
-    _configs += [ "//build/config:frame_pointers" ]
-  }
-
-  target(invoker.target_type, target_name) {
-    forward_variables_from(invoker, "*", [ "target_type" ] + _extra_deps)
-    if (using_lsan) {
-      forward_variables_from(invoker, _extra_deps)
-    }
-
-    if (defined(configs)) {
-      configs += _configs
-    } else {
-      configs = _configs
-    }
-  }
-}
-
-group("sanitizer") {
-  testonly = true
-  deps = [
-    ":hwasan-ctor-order-bootfs-test",
-    ":lsan-bootfs-test",
-    ":sanitizer-allocator-bootfs-test",
-    ":sanitizer-utils-bootfs-test",
-  ]
-}
-
+bootfs_tests += [ "sanitizer-utils-test" ]
 test("sanitizer-utils-test") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   sources = [ "sanitizer-utils.cc" ]
   deps = [
     ":memory-snapshot-test",
@@ -107,8 +28,9 @@ test("sanitizer-utils-test") {
 
 executable("sanitizer-exit-hook-test-helper") {
   visibility = [ ":*" ]
+  testonly = true
+
   sources = [ "exit-hook-test-helper.cc" ]
-  configs -= [ "//build/config/fuchsia:fdio_config" ]
   exclude_toolchain_tags = [ "instrumentation-runtime" ]
 }
 
@@ -117,10 +39,10 @@ executable("sanitizer-module-loaded-test-helper") {
   testonly = true
 
   sources = [ "module-loaded-test-helper.cc" ]
-  configs -= [ "//build/config/fuchsia:fdio_config" ]
-  exclude_toolchain_tags = [ "instrumentation-runtime" ]
   deps = [ ":sanitizer-module-loaded-test-needed-dso" ]
   data_deps = [ ":sanitizer-module-loaded-test-dlopen-dso" ]
+
+  exclude_toolchain_tags = [ "instrumentation-runtime" ]
 
   # The linker can omit some symbols from the .dynsym since it's an executable and
   # might not be able to find instances it links against at build time where this
@@ -155,6 +77,8 @@ shared_library("sanitizer-module-loaded-test-dlopen-needed-dso") {
 
 source_set("memory-snapshot-test") {
   visibility = [ ":*" ]
+  testonly = true
+
   sources = [ "memory-snapshot-test.cc" ]
   deps = [
     ":sanitizer-memory-snapshot-test-needed-dso",
@@ -173,45 +97,24 @@ source_set("memory-snapshot-test") {
   deps += [ "//build/config/sanitizers:suppress-asan-stack-use-after-return" ]
 }
 
-shared_library("ctor-order-test-no-deps-dso") {
+shared_library("sanitizer-memory-snapshot-test-needed-dso") {
   visibility = [ ":*" ]
-
-  sources = [ "no-deps.cc" ]
   testonly = true
+
+  sources = [ "sanitizer-memory-snapshot-test-needed-dso.cc" ]
 }
 
-shared_library("ctor-order-test-interposable-dso") {
+shared_library("sanitizer-memory-snapshot-test-dlopen-dso") {
   visibility = [ ":*" ]
-
-  sources = [ "interposable.cc" ]
   testonly = true
+
+  sources = [ "sanitizer-memory-snapshot-test-dlopen-dso.cc" ]
 }
 
-shared_library("ctor-order-test-interposable-weak-dso") {
-  visibility = [ ":*" ]
-
-  sources = [ "interposable-weak.cc" ]
-  testonly = true
-}
-
-shared_library("ctor-order-test-no-interposing-dso") {
-  visibility = [ ":*" ]
-
-  sources = [ "no-interposing.cc" ]
-  deps = [ ":ctor-order-test-interposable-dso" ]
-  testonly = true
-}
-
-shared_library("ctor-order-test-interposing-dso") {
-  visibility = [ ":*" ]
-
-  sources = [ "interposing.cc" ]
-  deps = [ ":ctor-order-test-interposable-dso" ]
-  testonly = true
-}
-
+bootfs_tests += [ "hwasan-ctor-order-test" ]
 test("hwasan-ctor-order-test") {
   visibility = [ ":*" ]
+  testonly = true
 
   sources = [ "hwasan-ctor-order.cc" ]
   data_deps = [
@@ -222,62 +125,113 @@ test("hwasan-ctor-order-test") {
     ":ctor-order-test-no-interposing-dso",
   ]
   deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+shared_library("ctor-order-test-no-deps-dso") {
+  visibility = [ ":*" ]
+
+  sources = [ "no-deps.cc" ]
   testonly = true
 }
 
-bootfs_test("hwasan-ctor-order-bootfs-test") {
-  name = "hwasan-ctor-order-test"
-  deps = [ ":hwasan-ctor-order-test" ]
-}
-
-shared_library("sanitizer-memory-snapshot-test-needed-dso") {
+shared_library("ctor-order-test-interposable-dso") {
   visibility = [ ":*" ]
-  sources = [ "sanitizer-memory-snapshot-test-needed-dso.cc" ]
-}
-
-shared_library("sanitizer-memory-snapshot-test-dlopen-dso") {
-  visibility = [ ":*" ]
-  sources = [ "sanitizer-memory-snapshot-test-dlopen-dso.cc" ]
-}
-
-lsan_target("lsan-test") {
-  target_type = "test"
-  deps = [
-    "//zircon/system/ulib/explicit-memory",
-    "//zircon/system/ulib/zxtest",
-  ]
-
-  # Note that if lsan is not available, this will result in an empty test where
-  # main is provided by zxtest.
-  sources = [ "lsan-test.cc" ]
-  data_deps = [ ":lsan-thread-race-test" ]
-}
-
-lsan_target("lsan-thread-race-test") {
-  target_type = "executable"
   testonly = true
-  sources = [ "lsan-thread-race-test.cc" ]
+
+  sources = [ "interposable.cc" ]
 }
 
-bootfs_test("sanitizer-utils-bootfs-test") {
-  name = "sanitizer-utils-test"
-  deps = [ ":sanitizer-utils-test" ]
+shared_library("ctor-order-test-interposable-weak-dso") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "interposable-weak.cc" ]
 }
 
-bootfs_test("lsan-bootfs-test") {
-  name = "lsan-test"
-  deps = [ ":lsan-test" ]
+shared_library("ctor-order-test-no-interposing-dso") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "no-interposing.cc" ]
+  deps = [ ":ctor-order-test-interposable-dso" ]
 }
 
-bootfs_test("sanitizer-allocator-bootfs-test") {
-  name = "sanitizer-allocator-test"
-  deps = [ ":sanitizer-allocator-test" ]
+shared_library("ctor-order-test-interposing-dso") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "interposing.cc" ]
+  deps = [ ":ctor-order-test-interposable-dso" ]
 }
 
+bootfs_tests += [ "sanitizer-allocator-test" ]
 test("sanitizer-allocator-test") {
   deps = [
     "//sdk/lib/tbi",
     "//zircon/system/ulib/zxtest",
   ]
   sources = [ "sanitizer-allocator-test.cc" ]
+}
+
+fp_related_configs = [
+  "//build/config:default_frame_pointers",
+  "//build/config:frame_pointers",
+  "//build/config:no_frame_pointers",
+]
+lsan_configs = [ "//build/config:frame_pointers" ]
+
+if (toolchain_variant.tags + [ "lsan" ] - [ "lsan" ] !=
+    toolchain_variant.tags) {
+  # The variant has lsan.
+} else if (toolchain_variant.tags + [ "replaces-allocator" ] -
+           [ "replaces-allocator" ] != toolchain_variant.tags) {
+  # The variant does not have lsan but replaces C/C++ memory allocation APIs.
+  # HWASan falls under this case.
+  lsan_configs = false
+} else {
+  # Neither replaces-allocator nor lsan is in tags.  We can just add the lsan
+  # config and build the test normally.
+  lsan_configs += [ "//build/config/sanitizers:lsan" ]
+}
+
+if (lsan_configs != false) {
+  bootfs_tests += [ "lsan-test" ]
+  test("lsan-test") {
+    configs += fp_related_configs
+    configs -= fp_related_configs
+    configs += lsan_configs
+
+    sources = [ "lsan-test.cc" ]
+    deps = [
+      "//zircon/system/ulib/explicit-memory",
+      "//zircon/system/ulib/zxtest",
+    ]
+
+    data_deps = [ ":lsan-thread-race-test" ]
+  }
+
+  executable("lsan-thread-race-test") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    configs += fp_related_configs
+    configs -= fp_related_configs
+    configs += lsan_configs
+    sources = [ "lsan-thread-race-test.cc" ]
+  }
+}
+
+foreach(test, bootfs_tests) {
+  bootfs_test("$test.bootfs") {
+    name = test
+    deps = [ ":$test" ]
+  }
+}
+
+group("bootfs-tests") {
+  testonly = true
+  deps = []
+  foreach(test, bootfs_tests) {
+    deps += [ ":$test.bootfs" ]
+  }
 }
