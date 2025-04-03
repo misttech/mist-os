@@ -4114,7 +4114,7 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
         let (eth, ip, tcp, _frame) = frames.next().await.unwrap();
         assert!(tcp.syn_set());
 
-        // Send a SYN/ACK in response, and wait for the ACK response.
+        // Send a SYN/ACK in response.
         let ethernet_builder = EthernetFrameBuilder::new(
             eth.dst_mac(),
             eth.src_mac(),
@@ -4149,7 +4149,15 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
             .expect("serialize SYN/ACK")
             .unwrap_b();
         fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
-        let _ack = frames.next().await.unwrap();
+
+        // Wait for the ACK response, skipping any other packets (such as retransmitted
+        // SYNs).
+        loop {
+            let (_eth, _ip, tcp, _frame) = frames.next().await.unwrap();
+            if tcp.ack_num().is_some() {
+                break;
+            }
+        }
 
         // Now that the connection is established, respond to the next packet with an
         // ICMP error indicating the packet was too big and providing a lower MTU.
