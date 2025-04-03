@@ -316,6 +316,16 @@ mod sack_block {
             }
         }
 
+        /// Creates a new [`SackBlock`] without checking that `right` is
+        /// strictly after `left`.
+        ///
+        /// # Safety
+        ///
+        /// Caller must guarantee that `right.after(left)`.
+        pub unsafe fn new_unchecked(left: SeqNum, right: SeqNum) -> Self {
+            Self { left, right }
+        }
+
         /// Consumes this [`SackBlock`] returning a [`Range`] representation.
         pub fn into_range(self) -> Range<SeqNum> {
             let Self { left, right } = self;

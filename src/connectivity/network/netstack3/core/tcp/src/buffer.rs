@@ -6,7 +6,7 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
-use netstack3_base::{Payload, SackBlock, SackBlocks, SeqNum};
+use netstack3_base::{Payload, SackBlocks, SeqNum};
 
 use arrayvec::ArrayVec;
 use core::fmt::Debug;
@@ -159,13 +159,11 @@ impl Assembler {
 
         let Self { outstanding, nxt, generation } = self;
         *generation = *generation + 1;
-        outstanding.insert(start..end, *generation);
+        let _: bool = outstanding.insert(start..end, *generation);
 
-        if let Some(advanced) = outstanding.pop_front_if(|r| r.range.start == *nxt) {
-            *nxt = advanced.range.end;
-            // The following unwrap is safe because it is invalid to have
-            // have a range where `end` is before `start`.
-            usize::try_from(advanced.range.end - advanced.range.start).unwrap()
+        if let Some(advanced) = outstanding.pop_front_if(|r| r.start() == *nxt) {
+            *nxt = advanced.end();
+            usize::try_from(advanced.len()).unwrap()
         } else {
             0
         }
@@ -201,7 +199,7 @@ impl Assembler {
         let mut heap = ArrayVec::<&SeqRange<_>, { SackBlocks::MAX_BLOCKS }>::new();
         for block in outstanding.iter() {
             if heap.is_full() {
-                if heap.last().is_some_and(|l| l.meta < block.meta) {
+                if heap.last().is_some_and(|l| l.meta() < block.meta()) {
                     // New block is later than the earliest block in the heap.
                     let _: Option<_> = heap.pop();
                 } else {
@@ -213,13 +211,10 @@ impl Assembler {
 
             heap.push(block);
             // Sort heap larger generation to lower.
-            heap.sort_by(|a, b| b.meta.cmp(&a.meta))
+            heap.sort_by(|a, b| b.meta().cmp(&a.meta()))
         }
 
-        SackBlocks::from_iter(heap.into_iter().map(|block| {
-            // Assembler is guaranteed to be in order, unwrap is safe.
-            SackBlock::try_new(block.range.start, block.range.end).unwrap()
-        }))
+        SackBlocks::from_iter(heap.into_iter().map(|block| block.to_sack_block()))
     }
 }
 
@@ -806,7 +801,7 @@ mod test {
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 5, end: 10 }]
         => Assembler {
             outstanding: [
-                SeqRange{ range: Range { start: SeqNum::new(5), end: SeqNum::new(15) }, meta: 2 },
+                SeqRange::new(SeqNum::new(5)..SeqNum::new(15), 2).unwrap()
             ].into_iter().collect(),
             nxt: SeqNum::new(0),
             generation: 2,
@@ -819,7 +814,7 @@ mod test {
     #[test_case([Range{ start: 10, end: 15 }, Range { start: 10, end: 15 }, Range { start: 11, end: 12 }]
         => Assembler {
              outstanding: [
-                SeqRange{ range: Range { start: SeqNum::new(10), end: SeqNum::new(15) }, meta: 3 }
+                SeqRange::new(SeqNum::new(10)..SeqNum::new(15), 3).unwrap()
             ].into_iter().collect(),
             nxt: SeqNum::new(0), generation: 3 })]
     fn assembler_examples(ops: impl IntoIterator<Item = Range<u32>>) -> Assembler {

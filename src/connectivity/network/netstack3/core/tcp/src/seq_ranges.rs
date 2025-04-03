@@ -35,34 +35,12 @@ impl<M> SeqRanges<M> {
         }
     }
 
-    /// Inserts `range` into this tracking structure.
-    ///
-    /// No-op if the range is empty.
-    ///
-    /// `meta` is attached to the newly created range and all the ranges it
-    /// touches, including if `range` is a subset of a currently tracked range.
-    pub(crate) fn insert(&mut self, range: Range<SeqNum>, meta: M)
-    where
-        M: Clone,
-    {
-        let Range { mut start, mut end } = range;
-        let Self { blocks } = self;
-
-        if start == end {
-            return;
-        }
-
-        if blocks.is_empty() {
-            blocks.push_back(SeqRange { range: Range { start, end }, meta });
-            return;
-        }
-
-        // Search for the first segment whose `start` is greater.
-        let first_after = match blocks.binary_search_by(|block| {
-            if block.range.start == start {
+    fn find_first_after(blocks: &mut VecDeque<SeqRange<M>>, start: SeqNum) -> usize {
+        match blocks.binary_search_by(|block| {
+            if block.start() == start {
                 return core::cmp::Ordering::Equal;
             }
-            if block.range.start.before(start) {
+            if block.start().before(start) {
                 core::cmp::Ordering::Less
             } else {
                 core::cmp::Ordering::Greater
@@ -79,58 +57,97 @@ impl<M> SeqRanges<M> {
                 // next greater range.
                 e
             }
+        }
+    }
+
+    /// Inserts `range` into this tracking structure.
+    ///
+    /// No-op if the range is empty.
+    ///
+    /// `meta` is attached to the newly created range and all the ranges it
+    /// touches, including if `range` is a subset of a currently tracked range.
+    ///
+    /// Returns `true` iff `range` insertion increases the total number of
+    /// tracked bytes contained in `SeqRanges`.
+    pub(crate) fn insert(&mut self, range: Range<SeqNum>, meta: M) -> bool
+    where
+        M: Clone,
+    {
+        let Some(range) = SeqRange::new(range, meta) else {
+            return false;
         };
+        self.insert_seq_range(range)
+    }
+
+    fn insert_seq_range(&mut self, mut range: SeqRange<M>) -> bool
+    where
+        M: Clone,
+    {
+        let Self { blocks } = self;
+
+        if blocks.is_empty() {
+            blocks.push_back(range);
+            return true;
+        }
+
+        // Search for the first segment whose `start` is greater.
+        let first_after = Self::find_first_after(blocks, range.start());
 
         let mut merge_right = 0;
         for block in blocks.range(first_after..blocks.len()) {
-            if end.before(block.range.start) {
-                break;
-            }
-            merge_right += 1;
-            if end.before(block.range.end) {
-                end = block.range.end;
-                break;
+            match range.merge_right(block) {
+                MergeRightResult::Before => break,
+                MergeRightResult::After { merged } => {
+                    merge_right += 1;
+                    if merged {
+                        break;
+                    }
+                }
             }
         }
 
-        let mut merge_left = 0;
-        for block in blocks.range(0..first_after).rev() {
-            if start.after(block.range.end) {
-                break;
+        // Given we're always sorted and we know the first range strictly after
+        // the inserting one, we only need to check to the left once.
+        let merge_left = match first_after
+            .checked_sub(1)
+            .and_then(|first_before| blocks.get_mut(first_before))
+        {
+            Some(block) => {
+                match block.merge_right(&range) {
+                    MergeRightResult::Before => 0,
+                    MergeRightResult::After { merged } => {
+                        if merged {
+                            range.clone_range_from(&block);
+                            1
+                        } else {
+                            // The new range fits entirely within an existing
+                            // block. Update the metadata and return early.
+                            block.set_meta(range.into_meta());
+                            return false;
+                        }
+                    }
+                }
             }
-            // There is no guarantee that `end.after(range.end)`, not doing
-            // the following may shrink existing coverage. For example:
-            // range.start = 0, range.end = 10, start = 0, end = 1, will result
-            // in only 0..1 being tracked in the resulting assembler. We didn't
-            // do the symmetrical thing above when merging to the right because
-            // the search guarantees that `start.before(range.start)`, thus the
-            // problem doesn't exist there. The asymmetry rose from the fact
-            // that we used `start` to perform the search.
-            if end.before(block.range.end) {
-                end = block.range.end;
-            }
-            merge_left += 1;
-            if start.after(block.range.start) {
-                start = block.range.start;
-                break;
-            }
-        }
+            None => 0,
+        };
 
         if merge_left == 0 && merge_right == 0 {
             // If the new segment cannot merge with any of its neighbors, we
             // add a new entry for it.
-            blocks.insert(first_after, SeqRange { range: Range { start, end }, meta });
+            blocks.insert(first_after, range);
         } else {
             // Otherwise, we put the new segment at the left edge of the merge
             // window and remove all other existing segments.
             let left_edge = first_after - merge_left;
             let right_edge = first_after + merge_right;
-            blocks[left_edge] = SeqRange { range: Range { start, end }, meta };
+            blocks[left_edge] = range;
             for i in right_edge..blocks.len() {
                 blocks[i - merge_left - merge_right + 1] = blocks[i].clone();
             }
             blocks.truncate(blocks.len() - merge_left - merge_right + 1);
         }
+
+        true
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &SeqRange<M>> + '_ {
@@ -141,20 +158,92 @@ impl<M> SeqRanges<M> {
 impl<M: Clone> FromIterator<SeqRange<M>> for SeqRanges<M> {
     fn from_iter<T: IntoIterator<Item = SeqRange<M>>>(iter: T) -> Self {
         let mut ranges = SeqRanges::default();
-        for SeqRange { range, meta } in iter {
-            ranges.insert(range, meta)
+        for range in iter {
+            let _: bool = ranges.insert_seq_range(range);
         }
         ranges
     }
 }
 
-/// A range kept in [`SeqRanges`].
-#[derive(Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct SeqRange<M> {
-    pub(crate) range: Range<SeqNum>,
-    pub(crate) meta: M,
+mod range {
+    use netstack3_base::SackBlock;
+
+    use super::*;
+
+    /// A range kept in [`SeqRanges`].
+    #[derive(Debug, Clone)]
+    #[cfg_attr(test, derive(PartialEq, Eq))]
+    pub(crate) struct SeqRange<M> {
+        range: Range<SeqNum>,
+        meta: M,
+    }
+
+    impl<M> SeqRange<M> {
+        pub(crate) fn new(range: Range<SeqNum>, meta: M) -> Option<Self> {
+            range.end.after(range.start).then(|| Self { range, meta })
+        }
+
+        pub(crate) fn start(&self) -> SeqNum {
+            self.range.start
+        }
+
+        pub(crate) fn end(&self) -> SeqNum {
+            self.range.end
+        }
+
+        pub(crate) fn set_meta(&mut self, meta: M) {
+            self.meta = meta;
+        }
+
+        pub(crate) fn meta(&self) -> &M {
+            &self.meta
+        }
+
+        pub(crate) fn into_meta(self) -> M {
+            self.meta
+        }
+
+        pub(super) fn clone_range_from(&mut self, other: &Self) {
+            let Self { range, meta: _ } = self;
+            *range = other.range.clone();
+        }
+
+        pub(crate) fn len(&self) -> u32 {
+            let Self { range: Range { start, end }, meta: _ } = self;
+            let len = *end - *start;
+            // Assert on SeqRange invariant in debug only.
+            debug_assert!(len >= 0);
+            len as u32
+        }
+
+        pub(crate) fn to_sack_block(&self) -> SackBlock {
+            let Self { range: Range { start, end }, meta: _ } = self;
+            // SAFETY: SackBlock requires that end is after start, which is the
+            // same invariant held by SeqRange.
+            unsafe { SackBlock::new_unchecked(*start, *end) }
+        }
+
+        pub(super) fn merge_right(&mut self, other: &Self) -> MergeRightResult {
+            if self.range.end.before(other.range.start) {
+                return MergeRightResult::Before;
+            }
+
+            let merged = self.range.end.before(other.range.end);
+            if merged {
+                self.range.end = other.range.end;
+            }
+
+            MergeRightResult::After { merged }
+        }
+    }
+
+    pub(super) enum MergeRightResult {
+        Before,
+        After { merged: bool },
+    }
 }
+use range::MergeRightResult;
+pub(crate) use range::SeqRange;
 
 #[cfg(test)]
 mod test {
@@ -162,11 +251,18 @@ mod test {
 
     use alloc::format;
 
-    use netstack3_base::WindowSize;
+    use netstack3_base::{SackBlock, WindowSize};
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
     use proptest::{prop_assert, prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
+
+    impl SeqRanges<()> {
+        fn insert_u32(&mut self, range: Range<u32>) -> bool {
+            let Range { start, end } = range;
+            self.insert(SeqNum::new(start)..SeqNum::new(end), ())
+        }
+    }
 
     proptest! {
         #![proptest_config(Config {
@@ -194,19 +290,29 @@ mod test {
                 // assert that it's impossible to have more entries than the
                 // number of insertions performed.
                 prop_assert!(seq_ranges.blocks.len() <= num_insertions_performed);
-                seq_ranges.insert(start..end, ());
+                let _: bool = seq_ranges.insert(start..end, ());
                 num_insertions_performed += 1;
 
                 // assert that the ranges are sorted and don't overlap with
                 // each other.
                 for i in 1..seq_ranges.blocks.len() {
                     prop_assert!(
-                        seq_ranges.blocks[i-1].range.end.before(seq_ranges.blocks[i].range.start)
+                        seq_ranges.blocks[i-1].end().before(seq_ranges.blocks[i].start())
                     );
                 }
             }
-            prop_assert_eq!(seq_ranges.blocks.front().unwrap().range.start, min_seq);
-            prop_assert_eq!(seq_ranges.blocks.back().unwrap().range.end, max_seq);
+            prop_assert_eq!(seq_ranges.blocks.front().unwrap().start(), min_seq);
+            prop_assert_eq!(seq_ranges.blocks.back().unwrap().end(), max_seq);
+        }
+
+        // Test that the invariants between SackBlock and SeqRange creation
+        // match. Supports unsafe block in SeqRange::to_sack_block.
+        #[test]
+        fn seq_range_to_sack_block((start, end) in sequence_numbers()) {
+            prop_assert_eq!(
+                SeqRange::new(start..end, ()).map(|sr| sr.to_sack_block()),
+                SackBlock::try_new(start, end).ok()
+            );
         }
     }
 
@@ -216,5 +322,30 @@ mod test {
                 Just(Range { start: SeqNum::new(start), end: SeqNum::new(end) })
             })
         })
+    }
+
+    fn sequence_numbers() -> impl Strategy<Value = (SeqNum, SeqNum)> {
+        (0u32..5).prop_flat_map(|start| {
+            (0u32..5).prop_flat_map(move |end| Just((SeqNum::new(start), SeqNum::new(end))))
+        })
+    }
+
+    #[test]
+    fn insert_return() {
+        let mut sr = SeqRanges::default();
+        assert!(sr.insert_u32(10..20));
+
+        assert!(!sr.insert_u32(10..20));
+        assert!(!sr.insert_u32(11..20));
+        assert!(!sr.insert_u32(11..12));
+        assert!(!sr.insert_u32(19..20));
+
+        assert!(sr.insert_u32(0..5));
+        assert!(sr.insert_u32(25..35));
+        assert!(sr.insert_u32(5..7));
+        assert!(sr.insert_u32(22..25));
+
+        assert!(sr.insert_u32(7..22));
+        assert!(!sr.insert_u32(0..35));
     }
 }
