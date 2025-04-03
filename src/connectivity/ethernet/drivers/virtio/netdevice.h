@@ -24,8 +24,6 @@
 #include <kernel/brwlock.h>
 #include <virtio/net.h>
 
-#include "src/connectivity/lib/network-device/buffer_descriptor/buffer_descriptor.h"
-#include "src/connectivity/network/drivers/network-device/device/data_structs.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace virtio {

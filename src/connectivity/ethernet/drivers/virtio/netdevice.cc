@@ -105,6 +105,11 @@ zx_status_t NetworkDevice::Init() {
   static_assert(sizeof(config.mac) == sizeof(mac_.octets));
   std::ranges::copy(config.mac, std::begin(mac_.octets));
 
+  if (zx_status_t status = vmo_store_.Reserve(MAX_VMOS); status != ZX_OK) {
+    LTRACEF("failed to initialize vmo store: %s\n", zx_status_get_string(status));
+    return status;
+  }
+
   tx_depth_ = ktl::min(GetRingSize(kTxId), kMaxDepth);
   rx_depth_ = ktl::min(GetRingSize(kRxId), kMaxDepth);
 
