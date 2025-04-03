@@ -18,7 +18,9 @@ use fidl_fuchsia_ui_pointer::{
 use futures::StreamExt as _;
 use starnix_core::power::create_proxy_for_wake_events_counter;
 use starnix_core::task::Kernel;
-use starnix_logging::log_warn;
+use starnix_logging::{
+    log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_end,
+};
 use starnix_sync::Mutex;
 use starnix_types::time::timeval_from_time;
 use starnix_uapi::uapi;
@@ -216,6 +218,20 @@ impl InputEventsRelay {
 
                 match watch_future.await {
                     Ok(touch_events) => {
+                        trace_duration!(c"input", c"starnix_process_touch_event");
+                        for e in &touch_events {
+                            match e.trace_flow_id {
+                                Some(trace_flow_id)=>{
+                                    trace_flow_end!(
+                                        c"input",
+                                        c"dispatch_event_to_app",
+                                        trace_flow_id.into());
+                                }
+                                None => {
+                                    log_warn!("touch event has not tracing id");
+                                }
+                            }
+                        }
                         // TODO(https://fxbug.dev/365571169): record received event count by device,
                         // and use `num_received_events` in another inspect node.
                         let num_received_events: u64 = touch_events.len().try_into().unwrap();
@@ -231,6 +247,8 @@ impl InputEventsRelay {
                         num_ignored_events += ignored_events;
 
                         for (device_id, events) in events_by_device {
+                            trace_duration_begin!(c"input", c"starnix_process_per_device_touch_event");
+
                             let mut devs = slf.devices.lock();
 
                             let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
@@ -248,6 +266,7 @@ impl InputEventsRelay {
                                 num_unexpected_events += batch.count_unexpected_fidl_events;
                                 last_event_time_ns = batch.last_event_time_ns;
                             } else {
+                                trace_duration_end!(c"input", c"starnix_process_per_device_touch_event");
                                 log_warn!("Non touch device received touch events: device_id = {}, device_type = {}", device_id, dev.device_type);
                                 continue;
                             }
@@ -265,6 +284,7 @@ impl InputEventsRelay {
                                 log_warn!("unable to record inspect for device_id: {}, device_type: {}", device_id, dev.device_type);
                             }
 
+                            trace_duration_end!(c"input", c"starnix_process_per_device_touch_event");
                             dev.open_files.lock().retain(|f| {
                                 let Some(file) = f.upgrade() else {
                                     log_warn!("Dropping input file for touch that failed to upgrade");
