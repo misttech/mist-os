@@ -914,6 +914,7 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
 bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
+  __UNINITIALIZED DeferredOps deferred(this);
   Guard<VmoLockType> guard{lock()};
 
   // Forbid zero page deduping if this is high priority.
@@ -958,13 +959,12 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     __UNINITIALIZED auto result =
         BeginAddPageWithSlotLocked(offset, page_or_marker, CanOverwriteContent::NonZero);
     DEBUG_ASSERT(result.is_ok());
-    __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
     VmPageOrMarker old_page = CompleteAddPageLocked(*result, VmPageOrMarker::Marker(), &deferred);
     DEBUG_ASSERT(old_page.IsPage());
 
     // Free the old page.
     vm_page_t* released_page = old_page.ReleasePage();
-    RemoveAndFreePageLocked(released_page);
+    RemovePageLocked(released_page, deferred);
 
     reclamation_event_count_++;
     VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
