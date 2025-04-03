@@ -13,10 +13,6 @@ pub mod macro_deps {
 pub const BUG_REPORT_URL: &str =
     "https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957";
 
-/// Trait to define requiring IntoExitCode and Error traits.
-/// This is used to hold the source of the error.
-pub trait SourceError: IntoExitCode + std::error::Error {}
-
 /// The ffx main function expects a anyhow::Result from ffx plugins. If the Result is an Err it be
 /// downcast to FfxError, and if successful this error is presented as a user-readable error. All
 /// other error types are printed with full context and a BUG prefix, guiding the user to file bugs
@@ -31,17 +27,27 @@ pub enum FfxError {
     TestingError, // this is here to be used in tests for verifying errors are translated properly.
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", .err)]
-    DaemonError { err: Box<dyn SourceError + Send + Sync>, target: Option<String> },
+    DaemonError { err: Box<dyn std::error::Error + Send + Sync>, target: Option<String> },
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", .err)]
-    OpenTargetError { err: Box<dyn SourceError + Send + Sync>, target: Option<String> },
+    OpenTargetError {
+        #[source]
+        err: Box<dyn std::error::Error + Send + Sync>,
+        target: Option<String>,
+        exit_code: i32,
+    },
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", .err)]
-    TunnelError { err: Box<dyn SourceError + Send + Sync>, target: Option<String> },
+    TunnelError {
+        #[source]
+        err: Box<dyn std::error::Error + Send + Sync>,
+        target: Option<String>,
+    },
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", .err)]
     TargetConnectionError {
-        err: Box<dyn SourceError + Send + Sync>,
+        #[source]
+        err: Box<dyn std::error::Error + Send + Sync>,
         target: Option<String>,
         logs: Option<String>,
     },
@@ -117,13 +123,13 @@ impl IntoExitCode for FfxError {
             FfxError::Error(_, code) => *code,
             FfxError::TestingError => 254,
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::DaemonError { err, target: _ } => err.exit_code(),
+            FfxError::DaemonError { .. } => 1,
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::OpenTargetError { err, target: _ } => err.exit_code(),
+            FfxError::OpenTargetError { exit_code, .. } => *exit_code,
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::TunnelError { err, target: _ } => err.exit_code(),
+            FfxError::TunnelError { .. } => 1,
             #[cfg(not(target_os = "fuchsia"))]
-            FfxError::TargetConnectionError { err, target: _, logs: _ } => err.exit_code(),
+            FfxError::TargetConnectionError { .. } => 1,
         }
     }
 }

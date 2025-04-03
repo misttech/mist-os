@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use errors::{FfxError, IntoExitCode, SourceError};
+use errors::{FfxError, IntoExitCode};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, OpenTargetError, TargetConnectionError, TunnelError,
 };
@@ -122,8 +122,6 @@ Please report it at https://fxbug.dev/new/ffx+User+Bug."
     .into()
 }
 
-impl SourceError for FfxTargetError {}
-
 impl IntoExitCode for FfxTargetError {
     fn exit_code(&self) -> i32 {
         match self {
@@ -148,9 +146,11 @@ impl Into<FfxError> for FfxTargetError {
             FfxTargetError::DaemonError { ref target, .. } => {
                 FfxError::DaemonError { err: Box::new(self.clone()), target: target.clone() }
             }
-            FfxTargetError::OpenTargetError { ref target, .. } => {
-                FfxError::OpenTargetError { err: Box::new(self.clone()), target: target.clone() }
-            }
+            FfxTargetError::OpenTargetError { ref target, .. } => FfxError::OpenTargetError {
+                err: Box::new(self.clone()),
+                target: target.clone(),
+                exit_code: self.exit_code(),
+            },
             FfxTargetError::TunnelError { ref target, .. } => {
                 FfxError::TunnelError { err: Box::new(self.clone()), target: target.clone() }
             }
