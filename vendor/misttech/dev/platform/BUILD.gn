@@ -13,6 +13,8 @@ zx_library("platform") {
     "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice_lib",
     "//src/devices/block/drivers/virtio:block_lib",
     "//src/devices/bus/lib/virtio",
+    "//vendor/misttech/src/connectivity/lib/network-device/cpp",
+    "//vendor/misttech/third_party/lwip",
     "//zircon/kernel/lib/init",
     "//zircon/system/ulib/virtio",
   ]

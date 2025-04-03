@@ -29,24 +29,25 @@ GetBtiAndBackend(platform_bus::PlatformBus* platform_bus, KernelHandle<PciDevice
 // is released to devmgr.
 template <class VirtioDevice, class = typename std::enable_if<
                                   std::is_base_of<virtio::Device, VirtioDevice>::value>::type>
-zx_status_t CreateAndBind(platform_bus::PlatformBus* platform_bus,
-                          KernelHandle<PciDeviceDispatcher> device, zx_pcie_device_info_t info) {
+ktl::unique_ptr<VirtioDevice> CreateAndBind(platform_bus::PlatformBus* platform_bus,
+                                            KernelHandle<PciDeviceDispatcher> device,
+                                            zx_pcie_device_info_t info) {
   auto bti_and_backend = GetBtiAndBackend(platform_bus, ktl::move(device), info);
   if (!bti_and_backend.is_ok()) {
-    return bti_and_backend.status_value();
+    dprintf(CRITICAL, "Failed to get BTI and backend %d\n", bti_and_backend.error_value());
+    return nullptr;
   }
   fbl::AllocChecker ac;
   auto dev = ktl::make_unique<VirtioDevice>(&ac, ktl::move(bti_and_backend.value().first),
                                             ktl::move(bti_and_backend.value().second));
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return nullptr;
   }
   zx_status_t status = dev->Init();
   if (status == ZX_OK) {
-    // devmgr is now in charge of the memory for dev
-    [[maybe_unused]] auto ptr = dev.release();
+    return ktl::move(dev);
   }
-  return status;
+  return nullptr;
 }
 
 }  // namespace virtio
