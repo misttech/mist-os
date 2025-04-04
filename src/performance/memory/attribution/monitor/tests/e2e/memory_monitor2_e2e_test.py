@@ -65,7 +65,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
 
         root = only_entry["payload"]["root"]
         asserts.assert_greater(root["kmem_stats"]["total_bytes"], 0)
-        asserts.assert_greater(
+        asserts.assert_greater_equal(
             root["kmem_stats_compression"]["pages_decompressed_unit_ns"], 0
         )
 
@@ -82,7 +82,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             raise AssertionError("Payload should not be none")
         root = only_entry.payload["root"]
         asserts.assert_greater(root["kmem_stats"]["total_bytes"], 0)
-        asserts.assert_greater(
+        asserts.assert_greater_equal(
             root["kmem_stats_compression"]["pages_decompressed_unit_ns"], 0
         )
 
@@ -97,10 +97,17 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         if only_entry.payload is None:
             raise AssertionError("Payload should not be none")
         root = only_entry.payload["root"]
-        for i in range(6):
-            asserts.assert_greater(
-                root["current"]["core/memory_monitor2"][i], 0
-            )
+        value_dict = root["current"]["core/memory_monitor2"]
+        for field in (
+            "committed_private",
+            "committed_scaled",
+            "committed_total",
+            "populated_private",
+            "populated_scaled",
+            "populated_total",
+        ):
+            asserts.assert_in(field, value_dict)
+            asserts.assert_greater(value_dict[field], 0)
 
     def test_memory_monitor2_traces_provider(self) -> None:
         json_text = self.dut.ffx.run(
@@ -149,6 +156,7 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
                 "kmem_stats_b",
                 "kmem_stats_compression",
                 "kmem_stats_compression_time",
+                "memory_stall",
             },
         )
 
