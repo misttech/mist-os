@@ -270,22 +270,16 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
       nullptr, DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                               \
       [&]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
 
-void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
-                                    bool expect_audio_svcs_not_connected,
-                                    bool enable_position_tests) {
+void RegisterPositionTestsForDevice(const DeviceEntry& device_entry) {
+  // Codec drivers have no RingBuffers, and thus require no position tests.
   if (device_entry.isCodec()) {
     return;
   }
-  // If audio_core is connected to the audio driver, admin tests will fail.
-  // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (device_entry.isA2DP() || expect_audio_svcs_not_connected) {
-    if (enable_position_tests) {
-      REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
-      REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
-      REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
-      REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
-    }
-  }
+
+  REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
+  REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
+  REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
+  REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
 }
 
 }  // namespace media::audio::drivers::test

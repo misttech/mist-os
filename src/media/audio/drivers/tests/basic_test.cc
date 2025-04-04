@@ -22,7 +22,7 @@ namespace media::audio::drivers::test {
 
 namespace {
 
-constexpr bool kLogGainValues = false;
+inline constexpr bool kLogGainValues = false;
 void LogGainState(std::string_view prologue,
                   const fuchsia::hardware::audio::GainState& gain_state) {
   if constexpr (kLogGainValues) {
