@@ -52,8 +52,10 @@ BT_SET_UP() {
   metrics_notice="${BT_TEMP_DIR}/metrics_notice"
   metrics_config_internal="${BT_TEMP_DIR}/Fuchsia/metrics/analytics-status-internal"
   metrics_config_external="${BT_TEMP_DIR}/Fuchsia/metrics/analytics-status"
-  BT_ASSERT_FILE_DOES_NOT_EXIST "${BT_TEMP_DIR}/.fx-metrics-config"
+  metrics_config_fx="${BT_TEMP_DIR}/.fx/config/metrics"
+  BT_ASSERT_FILE_DOES_NOT_EXIST "${metrics_config_fx}"
 
+  mkdir -p ${BT_TEMP_DIR}/.fx/config
   source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   source "${BT_TEMP_DIR}/tools/devshell/lib/metrics.sh"
   metrics-write-config 1 TESTUUID "${metrics_log}"
@@ -162,9 +164,9 @@ TEST_metrics_no_custom_track() {
 # We start with defining a few helper functions, and then there
 # will be a series of tests named in the form TEST_metrics_state_xyzw
 # where the values of x, y, z and w have the following meanings
-# x=N: .fx-metrics-config does not exist
-# x=0: METRICS_ENABLED=0 in .fx-metrics-config
-# x=1: METRICS_ENABLED=1 in .fx-metrics-config
+# x=N: .fx/config/metrics does not exist
+# x=0: METRICS_ENABLED=0 in .fx/config/metrics
+# x=1: METRICS_ENABLED=1 in .fx/config/metrics
 #
 # y=N: analytics-status does not exist
 # y=0: analytics-status has content 0
@@ -192,14 +194,14 @@ set_up_environment() {
 
   case "${fx_metrics_config}" in
     N)
-      rm -f "${BT_TEMP_DIR}/.fx-metrics-config"
+      rm -f "${metrics_config_fx}"
       if [[ "${is_internal}" == "1" && "${analytics_status_internal}" != "0" && "${analytics_status_internal}" != "N" ]]; then
         metrics-write-config-internal TESTUUID "${metrics_log}"
       fi
       ;;
     0)
       metrics-write-config-internal TESTUUID "${metrics_log}"
-      echo "METRICS_ENABLED=0" >> "${BT_TEMP_DIR}/.fx-metrics-config"
+      echo "METRICS_ENABLED=0" >> "${metrics_config_fx}"
       ;;
     1)
       metrics-write-config 1 TESTUUID "${metrics_log}"

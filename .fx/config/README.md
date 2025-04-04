@@ -9,3 +9,5 @@ Place configuration files that influence `fx` operation in this directory.
   Set by `fx build-metrics`, and used by `fx build`.
 * `build-profile` controls profiling local memory and network usage during
   build.  Set by `fx build-profile`, and used by `fx build`.
+* `metrics` controls per-tree behaviors of sending fx metrics to Google
+  Analytics.

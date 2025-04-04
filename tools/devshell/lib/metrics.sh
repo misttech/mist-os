@@ -178,7 +178,9 @@ _METRICS_TRACK_UNKNOWN_OPS=( "shell" )
 readonly _METRICS_GA_PROPERTY_ID _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
 
 # To properly enable unit testing, METRICS_CONFIG is not read-only
-METRICS_CONFIG="${FUCHSIA_DIR}/.fx-metrics-config"
+METRICS_CONFIG="${FUCHSIA_DIR}/.fx/config/metrics"
+# Old location of this file.  Will move to new location automatically.
+readonly METRICS_CONFIG_OLD="${FUCHSIA_DIR}/.fx-metrics-config"
 
 _METRICS_DEBUG=0
 _METRICS_DEBUG_LOG_FILE=""
@@ -475,6 +477,10 @@ function metrics-migrate-internal-users {
 }
 
 function metrics-read-and-validate {
+  if [[ -f "${METRICS_CONFIG_OLD}" ]]; then
+    fx-info "Moving ${METRICS_CONFIG_OLD} to new location ${METRICS_CONFIG}.  No further action is needed."
+    mv "${METRICS_CONFIG_OLD}" "${METRICS_CONFIG}"
+  fi
   if metrics-is-internal-user; then
     metrics-migrate-internal-users "$1"
     metrics-read-config-internal
