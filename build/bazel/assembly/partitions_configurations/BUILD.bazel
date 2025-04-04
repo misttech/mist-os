@@ -128,9 +128,6 @@ alias(
 fuchsia_partitions_configuration(
     name = "riscv64",
     hardware_revision = "riscv64",
-    partitions = [
-        ":zircon_r",
-    ],
 )
 
 fuchsia_partitions_configuration(

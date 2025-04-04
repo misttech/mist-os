@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use assembly_util::read_config;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
@@ -76,28 +76,6 @@ impl PartitionsConfig {
             bootloader.image = base_path.join(&bootloader.image);
         }
         Ok(config)
-    }
-
-    /// Determine which recovery style we will be using, and throw an error if we find both AB and R
-    /// style recoveries.
-    pub fn recovery_style(&self) -> Result<RecoveryStyle> {
-        let mut recovery_style = RecoveryStyle::NoRecovery;
-        for partition in &self.partitions {
-            if partition.slot() == Some(&Slot::R) {
-                if recovery_style == RecoveryStyle::AB {
-                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
-                }
-                recovery_style = RecoveryStyle::R;
-            }
-
-            if matches!(partition, Partition::RecoveryZBI { .. }) {
-                if recovery_style == RecoveryStyle::R {
-                    bail!("Partitions config cannot contain both AB and R slotted recoveries.");
-                }
-                recovery_style = RecoveryStyle::AB;
-            }
-        }
-        Ok(recovery_style)
     }
 }
 
@@ -278,17 +256,6 @@ impl std::fmt::Display for Slot {
         };
         write!(f, "{}", message)
     }
-}
-
-/// The style of recovery.
-#[derive(Debug, PartialEq)]
-pub enum RecoveryStyle {
-    /// No recovery images are present.
-    NoRecovery,
-    /// Recovery lives in a separate R slot.
-    R,
-    /// Recovery is updated alongside the "main" images in AB slots.
-    AB,
 }
 
 #[cfg(test)]
