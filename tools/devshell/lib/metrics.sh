@@ -824,6 +824,8 @@ function track-build-event {
     env_flags="${env_flags}-multi"
   fi
 
+  local -i args_json_size=$(wc -c < "${build_dir}"/args.json)
+
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
     --arg args_gn2 "${args_gn2}" \
@@ -838,6 +840,7 @@ function track-build-event {
     --argjson target_count "${target_count}" \
     --argjson is_clean_build "${is_clean_build}" \
     --arg env_flags "${env_flags}" \
+    --argjson args_json_size "${args_json_size}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "build" "${event_params}"
