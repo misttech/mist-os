@@ -9,4 +9,7 @@ readonly script="$0"
 # assume script is always with path prefix, e.g. "./$script"
 readonly script_dir="${script%/*}"
 
-exec "$script_dir"/build_summary.py --format=json "$@"
+# Get path to python interpreter.
+source "$script_dir"/common-setup.sh
+
+exec "$python" -S "$script_dir"/build_summary.py --format=json "$@"
