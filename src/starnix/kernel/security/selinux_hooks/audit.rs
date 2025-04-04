@@ -6,7 +6,7 @@ use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
 use starnix_core::task::{CurrentTask, Task};
-use starnix_core::vfs::{FileObject, FileSystem, FsNode};
+use starnix_core::vfs::{FileObject, FileSystem, FsNode, FsStr};
 use starnix_logging::{
     log_warn, BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY,
 };
@@ -41,6 +41,7 @@ pub(super) enum Auditable<'a> {
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
+    Name(&'a FsStr),
     Task(&'a Task),
     // keep-sorted end
 }
@@ -190,6 +191,9 @@ impl Display for Auditable<'_> {
             }
             Auditable::FileSystem(fs) => {
                 write!(f, " dev=\"{}\"", fs.options.source)
+            }
+            Auditable::Name(name) => {
+                write!(f, " name=\"{}\"", name)
             }
             Auditable::Task(task) => {
                 write!(f, " pid={}, comm={}", task.get_pid(), BStr::new(task.command().as_bytes()))

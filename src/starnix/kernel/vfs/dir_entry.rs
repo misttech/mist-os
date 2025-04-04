@@ -717,6 +717,8 @@ impl DirEntry {
                 &renamed.node,
                 &new_parent.node,
                 maybe_replaced.as_ref().map(|dir_entry| dir_entry.node.deref().as_ref()),
+                old_basename,
+                new_basename,
             )?;
 
             // We've found all the errors that we know how to find. Ask the

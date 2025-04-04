@@ -503,6 +503,7 @@ pub fn check_fs_node_unlink_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     child: &FsNode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_fs_node_unlink_access");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -511,6 +512,7 @@ pub fn check_fs_node_unlink_access(
             current_task,
             parent,
             child,
+            name,
         )
     })
 }
@@ -521,6 +523,7 @@ pub fn check_fs_node_rmdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     child: &FsNode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_fs_node_rmdir_access");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -529,6 +532,7 @@ pub fn check_fs_node_rmdir_access(
             current_task,
             parent,
             child,
+            name,
         )
     })
 }
@@ -543,6 +547,8 @@ pub fn check_fs_node_rename_access(
     moving_node: &FsNode,
     new_parent: &FsNode,
     replaced_node: Option<&FsNode>,
+    old_basename: &FsStr,
+    new_basename: &FsStr,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_fs_node_rename_access");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -553,6 +559,8 @@ pub fn check_fs_node_rename_access(
             moving_node,
             new_parent,
             replaced_node,
+            old_basename,
+            new_basename,
         )
     })
 }
