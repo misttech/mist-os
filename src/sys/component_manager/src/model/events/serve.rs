@@ -447,9 +447,9 @@ fn create_event_fidl_objects(event: Event) -> BoxStream<Result<fcomponent::Event
             target.strip_prefix(scope).expect("target must be a child of event scope").to_string()
         }
     };
-    let event_type = event.event.event_type();
+    let event_type = event.event.event_type().into();
     let header = fcomponent::EventHeader {
-        event_type: Some(event_type.into()),
+        event_type: Some(event_type),
         moniker: Some(moniker_string),
         component_url: Some(event.event.component_url.to_string()),
         timestamp: Some(event.event.timestamp),

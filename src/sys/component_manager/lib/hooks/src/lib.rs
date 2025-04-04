@@ -31,7 +31,7 @@ pub trait TransferEvent {
     async fn transfer(&self) -> Self;
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EventType {
     /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
     /// with the ServerEnd of the channel for the capability.
@@ -54,7 +54,7 @@ pub enum EventType {
 }
 
 impl EventType {
-    pub fn as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         match self {
             EventType::CapabilityRequested => "capability_requested",
             EventType::Destroyed => "destroyed",

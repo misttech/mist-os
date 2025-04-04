@@ -10,7 +10,6 @@ fidl("fuchsia.component.internal") {
     "component_capability.fidl",
     "component_id_index.fidl",
     "config.fidl",
-    "event_stream_route_metadata.fidl",
     "internal_capability.fidl",
   ]
   public_deps = [

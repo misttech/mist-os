@@ -42,10 +42,10 @@ use crate::model::component::manager::ComponentManagerInstance;
 use crate::model::component::WeakComponentInstance;
 use crate::model::environment::Environment;
 use crate::model::event_logger::EventLogger;
-use crate::model::events::registry::EventRegistry;
+use crate::model::events::registry::{EventRegistry, EventSubscription};
+use crate::model::events::serve::serve_event_stream;
 use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactoryCapability};
 use crate::model::events::stream_provider::EventStreamProvider;
-use crate::model::events::use_router::EventStreamUseRouter;
 use crate::model::model::{Model, ModelParams};
 use crate::model::resolver::{Resolver, ResolverRegistry};
 use crate::model::token::InstanceRegistry;
@@ -54,8 +54,6 @@ use crate::sandbox_util::{take_handle_as_stream, LaunchTaskOnReceive};
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::dict_ext::DictExt;
-use ::routing::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
-use ::routing::bedrock::sandbox_construction::EventStreamSourceRouter;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
 use ::routing::capability_source::{
@@ -87,7 +85,9 @@ use builtins::stall_resource::StallResource;
 use builtins::tracing_resource::TracingResource;
 use builtins::vmex_resource::VmexResource;
 use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
-use cm_rust::{CapabilityTypeName, RunnerRegistration};
+use cm_rust::{
+    Availability, CapabilityTypeName, RunnerRegistration, UseEventStreamDecl, UseSource,
+};
 use cm_types::{Name, Url};
 use cm_util::WeakTaskGroup;
 use elf_runner::crash_info::CrashRecords;
@@ -108,7 +108,6 @@ use hooks::EventType;
 use log::{error, info, warn};
 use moniker::ExtendedMoniker;
 use routing::resolving::ComponentAddress;
-use sandbox::{Capability, Data, Dict, Message, Request, Router, RouterResponse};
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
@@ -116,11 +115,11 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use zx::{self, Resource};
 use {
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_pkg as fpkg,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime,
-    fidl_fuchsia_update_verify as fupdate, fuchsia_async as fasync,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl_fuchsia_kernel as fkernel, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fidl_fuchsia_update_verify as fupdate,
+    fuchsia_async as fasync,
 };
 
 #[cfg(feature = "tracing")]
@@ -136,7 +135,7 @@ pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 
 // LINT.IfChange
 /// Set the size of the inspect VMO to be 350 KiB.
-pub const INSPECTOR_SIZE: usize = 350 * 1024;
+const INSPECTOR_SIZE: usize = 350 * 1024;
 // LINT.ThenChange(/src/tests/diagnostics/meta/component_manager_status_tests.cml)
 
 pub struct BuiltinEnvironmentBuilder {
@@ -439,9 +438,6 @@ impl BuiltinEnvironmentBuilder {
             runtime_config: Arc::clone(&runtime_config),
             top_instance,
             instance_registry: self.instance_registry,
-            inspector: self
-                .inspector
-                .unwrap_or_else(|| component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
             #[cfg(test)]
             scope_factory: self.scope_factory,
         };
@@ -464,6 +460,8 @@ impl BuiltinEnvironmentBuilder {
             boot_resolvers,
             realm_builder_resolver,
             self.utc_clock,
+            self.inspector
+                .unwrap_or_else(|| component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
             self.crash_records,
             capability_passthrough,
             svc_stash_provider,
@@ -774,45 +772,6 @@ impl RootComponentInputBuilder {
         }
     }
 
-    fn add_event_stream_capabilities(&self) {
-        for event_type in EventType::values() {
-            let router = Router::new(move |request: Option<sandbox::Request>, debug| {
-                async move {
-                    if debug {
-                        let name = Name::new(event_type.as_str()).unwrap();
-                        let capability_source = CapabilitySource::Builtin(BuiltinSource {
-                            capability: InternalCapability::EventStream(name),
-                        });
-                        return Ok(RouterResponse::Debug(capability_source.try_into().unwrap()));
-                    }
-                    let request = request.expect("missing expect on event stream route");
-                    let request_metadata = request.metadata;
-                    let _ = request_metadata.insert(
-                        Name::new("event_stream_name").unwrap(),
-                        Capability::Data(Data::String(event_type.to_string())),
-                    );
-                    Ok(RouterResponse::Capability(request_metadata))
-                }
-                .boxed()
-            });
-            let name = Name::new(event_type.as_str()).unwrap();
-            if let Err(e) = self.input.capabilities().insert_capability(
-                &name,
-                router
-                    .with_porcelain_type(
-                        CapabilityTypeName::EventStream,
-                        ExtendedMoniker::ComponentManager,
-                    )
-                    .into(),
-            ) {
-                warn!(
-                    "failed to add event_stream {} to root component offered capabilities: {e:?}",
-                    name
-                );
-            }
-        }
-    }
-
     pub fn build(self) -> ComponentInput {
         self.input
     }
@@ -835,6 +794,7 @@ pub struct BuiltinEnvironment {
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub event_registry: Arc<EventRegistry>,
+    pub event_source_factory: Arc<EventSourceFactory>,
     pub capability_store: CapabilityStore,
     pub stop_notifier: Arc<RootStopNotifier>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
@@ -876,6 +836,7 @@ impl BuiltinEnvironment {
         boot_resolvers: Option<(FuchsiaBootResolver, Option<Arc<FuchsiaBootPackageResolver>>)>,
         realm_builder_resolver: Option<RealmBuilderResolver>,
         utc_clock: Option<Arc<UtcClock>>,
+        inspector: Inspector,
         crash_records: CrashRecords,
         capability_passthrough: bool,
         svc_stash_provider: Option<Arc<SvcStashCapability>>,
@@ -1467,10 +1428,8 @@ impl BuiltinEnvironment {
             },
         );
 
-        root_input_builder.add_event_stream_capabilities();
-
         // Set up the Inspect sink provider.
-        let inspect_sink_provider = Arc::new(InspectSinkProvider::new(params.inspector.clone()));
+        let inspect_sink_provider = Arc::new(InspectSinkProvider::new(inspector));
 
         // Set up the event registry.
         let event_registry = {
@@ -1596,7 +1555,7 @@ impl BuiltinEnvironment {
             .await;
 
         // Set up the Component Tree Diagnostics runtime statistics.
-        let inspector = model.context().inspector();
+        let inspector = inspect_sink_provider.inspector();
         let component_tree_stats =
             ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         component_tree_stats.track_component_manager_stats().await;
@@ -1621,6 +1580,7 @@ impl BuiltinEnvironment {
             realm_query,
             lifecycle_controller,
             event_registry,
+            event_source_factory,
             capability_store,
             stop_notifier,
             inspect_sink_provider,
@@ -1693,70 +1653,84 @@ impl BuiltinEnvironment {
         // If component manager is in debug mode, create an event source scoped at the
         // root and offer it via ServiceFs to the outside world.
         if self.debug {
-            let weak_root_component = self.model.root().as_weak();
+            let event_source = self.event_source_factory.create_for_above_root();
 
-            service_fs.dir("svc").add_service_connector(move |server_end: ServerEnd<fcomponent::EventStreamMarker>| {
-                let weak_root_component = weak_root_component.clone();
-                let Ok(root_component) = weak_root_component.upgrade() else {
-                    // If the root component doesn't exist, then we must be at the end of tearing
-                    // down the world. Let's just drop the connection, it'll be closed in a moment
-                    // regardless of what we do.
-                    return;
-                };
+            service_fs.dir("svc").add_fidl_service(move |stream| {
+                let mut event_source = event_source.clone();
+                // Spawn a short-lived task that adds the EventSource serve to
+                // component manager's task scope.
                 fasync::Task::spawn(async move {
-                    let root_sandbox = {
-                        let Ok(resolved_state) = root_component.lock_resolved_state().await else {
-                            return;
-                        };
-                        resolved_state.sandbox.clone()
-                    };
-                    let event_types_to_expose = [
-                        EventType::Started,
-                        EventType::Stopped,
-                        EventType::Destroyed,
-                        EventType::Resolved,
-                        EventType::Unresolved,
-                    ];
-                    let source_routes = event_types_to_expose.iter().map(|event_type| {
-                        let capability = root_sandbox
-                            .component_input
-                            .capabilities()
-                            .get(&Name::new(event_type.as_str()).unwrap())
-                            .ok()
-                            .flatten()
-                            .expect("root component input sandbox should always have all event \
-                                    stream types");
-                        let router = match capability {
-                            Capability::DictionaryRouter(router) => router,
-                            other_type => panic!("unexpected capability type: {:?}", other_type),
-                        };
-                        EventStreamSourceRouter {
-                            router,
-                            availability: cm_rust::Availability::Required,
-                            route_metadata: Default::default(),
-                            filter: None,
-                        }
-                    }).collect::<Vec<_>>();
-                    let use_router = EventStreamUseRouter::new(
-                        source_routes,
-                    );
-
-                    let metadata = Dict::new();
-                    metadata
-                        .insert(
-                            Name::new(METADATA_KEY_TYPE).unwrap(),
-                            Capability::Data(Data::String(CapabilityTypeName::EventStream.to_string())),
-                        )
-                        .expect("failed to build default use metadata?");
-                    metadata.set_metadata(cm_rust::Availability::Required);
-                    let request = Request { metadata, target: weak_root_component.into() };
-
-                    let connector = match use_router.route(Some(request), false).await {
-                        Ok(RouterResponse::Capability(connector)) => connector,
-                        other_response => panic!("event stream routing from root should always succeed, instead we got {:?}", other_response),
-                    };
-                    let _ = connector.send(Message { channel: server_end.into_channel() });
-                }).detach();
+                    serve_event_stream(
+                        event_source
+                            .subscribe(vec![
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: EventType::Started.into(),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: EventType::Stopped.into(),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: EventType::Destroyed.into(),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: EventType::Resolved.into(),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                                EventSubscription {
+                                    event_name: UseEventStreamDecl {
+                                        source_name: EventType::Unresolved.into(),
+                                        source: UseSource::Parent,
+                                        scope: None,
+                                        target_path: "/svc/fuchsia.component.EventStream"
+                                            .parse()
+                                            .unwrap(),
+                                        filter: None,
+                                        availability: Availability::Required,
+                                    },
+                                },
+                            ])
+                            .await
+                            .unwrap(),
+                        stream,
+                    )
+                    .await;
+                })
+                .detach();
             });
         }
 
