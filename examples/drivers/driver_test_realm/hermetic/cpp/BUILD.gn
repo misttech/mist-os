@@ -15,8 +15,7 @@ test("driver_test_realm_example_hermetic_cpp") {
   sources = [ "test.cc" ]
   deps = [
     "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/async-loop",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",

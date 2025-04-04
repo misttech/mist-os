@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sample/cpp/wire.h>
-#include <fuchsia/driver/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
@@ -26,11 +26,10 @@ TEST_F(DriverTestRealmTest, DriversExist) {
   auto realm = realm_builder.Build(dispatcher());
 
   // Start DriverTestRealm.
-  fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
-  fuchsia::driver::test::Realm_Start_Result realm_result;
-  ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
-  ASSERT_FALSE(realm_result.is_err()) << zx_status_get_string(realm_result.err());
+  zx::result dtr_client = realm.component().Connect<fuchsia_driver_test::Realm>();
+  ASSERT_EQ(ZX_OK, dtr_client.status_value());
+  fidl::Result realm_result = fidl::Call(*dtr_client)->Start({});
+  ASSERT_TRUE(realm_result.is_ok()) << realm_result.error_value().FormatDescription();
 
   fbl::unique_fd fd;
   auto exposed = realm.component().CloneExposedDir();
@@ -41,13 +40,12 @@ TEST_F(DriverTestRealmTest, DriversExist) {
       device_watcher::RecursiveWaitForFile(fd.get(), "dev-topological/sys/test/sample_driver");
   ASSERT_EQ(channel.status_value(), ZX_OK);
 
-  // Turn the connection into FIDL.
-  fidl::WireSyncClient client(
-      fidl::ClientEnd<fuchsia_hardware_sample::Echo>(std::move(channel.value())));
+  fidl::ClientEnd<fuchsia_hardware_sample::Echo> client(std::move(*channel));
 
   // Send a FIDL request.
   constexpr std::string_view sent_string = "hello";
-  fidl::WireResult result = client->EchoString(fidl::StringView::FromExternal(sent_string));
+  fidl::WireResult result =
+      fidl::WireCall(client)->EchoString(fidl::StringView::FromExternal(sent_string));
   ASSERT_EQ(ZX_OK, result.status());
   ASSERT_EQ(sent_string, result.value().response.get());
 }

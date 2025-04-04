@@ -13,9 +13,7 @@ fidl("fuchsia.gizmo.protocol") {
 test("transport_test_v2") {
   sources = [ "test_v2.cc" ]
   deps = [
-    ":fuchsia.gizmo.protocol_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
@@ -28,8 +26,7 @@ test("transport_test_v2") {
 test("transport_test_v1") {
   sources = [ "test_v1.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
