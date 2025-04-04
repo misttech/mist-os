@@ -11,6 +11,7 @@
 
 #include "acpi-private.h"
 #include "acpi.h"
+#include "dev.h"
 #include "src/devices/board/lib/acpi/manager.h"
 #include "src/devices/board/lib/acpi/status.h"
 
@@ -18,7 +19,6 @@
 
 namespace {
 
-#if 0
 const std::string_view hid_from_acpi_devinfo(const ACPI_DEVICE_INFO& info) {
   if ((info.Valid & ACPI_VALID_HID) && (info.HardwareId.Length > 0) &&
       ((info.HardwareId.Length - 1) <= sizeof(uint64_t))) {
@@ -28,8 +28,6 @@ const std::string_view hid_from_acpi_devinfo(const ACPI_DEVICE_INFO& info) {
 
   return std::string_view{};
 }
-#endif
-
 
 }  // namespace
 
@@ -107,16 +105,16 @@ zx_status_t publish_acpi_devices(acpi::Manager* manager) {
         // Extract pointers to the hardware ID and the compatible ID
         // if present. If there is no hardware ID, just skip the
         // device.
-        // const std::string_view hid = hid_from_acpi_devinfo(*info);
-        // if (hid.empty()) {
-        //  return acpi::ok();
-        //}
+        const std::string_view hid = hid_from_acpi_devinfo(*info);
+        if (hid.empty()) {
+          return acpi::ok();
+        }
 
         // Now, if we recognize the HID, go ahead and deal with
         // publishing the device.
-        // if (hid == EC_HID_STRING) {
-        // acpi_ec::EcDevice::Create(acpi_root, acpi, object);
-        //}
+        if (hid == EC_HID_STRING) {
+          // acpi_ec::EcDevice::Create(acpi_root, acpi, object);
+        }
         return acpi::ok();
       });
 
