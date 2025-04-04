@@ -24,6 +24,7 @@ use starnix_modules_input::{
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_nanohub::nanohub_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
+use starnix_modules_perfetto_producer::start_perfetto_producer_thread;
 use starnix_modules_thermal::thermal_device_init;
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
@@ -85,6 +86,7 @@ pub struct Features {
 
     /// Optional perfetto configuration.
     pub perfetto: Option<FsString>,
+    pub perfetto_producer: Option<FsString>,
 
     /// Whether to enable support for Android's Factory Data Reset.
     pub android_fdr: bool,
@@ -144,6 +146,7 @@ impl Features {
                 android_serialno,
                 self_profile,
                 perfetto,
+                perfetto_producer,
                 android_fdr,
                 rootfs_rw,
                 network_manager,
@@ -184,6 +187,10 @@ impl Features {
                 inspect_node.record_string(
                     "perfetto",
                     perfetto.as_ref().map(|p| p.to_string()).unwrap_or_default(),
+                );
+                inspect_node.record_string(
+                    "perfetto_producer",
+                    perfetto_producer.as_ref().map(|p| p.to_string()).unwrap_or_default(),
                 );
                 inspect_node.record_bool("android_fdr", *android_fdr);
                 inspect_node.record_bool("rootfs_rw", *rootfs_rw);
@@ -291,6 +298,12 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
             }
             ("perfetto", None) => {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
+            }
+            ("perfetto_producer", Some(socket_path)) => {
+                features.perfetto_producer = Some(socket_path.into());
+            }
+            ("perfetto_producer", None) => {
+                return Err(anyhow!("Perfetto Producer feature must contain a socket path"));
             }
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
@@ -460,6 +473,9 @@ pub fn run_container_features(
     if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
             .context("Failed to start perfetto consumer thread")?;
+    }
+    if let Some(socket_path) = features.perfetto_producer.clone() {
+        start_perfetto_producer_thread(kernel, socket_path)
     }
     if features.self_profile {
         enabled_profiling = true;

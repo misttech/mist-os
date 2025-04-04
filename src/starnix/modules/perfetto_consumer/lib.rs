@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use perfetto_consumer_proto::perfetto::protos::trace_config::buffer_config::FillPolicy;
-use perfetto_consumer_proto::perfetto::protos::trace_config::{BufferConfig, DataSource};
-use perfetto_consumer_proto::perfetto::protos::{
+use perfetto_protos::perfetto::protos::trace_config::buffer_config::FillPolicy;
+use perfetto_protos::perfetto::protos::trace_config::{BufferConfig, DataSource};
+use perfetto_protos::perfetto::protos::{
     ipc_frame, DataSourceConfig, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
     FtraceConfig, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };

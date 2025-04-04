@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
@@ -10,18 +11,20 @@ rustc_library("perfetto") {
   sources = [ "src/lib.rs" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
   deps = [
-    ":perfetto_consumer_proto",
+    ":perfetto_protos",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:prost",
+    "//third_party/rust_crates:thiserror",
   ]
 }
 
-rust_proto_library("perfetto_consumer_proto") {
+rust_proto_library("perfetto_protos") {
   sources = [
     "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/producer_port.proto",
     "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
   ]
   packages = [ "perfetto.protos" ]

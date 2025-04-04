@@ -5,8 +5,8 @@
 import("//build/rust/rustc_library.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
-rustc_library("perfetto_consumer") {
-  name = "starnix-modules-perfetto_consumer"
+rustc_library("perfetto-producer") {
+  name = "starnix-modules-perfetto-producer"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
@@ -14,15 +14,12 @@ rustc_library("perfetto_consumer") {
   sources = [ "lib.rs" ]
 
   deps = [
-    "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-observer",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/perfetto",
     "//src/starnix/lib/perfetto:perfetto_protos",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_uapi",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:prost",
+    "//third_party/rust_crates:thiserror",
   ]
 }
