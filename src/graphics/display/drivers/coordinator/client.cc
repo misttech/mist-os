@@ -1240,6 +1240,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   return false;
 }
 
+void Client::ReapplyConfig() {
+  if (client_apply_count_) {
+    ApplyConfig();
+  }
+}
+
 void Client::ApplyConfig() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig internal");
@@ -1338,9 +1344,7 @@ void Client::SetOwnership(bool is_owner) {
   }
 
   // Only apply the current config if the client has previously applied a config.
-  if (client_apply_count_) {
-    ApplyConfig();
-  }
+  ReapplyConfig();
 }
 
 fidl::Status Client::NotifyDisplayChanges(
@@ -1821,7 +1825,7 @@ void ClientProxy::ReapplyConfig() {
   task->set_handler([this, client_handler = &handler_](async_dispatcher_t* /*dispatcher*/,
                                                        async::Task* task, zx_status_t status) {
     if (status == ZX_OK && client_handler->IsValid()) {
-      client_handler->ApplyConfig();
+      client_handler->ReapplyConfig();
     }
     // Update `client_scheduled_tasks_`.
     fbl::AutoLock task_lock(&task_mtx_);

@@ -151,6 +151,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                            display::VsyncAckCookie vsync_ack_cookie);
 
   void ApplyConfig();
+  void ReapplyConfig();
 
   void OnFenceFired(FenceReference* fence);
 
