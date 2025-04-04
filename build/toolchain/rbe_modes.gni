@@ -25,6 +25,7 @@ declare_args() {
   #                        remote services.
   #  * 'remote_full' => Run as many actions remotely as possible, including
   #                  cache-misses, which reduces use of local resources.
+  #  * 'racing' => Race remote against local execution, for some action types.
   #  * 'cloudtop' => An RBE configuration that's optimized for running on a
   #                  cloudtop. Suitable for high-bandwidth connections to
   #                  remote services and downloading remote outputs.
@@ -118,6 +119,27 @@ _default_rbe_settings = {
     rust_enable = true
     rust_exec_strategy = "remote"
 
+    bazel_enable = true
+    bazel_exec_strategy = "remote"
+  }
+
+  # The "racing" mode runs both locally and remotely, taking the results
+  # of the first to succeed.  This will self-warm the remote caches.
+  # This is a good option when you expect a high number of cache-misses.
+  racing = {
+    forward_variables_from(_all_modes_defaults, "*")
+
+    # Racing is less beneficial for small actions, so leave C++ as-is.
+    cxx_enable = true
+
+    link_enable = true
+    rust_exec_strategy = "racing"
+
+    rust_enable = true
+    rust_exec_strategy = "racing"
+
+    # TODO: bazel does support "dynamic" execution strategies for racing,
+    # but it would be a good idea to spell out strategies per mnemonic (action type).
     bazel_enable = true
     bazel_exec_strategy = "remote"
   }
