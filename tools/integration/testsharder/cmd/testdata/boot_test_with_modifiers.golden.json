@@ -48,7 +48,7 @@
         "is_boot_test": true,
         "cipd_packages": [
             {
-                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "name": "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
                 "version": "aemu_version",
                 "subdir": "aemu/bin"
             },
@@ -109,7 +109,7 @@
         "is_boot_test": true,
         "cipd_packages": [
             {
-                "name": "fuchsia/third_party/android/aemu/release/${platform}",
+                "name": "fuchsia/third_party/android/aemu/release-gfxstream/${platform}",
                 "version": "aemu_version",
                 "subdir": "aemu/bin"
             },
