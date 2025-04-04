@@ -99,7 +99,9 @@ def compile_text_policy_to_binary_policy(
     subprocess.run(
         [
             checkpolicy_executable_path,
-            "--mls",
+            "-M",  # Enable Multi-Level Security.
+            "-S",  # Sort ocontexts consistent with semanage behaviour.
+            "-O",  # Optimize out redundant rules.
             "-c",
             "33",
             "--output",
