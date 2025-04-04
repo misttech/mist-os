@@ -207,17 +207,14 @@ impl RemoteControlService {
             .await;
     }
 
-    pub async fn identify_host(
+    pub async fn get_host_identity(
         self: &Rc<Self>,
-        responder: rcs::RemoteControlIdentifyHostResponder,
-    ) -> Result<()> {
+    ) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError> {
         let identifier = match (self.id_allocator)() {
             Ok(i) => i,
             Err(e) => {
                 error!(e:%; "Allocating host identifier");
-                return responder
-                    .send(Err(rcs::IdentifyHostError::ProxyConnectionFailed))
-                    .context("responding to client");
+                return Err(rcs::IdentifyHostError::ProxyConnectionFailed);
             }
         };
 
@@ -244,7 +241,16 @@ impl RemoteControlService {
             i.ids = Some(ids);
             i
         });
-        responder.send(target_identity.as_ref().map_err(|e| *e)).context("responding to client")?;
+        target_identity
+    }
+
+    pub async fn identify_host(
+        self: &Rc<Self>,
+        responder: rcs::RemoteControlIdentifyHostResponder,
+    ) -> Result<()> {
+        responder
+            .send(self.get_host_identity().await.as_ref().map_err(|e| *e))
+            .context("responding to client")?;
         Ok(())
     }
 

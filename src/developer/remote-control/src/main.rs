@@ -111,6 +111,14 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
             info!("VSOCK serving failed with error {e:?}");
         }
     };
+    let sc = service.clone();
+    let vsock_ident_fut = async move {
+        // TODO(https://fxbug.dev/296283299): Change this info! to error! Once
+        // we can return normally if VSOCK support is disabled
+        if let Err(e) = vsock::run_identify_vsock(sc).await {
+            info!("VSOCK identity serving failed with error {e:?}");
+        }
+    };
 
     let sc1 = service.clone();
     let sc2 = service.clone();
@@ -125,7 +133,7 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
     let fidl_fut = fs.collect::<()>();
 
-    join!(fidl_fut, onet_fut, usb_fut, vsock_fut);
+    join!(fidl_fut, onet_fut, usb_fut, vsock_fut, vsock_ident_fut);
     Ok(())
 }
 

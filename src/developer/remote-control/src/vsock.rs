@@ -4,12 +4,15 @@
 
 use anyhow::Result;
 use circuit::multi_stream::multi_stream_node_connection_to_async;
-use futures::{AsyncReadExt, StreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
 use overnet_core::Router;
+use remote_control::RemoteControlService;
+use std::rc::Rc;
 use std::sync::Weak;
 use {fidl_fuchsia_vsock as vsock, fuchsia_async as fasync};
 
 const OVERNET_VSOCK_PORT: u32 = 202;
+const IDENTIFY_VSOCK_PORT: u32 = 201;
 
 pub async fn run_vsocks(router: Weak<Router>) -> Result<()> {
     let connector = fuchsia_component::client::connect_to_protocol::<vsock::ConnectorMarker>()?;
@@ -64,6 +67,35 @@ pub async fn run_vsocks(router: Weak<Router>) -> Result<()> {
         scope.detach();
 
         responder.send(Some(vsock::ConnectionTransport { data, con }))?;
+    }
+    Ok(())
+}
+
+pub async fn run_identify_vsock(service: Rc<RemoteControlService>) -> Result<()> {
+    let connector = fuchsia_component::client::connect_to_protocol::<vsock::ConnectorMarker>()?;
+    let (client, mut requests) = fidl::endpoints::create_request_stream();
+    connector.listen(IDENTIFY_VSOCK_PORT, client).await?.map_err(fidl::Status::from_raw)?;
+
+    while let Some(request) = requests.next().await {
+        let vsock::AcceptorRequest::Accept { addr, responder } = request?;
+
+        log::info!(addr:? = addr; "Accepted VSOCK connection");
+
+        let (_client, con) = fidl::endpoints::create_endpoints();
+        let (data, socket) = fidl::Socket::create_stream();
+        let socket = fuchsia_async::Socket::from_socket(socket);
+        let (_reader, mut writer) = socket.split();
+        responder.send(Some(vsock::ConnectionTransport { data, con }))?;
+
+        let header = fidl::encoding::TransactionHeader::new(
+            0,
+            0x6035e1ab368deee1,
+            fidl::encoding::DynamicFlags::FLEXIBLE,
+        );
+        let identity_result = service.get_host_identity().await;
+
+        let buf = fidl_message::encode_response_result(header, identity_result)?;
+        writer.write_all(&buf).await?;
     }
     Ok(())
 }
