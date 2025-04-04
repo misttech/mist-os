@@ -788,7 +788,7 @@ function track-build-event {
     args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant|compilation_mode' "${build_dir}"/args.gn | paste -sd ';' -)"
     args_gn="${args_gn//[[:blank:]]/}" # remove blanks
 
-    args_json=$(fx-command-run jq -c '{ b: .build_info_board, p: .build_info_product, r: .rbe_mode, c: .compilation_mode, o:.optimize, sv: .select_variant }' "${build_dir}"/args.json)
+    args_json=$(fx-command-run jq -c '{ b: .build_info_board, p: .build_info_product, r: .rbe_mode, c: .compilation_mode, o: .optimize, sv: .select_variant, tc: .target_cpu, ri: .rust_incremental }' "${build_dir}"/args.json)
   else
     switches=""
     ninja_switches=""
