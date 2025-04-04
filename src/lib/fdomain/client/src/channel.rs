@@ -162,7 +162,18 @@ impl Channel {
 
     /// Writes a message into the channel.
     pub fn write(&self, bytes: &[u8], handles: Vec<Handle>) -> Result<(), Error> {
-        let _ = self.fdomain_write(bytes, handles);
+        if bytes.len() > zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize
+            || handles.len() > zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize
+        {
+            return Err(Error::FDomain(proto::Error::TargetError(
+                fidl::Status::OUT_OF_RANGE.into_raw(),
+            )));
+        }
+
+        let _ = self.write_inner(
+            bytes,
+            proto::Handles::Handles(handles.into_iter().map(|x| x.take_proto()).collect()),
+        );
         Ok(())
     }
 
@@ -174,10 +185,20 @@ impl Channel {
         bytes: &[u8],
         handles: Vec<Handle>,
     ) -> impl Future<Output = Result<(), Error>> + '_ {
-        self.write_inner(
-            bytes,
-            proto::Handles::Handles(handles.into_iter().map(|x| x.take_proto()).collect()),
-        )
+        if bytes.len() > zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize
+            || handles.len() > zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize
+        {
+            Either::Left(async {
+                Err(Error::FDomain(proto::Error::TargetError(
+                    fidl::Status::OUT_OF_RANGE.into_raw(),
+                )))
+            })
+        } else {
+            Either::Right(self.write_inner(
+                bytes,
+                proto::Handles::Handles(handles.into_iter().map(|x| x.take_proto()).collect()),
+            ))
+        }
     }
 
     /// A future that returns when the channel is closed.
@@ -223,6 +244,17 @@ impl Channel {
                 }
             })
             .collect::<Result<Vec<_>, Error>>();
+
+        let handles = if handles
+            .as_ref()
+            .map(|x| x.len() > zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize)
+            .unwrap_or(false)
+            || bytes.len() > zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize
+        {
+            Err(Error::FDomain(proto::Error::TargetError(fidl::Status::OUT_OF_RANGE.into_raw())))
+        } else {
+            handles
+        };
 
         match handles {
             Ok(handles) => {

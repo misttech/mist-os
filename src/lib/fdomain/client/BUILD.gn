@@ -15,6 +15,7 @@ rustc_library("client") {
   deps = [
     "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain_rust",
     "//sdk/fidl/fuchsia.fdomain($fidl_toolchain)",
+    "//sdk/rust/zx-types",
     "//src/lib/fdomain/container:fdomain_macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fidl/rust/fidl_message",

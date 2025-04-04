@@ -38,10 +38,10 @@ open protocol Channel {
     // Write to a channel. Handles are always consumed.
     flexible WriteChannel(struct {
         handle HandleId;
-        data vector<uint8>;
+        data vector<uint8>:zx.CHANNEL_MAX_MSG_BYTES;
         handles strict union {
-            1: handles vector<HandleId>;
-            2: dispositions vector<HandleDisposition>;
+            1: handles vector<HandleId>:zx.CHANNEL_MAX_MSG_HANDLES;
+            2: dispositions vector<HandleDisposition>:zx.CHANNEL_MAX_MSG_HANDLES;
         };
     }) -> () error WriteChannelError;
 

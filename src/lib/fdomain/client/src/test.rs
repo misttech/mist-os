@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyHandle, Client, Error, FDomainTransport};
+use crate::channel::HandleOp;
+use crate::{AnyHandle, Client, Error, FDomainTransport, HandleBased};
 use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
 use fidl_fuchsia_fdomain::Error as FDomainError;
@@ -460,4 +461,85 @@ async fn channel_read_stream_read() {
     let b = stream.rejoin(writer);
     let read_3 = b.recv_msg().await.unwrap();
     assert_eq!(test_str_b, read_3.bytes.as_slice());
+}
+
+#[fuchsia::test]
+async fn channel_too_big() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel();
+
+    // Test with fdomain_write
+    let err = a
+        .fdomain_write(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![])
+        .await
+        .unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles.push(client.create_event().into_handle());
+    }
+
+    let err = a.fdomain_write(b"", too_many_handles).await.unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Test with zircon-like write
+    let err =
+        a.write(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![]).unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles.push(client.create_event().into_handle());
+    }
+
+    let err = a.write(b"", too_many_handles).unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Test with fdomain_write_etc
+    let err = a
+        .fdomain_write_etc(&[0xABu8; zx_types::ZX_CHANNEL_MAX_MSG_BYTES as usize + 1], vec![])
+        .await
+        .unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    let mut too_many_handles =
+        Vec::with_capacity(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES as usize + 1);
+    for _ in 0..(zx_types::ZX_CHANNEL_MAX_MSG_HANDLES + 1) {
+        too_many_handles
+            .push(HandleOp::Move(client.create_event().into_handle(), fidl::Rights::SAME_RIGHTS));
+    }
+
+    let err = a.fdomain_write_etc(b"", too_many_handles).await.unwrap_err();
+
+    let Error::FDomain(FDomainError::TargetError(i)) = err else { panic!() };
+
+    assert_eq!(fidl::Status::OUT_OF_RANGE.into_raw(), i);
+
+    // Make sure channel still functions
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+
+    a.fdomain_write(TEST_STR_1, vec![]).await.unwrap();
+
+    let msg = b.recv_msg().await.unwrap();
+
+    assert_eq!(TEST_STR_1, msg.bytes.as_slice());
 }
