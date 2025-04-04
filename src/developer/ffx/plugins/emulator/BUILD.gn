@@ -34,8 +34,8 @@ if (is_host) {
     ]
   }
 
-  # AEMU is supported on mac and linux and both arm64 and x64
-  if (arm_sdk_tools || current_cpu == host_cpu) {
+  # AEMU is supported on linux-arm64 and linux-x64
+  if (is_linux && (arm_sdk_tools || current_cpu == host_cpu)) {
     emu_companion("aemu_internal") {
       default_binary = "//prebuilt/third_party/android/aemu/release/${current_os}-${current_cpu}/emulator"
       prebuilt_path = "//prebuilt/third_party/android/aemu/release/${current_os}-${current_cpu}"
