@@ -210,6 +210,7 @@ multiconst!(zx_vm_option_t, [
     ZX_VM_ALLOW_FAULTS                 = 1 << 12;
     ZX_VM_OFFSET_IS_UPPER_LIMIT        = 1 << 13;
     ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED = 1 << 14;
+    ZX_VM_FAULT_BEYOND_STREAM_SIZE     = 1 << 15;
 
     // VM alignment options
     ZX_VM_ALIGN_BASE                   = 24;
