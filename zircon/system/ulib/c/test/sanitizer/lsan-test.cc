@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <filesystem>
 #include <mutex>
 #include <new>
 #include <thread>
@@ -436,10 +437,10 @@ TEST_F(LeakSanitizerTest, TlsReference) {
 TEST_F(LeakSanitizerTest, DISABLED_LeakedThreadFix) {
   const char* root_dir = getenv("TEST_ROOT_DIR");
   if (!root_dir) {
-    root_dir = "";
+    root_dir = "/pkg";
   }
-  std::string file(root_dir);
-  file += "/bin/lsan-thread-race-test";
+  std::filesystem::path file(root_dir);
+  file /= "bin/lsan-thread-race-test";
   const char* argv[] = {file.c_str(), nullptr};
 
   // Before, it was almost guaranteed the issue would reporoduce a couple dozen times in 100 runs.

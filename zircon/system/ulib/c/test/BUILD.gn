@@ -18,6 +18,10 @@ group("tests") {
   testonly = true
   deps = [
     ":libc-tests",
+    "sanitizer:tests",
+
+    # TODO(https://fxbug.dev/407804528): This should be replaced in
+    # //sdk/lib/dl.
     "dlsym-circular-deps",
   ]
 }

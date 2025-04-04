@@ -17,9 +17,11 @@
 
 #include <array>
 #include <atomic>
+#include <filesystem>
 
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
+
 #if __has_feature(address_sanitizer)
 #include <sanitizer/asan_interface.h>
 #endif
@@ -337,10 +339,12 @@ TEST(SanitizerUtilsTest, FillShadowPartialPages) {
 void RunExe(std::string_view path, uint32_t expected_ret) {
   const char* root_dir = getenv("TEST_ROOT_DIR");
   if (!root_dir) {
-    root_dir = "";
+    root_dir = "/pkg";
   }
-  std::string file(root_dir);
-  file += path;
+  std::filesystem::path file(root_dir);
+  file /= path;
+  ASSERT_TRUE(std::filesystem::exists(file), "\"%s\" from TEST_ROOT_DIR=\"%s\"", file.c_str(),
+              root_dir);
 
   zx::process child;
   const char* argv[] = {file.c_str(), nullptr};
@@ -358,11 +362,11 @@ void RunExe(std::string_view path, uint32_t expected_ret) {
 }
 
 TEST(SanitizerUtilsTest, ProcessExitHook) {
-  RunExe("/bin/sanitizer-exit-hook-test-helper", kHookStatus);
+  RunExe("bin/sanitizer-exit-hook-test-helper", kHookStatus);
 }
 
 TEST(SanitizerUtilsTest, ModuleLoadedStartup) {
-  RunExe("/bin/sanitizer-module-loaded-test-helper", 0);
+  RunExe("bin/sanitizer-module-loaded-test-helper", 0);
 }
 
 }  // namespace
