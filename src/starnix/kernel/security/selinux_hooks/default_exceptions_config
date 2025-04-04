@@ -64,6 +64,14 @@ todo_deny https://fxbug.dev/408146899 logd unlabeled file
 // https://fxbug.dev/408148161 - Fails to read "/proc/.../stat" of a zygote.
 todo_deny https://fxbug.dev/408148161 gmscore_app zygote file
 
+// https://fxbug.dev/408251799 - Exceptions yet to be investigated.
+todo_deny https://fxbug.dev/408251799 vdc vdc capability2
+todo_deny https://fxbug.dev/408251799 surfaceflinger rootfs dir
+todo_deny https://fxbug.dev/408251799 bootanim rootfs dir
+todo_deny https://fxbug.dev/408251799 artd system_file dir
+todo_deny https://fxbug.dev/408251799 mediaswcodec tmpfs file
+todo_deny https://fxbug.dev/408251799 nfc system_data_file dir
+
 //
 // Exceptions required for the SELinux Test Suite container.
 //
