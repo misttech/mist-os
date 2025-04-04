@@ -64,6 +64,21 @@ todo_deny https://fxbug.dev/408146899 logd unlabeled file
 // https://fxbug.dev/408148161 - Fails to read "/proc/.../stat" of a zygote.
 todo_deny https://fxbug.dev/408148161 gmscore_app zygote file
 
+// https://fxbug.dev/408336449 - Dumpstate encounters "share" and some "getattr"
+// "use" and "read" failures.
+todo_deny https://fxbug.dev/408336449 dumpstate device dir
+todo_deny https://fxbug.dev/408336449 dumpstate fuse_device chr_file
+todo_deny https://fxbug.dev/408336449 dumpstate usermodehelper file
+todo_deny https://fxbug.dev/408336449 dumpstate su process
+todo_deny https://fxbug.dev/408336449 kernel dumpstate fifo_file
+todo_deny https://fxbug.dev/408336449 apexd dumpstate fd
+
+// https://fxbug.dev/408339748 - nmfs is not correctly labeled.
+todo_deny https://fxbug.dev/408339748 dumpstate unlabeled filesystem
+
+// https://fxbug.dev/408318516 - Stats test does not run as root.
+todo_deny https://fxbug.dev/408318516 shell sysfs_suspend_stats file
+
 // https://fxbug.dev/408251799 - Exceptions yet to be investigated.
 todo_deny https://fxbug.dev/408251799 vdc vdc capability2
 todo_deny https://fxbug.dev/408251799 surfaceflinger rootfs dir
