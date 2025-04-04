@@ -50,8 +50,7 @@
 //!             }
 //!         }
 //!         expands to {
-//!             #[allow(non_upper_case_globals)]
-//!             const _DERIVE_synstructure_test_traits_WalkFields_FOR_A: () = {
+//!             const _: () = {
 //!                 extern crate synstructure_test_traits;
 //!                 impl<T> synstructure_test_traits::WalkFields for A<T>
 //!                     where T: synstructure_test_traits::WalkFields
@@ -120,8 +119,7 @@
 //!             }
 //!         }
 //!         expands to {
-//!             #[allow(non_upper_case_globals)]
-//!             const _DERIVE_synstructure_test_traits_Interest_FOR_A: () = {
+//!             const _: () = {
 //!                 extern crate synstructure_test_traits;
 //!                 impl<T> synstructure_test_traits::Interest for A<T>
 //!                     where T: synstructure_test_traits::Interest
@@ -149,6 +147,18 @@
 //! For more example usage, consider investigating the `abomonation_derive` crate,
 //! which makes use of this crate, and is fairly simple.
 
+#![allow(
+    clippy::default_trait_access,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate,
+    clippy::needless_pass_by_value
+)]
+
+#[cfg(all(
+    not(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "wasi"))),
+    feature = "proc-macro"
+))]
 extern crate proc_macro;
 
 use std::collections::HashSet;
@@ -161,13 +171,11 @@ use syn::{
     TraitBound, Type, TypeMacro, TypeParamBound, TypePath, WhereClause, WherePredicate,
 };
 
-use quote::{quote_spanned, format_ident, ToTokens};
+use quote::{format_ident, quote_spanned, ToTokens};
 // re-export the quote! macro so we can depend on it being around in our macro's
 // implementations.
 #[doc(hidden)]
 pub use quote::quote;
-
-use unicode_xid::UnicodeXID;
 
 use proc_macro2::{Span, TokenStream, TokenTree};
 
@@ -178,6 +186,7 @@ use proc_macro2::{Span, TokenStream, TokenTree};
 pub mod macros;
 
 /// Changes how bounds are added
+#[allow(clippy::manual_non_exhaustive)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AddBounds {
     /// Add for fields and generics
@@ -234,27 +243,11 @@ fn fetch_generics<'a>(set: &[bool], generics: &'a Generics) -> Vec<&'a Ident> {
     for (&seen, param) in set.iter().zip(generics.params.iter()) {
         if seen {
             if let GenericParam::Type(tparam) = param {
-                tys.push(&tparam.ident)
+                tys.push(&tparam.ident);
             }
         }
     }
     tys
-}
-
-// Internal method for sanitizing an identifier for hygiene purposes.
-fn sanitize_ident(s: &str) -> Ident {
-    let mut res = String::with_capacity(s.len());
-    for mut c in s.chars() {
-        if !UnicodeXID::is_xid_continue(c) {
-            c = '_'
-        }
-        // Deduplicate consecutive _ characters.
-        if res.ends_with('_') && c == '_' {
-            continue;
-        }
-        res.push(c);
-    }
-    Ident::new(&res, Span::call_site())
 }
 
 // Internal method to merge two Generics objects together intelligently.
@@ -342,6 +335,9 @@ pub struct BindingInfo<'a> {
     // These are used to determine which type parameters are avaliable.
     generics: &'a Generics,
     seen_generics: Vec<bool>,
+    // The original index of the binding
+    // this will not change when .filter() is called
+    index: usize,
 }
 
 impl<'a> ToTokens for BindingInfo<'a> {
@@ -378,11 +374,7 @@ impl<'a> BindingInfo<'a> {
     /// );
     /// ```
     pub fn pat(&self) -> TokenStream {
-        let BindingInfo {
-            binding,
-            style,
-            ..
-        } = self;
+        let BindingInfo { binding, style, .. } = self;
         quote!(#style #binding)
     }
 
@@ -434,12 +426,13 @@ pub struct VariantAst<'a> {
 pub struct VariantInfo<'a> {
     pub prefix: Option<&'a Ident>,
     bindings: Vec<BindingInfo<'a>>,
-    omitted_fields: bool,
     ast: VariantAst<'a>,
     generics: &'a Generics,
+    // The original length of `bindings` before any `.filter()` calls
+    original_length: usize,
 }
 
-/// Helper function used by the VariantInfo constructor. Walks all of the types
+/// Helper function used by the `VariantInfo` constructor. Walks all of the types
 /// in `field` and returns a list of the type parameters from `ty_params` which
 /// are referenced in the field.
 fn get_ty_params(field: &Field, generics: &Generics) -> Vec<bool> {
@@ -469,7 +462,7 @@ fn get_ty_params(field: &Field, generics: &Generics) -> Vec<bool> {
             for r in &mut self.result {
                 *r = true;
             }
-            visit::visit_type_macro(self, x)
+            visit::visit_type_macro(self, x);
         }
     }
 
@@ -488,12 +481,9 @@ impl<'a> VariantInfo<'a> {
         let bindings = match ast.fields {
             Fields::Unit => vec![],
             Fields::Unnamed(FieldsUnnamed {
-                unnamed: fields,
-                ..
+                unnamed: fields, ..
             })
-            | Fields::Named(FieldsNamed {
-                named: fields, ..
-            }) => {
+            | Fields::Named(FieldsNamed { named: fields, .. }) => {
                 fields
                     .into_iter()
                     .enumerate()
@@ -506,18 +496,20 @@ impl<'a> VariantInfo<'a> {
                             field,
                             generics,
                             seen_generics: get_ty_params(field, generics),
+                            index: i,
                         }
                     })
                     .collect::<Vec<_>>()
             }
         };
 
+        let original_length = bindings.len();
         VariantInfo {
             prefix,
             bindings,
-            omitted_fields: false,
             ast,
             generics,
+            original_length,
         }
     }
 
@@ -539,7 +531,7 @@ impl<'a> VariantInfo<'a> {
 
     /// True if any bindings were omitted due to a `filter` call.
     pub fn omitted_bindings(&self) -> bool {
-        self.omitted_fields
+        self.original_length != self.bindings.len()
     }
 
     /// Generates the match-arm pattern which could be used to match against this Variant.
@@ -574,11 +566,17 @@ impl<'a> VariantInfo<'a> {
                 assert!(self.bindings.is_empty());
             }
             Fields::Unnamed(..) => token::Paren(Span::call_site()).surround(&mut t, |t| {
+                let mut expected_index = 0;
                 for binding in &self.bindings {
+                    while expected_index < binding.index {
+                        quote!(_,).to_tokens(t);
+                        expected_index += 1;
+                    }
                     binding.pat().to_tokens(t);
                     quote!(,).to_tokens(t);
+                    expected_index += 1;
                 }
-                if self.omitted_fields {
+                if expected_index != self.original_length {
                     quote!(..).to_tokens(t);
                 }
             }),
@@ -589,7 +587,7 @@ impl<'a> VariantInfo<'a> {
                     binding.pat().to_tokens(t);
                     quote!(,).to_tokens(t);
                 }
-                if self.omitted_fields {
+                if self.omitted_bindings() {
                     quote!(..).to_tokens(t);
                 }
             }),
@@ -648,7 +646,7 @@ impl<'a> VariantInfo<'a> {
                         func(field, i).to_tokens(t);
                         quote!(,).to_tokens(t);
                     }
-                })
+                });
             }
             Fields::Named(FieldsNamed { named, .. }) => {
                 token::Brace::default().surround(&mut t, |t| {
@@ -658,7 +656,7 @@ impl<'a> VariantInfo<'a> {
                         func(field, i).to_tokens(t);
                         quote!(,).to_tokens(t);
                     }
-                })
+                });
             }
         }
         t
@@ -790,12 +788,73 @@ impl<'a> VariantInfo<'a> {
     where
         F: FnMut(&BindingInfo<'_>) -> bool,
     {
-        let before_len = self.bindings.len();
         self.bindings.retain(f);
-        if self.bindings.len() != before_len {
-            self.omitted_fields = true;
-        }
         self
+    }
+
+    /// Iterates all the bindings of this `Variant` object and uses a closure to determine if a
+    /// binding should be removed. If the closure returns `true` the binding is removed from the
+    /// variant. If the closure returns `false`, the binding remains in the variant.
+    ///
+    /// All the removed bindings are moved to a new `Variant` object which is otherwise identical
+    /// to the current one. To understand the effects of removing a binding from a variant check
+    /// the [`VariantInfo::filter`] documentation.
+    ///
+    /// # Example
+    /// ```
+    /// # use synstructure::*;
+    /// let di: syn::DeriveInput = syn::parse_quote! {
+    ///     enum A {
+    ///         B{ a: i32, b: i32 },
+    ///         C{ a: u32 },
+    ///     }
+    /// };
+    /// let mut s = Structure::new(&di);
+    ///
+    /// let mut with_b = &mut s.variants_mut()[0];
+    ///
+    /// let with_a = with_b.drain_filter(|bi| {
+    ///     bi.ast().ident == Some(quote::format_ident!("a"))
+    /// });
+    ///
+    /// assert_eq!(
+    ///     with_a.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::B{ a: ref __binding_0, .. } => {
+    ///             { println!("{:?}", __binding_0) }
+    ///         }
+    ///     }.to_string()
+    /// );
+    ///
+    /// assert_eq!(
+    ///     with_b.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::B{ b: ref __binding_1, .. } => {
+    ///             { println!("{:?}", __binding_1) }
+    ///         }
+    ///     }.to_string()
+    /// );
+    /// ```
+    #[allow(clippy::return_self_not_must_use)]
+    pub fn drain_filter<F>(&mut self, mut f: F) -> Self
+    where
+        F: FnMut(&BindingInfo<'_>) -> bool,
+    {
+        let mut other = VariantInfo {
+            prefix: self.prefix,
+            bindings: vec![],
+            ast: self.ast,
+            generics: self.generics,
+            original_length: self.original_length,
+        };
+
+        let (other_bindings, self_bindings) = self.bindings.drain(..).partition(&mut f);
+        other.bindings = other_bindings;
+        self.bindings = self_bindings;
+
+        other
     }
 
     /// Remove the binding at the given index.
@@ -805,7 +864,6 @@ impl<'a> VariantInfo<'a> {
     /// Panics if the index is out of range.
     pub fn remove_binding(&mut self, idx: usize) -> &mut Self {
         self.bindings.remove(idx);
-        self.omitted_fields = true;
         self
     }
 
@@ -844,7 +902,7 @@ impl<'a> VariantInfo<'a> {
         F: FnMut(&BindingInfo<'_>) -> BindStyle,
     {
         for binding in &mut self.bindings {
-            binding.style = f(&binding);
+            binding.style = f(binding);
         }
         self
     }
@@ -976,21 +1034,12 @@ impl<'a> Structure<'a> {
                 })
                 .collect::<Vec<_>>(),
             Data::Struct(data) => {
-                // SAFETY NOTE: Normally putting an `Expr` in static storage
-                // wouldn't be safe, because it could contain `Term` objects
-                // which use thread-local interning. However, this static always
-                // contains the value `None`. Thus, it will never contain any
-                // unsafe values.
-                struct UnsafeMakeSync(Option<(token::Eq, Expr)>);
-                unsafe impl Sync for UnsafeMakeSync {}
-                static NONE_DISCRIMINANT: UnsafeMakeSync = UnsafeMakeSync(None);
-
                 vec![VariantInfo::new(
                     VariantAst {
                         attrs: &ast.attrs,
                         ident: &ast.ident,
                         fields: &data.fields,
-                        discriminant: &NONE_DISCRIMINANT.0,
+                        discriminant: &None,
                     },
                     None,
                     &ast.generics,
@@ -1228,6 +1277,74 @@ impl<'a> Structure<'a> {
         self
     }
 
+    /// Iterates all the bindings of this `Structure` object and uses a closure to determine if a
+    /// binding should be removed. If the closure returns `true` the binding is removed from the
+    /// structure. If the closure returns `false`, the binding remains in the structure.
+    ///
+    /// All the removed bindings are moved to a new `Structure` object which is otherwise identical
+    /// to the current one. To understand the effects of removing a binding from a structure check
+    /// the [`Structure::filter`] documentation.
+    ///
+    /// # Example
+    /// ```
+    /// # use synstructure::*;
+    /// let di: syn::DeriveInput = syn::parse_quote! {
+    ///     enum A {
+    ///         B{ a: i32, b: i32 },
+    ///         C{ a: u32 },
+    ///     }
+    /// };
+    /// let mut with_b = Structure::new(&di);
+    ///
+    /// let with_a = with_b.drain_filter(|bi| {
+    ///     bi.ast().ident == Some(quote::format_ident!("a"))
+    /// });
+    ///
+    /// assert_eq!(
+    ///     with_a.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::B{ a: ref __binding_0, .. } => {
+    ///             { println!("{:?}", __binding_0) }
+    ///         }
+    ///         A::C{ a: ref __binding_0, } => {
+    ///             { println!("{:?}", __binding_0) }
+    ///         }
+    ///     }.to_string()
+    /// );
+    ///
+    /// assert_eq!(
+    ///     with_b.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::B{ b: ref __binding_1, .. } => {
+    ///             { println!("{:?}", __binding_1) }
+    ///         }
+    ///         A::C{ .. } => {
+    ///
+    ///         }
+    ///     }.to_string()
+    /// );
+    /// ```
+    #[allow(clippy::return_self_not_must_use)]
+    pub fn drain_filter<F>(&mut self, mut f: F) -> Self
+    where
+        F: FnMut(&BindingInfo<'_>) -> bool,
+    {
+        Self {
+            variants: self
+                .variants
+                .iter_mut()
+                .map(|variant| variant.drain_filter(&mut f))
+                .collect(),
+            omitted_variants: self.omitted_variants,
+            ast: self.ast,
+            extra_impl: self.extra_impl.clone(),
+            extra_predicates: self.extra_predicates.clone(),
+            add_bounds: self.add_bounds,
+        }
+    }
+
     /// Specify additional where predicate bounds which should be generated by
     /// impl-generating functions such as `gen_impl`, `bound_impl`, and
     /// `unsafe_bound_impl`.
@@ -1251,9 +1368,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U>
     ///                 where T: std::fmt::Display,
@@ -1297,9 +1412,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U>
     ///                 where T: krate::Trait,
@@ -1360,6 +1473,68 @@ impl<'a> Structure<'a> {
             self.omitted_variants = true;
         }
         self
+    }
+    /// Iterates all the variants of this `Structure` object and uses a closure to determine if a
+    /// variant should be removed. If the closure returns `true` the variant is removed from the
+    /// structure. If the closure returns `false`, the variant remains in the structure.
+    ///
+    /// All the removed variants are moved to a new `Structure` object which is otherwise identical
+    /// to the current one. To understand the effects of removing a variant from a structure check
+    /// the [`Structure::filter_variants`] documentation.
+    ///
+    /// # Example
+    /// ```
+    /// # use synstructure::*;
+    /// let di: syn::DeriveInput = syn::parse_quote! {
+    ///     enum A {
+    ///         B(i32, i32),
+    ///         C(u32),
+    ///     }
+    /// };
+    ///
+    /// let mut with_c = Structure::new(&di);
+    ///
+    /// let with_b = with_c.drain_filter_variants(|v| v.ast().ident == "B");
+    ///
+    /// assert_eq!(
+    ///     with_c.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::C(ref __binding_0,) => {
+    ///             { println!("{:?}", __binding_0) }
+    ///         }
+    ///     }.to_string()
+    /// );
+    ///
+    /// assert_eq!(
+    ///     with_b.each(|bi| quote!(println!("{:?}", #bi))).to_string(),
+    ///
+    ///     quote!{
+    ///         A::B(ref __binding_0, ref __binding_1,) => {
+    ///             { println!("{:?}", __binding_0) }
+    ///             { println!("{:?}", __binding_1) }
+    ///         }
+    ///     }.to_string()
+    /// );
+    #[allow(clippy::return_self_not_must_use)]
+    pub fn drain_filter_variants<F>(&mut self, mut f: F) -> Self
+    where
+        F: FnMut(&VariantInfo<'_>) -> bool,
+    {
+        let mut other = Self {
+            variants: vec![],
+            omitted_variants: self.omitted_variants,
+            ast: self.ast,
+            extra_impl: self.extra_impl.clone(),
+            extra_predicates: self.extra_predicates.clone(),
+            add_bounds: self.add_bounds,
+        };
+
+        let (other_variants, self_variants) = self.variants.drain(..).partition(&mut f);
+        other.variants = other_variants;
+        self.variants = self_variants;
+
+        other
     }
 
     /// Remove the variant at the given index.
@@ -1519,9 +1694,7 @@ impl<'a> Structure<'a> {
     ///         }
     ///     ).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_X_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U, X: krate::AnotherTrait> krate::Trait<X> for A<T, U>
     ///                 where T : krate :: Trait < X >,
@@ -1614,6 +1787,11 @@ impl<'a> Structure<'a> {
         }
     }
 
+    /// This method is a no-op, underscore consts are used by default now.
+    pub fn underscore_const(&mut self, _enabled: bool) -> &mut Self {
+        self
+    }
+
     /// > NOTE: This methods' features are superceded by `Structure::gen_impl`.
     ///
     /// Creates an `impl` block with the required generic type fields filled in
@@ -1661,9 +1839,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U>
     ///                 where Option<U>: krate::Trait,
@@ -1731,9 +1907,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             unsafe impl<T, U> krate::Trait for A<T, U>
     ///                 where Option<U>: krate::Trait,
@@ -1794,9 +1968,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U> {
     ///                 fn a() {}
@@ -1854,9 +2026,7 @@ impl<'a> Structure<'a> {
     ///         fn a() {}
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         #[doc(hidden)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             unsafe impl<T, U> krate::Trait for A<T, U> {
     ///                 fn a() {}
@@ -1885,7 +2055,7 @@ impl<'a> Structure<'a> {
         let mode = mode.unwrap_or(self.add_bounds);
         let name = &self.ast.ident;
         let mut gen_clone = self.ast.generics.clone();
-        gen_clone.params.extend(self.extra_impl.clone().into_iter());
+        gen_clone.params.extend(self.extra_impl.iter().cloned());
         let (impl_generics, _, _) = gen_clone.split_for_impl();
         let (_, ty_generics, where_clause) = self.ast.generics.split_for_impl();
 
@@ -1894,12 +2064,6 @@ impl<'a> Structure<'a> {
 
         let mut where_clause = where_clause.cloned();
         self.add_trait_bounds(&bound, &mut where_clause, mode);
-
-        let dummy_const: Ident = sanitize_ident(&format!(
-            "_DERIVE_{}_FOR_{}",
-            (&bound).into_token_stream(),
-            name.into_token_stream(),
-        ));
 
         // This function is smart. If a global path is passed, no extern crate
         // statement will be generated, however, a relative path will cause the
@@ -1913,15 +2077,15 @@ impl<'a> Structure<'a> {
             }
         }
 
+        let generated = quote! {
+            #extern_crate
+            #safety impl #impl_generics #bound for #name #ty_generics #where_clause {
+                #body
+            }
+        };
+
         quote! {
-            #[allow(non_upper_case_globals)]
-            #[doc(hidden)]
-            const #dummy_const: () = {
-                #extern_crate
-                #safety impl #impl_generics #bound for #name #ty_generics #where_clause {
-                    #body
-                }
-            };
+            const _: () = { #generated };
         }
     }
 
@@ -1967,17 +2131,19 @@ impl<'a> Structure<'a> {
     ///
     /// # Hygiene
     ///
-    /// This method tries to handle hygiene intelligenly for both stable and
+    /// This method tries to handle hygiene intelligently for both stable and
     /// unstable proc-macro implementations, however there are visible
     /// differences.
     ///
     /// The output of every `gen_impl` function is wrapped in a dummy `const`
     /// value, to ensure that it is given its own scope, and any values brought
-    /// into scope are not leaked to the calling crate. For example, the above
-    /// invocation may generate an output like the following:
+    /// into scope are not leaked to the calling crate.
+    ///
+    /// By default, the above invocation may generate an output like the
+    /// following:
     ///
     /// ```ignore
-    /// const _DERIVE_krate_Trait_FOR_Struct: () = {
+    /// const _: () = {
     ///     extern crate krate;
     ///     use krate::Trait as MyTrait;
     ///     impl<T> MyTrait for Struct<T> where T: MyTrait {
@@ -2047,8 +2213,7 @@ impl<'a> Structure<'a> {
     ///         }
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U>
     ///             where
@@ -2073,8 +2238,7 @@ impl<'a> Structure<'a> {
     ///         }
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         const _DERIVE_krate_Trait_X_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<X: krate::OtherTrait, T, U> krate::Trait<X> for A<T, U>
     ///             where
@@ -2102,8 +2266,7 @@ impl<'a> Structure<'a> {
     ///         }
     ///     }).to_string(),
     ///     quote!{
-    ///         #[allow(non_upper_case_globals)]
-    ///         const _DERIVE_krate_Trait_FOR_A: () = {
+    ///         const _: () = {
     ///             extern crate krate;
     ///             impl<T, U> krate::Trait for A<T, U>
     ///             where
@@ -2210,17 +2373,8 @@ impl<'a> Structure<'a> {
         };
 
         if wrap {
-            let dummy_const: Ident = sanitize_ident(&format!(
-                "_DERIVE_{}_FOR_{}",
-                (&bound).into_token_stream(),
-                name.into_token_stream(),
-            ));
-
             Ok(quote! {
-                #[allow(non_upper_case_globals)]
-                const #dummy_const: () = {
-                    #generated
-                };
+                const _: () = { #generated };
             })
         } else {
             Ok(generated)
@@ -2247,8 +2401,7 @@ impl<'a> Structure<'a> {
 /// # use quote::quote;
 /// assert_eq!(
 ///     synstructure::unpretty_print(quote! {
-///         #[allow(non_upper_case_globals)]
-///         const _DERIVE_krate_Trait_FOR_A: () = {
+///         const _: () = {
 ///             extern crate krate;
 ///             impl<T, U> krate::Trait for A<T, U>
 ///             where
@@ -2259,11 +2412,7 @@ impl<'a> Structure<'a> {
 ///             }
 ///         };
 ///     }),
-///     "# [
-///     allow (
-///         non_upper_case_globals )
-///     ]
-/// const _DERIVE_krate_Trait_FOR_A : (
+///     "const _ : (
 ///     )
 /// = {
 ///     extern crate krate ;
@@ -2320,9 +2469,28 @@ pub trait MacroResult {
     ///
     /// If `into_result()` would return an `Err`, this method should instead
     /// generate a `compile_error!` invocation to nicely report the error.
-    fn into_stream(self) -> proc_macro::TokenStream;
+    ///
+    /// *This method is available if `synstructure` is built with the
+    /// `"proc-macro"` feature.*
+    #[cfg(all(
+        not(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "wasi"))),
+        feature = "proc-macro"
+    ))]
+    fn into_stream(self) -> proc_macro::TokenStream
+    where
+        Self: Sized,
+    {
+        match self.into_result() {
+            Ok(ts) => ts.into(),
+            Err(err) => err.to_compile_error().into(),
+        }
+    }
 }
 
+#[cfg(all(
+    not(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "wasi"))),
+    feature = "proc-macro"
+))]
 impl MacroResult for proc_macro::TokenStream {
     fn into_result(self) -> Result<TokenStream> {
         Ok(self.into())
@@ -2337,10 +2505,6 @@ impl MacroResult for TokenStream {
     fn into_result(self) -> Result<TokenStream> {
         Ok(self)
     }
-
-    fn into_stream(self) -> proc_macro::TokenStream {
-        self.into()
-    }
 }
 
 impl<T: MacroResult> MacroResult for Result<T> {
@@ -2350,11 +2514,43 @@ impl<T: MacroResult> MacroResult for Result<T> {
             Err(err) => Err(err),
         }
     }
+}
 
-    fn into_stream(self) -> proc_macro::TokenStream {
-        match self {
-            Ok(v) => v.into_stream(),
-            Err(err) => err.to_compile_error().into(),
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression test for #48
+    #[test]
+    fn test_each_enum() {
+        let di: syn::DeriveInput = syn::parse_quote! {
+         enum A {
+             Foo(usize, bool),
+             Bar(bool, usize),
+             Baz(usize, bool, usize),
+             Quux(bool, usize, bool)
+         }
+        };
+        let mut s = Structure::new(&di);
+
+        s.filter(|bi| bi.ast().ty.to_token_stream().to_string() == "bool");
+
+        assert_eq!(
+            s.each(|bi| quote!(do_something(#bi))).to_string(),
+            quote! {
+                A::Foo(_, ref __binding_1,) => { { do_something(__binding_1) } }
+                A::Bar(ref __binding_0, ..) => { { do_something(__binding_0) } }
+                A::Baz(_, ref __binding_1, ..) => { { do_something(__binding_1) } }
+                A::Quux(ref __binding_0, _, ref __binding_2,) => {
+                    {
+                        do_something(__binding_0)
+                    }
+                    {
+                        do_something(__binding_2)
+                    }
+                }
+            }
+            .to_string()
+        );
     }
 }

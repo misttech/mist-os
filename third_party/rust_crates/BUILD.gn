@@ -1030,7 +1030,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("synstructure") {
-    public_deps = [ ":synstructure-v0_12_1" ]
+    public_deps = [ ":synstructure-v0_13_1" ]
   }
 }
 
@@ -16291,36 +16291,37 @@ rust_library("syn-v2_0_100") {
   applicable_licenses = [ ":syn-v2_0_100.license" ]
 }
 
-license("synstructure-v0_12_1.license") {
+license("synstructure-v0_13_1.license") {
   public_package_name = "synstructure"
   license_files =
-      [ "//third_party/rust_crates/vendor/synstructure-0.12.1/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/synstructure-0.13.1/LICENSE" ]
 }
 
-rust_library("synstructure-v0_12_1") {
+rust_library("synstructure-v0_13_1") {
   crate_name = "synstructure"
-  crate_root = "//third_party/rust_crates/vendor/synstructure-0.12.1/src/lib.rs"
-  output_name = "synstructure-379147eabfeddd75"
+  crate_root = "//third_party/rust_crates/vendor/synstructure-0.13.1/src/lib.rs"
+  output_name = "synstructure-e30d2e78ed7ffce1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_38" ]
-  deps += [ ":syn-v1_0_98" ]
-  deps += [ ":unicode-xid-v0_2_0" ]
+  deps += [ ":syn-v2_0_100" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=379147eabfeddd75",
-    "-Cextra-filename=-379147eabfeddd75",
+    "-Cmetadata=e30d2e78ed7ffce1",
+    "-Cextra-filename=-e30d2e78ed7ffce1",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"proc-macro\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":synstructure-v0_12_1.license" ]
+  applicable_licenses = [ ":synstructure-v0_13_1.license" ]
 }
 
 license("redox_syscall-v0_1_51.license") {

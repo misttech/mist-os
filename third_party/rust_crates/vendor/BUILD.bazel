@@ -2719,14 +2719,14 @@ alias(
 )
 
 alias(
-    name = "synstructure-0.12.1",
-    actual = "//third_party/rust_crates/vendor/synstructure-0.12.1:synstructure",
+    name = "synstructure-0.13.1",
+    actual = "//third_party/rust_crates/vendor/synstructure-0.13.1:synstructure",
     tags = ["manual"],
 )
 
 alias(
     name = "synstructure",
-    actual = "//third_party/rust_crates/vendor/synstructure-0.12.1:synstructure",
+    actual = "//third_party/rust_crates/vendor/synstructure-0.13.1:synstructure",
     tags = ["manual"],
 )
 
