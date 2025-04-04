@@ -740,7 +740,7 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   request->request()->setup.bm_request_type = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
   request->request()->setup.b_request = USB_REQ_GET_DESCRIPTOR;
   request->request()->setup.w_value = USB_DT_DEVICE << 8;
-  ASSERT_LE(zx_system_get_page_size() * 2, UINT16_MAX);
+  ASSERT_LE(zx_system_get_page_size() * 2, static_cast<uint32_t>(UINT16_MAX));
   request->request()->setup.w_length = static_cast<uint16_t>(zx_system_get_page_size() * 2);
   RequestQueue(std::move(*request));
   ASSERT_TRUE(rang);

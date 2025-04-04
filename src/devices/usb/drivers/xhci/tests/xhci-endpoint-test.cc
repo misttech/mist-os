@@ -263,7 +263,7 @@ TEST_F(EndpointHarness, QueueControlRequest) {
   zx::vmo vmo;
   EXPECT_OK(zx::vmo::create(zx_system_get_page_size() * 2, 0, &vmo));
   std::vector<fuchsia_hardware_usb_request::Request> requests;
-  ASSERT_LE(zx_system_get_page_size() * 2, UINT16_MAX);
+  ASSERT_LE(zx_system_get_page_size() * 2, static_cast<uint32_t>(UINT16_MAX));
   requests.emplace_back()
       .defer_completion(false)
       .information(fuchsia_hardware_usb_request::RequestInfo::WithControl(
