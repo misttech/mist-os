@@ -25,8 +25,15 @@ Include a link to data from 'fx report-last-build'.""",
     """Accelerate builds with remote execution and caching:
 https://fuchsia.dev/internal/intree/concepts/remote-builds""",
     """Profile memory and network usage of builds with 'fx build-profile enable'""",
+    """Use `fx -i` to automatically re-build/test when a file changes.""",
+    """Set `NINJA_STATUS_MAX_COMMANDS=N` in your environment to show the N longest-running build actions.
+Set `NINJA_STATUS_REFRESH_MILLIS=t` to change the refresh rate.""",
+    """Set `FX_BUILD_RBE_STATS=1` in your environment to remote execution statistics after each build.""",
+    """Publish build results to ResultStore (go/fxbtx) by setting in args.gn:
+  bazel_upload_build_events = \"resultstore\" """
     # fx
     """Help with fx commands: fx help COMMAND""",
+    """Build service authentication errors?  Troubleshoot with `fx rbe auth`.""",
     # ffx
     # editors
     # Infra
