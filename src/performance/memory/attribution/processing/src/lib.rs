@@ -9,6 +9,7 @@ use futures::future::BoxFuture;
 use std::collections::{HashMap, HashSet};
 use summary::MemorySummary;
 
+pub mod digest;
 pub mod kernel_statistics;
 pub mod summary;
 
