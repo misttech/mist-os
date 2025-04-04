@@ -1456,6 +1456,8 @@ group("tool_paths.metadata") {
     "//src/testing/fidl_coverage",
     "//src/testing/perfcompare",
 
+    rbe_metrics_summary_script,
+
     # reclient is using fairly generic names (bootstrap, dumpstats). We may
     # need to move these into their own group() at some point to namespace
     # them.
@@ -1463,6 +1465,7 @@ group("tool_paths.metadata") {
     "//prebuilt/proprietary/third_party/reclient/$host_platform/dumpstats",
     "//prebuilt/proprietary/third_party/reclient/$host_platform/reproxy",
     "//prebuilt/proprietary/third_party/reclient/$host_platform/rewrapper",
+
     "//prebuilt/sdk/bazel/bazel",
     "//prebuilt/third_party/buildifier/$host_platform/buildifier",
     "//prebuilt/third_party/clang/$host_platform/share/clang/clang-format-diff.py",

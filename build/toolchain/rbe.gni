@@ -17,6 +17,7 @@ rbe_common_tools = [
 
 rewrapper_config_file = "//build/rbe/fuchsia-rewrapper.cfg"
 reproxy_config_file = "//build/rbe/fuchsia-reproxy.cfg"
+rbe_metrics_summary_script = "//build/rbe/rbe_metrics_summary_json.sh"
 
 declare_args() {
   ############################
