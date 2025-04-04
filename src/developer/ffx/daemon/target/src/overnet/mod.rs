@@ -3,4 +3,5 @@
 // found in the LICENSE file.
 
 pub mod host_pipe;
+pub mod usb;
 pub mod vsock;

@@ -543,7 +543,14 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
         }
         TargetInfoQuery::VSock(cid) => {
             if let TargetState::Product(addrs) = &h.state {
-                if addrs.iter().any(|a| a.cid() == Some(*cid)) {
+                if addrs.iter().any(|a| a.cid_vsock() == Some(*cid)) {
+                    return true;
+                }
+            }
+        }
+        TargetInfoQuery::Usb(cid) => {
+            if let TargetState::Product(addrs) = &h.state {
+                if addrs.iter().any(|a| a.cid_usb() == Some(*cid)) {
                     return true;
                 }
             }
