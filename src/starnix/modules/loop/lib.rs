@@ -368,21 +368,39 @@ impl FileOps for LoopDeviceFile {
         )?;
         let backing_memory_size = backing_memory.get_size();
 
-        let slice_len = backing_memory_size
+        let clone_len = backing_memory_size
             .min(configured_size_limit.unwrap_or(u64::MAX))
             .min(requested_length.unwrap_or(usize::MAX) as u64);
 
-        let memory_slice = backing_memory
-            .create_child(VmoChildOptions::SLICE, configured_offset, slice_len)
-            .map_err(|e| errno!(EINVAL, e))?;
-
         let backing_content_size = backing_memory.get_content_size();
-        if backing_content_size < slice_len {
-            let new_content_size = backing_content_size.saturating_sub(configured_offset);
-            memory_slice.set_content_size(new_content_size);
-        }
 
-        Ok(Arc::new(memory_slice))
+        let mem = if backing_content_size < clone_len {
+            // If we need to set a content size then the backing memory must not be writable since
+            // we are going to create a snapshot clone, which will prevent any writes from becoming
+            // visible in the backing memory.
+            if backing_file.can_write() {
+                track_stub!(
+                    TODO("https://fxbug.dev/408048145"),
+                    "Loop device mutable loop backing files with smaller content"
+                );
+                return error!(EINVAL);
+            }
+            let memory_clone = backing_memory
+                .create_child(
+                    VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE,
+                    configured_offset,
+                    clone_len,
+                )
+                .map_err(|e| errno!(EINVAL, e))?;
+            let new_content_size = backing_content_size.saturating_sub(configured_offset);
+            memory_clone.set_content_size(new_content_size).map_err(|e| errno!(EINVAL, e))?;
+            memory_clone
+        } else {
+            backing_memory
+                .create_child(VmoChildOptions::SLICE, configured_offset, clone_len)
+                .map_err(|e| errno!(EINVAL, e))?
+        };
+        Ok(Arc::new(mem))
     }
 
     fn sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
