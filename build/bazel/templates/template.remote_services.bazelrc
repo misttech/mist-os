@@ -28,6 +28,10 @@ build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
 build:remote_cache_only --config=_remote_common
 build:remote_cache_only --remote_cache=grpcs://remotebuildexecution.googleapis.com
 
+# nocache: force cache-miss, re-execute remotely
+build:nocache --config=remote
+build:nocache --noremote_accept_cached
+
 # Build event protocol (BEP) streaming
 build:_bes_common --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
 build:_bes_common --google_default_credentials=true

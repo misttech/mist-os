@@ -103,6 +103,9 @@ declare_args() {
   #
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
+  #   * "nocache": Force remote execution without using cached results.
+  #         This can be useful for benchmarking cache-miss scenarios.
+  #
   #   (There are other rewrapper options that are not exposed.)
   rust_rbe_exec_strategy = rbe_settings.rust_exec_strategy
 
@@ -178,6 +181,9 @@ declare_args() {
   #
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
+  #   * "nocache": Force remote execution without using cached results.
+  #         This can be useful for benchmarking cache-miss scenarios.
+  #
   #   (There are other rewrapper options that are not exposed.)
   cxx_rbe_exec_strategy = rbe_settings.cxx_exec_strategy
 
@@ -251,6 +257,9 @@ declare_args() {
   #
   #   * "racing": Race local vs. remote execution, take the first to finish.
   #
+  #   * "nocache": Force remote execution without using cached results.
+  #         This can be useful for benchmarking cache-miss scenarios.
+  #
   #   (There are other rewrapper options that are not exposed.)
   link_rbe_exec_strategy = rbe_settings.link_exec_strategy
 
@@ -319,11 +328,12 @@ cxx_link_rbe_deps =
       cxx_link_remote_wrapper,
     ]
 
-assert(
-    rust_rbe_exec_strategy == "remote" ||
-        rust_rbe_exec_strategy == "remote_local_fallback" ||
-        rust_rbe_exec_strategy == "local" || rust_rbe_exec_strategy == "racing",
-    "Unsupported RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
+assert(rust_rbe_exec_strategy == "remote" ||
+           rust_rbe_exec_strategy == "remote_local_fallback" ||
+           rust_rbe_exec_strategy == "local" ||
+           rust_rbe_exec_strategy == "racing" ||
+           rust_rbe_exec_strategy == "nocache",
+       "Unsupported Rust RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
 assert(
     rust_rbe_check == "none" || rust_rbe_check == "consistency" ||
         rust_rbe_check == "determinism",
@@ -332,10 +342,11 @@ assert(
 assert(rust_rbe_download_rlibs || rust_emit_rmeta,
        "rust_rbe_download_rlibs=false requires rust_emit_rmeta=true")
 
-assert(cxx_rbe_exec_strategy == "remote" || cxx_rbe_exec_strategy == "local" ||
-           cxx_rbe_exec_strategy == "remote_local_fallback" ||
-           cxx_rbe_exec_strategy == "racing",
-       "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
+assert(
+    cxx_rbe_exec_strategy == "remote" || cxx_rbe_exec_strategy == "local" ||
+        cxx_rbe_exec_strategy == "remote_local_fallback" ||
+        cxx_rbe_exec_strategy == "racing" || cxx_rbe_exec_strategy == "nocache",
+    "Unsupported C++ RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
 
 assert(
     cxx_rbe_check == "none" || cxx_rbe_check == "consistency" ||
@@ -345,6 +356,13 @@ assert(
 assert(
     cxx_rbe_download_obj_files || !cxx_rbe_minimalist_wrapper,
     "Skipping downloading .o files is only available with the non-minimalist cxx_remote_wrapper.py wrapper.  Set cxx_rbe_minimalist_wrapper=false if this is what you intended.")
+
+assert(
+    link_rbe_exec_strategy == "remote" || link_rbe_exec_strategy == "local" ||
+        link_rbe_exec_strategy == "remote_local_fallback" ||
+        link_rbe_exec_strategy == "racing" ||
+        link_rbe_exec_strategy == "nocache",
+    "Unsupported link RBE exec_strategy: \"$link_rbe_exec_strategy\".")
 
 assert(
     link_rbe_check == "none" || link_rbe_check == "consistency" ||

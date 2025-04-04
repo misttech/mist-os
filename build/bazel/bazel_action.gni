@@ -855,6 +855,8 @@ template("bazel_action") {
         args += [ "--config=remote" ]
       } else if (bazel_rbe_exec_strategy == "local") {
         args += [ "--config=remote_cache_only" ]
+      } else if (bazel_rbe_exec_strategy == "nocache") {
+        args += [ "--config=nocache" ]
       } else {
         assert(false,
                "Unknown bazel_rbe_exec_strategy: $bazel_rbe_exec_strategy")

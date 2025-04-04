@@ -39,6 +39,7 @@ declare_args() {
   #  * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
   #                              Saves bandwidth by avoiding downloading some
   #                              intermediate results.
+  #  * 'nocache' => Force all cache-misses, and re-execute remotely.
   rbe_mode = "off"
 
   # Overridden settings for the RBE mode.  This is a set of override values for
@@ -119,6 +120,24 @@ _default_rbe_settings = {
 
     bazel_enable = true
     bazel_exec_strategy = "remote"
+  }
+
+  # The "nocache" mode forces remote re-execution without using the cache.
+  # This mode is mostly intended for benchmarking remote execution,
+  # and is not intended for most users.
+  nocache = {
+    forward_variables_from(_all_modes_defaults, "*")
+    cxx_enable = true
+    cxx_exec_strategy = "nocache"
+
+    link_enable = true
+    link_exec_strategy = "nocache"
+
+    rust_enable = true
+    rust_exec_strategy = "nocache"
+
+    bazel_enable = true
+    bazel_exec_strategy = "nocache"
   }
 
   # The "cloudtop" development environment has very high
@@ -221,7 +240,7 @@ _default_rbe_settings = {
 # Validate that the chosen RBE mode is one of the valid modes
 assert(
     defined(_default_rbe_settings[rbe_mode]),
-    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only', and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
+    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only', 'nocache', and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
 
 # Set the RBE settings to use based on the chosen RBE mode
 _settings_defaults = _default_rbe_settings[rbe_mode]
