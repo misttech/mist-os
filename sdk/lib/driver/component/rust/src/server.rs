@@ -202,9 +202,14 @@ impl<T: Driver> DriverServer<T> {
 mod tests {
     use super::*;
 
-    use fdf::{Arena, CurrentDispatcher};
+    use fdf::{CurrentDispatcher, OnDispatcher};
     use fdf_env::test::spawn_in_driver;
+    use fidl_next_fuchsia_driver_framework::DriverClientHandler;
     use zx::Status;
+
+    use fdf::Channel;
+    use fidl_next::{Client, ClientEnd};
+    use fidl_next_fuchsia_driver_framework::{DriverClientSender, DriverStartRequest};
 
     #[derive(Default)]
     struct TestDriver {
@@ -227,33 +232,59 @@ mod tests {
 
     crate::driver_register!(TestDriver);
 
+    struct DriverClient;
+    impl DriverClientHandler<fdf_fidl::DriverChannel> for DriverClient {}
+
     #[test]
     fn register_driver() {
         assert_eq!(__fuchsia_driver_registration__.version, 1);
         let initialize_func = __fuchsia_driver_registration__.v1.initialize.expect("initializer");
         let destroy_func = __fuchsia_driver_registration__.v1.destroy.expect("destroy function");
 
-        let (server_chan, client_chan) = fdf::Channel::<[u8]>::create();
+        let (server_chan, client_chan) = Channel::<[fidl_next::Chunk]>::create();
+
+        let (client_exit_tx, client_exit_rx) = futures::channel::oneshot::channel();
         spawn_in_driver("driver registration", async move {
+            let client_end = ClientEnd::from_untyped(fdf_fidl::DriverChannel::new(client_chan));
+            let mut client = Client::new(client_end);
+            let client_sender = client.sender().clone();
+
+            CurrentDispatcher
+                .spawn_task(async move {
+                    client.run(DriverClient).await.unwrap_err();
+                    client_exit_tx.send(()).unwrap();
+                })
+                .unwrap();
+
             let channel_handle = server_chan.into_driver_handle().into_raw().get();
             let driver_server = unsafe { initialize_func(channel_handle) } as usize;
             assert_ne!(driver_server, 0);
-
-            let start_msg =
-                DriverRequest::start_as_message(Arena::new(), DriverStartArgs::default(), 1)
-                    .unwrap();
-            client_chan.write(start_msg).unwrap();
-            let _ = client_chan.read_bytes(CurrentDispatcher).await.unwrap();
-
-            let stop_msg = DriverRequest::stop_as_message(Arena::new()).unwrap();
-            client_chan.write(stop_msg).unwrap();
-            let Err(Status::PEER_CLOSED) = client_chan.read_bytes(CurrentDispatcher).await else {
-                panic!("expected peer closed from driver server after end message");
+            let mut start_request = DriverStartRequest {
+                start_args: fidl_next_fuchsia_driver_framework::DriverStartArgs {
+                    node: None,
+                    symbols: None,
+                    url: None,
+                    program: None,
+                    incoming: None,
+                    outgoing_dir: None,
+                    config: None,
+                    node_name: None,
+                    node_properties: None,
+                    node_offers: None,
+                    node_token: None,
+                    node_properties_2: None,
+                },
             };
+
+            let mut start_res = client_sender.start(&mut start_request).unwrap().await.unwrap();
+            start_res.decode().unwrap().unwrap();
+
+            client_sender.stop().unwrap().await.unwrap();
+            client_exit_rx.await.unwrap();
 
             unsafe {
                 destroy_func(driver_server as *mut c_void);
             }
-        });
+        })
     }
 }
