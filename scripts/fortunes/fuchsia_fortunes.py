@@ -34,9 +34,19 @@ Set `NINJA_STATUS_REFRESH_MILLIS=t` to change the refresh rate.""",
     # fx
     """Help with fx commands: fx help COMMAND""",
     """Build service authentication errors?  Troubleshoot with `fx rbe auth`.""",
+    """`fx repro BBID` prints instructions on how to reproduce a build from infra.""",
+    """`fx format-code` reformats changed code.  Do this before `jiri upload`.""",
     # ffx
     # editors
     # Infra
+    """go/fuchsia-builders lists all builders in Fuchsia infra.""",
+    """go/tq-cq-q shows the number of CQ attempts in progress.""",
+    """go/fuchsia-rbe-weather shows the RBE backend load.""",
+    """General infra requests: go/fuchsia-infra-bug""",
+    """Need a new third-party package in CIPD?  go/fuchsia-new-3pp""",
+    """Request open-source code license reviews at go/osrbugs""",
+    # Gerrit
+    # jiri
     # testing
     # debugging
     # add more helpful entries here...
