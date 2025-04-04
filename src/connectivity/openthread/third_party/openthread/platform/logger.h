@@ -31,9 +31,8 @@
  *   This file implements the `Logger` class for use by POSIX platform module.
  */
 
-#ifdef OPENTHREAD_250225
-#ifndef OT_POSIX_PLATFORM_LOGGER_HPP_
-#define OT_POSIX_PLATFORM_LOGGER_HPP_
+#ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_LOGGER_H_
+#define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_LOGGER_H_
 
 #include <openthread/logging.h>
 
@@ -126,5 +125,4 @@ class Logger {
 }  // namespace Posix
 }  // namespace ot
 
-#endif  // OT_POSIX_PLATFORM_LOGGER_HPP_
-#endif  // OPENTHREAD_250225
+#endif  // SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_LOGGER_H_

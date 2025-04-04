@@ -26,9 +26,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef OPENTHREAD_250225
-#ifndef POSIX_PLATFORM_SPINEL_MANAGER_HPP_
-#define POSIX_PLATFORM_SPINEL_MANAGER_HPP_
+#ifndef SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_SPINEL_MANAGER_H_
+#define SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_SPINEL_MANAGER_H_
 
 #include <assert.h>
 
@@ -129,5 +128,4 @@ CoprocessorType platformSpinelManagerInit(const char *aUrl);
 extern "C" void platformSpinelManagerProcess(otInstance *aInstance,
                                              const otSysMainloopContext *aContext);
 
-#endif  // POSIX_PLATFORM_SPINEL_MANAGER_HPP_
-#endif  // OPENTHREAD_250225
+#endif  // SRC_CONNECTIVITY_OPENTHREAD_THIRD_PARTY_OPENTHREAD_PLATFORM_SPINEL_MANAGER_H_
