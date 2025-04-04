@@ -42,4 +42,26 @@ libc_source_set("zircon.basic") {
 
 libc_test("unittests") {
   sources = [ "thrd_zx_process_test.cc" ]
+  deps = [ ":vmar-tests" ]
+}
+
+libc_source_set("vmar") {
+  public = [ "vmar.h" ]
+  public_deps = [
+    # "vmar.h" uses "zircon_impl.h" for now.
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
+  sources = [ "vmar.cc" ]
+  deps = [
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+libc_test("vmar-tests") {
+  sources = [ "vmar-tests.cc" ]
+  deps = [
+    ":vmar.testonly",
+    "//sdk/lib/fit",
+  ]
 }

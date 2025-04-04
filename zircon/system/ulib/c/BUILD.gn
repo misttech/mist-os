@@ -27,10 +27,12 @@ libc_components = [
   "inttypes",
   "math",
   "pthread",
+  "sanitizers",
   "scudo",
   "setjmp",
   "stdio",
   "stdlib",
+  "zircon",
 ]
 
 libc_testonly_components = [ "threads" ]
@@ -57,9 +59,7 @@ group("components") {
 group("legacy-components") {
   visibility = [ ":*" ]
   deps = [
-    "sanitizers",
     "stubs",
-    "zircon",
     "//zircon/system/ulib/zx-panic-libc:as_source",
   ]
 }
@@ -78,11 +78,7 @@ group("unittests") {
     ":weak-tests",
     "errno:errno.testonly",
   ]
-  foreach(subdir,
-          libc_components + [
-                "sanitizers",
-                "zircon",
-              ] + libc_testonly_components) {
+  foreach(subdir, libc_components + libc_testonly_components) {
     deps += [ "$subdir:unittests" ]
   }
 }
