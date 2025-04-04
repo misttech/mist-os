@@ -366,7 +366,7 @@ Valid options: all, minimal, toplevel (default since Bazel 7.1)
 
 **Current value (from the default):** `"toplevel"`
 
-From //build/bazel/remote_services.gni:31
+From //build/bazel/remote_services.gni:32
 
 ### bazel_rbe_exec_strategy
 
@@ -376,10 +376,11 @@ that is used.
 Supported options:
   "remote": on cache-miss, build remotely (default)
   "local": on cache-miss, build locally
+  "nocache": force execution, as if cache-miss.
 
 **Current value (from the default):** `"remote"`
 
-From //build/bazel/remote_services.gni:24
+From //build/bazel/remote_services.gni:25
 
 ### bazel_upload_build_events
 
@@ -400,7 +401,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:47
+From //build/bazel/remote_services.gni:48
 
 ### blobfs_capacity
 
@@ -699,7 +700,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8718564031675656545"`
+**Current value for `target_cpu = "arm64"`:** `"8718518723520766849"`
 
 From //out/not-default/args.gn:10
 
@@ -707,7 +708,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8718564031675656545"`
+**Current value for `target_cpu = "riscv64"`:** `"8718518723520766849"`
 
 From //out/not-default/args.gn:10
 
@@ -715,7 +716,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8718564031675656545"`
+**Current value for `target_cpu = "x64"`:** `"8718518723520766849"`
 
 From //out/not-default/args.gn:10
 
@@ -1096,11 +1097,11 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1914,7 +1915,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:221
+From //build/toolchain/rbe.gni:227
 
 ### compilation_mode
 
@@ -2131,7 +2132,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:206
+From //build/toolchain/rbe.gni:212
 
 ### cxx_rbe_download_obj_files
 
@@ -2143,7 +2144,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:228
+From //build/toolchain/rbe.gni:234
 
 ### cxx_rbe_enable
 
@@ -2152,7 +2153,7 @@ Remote execution offers increased build parallelism and caching.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:159
+From //build/toolchain/rbe.gni:162
 
 ### cxx_rbe_exec_strategy
 
@@ -2171,11 +2172,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:182
+From //build/toolchain/rbe.gni:188
 
 ### cxx_rbe_full_toolchain
 
@@ -2190,7 +2194,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:216
+From //build/toolchain/rbe.gni:222
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -2200,7 +2204,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:164
+From //build/toolchain/rbe.gni:167
 
 ### data_filesystem_format
 
@@ -3818,13 +3822,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:275
+From //build/toolchain/rbe.gni:284
 
 ### link_rbe_download_unstripped_outputs
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:291
+From //build/toolchain/rbe.gni:300
 
 ### link_rbe_enable
 
@@ -3834,7 +3838,7 @@ linkers like `lld`.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:237
+From //build/toolchain/rbe.gni:243
 
 ### link_rbe_exec_strategy
 
@@ -3853,11 +3857,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:255
+From //build/toolchain/rbe.gni:264
 
 ### link_rbe_full_toolchain
 
@@ -3872,7 +3879,7 @@ Use this primarily for debugging and as an emergency workaround.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:285
+From //build/toolchain/rbe.gni:294
 
 ### llvm_prefix
 
@@ -5052,6 +5059,7 @@ The overall mode for RBE to be operating in.  The valid values are:
                        remote services.
  * 'remote_full' => Run as many actions remotely as possible, including
                  cache-misses, which reduces use of local resources.
+ * 'racing' => Race remote against local execution, for some action types.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services and downloading remote outputs.
@@ -5066,10 +5074,11 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
                              Saves bandwidth by avoiding downloading some
                              intermediate results.
+ * 'nocache' => Force all cache-misses, and re-execute remotely.
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:42
+From //build/toolchain/rbe_modes.gni:44
 
 ### rbe_settings_overrides
 
@@ -5078,7 +5087,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:46
+From //build/toolchain/rbe_modes.gni:48
 
 ### recovery_board_configuration_label
 
@@ -5194,7 +5203,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:147
+From //build/toolchain/rbe.gni:150
 
 ### rust_incremental
 
@@ -5261,7 +5270,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:133
+From //build/toolchain/rbe.gni:136
 
 ### rust_rbe_download_rlibs
 
@@ -5270,13 +5279,13 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:151
+From //build/toolchain/rbe.gni:154
 
 ### rust_rbe_download_unstripped_binaries
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:141
+From //build/toolchain/rbe.gni:144
 
 ### rust_rbe_enable
 
@@ -5303,11 +5312,14 @@ One of:
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
+  * "nocache": Force remote execution without using cached results.
+        This can be useful for benchmarking cache-miss scenarios.
+
   (There are other rewrapper options that are not exposed.)
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:107
+From //build/toolchain/rbe.gni:110
 
 ### rust_v0_symbol_mangling
 
