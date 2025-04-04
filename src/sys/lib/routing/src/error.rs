@@ -811,6 +811,16 @@ impl From<&cm_rust::UseConfigurationDecl> for RouteRequestErrorInfo {
     }
 }
 
+impl From<&cm_rust::UseEventStreamDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::UseEventStreamDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: CapabilityTypeName::EventStream,
+            name: value.source_name.clone(),
+            availability: value.availability,
+        }
+    }
+}
+
 impl From<&cm_rust::ExposeDecl> for RouteRequestErrorInfo {
     fn from(value: &cm_rust::ExposeDecl) -> Self {
         RouteRequestErrorInfo {

@@ -92,18 +92,17 @@ pub mod tests {
     };
     use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType, UnresolveAction};
     use crate::model::component::{ComponentInstance, StartReason};
-    use crate::model::events::registry::EventSubscription;
-    use crate::model::events::stream::EventStream;
     use crate::model::testing::test_helpers::{component_decl_with_test_runner, ActionsTest};
     use assert_matches::assert_matches;
-    use cm_rust::{Availability, UseEventStreamDecl, UseSource};
     use cm_rust_testing::*;
-    use cm_types::Name;
     use errors::{ActionError, UnresolveActionError};
     use hooks::EventType;
     use moniker::Moniker;
     use std::sync::Arc;
-    use {fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync};
+    use {
+        fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+        fuchsia_async as fasync,
+    };
 
     /// Check unresolve for _recursive_ case. The system has a root with the child `a` and `a` has
     /// descendants as shown in the diagram below.
@@ -206,34 +205,11 @@ pub mod tests {
         assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
     }
 
-    async fn setup_unresolve_test_event_stream(
-        test: &ActionsTest,
-        event_types: Vec<EventType>,
-    ) -> EventStream {
-        let events: Vec<_> = event_types.into_iter().map(|e| e.into()).collect();
-        let mut event_source =
-            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
-        let event_stream = event_source
-            .subscribe(
-                events
-                    .into_iter()
-                    .map(|event: Name| EventSubscription {
-                        event_name: UseEventStreamDecl {
-                            source_name: event,
-                            source: UseSource::Parent,
-                            scope: None,
-                            target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                            filter: None,
-                            availability: Availability::Required,
-                        },
-                    })
-                    .collect(),
-            )
-            .await
-            .expect("subscribe to event stream");
+    async fn setup_unresolve_test_event_stream(test: &ActionsTest) -> fcomponent::EventStreamProxy {
+        let unresolved_event_stream = test.new_event_stream(vec![EventType::Unresolved]).await;
         let model = test.model.clone();
         fasync::Task::spawn(async move { model.start().await }).detach();
-        event_stream
+        unresolved_event_stream
     }
 
     #[fuchsia::test]
@@ -245,20 +221,21 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         test.start(Moniker::root()).await;
-        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
+        let a_moniker: Moniker = vec!["a"].try_into().unwrap();
+        let component_a = test.start(a_moniker.clone()).await;
         test.start(vec!["a", "b"].try_into().unwrap()).await;
 
-        let mut event_stream =
-            setup_unresolve_test_event_stream(&test, vec![EventType::Unresolved]).await;
+        let event_stream = setup_unresolve_test_event_stream(&test).await;
 
         // Register the UnresolveAction.
         let nf = component_a.actions().register_no_wait(UnresolveAction::new()).await;
 
         // Component a is then unresolved.
-        event_stream
-            .wait_until(EventType::Unresolved, vec!["a"].try_into().unwrap())
-            .await
-            .unwrap();
+        let unresolved_events = event_stream.get_next().await.unwrap();
+        assert_eq!(
+            unresolved_events[0].header.as_ref().unwrap().moniker,
+            Some(a_moniker.to_string())
+        );
         nf.await.unwrap();
 
         // Now attempt to unresolve again with another UnresolveAction.

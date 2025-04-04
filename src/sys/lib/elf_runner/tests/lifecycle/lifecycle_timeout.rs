@@ -42,7 +42,6 @@ async fn test_stop_timeouts() {
         EventSequence::new()
             .all_of(
                 vec![
-                    EventMatcher::ok().r#type(Started::TYPE).moniker("."),
                     EventMatcher::ok().r#type(Started::TYPE).moniker(root_moniker.clone()),
                     EventMatcher::ok().r#type(Started::TYPE).moniker(custom_timeout_child.clone()),
                     EventMatcher::ok()

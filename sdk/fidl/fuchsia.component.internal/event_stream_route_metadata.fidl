@@ -1,0 +1,15 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.component.internal;
+
+using fuchsia.component.decl;
+using fuchsia.component;
+
+/// This value is used internally by event stream routers, to carry information
+/// pertinent to the route.
+type EventStreamRouteMetadata = table {
+    1: scope_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    2: scope vector<fuchsia.component.decl.Ref>:MAX;
+};

@@ -5,27 +5,31 @@
 use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
 use crate::capability;
 use crate::framework::realm::Realm;
-use crate::model::component::instance::InstanceState;
+use crate::model::component::instance::{InstanceState, UnresolvedInstanceState};
 use crate::model::component::{ComponentInstance, StartReason};
-use crate::model::events::registry::EventSubscription;
+use crate::model::events::use_router::EventStreamUseRouter;
 use crate::model::model::Model;
 use crate::model::testing::mocks::{ControlMessage, MockResolver, MockRunner};
 use crate::model::testing::test_hook::TestHook;
+use ::routing::bedrock::request_metadata::event_stream_metadata;
+use ::routing::bedrock::sandbox_construction::EventStreamSourceRouter;
+use ::routing::component_instance::ComponentInstanceInterface;
 use camino::Utf8PathBuf;
 use cm_config::RuntimeConfig;
 use cm_rust::{
-    Availability, CapabilityDecl, ComponentDecl, ConfigChecksum, ConfigDecl, ConfigField,
-    ConfigSingleValue, ConfigValue, ConfigValueSource, ConfigValueSpec, ConfigValueType,
-    ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
+    CapabilityDecl, ComponentDecl, ConfigChecksum, ConfigDecl, ConfigField, ConfigSingleValue,
+    ConfigValue, ConfigValueSource, ConfigValueSpec, ConfigValueType, ConfigValuesData,
+    EventStreamDecl, NativeIntoFidl, RunnerDecl,
 };
 use cm_rust_testing::*;
-use cm_types::Url;
+use cm_types::{Name, Url};
 use fidl::endpoints;
 use futures::channel::mpsc::Receiver;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use hooks::{EventType, HooksRegistration};
 use moniker::{ChildName, Moniker};
+use sandbox::{Capability, Message, Request, RouterResponse};
 use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
@@ -501,34 +505,53 @@ pub async fn new_event_stream(
     builtin_environment: &BuiltinEnvironment,
     events: Vec<EventType>,
 ) -> fcomponent::EventStreamProxy {
-    let mut event_source = builtin_environment.event_source_factory.create_for_above_root();
-    let event_stream = event_source
-        .subscribe(
-            events
-                .into_iter()
-                .map(|event| EventSubscription {
-                    event_name: UseEventStreamDecl {
-                        source_name: event.into(),
-                        source: UseSource::Parent,
-                        scope: None,
-                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
-                        filter: None,
-                        availability: Availability::Required,
-                    },
-                })
-                .collect(),
-        )
-        .await
-        .expect("subscribe to event stream");
-    let (proxy, fidl_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fcomponent::EventStreamMarker>();
-    // It's obviously not ideal to detach this, but the need to create an extra task here goes away
-    // in the next commit.
-    fuchsia_async::Task::spawn(async move {
-        let _event_source = event_source;
-        crate::model::events::serve::serve_event_stream(event_stream, fidl_stream).await;
-    })
-    .detach();
+    let root_component = builtin_environment.model.root().clone();
+    // Locking the component's resolved state would be easier, but that would cause the root
+    // component to be resolved and some tests want to observe the root component's resolved event,
+    // which would then be missed because we don't create the event stream until after we get the
+    // root's component input (which we need because it holds the routers for every event stream
+    // capability).
+    let root_component_input = match &*root_component.lock_state().await {
+        InstanceState::Unresolved(UnresolvedInstanceState { component_input, .. }) => {
+            component_input.clone()
+        }
+        InstanceState::Resolved(resolved_state) | InstanceState::Started(resolved_state, _) => {
+            resolved_state.sandbox.component_input.clone()
+        }
+        other_state => panic!("root component is in unexpected state {:?}", other_state),
+    };
+    let source_routers = events
+        .into_iter()
+        .map(|e| {
+            root_component_input
+                .capabilities()
+                .get(&Name::new(e.as_str()).unwrap())
+                .unwrap()
+                .unwrap()
+        })
+        .map(|cap| match cap {
+            Capability::DictionaryRouter(router) => router,
+            other_capability => panic!("unexpected capability: {:?}", other_capability),
+        })
+        .map(|router| EventStreamSourceRouter {
+            router,
+            availability: cm_rust::Availability::Required,
+            route_metadata: Default::default(),
+            filter: None,
+        })
+        .collect::<Vec<_>>();
+    let use_router = EventStreamUseRouter::new(source_routers);
+
+    let metadata = event_stream_metadata(cm_rust::Availability::Required, Default::default());
+    let request = Request { metadata, target: root_component.as_weak().into() };
+    let result = use_router.route(Some(request), false).await;
+    let connector = match result {
+        Ok(RouterResponse::Capability(connector)) => connector,
+        other_response => panic!("unexpected router response: {:?}", other_response),
+    };
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fcomponent::EventStreamMarker>();
+    connector.send(Message { channel: server_end.into_channel() }).unwrap();
+    proxy.wait_for_ready().await.unwrap();
     proxy
 }
 

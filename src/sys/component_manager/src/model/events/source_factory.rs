@@ -13,6 +13,7 @@ use std::sync::{Arc, Weak};
 
 /// Allows to create `EventSource`s and tracks all the created ones.
 pub struct EventSourceFactory {
+    #[allow(unused)]
     top_instance: Weak<ComponentManagerInstance>,
 
     /// The event registry. It subscribes to all events happening in the system and
@@ -42,13 +43,13 @@ impl EventSourceFactory {
         )
     }
 
-    pub fn create_for_above_root(&self) -> EventSource {
-        EventSource::new(
-            WeakExtendedInstance::AboveRoot(self.top_instance.clone()),
-            self.event_registry.clone(),
-            self.event_stream_provider.clone(),
-        )
-    }
+    // pub fn create_for_above_root(&self) -> EventSource {
+    //     EventSource::new(
+    //         WeakExtendedInstance::AboveRoot(self.top_instance.clone()),
+    //         self.event_registry.clone(),
+    //         self.event_stream_provider.clone(),
+    //     )
+    // }
 
     fn matches(&self, capability: &InternalCapability) -> bool {
         matches!(capability, InternalCapability::EventStream(_))
