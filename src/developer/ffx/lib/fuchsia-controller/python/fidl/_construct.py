@@ -75,17 +75,16 @@ def make_default_obj_from_ident(ident: str) -> Any:
     # If there is not identifier then this is for a two way method that returns ().
     if not ident:
         return None
-    split = ident.split("/")
-    library = "fidl." + split[0].replace(".", "_")
-    ty = split[1]
+    library_identifier, member_identifier = ident.split("/")
     try:
+        # Use static FIDL bindings if their available.
+        library = "fidl_" + library_identifier.replace(".", "_")
         mod = sys.modules[library]
     except KeyError:
-        # Try using fidl_ as the prefix because static FIDL bindings may
-        # be available.
-        library = "fidl_" + split[0].replace(".", "_")
+        # Fallback to dynamic FIDL bindings.
+        library = "fidl." + library_identifier.replace(".", "_")
         mod = sys.modules[library]
-    obj_ty = getattr(mod, ty)
+    obj_ty = getattr(mod, member_identifier)
     return obj_ty.make_default()
 
 
