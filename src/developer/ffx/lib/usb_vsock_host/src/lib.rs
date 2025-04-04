@@ -19,7 +19,7 @@ use std::pin::pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use thiserror::Error;
-use usb_vsock::{Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator};
+use usb_vsock::{Address, Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator};
 
 /// Magic sent in the sync packet of the USB protocol. This is a temporary
 /// version from the original Overnet protocol. We'll be updating it soon as the
@@ -78,6 +78,17 @@ fn sync_packet() -> Vec<u8> {
     packet_storage
 }
 
+/// Creates a new magic packet used to synchronize a USB VSOCK connection.
+fn echo_reply_packet(address: &Address, payload: &[u8]) -> Vec<u8> {
+    let header = &mut Header::new(PacketType::EchoReply);
+    header.set_address(address);
+    header.payload_len = (payload.len() as u32).into();
+    let packet = Packet { header, payload: payload };
+    let mut packet_storage = vec![0; header.packet_size()];
+    packet.write_to_unchecked(&mut packet_storage);
+    packet_storage
+}
+
 /// Wait on a USB port for the magic packet indicating the start of our USB
 /// VSOCK protocol.
 async fn wait_for_magic(
@@ -87,8 +98,8 @@ async fn wait_for_magic(
 ) -> Result<(), SyncError> {
     let mut magic_timer = fasync::Timer::new(MAGIC_TIMEOUT);
     let mut buf = [0u8; MTU];
+    out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
     loop {
-        out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
         let size = {
             tracing::trace!(device = debug_name, "Reading from in endpoint for magic string");
             let read_fut = in_ep.read(&mut buf);
@@ -122,23 +133,30 @@ async fn wait_for_magic(
 
                     tracing::warn!(
                         device = debug_name,
-                        "Invalid USB magic string (len = {}) received, ignoring",
+                        "Invalid USB magic string (len = {}) received, ignoring and re-attempting sync",
                         packet.header.payload_len
                     );
+                    out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
+                }
+                PacketType::Echo => {
+                    tracing::debug!(
+                        device = debug_name,
+                        "received echo packet while waiting for sync, responding."
+                    );
+                    out_ep
+                        .write(&echo_reply_packet(&Address::from(packet.header), packet.payload))
+                        .await
+                        .map_err(SyncError::Send)?;
                 }
                 ty => {
                     tracing::warn!(
                         device = debug_name,
-                        "Unexpected packet type '{ty:?}' waiting for packet synchronization"
+                        "Unexpected packet type '{ty:?}' waiting for packet synchronization, ignoring and re-attempting sync"
                     );
+                    out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
                 }
             }
         }
-        tracing::warn!(
-            device = debug_name,
-            "Invalid packet of size {size} bytes ignored and attempting to resynchronize",
-            size = buf.len(),
-        );
     }
 }
 

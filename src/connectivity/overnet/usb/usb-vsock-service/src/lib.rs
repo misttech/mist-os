@@ -5,16 +5,17 @@
 use fdf_component::{driver_register, Driver, DriverContext, Node};
 use fidl::endpoints::create_endpoints;
 use fuchsia_async::scope::ScopeStream;
-use fuchsia_async::{Scope, Socket};
+use fuchsia_async::{Scope, Socket, TimeoutExt};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::future::{select, Either};
 use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, TryStreamExt};
 use log::{debug, error, info, warn};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::pin::pin;
 use std::sync::Arc;
+use std::time::Duration;
 use usb_vsock::{
     Connection, ConnectionRequest, Header, Packet, PacketType, UsbPacketBuilder,
     VsockPacketIterator,
@@ -62,6 +63,67 @@ impl UsbConnection {
         Self { vsock_service, usb_socket_reader, usb_socket_writer, connection_tx }
     }
 
+    // TODO(406262417): this is only here because the host side has trouble with hanging
+    // gets and sending some data immediately after will help it clear and re-establish its state.
+    async fn clear_host_requests(&mut self, found_magic: &[u8]) -> Option<()> {
+        let mut data = [0; MTU];
+        for _ in 0..10 {
+            let header = &mut Header::new(PacketType::Echo);
+            header.payload_len.set(found_magic.len() as u32);
+            let packet = Packet { header, payload: &found_magic };
+            packet.write_to_unchecked(&mut data);
+            if let Err(err) = self.usb_socket_writer.write(&data[..packet.size()]).await {
+                error!("Error writing echo to the usb socket: {err:?}");
+                return None;
+            }
+            let next_packet = read_packet_stream(&mut self.usb_socket_reader, &mut data)
+                .on_timeout(Duration::from_millis(100), || Err(ErrorKind::TimedOut.into()))
+                .await;
+            let mut packets = match next_packet {
+                Ok(None) => {
+                    debug!("Usb socket closed");
+                    return None;
+                }
+                Err(err) if err.kind() == ErrorKind::TimedOut => {
+                    error!("Timed out waiting for matching packet, trying again");
+                    continue;
+                }
+                Err(err) => {
+                    error!("Unexpected error on usb socket: {err}");
+                    return None;
+                }
+                Ok(Some(packets)) => packets,
+            };
+
+            while let Some(packet) = packets.next() {
+                // note: we will deliberately warn and ignore for any vsock packets in the same
+                // usb packet as a sync packet, regardless of whether they were before or after.
+                match packet {
+                    Ok(Packet {
+                        header: Header { packet_type: PacketType::EchoReply, .. },
+                        payload,
+                    }) => {
+                        if payload == found_magic {
+                            debug!("host replied to echo packet and it was received, continuing synchronization");
+                            return Some(());
+                        } else {
+                            warn!("Got echo reply with incorrect payload, ignoring.")
+                        }
+                    }
+                    Ok(packet) => {
+                        warn!("Got unexpected packet of type {:?} and length {} while waiting for sync packet. Ignoring.", packet.header.packet_type, packet.header.payload_len);
+                    }
+                    Err(err) => {
+                        warn!("Got invalid vsock packet while waiting for sync packet: {err:?}");
+                    }
+                }
+            }
+        }
+        // try and finish the connection anyways
+        warn!("Failed to receive echo response in time, giving up but still trying to connect");
+        Some(())
+    }
+
     /// Waits for an [`PacketType::Sync`] packet and sends the reply back, and then returns a
     /// fresh control socket for the new connection
     async fn next_socket(&mut self, mut found_magic: Option<Vec<u8>>) -> Option<Socket> {
@@ -102,6 +164,11 @@ impl UsbConnection {
         let found_magic =
             found_magic.expect("read loop should not terminate until sync packet is read");
 
+        // send echo packets until we get back an expected reply
+        // TODO(406262417): this is only here because the host side has trouble with hanging
+        // gets and sending some data immediately after will help it clear and re-establish its state.
+        self.clear_host_requests(&found_magic).await?;
+
         debug!("Read sync packet, sending it back and setting up a new link");
         let mut header = Header::new(PacketType::Sync);
         header.payload_len = (found_magic.len() as u32).into();
@@ -111,14 +178,10 @@ impl UsbConnection {
             error!("Error writing overnet magic string to the usb socket: {err:?}");
             return None;
         }
-        let (next_control_socket, other_end) = zx::Socket::create_stream();
-        // TODO(406262417): this is only here because the host side has trouble with hanging
-        // gets and sending some data immediately after will help it clear and re-establish its state.
-        Socket::from_socket(other_end).write_all(b"hello").await.ok();
-        // after writing to the 'other_end' we drop this socket end because we don't expect any
-        // further data on the control socket, as it's currently unused. In the future if we want
-        // to have side channel data flow between the host and driver, this is the socket it would
-        // go in.
+        let (next_control_socket, _other_end) = zx::Socket::create_stream();
+        // we allow `_other_end` to drop because we don't expect any further data on the control
+        // socket, as it's currently unused. In the future if we want to have side channel data flow
+        // between the host and driver, this is the socket it would go in.
         return Some(Socket::from_socket(next_control_socket));
     }
 
@@ -133,6 +196,7 @@ impl UsbConnection {
             found_magic = None;
             let connection = Arc::new(Connection::new(control_socket, self.connection_tx.clone()));
             self.vsock_service.set_connection(connection.clone()).await;
+
             let usb_socket_writer =
                 usb_socket_writer::<MTU>(&connection, &mut self.usb_socket_writer);
             let usb_socket_reader = usb_socket_reader::<MTU>(

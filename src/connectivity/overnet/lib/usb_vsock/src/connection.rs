@@ -283,6 +283,7 @@ impl<B: PacketBuffer> Connection<B> {
     async fn handle_echo_packet(&self, address: Address, payload: &[u8]) -> Result<(), Error> {
         debug!("received echo for {address:?} with payload {payload:?}");
         let header = &mut Header::new(PacketType::EchoReply);
+        header.payload_len.set(payload.len() as u32);
         header.set_address(&address);
         self.packet_filler
             .write_vsock_packet(&Packet { header, payload })
