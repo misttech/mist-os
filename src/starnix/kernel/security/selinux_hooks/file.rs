@@ -50,6 +50,16 @@ pub(in crate::security) fn file_permission(
         &security_server.as_permission_check(),
         current_sid,
         file,
+        &[],
+        current_task.into(),
+    )?;
+
+    todo_has_fs_node_permissions(
+        TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission checks"),
+        &current_task.kernel(),
+        &security_server.as_permission_check(),
+        current_sid,
+        &file.name.entry.node,
         &permissions_from_flags(permission_flags, file_class),
         current_task.into(),
     )
