@@ -27,7 +27,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct DeviceHandleInner(String);
+pub struct DeviceHandleInner(pub(crate) String);
 
 impl DeviceHandleInner {
     pub(crate) fn new(hdl: String) -> DeviceHandleInner {

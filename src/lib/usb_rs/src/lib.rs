@@ -25,6 +25,13 @@ impl From<usb_plat::DeviceHandleInner> for DeviceHandle {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl DeviceHandle {
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> Self {
+        DeviceHandle(usb_plat::DeviceHandleInner(path.as_ref().to_string_lossy().into_owned()))
+    }
+}
+
 impl DeviceHandle {
     /// A printable name for this device.
     pub fn debug_name(&self) -> String {

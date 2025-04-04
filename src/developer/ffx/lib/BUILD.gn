@@ -40,6 +40,7 @@ libs = [
   "testing",
   "timeout",
   "usb_fastboot_discovery",
+  "usb_vsock_host",
   "version",
   "writer",
 
