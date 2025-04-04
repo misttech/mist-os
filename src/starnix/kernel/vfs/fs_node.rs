@@ -125,7 +125,7 @@ pub struct FsNode {
     ///
     /// The FsNodeOps are implemented by the individual file systems to provide
     /// specific behaviors for this FsNode.
-    ops: Box<dyn FsNodeOps>,
+    ops: Option<Box<dyn FsNodeOps>>,
 
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
@@ -205,9 +205,13 @@ pub struct FsNodeInfo {
     pub time_access: UtcInstant,
     pub time_modify: UtcInstant,
     pub casefold: bool,
-    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt
-    // it.
+    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt it.
     pub wrapping_key_id: Option<[u8; 16]>,
+    // Used to indicate to filesystems that manage timestamps that an access has occurred and to
+    // update the node's atime.
+    // This only impacts accesses within Starnix. Most Fuchsia programs are not expected to maintain
+    // access times. If the file handle is transferred out of Starnix, there may be inconsistencies.
+    pub pending_time_access_update: bool,
 }
 
 impl FsNodeInfo {
@@ -848,7 +852,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 
     /// Called when the FsNode is freed by the Kernel.
     fn forget(
-        &self,
+        self: Box<Self>,
         _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -1240,7 +1244,7 @@ impl FsNode {
         {
             let result = Self {
                 weak_handle: Default::default(),
-                ops,
+                ops: Some(ops),
                 fs,
                 node_id,
                 info: RwLock::new(info),
@@ -1282,7 +1286,7 @@ impl FsNode {
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {
-        self.ops.as_ref()
+        self.ops.as_ref().expect("live FsNodes must have an ops").as_ref()
     }
 
     /// Returns an error if this node is encrypted and locked.
@@ -2020,7 +2024,7 @@ impl FsNode {
         if access.contains(Access::EXEC) && !self.is_dir() {
             mount.check_noexec_filesystem()?;
         }
-        self.ops.check_access(
+        self.ops().check_access(
             &mut locked.cast_locked::<FileOpsCore>(),
             self,
             current_task,
@@ -2680,14 +2684,16 @@ impl std::fmt::Debug for FsNode {
 impl Releasable for FsNode {
     type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
-        if let Err(err) =
-            self.ops.forget(&mut locked.cast_locked::<FileOpsCore>(), &self, current_task)
-        {
+        if let Err(err) = self.ops.take().unwrap().forget(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            &self,
+            current_task,
+        ) {
             log_error!("Error on FsNodeOps::forget: {err:?}");
         }
     }

@@ -432,8 +432,6 @@ fn fetch_and_refresh_info_impl<'a>(
     zxio: &Arc<syncio::Zxio>,
     info: &'a RwLock<FsNodeInfo>,
 ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-    // TODO(https://fxbug.dev/294318193): when Fxfs and Memfs support tracking atime, we should
-    // refresh the corresponding value.
     let attrs = zxio
         .attr_get(zxio_node_attr_has_t {
             content_size: true,
@@ -441,13 +439,16 @@ fn fetch_and_refresh_info_impl<'a>(
             link_count: true,
             modification_time: true,
             change_time: true,
+            access_time: true,
             casefold: true,
             wrapping_key_id: true,
+            pending_access_time_update: info.read().pending_time_access_update,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
     let mut info = info.write();
     update_info_from_attrs(&mut info, &attrs);
+    info.pending_time_access_update = false;
     Ok(RwLockWriteGuard::downgrade(info))
 }
 
@@ -473,6 +474,9 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     if attrs.has.change_time {
         info.time_status_change =
             UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+    }
+    if attrs.has.access_time {
+        info.time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
     }
     if attrs.has.wrapping_key_id {
         info.wrapping_key_id = Some(attrs.wrapping_key_id);
@@ -742,6 +746,9 @@ impl FsNodeOps for RemoteNode {
         let owner;
         let rdev;
         let fsverity_enabled;
+        let time_modify;
+        let time_status_change;
+        let time_access;
         let mut attrs = zxio_node_attributes_t {
             has: zxio_node_attr_has_t {
                 protocols: true,
@@ -753,6 +760,9 @@ impl FsNodeOps for RemoteNode {
                 id: true,
                 fsverity_enabled: true,
                 casefold: true,
+                modification_time: true,
+                change_time: true,
+                access_time: true,
                 ..Default::default()
             },
             ..Default::default()
@@ -780,7 +790,11 @@ impl FsNodeOps for RemoteNode {
             return error!(EINVAL);
         }
         let casefold = attrs.casefold;
-
+        time_modify =
+            UtcInstant::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
+        time_status_change =
+            UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+        time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
         let node = fs.get_or_create_node(
             current_task,
             if fs_ops.use_remote_ids {
@@ -804,7 +818,14 @@ impl FsNodeOps for RemoteNode {
                     ops,
                     &fs,
                     node_id,
-                    FsNodeInfo { rdev, casefold, ..FsNodeInfo::new(node_id, mode, owner) },
+                    FsNodeInfo {
+                        rdev,
+                        casefold,
+                        time_status_change,
+                        time_modify,
+                        time_access,
+                        ..FsNodeInfo::new(node_id, mode, owner)
+                    },
                 );
                 if fsverity_enabled {
                     *child.fsverity.lock() = FsVerityState::FsVerity;
@@ -1050,6 +1071,23 @@ impl FsNodeOps for RemoteNode {
         } else {
             error!(EXDEV)
         }
+    }
+
+    fn forget(
+        self: Box<Self>,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<(), Errno> {
+        // Before forgetting this node, update atime if we need to.
+        if node.info().pending_time_access_update {
+            // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
+            // other references around.
+            let zxio = Arc::try_unwrap(self.zxio)
+                .expect("should not forget remotefs nodes that have multiple references");
+            zxio.close_and_update_access_time().map_err(|status| from_status_like_fdio!(status))?;
+        }
+        Ok(())
     }
 
     fn enable_fsverity(&self, descriptor: &fsverity_descriptor) -> Result<(), Errno> {
@@ -1598,6 +1636,23 @@ impl FsNodeOps for RemoteSymlink {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         fetch_and_refresh_info_impl(&self.zxio, info)
+    }
+
+    fn forget(
+        self: Box<Self>,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<(), Errno> {
+        // Before forgetting this node, update atime if we need to.
+        if node.info().pending_time_access_update {
+            // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
+            // other references around.
+            let zxio = Arc::try_unwrap(self.zxio)
+                .expect("should not forget remotefs nodes that have multiple references");
+            zxio.close_and_update_access_time().map_err(|status| from_status_like_fdio!(status))?;
+        }
+        Ok(())
     }
 }
 
@@ -3056,6 +3111,232 @@ mod test {
             .await
             .expect("spawn");
         assert!(casefold);
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_update_time_access_persists() {
+        let fixture = TestFixture::new().await;
+
+        const TEST_FILE: &str = "test_file";
+
+        let info_after_read = {
+            let (server, client) = zx::Channel::create();
+            fixture.root().clone(server.into()).expect("clone failed");
+
+            // Set up file.
+            let (kernel, _init_task) = create_kernel_and_task();
+            kernel
+                .kthreads
+                .spawner()
+                .spawn_and_get_result({
+                    let kernel = Arc::clone(&kernel);
+                    move |locked, current_task| {
+                        let fs = RemoteFs::new_fs(
+                            &kernel,
+                            client,
+                            FileSystemOptions {
+                                source: b"/".into(),
+                                flags: MountFlags::RELATIME,
+                                ..Default::default()
+                            },
+                            fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        )
+                        .expect("new_fs failed");
+                        let ns = Namespace::new_with_flags(fs, MountFlags::RELATIME);
+                        let child = ns
+                            .root()
+                            .open_create_node(
+                                locked,
+                                &current_task,
+                                TEST_FILE.into(),
+                                FileMode::ALLOW_ALL.with_type(FileMode::IFREG),
+                                DeviceType::NONE,
+                                OpenFlags::empty(),
+                            )
+                            .expect("create_node failed");
+
+                        let file_handle = child
+                            .open(locked, &current_task, OpenFlags::RDWR, AccessCheck::default())
+                            .expect("open failed");
+
+                        // Expect atime to be updated as this is the first file access since the
+                        // last file modification or status change.
+                        file_handle
+                            .read(locked, &current_task, &mut VecOutputBuffer::new(10))
+                            .expect("read failed");
+
+                        // Call `fetch_and_refresh_info` to persist atime update.
+                        let info_after_read = child
+                            .entry
+                            .node
+                            .fetch_and_refresh_info(locked, &current_task)
+                            .expect("fetch_and_refresh_info failed")
+                            .clone();
+
+                        info_after_read
+                    }
+                })
+                .await
+                .expect("spawn failed")
+        };
+
+        // Tear down the kernel and open the file again. The file should no longer be cached.
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+
+        {
+            let (server, client) = zx::Channel::create();
+            fixture.root().clone(server.into()).expect("clone failed");
+            let (kernel, _init_task) = create_kernel_and_task();
+
+            kernel
+                .kthreads
+                .spawner()
+                .spawn_and_get_result({
+                    let kernel = Arc::clone(&kernel);
+                    move |locked, current_task| {
+                        let fs = RemoteFs::new_fs(
+                            &kernel,
+                            client,
+                            FileSystemOptions {
+                                source: b"/".into(),
+                                flags: MountFlags::RELATIME,
+                                ..Default::default()
+                            },
+                            fio::PERM_READABLE | fio::PERM_WRITABLE,
+                        )
+                        .expect("new_fs failed");
+                        let ns = Namespace::new_with_flags(fs, MountFlags::RELATIME);
+                        let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                        let child = ns
+                            .root()
+                            .lookup_child(locked, &current_task, &mut context, TEST_FILE.into())
+                            .expect("lookup_child failed");
+
+                        // Get info - this should be refreshed with info that was persisted before
+                        // we tore down the kernel.
+                        let persisted_info = child
+                            .entry
+                            .node
+                            .fetch_and_refresh_info(locked, &current_task)
+                            .expect("fetch_and_refresh_info failed")
+                            .clone();
+                        assert_eq!(info_after_read.time_access, persisted_info.time_access);
+                    }
+                })
+                .await
+                .expect("spawn failed")
+        };
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_pending_access_time_updates() {
+        let fixture = TestFixture::new().await;
+
+        const TEST_FILE: &str = "test_file";
+
+        let (server, client) = zx::Channel::create();
+        fixture.root().clone(server.into()).expect("clone failed");
+
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |locked, current_task| {
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions {
+                            source: b"/".into(),
+                            flags: MountFlags::RELATIME,
+                            ..Default::default()
+                        },
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
+                    )
+                    .expect("new_fs failed");
+
+                    let ns = Namespace::new_with_flags(fs, MountFlags::RELATIME);
+                    let child = ns
+                        .root()
+                        .open_create_node(
+                            locked,
+                            &current_task,
+                            TEST_FILE.into(),
+                            FileMode::ALLOW_ALL.with_type(FileMode::IFREG),
+                            DeviceType::NONE,
+                            OpenFlags::empty(),
+                        )
+                        .expect("create_node failed");
+
+                    let file_handle = child
+                        .open(locked, &current_task, OpenFlags::RDWR, AccessCheck::default())
+                        .expect("open failed");
+
+                    // Expect atime to be updated as this is the first file access since the last
+                    // file modification or status change.
+                    file_handle
+                        .read(locked, &current_task, &mut VecOutputBuffer::new(10))
+                        .expect("read failed");
+
+                    let atime_after_first_read = child
+                        .entry
+                        .node
+                        .fetch_and_refresh_info(locked, &current_task)
+                        .expect("fetch_and_refresh_info failed")
+                        .time_access;
+
+                    // Read again (this read will not trigger a persistent atime update if
+                    // filesystem was mounted with atime)
+                    file_handle
+                        .read(locked, &current_task, &mut VecOutputBuffer::new(10))
+                        .expect("read failed");
+
+                    let atime_after_second_read = child
+                        .entry
+                        .node
+                        .fetch_and_refresh_info(locked, &current_task)
+                        .expect("fetch_and_refresh_info failed")
+                        .time_access;
+                    assert_eq!(atime_after_first_read, atime_after_second_read);
+
+                    // Do another operation that will update ctime and/or mtime but not atime.
+                    let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+                    let _written = file_handle
+                        .write(locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .expect("write failed");
+
+                    // Read again (atime should be updated).
+                    file_handle
+                        .read(locked, &current_task, &mut VecOutputBuffer::new(10))
+                        .expect("read failed");
+
+                    assert!(
+                        atime_after_second_read
+                            < child
+                                .entry
+                                .node
+                                .fetch_and_refresh_info(locked, &current_task)
+                                .expect("fetch_and_refresh_info failed")
+                                .time_access
+                    );
+                }
+            })
+            .await
+            .expect("spawn failed");
 
         fixture.close().await;
     }
