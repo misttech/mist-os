@@ -1076,11 +1076,11 @@ impl FsNodeOps for RemoteNode {
     fn forget(
         self: Box<Self>,
         _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
         _current_task: &CurrentTask,
+        info: FsNodeInfo,
     ) -> Result<(), Errno> {
         // Before forgetting this node, update atime if we need to.
-        if node.info().pending_time_access_update {
+        if info.pending_time_access_update {
             // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
             // other references around.
             let zxio = Arc::try_unwrap(self.zxio)
@@ -1641,11 +1641,11 @@ impl FsNodeOps for RemoteSymlink {
     fn forget(
         self: Box<Self>,
         _locked: &mut Locked<'_, FileOpsCore>,
-        node: &FsNode,
         _current_task: &CurrentTask,
+        info: FsNodeInfo,
     ) -> Result<(), Errno> {
         // Before forgetting this node, update atime if we need to.
-        if node.info().pending_time_access_update {
+        if info.pending_time_access_update {
             // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
             // other references around.
             let zxio = Arc::try_unwrap(self.zxio)

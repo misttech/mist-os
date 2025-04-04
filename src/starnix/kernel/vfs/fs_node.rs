@@ -125,7 +125,7 @@ pub struct FsNode {
     ///
     /// The FsNodeOps are implemented by the individual file systems to provide
     /// specific behaviors for this FsNode.
-    ops: Option<Box<dyn FsNodeOps>>,
+    ops: Box<dyn FsNodeOps>,
 
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
@@ -854,8 +854,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn forget(
         self: Box<Self>,
         _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
         _current_task: &CurrentTask,
+        _info: FsNodeInfo,
     ) -> Result<(), Errno> {
         Ok(())
     }
@@ -1244,7 +1244,7 @@ impl FsNode {
         {
             let result = Self {
                 weak_handle: Default::default(),
-                ops: Some(ops),
+                ops,
                 fs,
                 node_id,
                 info: RwLock::new(info),
@@ -1286,7 +1286,7 @@ impl FsNode {
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {
-        self.ops.as_ref().expect("live FsNodes must have an ops").as_ref()
+        self.ops.as_ref()
     }
 
     /// Returns an error if this node is encrypted and locked.
@@ -2684,15 +2684,15 @@ impl std::fmt::Debug for FsNode {
 impl Releasable for FsNode {
     type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
-        if let Err(err) = self.ops.take().unwrap().forget(
+        if let Err(err) = self.ops.forget(
             &mut locked.cast_locked::<FileOpsCore>(),
-            &self,
             current_task,
+            self.info.into_inner(),
         ) {
             log_error!("Error on FsNodeOps::forget: {err:?}");
         }
