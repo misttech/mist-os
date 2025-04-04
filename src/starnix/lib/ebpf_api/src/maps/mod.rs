@@ -7,6 +7,7 @@
 mod array;
 mod buffer;
 mod hashmap;
+mod lock;
 mod ring_buffer;
 mod vmar;
 
