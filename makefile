@@ -139,5 +139,14 @@ starnix_lite_kernel: gen info
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: starnix_lite_kernel
 
+iso:
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-32-boot-shim.bin
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/multiboot-shim.bin
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel_x64/kernel.zbi
+	$(MISTOSROOT)/zircon/scripts/make-zircon-x64-grub
+.PHONY: iso
+
+
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@

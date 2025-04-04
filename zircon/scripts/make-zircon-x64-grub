@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Copyright 2025 Mist Tecnologia Ltda. All rights reserved.
 # Copyright 2016 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -10,27 +11,37 @@ set -e -u
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-PROJECT="x64"
-PROJECT_DIR="$DIR/../build-$PROJECT"
-BOOTDATA="${1:-$PROJECT_DIR/bootdata.bin}"
+PROJECT_DIR="$DIR/../../out/default"
+# osx prefix for grub legacy (x86_64-elf is for EFI)
+GRUB_PREFIX=i686-elf-
 
-(cd "$DIR/.."; ENABLE_NEW_BOOT=true $DIR/make-parallel $PROJECT) || exit
-
-if ! which xorriso grub-mkrescue &> /dev/null; then
-  echo "ERROR: You must install xorriso and grub-mkrescue"
+if ! which xorriso ${GRUB_PREFIX}grub-mkrescue &> /dev/null; then
+  echo "ERROR: You must install xorriso and ${GRUB_PREFIX}grub-mkrescue"
   exit
 fi
 
-trap 'rm -rf "$TEMP"' EXIT HUP INT TERM
-TEMP="$(mktemp -d)"
-
-mkdir -p "$TEMP/boot/grub"
-cp "$PROJECT_DIR/multiboot.bin" "$PROJECT_DIR/zircon.zbi" "$TEMP/boot/"
-cat > "$TEMP/boot/grub/grub.cfg" << \EOF
-set timeout=0
-menuentry "Zircon" {
-  multiboot /boot/multiboot.bin
-  module /boot/initrd.bin
+mkdir -p "$PROJECT_DIR/iso/boot/grub"
+cp "$PROJECT_DIR/kernel.phys32/linux-x86-32-boot-shim.bin" "$PROJECT_DIR/iso/boot/"
+cp "$PROJECT_DIR/kernel.phys32/linux-x86-boot-shim.bin" "$PROJECT_DIR/iso/boot/"
+cp "$PROJECT_DIR/kernel.phys32/multiboot-shim.bin" "$PROJECT_DIR/iso/boot/"
+cp "$PROJECT_DIR/kernel_x64/kernel.zbi" "$PROJECT_DIR/iso/boot/"
+cat > "$PROJECT_DIR/iso/boot/grub/grub.cfg" << \EOF
+set timeout=1
+menuentry "mist-os" {
+  multiboot /boot/multiboot-shim.bin kernel.serial=legacy kernel.shell=true
+  module /boot/kernel.zbi
+}
+menuentry "mist-os-linux32" {
+  linux /boot/linux-x86-32-boot-shim.bin kernel.serial=legacy kernel.shell=true
+  initrd /boot/kernel.zbi
+}
+menuentry "mist-os-linux64" {
+  linux /boot/linux-x86-boot-shim.bin kernel.serial=legacy kernel.shell=true
+  initrd /boot/kernel.zbi
 }
 EOF
-grub-mkrescue -o "$PROJECT_DIR/zircon.iso" "$TEMP"
+${GRUB_PREFIX}grub-mkrescue -o "$PROJECT_DIR/mistos.iso" "$PROJECT_DIR/iso"
+
+# Verify ISO contents
+#echo "Verifying ISO contents..."
+#xorriso -indev "$PROJECT_DIR/mistos.iso" -toc
