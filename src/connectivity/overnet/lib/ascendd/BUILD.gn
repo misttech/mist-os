@@ -14,12 +14,8 @@ if (is_host) {
     deps = [
       "//src/connectivity/overnet/lib/circuit",
       "//src/connectivity/overnet/lib/core",
-      "//src/connectivity/overnet/lib/usb_vsock",
       "//src/developer/ffx/lib/netext:lib",
-      "//src/devices/bind/fuchsia.google.platform.usb:fuchsia.google.platform.usb_rust",
-      "//src/devices/bind/fuchsia.usb:fuchsia.usb_rust",
       "//src/lib/fuchsia-async",
-      "//src/lib/usb_rs",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:futures",
@@ -28,9 +24,6 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
 
-    sources = [
-      "src/lib.rs",
-      "src/usb.rs",
-    ]
+    sources = [ "src/lib.rs" ]
   }
 }

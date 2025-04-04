@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod usb;
-
-use crate::usb::listen_for_usb_devices;
 use anyhow::{bail, format_err, Context as ErrorContext, Error};
 use argh::FromArgs;
 use fuchsia_async::{Task, TimeoutExt};
@@ -122,10 +119,6 @@ pub struct Opt {
     /// paths to other ascendds which we will connect this ascendd to, causing
     /// both to be part of the same network.
     pub link: Vec<PathBuf>,
-
-    #[argh(option, default = "false")]
-    /// allow ascendd to scan for USB devices and connect to them automatically.
-    pub usb: bool,
 }
 
 #[derive(Debug)]
@@ -139,11 +132,10 @@ impl Ascendd {
         mut opt: Opt,
         node: Arc<overnet_core::Router>,
     ) -> Result<impl FnOnce() -> Self, Error> {
-        let usb = opt.usb;
         let link = std::mem::replace(&mut opt.link, vec![]);
         let (sockpath, client_routing, incoming) = bind_listener(opt, node.node_id()).await?;
         Ok(move || Self {
-            task: Task::spawn(run_ascendd(node, sockpath, incoming, client_routing, usb, link)),
+            task: Task::spawn(run_ascendd(node, sockpath, incoming, client_routing, link)),
         })
     }
 
@@ -246,7 +238,7 @@ async fn bind_listener(
     opt: Opt,
     node_id: overnet_core::NodeId,
 ) -> Result<(PathBuf, AscenddClientRouting, UnixListener), Error> {
-    let Opt { sockpath, serial: _, client_routing, usb: _, link: _ } = opt;
+    let Opt { sockpath, serial: _, client_routing, link: _ } = opt;
     let client_routing =
         if client_routing { AscenddClientRouting::Enabled } else { AscenddClientRouting::Disabled };
     tracing::debug!(node_id = node_id.0, "starting ascendd on {}", sockpath.display(),);
@@ -322,7 +314,6 @@ async fn run_ascendd(
     sockpath: PathBuf,
     incoming: UnixListener,
     client_routing: AscenddClientRouting,
-    usb: bool,
     link: Vec<PathBuf>,
 ) -> Result<(), Error> {
     node.set_client_routing(client_routing);
@@ -330,7 +321,7 @@ async fn run_ascendd(
     tracing::debug!("ascendd listening to socket {}", sockpath.display());
 
     #[allow(clippy::large_futures)]
-    futures::future::try_join3(
+    futures::future::try_join(
         futures::stream::iter(link.into_iter().map(Ok)).try_for_each_concurrent(None, |path| {
             let node = Arc::clone(&node);
             async move {
@@ -349,17 +340,6 @@ async fn run_ascendd(
                 Ok(())
             }
         }),
-        {
-            let node = Arc::clone(&node);
-            async move {
-                if usb {
-                    #[allow(clippy::large_futures)]
-                    listen_for_usb_devices(Arc::downgrade(&node)).await
-                } else {
-                    Ok(())
-                }
-            }
-        },
         {
             let node = Arc::clone(&node);
             async move {
