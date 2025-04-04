@@ -285,7 +285,7 @@ AnnotationMap GetReportAnnotations(const feedback::Annotations& snapshot_annotat
   };
 
   added_annotations.Set(snapshot_annotations)
-      .Set(feedback::kOSVersionKey, Get(feedback::kBuildVersionKey))
+      .Set(feedback::kOSVersionKey, Get(feedback::kBuildPlatformVersionKey))
       .Set(feedback::kOSChannelKey, Get(feedback::kSystemUpdateChannelCurrentKey));
 
   return added_annotations;

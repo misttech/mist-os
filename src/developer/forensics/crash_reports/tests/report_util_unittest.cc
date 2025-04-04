@@ -178,6 +178,7 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_EmptySnapshotAnnotations) {
 TEST(SnapshotAnnotationsTest, GetReportAnnotations_Snapshot) {
   const feedback::Annotations startup_annotations = {
       {feedback::kBuildVersionKey, ErrorOrString("version")},
+      {feedback::kBuildPlatformVersionKey, ErrorOrString("platform-version")},
       {feedback::kSystemUpdateChannelCurrentKey, ErrorOrString("channel")},
       {feedback::kBuildBoardKey, ErrorOrString("board")},
       {feedback::kBuildProductKey, ErrorOrString(Error::kTimeout)},
@@ -188,9 +189,10 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_Snapshot) {
 
   EXPECT_THAT(annotations.Raw(),
               UnorderedElementsAreArray({
-                  Pair(feedback::kOSVersionKey, "version"),
+                  Pair(feedback::kOSVersionKey, "platform-version"),
                   Pair(feedback::kOSChannelKey, "channel"),
                   Pair(feedback::kBuildVersionKey, "version"),
+                  Pair(feedback::kBuildPlatformVersionKey, "platform-version"),
                   Pair(feedback::kSystemUpdateChannelCurrentKey, "channel"),
                   Pair(feedback::kBuildBoardKey, "board"),
                   Pair(feedback::kBuildProductKey, "unknown"),
