@@ -38,7 +38,7 @@ pub trait AssemblyContainer {
         // performance for serde.
         let data = std::fs::read_to_string(config_path.as_ref())
             .with_context(|| format!("Reading config: {}", config_path.as_ref()))?;
-        let config = serde_json::from_str(&data)
+        let config = serde_json5::from_str(&data)
             .with_context(|| format!("Parsing config: {}", config_path.as_ref()))?;
 
         // We assume that the paths are already absolute, because we are loading
@@ -418,6 +418,29 @@ mod tests {
         let config_file = NamedTempFile::new().unwrap();
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
         serde_json::to_writer(&config_file, &config_value).unwrap();
+
+        // Parse the config into memory and ensure it is correct.
+        // The config in memory should have absolute paths.
+        let expected: Config = serde_json::from_value(config_value).unwrap();
+        let config = Config::from_config_path(&config_path).unwrap();
+        assert_eq!(expected, config);
+    }
+
+    #[test]
+    fn test_read_from_json5_config() {
+        // Write a config to disk using absolute paths.
+        let gamma_file = NamedTempFile::new().unwrap();
+        let gamma_path = Utf8PathBuf::from_path_buf(gamma_file.path().to_path_buf()).unwrap();
+        let config_value = json!({
+            "alpha": {
+                "beta": {
+                    "gamma": gamma_path.clone(),
+                }
+            }
+        });
+        let config_file = NamedTempFile::new().unwrap();
+        let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
+        serde_json5::to_writer(&config_file, &config_value).unwrap();
 
         // Parse the config into memory and ensure it is correct.
         // The config in memory should have absolute paths.
