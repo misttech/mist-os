@@ -539,8 +539,6 @@ impl Query for SecurityServer {
             AbstractObjectClass::Custom(target_class) => active_policy
                 .parsed
                 .compute_access_decision_custom(&source_context, &target_context, &target_class),
-            // No meaningful policy can be determined without target class.
-            _ => AccessDecision::allow(AccessVector::NONE),
         }
     }
 
@@ -632,8 +630,6 @@ impl Query for SecurityServer {
                     ioctl_prefix,
                 )
             }
-            // No meaningful policy can be determined without target class.
-            _ => IoctlAccessDecision::DENY_ALL,
         }
     }
 }

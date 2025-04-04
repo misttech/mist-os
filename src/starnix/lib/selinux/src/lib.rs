@@ -34,18 +34,11 @@ impl SecurityId {
 /// A class that may appear in SELinux policy or an access vector cache query.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum AbstractObjectClass {
-    Unspecified,
     /// A well-known class used in the SELinux system, such as `process` or `file`.
     System(ObjectClass),
     /// A custom class that only has meaning in policies that define class with the given string
     /// name.
     Custom(String),
-}
-
-impl Default for AbstractObjectClass {
-    fn default() -> Self {
-        Self::Unspecified
-    }
 }
 
 /// Declares an `enum` and implements an `all_variants()` API for it.
@@ -419,28 +412,6 @@ impl From<FileClass> for FsNodeClass {
 impl From<SocketClass> for FsNodeClass {
     fn from(sock_class: SocketClass) -> Self {
         FsNodeClass::Socket(sock_class)
-    }
-}
-
-/// A permission that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, PartialEq)]
-pub enum AbstractPermission {
-    /// A permission that is interpreted directly by the system. These are kernel objects such as
-    /// a "process", "file", etc.
-    System(Permission),
-    /// A permission with an arbitrary string identifier.
-    Custom { class: AbstractObjectClass, permission: String },
-}
-
-impl AbstractPermission {
-    pub fn new_custom(class: AbstractObjectClass, permission: String) -> Self {
-        Self::Custom { class, permission }
-    }
-}
-
-impl From<Permission> for AbstractPermission {
-    fn from(permission: Permission) -> Self {
-        Self::System(permission)
     }
 }
 
@@ -1499,7 +1470,6 @@ mod tests {
 
     #[test]
     fn object_class_permissions() {
-        assert_eq!(AbstractObjectClass::Unspecified, AbstractObjectClass::default());
         assert_eq!(
             AbstractObjectClass::Custom(String::from("my_class")),
             String::from("my_class").into()
@@ -1509,10 +1479,6 @@ mod tests {
             assert_eq!("process", variant.class().name());
             let permission: Permission = variant.clone().into();
             assert_eq!(Permission::Process(variant.clone()), permission);
-            assert_eq!(
-                AbstractPermission::System(Permission::Process(variant.clone())),
-                permission.into()
-            );
             assert_eq!(AbstractObjectClass::System(ObjectClass::Process), variant.class().into());
         }
     }
