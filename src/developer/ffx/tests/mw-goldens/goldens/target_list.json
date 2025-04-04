@@ -93,28 +93,6 @@
             }
           },
           "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "Usb"
-          ],
-          "properties": {
-            "Usb": {
-              "type": "object",
-              "required": [
-                "cid"
-              ],
-              "properties": {
-                "cid": {
-                  "type": "integer",
-                  "format": "uint32",
-                  "minimum": 0.0
-                }
-              }
-            }
-          },
-          "additionalProperties": false
         }
       ]
     }

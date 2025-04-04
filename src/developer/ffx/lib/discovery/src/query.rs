@@ -4,9 +4,7 @@
 use crate::desc::Description;
 use crate::DiscoverySources;
 use addr::{TargetAddr, TargetIpAddr};
-use fidl_fuchsia_developer_ffx::{
-    TargetAddrInfo, TargetInfo, TargetIpAddrInfo, TargetIpPort, TargetVSockNamespace,
-};
+use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIpAddrInfo, TargetIpPort};
 use std::net::SocketAddr;
 
 #[derive(Debug, Clone)]
@@ -18,8 +16,6 @@ pub enum TargetInfoQuery {
     Addr(SocketAddr),
     /// Match a target which has a VSock address with the given CID.
     VSock(u32),
-    /// Match a target which has a USB emulated VSock address with the given CID.
-    Usb(u32),
     First,
 }
 
@@ -84,8 +80,7 @@ impl TargetInfoQuery {
                 .iter()
                 .filter_map(|x| TargetIpAddr::try_from(x).ok())
                 .any(|a| address_matcher(addr, &mut a.into(), t.ssh_port.unwrap_or(22))),
-            Self::VSock(cid) => t.addresses.iter().filter_map(|x| x.cid_vsock()).any(|x| x == *cid),
-            Self::Usb(cid) => t.addresses.iter().filter_map(|x| x.cid_usb()).any(|x| x == *cid),
+            Self::VSock(cid) => t.addresses.iter().filter_map(|x| x.cid()).any(|x| x == *cid),
             Self::First => true,
         }
     }
@@ -142,20 +137,7 @@ impl TargetInfoQuery {
                 .map(|addresses| {
                     addresses.iter().any(|a| {
                         if let TargetAddrInfo::Vsock(a) = a {
-                            a.cid == *cid && a.namespace == TargetVSockNamespace::Vsock
-                        } else {
-                            false
-                        }
-                    })
-                })
-                .unwrap_or(false),
-            Self::Usb(cid) => t
-                .addresses
-                .as_ref()
-                .map(|addresses| {
-                    addresses.iter().any(|a| {
-                        if let TargetAddrInfo::Vsock(a) = a {
-                            a.cid == *cid && a.namespace == TargetVSockNamespace::Usb
+                            a.cid == *cid
                         } else {
                             false
                         }
@@ -211,16 +193,6 @@ impl From<String> for TargetInfoQuery {
             // and want to to preserve that across the client/daemon boundary
             return Self::Serial(String::from(&s[7..]));
         }
-        if s.starts_with("usb:cid:") {
-            if let Ok(cid) = s["usb:cid:".len()..].parse() {
-                return Self::Usb(cid);
-            }
-        }
-        if s.starts_with("vsock:cid:") {
-            if let Ok(cid) = s["vsock:cid:".len()..].parse() {
-                return Self::VSock(cid);
-            }
-        }
 
         let (addr, scope, port) = match netext::parse_address_parts(s.as_str()) {
             Ok(r) => r,
@@ -246,7 +218,6 @@ impl From<TargetAddr> for TargetInfoQuery {
         match t {
             TargetAddr::Net(socket_addr) => Self::Addr(socket_addr),
             TargetAddr::VSockCtx(cid) => Self::VSock(cid),
-            TargetAddr::UsbCtx(cid) => Self::Usb(cid),
         }
     }
 }
@@ -266,7 +237,7 @@ pub fn target_addr_info_to_socketaddr(tai: TargetIpAddrInfo) -> SocketAddr {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_developer_ffx::{TargetIp, TargetVSockCtx};
+    use fidl_fuchsia_developer_ffx::TargetIp;
     use fidl_fuchsia_net as net;
 
     #[test]
@@ -303,50 +274,6 @@ mod test {
             TargetInfoQuery::Serial(s) if s == serial => {}
             _ => panic!("parsing of serial query failed"),
         }
-    }
-
-    #[test]
-    fn test_vsock_query() {
-        const CID: u32 = 3;
-        let q = TargetInfoQuery::from(format!("vsock:cid:{CID}"));
-        match q {
-            TargetInfoQuery::VSock(cid) if cid == CID => {}
-            _ => panic!("parsing of vsock query failed"),
-        }
-
-        assert!(q.match_description(&Description {
-            addresses: vec![TargetAddr::VSockCtx(CID)],
-            ..Default::default()
-        }));
-        assert!(q.match_target_info(&TargetInfo {
-            addresses: Some(vec![TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid: CID,
-                namespace: TargetVSockNamespace::Vsock
-            })]),
-            ..Default::default()
-        }));
-    }
-
-    #[test]
-    fn test_usb_query() {
-        const CID: u32 = 3;
-        let q = TargetInfoQuery::from(format!("usb:cid:{CID}"));
-        match q {
-            TargetInfoQuery::Usb(cid) if cid == CID => {}
-            _ => panic!("parsing of serial query failed"),
-        }
-
-        assert!(q.match_description(&Description {
-            addresses: vec![TargetAddr::UsbCtx(CID)],
-            ..Default::default()
-        }));
-        assert!(q.match_target_info(&TargetInfo {
-            addresses: Some(vec![TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid: CID,
-                namespace: TargetVSockNamespace::Usb
-            })]),
-            ..Default::default()
-        }));
     }
 
     #[test]

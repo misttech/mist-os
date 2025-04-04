@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use fidl_fuchsia_developer_ffx::{
-    TargetAddrInfo, TargetIp, TargetIpAddrInfo, TargetIpPort, TargetVSockCtx, TargetVSockNamespace,
+    TargetAddrInfo, TargetIp, TargetIpAddrInfo, TargetIpPort, TargetVSockCtx,
 };
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use netext::{scope_id_to_name, IsLocalAddr};
@@ -183,7 +183,7 @@ impl TryFrom<&TargetAddr> for TargetIpAddr {
     fn try_from(value: &TargetAddr) -> std::result::Result<Self, Self::Error> {
         match value {
             TargetAddr::Net(socket_addr) => Ok(TargetIpAddr(*socket_addr)),
-            TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_) => Err(NotANetworkAddress),
+            TargetAddr::VSockCtx(_) => Err(NotANetworkAddress),
         }
     }
 }
@@ -234,7 +234,6 @@ impl std::fmt::Display for TargetIpAddr {
 pub enum TargetAddr {
     Net(SocketAddr),
     VSockCtx(u32),
-    UsbCtx(u32),
 }
 
 // Only compare `TargetAddr` by ip and port, since we want to deduplicate targets if they are
@@ -247,10 +246,6 @@ impl std::hash::Hash for TargetAddr {
         match self {
             TargetAddr::Net(addr) => (addr.ip(), addr.port()).hash(state),
             TargetAddr::VSockCtx(cid) => cid.hash(state),
-            TargetAddr::UsbCtx(cid) => {
-                cid.hash(state);
-                "usb".hash(state)
-            }
         }
     }
 }
@@ -263,8 +258,6 @@ impl PartialEq for TargetAddr {
             }
             (TargetAddr::Net(_), _) | (_, TargetAddr::Net(_)) => false,
             (TargetAddr::VSockCtx(cid), TargetAddr::VSockCtx(other)) => cid == other,
-            (TargetAddr::VSockCtx(_), _) | (_, TargetAddr::VSockCtx(_)) => false,
-            (TargetAddr::UsbCtx(cid), TargetAddr::UsbCtx(other)) => cid == other,
         }
     }
 }
@@ -277,14 +270,9 @@ impl Ord for TargetAddr {
             (TargetAddr::Net(addr), TargetAddr::Net(other)) => {
                 addr.ip().cmp(&other.ip()).then(addr.port().cmp(&other.port()))
             }
-            (TargetAddr::Net(_), TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_)) => Ordering::Less,
-            (TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_), TargetAddr::Net(_)) => {
-                Ordering::Greater
-            }
+            (TargetAddr::Net(_), TargetAddr::VSockCtx(_)) => Ordering::Less,
+            (TargetAddr::VSockCtx(_), TargetAddr::Net(_)) => Ordering::Greater,
             (TargetAddr::VSockCtx(cid), TargetAddr::VSockCtx(other)) => cid.cmp(other),
-            (TargetAddr::UsbCtx(cid), TargetAddr::UsbCtx(other)) => cid.cmp(other),
-            (TargetAddr::VSockCtx(_), TargetAddr::UsbCtx(_)) => Ordering::Greater,
-            (TargetAddr::UsbCtx(_), TargetAddr::VSockCtx(_)) => Ordering::Less,
         }
     }
 }
@@ -299,14 +287,7 @@ impl Into<TargetAddrInfo> for &TargetAddr {
     fn into(self) -> TargetAddrInfo {
         match self {
             TargetAddr::Net(addr) => TargetIpAddr::from(*addr).into(),
-            TargetAddr::VSockCtx(cid) => TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid: *cid,
-                namespace: TargetVSockNamespace::Vsock,
-            }),
-            TargetAddr::UsbCtx(cid) => TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid: *cid,
-                namespace: TargetVSockNamespace::Usb,
-            }),
+            TargetAddr::VSockCtx(cid) => TargetAddrInfo::Vsock(TargetVSockCtx { cid: *cid }),
         }
     }
 }
@@ -364,13 +345,8 @@ impl From<&TargetAddrInfo> for TargetAddr {
                 IpAddress::Ipv6(Ipv6Address { addr }) => (addr.into(), ip.scope_id, ip.port),
                 IpAddress::Ipv4(Ipv4Address { addr }) => (addr.into(), ip.scope_id, ip.port),
             },
-            TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid,
-                namespace: TargetVSockNamespace::Vsock,
-            }) => return TargetAddr::VSockCtx(*cid),
-            TargetAddrInfo::Vsock(TargetVSockCtx { cid, namespace: TargetVSockNamespace::Usb }) => {
-                return TargetAddr::UsbCtx(*cid)
-            } // TODO(https://fxbug.dev/42130068): Add serial numbers.,
+            TargetAddrInfo::Vsock(ctx) => return TargetAddr::VSockCtx(ctx.cid),
+            // TODO(https://fxbug.dev/42130068): Add serial numbers.,
         };
 
         TargetAddr::new(addr, scope, port)
@@ -423,28 +399,21 @@ impl TargetAddr {
     pub fn ip(&self) -> Option<IpAddr> {
         match self {
             TargetAddr::Net(addr) => Some(addr.ip()),
-            TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_) => None,
+            TargetAddr::VSockCtx(_) => None,
         }
     }
 
     pub fn port(&self) -> Option<u16> {
         match self {
             TargetAddr::Net(addr) => Some(addr.port()),
-            TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_) => None,
+            TargetAddr::VSockCtx(_) => None,
         }
     }
 
-    pub fn cid_vsock(&self) -> Option<u32> {
+    pub fn cid(&self) -> Option<u32> {
         match self {
             TargetAddr::VSockCtx(cid) => Some(*cid),
-            TargetAddr::Net(_) | TargetAddr::UsbCtx(_) => None,
-        }
-    }
-
-    pub fn cid_usb(&self) -> Option<u32> {
-        match self {
-            TargetAddr::UsbCtx(cid) => Some(*cid),
-            TargetAddr::Net(_) | TargetAddr::VSockCtx(_) => None,
+            TargetAddr::Net(_) => None,
         }
     }
 
@@ -454,7 +423,7 @@ impl TargetAddr {
                 addr.set_port(new_port);
                 Ok(())
             }
-            TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_) => Err(NotANetworkAddress),
+            TargetAddr::VSockCtx(_) => Err(NotANetworkAddress),
         }
     }
 
@@ -465,7 +434,7 @@ impl TargetAddr {
                 (IpAddr::V6(_), p) => format!("[{self}]:{p}"),
                 (_, p) => format!("{self}:{p}"),
             },
-            TargetAddr::VSockCtx(_) | TargetAddr::UsbCtx(_) => format!("{self}"),
+            TargetAddr::VSockCtx(_) => format!("{self}"),
         }
     }
 }
@@ -475,7 +444,6 @@ impl std::fmt::Display for TargetAddr {
         match self {
             TargetAddr::Net(addr) => write!(f, "{}", TargetIpAddr::from(*addr)),
             TargetAddr::VSockCtx(cid) => write!(f, "vsock:cid:{cid}"),
-            TargetAddr::UsbCtx(cid) => write!(f, "usb:cid:{cid}"),
         }
     }
 }

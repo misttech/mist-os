@@ -18,14 +18,8 @@ type TargetIpPort = struct {
     port uint16;
 };
 
-type TargetVSockNamespace = strict enum {
-    VSOCK = 0;
-    USB = 1;
-};
-
 type TargetVSockCtx = struct {
     cid uint32;
-    namespace TargetVSockNamespace;
 };
 
 // TODO(awdavies): Add serial number.

@@ -13,7 +13,6 @@ rustc_library("fidl_message") {
   deps = [ "//src/lib/fidl/rust/fidl" ]
   visibility = [
     ":*",
-    "//src/developer/ffx/daemon/*",
     "//src/developer/remote-control/*",
     "//src/lib/fdomain/*",
     "//src/lib/fidl/rust/external_tests:*",

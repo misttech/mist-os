@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use ffx::{TargetAddrInfo, TargetVSockCtx};
-use fidl_fuchsia_developer_ffx::{self as ffx, TargetVSockNamespace};
+use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::stream::StreamExt;
@@ -300,10 +300,7 @@ impl EmulatorWatcher {
             instance.emulator_configuration.device.vsock.clone().filter(|x| x.enabled);
 
         if let Some(v) = &vsock_device {
-            addresses.push(TargetAddrInfo::Vsock(TargetVSockCtx {
-                cid: v.cid,
-                namespace: TargetVSockNamespace::Vsock,
-            }));
+            addresses.push(TargetAddrInfo::Vsock(TargetVSockCtx { cid: v.cid }));
         }
 
         if nodename.is_empty() {

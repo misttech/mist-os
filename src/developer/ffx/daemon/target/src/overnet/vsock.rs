@@ -12,7 +12,7 @@ use std::os::fd::AsRawFd;
 use std::sync::Arc;
 use tokio::io::Ready;
 
-pub(crate) const OVERNET_VSOCK_PORT: u32 = 202;
+const OVERNET_VSOCK_PORT: u32 = 202;
 const BUFFER_SIZE: usize = 4096;
 
 /// Host-pipe-like task for communicating via vsock.
