@@ -13,12 +13,12 @@ use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
-    default_ioctl, default_seek, fileops_impl_directory, fileops_impl_seekable,
-    fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, Anon, AppendLockGuard,
-    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
-    DEFAULT_BYTES_PER_BLOCK,
+    default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
+    fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
+    fs_node_impl_xattr_delegate, Anon, AppendLockGuard, CacheConfig, CacheMode, DirectoryEntryType,
+    DirentSink, FallocMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    SeekTarget, SymlinkTarget, XattrOp, XattrStorage, DEFAULT_BYTES_PER_BLOCK,
 };
 use bstr::{BString, ByteSlice};
 use fidl::AsHandleRef;
@@ -53,7 +53,7 @@ use syncio::{
     DirentIterator, SelinuxContextAttr, XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions,
     ZXIO_ROOT_HASH_LENGTH,
 };
-use zx::{HandleBased, Status};
+use zx::{Counter, HandleBased};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder,
     fidl_fuchsia_unknown as funknown,
@@ -380,7 +380,11 @@ fn remote_file_attrs_and_ops(
             }
         };
         handle = queryable.into_channel().into_handle();
-    };
+    } else if handle_type == zx::ObjectType::COUNTER {
+        let attr = zxio_node_attr::default();
+        let file_ops = Box::new(RemoteCounter::new(handle.into()));
+        return Ok((attr, file_ops));
+    }
 
     // Otherwise, use zxio based objects.
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
@@ -1397,11 +1401,13 @@ impl FileOps for RemoteDirectoryObject {
 
     fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
         self.zxio.sync().map_err(|status| match status {
-            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
-            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
-            Status::BAD_HANDLE => errno!(EBADFD),
-            Status::NOT_SUPPORTED => errno!(ENOTSUP),
-            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            zx::Status::NO_RESOURCES | zx::Status::NO_MEMORY | zx::Status::NO_SPACE => {
+                errno!(ENOSPC)
+            }
+            zx::Status::INVALID_ARGS | zx::Status::NOT_FILE => errno!(EINVAL),
+            zx::Status::BAD_HANDLE => errno!(EBADFD),
+            zx::Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            zx::Status::INTERRUPTED_RETRY => errno!(EINTR),
             _ => errno!(EIO),
         })
     }
@@ -1516,11 +1522,13 @@ impl FileOps for RemoteFileObject {
 
     fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
         self.zxio.sync().map_err(|status| match status {
-            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
-            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
-            Status::BAD_HANDLE => errno!(EBADFD),
-            Status::NOT_SUPPORTED => errno!(ENOTSUP),
-            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            zx::Status::NO_RESOURCES | zx::Status::NO_MEMORY | zx::Status::NO_SPACE => {
+                errno!(ENOSPC)
+            }
+            zx::Status::INVALID_ARGS | zx::Status::NOT_FILE => errno!(EINVAL),
+            zx::Status::BAD_HANDLE => errno!(EBADFD),
+            zx::Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            zx::Status::INTERRUPTED_RETRY => errno!(EINTR),
             _ => errno!(EIO),
         })
     }
@@ -1535,8 +1543,10 @@ impl FileOps for RemoteFileObject {
     ) -> Result<SyscallResult, Errno> {
         // TODO(b/305781995): Change the SyncFence implementation to not rely on VMOs and
         // remove this ioctl. This is temporary solution.
-        if (request >> 8) as u8 == SYNC_IOC_MAGIC && (request as u8 == SYNC_IOC_FILE_INFO)
-            || (request as u8 == SYNC_IOC_MERGE)
+        let ioctl_type = (request >> 8) as u8;
+        let ioctl_number = request as u8;
+        if ioctl_type == SYNC_IOC_MAGIC
+            && (ioctl_number == SYNC_IOC_FILE_INFO || ioctl_number == SYNC_IOC_MERGE)
         {
             let mut sync_points: Vec<SyncPoint> = vec![];
             let memory = self.get_memory(
@@ -1551,7 +1561,7 @@ impl FileOps for RemoteFileObject {
                 .ok_or_else(|| errno!(ENOTSUP))?
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .map_err(impossible_error)?;
-            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
+            sync_points.push(SyncPoint::new(Timeline::Hwc, vmo.into()));
             let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
             let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
             return sync_file.ioctl(locked, file, current_task, request, arg);
@@ -1588,6 +1598,71 @@ impl FsNodeOps for RemoteSymlink {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         fetch_and_refresh_info_impl(&self.zxio, info)
+    }
+}
+
+pub struct RemoteCounter {
+    counter: Counter,
+}
+
+impl RemoteCounter {
+    fn new(counter: Counter) -> Self {
+        Self { counter }
+    }
+
+    pub fn duplicate_handle(&self) -> Result<Counter, Errno> {
+        self.counter.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)
+    }
+}
+
+impl FileOps for RemoteCounter {
+    fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
+
+    fn ioctl(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        let ioctl_type = (request >> 8) as u8;
+        let ioctl_number = request as u8;
+        if ioctl_type == SYNC_IOC_MAGIC
+            && (ioctl_number == SYNC_IOC_FILE_INFO || ioctl_number == SYNC_IOC_MERGE)
+        {
+            let mut sync_points: Vec<SyncPoint> = vec![];
+            let counter = self.duplicate_handle()?;
+            sync_points.push(SyncPoint::new(Timeline::Hwc, counter.into()));
+            let sync_file_name: &[u8; 32] = b"remote counter\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+            let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
+            return sync_file.ioctl(locked, file, current_task, request, arg);
+        }
+
+        error!(EINVAL)
     }
 }
 
@@ -1768,6 +1843,16 @@ mod test {
         let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
+        assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_remote_counter() {
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let counter = zx::Counter::create().expect("Counter::create");
+
+        let fd = new_remote_file(&current_task, counter.into(), OpenFlags::RDONLY)
+            .expect("new_remote_file");
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 

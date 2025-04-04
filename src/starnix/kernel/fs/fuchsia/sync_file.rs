@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::RemoteFileObject;
+use crate::fs::fuchsia::{RemoteCounter, RemoteFileObject};
 use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::{
     CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
@@ -12,7 +12,6 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
 };
-use fidl::HandleBased;
 
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn, trace_duration};
@@ -27,7 +26,7 @@ use starnix_uapi::{
 };
 use std::collections::HashSet;
 use std::sync::Arc;
-use zx::AsHandleRef;
+use zx::{AsHandleRef, HandleBased, HandleRef};
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync
@@ -58,10 +57,67 @@ pub enum Status {
     Signaled = 1,
 }
 
+pub enum Handle {
+    Vmo(zx::Vmo),
+    Counter(zx::Counter),
+}
+
+impl Handle {
+    fn read(&self) -> Result<u64, zx::Status> {
+        match self {
+            Handle::Vmo(vmo) => {
+                let mut vmo_bytes = vec![0; 8];
+                vmo.read(&mut vmo_bytes, /*offset=*/ 0)?;
+                Ok(u64::from_le_bytes(
+                    vmo_bytes[0..8].try_into().map_err(|_| zx::Status::BAD_STATE)?,
+                ))
+            }
+            Handle::Counter(counter) => Ok(counter.read()? as u64),
+        }
+    }
+}
+
+impl AsHandleRef for Handle {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        match self {
+            Handle::Vmo(vmo) => vmo.as_handle_ref(),
+            Handle::Counter(counter) => counter.as_handle_ref(),
+        }
+    }
+}
+
+impl From<zx::Handle> for Handle {
+    fn from(handle: zx::Handle) -> Self {
+        let info = handle.basic_info().unwrap();
+        match info.object_type {
+            zx::ObjectType::VMO => Handle::Vmo(handle.into()),
+            zx::ObjectType::COUNTER => Handle::Counter(handle.into()),
+            _ => panic!("Unsupported"),
+        }
+    }
+}
+
+impl From<Handle> for zx::Handle {
+    fn from(handle: Handle) -> zx::Handle {
+        match handle {
+            Handle::Vmo(vmo) => vmo.into(),
+            Handle::Counter(counter) => counter.into(),
+        }
+    }
+}
+
+impl HandleBased for Handle {}
+
 #[derive(Clone)]
 pub struct SyncPoint {
     pub timeline: Timeline,
-    pub handle: Arc<zx::Vmo>,
+    pub handle: Arc<Handle>,
+}
+
+impl SyncPoint {
+    pub fn new(timeline: Timeline, handle: zx::Handle) -> SyncPoint {
+        SyncPoint { timeline, handle: Arc::new(handle.into()) }
+    }
 }
 
 pub struct SyncFence {
@@ -94,13 +150,10 @@ impl SyncFile {
             {
                 state.push(FenceState { status: Status::Active, timestamp_ns: 0 });
             } else {
-                // Object is signaled so it should be safe to read the timestamp now.
-                let mut vmo_bytes = vec![0; 8];
-                let result = sync_point.handle.read(&mut vmo_bytes, /*offset=*/ 0);
-                assert!(result.is_ok());
-
-                let timestamp_ns = u64::from_le_bytes(vmo_bytes[0..8].try_into().unwrap());
-                state.push(FenceState { status: Status::Signaled, timestamp_ns });
+                state.push(FenceState {
+                    status: Status::Signaled,
+                    timestamp_ns: sync_point.handle.read().unwrap(),
+                });
             }
         }
         state
@@ -180,9 +233,13 @@ impl FileOps for SyncFile {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .map_err(impossible_error)?;
                     if set.insert(koid) {
-                        fence
-                            .sync_points
-                            .push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
+                        fence.sync_points.push(SyncPoint::new(Timeline::Hwc, vmo.into()));
+                    }
+                } else if let Some(file2) = file2.downcast_file::<RemoteCounter>() {
+                    let counter = file2.duplicate_handle()?;
+                    let koid = counter.get_koid().map_err(impossible_error)?;
+                    if set.insert(koid) {
+                        fence.sync_points.push(SyncPoint::new(Timeline::Hwc, counter.into()));
                     }
                 } else {
                     return error!(EINVAL);
@@ -198,11 +255,8 @@ impl FileOps for SyncFile {
                         .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::ZERO)
                         != Err(zx::Status::TIMED_OUT)
                     {
-                        let mut vmo_bytes = vec![0; 8];
-                        let result =
-                            fence.sync_points[i].handle.read(&mut vmo_bytes, /*offset=*/ 0);
-                        assert!(result.is_ok());
-                        let timestamp_ns = u64::from_le_bytes(vmo_bytes[0..8].try_into().unwrap());
+                        let timestamp_ns =
+                            fence.sync_points[i].handle.read().map_err(|_| errno!(EIO))?;
                         let removed = fence.sync_points.remove(i);
                         if i == 0 && timestamp_ns >= last_signaled_timestamp_ns {
                             last_signaled_timestamp_ns = timestamp_ns;
@@ -341,7 +395,10 @@ impl FileOps for SyncFile {
             {
                 canceler = WaitCanceler::merge_unbounded(
                     canceler,
-                    WaitCanceler::new_vmo(Arc::downgrade(&sync_point.handle), canceler_result),
+                    WaitCanceler::new_sync_file(
+                        Arc::downgrade(&sync_point.handle),
+                        canceler_result,
+                    ),
                 );
             } else {
                 canceler_result.cancel(sync_point.handle.as_handle_ref());
