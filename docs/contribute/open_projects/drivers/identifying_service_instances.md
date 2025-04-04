@@ -6,7 +6,7 @@ instances using a fixed moniker.
 Specifically, this guide is for non-driver component clients that do any of the
 following:
 
- - Use topological paths such as `/dev/sys/platform/00:00:2e/nand-ctl`
+ - Use topological paths such as `/dev/sys/platform/ram-nand/nand-ctl`
  - Use a hardcoded class path (eg. /dev/class/camera/000)
  - Connect to the `device_controller` for a given devfs entry and call
    `GetTopologicalPath()`.

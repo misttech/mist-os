@@ -20,7 +20,7 @@ namespace ramdevice_client {
 
 // A client library for creating, configuring and manipulating ramnands.
 // ```
-// ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2e/nand-ctl",
+// ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-nand/nand-ctl",
 //   zx::sec(60)).status_value());
 // fuchsia_hardware_nand::wire::RamNandInfo ram_nand_config = {
 //   .nand_info = {
@@ -39,7 +39,7 @@ namespace ramdevice_client {
 class RamNand {
  public:
   // The default path to the system nand-ctl.
-  static constexpr char kBasePath[] = "/dev/sys/platform/00:00:2e/nand-ctl";
+  static constexpr char kBasePath[] = "/dev/sys/platform/ram-nand/nand-ctl";
 
   // Creates a ram_nand under ram_nand_ctl running under the main devmgr.
   static zx_status_t Create(fuchsia_hardware_nand::wire::RamNandInfo config,

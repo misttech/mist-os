@@ -9,7 +9,7 @@
 #include <zxtest/zxtest.h>
 
 // The path for the block device under test.
-constexpr char kTestDevice[] = "/fake/dev/sys/platform/00:00:2e/nand-ctl/ram-nand-0/ftl/block";
+constexpr char kTestDevice[] = "/fake/dev/sys/platform/ram-nand/nand-ctl/ram-nand-0/ftl/block";
 
 // Performs process-wide setup for the integration test.
 class FtlTestObserver {

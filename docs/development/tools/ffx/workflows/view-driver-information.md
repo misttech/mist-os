@@ -173,7 +173,7 @@ $ ffx driver dump
     [platform] pid=None unbound
       [ram-disk] pid=7584 fuchsia-boot:///ramdisk#meta/ramdisk.cm
         [ramctl] pid=None unbound
-      [00_00_2e] pid=None unbound
+      [ram-nand] pid=None unbound
       [virtual-audio] pid=25117 fuchsia-pkg://fuchsia.com/virtual_audio#meta/virtual_audio_driver.cm
         [virtual_audio] pid=None unbound
       [bt-hci-emulator] pid=None unbound
@@ -223,7 +223,7 @@ digraph {
      "3675787305008" [label="sys"]
      "3675787315872" [label="platform"]
      "3675787309664" [label="ram-disk"]
-     "3675787306560" [label="00_00_2e"]
+     "3675787306560" [label="ram-nand"]
      "3675787308112" [label="virtual-audio"]
      "3675787312768" [label="bt-hci-emulator"]
      "3675787311216" [label="fake-battery"]
@@ -254,7 +254,7 @@ dev
 dev.sys
 dev.sys.platform
 dev.sys.platform.ram-disk
-dev.sys.platform.00_00_2e
+dev.sys.platform.ram-nand
 dev.sys.platform.virtual-audio
 dev.sys.platform.bt-hci-emulator
 dev.sys.platform.fake-battery

@@ -35,7 +35,7 @@ root.sys.platform
 root.sys.cpu-trace
 root.sys.platform.pt
 root.sys.platform.ram-disk
-root.sys.platform.00_00_2e
+root.sys.platform.ram-nand
 root.sys.platform.virtual-audio
 root.sys.platform.bt-hci-emulator
 root.sys.platform.00_00_1b
