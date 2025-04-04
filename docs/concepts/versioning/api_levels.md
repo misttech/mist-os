@@ -190,16 +190,16 @@ platform and is not intended to be targeted by an SDK user.
 `PLATFORM` represents a complete set of APIs that the current version of
 the Fuchsia platform must support, such as:
 
+* All currently supported stable numerical API levels (see
+  [Supported](#supported) and [Sunset](#sunset)).
 * The `NEXT` API level.
 * The `HEAD` API level.
-* All currently supported stable numerical API levels. See
-  [Supported](#supported) and [Sunset](#sunset).
 
 The main purpose of `PLATFORM` is to ensure that the platform can run components
 built against any of its supported stable API levels, as well as those targeting
-the `HEAD` level. `PLATFORM` includes APIs from all supported stable numerical
-levels, so it may contain APIs that have already been removed from `NEXT` or
-`HEAD`.
+the `NEXT and `HEAD` API levels. `PLATFORM` includes APIs from all supported
+stable numerical levels, so it may contain APIs that have already been removed
+from `NEXT` or `HEAD`.
 
 [abi-compability]: /docs/concepts/versioning/compatibility.md#abi-compatibility-guarantee
 [api-compability]: /docs/concepts/versioning/compatibility.md#api-compatibility-guarantee
