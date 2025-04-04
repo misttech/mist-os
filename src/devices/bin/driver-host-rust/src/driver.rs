@@ -203,6 +203,12 @@ struct DriverInner {
 
 impl Drop for DriverInner {
     fn drop(&mut self) {
+        self.destroy();
+    }
+}
+
+impl DriverInner {
+    fn destroy(&mut self) {
         if let Some(token) = self.token.take() {
             self.hooks.destroy(token);
         }
@@ -567,10 +573,10 @@ impl Driver {
                     let _ = shutdown_signaler.send(Arc::downgrade(&this));
                 }
 
-                // This should be the last strong reference to the driver. The destroy hook will run
-                // in its destructor.
-                Arc::try_unwrap(this)
-                    .expect("Someone unexpected is holding onto a reference of driver");
+                // Trigger destroy hook.
+                // In theory this should be the last reference to the driver, however if shutdown
+                // is invoked from the main driver_host thread, it's not guaranteed.
+                this.inner.lock().destroy();
 
                 let _ = driver_request.close_with_epitaph(zx::Status::OK);
             });
