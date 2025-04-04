@@ -16,8 +16,8 @@ use crate::policy::{
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
-    AbstractObjectClass, ClassPermission, FileSystemLabel, FileSystemLabelingScheme,
-    FileSystemMountOptions, FsNodeClass, InitialSid, NullessByteStr, ObjectClass, Permission,
+    ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
+    FsNodeClass, InitialSid, KernelClass, KernelPermission, NullessByteStr, ObjectClass,
     SeLinuxStatus, SeLinuxStatusPublisher, SecurityId,
 };
 
@@ -483,7 +483,7 @@ impl SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: KernelClass,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
@@ -509,7 +509,7 @@ impl Query for SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
     ) -> AccessDecision {
         let locked_state = self.state.lock();
 
@@ -523,7 +523,7 @@ impl Query for SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         match target_class {
-            AbstractObjectClass::System(target_class) => {
+            ObjectClass::System(target_class) => {
                 let mut decision = active_policy.parsed.compute_access_decision(
                     &source_context,
                     &target_context,
@@ -536,7 +536,7 @@ impl Query for SecurityServer {
                 );
                 decision
             }
-            AbstractObjectClass::Custom(target_class) => active_policy
+            ObjectClass::Custom(target_class) => active_policy
                 .parsed
                 .compute_access_decision_custom(&source_context, &target_context, &target_class),
         }
@@ -599,7 +599,7 @@ impl Query for SecurityServer {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
+        target_class: ObjectClass,
         ioctl_prefix: u8,
     ) -> IoctlAccessDecision {
         let locked_state = self.state.lock();
@@ -614,7 +614,7 @@ impl Query for SecurityServer {
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         match target_class {
-            AbstractObjectClass::System(target_class) => {
+            ObjectClass::System(target_class) => {
                 active_policy.parsed.compute_ioctl_access_decision(
                     &source_context,
                     &target_context,
@@ -622,7 +622,7 @@ impl Query for SecurityServer {
                     ioctl_prefix,
                 )
             }
-            AbstractObjectClass::Custom(target_class) => {
+            ObjectClass::Custom(target_class) => {
                 active_policy.parsed.compute_ioctl_access_decision_custom(
                     &source_context,
                     &target_context,
@@ -635,7 +635,9 @@ impl Query for SecurityServer {
 }
 
 impl AccessVectorComputer for SecurityServer {
-    fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    fn access_vector_from_permissions<
+        P: ClassPermission + Into<KernelPermission> + Clone + 'static,
+    >(
         &self,
         permissions: &[P],
     ) -> Option<AccessVector> {
@@ -697,7 +699,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_decision(sid1, sid2, ObjectClass::Process.into()).allow,
+            security_server.compute_access_decision(sid1, sid2, KernelClass::Process.into()).allow,
             AccessVector::ALL
         );
     }

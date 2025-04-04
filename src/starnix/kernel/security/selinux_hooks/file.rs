@@ -18,7 +18,7 @@ use crate::security::selinux_hooks::{
 use crate::task::CurrentTask;
 use crate::vfs::{FileHandle, FileObject};
 use crate::TODO_DENY;
-use selinux::{CommonFsNodePermission, FsNodeClass, Permission, SecurityServer};
+use selinux::{CommonFsNodePermission, FsNodeClass, KernelPermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
@@ -105,7 +105,7 @@ pub(in crate::security) fn check_file_ioctl_access(
     let subject_sid = current_task.security_state.lock().current_sid;
 
     let file_class = file.node().security_state.lock().class;
-    let permissions: &[Permission] = match request {
+    let permissions: &[KernelPermission] = match request {
         FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
             &[CommonFsNodePermission::GetAttr.for_class(file_class)]
         }
@@ -243,7 +243,7 @@ pub fn mmap_file(
 
     if let Some(file) = file {
         let node_class = file.node().security_state.lock().class;
-        let mut permissions: Vec<Permission> = vec![
+        let mut permissions: Vec<KernelPermission> = vec![
             CommonFsNodePermission::Read.for_class(node_class),
             CommonFsNodePermission::Map.for_class(node_class),
         ];

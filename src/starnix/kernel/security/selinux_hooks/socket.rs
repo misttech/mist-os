@@ -10,7 +10,7 @@ use crate::vfs::socket::{
 use crate::vfs::FsNode;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonSocketPermission, FsNodeClass, InitialSid, Permission, SecurityId, SecurityServer,
+    CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission, SecurityId, SecurityServer,
     SocketClass,
 };
 use starnix_uapi::errors::Errno;
@@ -22,7 +22,7 @@ fn has_socket_permission(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     socket_node: &FsNode,
-    permission: &Permission,
+    permission: &KernelPermission,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;

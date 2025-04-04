@@ -4,7 +4,7 @@
 
 use crate::policy::parser::ByValue;
 use crate::policy::{Policy, TypeId};
-use crate::ObjectClass;
+use crate::KernelClass;
 
 use anyhow::{anyhow, bail};
 use std::collections::HashMap;
@@ -39,7 +39,7 @@ impl ExceptionsConfig {
         &self,
         source: TypeId,
         target: TypeId,
-        class: ObjectClass,
+        class: KernelClass,
     ) -> Option<NonZeroU64> {
         self.entries.get(&ExceptionsEntry { source, target, class }).copied()
     }
@@ -99,13 +99,13 @@ impl ExceptionsConfig {
 struct ExceptionsEntry {
     source: TypeId,
     target: TypeId,
-    class: ObjectClass,
+    class: KernelClass,
 }
 
-/// Returns the kernel `ObjectClass` corresponding to the supplied `name`, if any.
+/// Returns the `KernelClass` corresponding to the supplied `name`, if any.
 /// `None` is returned if no such kernel object class exists in the Starnix implementation.
-fn object_class_by_name(name: &str) -> Option<ObjectClass> {
-    ObjectClass::all_variants().into_iter().find(|class| class.name() == name)
+fn object_class_by_name(name: &str) -> Option<KernelClass> {
+    KernelClass::all_variants().into_iter().find(|class| class.name() == name)
 }
 
 #[cfg(test)]
@@ -202,21 +202,21 @@ mod tests {
 
         // Matching source, target & class will resolve to the corresponding bug Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, ObjectClass::File),
+            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::File),
             Some(NonZeroU64::new(1).unwrap())
         );
 
         // Mismatched class, source or target returns no Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, ObjectClass::Dir),
+            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::Dir),
             None
         );
         assert_eq!(
-            config.lookup(test_data.unmatched_type, test_data.defined_target, ObjectClass::File),
+            config.lookup(test_data.unmatched_type, test_data.defined_target, KernelClass::File),
             None
         );
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.unmatched_type, ObjectClass::File),
+            config.lookup(test_data.defined_source, test_data.unmatched_type, KernelClass::File),
             None
         );
     }

@@ -5,7 +5,7 @@
 use crate::access_vector_cache::{FifoQueryCache, Locked, Query};
 use crate::policy::{AccessVector, AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, FsNodeClass, NullessByteStr, Permission, SecurityId};
+use crate::{ClassPermission, FsNodeClass, KernelPermission, NullessByteStr, SecurityId};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
@@ -49,7 +49,7 @@ impl<'a> PermissionCheck<'a> {
     /// Returns whether the `source_sid` has the specified `permission` on `target_sid`.
     /// The result indicates both whether `permission` is `permit`ted, and whether the caller
     /// should `audit` log the query.
-    pub fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    pub fn has_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -77,7 +77,7 @@ impl<'a> PermissionCheck<'a> {
     ///
     /// A denied request is audited if the ioctl permission is `dontaudit` or the numeric ioctl
     /// extended permission is `dontauditxperm`.
-    pub fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    pub fn has_ioctl_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
@@ -128,7 +128,7 @@ impl<'a> PermissionCheck<'a> {
 }
 
 /// Internal implementation of the `has_permission()` API, in terms of the `Query` and `AccessVectorComputer` traits.
-fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn has_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     is_enforcing: bool,
     query: &impl Query,
     access_vector_computer: &impl AccessVectorComputer,
@@ -177,7 +177,7 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
 
 /// Internal implementation of the `has_ioctl_permission()` API, in terms of the `Query` and
 /// `AccessVectorComputer` traits.
-fn has_ioctl_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn has_ioctl_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     is_enforcing: bool,
     query: &impl Query,
     access_vector_computer: &impl AccessVectorComputer,
@@ -240,8 +240,8 @@ mod tests {
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
     use crate::{
-        AbstractObjectClass, CommonFilePermission, CommonFsNodePermission, FileClass,
-        FilePermission, ProcessPermission,
+        CommonFilePermission, CommonFsNodePermission, FileClass, FilePermission, ObjectClass,
+        ProcessPermission,
     };
 
     use std::num::NonZeroU32;
@@ -257,15 +257,15 @@ mod tests {
         SecurityId(NonZeroU32::new(NEXT_ID.fetch_add(1, Ordering::AcqRel)).unwrap())
     }
 
-    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+    fn access_vector_from_permission<P: ClassPermission + Into<KernelPermission> + 'static>(
         permission: P,
     ) -> AccessVector {
         match permission.into() {
             // Process class permissions
-            Permission::Process(ProcessPermission::Fork) => ACCESS_VECTOR_0001,
-            Permission::Process(ProcessPermission::Transition) => ACCESS_VECTOR_0010,
+            KernelPermission::Process(ProcessPermission::Fork) => ACCESS_VECTOR_0001,
+            KernelPermission::Process(ProcessPermission::Transition) => ACCESS_VECTOR_0010,
             // File class permissions
-            Permission::File(FilePermission::Common(CommonFilePermission::Common(
+            KernelPermission::File(FilePermission::Common(CommonFilePermission::Common(
                 CommonFsNodePermission::Ioctl,
             ))) => ACCESS_VECTOR_0001,
             _ => AccessVector::NONE,
@@ -274,7 +274,7 @@ mod tests {
 
     fn access_vector_from_permissions<
         'a,
-        P: ClassPermission + Into<Permission> + Clone + 'static,
+        P: ClassPermission + Into<KernelPermission> + Clone + 'static,
     >(
         permissions: &[P],
     ) -> AccessVector {
@@ -293,7 +293,7 @@ mod tests {
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
-            target_class: AbstractObjectClass,
+            target_class: ObjectClass,
         ) -> AccessDecision {
             self.0.compute_access_decision(source_sid, target_sid, target_class)
         }
@@ -321,7 +321,7 @@ mod tests {
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
-            target_class: AbstractObjectClass,
+            target_class: ObjectClass,
             ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             self.0.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
@@ -330,7 +330,7 @@ mod tests {
 
     impl AccessVectorComputer for DenyAllPermissions {
         fn access_vector_from_permissions<
-            P: ClassPermission + Into<Permission> + Clone + 'static,
+            P: ClassPermission + Into<KernelPermission> + Clone + 'static,
         >(
             &self,
             permissions: &[P],
@@ -348,7 +348,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             AccessDecision::allow(AccessVector::ALL)
         }
@@ -376,7 +376,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
             _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             IoctlAccessDecision::ALLOW_ALL
@@ -385,7 +385,7 @@ mod tests {
 
     impl AccessVectorComputer for AllowAllPermissions {
         fn access_vector_from_permissions<
-            P: ClassPermission + Into<Permission> + Clone + 'static,
+            P: ClassPermission + Into<KernelPermission> + Clone + 'static,
         >(
             &self,
             permissions: &[P],
@@ -403,7 +403,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             AccessDecision::allow(AccessVector::NONE)
         }
@@ -431,7 +431,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
             _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             IoctlAccessDecision::ALLOW_ALL
@@ -440,7 +440,7 @@ mod tests {
 
     impl AccessVectorComputer for DenyPermissionsAllowXperms {
         fn access_vector_from_permissions<
-            P: ClassPermission + Into<Permission> + Clone + 'static,
+            P: ClassPermission + Into<KernelPermission> + Clone + 'static,
         >(
             &self,
             permissions: &[P],
@@ -458,7 +458,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             AccessDecision::allow(AccessVector::ALL)
         }
@@ -486,7 +486,7 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: AbstractObjectClass,
+            _target_class: ObjectClass,
             _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             IoctlAccessDecision::DENY_ALL
@@ -495,7 +495,7 @@ mod tests {
 
     impl AccessVectorComputer for AllowPermissionsDenyXperms {
         fn access_vector_from_permissions<
-            P: ClassPermission + Into<Permission> + Clone + 'static,
+            P: ClassPermission + Into<KernelPermission> + Clone + 'static,
         >(
             &self,
             permissions: &[P],

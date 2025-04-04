@@ -23,7 +23,7 @@ use bstr::BStr;
 use selinux::policy::FsUseType;
 use selinux::{
     CommonFilePermission, CommonFsNodePermission, DirPermission, FileClass, FileSystemLabel,
-    FileSystemLabelingScheme, FileSystemPermission, FsNodeClass, InitialSid, ObjectClass,
+    FileSystemLabelingScheme, FileSystemPermission, FsNodeClass, InitialSid, KernelClass,
     SecurityId, SecurityServer,
 };
 use starnix_logging::{log_debug, log_warn, track_stub};
@@ -239,7 +239,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
             };
 
             let class_id = security_server
-                .class_id_by_name(ObjectClass::from(fs_node_class).name())
+                .class_id_by_name(KernelClass::from(fs_node_class).name())
                 .map_err(|_| errno!(EINVAL))?;
 
             security_server

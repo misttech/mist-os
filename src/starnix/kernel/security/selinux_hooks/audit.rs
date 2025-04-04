@@ -4,7 +4,7 @@
 
 use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
-use selinux::{ClassPermission, Permission, SecurityId};
+use selinux::{ClassPermission, KernelPermission, SecurityId};
 use starnix_core::task::{CurrentTask, Task};
 use starnix_core::vfs::{FileObject, FileSystem, FsNode, FsStr};
 use starnix_logging::{
@@ -103,7 +103,7 @@ pub(super) fn audit_decision(
     result: PermissionCheckResult,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: Permission,
+    permission: KernelPermission,
     audit_data: Auditable<'_>,
 ) {
     trace_instant!(
@@ -166,7 +166,7 @@ pub(super) fn audit_todo_decision(
     mut result: PermissionCheckResult,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permission: Permission,
+    permission: KernelPermission,
     audit_context: Auditable<'_>,
 ) {
     result.todo_bug = Some(bug.into());

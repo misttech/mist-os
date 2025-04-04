@@ -4,15 +4,15 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, Permission, PermissionCheck,
+    fs_node_set_label_with_task, has_file_permissions, KernelPermission, PermissionCheck,
     ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::FsNode;
 use selinux::{
-    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, NullessByteStr,
-    ObjectClass,
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, KernelClass,
+    NullessByteStr,
 };
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
@@ -162,7 +162,7 @@ pub(in crate::security) fn check_exec_access(
         exec_sid
     } else {
         security_server
-            .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
+            .compute_new_sid(current_sid, executable_sid, KernelClass::Process)
             .map_err(|_| errno!(EACCES))?
     };
 
@@ -377,7 +377,7 @@ pub(in crate::security) fn task_get_context(
     Ok(security_server.sid_to_security_context(sid).unwrap_or_default())
 }
 
-fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) -> Permission {
+fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) -> KernelPermission {
     // TODO: https://fxbug.dev/297313673 - CapClass::CapUserns will play a role here if-and-after
     // user namespaces are implemented in Starnix.
     match capabilities {
