@@ -37,8 +37,17 @@
 // extern int SomeVariable LIBC_ASM_LINKAGE_DECLARE(SomeVariable);
 // }  // namespace LIBC_NAMESPACE_DECL
 // ```
-#define LIBC_ASM_LINKAGE_DECLARE(name, ...) __asm__(LIBC_ASM_LINKAGE_STRING(name, __VA_ARGS__))
+#define LIBC_ASM_LINKAGE_DECLARE(name, ...) \
+  __asm__(LIBC_ASM_LINKAGE_STRING(name, __VA_ARGS__)) LIBC_ASM_LINKAGE_ATTR
 #define LIBC_ASM_LINKAGE_STRING(name, ...) LIBC_MACRO_TO_STRING(LIBC_ASM_LINKAGE(name, __VA_ARGS__))
+#ifdef __clang__
+// When definitions or references are in assembly or user.basic code, they
+// won't have tagged symbol values.  This can't use [[...]] syntax when it
+// follows __asm__(...).
+#define LIBC_ASM_LINKAGE_ATTR __attribute__((no_sanitize("hwaddress")))
+#else
+#define LIBC_ASM_LINKAGE_ATTR
+#endif
 
 #else  // clang-format off
 

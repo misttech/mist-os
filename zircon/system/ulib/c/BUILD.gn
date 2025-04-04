@@ -33,7 +33,7 @@ libc_components = [
   "stdlib",
 ]
 
-libc_testonly_components = []
+libc_testonly_components = [ "threads" ]
 
 if (use_llvm_libc_string_functions) {
   libc_components += [
@@ -75,6 +75,7 @@ group("unittests") {
   testonly = true
   deps = [
     ":test_utils",
+    ":weak-tests",
     "errno:errno.testonly",
   ]
   foreach(subdir,
@@ -316,6 +317,7 @@ if (zircon_toolchain != false) {
       ":components",
       ":legacy-components",
       "ld:musl-glue",
+      "threads:musl-glue",
       "//zircon/third_party/ulib/musl:legacy-impl",
     ]
 

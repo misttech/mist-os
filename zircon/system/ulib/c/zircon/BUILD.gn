@@ -2,18 +2,38 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/zircon/lib/zircon/libzircon.gni")
 import("../libc.gni")
 
-source_set("zircon") {
+libc_source_set("zircon") {
   sources = [
     "getentropy.c",
     "internal.c",
     "take_startup_handle.c",
-    "thrd_get_zx_handle.cc",
     "thrd_get_zx_process.cc",
     "thrd_set_zx_process.cc",
     "utc.cc",
   ]
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+
+  libc_deps = [ ":zircon.basic" ]
+}
+
+# These are effectively trivial leaf accessors (though not literally leaf
+# functions!).  At least _zx_thread_self() is needed from low-level places that
+# can't rely on the shadow-call-stack ABI and the like.
+libc_source_set("zircon.basic") {
+  basic_abi = true
+
+  global_symbols = [
+    "_zx_thread_self",
+    "native_thread_get_zx_handle",
+    "thrd_get_zx_handle",
+    "zx_thread_self",
+  ]
+  undefined_symbols = libzircon_linkage_names
+
+  sources = [ "thrd_get_zx_handle.cc" ]
   deps = [
     "//zircon/system/ulib/runtime",
     "//zircon/third_party/ulib/musl:musl_internal",

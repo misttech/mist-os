@@ -10,6 +10,7 @@ if (zircon_toolchain != false) {
     deps = [
       ":backtrace",
       ":debugdata",
+      ":memory-snapshot",
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
       "//zircon/third_party/ulib/musl:musl_internal",
@@ -20,7 +21,6 @@ if (zircon_toolchain != false) {
       "asan-stubs.c",
       "hooks.c",
       "hwasan-stubs.cc",
-      "memory-snapshot.cc",
       "ubsan-stubs.cc",
     ]
 
@@ -50,6 +50,15 @@ if (zircon_toolchain != false) {
     sources = [ "sancov-stubs.cc" ]
     configs += [ "//build/config/sanitizers:no_sanitizers" ]
   }
+}
+
+libc_source_set("memory-snapshot") {
+  sources = [ "memory-snapshot.cc" ]
+  deps = [
+    "..:weak",
+    "../threads:thread-list",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 libc_source_set("backtrace") {

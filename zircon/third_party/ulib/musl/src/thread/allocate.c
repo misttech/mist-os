@@ -16,60 +16,7 @@
 // only use the libc-internal symbols, which don't have any setup requirements.
 __asan_weak_ref("memcpy") __asan_weak_ref("memset")
 
-    enum lock_state {
-      LOCK_UNLOCKED,
-      LOCK_LOCKED,
-      LOCK_CONTENDED,
-    };
-
-static struct pthread* all_threads;
-static zx_futex_t all_threads_lock = LOCK_UNLOCKED;
-
-LIBC_NO_SAFESTACK struct pthread** __thread_list_acquire(void) {
-  // Fast path: LOCK_UNLOCKED -> LOCK_LOCKED
-  int expected = LOCK_UNLOCKED;
-  if (atomic_compare_exchange_strong_explicit(&all_threads_lock, &expected, LOCK_LOCKED,
-                                              memory_order_acquire, memory_order_relaxed)) {
-    return &all_threads;
-  }
-
-  // Slow path: bring all states to LOCK_CONTENDED, success if the previous state was LOCK_UNLOCKED
-  while (true) {
-    int observed =
-        atomic_exchange_explicit(&all_threads_lock, LOCK_CONTENDED, memory_order_acquire);
-    if (observed == LOCK_UNLOCKED) {
-      break;
-    }
-    if (observed != LOCK_LOCKED && observed != LOCK_CONTENDED) {
-      // Lock memory was corrupted.
-      __builtin_trap();
-    }
-    _zx_futex_wait(&all_threads_lock, LOCK_CONTENDED, ZX_HANDLE_INVALID, ZX_TIME_INFINITE);
-  }
-
-  return &all_threads;
-}
-
-LIBC_NO_SAFESTACK void __thread_list_release(void) {
-  int old = atomic_exchange_explicit(&all_threads_lock, LOCK_UNLOCKED, memory_order_release);
-  if (old == LOCK_CONTENDED) {
-    _zx_futex_wake(&all_threads_lock, 1);
-  }
-}
-
-// A detached thread has to remove itself from the list.
-// Joinable threads get removed only in pthread_join.
-LIBC_NO_SAFESTACK void __thread_list_erase(void* arg) {
-  struct pthread* t = arg;
-  __thread_list_acquire();
-  *t->prevp = t->next;
-  if (t->next != NULL) {
-    t->next->prevp = t->prevp;
-  }
-  __thread_list_release();
-}
-
-static pthread_rwlock_t allocation_lock = PTHREAD_RWLOCK_INITIALIZER;
+    static pthread_rwlock_t allocation_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 // Many threads could be reading the TLS state.
 static void thread_allocation_acquire(void) { pthread_rwlock_rdlock(&allocation_lock); }
@@ -344,14 +291,7 @@ __asan_weak_ref("memcpy")
   td->head.tp = (uintptr_t)pthread_to_tp(td);
   td->abi.unsafe_sp = (uintptr_t)td->unsafe_stack.iov_base + td->unsafe_stack.iov_len;
 
-  struct pthread** prevp = __thread_list_acquire();
-  td->prevp = prevp;
-  td->next = *prevp;
-  if (td->next != NULL) {
-    td->next->prevp = &td->next;
-  }
-  *prevp = td;
-  __thread_list_release();
+  (initial_thread ? __thread_list_start : __thread_list_add)(td);
 
   return td;
 }

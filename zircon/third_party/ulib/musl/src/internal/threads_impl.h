@@ -352,71 +352,16 @@ thrd_info_t __init_main_thread(zx_handle_t thread_self) ATTR_LIBC_VISIBILITY;
 
 int __clock_gettime(clockid_t, struct timespec*) ATTR_LIBC_VISIBILITY;
 
-// Returns the head of the pthread::next, pthread::prevp doubly-linked list,
-// i.e. where the first thread's prevp points to.  The list can be used and
-// mutated until __thread_list_release is called.
-struct pthread** __thread_list_acquire(void) ATTR_LIBC_VISIBILITY;
-void __thread_list_release(void) ATTR_LIBC_VISIBILITY;
+// Adds a new thread to the list, taking the lock.
+void __thread_list_add(struct pthread*) ATTR_LIBC_VISIBILITY;
+
+// Adds the first thread to the list, before locks are necessary.
+void __thread_list_start(struct pthread*) ATTR_LIBC_VISIBILITY;
 
 // Removes the (dead) thread from the list, taking the lock.
 // The argument type is void* for the zxr_thread_exit_unmap_if_detached API.
 void __thread_list_erase(void* pthread_t_arg) ATTR_LIBC_VISIBILITY;
 
 __END_CDECLS
-
-#ifdef __cplusplus
-namespace {
-
-class LockedThreadList {
- public:
-  LockedThreadList() = delete;
-  LockedThreadList(const LockedThreadList&) = default;
-
-  class iterator {
-   public:
-    iterator() = default;
-    iterator(const iterator&) = default;
-    iterator(iterator&&) = default;
-
-    bool operator==(const iterator& other) const { return next_ == other.next_; }
-    bool operator!=(const iterator& other) const { return !(*this == other); }
-
-    pthread* operator*() const { return next_; }
-
-    iterator& operator++() {  // prefix
-      next_ = next_->next;
-      return *this;
-    }
-
-    iterator operator++(int) {  // postfix
-      iterator old = *this;
-      ++*this;
-      return old;
-    }
-
-   private:
-    pthread* next_ = nullptr;
-
-    friend LockedThreadList;
-    explicit iterator(pthread* head) : next_(head) {}
-  };
-
-  iterator begin() { return iterator(head_); }
-  iterator end() { return iterator(); }
-
- protected:
-  explicit LockedThreadList(pthread** head) : head_(*head) {}
-
- private:
-  pthread*& head_;
-};
-
-struct ScopedThreadList : public LockedThreadList {
-  ScopedThreadList() : LockedThreadList(__thread_list_acquire()) {}
-  ~ScopedThreadList() { __thread_list_release(); }
-};
-
-}  // namespace
-#endif
 
 #endif  // ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_THREADS_IMPL_H_
