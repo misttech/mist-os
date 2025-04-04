@@ -32,6 +32,7 @@ use futures::stream::StreamExt;
 use futures::task::Poll;
 use lazy_static::lazy_static;
 use log::{debug, info};
+use rand::Rng;
 use std::convert::Infallible;
 use std::pin::{pin, Pin};
 use std::rc::Rc;
@@ -2884,4 +2885,156 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
 
     // Expect a failed attempt to solict a roam scan, since roams per day limit has been reached.
     assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_none());
+}
+
+#[fuchsia::test]
+fn test_autconnect_starts_after_roam_error() {
+    let mut exec = fasync::TestExecutor::new_with_fake_time();
+    let mut test_values = test_setup(
+        &mut exec,
+        RECOVERY_PROFILE_EMPTY_STRING,
+        false,
+        RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
+    );
+
+    // Connect to a network.
+    let mut existing_connection = save_and_connect(
+        TEST_SSID.clone(),
+        Saved::None,
+        Scanned::Open,
+        TEST_CREDS.none.clone(),
+        &mut exec,
+        &mut test_values,
+    );
+
+    // Create a mock scan result with a very strong BSS roam candidate.
+    let scan_results = vec![fidl_sme::ScanResult {
+        compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+            mutual_security_protocols: security_protocols_from_protection(Scanned::Open),
+        }),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            bssid: [1, 1, 1, 1, 1, 1],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: 10,
+            snr_db: 100,
+            channel: types::WlanChan::new(36, types::Cbw::Cbw40),
+        ),
+    }];
+
+    // Advance fake time past max roam scan backoff time.
+    exec.set_fake_time(fasync::MonotonicInstant::after(
+        stationary_monitor::TIME_BETWEEN_ROAM_SCANS_MAX
+            + fasync::MonotonicDuration::from_seconds(1),
+    ));
+
+    // Expect a successful attempt to trigger a roam scan.
+    assert_variant!(solicit_roam_scan_weak_rssi(&mut exec, &mut test_values, &mut existing_connection), Some(responder) => {
+        // Respond with the mock roam candidate.
+        responder
+        .send(Ok(write_vmo(scan_results.clone()).expect("failed to write VMO")))
+        .expect("failed to send scan results");
+    });
+
+    // Run forward internal futures.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Expect that a roam request was sent to SME.
+    assert_variant!(exec.run_until_stalled(&mut existing_connection.state_machine_sme_stream.next()), Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Roam { req, .. }))) => {
+        assert_eq!(req.bss_description.bssid, [1, 1, 1, 1, 1, 1]);
+    });
+
+    // Respond with a roam result that does NOT match the requested BSSID, which would result in an
+    // unrecoverable state.
+    let roam_result = fidl_sme::RoamResult {
+        bssid: [2, 2, 2, 2, 2, 2],
+        status_code: fidl_ieee80211::StatusCode::Success,
+        original_association_maintained: false,
+        bss_description: Some(Box::new(random_fidl_bss_description!(bssid: [2, 2, 2, 2, 2, 2]))),
+        disconnect_info: None,
+        is_credential_rejected: false,
+    };
+    existing_connection
+        .connect_txn_handle
+        .send_on_roam_result(&roam_result)
+        .expect("failed to return roam result");
+
+    // Run forward internal futures.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // State machine requests disconnect.
+    let next_sme_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        existing_connection.state_machine_sme_stream.next(),
+    );
+    assert_variant!(
+        next_sme_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Disconnect {
+            reason, responder
+        })) => {
+            assert_eq!(fidl_sme::UserDisconnectReason::DisconnectDetectedFromSme, reason);
+            assert!(responder.send().is_ok());
+        }
+    );
+
+    // Run forward internal futures.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Check for a listener update showing that the connection ended.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
+    assert_eq!(network.status.unwrap(), types::DisconnectStatus::ConnectionFailed);
+    assert_eq!(network.id.unwrap().ssid, TEST_SSID.clone());
+
+    // Passive scanning should start due to the idle interface and saved network.
+    let expected_scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
+    let mutual_security_protocols = security_protocols_from_protection(Scanned::Open);
+    let mock_scan_results = vec![fidl_sme::ScanResult {
+        compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+            mutual_security_protocols,
+        }),
+        timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
+        bss_description: random_fidl_bss_description!(
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            bssid: [0, 0, 0, 0, 0, 0],
+            ssid: TEST_SSID.clone(),
+            rssi_dbm: 10,
+            snr_db: 10,
+            channel: types::WlanChan::new(1, types::Cbw::Cbw20),
+        ),
+    }];
+    let next_sme_stream_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        existing_connection.iface_sme_stream.next(),
+    );
+    assert_variant!(
+        next_sme_stream_req,
+        Some(Ok(fidl_sme::ClientSmeRequest::Scan {
+            req, responder
+        })) => {
+            assert_eq!(req, expected_scan_request);
+            let vmo = write_vmo(mock_scan_results.clone()).expect("failed to write VMO");
+            responder.send(Ok(vmo)).expect("failed to send scan data");
+        }
+    );
 }
