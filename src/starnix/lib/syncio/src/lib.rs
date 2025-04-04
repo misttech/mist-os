@@ -9,6 +9,7 @@ use crate::zxio::{
 use bitflags::bitflags;
 use bstr::BString;
 use fidl::encoding::const_assert_eq;
+use fidl::endpoints::SynchronousProxy;
 use fidl_fuchsia_io as fio;
 use std::cell::OnceCell;
 use std::ffi::CStr;
@@ -994,6 +995,35 @@ impl Zxio {
         let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
         zx::ok(status)?;
         Ok(attributes)
+    }
+
+    // Call this function if access time needs to be updated before closing the node. For the case
+    // where the underlying filesystem is unable to manage access time updates by itself (e.g.
+    // because it cannot differentiate between a file read and write operation), Starnix is
+    // responsible for informing the underlying filesystem that the node has been accessed and is
+    // pending an access time update.
+    pub fn close_and_update_access_time(self) -> Result<(), zx::Status> {
+        let mut out_handle = zx::sys::ZX_HANDLE_INVALID;
+        // SAFETY: This is okay as we have exclusive access to this Zxio object.
+        let status = unsafe { zxio::zxio_release(self.as_ptr(), &mut out_handle) };
+        zx::ok(status)?;
+        let proxy = fio::NodeSynchronousProxy::from_channel(
+            // SAFETY: `out_handle` extracted from `zxio_release` should be a valid handle.
+            unsafe { zx::Handle::from_raw(out_handle) }.into(),
+        );
+
+        // Don't wait for response from `get_attributes` (by setting deadline to `INFINITE_PAST`).
+        // We don't need to know any queried attributes, and ignore if this request fails.
+        // Expect this to fail with a TIMED_OUT error. Timeouts are generally fatal and clients do
+        // not expect to continue communications on a channel that is timing out.
+        let _ = proxy.get_attributes(
+            fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE,
+            zx::MonotonicInstant::INFINITE_PAST,
+        );
+
+        // The handle will be dropped when the proxy is dropped. `zxio_close` is called when self
+        // is dropped.
+        Ok(())
     }
 
     /// Assumes that the caller has set `query.fsverity_root_hash` to true.
