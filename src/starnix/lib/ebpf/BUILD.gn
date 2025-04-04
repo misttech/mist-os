@@ -24,6 +24,7 @@ rustc_library("ebpf") {
     "src/memio/${current_cpu}.rs",
     "src/memio/mod.rs",
     "src/program.rs",
+    "src/scalar_value.rs",
     "src/verifier.rs",
     "src/visitor.rs",
   ]
@@ -32,6 +33,7 @@ rustc_library("ebpf") {
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",

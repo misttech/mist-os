@@ -10,6 +10,7 @@ mod executor;
 pub mod maps;
 pub mod memio;
 pub mod program;
+mod scalar_value;
 pub mod verifier;
 mod visitor;
 

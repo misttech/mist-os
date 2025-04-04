@@ -4,6 +4,7 @@
 
 #![allow(unused_variables)]
 
+use crate::scalar_value::{ScalarValueData, U32ScalarValueData, U64Range};
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE,
@@ -209,191 +210,6 @@ impl MemoryParameterSize {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Range<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> {
-    min: T,
-    max: T,
-}
-
-impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> Range<T> {
-    const fn new(min: T, max: T) -> Self {
-        Self { min, max }
-    }
-}
-
-impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> From<T> for Range<T> {
-    fn from(value: T) -> Self {
-        Self::new(value, value)
-    }
-}
-
-type U64Range = Range<u64>;
-
-impl U64Range {
-    const fn max() -> Self {
-        Self::new(0, u64::MAX)
-    }
-
-    fn extract_slices(value: u64, offset: usize, byte_count: usize) -> (u64, u64, u64) {
-        let v1 = if offset > 0 { NativeEndian::read_uint(&value.as_bytes(), offset) } else { 0 };
-        let v2 = NativeEndian::read_uint(&value.as_bytes()[offset..], byte_count);
-        let v3 = if offset + byte_count < 8 {
-            NativeEndian::read_uint(
-                &value.as_bytes()[(offset + byte_count)..],
-                8 - offset - byte_count,
-            )
-        } else {
-            0
-        };
-        if cfg!(target_endian = "little") {
-            (v1, v2, v3)
-        } else {
-            (v3, v2, v1)
-        }
-    }
-
-    fn assemble_slices(values: (u64, u64, u64), offset: usize, byte_count: usize) -> u64 {
-        let mut result: u64 = 0;
-        let (v1, v2, v3) =
-            if cfg!(target_endian = "little") { values } else { (values.2, values.1, values.0) };
-        if offset > 0 {
-            result.as_mut_bytes()[..offset].copy_from_slice(&v1.as_bytes()[..offset]);
-        }
-        result.as_mut_bytes()[offset..(offset + byte_count)]
-            .copy_from_slice(&v2.as_bytes()[..byte_count]);
-        result.as_mut_bytes()[(offset + byte_count)..]
-            .copy_from_slice(&v3.as_bytes()[..(8 - offset - byte_count)]);
-        result
-    }
-
-    /// Given a target and source values, each in the `target` and `source` ranges. Compute the
-    /// range of the result of the operation where `byte_count` bytes from `source` at offset
-    /// `source_offset` replace `byte_count` bytes from `target` at offset `target_offset`.
-    fn compute_range_for_bytes_swap(
-        target: U64Range,
-        source: U64Range,
-        target_offset: usize,
-        source_offset: usize,
-        byte_count: usize,
-    ) -> U64Range {
-        let (target_umin1, target_umin2, target_umin3) =
-            Self::extract_slices(target.min, target_offset, byte_count);
-        let (target_umax1, target_umax2, target_umax3) =
-            Self::extract_slices(target.max, target_offset, byte_count);
-        let (_, source_umin2, source_umin3) =
-            Self::extract_slices(source.min, source_offset, byte_count);
-        let (_, source_umax2, source_umax3) =
-            Self::extract_slices(source.max, source_offset, byte_count);
-
-        let (final_umin3, final_umax3) = (target_umin3, target_umax3);
-        let (final_umin2, final_umax2) =
-            if source_umax3 > source_umin3 { (0, u64::MAX) } else { (source_umin2, source_umax2) };
-        let (final_umin1, final_umax1) =
-            if target_umax3 > target_umin3 || target_umax2 > target_umin2 {
-                (0, u64::MAX)
-            } else {
-                (target_umin1, target_umax1)
-            };
-
-        let final_min = Self::assemble_slices(
-            (final_umin1, final_umin2, final_umin3),
-            target_offset,
-            byte_count,
-        );
-        let final_max = Self::assemble_slices(
-            (final_umax1, final_umax2, final_umax3),
-            target_offset,
-            byte_count,
-        );
-
-        Range::new(final_min, final_max)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ScalarValueData {
-    /// The value. Its interpresentation depends on `unknown_mask` and `unwritten_mask`.
-    value: u64,
-    /// A bit mask of unknown bits. A bit in `value` is valid (and can be used by the verifier)
-    /// if the equivalent mask in unknown_mask is 0.
-    unknown_mask: u64,
-    /// A bit mask of unwritten bits. A bit in `value` is written (and can be sent back to
-    /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
-    /// subset of `unwritten_mask`.
-    unwritten_mask: u64,
-    /// The range of possible unsigned values of this scalar.
-    urange: U64Range,
-}
-
-/// Defines a partial ordering on `ScalarValueData` instances, capturing the notion of how "broad"
-/// a scalar value is in terms of the set of potential values it represents.
-///
-/// The ordering is defined such that `s1 > s2` if a proof that an eBPF program terminates
-/// in a state where a register or memory location has a scalar value `s1` is also a proof that
-/// the program terminates in a state where that location has scalar value `s2`.
-///
-/// In other words, a "broader" value represents a larger set of possible values, and
-/// proving termination with a broader type implies termination with any narrower value.
-///
-/// Examples:
-/// * `ScalarValueData { unknown_mask: 0, .. }` (a known scalar value) is less than
-///   `ScalarValueData { unknown_mask: u64::MAX, .. }` (an unknown scalar value).
-impl PartialOrd for ScalarValueData {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        fn mask_is_larger(m1: u64, m2: u64) -> bool {
-            m1 & m2 == m2
-        }
-
-        // If the values are equals, return the known result.
-        if self == other {
-            return Some(Ordering::Equal);
-        }
-
-        if mask_is_larger(self.unwritten_mask, other.unwritten_mask)
-            && mask_is_larger(self.unknown_mask, other.unknown_mask)
-            && self.value & !self.unknown_mask == other.value & !self.unknown_mask
-        {
-            return Some(Ordering::Greater);
-        }
-        if mask_is_larger(other.unwritten_mask, self.unwritten_mask)
-            && mask_is_larger(other.unknown_mask, self.unknown_mask)
-            && self.value & !other.unknown_mask == other.value & !other.unknown_mask
-        {
-            return Some(Ordering::Less);
-        }
-        None
-    }
-}
-
-impl From<u64> for ScalarValueData {
-    fn from(value: u64) -> Self {
-        Self { value, unknown_mask: 0, unwritten_mask: 0, urange: value.into() }
-    }
-}
-
-impl ScalarValueData {
-    const UNINITIALIZED: Self =
-        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX, urange: Range::max() };
-    const UNKNOWN_WRITTEN: Self =
-        Self { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0, urange: Range::max() };
-
-    const fn is_known(&self) -> bool {
-        self.unknown_mask == 0
-    }
-
-    const fn is_fully_initialized(&self) -> bool {
-        self.unwritten_mask == 0
-    }
-
-    const fn is_uninitialized(&self) -> bool {
-        self.unwritten_mask == u64::MAX
-    }
-
-    const fn is_zero(&self) -> bool {
-        self.is_known() && self.value == 0
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
     /// A number.
@@ -497,6 +313,12 @@ impl PartialOrd for Type {
     }
 }
 
+impl From<ScalarValueData> for Type {
+    fn from(value: ScalarValueData) -> Self {
+        Self::ScalarValue(value)
+    }
+}
+
 impl From<u64> for Type {
     fn from(value: u64) -> Self {
         Self::ScalarValue(value.into())
@@ -584,7 +406,7 @@ impl Type {
                     value: data1.value | data2.value,
                     unknown_mask: data1.unknown_mask & data2.unknown_mask,
                     unwritten_mask: 0,
-                    urange: Range::new(umin, umax),
+                    urange: U64Range::new(umin, umax),
                 });
                 (v.clone(), v)
             }
@@ -602,7 +424,7 @@ impl Type {
                     None
                 };
 
-                let urange1 = Range::new(
+                let urange1 = U64Range::new(
                     maybe_umin.unwrap_or(data1.urange.min),
                     maybe_umax.unwrap_or(data1.urange.max),
                 );
@@ -613,7 +435,7 @@ impl Type {
                     urange: urange1,
                 });
 
-                let urange2 = Range::new(
+                let urange2 = U64Range::new(
                     maybe_umin.unwrap_or(data2.urange.min),
                     maybe_umax.unwrap_or(data2.urange.max),
                 );
@@ -1672,60 +1494,21 @@ impl ComputationContext {
         op1: Type,
         op2: Type,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<Type, String> {
         let result: Type = match (alu_type, op1.inner(context)?, op2.inner(context)?) {
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_known() && data2.is_known() =>
-            {
-                op(data1.value, data2.value).into()
-            }
-            (AluType::Bitwise, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
-                let unknown_mask = data1.unknown_mask | data2.unknown_mask;
-                let unwritten_mask = data1.unwritten_mask | data2.unwritten_mask;
-                let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
-            }
-            (AluType::Shift, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data2.is_known() =>
-            {
-                let value = op(data1.value, data2.value);
-                let unknown_mask = op(data1.unknown_mask, data2.value);
-                let unwritten_mask = op(data1.unwritten_mask, data2.value);
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
-            }
-            (AluType::Arsh, Type::ScalarValue(data1), Type::ScalarValue(data2)) => {
-                let unknown_mask = data1.unknown_mask.overflowing_shr(data2.value as u32).0;
-                let unwritten_mask = data1.unwritten_mask.overflowing_shr(data2.value as u32).0;
-                let value = op(data1.value, data2.value) & !unknown_mask;
-                Type::ScalarValue(ScalarValueData {
-                    value,
-                    unknown_mask,
-                    unwritten_mask,
-                    urange: Range::max(),
-                })
-            }
+            (_, Type::ScalarValue(data1), Type::ScalarValue(data2)) => op(*data1, *data2).into(),
             (alu_type, Type::PtrToStack { offset: x }, Type::ScalarValue(data))
                 if alu_type.is_ptr_compatible() && data.is_known() =>
             {
-                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, data.value)) }
+                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x.into(), *data).value) }
             }
             (
                 alu_type,
                 Type::PtrToMemory { id, offset: x, buffer_size },
                 Type::ScalarValue(data),
             ) if alu_type.is_ptr_compatible() && data.is_known() => {
-                let offset = op(*x as u64, data.value);
+                let offset = op((*x as u64).into(), *data).value;
                 Type::PtrToMemory {
                     id: id.clone(),
                     offset: offset as i64,
@@ -1737,7 +1520,7 @@ impl ComputationContext {
                 Type::PtrToStruct { id, offset: x, descriptor },
                 Type::ScalarValue(data),
             ) if alu_type.is_ptr_compatible() && data.is_known() => {
-                let offset = op(*x as u64, data.value);
+                let offset = op((*x as u64).into(), *data).value;
                 Type::PtrToStruct {
                     id: id.clone(),
                     offset: offset as i64,
@@ -1747,7 +1530,7 @@ impl ComputationContext {
             (alu_type, Type::PtrToArray { id, offset: x }, Type::ScalarValue(data))
                 if alu_type.is_ptr_compatible() && data.is_known() =>
             {
-                let offset = op(*x as u64, data.value);
+                let offset = op((*x as u64).into(), *data).value;
                 Type::PtrToArray { id: id.clone(), offset: offset as i64 }
             }
             (
@@ -1764,9 +1547,9 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToArray { id: id1, offset: x1 },
                 Type::PtrToArray { id: id2, offset: x2 },
-            ) if id1 == id2 => Type::from(op(*x1 as u64, *x2 as u64)),
+            ) if id1 == id2 => Type::from(op((*x1 as u64).into(), (*x2 as u64).into())),
             (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
-                Type::from(op(x1.reg(), x2.reg()))
+                Type::from(op(x1.reg().into(), x2.reg().into()))
             }
             (
                 AluType::Sub,
@@ -1778,11 +1561,6 @@ impl ComputationContext {
                 Type::PtrToEndArray { id: id1, .. },
                 Type::PtrToArray { id: id2, .. },
             ) if id1 == id2 => Type::UNKNOWN_SCALAR,
-            (_, Type::ScalarValue(data1), Type::ScalarValue(data2))
-                if data1.is_fully_initialized() && data2.is_fully_initialized() =>
-            {
-                Type::UNKNOWN_SCALAR
-            }
             _ => Type::default(),
         };
         Ok(result)
@@ -1795,7 +1573,7 @@ impl ComputationContext {
         dst: Register,
         src: Source,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<(), String> {
         if let Some(op_name) = op_name {
             bpf_log!(
@@ -1872,7 +1650,7 @@ impl ComputationContext {
         offset: i16,
         src: Register,
         alu_type: AluType,
-        op: impl Fn(u64, u64) -> u64,
+        op: impl Fn(ScalarValueData, ScalarValueData) -> ScalarValueData,
     ) -> Result<(), String> {
         self.raw_atomic_operation(
             op_name,
@@ -1951,7 +1729,7 @@ impl ComputationContext {
                 value: bit_op(data.value),
                 unknown_mask: bit_op(data.unknown_mask),
                 unwritten_mask: bit_op(data.unwritten_mask),
-                urange: Range::max(),
+                urange: U64Range::max(),
             }),
             _ => Type::default(),
         };
@@ -2992,9 +2770,6 @@ struct TerminatingContext {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AluType {
     Plain,
-    Bitwise,
-    Shift,
-    Arsh,
     Sub,
     Add,
 }
@@ -3071,9 +2846,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("add32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_add(y).0)
-        })
+        self.alu(Some("add32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x + y))
     }
     fn add64<'a>(
         &mut self,
@@ -3081,7 +2854,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("add"), context, dst, src, AluType::Add, |x, y| x.overflowing_add(y).0)
+        self.alu(Some("add"), context, dst, src, AluType::Add, |x, y| x + y)
     }
     fn and<'a>(
         &mut self,
@@ -3089,9 +2862,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("and32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x & y)
-        })
+        self.alu(Some("and32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x & y))
     }
     fn and64<'a>(
         &mut self,
@@ -3099,7 +2870,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("and"), context, dst, src, AluType::Bitwise, |x, y| x & y)
+        self.alu(Some("and"), context, dst, src, AluType::Plain, |x, y| x & y)
     }
     fn arsh<'a>(
         &mut self,
@@ -3107,11 +2878,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("arsh32"), context, dst, src, AluType::Arsh, |x, y| {
-            alu32(x, y, |x, y| {
-                let x = x as i32;
-                x.overflowing_shr(y).0 as u32
-            })
+        self.alu(Some("arsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x.ashr(y))
         })
     }
     fn arsh64<'a>(
@@ -3120,10 +2888,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("arsh"), context, dst, src, AluType::Arsh, |x, y| {
-            let x = x as i64;
-            x.overflowing_shr(y as u32).0 as u64
-        })
+        self.alu(Some("arsh"), context, dst, src, AluType::Plain, |x, y| x.ashr(y))
     }
     fn div<'a>(
         &mut self,
@@ -3131,9 +2896,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("div32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| if y == 0 { 0 } else { x / y })
-        })
+        self.alu(Some("div32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x / y))
     }
     fn div64<'a>(
         &mut self,
@@ -3141,14 +2904,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(
-            Some("div"),
-            context,
-            dst,
-            src,
-            AluType::Plain,
-            |x, y| if y == 0 { 0 } else { x / y },
-        )
+        self.alu(Some("div"), context, dst, src, AluType::Plain, |x, y| x / y)
     }
     fn lsh<'a>(
         &mut self,
@@ -3156,8 +2912,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("lsh32"), context, dst, src, AluType::Shift, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_shl(y).0)
+        self.alu(Some("lsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x << y)
         })
     }
     fn lsh64<'a>(
@@ -3166,9 +2922,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("lsh"), context, dst, src, AluType::Shift, |x, y| {
-            x.overflowing_shl(y as u32).0
-        })
+        self.alu(Some("lsh"), context, dst, src, AluType::Plain, |x, y| x << y)
     }
     fn r#mod<'a>(
         &mut self,
@@ -3176,9 +2930,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mod32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| if y == 0 { x } else { x % y })
-        })
+        self.alu(Some("mod32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x % y))
     }
     fn mod64<'a>(
         &mut self,
@@ -3186,14 +2938,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(
-            Some("mod"),
-            context,
-            dst,
-            src,
-            AluType::Plain,
-            |x, y| if y == 0 { x } else { x % y },
-        )
+        self.alu(Some("mod"), context, dst, src, AluType::Plain, |x, y| x % y)
     }
     fn mov<'a>(
         &mut self,
@@ -3237,9 +2982,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mul32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_mul(y).0)
-        })
+        self.alu(Some("mul32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x * y))
     }
     fn mul64<'a>(
         &mut self,
@@ -3247,7 +2990,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("mul"), context, dst, src, AluType::Plain, |x, y| x.overflowing_mul(y).0)
+        self.alu(Some("mul"), context, dst, src, AluType::Plain, |x, y| x * y)
     }
     fn or<'a>(
         &mut self,
@@ -3255,9 +2998,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("or32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x | y)
-        })
+        self.alu(Some("or32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x | y))
     }
     fn or64<'a>(
         &mut self,
@@ -3265,7 +3006,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("or"), context, dst, src, AluType::Bitwise, |x, y| x | y)
+        self.alu(Some("or"), context, dst, src, AluType::Plain, |x, y| x | y)
     }
     fn rsh<'a>(
         &mut self,
@@ -3273,8 +3014,8 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("rsh32"), context, dst, src, AluType::Shift, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_shr(y).0)
+        self.alu(Some("rsh32"), context, dst, src, AluType::Plain, |x, y| {
+            alu32(x, y, |x, y| x >> y)
         })
     }
     fn rsh64<'a>(
@@ -3283,9 +3024,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("rsh"), context, dst, src, AluType::Shift, |x, y| {
-            x.overflowing_shr(y as u32).0
-        })
+        self.alu(Some("rsh"), context, dst, src, AluType::Plain, |x, y| x >> y)
     }
     fn sub<'a>(
         &mut self,
@@ -3293,9 +3032,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("sub32"), context, dst, src, AluType::Plain, |x, y| {
-            alu32(x, y, |x, y| x.overflowing_sub(y).0)
-        })
+        self.alu(Some("sub32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x - y))
     }
     fn sub64<'a>(
         &mut self,
@@ -3303,7 +3040,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("sub"), context, dst, src, AluType::Sub, |x, y| x.overflowing_sub(y).0)
+        self.alu(Some("sub"), context, dst, src, AluType::Sub, |x, y| x - y)
     }
     fn xor<'a>(
         &mut self,
@@ -3311,9 +3048,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("xor32"), context, dst, src, AluType::Bitwise, |x, y| {
-            alu32(x, y, |x, y| x ^ y)
-        })
+        self.alu(Some("xor32"), context, dst, src, AluType::Plain, |x, y| alu32(x, y, |x, y| x ^ y))
     }
     fn xor64<'a>(
         &mut self,
@@ -3321,26 +3056,18 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("xor"), context, dst, src, AluType::Bitwise, |x, y| x ^ y)
+        self.alu(Some("xor"), context, dst, src, AluType::Plain, |x, y| x ^ y)
     }
 
     fn neg<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         bpf_log!(self, context, "neg32 {}", display_register(dst));
         self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, y| {
-            alu32(x, y, |x, _y| {
-                let x = x as i32;
-                let x = -x;
-                x as u32
-            })
+            alu32(x, y, |x, _y| -x)
         })
     }
     fn neg64<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         bpf_log!(self, context, "neg {}", display_register(dst));
-        self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, _y| {
-            let x = x as i64;
-            let x = -x;
-            x as u64
-        })
+        self.alu(None, context, dst, Source::Value(0), AluType::Plain, |x, _y| -x)
     }
 
     fn be<'a>(
@@ -3869,7 +3596,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x & y),
         )
     }
@@ -3890,7 +3617,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x & y,
         )
     }
@@ -3911,7 +3638,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x | y),
         )
     }
@@ -3932,7 +3659,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x | y,
         )
     }
@@ -3953,7 +3680,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| alu32(x, y, |x, y| x ^ y),
         )
     }
@@ -3974,7 +3701,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            AluType::Bitwise,
+            AluType::Plain,
             |x, y| x ^ y,
         )
     }
@@ -4203,8 +3930,12 @@ impl BpfVisitor for ComputationContext {
     }
 }
 
-fn alu32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> u32) -> u64 {
-    op(x as u32, y as u32) as u64
+fn alu32(
+    x: ScalarValueData,
+    y: ScalarValueData,
+    op: impl FnOnce(U32ScalarValueData, U32ScalarValueData) -> U32ScalarValueData,
+) -> ScalarValueData {
+    op(U32ScalarValueData::from(x), U32ScalarValueData::from(y)).into()
 }
 
 fn comp32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> bool) -> bool {
@@ -4391,8 +4122,8 @@ mod tests {
                         for max_old in values.iter().filter(|v| *v >= old) {
                             for max_new in values.iter().filter(|v| *v >= new) {
                                 let range = U64Range::compute_range_for_bytes_swap(
-                                    Range::new(*min_old, *max_old),
-                                    Range::new(*min_new, *max_new),
+                                    U64Range::new(*min_old, *max_old),
+                                    U64Range::new(*min_new, *max_new),
                                     1,
                                     0,
                                     1,
