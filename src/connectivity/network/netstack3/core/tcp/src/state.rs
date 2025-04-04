@@ -29,7 +29,7 @@ use crate::internal::base::{
     BufferSizes, BuffersRefMut, ConnectionError, IcmpErrorResult, KeepAlive, SocketOptions,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
-use crate::internal::congestion::CongestionControl;
+use crate::internal::congestion::{CongestionControl, CongestionControlSendOutcome};
 use crate::internal::counters::TcpCountersRefs;
 use crate::internal::rtt::{Estimator, Rto, RttSampler};
 
@@ -1388,22 +1388,20 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
         // Find the sequence number for the next segment, we start with snd_nxt
         // unless a fast retransmit is needed.
-        let (next_seg, loss_recovery) = match congestion_control.fast_retransmit() {
-            None => (*snd_nxt, false),
-            Some(seg) => {
-                increment_retransmit_counters(congestion_control);
-                (seg, true)
-            }
-        };
+        //
+        // Bail early if congestion control tells us not to send anything.
+        let CongestionControlSendOutcome {
+            next_seg,
+            congestion_limit,
+            congestion_window,
+            loss_recovery,
+        } = congestion_control.poll_send(*snd_una, *snd_nxt, *snd_wnd, readable_bytes)?;
+
         // First calculate the unused window, note that if our peer has shrank
         // their window (it is strongly discouraged), the following conversion
         // will fail and we return early.
         let unused_window =
             u32::try_from(*snd_una + *snd_wnd - next_seg).ok_checked::<TryFromIntError>()?;
-        let cwnd = congestion_control.cwnd();
-        // If we don't have space in the congestion window return early.
-        let unused_congestion_window =
-            u32::try_from(*snd_una + cwnd - next_seg).ok_checked::<TryFromIntError>()?;
         let offset =
             usize::try_from(next_seg - *snd_una).unwrap_or_else(|TryFromIntError { .. }| {
                 panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
@@ -1414,9 +1412,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         // the bytes that are available, additionally, if in zero window probe
         // mode, allow at least one byte past the limit to be sent.
         let can_send = unused_window
-            .min(unused_congestion_window)
+            .min(congestion_limit)
             .min(available)
-            .min(mss)
             .min(limit)
             .max(u32::from(zero_window_probe));
 
@@ -1425,6 +1422,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 *timer = Some(SendTimer::KeepAlive(KeepAliveTimer::idle(now, keep_alive)));
             }
             return None;
+        }
+
+        if next_seg.before(*snd_nxt) {
+            increment_retransmit_counters(congestion_control);
         }
 
         let has_fin = FIN_QUEUED && can_send == available;
@@ -1544,12 +1545,13 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             "len" => seg.len(),
             "can_send" => can_send,
             "snd_wnd" => u32::from(*snd_wnd),
-            "cwnd" => u32::from(cwnd),
+            "cwnd" => congestion_window,
             "unused_window" => unused_window,
             "available" => available,
         );
         let seq_max = next_seg + seg.len();
         rtt_sampler.on_will_send_segment(now, next_seg..seq_max, *snd_max);
+        congestion_control.on_will_send_segment(seg.len());
 
         if seq_max.after(*snd_nxt) {
             *snd_nxt = seq_max;
@@ -1655,14 +1657,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
         // TODO(https://fxbug.dev/42078221): Remove SACK_PERMITTED guard when
         // SACK-based loss recovery is complete.
-        if SACK_PERMITTED {
-            // TODO(https://fxbug.dev/42078221): Use duplicate ack information
-            // from scoreboard to enter SACK-based loss recovery.
-            let _is_dup_ack_by_sack =
-                congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
-        }
-
-        let (trace, data_acked) = if seg_ack.after(*snd_una) {
+        let seg_sack_blocks = if SACK_PERMITTED { seg_sack_blocks } else { &SackBlocks::EMPTY };
+        let is_dup_ack_by_sack =
+            congestion_control.preprocess_ack(seg_ack, *snd_nxt, seg_sack_blocks);
+        let (is_dup_ack, data_acked) = if seg_ack.after(*snd_una) {
             // The unwrap is safe because the result must be positive.
             let acked = u32::try_from(seg_ack - *snd_una)
                 .ok_checked::<TryFromIntError>()
@@ -1704,44 +1702,53 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 rtt_estimator.sample(rtt);
             }
 
-            // It is possible, however unlikely, that we get here without an
-            // RTT estimation - in case the first data segment that we send
-            // out gets retransmitted. In that case, simply don't update
-            // congestion control which at worst causes slow start to take
-            // one extra step.
-            if let Some(rtt) = rtt_estimator.srtt() {
-                congestion_control.on_ack(acked, now, rtt);
+            // Note that we may not have an RTT estimation yet, see
+            // CongestionControl::on_ack.
+            let recovered = congestion_control.on_ack(seg_ack, acked, now, rtt_estimator.srtt());
+            if recovered {
+                counters.increment(|c| &c.loss_recovered);
             }
 
+            // This can be a duplicate ACK according to the SACK-based algorithm
+            // in RFC 6675. Use that if available, otherwise given we've
+            // received a new acknowledgement this is not a duplicate ACK.
+            let is_dup_ack = is_dup_ack_by_sack.unwrap_or(false);
+
             // At least one byte of data was ACKed by the peer.
-            (true, DataAcked::Yes)
+            (is_dup_ack, DataAcked::Yes)
         } else {
-            // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
-            //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
-            //   "duplicate" in the following algorithms when (a) the receiver of
-            //   the ACK has outstanding data, (b) the incoming acknowledgment
-            //   carries no data, (c) the SYN and FIN bits are both off, (d) the
-            //   acknowledgment number is equal to the greatest acknowledgment
-            //   received on the given connection (TCP.UNA from [RFC793]) and (e)
-            //   the advertised window in the incoming acknowledgment equals the
-            //   advertised window in the last incoming acknowledgment.
-            let is_dup_ack = {
+            // Check if this is a duplicate ACK according to RFC 5681 if we
+            // don't have this information from the SACK blocks.
+            let is_dup_ack = is_dup_ack_by_sack.unwrap_or_else(|| {
+                // Per RFC 5681
+                //   (https://www.rfc-editor.org/rfc/rfc5681#section-2):
+                //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
+                //   "duplicate" in the following algorithms when (a) the
+                //   receiver of the ACK has outstanding data, (b) the incoming
+                //   acknowledgment carries no data, (c) the SYN and FIN bits
+                //   are both off, (d) the acknowledgment number is equal to the
+                //   greatest acknowledgment received on the given connection
+                //   (TCP.UNA from [RFC793]) and (e) the advertised window in
+                //   the incoming acknowledgment equals the advertised window in
+                //   the last incoming acknowledgment.
                 snd_nxt.after(*snd_una) // (a)
-                && pure_ack // (b) & (c)
-                && seg_ack == *snd_una // (d)
-                && seg_wnd == *snd_wnd // (e)
-            };
-            if is_dup_ack {
-                let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
-                if fast_recovery_initiated {
-                    counters.increment(|c| &c.fast_recovery);
-                }
-            }
+                    && pure_ack // (b) & (c)
+                    && seg_ack == *snd_una // (d)
+                    && seg_wnd == *snd_wnd // (e)
+            });
+
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
             //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
             //   ignored.
             (is_dup_ack, DataAcked::No)
         };
+
+        if is_dup_ack {
+            let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack, *snd_nxt);
+            if fast_recovery_initiated {
+                counters.increment(|c| &c.fast_recovery);
+            }
+        }
 
         // Per RFC 9293
         // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
@@ -1766,7 +1773,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         }
 
         // Only generate traces for interesting things.
-        if trace {
+        if data_acked == DataAcked::Yes || is_dup_ack {
             trace_instant!(c"tcp::Send::process_ack",
                 "id" => id.trace_id(),
                 "seg_ack" => u32::from(seg_ack),
@@ -1777,7 +1784,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     // signal.
                     rtt_estimator.srtt().unwrap_or(Duration::ZERO).as_millis()
                 ).unwrap_or(u32::MAX),
-                "cwnd" => u32::from(congestion_control.cwnd()),
+                "cwnd" => congestion_control.inspect_cwnd().cwnd(),
                 "ssthresh" => congestion_control.slow_start_threshold(),
                 "fast_recovery" => congestion_control.in_fast_recovery(),
                 "acked" => data_acked == DataAcked::Yes,
@@ -1803,10 +1810,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             return ShouldRetransmit::No;
         }
 
-        // Update the MSS, and let congestion control update the congestion window
-        // accordingly.
-        self.congestion_control.update_mss(mss);
-
         // Per [RFC 8201 section 5.4], rewind SND.NXT to the sequence number of the
         // segment that exceeded the MTU, and try to send some more data. This will
         // cause us to retransmit all unacknowledged data starting from that segment in
@@ -1827,6 +1830,10 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         //
         // [RFC 8201 section 5.4]: https://datatracker.ietf.org/doc/html/rfc8201#section-5.4
         self.nxt = seq;
+
+        // Update the MSS, and let congestion control update the congestion window
+        // accordingly.
+        self.congestion_control.update_mss(mss, self.una, self.nxt);
 
         // Have the caller trigger an immediate retransmit of up to the new MSS.
         //
@@ -3576,6 +3583,7 @@ pub(super) enum CloseReason<I: Instant> {
 #[cfg(test)]
 mod test {
     use alloc::vec;
+    use alloc::vec::Vec;
     use core::fmt::Debug;
     use core::num::NonZeroU16;
     use core::time::Duration;
@@ -3587,15 +3595,15 @@ mod test {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::base::testutil::{
-        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
-    };
     use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
-    use crate::internal::buffer::testutil::RingBuffer;
+    use crate::internal::buffer::testutil::{InfiniteSendBuffer, RingBuffer};
     use crate::internal::buffer::Buffer;
     use crate::internal::congestion::DUP_ACK_THRESHOLD;
     use crate::internal::counters::testutil::CounterExpectations;
     use crate::internal::counters::TcpCountersWithSocketInner;
+    use crate::internal::testutil::{
+        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
+    };
 
     const ISS_1: SeqNum = SeqNum::new(100);
     const ISS_2: SeqNum = SeqNum::new(300);
@@ -6168,9 +6176,9 @@ mod test {
         // into the network.
         CounterExpectations::default().assert_counters(&counters);
         dup_ack(b'B', &counters.refs());
-        CounterExpectations { fast_recovery: 1, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, ..Default::default() }.assert_counters(&counters);
         dup_ack(b'C', &counters.refs());
-        CounterExpectations { fast_recovery: 1, ..Default::default() }.assert_counters(&counters);
+        CounterExpectations { fast_recovery: 0, ..Default::default() }.assert_counters(&counters);
         // The third dup ack will cause a fast retransmit of the first segment
         // at snd.una.
         dup_ack(b'A', &counters.refs());
@@ -6207,9 +6215,10 @@ mod test {
         );
         let established = assert_matches!(state, State::Established(established) => established);
         assert_eq!(
-            u32::from(established.snd.congestion_control.cwnd()),
+            established.snd.congestion_control.inspect_cwnd().cwnd(),
             2 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
         );
+        assert!(!established.snd.congestion_control.in_fast_recovery());
     }
 
     #[test]
@@ -6830,7 +6839,6 @@ mod test {
         CounterExpectations {
             established_closed: 1,
             established_timedout: 1,
-            fast_retransmits: if zero_window_probe { 1 } else { 0 },
             fast_recovery: if zero_window_probe { 1 } else { 0 },
             // Note: We don't want to assert on these counters having a specific
             // value, so copy in their actual value.
@@ -8864,5 +8872,226 @@ mod test {
         };
         assert_eq!(seg.len(), u32::try_from(payload.len()).unwrap());
         assert_eq!(seg.header.seq, ack.header.ack.unwrap());
+    }
+
+    // Test a connection that is limited only by a theoretical congestion
+    // window, provided in multiples of MSS.
+    //
+    // This is a bit large for a unit test, but the set up to prove that traffic
+    // is only limited by the congestion window is not achievable when the
+    // entire stack is hooked up. Namely this test is proving 2 things:
+    //
+    // - When provided with infinite bytes to send and a receiver with an
+    //   impossibly large window, a TCP sender still paces the connection based
+    //   on the congestion window estimate. It is very hard to provide an
+    //   infinite data source and boundless receiver in a full integration test.
+    // - After sending enough bytes and going through enough congestion events,
+    //   the TCP sender has an _acceptable_ estimate of what the congestion
+    //   window is.
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(3)]
+    #[test_case(5)]
+    #[test_case(20)]
+    #[test_case(50)]
+    fn congestion_window_limiting(theoretical_window: u32) {
+        netstack3_base::testutil::set_logger_for_test();
+
+        let mss = DEVICE_MAXIMUM_SEGMENT_SIZE;
+
+        // The test argument is the theoretical window in terms of multiples
+        // of mss.
+        let theoretical_window = theoretical_window * u32::from(mss);
+
+        // Ensure we're not going to ever be blocked by the receiver window.
+        let snd_wnd = WindowSize::MAX;
+        let wnd_scale = snd_wnd.scale();
+
+        let mut state = State::<FakeInstant, _, _, ()>::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: snd_wnd,
+                wnd_max: snd_wnd,
+                // Instantiate with a buffer that always reports it has data to
+                // send.
+                buffer: InfiniteSendBuffer::default(),
+                wl1: ISS_2 + 1,
+                wl2: ISS_1 + 1,
+                rtt_estimator: Estimator::default(),
+                rtt_sampler: RttSampler::default(),
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(mss),
+                wnd_scale,
+            }
+            .into(),
+            rcv: Recv {
+                buffer: RecvBufferState::Open {
+                    buffer: RingBuffer::default(),
+                    assembler: Assembler::new(ISS_2 + 1),
+                },
+                timer: None,
+                mss,
+                // quickacks start at zero.
+                remaining_quickacks: 0,
+                last_segment_at: None,
+                wnd_scale: WindowScale::default(),
+                last_window_update: (ISS_2 + 1, WindowSize::DEFAULT),
+                sack_permitted: SACK_PERMITTED,
+            }
+            .into(),
+        });
+
+        let socket_options = SocketOptions::default_for_state_tests();
+        let mut clock = FakeInstantCtx::default();
+        let counters = FakeTcpCounters::default();
+
+        assert!(state.assert_established().snd.congestion_control.in_slow_start());
+
+        let poll_until_empty =
+            |state: &mut State<_, _, _, _>, segments: &mut Vec<(SeqNum, u32)>, now| loop {
+                match state.poll_send(
+                    &FakeStateMachineDebugId,
+                    &counters.refs(),
+                    u32::MAX,
+                    now,
+                    &socket_options,
+                ) {
+                    Ok(seg) => {
+                        // All sent segments controlled only by congestion
+                        // window should send MSS.
+                        assert_eq!(seg.len(), u32::from(mss));
+                        segments.push((seg.header.seq, seg.len()));
+                    }
+                    Err(closed) => {
+                        assert_eq!(closed, NewlyClosed::No);
+                        break;
+                    }
+                }
+            };
+
+        let mut pending_segments = Vec::new();
+        let mut pending_acks = Vec::new();
+        let mut receiver = Assembler::new(ISS_1 + 1);
+        let mut total_sent = 0;
+        let mut total_sent_rounds = 0;
+
+        // Ensure the test doesn't run for too long.
+        let mut loops = 500;
+        let mut continue_running = |state: &mut State<_, _, _, _>| {
+            loops -= 1;
+            assert!(loops > 0, "test seems to have stalled");
+
+            // Run the connection until we have crossed a number of interesting
+            // congestion events.
+            const CONGESTION_EVENTS: u64 = 10;
+            let event_count =
+                counters.stack_wide.timeouts.get() + counters.stack_wide.loss_recovered.get();
+            let congestion_control = &state.assert_established().snd.congestion_control;
+            event_count <= CONGESTION_EVENTS
+                // Continue running until we've left fast recovery or slow
+                // start.
+                || congestion_control.in_fast_recovery() || congestion_control.in_slow_start()
+        };
+
+        while continue_running(&mut state) {
+            clock.sleep(Duration::from_millis(1));
+            if pending_acks.is_empty() {
+                poll_until_empty(&mut state, &mut pending_segments, clock.now());
+            } else {
+                for ack in pending_acks.drain(..) {
+                    let seg: Segment<()> = Segment::ack(ISS_2 + 1, ack, snd_wnd >> wnd_scale);
+                    let (seg, passive_open, data_acked, newly_closed) = state
+                        .on_segment::<_, ClientlessBufferProvider>(
+                        &FakeStateMachineDebugId,
+                        &counters.refs(),
+                        seg,
+                        clock.now(),
+                        &socket_options,
+                        false,
+                    );
+
+                    assert_eq!(seg, None);
+                    assert_eq!(passive_open, None);
+                    assert_eq!(newly_closed, NewlyClosed::No);
+                    // When we hit the congestion window duplicate acks will
+                    // start to be sent out so we can't really assert on
+                    // data_acked.
+                    let _: DataAcked = data_acked;
+
+                    poll_until_empty(&mut state, &mut pending_segments, clock.now());
+                }
+            }
+
+            let established = state.assert_established();
+            let congestion_control = &established.snd.congestion_control;
+            let ssthresh = congestion_control.slow_start_threshold();
+            let cwnd = congestion_control.inspect_cwnd().cwnd();
+            let in_slow_start = congestion_control.in_slow_start();
+            let in_fast_recovery = congestion_control.in_fast_recovery();
+            let pipe = congestion_control.pipe();
+            let sent = u32::try_from(pending_segments.len()).unwrap() * u32::from(mss);
+
+            if !in_slow_start {
+                total_sent += sent;
+                total_sent_rounds += 1;
+            }
+
+            // This test is a bit hard to debug when things go wrong, so emit
+            // the steps in logs.
+            log::debug!(
+                "ssthresh={ssthresh}, \
+                    cwnd={cwnd}, \
+                    sent={sent}, \
+                    pipe={pipe}, \
+                    in_slow_start={in_slow_start}, \
+                    in_fast_recovery={in_fast_recovery}, \
+                    retransmits={}, \
+                    fast_retransmits={}, \
+                    fast_recovery={}",
+                counters.stack_wide.retransmits.get(),
+                counters.stack_wide.fast_retransmits.get(),
+                counters.stack_wide.fast_recovery.get(),
+            );
+
+            if pending_segments.is_empty() {
+                assert_matches!(established.snd.timer, Some(SendTimer::Retrans(_)));
+                // Nothing to do. Move the clock to hit RTO.
+                clock.sleep_until(state.poll_send_at().expect("must have timeout"));
+                log::debug!("RTO");
+                continue;
+            }
+
+            let mut available = theoretical_window;
+            for (seq, len) in pending_segments.drain(..) {
+                // Drop segments that don't fit the congestion window.
+                if available < len {
+                    break;
+                }
+                available -= len;
+                // Generate all the acks.
+                if seq.after_or_eq(receiver.nxt()) {
+                    let _: usize = receiver.insert(seq..(seq + len));
+                }
+                pending_acks.push(receiver.nxt());
+            }
+        }
+
+        // The effective average utilization of the congestion window at every
+        // RTT, not including the slow start periods.
+        let avg_sent = total_sent / total_sent_rounds;
+        // Define the tolerance as a range based on the theoretical window. This
+        // is simply the tightest round integer value that we could find that
+        // makes the test pass. Given we're not closely tracking how many
+        // congestion events happening the estimate varies a lot, even with a
+        // big average over the non slow-start periods.
+        let tolerance = (theoretical_window / 3).max(u32::from(mss));
+        let low_range = theoretical_window - tolerance;
+        let high_range = theoretical_window + tolerance;
+        assert!(
+            avg_sent >= low_range && avg_sent <= high_range,
+            "{low_range} <= {avg_sent} <= {high_range}"
+        );
     }
 }

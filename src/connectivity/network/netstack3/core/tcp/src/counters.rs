@@ -132,6 +132,8 @@ pub struct TcpCountersWithSocketInner<C = Counter> {
     /// Count of times an established TCP connection transitioned to CLOSED due
     /// to a timeout (e.g. a keep-alive or retransmit timeout).
     pub established_timedout: C,
+    /// Count of times loss recovery completes successfully.
+    pub loss_recovered: C,
 }
 
 /// A composition of the TCP Counters with and without a socket.
@@ -174,6 +176,7 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
             established_closed,
             established_resets,
             established_timedout,
+            loss_recovered,
         } = with_socket.as_ref();
 
         // Note: Organize the "without socket" counters into helper structs to
@@ -251,6 +254,7 @@ impl<I: Ip> Inspectable for CombinedTcpCounters<'_, I> {
         inspector.record_counter("PassiveConnectionOpenings", passive_connection_openings);
         inspector.record_counter("ActiveConnectionOpenings", active_connection_openings);
         inspector.record_counter("FastRecovery", fast_recovery);
+        inspector.record_counter("LossRecovered", loss_recovered);
         inspector.record_counter("EstablishedClosed", established_closed);
         inspector.record_counter("EstablishedResets", established_resets);
         inspector.record_counter("EstablishedTimedout", established_timedout);
@@ -389,6 +393,7 @@ pub(crate) mod testutil {
                 established_closed,
                 established_resets,
                 established_timedout,
+                loss_recovered,
             } = counters;
             TcpCountersWithSocketInner {
                 received_segments_dispatched: received_segments_dispatched.get(),
@@ -415,6 +420,7 @@ pub(crate) mod testutil {
                 established_closed: established_closed.get(),
                 established_resets: established_resets.get(),
                 established_timedout: established_timedout.get(),
+                loss_recovered: loss_recovered.get(),
             }
         }
     }

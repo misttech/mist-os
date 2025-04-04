@@ -22,6 +22,8 @@ mod internal {
     pub(super) mod seq_ranges;
     pub(super) mod socket;
     pub(super) mod state;
+    #[cfg(test)]
+    pub(super) mod testutil;
     pub(super) mod uninstantiable;
 }
 

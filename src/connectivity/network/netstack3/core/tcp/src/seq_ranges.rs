@@ -35,7 +35,7 @@ impl<M> SeqRanges<M> {
         }
     }
 
-    fn find_first_after(blocks: &mut VecDeque<SeqRange<M>>, start: SeqNum) -> usize {
+    fn find_first_after(blocks: &VecDeque<SeqRange<M>>, start: SeqNum) -> usize {
         match blocks.binary_search_by(|block| {
             if block.start() == start {
                 return core::cmp::Ordering::Equal;
@@ -166,6 +166,11 @@ impl<M> SeqRanges<M> {
         let first_after = Self::find_first_after(blocks, value);
         // All the blocks starting at or before `value` can be discarded.
         let _drain = blocks.drain(0..first_after);
+    }
+
+    pub(crate) fn clear(&mut self) {
+        let Self { blocks } = self;
+        blocks.clear();
     }
 }
 

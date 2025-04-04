@@ -189,6 +189,62 @@ impl SackScoreboard {
 
         new
     }
+
+    pub(crate) fn pipe(&self) -> u32 {
+        self.pipe
+    }
+
+    /// Increments the pipe value kept by the scoreboard by `value`.
+    ///
+    /// Note that [`SackScoreboard::process_ack`] always updates the pipe value
+    /// based on the scoreboard. Whenever a segment is sent, we must increment
+    /// the pipe value so the estimate of total bytes in transit is always up to
+    /// date until the next ACK arrives.
+    pub(crate) fn increment_pipe(&mut self, value: u32) {
+        self.pipe = self.pipe.saturating_add(value);
+    }
+
+    pub(crate) fn on_retransmission_timeout(&mut self) {
+        let Self { acked_ranges, pipe } = self;
+        // RFC 2018 says that we MUST clear all SACK information on a
+        // retransmission timeout.
+        //
+        // RFC 6675 changes that to a SHOULD keep SACK information on a
+        // retransmission timeout, but doesn't quite specify how to deal with
+        // the SACKed ranges post the timeout. Notably, the pipe estimate is
+        // very clearly off post an RTO.
+        //
+        // Given that, the conservative thing to do here is to clear the
+        // scoreboard and reset the pipe so estimates can be based again on the
+        // rewound value of SND.NXT and the eventually retransmitted SACK blocks
+        // that we may get post the RTO event. Note that `process_ack` ignores
+        // any SACK blocks post SND.NXT in order to maintain the pipe variable
+        // sensible as well.
+        //
+        // See:
+        // - https://datatracker.ietf.org/doc/html/rfc2018
+        // - https://datatracker.ietf.org/doc/html/rfc6675
+        *pipe = 0;
+        acked_ranges.clear();
+    }
+
+    pub(crate) fn on_mss_update(
+        &mut self,
+        snd_una: SeqNum,
+        snd_nxt: SeqNum,
+        high_rxt: Option<SeqNum>,
+        mss: Mss,
+    ) {
+        // When MSS updates, we must recalculate so we know what frames are
+        // considered lost or not.
+        //
+        // Notably, this will also update the pipe variable so we have a new
+        // estimate of bytes in flight with a new value for snd_nxt.
+        //
+        // Given we don't detect renegging, this is equivalent to processing an
+        // ACK at the given parameters and without any SACK blocks.
+        let _: bool = self.process_ack(snd_una, snd_nxt, high_rxt, &SackBlocks::EMPTY, mss);
+    }
 }
 
 /// Returns the threshold over which a sequence number is considered lost per
@@ -205,20 +261,11 @@ mod test {
     use core::num::NonZeroU16;
     use core::ops::Range;
 
-    use netstack3_base::SackBlock;
-
     use super::*;
     use crate::internal::seq_ranges::SeqRange;
+    use crate::internal::testutil;
 
     const TEST_MSS: Mss = Mss(NonZeroU16::new(50).unwrap());
-
-    fn sack_blocks(iter: impl IntoIterator<Item = Range<u32>>) -> SackBlocks {
-        iter.into_iter()
-            .map(|Range { start, end }| {
-                SackBlock::try_new(SeqNum::new(start), SeqNum::new(end)).unwrap()
-            })
-            .collect()
-    }
 
     fn seq_ranges(iter: impl IntoIterator<Item = (Range<u32>, bool)>) -> SeqRanges<bool> {
         iter.into_iter()
@@ -256,7 +303,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([0..1, 4..6, 5..10]),
+            &testutil::sack_blocks([0..1, 4..6, 5..10]),
             TEST_MSS
         ));
         assert!(sb.acked_ranges.is_empty());
@@ -266,7 +313,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([100..200, 50..150]),
+            &testutil::sack_blocks([100..200, 50..150]),
             TEST_MSS
         ));
         assert!(sb.acked_ranges.is_empty());
@@ -278,7 +325,7 @@ mod test {
         let ack = SeqNum::new(5);
         let snd_nxt = SeqNum::new(100);
         let high_rxt = None;
-        let blocks = sack_blocks([20..30]);
+        let blocks = testutil::sack_blocks([20..30]);
         assert!(sb.process_ack(ack, snd_nxt, high_rxt, &blocks, TEST_MSS));
         let expect_ranges = seq_ranges([(20..30, false)]);
         assert_eq!(sb.acked_ranges, expect_ranges);
@@ -305,7 +352,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([block1.clone(), block2.clone(), block3.clone()]),
+            &testutil::sack_blocks([block1.clone(), block2.clone(), block3.clone()]),
             TEST_MSS
         ));
         assert_eq!(
@@ -334,7 +381,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([small_block.clone(), large_block.clone()]),
+            &testutil::sack_blocks([small_block.clone(), large_block.clone()]),
             TEST_MSS
         ));
         // Large block is exactly at the limit of the hole to its left being
@@ -356,7 +403,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([small_block.clone(), large_block.clone()]),
+            &testutil::sack_blocks([small_block.clone(), large_block.clone()]),
             TEST_MSS
         ));
         // Now the hole to the left of large block is also considered lost.
@@ -380,7 +427,7 @@ mod test {
         let first_block = 20..30;
         let second_block = 40..50;
 
-        let blocks = sack_blocks([first_block.clone(), second_block.clone()]);
+        let blocks = testutil::sack_blocks([first_block.clone(), second_block.clone()]);
 
         // Extract the baseline pipe that if we receive an ACK with the
         // parameters above but without a HighRxt value.
@@ -428,7 +475,13 @@ mod test {
 
         // Cumulative ack doesn't move, 1 SACK range signaling loss is received.
         let sack1 = 10..(10 + sacked_bytes_threshold(TEST_MSS) + 1);
-        assert!(sb.process_ack(ack, snd_nxt, high_rxt, &sack_blocks([sack1.clone()]), TEST_MSS));
+        assert!(sb.process_ack(
+            ack,
+            snd_nxt,
+            high_rxt,
+            &testutil::sack_blocks([sack1.clone()]),
+            TEST_MSS
+        ));
         assert_eq!(sb.acked_ranges, seq_ranges([(sack1.clone(), true)]),);
         assert_eq!(
             sb.pipe,
@@ -443,7 +496,7 @@ mod test {
             ack,
             snd_nxt,
             high_rxt,
-            &sack_blocks([sack1.clone(), sack2.clone()]),
+            &testutil::sack_blocks([sack1.clone(), sack2.clone()]),
             TEST_MSS
         ));
         assert_eq!(sb.acked_ranges, seq_ranges([(sack1.clone(), true), (sack2.clone(), false)]));
@@ -456,7 +509,13 @@ mod test {
 
         // Cumulative acknowledge the first SACK range.
         let ack = SeqNum::new(sack1.end);
-        assert!(!sb.process_ack(ack, snd_nxt, high_rxt, &sack_blocks([sack2.clone()]), TEST_MSS));
+        assert!(!sb.process_ack(
+            ack,
+            snd_nxt,
+            high_rxt,
+            &testutil::sack_blocks([sack2.clone()]),
+            TEST_MSS
+        ));
         assert_eq!(sb.acked_ranges, seq_ranges([(sack2, false)]));
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
 
@@ -473,7 +532,13 @@ mod test {
         let snd_nxt = SeqNum::new(500);
         let high_rxt = None;
         let block = 10..20;
-        assert!(sb.process_ack(ack, snd_nxt, high_rxt, &sack_blocks([block.clone()]), TEST_MSS));
+        assert!(sb.process_ack(
+            ack,
+            snd_nxt,
+            high_rxt,
+            &testutil::sack_blocks([block.clone()]),
+            TEST_MSS
+        ));
         assert_eq!(sb.acked_ranges, seq_ranges([(block.clone(), false)]));
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
 

@@ -245,7 +245,7 @@ pub(crate) mod testutil {
 
     use either::Either;
     use netstack3_base::sync::Mutex;
-    use netstack3_base::{FragmentedPayload, WindowSize};
+    use netstack3_base::{FragmentedPayload, PayloadLen, WindowSize};
 
     use crate::internal::socket::accept_queue::ListenerNotifier;
 
@@ -265,7 +265,7 @@ pub(crate) mod testutil {
     /// *Readable* memory, once read, becomes writable.
     ///
     /// *Writable* memory, once marked as such, becomes readable.
-    #[cfg_attr(any(test, feature = "testutils"), derive(Clone, PartialEq, Eq))]
+    #[derive(Clone, PartialEq, Eq)]
     pub struct RingBuffer {
         pub(super) storage: Vec<u8>,
         /// The index where the reader starts to read.
@@ -666,6 +666,92 @@ pub(crate) mod testutil {
 
     impl ListenerNotifier for ProvidedBuffers {
         fn new_incoming_connections(&mut self, _: usize) {}
+    }
+
+    #[derive(Debug)]
+    pub struct RepeatingPayload {
+        len: usize,
+    }
+
+    impl RepeatingPayload {
+        const REPEATING_BYTE: u8 = 0xAA;
+    }
+
+    impl PayloadLen for RepeatingPayload {
+        fn len(&self) -> usize {
+            self.len
+        }
+    }
+
+    impl Payload for RepeatingPayload {
+        fn slice(self, range: Range<u32>) -> Self {
+            Self { len: usize::try_from(range.end - range.start).unwrap() }
+        }
+
+        fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
+            assert!(offset < self.len);
+            assert_eq!(dst.len() - offset, self.len);
+            dst.fill(Self::REPEATING_BYTE);
+        }
+
+        fn partial_copy_uninit(&self, offset: usize, dst: &mut [core::mem::MaybeUninit<u8>]) {
+            assert!(offset < self.len);
+            assert_eq!(dst.len() - offset, self.len);
+            dst.fill(core::mem::MaybeUninit::new(Self::REPEATING_BYTE));
+        }
+
+        fn new_empty() -> Self {
+            Self { len: 0 }
+        }
+    }
+
+    impl InnerPacketBuilder for RepeatingPayload {
+        fn bytes_len(&self) -> usize {
+            self.len
+        }
+
+        fn serialize(&self, buffer: &mut [u8]) {
+            buffer.fill(Self::REPEATING_BYTE)
+        }
+    }
+
+    /// A buffer that always has [`usize::MAX`] bytes available to write.
+    #[derive(Default, Debug, Eq, PartialEq)]
+    pub struct InfiniteSendBuffer;
+
+    impl InfiniteSendBuffer {
+        const LEN: usize = usize::MAX as usize;
+    }
+
+    impl Buffer for InfiniteSendBuffer {
+        fn capacity_range() -> (usize, usize) {
+            (0, Self::LEN)
+        }
+
+        fn limits(&self) -> BufferLimits {
+            BufferLimits { capacity: Self::LEN, len: Self::LEN }
+        }
+
+        fn target_capacity(&self) -> usize {
+            Self::LEN
+        }
+
+        fn request_capacity(&mut self, size: usize) {
+            unimplemented!("can't change capacity of infinite send buffer to {size}")
+        }
+    }
+
+    impl SendBuffer for InfiniteSendBuffer {
+        type Payload<'a> = RepeatingPayload;
+
+        fn mark_read(&mut self, _count: usize) {}
+
+        fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
+        where
+            F: FnOnce(Self::Payload<'a>) -> R,
+        {
+            f(RepeatingPayload { len: Self::LEN - offset })
+        }
     }
 }
 

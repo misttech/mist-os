@@ -373,17 +373,3 @@ impl Default for KeepAlive {
         }
     }
 }
-
-#[cfg(test)]
-pub(crate) mod testutil {
-    use netstack3_base::Mss;
-    /// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
-    ///
-    /// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS
-    /// FORTY.
-    ///   The default IP Maximum Datagram Size is 576.
-    ///   The default TCP Maximum Segment Size is 536.
-    pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE: usize = 536;
-    pub(crate) const DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE: Mss =
-        Mss(core::num::NonZeroU16::new(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE as u16).unwrap());
-}

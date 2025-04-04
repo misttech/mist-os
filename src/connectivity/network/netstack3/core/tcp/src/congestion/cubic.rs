@@ -249,7 +249,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::base::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
+    use crate::internal::testutil::DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE;
 
     impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         // Helper function in test that takes a u32 instead of a NonZeroU32
@@ -303,7 +303,7 @@ mod tests {
         // We simulate a deterministic loss model, i.e., for loss_rate p, we
         // drop one packet for every 1/p packets.
         for _ in 0..ROUND_TRIPS {
-            let cwnd = u32::from(params.rounded_cwnd());
+            let cwnd = params.rounded_cwnd().cwnd();
             if ack_cnt >= loss_rate_reciprocal {
                 ack_cnt -= loss_rate_reciprocal;
                 cubic.on_loss_detected(&mut params);
@@ -381,10 +381,7 @@ mod tests {
                 RTT,
             );
         }
-        assert_eq!(
-            u32::from(params.rounded_cwnd()),
-            5 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
-        );
+        assert_eq!(params.rounded_cwnd().cwnd(), 5 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
 
         // Now we are at `epoch_start+RTT`, the window size should grow by at
         // lease 1 u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE) per RTT (standard TCP).
@@ -397,10 +394,7 @@ mod tests {
                 RTT,
             );
         }
-        assert_eq!(
-            u32::from(params.rounded_cwnd()),
-            6 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
-        );
+        assert_eq!(params.rounded_cwnd().cwnd(), 6 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE));
     }
 
     // This is a regression test for https://fxbug.dev/327628809.
