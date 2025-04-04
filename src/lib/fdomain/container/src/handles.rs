@@ -4,7 +4,7 @@
 
 #[cfg(target_os = "fuchsia")]
 use fidl::HandleBased;
-use fidl::{AsHandleRef, Peered};
+use fidl::{AsHandleRef, Peered, SocketOpts};
 use fidl_fuchsia_fdomain as proto;
 
 /// Amount of buffer space we allocate for reading from handles in order to
@@ -226,6 +226,20 @@ pub enum AnyHandle {
     Unknown(Unknown),
 }
 
+/// Whether a socket is a datagram socket.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum IsDatagramSocket {
+    NotDatagram,
+    Datagram,
+    Unknown,
+}
+
+impl IsDatagramSocket {
+    pub fn is_datagram(&self) -> bool {
+        matches!(self, IsDatagramSocket::Datagram)
+    }
+}
+
 impl AnyHandle {
     /// Signals that indicate we should do write processing on a handle.
     pub(crate) fn write_signals(&self) -> fidl::Signals {
@@ -247,6 +261,23 @@ impl AnyHandle {
         };
 
         sock_signals | fidl::Signals::OBJECT_READABLE | fidl::Signals::OBJECT_PEER_CLOSED
+    }
+
+    /// Whether this is a datagram socket.
+    pub(crate) fn is_datagram_socket(&self) -> IsDatagramSocket {
+        let AnyHandle::Socket(socket) = self else {
+            return IsDatagramSocket::NotDatagram;
+        };
+
+        let Ok(info) = socket.info() else {
+            return IsDatagramSocket::Unknown;
+        };
+
+        if info.options == SocketOpts::DATAGRAM {
+            IsDatagramSocket::Datagram
+        } else {
+            IsDatagramSocket::NotDatagram
+        }
     }
 
     /// zx_handle_duplicate but preserving our metadata.

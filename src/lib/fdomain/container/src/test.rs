@@ -73,12 +73,13 @@ async fn socket() {
 
     let response_read = fdomain.next().await.unwrap();
 
-    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketReadSocketResponse { data: got_data })) =
+    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketData { data: got_data, is_datagram })) =
         response_read
     else {
         panic!();
     };
 
+    assert!(!is_datagram);
     assert_eq!(tid_read, got_tid);
     assert_eq!(data_compare, got_data);
 
@@ -346,12 +347,13 @@ async fn channel() {
 
     let response_read = fdomain.next().await.unwrap();
 
-    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketReadSocketResponse { data: got_data })) =
+    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketData { data: got_data, is_datagram })) =
         response_read
     else {
         panic!();
     };
 
+    assert!(!is_datagram);
     assert_eq!(tid_read_succeed, got_tid);
     assert_eq!(socket_data_compare, got_data);
 
@@ -556,7 +558,7 @@ async fn bad_channel_writes() {
             proto::FDomainReplaceRequest {
                 handle: proto::HandleId { id: socket_hid_b },
                 new_handle: proto::NewHandleId { id: socket_hid_c },
-                rights: fidl::Rights::READ,
+                rights: fidl::Rights::READ | fidl::Rights::INSPECT,
             },
         )
         .unwrap();
@@ -791,8 +793,9 @@ async fn duplicate_socket() {
 
             FDomainEvent::SocketData(
                 got_tid,
-                Ok(proto::SocketReadSocketResponse { data: got_data }),
+                Ok(proto::SocketData { data: got_data, is_datagram }),
             ) => {
+                assert!(!is_datagram);
                 let len = got_data.len();
                 socket_data_events.push((got_tid, got_data));
 
@@ -1043,7 +1046,8 @@ async fn socket_async_read() {
         panic!()
     };
     assert_eq!(hid_b, got_handle);
-    assert_eq!(data_a, got_data.as_slice());
+    assert_eq!(data_a, got_data.data.as_slice());
+    assert!(!got_data.is_datagram);
 
     fdomain.write_socket(
         tid_3,
@@ -1068,7 +1072,8 @@ async fn socket_async_read() {
         panic!()
     };
     assert_eq!(hid_b, got_handle);
-    assert_eq!(data_b, got_data.as_slice());
+    assert_eq!(data_b, got_data.data.as_slice());
+    assert!(!got_data.is_datagram);
 }
 
 #[fuchsia::test]
@@ -1127,7 +1132,8 @@ async fn socket_async_read_detect_close() {
         panic!()
     };
     assert_eq!(hid_b, got_handle);
-    assert_eq!(data_a, got_data.as_slice());
+    assert_eq!(data_a, got_data.data.as_slice());
+    assert!(!got_data.is_datagram);
 
     fdomain.close(tid_3, proto::FDomainCloseRequest { handles: vec![hid_a] });
 
@@ -1206,7 +1212,8 @@ async fn socket_async_read_stop() {
         panic!()
     };
     assert_eq!(hid_b, got_handle);
-    assert_eq!(data_a, got_data.as_slice());
+    assert_eq!(data_a, got_data.data.as_slice());
+    assert!(!got_data.is_datagram);
 
     fdomain.read_socket_streaming_stop(
         tid_3,
@@ -1236,7 +1243,7 @@ async fn socket_async_read_stop() {
 
     fdomain.read_socket(tid_5, proto::SocketReadSocketRequest { handle: hid_b, max_bytes: 4096 });
 
-    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketReadSocketResponse { data })) =
+    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketData { data, is_datagram })) =
         fdomain.next().await.unwrap()
     else {
         panic!()
@@ -1244,6 +1251,7 @@ async fn socket_async_read_stop() {
 
     assert_eq!(tid_5, got_tid);
     assert_eq!(data_b, data.as_slice());
+    assert!(!is_datagram);
 }
 
 #[fuchsia::test]
@@ -1507,4 +1515,65 @@ async fn channel_async_read_stop() {
     assert_eq!(tid_5, got_tid);
     assert_eq!(data_b, got_data.as_slice());
     assert!(got_handles.is_empty())
+}
+
+#[fuchsia::test]
+async fn datagram_socket() {
+    let mut fdomain = FDomain::new_empty();
+
+    let hid_socket_write = 0;
+    let hid_socket_read = 2;
+
+    assert!(fdomain
+        .create_socket(proto::SocketCreateSocketRequest {
+            options: proto::SocketType::Datagram,
+            handles: [
+                proto::NewHandleId { id: hid_socket_write },
+                proto::NewHandleId { id: hid_socket_read },
+            ]
+        })
+        .is_ok());
+
+    let tid_write = 42.try_into().unwrap();
+    let tid_read = 89.try_into().unwrap();
+
+    let data =
+        b"I've got to admit, I've been giving no small amount of thought to these walls.".to_vec();
+    let data_compare = data.clone();
+    let data_len = data.len();
+
+    fdomain.write_socket(
+        tid_write,
+        proto::SocketWriteSocketRequest { handle: proto::HandleId { id: hid_socket_write }, data },
+    );
+    fdomain.read_socket(
+        tid_read,
+        proto::SocketReadSocketRequest {
+            handle: proto::HandleId { id: hid_socket_read },
+            max_bytes: 2,
+        },
+    );
+
+    let response_write = fdomain.next().await.unwrap();
+
+    let FDomainEvent::WroteSocket(got_tid, Ok(proto::SocketWriteSocketResponse { wrote })) =
+        response_write
+    else {
+        panic!();
+    };
+
+    assert_eq!(tid_write, got_tid);
+    assert_eq!(data_len, wrote.try_into().unwrap());
+
+    let response_read = fdomain.next().await.unwrap();
+
+    let FDomainEvent::SocketData(got_tid, Ok(proto::SocketData { data: got_data, is_datagram })) =
+        response_read
+    else {
+        panic!();
+    };
+
+    assert!(is_datagram);
+    assert_eq!(tid_read, got_tid);
+    assert_eq!(data_compare, got_data);
 }

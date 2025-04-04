@@ -22,7 +22,7 @@ mod test;
 
 pub type Result<T, E = proto::Error> = std::result::Result<T, E>;
 
-use handles::{AnyHandle, HandleType as _};
+use handles::{AnyHandle, HandleType as _, IsDatagramSocket};
 
 /// A queue. Basically just a `VecDeque` except we can asynchronously wait for
 /// an element to pop if it is empty.
@@ -95,7 +95,7 @@ pub enum FDomainEvent {
     SocketStreamingReadStart(NonZeroU32, Result<()>),
     SocketStreamingReadStop(NonZeroU32, Result<()>),
     WaitForSignals(NonZeroU32, Result<proto::FDomainWaitForSignalsResponse>),
-    SocketData(NonZeroU32, Result<proto::SocketReadSocketResponse>),
+    SocketData(NonZeroU32, Result<proto::SocketData>),
     SocketStreamingData(proto::SocketOnSocketStreamingDataRequest),
     SocketDispositionSet(NonZeroU32, Result<()>),
     WroteSocket(NonZeroU32, Result<proto::SocketWriteSocketResponse, proto::WriteSocketError>),
@@ -347,6 +347,10 @@ struct HandleState {
     /// operations should also fail until we receive an `AcknowledgeWriteError`
     /// method call.
     write_error_pending: bool,
+    /// Whether this is a datagram socket. We have to handle data coming out of
+    /// datagram sockets a bit differently to preserve their semantics from the
+    /// perspective of the host and avoid data loss.
+    is_datagram_socket: bool,
     /// Indicates we are sending `On*StreamingData` events to the client
     /// presently. It is an error for the user to try to move the handle out of
     /// the FDomain (e.g. send it through a channel or close it) until after
@@ -373,17 +377,26 @@ struct HandleState {
 }
 
 impl HandleState {
-    fn new(handle: AnyHandle, hid: proto::HandleId) -> Self {
-        HandleState {
+    fn new(handle: AnyHandle, hid: proto::HandleId) -> Result<Self, proto::Error> {
+        let is_datagram_socket = match handle.is_datagram_socket() {
+            IsDatagramSocket::Unknown => {
+                return Err(proto::Error::SocketTypeUnknown(proto::SocketTypeUnknown {
+                    type_: proto::SocketType::unknown(),
+                }))
+            }
+            other => other.is_datagram(),
+        };
+        Ok(HandleState {
             handle: Arc::new(handle),
             hid,
             async_read_in_progress: false,
             write_error_pending: false,
+            is_datagram_socket,
             read_queue: Queue::new(),
             write_queue: Queue::new(),
             signal_waiters: Vec::new(),
             io_waiter: None,
-        }
+        })
     }
 
     /// Poll this handle state. Lets us handle our IO queues and wait for the
@@ -583,7 +596,12 @@ impl HandleState {
                                 FDomainEvent::SocketStreamingData(
                                     proto::SocketOnSocketStreamingDataRequest {
                                         handle: self.hid,
-                                        socket_message: proto::SocketMessage::Data(data),
+                                        socket_message: proto::SocketMessage::Data(
+                                            proto::SocketData {
+                                                data,
+                                                is_datagram: self.is_datagram_socket,
+                                            },
+                                        ),
                                     },
                                 )
                                 .into(),
@@ -662,8 +680,33 @@ impl HandleState {
                 .into(),
             );
         }
+
+        let max_bytes = if self.is_datagram_socket {
+            let AnyHandle::Socket(s) = &*self.handle else {
+                unreachable!("Read socket from state that wasn't for a socket!");
+            };
+            match s.info() {
+                Ok(x) => x.rx_buf_available as u64,
+                // We should always succeed. The only failures are if we don't
+                // have the rights or something's screwed up with the handle. We
+                // know we have the rights because figuring out this was a
+                // datagram socket to begin with meant calling the same call on
+                // the same handle earlier.
+                Err(e) => {
+                    return Some(FDomainEvent::SocketData(
+                        tid,
+                        Err(proto::Error::TargetError(e.into_raw())),
+                    ))
+                }
+            }
+        } else {
+            max_bytes
+        };
         self.handle.read_socket(max_bytes).transpose().map(|x| {
-            FDomainEvent::SocketData(tid, x.map(|data| proto::SocketReadSocketResponse { data }))
+            FDomainEvent::SocketData(
+                tid,
+                x.map(|data| proto::SocketData { data, is_datagram: self.is_datagram_socket }),
+            )
         })
     }
 
@@ -860,7 +903,10 @@ impl FDomain {
     /// Given a [`fidl::MessageBufEtc`], load all of the handles from it into this
     /// FDomain and return a [`ReadChannelPayload`](proto::ReadChannelPayload)
     /// with the same data and the IDs for the handles.
-    fn process_message(&mut self, message: fidl::MessageBufEtc) -> proto::ChannelMessage {
+    fn process_message(
+        &mut self,
+        message: fidl::MessageBufEtc,
+    ) -> Result<proto::ChannelMessage, proto::Error> {
         let (data, handles) = message.split();
         let handles = handles
             .into_iter()
@@ -883,15 +929,15 @@ impl FDomain {
                     _ => AnyHandle::Unknown(handles::Unknown(info.handle, info.object_type)),
                 };
 
-                proto::HandleInfo {
+                Ok(proto::HandleInfo {
                     rights: info.rights,
-                    handle: self.alloc_fdomain_handle(handle),
+                    handle: self.alloc_fdomain_handle(handle)?,
                     type_,
-                }
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, proto::Error>>()?;
 
-        proto::ChannelMessage { data, handles }
+        Ok(proto::ChannelMessage { data, handles })
     }
 
     /// Allocate `N` new handle IDs. These are allocated from
@@ -930,7 +976,10 @@ impl FDomain {
             }))
         } else {
             let ids = ids.into_iter().map(|id| proto::HandleId { id: id.id });
-            let handles = ids.zip(handles.into_iter()).map(|(id, h)| (id, HandleState::new(h, id)));
+            let handles = ids
+                .zip(handles.into_iter())
+                .map(|(id, h)| HandleState::new(h, id).map(|x| (id, x)))
+                .collect::<Result<Vec<_>, proto::Error>>()?;
 
             self.handles.extend(handles);
 
@@ -940,12 +989,12 @@ impl FDomain {
 
     /// Allocate a new handle ID. These are allocated internally and are
     /// expected to follow the protocol rules for FDomain-allocated handle IDs.
-    fn alloc_fdomain_handle(&mut self, handle: AnyHandle) -> proto::HandleId {
+    fn alloc_fdomain_handle(&mut self, handle: AnyHandle) -> Result<proto::HandleId, proto::Error> {
         loop {
             let id = proto::HandleId { id: rand::random::<u32>() | (1u32 << 31) };
             if let Entry::Vacant(v) = self.handles.entry(id) {
-                v.insert(HandleState::new(handle, id));
-                break id;
+                v.insert(HandleState::new(handle, id)?);
+                break Ok(id);
             }
         }
     }
@@ -1335,18 +1384,29 @@ impl futures::Stream for FDomain {
         if let Some(event) = self.event_queue.pop_front() {
             match event {
                 UnprocessedFDomainEvent::Ready(event) => Poll::Ready(Some(event)),
-                UnprocessedFDomainEvent::ChannelData(tid, message) => Poll::Ready(Some(
-                    FDomainEvent::ChannelData(tid, Ok(self.process_message(message))),
-                )),
+                UnprocessedFDomainEvent::ChannelData(tid, message) => {
+                    Poll::Ready(Some(FDomainEvent::ChannelData(tid, self.process_message(message))))
+                }
                 UnprocessedFDomainEvent::ChannelStreamingData(hid, message) => {
-                    Poll::Ready(Some(FDomainEvent::ChannelStreamingData(
-                        proto::ChannelOnChannelStreamingDataRequest {
-                            handle: hid,
-                            channel_sent: proto::ChannelSent::Message(
-                                self.process_message(message),
-                            ),
-                        },
-                    )))
+                    match self.process_message(message) {
+                        Ok(message) => Poll::Ready(Some(FDomainEvent::ChannelStreamingData(
+                            proto::ChannelOnChannelStreamingDataRequest {
+                                handle: hid,
+                                channel_sent: proto::ChannelSent::Message(message),
+                            },
+                        ))),
+                        Err(e) => {
+                            self.handles.get_mut(&hid).unwrap().async_read_in_progress = false;
+                            Poll::Ready(Some(FDomainEvent::ChannelStreamingData(
+                                proto::ChannelOnChannelStreamingDataRequest {
+                                    handle: hid,
+                                    channel_sent: proto::ChannelSent::Stopped(proto::AioStopped {
+                                        error: Some(Box::new(e)),
+                                    }),
+                                },
+                            )))
+                        }
+                    }
                 }
             }
         } else {

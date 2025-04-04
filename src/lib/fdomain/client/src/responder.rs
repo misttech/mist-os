@@ -87,11 +87,11 @@ impl Responder {
                 result,
             ),
             Responder::ReadSocket(id) => {
-                Responder::dispatch_handle_etc::<proto::SocketReadSocketResponse, proto::Error>(
+                Responder::dispatch_handle_etc::<proto::SocketData, proto::Error>(
                     "read_channel",
                     ordinals::READ_SOCKET,
                     move |msg| {
-                        client_inner.handle_socket_read_response(msg.map(|x| x.data), id);
+                        client_inner.handle_socket_read_response(msg, id);
                     },
                     result,
                     None,

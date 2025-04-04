@@ -113,6 +113,52 @@ async fn socket() {
 }
 
 #[fuchsia::test]
+async fn datagram_socket() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_datagram_socket();
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
+
+    a.write_all(TEST_STR_1).await.unwrap();
+    a.write_all(TEST_STR_2).await.unwrap();
+
+    let mut buf = [0u8; 2];
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, 2);
+    assert_eq!(&TEST_STR_1[..2], &buf);
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, 2);
+    assert_eq!(&TEST_STR_2[..2], &buf);
+}
+
+#[fuchsia::test]
+async fn datagram_socket_underflow() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_datagram_socket();
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
+
+    a.write_all(TEST_STR_1).await.unwrap();
+    a.write_all(TEST_STR_2).await.unwrap();
+
+    const MAX_LEN: usize =
+        if TEST_STR_1.len() > TEST_STR_2.len() { TEST_STR_1.len() } else { TEST_STR_2.len() };
+    let mut buf = [0u8; MAX_LEN * 2];
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, TEST_STR_1.len());
+    assert_eq!(TEST_STR_1, &buf[..TEST_STR_1.len()]);
+
+    let new_bytes = b.read(&mut buf).await.unwrap();
+    assert_eq!(new_bytes, TEST_STR_2.len());
+    assert_eq!(TEST_STR_2, &buf[..TEST_STR_2.len()]);
+}
+
+#[fuchsia::test]
 async fn channel() {
     let (client, _) = TestFDomain::new_client();
 

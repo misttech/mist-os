@@ -336,10 +336,10 @@ impl Transport {
     }
 }
 
-/// State of a channel that is or has been read from.
+/// State of a socket that is or has been read from.
 struct SocketReadState {
     wakers: Vec<Waker>,
-    queued: VecDeque<Result<Vec<u8>, Error>>,
+    queued: VecDeque<Result<proto::SocketData, Error>>,
     read_request_pending: bool,
     is_streaming: bool,
 }
@@ -347,7 +347,7 @@ struct SocketReadState {
 impl SocketReadState {
     /// Handle an incoming message, which is either a channel streaming event or
     /// response to a `ChannelRead` request.
-    fn handle_incoming_message(&mut self, msg: Result<Vec<u8>, Error>) {
+    fn handle_incoming_message(&mut self, msg: Result<proto::SocketData, Error>) {
         self.queued.push_back(msg);
         self.wakers.drain(..).for_each(Waker::wake);
     }
@@ -545,7 +545,7 @@ impl ClientInner {
     /// Handles the response to a `SocketRead` protocol message.
     pub(crate) fn handle_socket_read_response(
         &mut self,
-        msg: Result<Vec<u8>, Error>,
+        msg: Result<proto::SocketData, Error>,
         id: proto::HandleId,
     ) {
         let state = self.socket_read_states.entry(id).or_insert_with(|| SocketReadState {
@@ -910,11 +910,11 @@ impl Client {
         if let Some(got) = state.queued.front_mut() {
             match got.as_mut() {
                 Ok(data) => {
-                    let read_size = std::cmp::min(data.len(), out.len());
-                    out[..read_size].copy_from_slice(&data[..read_size]);
+                    let read_size = std::cmp::min(data.data.len(), out.len());
+                    out[..read_size].copy_from_slice(&data.data[..read_size]);
 
-                    if data.len() > read_size {
-                        let _ = data.drain(..read_size);
+                    if data.data.len() > read_size && !data.is_datagram {
+                        let _ = data.data.drain(..read_size);
                     } else {
                         let _ = state.queued.pop_front();
                     }
