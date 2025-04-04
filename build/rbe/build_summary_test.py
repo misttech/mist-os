@@ -1087,6 +1087,11 @@ class BuildSummaryTestBase(unittest.TestCase):
 
 
 class LoadRbeMetricsTest(BuildSummaryTestBase):
+    def test_no_stats(self) -> None:
+        rbe_data = build_summary.load_rbe_metrics({})  # empty file
+        self.assertEqual(rbe_data.status_metrics, {})
+        self.assertEqual(rbe_data.bandwidth_metrics, {})
+
     def test_load(self) -> None:
         rbe_data = build_summary.load_rbe_metrics(self.parsed_input)
         self.assertEqual(

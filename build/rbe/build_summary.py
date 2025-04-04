@@ -175,11 +175,17 @@ class RbeMetrics(object):
 
 def load_rbe_metrics(data: dict[str, Any]) -> RbeMetrics:
     """Extracts RBE metrics into a structure of tables."""
-    stats = {_get_stat_name(stat): stat for stat in data["stats"]}
-
     # Construct a table by action type
     status_metrics: dict[str, dict[str, Any]] = collections.defaultdict(dict)
     bandwidth_metrics: dict[str, dict[str, Any]] = collections.defaultdict(dict)
+
+    if "stats" not in data:
+        return RbeMetrics(
+            status_metrics=status_metrics,
+            bandwidth_metrics=bandwidth_metrics,
+        )
+
+    stats = {_get_stat_name(stat): stat for stat in data["stats"]}
 
     for name, fields in stats.items():
         # Extract labels from name (if applicable)
@@ -296,9 +302,6 @@ def main(argv: Sequence[str]) -> int:
 
     with open(rbe_metrics_txt) as f:
         data = textpb.parse(f)
-
-    if "stats" not in data:
-        return 0
 
     rbe_data = load_rbe_metrics(data)
 
