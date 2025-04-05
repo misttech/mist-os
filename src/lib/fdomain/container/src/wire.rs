@@ -101,13 +101,6 @@ impl FDomainCodec {
                 )?;
                 self.fdomain.write_channel(tx_id, request);
             }
-            ordinals::ACKNOWLEDGE_WRITE_ERROR => {
-                let request = fidl_message::decode_message::<
-                    proto::FDomainAcknowledgeWriteErrorRequest,
-                >(header, rest)?;
-                let result = self.fdomain.acknowledge_write_error(request);
-                self.send_response(tx_id, header.ordinal, result)?;
-            }
             ordinals::WAIT_FOR_SIGNALS => {
                 let request = fidl_message::decode_message::<proto::FDomainWaitForSignalsRequest>(
                     header, rest,

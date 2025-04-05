@@ -72,25 +72,18 @@ type Error = flexible union {
     // from to begin with.
     7: no_read_in_progress struct {};
 
-    // We need to call `AcknowledgeWriteError` on this handle to acknowledge a
-    // previous write error.
-    8: error_pending struct {};
-
-    // We called `AcknowledgeWriteError` on a handle with no write errors pending.
-    9: no_error_pending struct {};
-
     // We tried to write a channel into itself.
-    10: wrote_to_self struct {};
+    8: wrote_to_self struct {};
 
     // We received a request to close or transfer a handle while we were waiting
     // to read from it.
-    11: closed_during_read struct {};
+    9: closed_during_read struct {};
 
     // The flexible features of this protocol allowed the client to send us
     // signals that we didn't actually understand, and we couldn't proceed
     // safely without knowing what they were. The signals field should contain
     // only the signals that weren't understood.
-    12: signals_unknown struct {
+    10: signals_unknown struct {
         signals zx.Signals;
     };
 
@@ -98,17 +91,17 @@ type Error = flexible union {
     // rights that we didn't actually understand, and we couldn't proceed safely
     // without knowing what they were. The rights field should contain only the
     // rights that weren't understood.
-    13: rights_unknown struct {
+    11: rights_unknown struct {
         rights zx.Rights;
     };
 
     // The client used a socket disposition that the FDomain did not recognize.
-    14: socket_disposition_unknown struct {
+    12: socket_disposition_unknown struct {
         disposition SocketDisposition;
     };
 
     // The client used a socket type that the FDomain did not recognize.
-    15: socket_type_unknown struct {
+    13: socket_type_unknown struct {
         type SocketType;
     };
 };
@@ -186,12 +179,4 @@ open protocol FDomain {
     }) -> (struct {
         signals zx.Signals;
     }) error Error;
-
-    // When a write error occurs, further write operations to that handle will
-    // fail until this method is called. This allows us to safely submit
-    // multiple writes asynchronously without transient failures affecting their
-    // order.
-    flexible AcknowledgeWriteError(struct {
-        handle HandleId;
-    }) -> () error Error;
 };

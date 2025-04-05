@@ -27,7 +27,7 @@ mod test;
 
 pub mod fidl;
 
-use responder::{Responder, ResponderStatus};
+use responder::Responder;
 
 pub use channel::{
     AnyHandle, Channel, ChannelMessageStream, ChannelWriter, HandleInfo, MessageBuf,
@@ -74,9 +74,6 @@ fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) ->
         FDomainError::NoReadInProgress(proto::NoReadInProgress {}) => {
             write!(f, "No streaming read was in progress")
         }
-        FDomainError::NoErrorPending(proto::NoErrorPending {}) => {
-            write!(f, "Tried to dismiss write errors on handle where none had occurred")
-        }
         FDomainError::NewHandleIdOutOfRange(proto::NewHandleIdOutOfRange { id }) => {
             write!(f, "Tried to create a handle with id {id}, which is outside the valid range for client handles")
         }
@@ -86,9 +83,6 @@ fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) ->
             } else {
                 write!(f, "Tried to create a new handle with id {id}, which is already the id of an existing handle")
             }
-        }
-        FDomainError::ErrorPending(proto::ErrorPending {}) => {
-            write!(f, "Cannot write to handle again without dismissing previous write error")
         }
         FDomainError::WroteToSelf(proto::WroteToSelf {}) => {
             write!(f, "Tried to write a channel into itself")
@@ -449,19 +443,12 @@ impl ClientInner {
             };
 
             let tx = self.transactions.remove(&tx_id).ok_or(::fidl::Error::InvalidResponseTxid)?;
-            let responder_status = match tx.handle(self, Ok((header, data))) {
+            match tx.handle(self, Ok((header, data))) {
                 Ok(x) => x,
                 Err(e) => {
                     self.transport = Transport::Error(InnerError::Protocol(e));
                     continue;
                 }
-            };
-            if let ResponderStatus::WriteErrorOccurred(handle) = responder_status {
-                self.request(
-                    ordinals::ACKNOWLEDGE_WRITE_ERROR,
-                    proto::FDomainAcknowledgeWriteErrorRequest { handle },
-                    Responder::Ignore,
-                );
             }
         }
     }

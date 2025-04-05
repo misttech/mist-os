@@ -19,8 +19,8 @@ pub(crate) enum Responder {
     CreateEventPair(Sender<Result<(), Error>>),
     CreateEvent(Sender<Result<(), Error>>),
     SetSocketDisposition(Sender<Result<(), Error>>),
-    WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>, proto::HandleId),
-    WriteChannel(Sender<Result<(), Error>>, proto::HandleId),
+    WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>),
+    WriteChannel(Sender<Result<(), Error>>),
     Close(Sender<Result<(), Error>>),
     Duplicate(Sender<Result<(), Error>>),
     Replace(Sender<Result<(), Error>>),
@@ -35,7 +35,6 @@ pub(crate) enum Responder {
 
     // We always use the Ignore variant for these, but implementation is here
     // for posterity.
-    _AcknowledgeWriteError(Sender<Result<(), Error>>),
     _ReadChannelStreamingStart(Sender<Result<(), Error>>),
     _ReadChannelStreamingStop(Sender<Result<(), Error>>),
     _ReadSocketStreamingStart(Sender<Result<(), Error>>),
@@ -45,19 +44,13 @@ pub(crate) enum Responder {
     Ignore,
 }
 
-/// Result after calling a responder. Indicates whether we need to acknowledge a write error.
-pub(crate) enum ResponderStatus {
-    Ok,
-    WriteErrorOccurred(proto::HandleId),
-}
-
 impl Responder {
     /// Feed this responder a still-encoded FIDL request.
     pub(crate) fn handle(
         self,
         client_inner: &mut crate::ClientInner,
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
-    ) -> fidl::Result<ResponderStatus> {
+    ) -> fidl::Result<()> {
         match self {
             Responder::Namespace(sender) => {
                 Responder::dispatch_handle("namespace", ordinals::GET_NAMESPACE, sender, result)
@@ -94,7 +87,6 @@ impl Responder {
                         client_inner.handle_socket_read_response(msg, id);
                     },
                     result,
-                    None,
                 )
             }
             Responder::ReadChannel(id) => Responder::dispatch_handle_etc::<_, proto::Error>(
@@ -104,9 +96,8 @@ impl Responder {
                     client_inner.handle_channel_read_response(msg, id);
                 },
                 result,
-                None,
             ),
-            Responder::WriteSocket(sender, handle) => {
+            Responder::WriteSocket(sender) => {
                 Responder::dispatch_handle_etc::<_, proto::WriteSocketError>(
                     "write_socket",
                     ordinals::WRITE_SOCKET,
@@ -114,10 +105,9 @@ impl Responder {
                         let _ = sender.send(m);
                     },
                     result,
-                    Some(handle),
                 )
             }
-            Responder::WriteChannel(sender, handle) => {
+            Responder::WriteChannel(sender) => {
                 Responder::dispatch_handle_etc::<_, proto::WriteChannelError>(
                     "write_channel",
                     ordinals::WRITE_CHANNEL,
@@ -125,15 +115,8 @@ impl Responder {
                         let _ = sender.send(m);
                     },
                     result,
-                    Some(handle),
                 )
             }
-            Responder::_AcknowledgeWriteError(sender) => Responder::dispatch_handle(
-                "acknowledge_write_error",
-                ordinals::ACKNOWLEDGE_WRITE_ERROR,
-                sender,
-                result,
-            ),
             Responder::WaitForSignals(sender) => Responder::dispatch_handle(
                 "wait_for_signals",
                 ordinals::WAIT_FOR_SIGNALS,
@@ -179,7 +162,7 @@ impl Responder {
                 sender,
                 result,
             ),
-            Responder::Ignore => Ok(ResponderStatus::Ok),
+            Responder::Ignore => Ok(()),
         }
     }
 
@@ -192,7 +175,7 @@ impl Responder {
         ordinal: u64,
         sender: Sender<Result<R, Error>>,
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
-    ) -> fidl::Result<ResponderStatus> {
+    ) -> fidl::Result<()> {
         Self::dispatch_handle_etc::<R, proto::Error>(
             method_name,
             ordinal,
@@ -200,7 +183,6 @@ impl Responder {
                 let _ = sender.send(m);
             },
             result,
-            None,
         )
     }
 
@@ -211,8 +193,7 @@ impl Responder {
         ordinal: u64,
         send_fn: impl FnOnce(Result<R, Error>),
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
-        write_notify: Option<proto::HandleId>,
-    ) -> fidl::Result<ResponderStatus> {
+    ) -> fidl::Result<()> {
         match result {
             Ok((header, body)) => {
                 if header.ordinal != ordinal {
@@ -222,20 +203,14 @@ impl Responder {
                     header, body,
                 ) {
                     Ok(fidl_message::MaybeUnknown::Known(x)) => {
-                        let status = if let (Some(handle), true) = (write_notify, x.is_err()) {
-                            ResponderStatus::WriteErrorOccurred(handle)
-                        } else {
-                            ResponderStatus::Ok
-                        };
-
-                        (x.map_err(Into::into), Ok(status))
+                        (x.map_err(Into::into), Ok(()))
                     },
                     Ok(fidl_message::MaybeUnknown::Unknown) => {
                         (Err(Error::Protocol(fidl::Error::UnsupportedMethod {
                             method_name,
                             protocol_name:
                             <proto::FDomainMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME
-                        })), Ok(ResponderStatus::Ok))
+                        })), Ok(()))
                     }
                     Err(e) => {
                         (Err(Error::Protocol(e.clone())), Err(e))
@@ -246,7 +221,7 @@ impl Responder {
             }
             Err(e) => {
                 send_fn(Err(e.into()));
-                Ok(ResponderStatus::Ok)
+                Ok(())
             }
         }
     }

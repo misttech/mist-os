@@ -278,7 +278,7 @@ impl Channel {
         client.transaction(
             ordinals::WRITE_CHANNEL,
             proto::ChannelWriteChannelRequest { handle, data, handles },
-            move |x| Responder::WriteChannel(x, handle),
+            move |x| Responder::WriteChannel(x),
         )
     }
 

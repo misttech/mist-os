@@ -343,10 +343,6 @@ struct HandleState {
     handle: Arc<AnyHandle>,
     /// Our handle ID.
     hid: proto::HandleId,
-    /// Indicates that a write operation failed on this handle. Further
-    /// operations should also fail until we receive an `AcknowledgeWriteError`
-    /// method call.
-    write_error_pending: bool,
     /// Whether this is a datagram socket. We have to handle data coming out of
     /// datagram sockets a bit differently to preserve their semantics from the
     /// perspective of the host and avoid data loss.
@@ -390,7 +386,6 @@ impl HandleState {
             handle: Arc::new(handle),
             hid,
             async_read_in_progress: false,
-            write_error_pending: false,
             is_datagram_socket,
             read_queue: Queue::new(),
             write_queue: Queue::new(),
@@ -714,16 +709,6 @@ impl HandleState {
     /// socket. If the write succeeds or produces an error that should not be
     /// retried, produce an [`FDomainEvent`] containing the result.
     fn do_write_socket(&mut self, op: &mut SocketWrite) -> Option<FDomainEvent> {
-        if self.write_error_pending {
-            return Some(FDomainEvent::WroteSocket(
-                op.tid,
-                Err(proto::WriteSocketError {
-                    error: proto::Error::ErrorPending(proto::ErrorPending),
-                    wrote: op.wrote.try_into().unwrap(),
-                }),
-            ));
-        }
-
         match self.handle.write_socket(&op.to_write) {
             Ok(wrote) => {
                 op.wrote += wrote;
@@ -740,13 +725,10 @@ impl HandleState {
                     None
                 }
             }
-            Err(error) => {
-                self.write_error_pending = true;
-                Some(FDomainEvent::WroteSocket(
-                    op.tid,
-                    Err(proto::WriteSocketError { error, wrote: op.wrote.try_into().unwrap() }),
-                ))
-            }
+            Err(error) => Some(FDomainEvent::WroteSocket(
+                op.tid,
+                Err(proto::WriteSocketError { error, wrote: op.wrote.try_into().unwrap() }),
+            )),
         }
     }
 
@@ -761,25 +743,11 @@ impl HandleState {
         event_queue: &mut VecDeque<UnprocessedFDomainEvent>,
         ctx: &mut Context<'_>,
     ) -> Poll<()> {
-        if self.write_error_pending {
-            event_queue.push_back(
-                FDomainEvent::WroteChannel(
-                    tid,
-                    Err(proto::WriteChannelError::Error(proto::Error::ErrorPending(
-                        proto::ErrorPending,
-                    ))),
-                )
-                .into(),
-            );
-            return Poll::Ready(());
-        }
-
         let Poll::Ready(handles) = handles.poll_ready(event_queue, ctx) else {
             return Poll::Pending;
         };
 
         let ret = self.handle.write_channel(data, handles);
-        self.write_error_pending = !matches!(ret, Some(Ok(())) | None);
         if let Some(ret) = ret {
             event_queue.push_back(FDomainEvent::WroteChannel(tid, ret).into())
         }
@@ -1168,10 +1136,6 @@ impl FDomain {
         };
 
         if handles.iter().any(|x| x.is_err()) {
-            let _ = self.using_handle(request.handle, |h| {
-                h.write_error_pending = true;
-                Ok(())
-            });
             let e = handles.into_iter().map(|x| x.err().map(Box::new)).collect();
 
             self.push_event(FDomainEvent::WroteChannel(
@@ -1196,20 +1160,6 @@ impl FDomain {
                 Err(proto::WriteChannelError::Error(e)),
             ));
         }
-    }
-
-    pub fn acknowledge_write_error(
-        &mut self,
-        request: proto::FDomainAcknowledgeWriteErrorRequest,
-    ) -> Result<()> {
-        self.using_handle(request.handle, |h| {
-            if h.write_error_pending {
-                h.write_error_pending = false;
-                Ok(())
-            } else {
-                Err(proto::Error::NoErrorPending(proto::NoErrorPending))
-            }
-        })
     }
 
     pub fn wait_for_signals(

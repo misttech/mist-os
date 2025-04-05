@@ -118,7 +118,7 @@ async fn socket() {
     };
     assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
-    let tid_write_fail_2nd = 102.try_into().unwrap();
+    let tid_write_fail_2nd = 103.try_into().unwrap();
 
     fdomain.write_socket(
         tid_write_fail_2nd,
@@ -136,33 +136,6 @@ async fn socket() {
     };
 
     assert_eq!(tid_write_fail_2nd, got_tid);
-    assert_eq!(0, wrote);
-    assert!(matches!(error, proto::Error::ErrorPending(proto::ErrorPending)));
-
-    fdomain
-        .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::HandleId { id: hid_socket_write },
-        })
-        .unwrap();
-
-    let tid_write_fail_3rd = 103.try_into().unwrap();
-
-    fdomain.write_socket(
-        tid_write_fail_3rd,
-        proto::SocketWriteSocketRequest {
-            handle: proto::HandleId { id: hid_socket_write },
-            data: b"greeble".to_vec(),
-        },
-    );
-
-    let response_write = fdomain.next().await.unwrap();
-    let FDomainEvent::WroteSocket(got_tid, Err(proto::WriteSocketError { wrote, error })) =
-        response_write
-    else {
-        panic!();
-    };
-
-    assert_eq!(tid_write_fail_3rd, got_tid);
     assert_eq!(0, wrote);
     let proto::Error::TargetError(err) = error else {
         panic!();
@@ -391,38 +364,10 @@ async fn channel() {
     assert_eq!(tid_write_fail, got_tid);
     assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
-    let tid_write_fail_2nd = 102.try_into().unwrap();
+    let tid_write_fail_2nd = 103.try_into().unwrap();
 
     fdomain.write_channel(
         tid_write_fail_2nd,
-        proto::ChannelWriteChannelRequest {
-            handle: proto::HandleId { id: hid_channel_write },
-            handles: proto::Handles::Handles(vec![]),
-            data: b"greeble".to_vec(),
-        },
-    );
-
-    let response_write = fdomain.next().await.unwrap();
-    let FDomainEvent::WroteChannel(
-        got_tid,
-        Err(proto::WriteChannelError::Error(proto::Error::ErrorPending(proto::ErrorPending))),
-    ) = response_write
-    else {
-        panic!();
-    };
-
-    assert_eq!(tid_write_fail_2nd, got_tid);
-
-    fdomain
-        .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::HandleId { id: hid_channel_write },
-        })
-        .unwrap();
-
-    let tid_write_fail_3rd = 103.try_into().unwrap();
-
-    fdomain.write_channel(
-        tid_write_fail_3rd,
         proto::ChannelWriteChannelRequest {
             handle: proto::HandleId { id: hid_channel_write },
             handles: proto::Handles::Handles(vec![]),
@@ -439,7 +384,7 @@ async fn channel() {
         panic!();
     };
 
-    assert_eq!(tid_write_fail_3rd, got_tid);
+    assert_eq!(tid_write_fail_2nd, got_tid);
     assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
     let tid_read_fail = 105.try_into().unwrap();
@@ -530,12 +475,6 @@ async fn bad_channel_writes() {
     };
     assert_eq!(garbage_hid, got_id);
 
-    assert!(fdomain
-        .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::HandleId { id: channel_hid_a }
-        })
-        .is_ok());
-
     let socket_hid_a = 4;
     let socket_hid_b = 6;
     let socket_hid_c = 8;
@@ -595,12 +534,6 @@ async fn bad_channel_writes() {
     };
 
     assert_eq!(fidl::Status::ACCESS_DENIED.into_raw(), e);
-
-    assert!(fdomain
-        .acknowledge_write_error(proto::FDomainAcknowledgeWriteErrorRequest {
-            handle: proto::HandleId { id: channel_hid_a }
-        })
-        .is_ok());
 
     let tid = 44.try_into().unwrap();
     fdomain.write_channel(
