@@ -26,42 +26,46 @@ fuchsia_structured_config_cpp_elf_lib("platform-bus-config") {
   cm_label = ":manifest"
 }
 
-fuchsia_cc_driver("platform-bus-driver") {
-  legacy = true
-  output_name = "platform-bus"
+source_set("common") {
   sources = [
     "node-util.cc",
     "platform-bus.cc",
     "platform-device.cc",
     "platform-interrupt.cc",
   ]
-  deps = [
+  public_deps = [
     ":platform-bus-bind",
     ":platform-bus-config",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/zbi-format",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.resource:fuchsia.resource_cpp",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/lib/ddk:ddk_metadata",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
+}
+
+fuchsia_cc_driver("platform-bus-driver") {
+  output_name = "platform-bus"
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("platform-bus") {
@@ -93,42 +97,14 @@ export_fuchsia_package_to_bazel("platform-bus-package-bazel") {
 }
 
 test("platform-bus-unittest") {
-  sources = [
-    "node-util.cc",
-    "platform-bus-unittest.cc",
-    "platform-bus.cc",
-    "platform-device.cc",
-    "platform-interrupt.cc",
-  ]
+  sources = [ "platform-bus-unittest.cc" ]
   deps = [
-    ":platform-bus-bind",
-    ":platform-bus-config",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
-    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/zbi-format",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-    "//src/devices/bind/fuchsia.resource:fuchsia.resource_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/testing/driver-runtime-main:zxtest",
+    ":common",
+    "//sdk/lib/async-default",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/fxl/test:gtest_main",
   ]
 }
 

@@ -1721,7 +1721,7 @@ Devnode::Target Node::CreateDevfsPassthrough(
       [node = weak_from_this(), allow_controller_connection,
        node_name = name_](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
         if (!allow_controller_connection) {
-          LOGF(ERROR,
+          LOGF(WARNING,
                "Connection to %s controller interface failed, as that node did not"
                " include controller support in its DevAddArgs",
                node_name.c_str());

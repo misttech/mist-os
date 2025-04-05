@@ -9,37 +9,25 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
-#include <ddktl/device.h>
-
 namespace platform_bus {
 
 class PlatformDevice;
 
-class PlatformInterruptFragment;
-using InterruptDeviceType = ddk::Device<PlatformInterruptFragment>;
-
-class PlatformInterruptFragment : public InterruptDeviceType,
-                                  public fidl::WireServer<fuchsia_hardware_interrupt::Provider> {
+class PlatformInterruptFragment : public fidl::WireServer<fuchsia_hardware_interrupt::Provider> {
  public:
-  PlatformInterruptFragment(zx_device_t* parent, PlatformDevice* pdev, uint32_t index,
-                            async_dispatcher_t* dispatcher)
-      : InterruptDeviceType(parent),
-        pdev_(pdev),
-        index_(index),
-        outgoing_(dispatcher),
-        dispatcher_(dispatcher) {}
+  PlatformInterruptFragment(PlatformDevice* pdev, uint32_t index, async_dispatcher_t* dispatcher)
+      : pdev_(pdev), index_(index), dispatcher_(dispatcher) {}
 
   // Interrupt provider implementation.
-  void Get(GetCompleter::Sync& completer);
+  void Get(GetCompleter::Sync& completer) override;
 
-  zx_status_t Add(const char* name, PlatformDevice* pdev, fuchsia_hardware_platform_bus::Irq& irq);
-
-  void DdkRelease() { delete this; }
+  zx::result<> Add(std::string_view name, PlatformDevice* pdev,
+                   fuchsia_hardware_platform_bus::Irq& irq);
 
  private:
   PlatformDevice* pdev_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> node_;
   uint32_t index_;
-  component::OutgoingDirectory outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_interrupt::Provider> bindings_;
   async_dispatcher_t* dispatcher_;
 };

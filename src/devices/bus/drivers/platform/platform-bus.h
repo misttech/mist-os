@@ -8,14 +8,12 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <lib/async/cpp/task.h>
-#include <lib/ddk/device.h>
-#include <lib/fdf/cpp/channel.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/node/cpp/add_child.h>
 #include <lib/fdf/cpp/dispatcher.h>
-#include <lib/inspect/component/cpp/component.h>
-#include <lib/sync/completion.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/zbi-format/board.h>
-#include <lib/zx/channel.h>
 #include <lib/zx/iommu.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -23,30 +21,28 @@
 #include <zircon/types.h>
 
 #include <fbl/array.h>
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-#include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include "platform-device.h"
 
 namespace platform_bus {
 
 class PlatformBus;
-using PlatformBusType = ddk::Device<PlatformBus, ddk::Initializable>;
 
 // This is the main class for the platform bus driver.
-class PlatformBus : public PlatformBusType,
+class PlatformBus : public fdf::DriverBase,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu>,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::Firmware>,
                     public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
  public:
-  static zx_status_t Create(zx_device_t* parent, const char* name, zx::channel items_svc);
+  PlatformBus(fdf::DriverStartArgs start_args,
+              fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  PlatformBus(zx_device_t* parent, zx::channel items_svc);
+  using fdf::DriverBase::dispatcher;
+  using fdf::DriverBase::outgoing;
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // fuchsia.hardware.platform.bus.PlatformBus implementation.
   void NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
@@ -81,20 +77,11 @@ class PlatformBus : public PlatformBusType,
   void GetInterruptControllerInfo(GetInterruptControllerInfoCompleter::Sync& completer) override;
   void GetSerialNumber(GetSerialNumberCompleter::Sync& completer) override;
 
-  // IOMMU protocol implementation.
-  zx_status_t IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::bti* out_bti);
+  zx::result<zx::bti> GetBti(uint32_t iommu_index, uint32_t bti_id);
 
-  zx::unowned_resource GetIrqResource() const {
-    return zx::unowned_resource(get_irq_resource(parent()));
-  }
-
-  zx::unowned_resource GetMmioResource() const {
-    return zx::unowned_resource(get_mmio_resource(parent()));
-  }
-
-  zx::unowned_resource GetSmcResource() const {
-    return zx::unowned_resource(get_smc_resource(parent()));
-  }
+  zx::unowned_resource GetIrqResource() const;
+  zx::unowned_resource GetMmioResource() const;
+  zx::unowned_resource GetSmcResource() const;
 
   struct BootItemResult {
     zx::vmo vmo;
@@ -106,14 +93,7 @@ class PlatformBus : public PlatformBusType,
 
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend>& suspend_cb() { return suspend_cb_; }
 
-  fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info() {
-    fbl::AutoLock lock(&board_info_lock_);
-    return board_info_;
-  }
-
-  fdf::OutgoingDirectory& outgoing() { return outgoing_; }
-
-  fdf::UnownedDispatcher dispatcher() { return dispatcher_->borrow(); }
+  fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info() { return board_info_; }
 
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus>& bindings() {
     return bindings_;
@@ -133,31 +113,28 @@ class PlatformBus : public PlatformBusType,
 
   bool suspend_enabled() const { return suspend_enabled_; }
 
+  fidl::UnownedClientEnd<fuchsia_driver_framework::Node> platform_node() const {
+    return platform_node_.node_.borrow();
+  }
+
  private:
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PlatformBus);
 
   zx::result<zbi_board_info_t> GetBoardInfo();
-  zx_status_t Init();
 
   zx::result<> NodeAddInternal(fuchsia_hardware_platform_bus::Node& node);
-  zx::result<> ValidateResources(fuchsia_hardware_platform_bus::Node& node);
 
   fidl::ClientEnd<fuchsia_boot::Items> items_svc_;
 
-  // Protects board_name_completer_.
-  fbl::Mutex board_info_lock_;
-  fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info_ __TA_GUARDED(board_info_lock_) = {};
+  fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info_ = {};
   // List to cache requests when board_name is not yet set.
-  std::vector<GetBoardNameCompleter::Async> board_name_completer_ __TA_GUARDED(board_info_lock_);
+  std::vector<GetBoardNameCompleter::Async> board_name_completer_;
 
-  fbl::Mutex bootloader_info_lock_;
-  fuchsia_hardware_platform_bus::BootloaderInfo bootloader_info_
-      __TA_GUARDED(bootloader_info_lock_) = {};
+  fuchsia_hardware_platform_bus::BootloaderInfo bootloader_info_ = {};
   // List to cache requests when vendor is not yet set.
-  std::vector<GetBootloaderVendorCompleter::Async> bootloader_vendor_completer_
-      __TA_GUARDED(bootloader_info_lock_);
+  std::vector<GetBootloaderVendorCompleter::Async> bootloader_vendor_completer_;
 
   fuchsia_sysinfo::wire::InterruptControllerType interrupt_controller_type_ =
       fuchsia_sysinfo::wire::InterruptControllerType::kUnknown;
@@ -167,23 +144,22 @@ class PlatformBus : public PlatformBusType,
 
   std::map<std::pair<uint32_t, uint32_t>, zx::bti> cached_btis_;
 
-  zx_device_t* protocol_passthrough_ = nullptr;
-  fdf::OutgoingDirectory outgoing_;
+  fdf::OwnedChildNode sys_node_;
+  fdf::OwnedChildNode platform_node_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> pt_node_;
+
+  std::vector<std::unique_ptr<PlatformDevice>> devices_;
+
+  compat::DeviceServer device_server_;
+
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu> iommu_bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Firmware> fw_bindings_;
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> sysinfo_bindings_;
-  fdf::UnownedDispatcher dispatcher_;
-  std::optional<inspect::ComponentInspector> inspector_;
 
   bool suspend_enabled_ = false;
 };
 
 }  // namespace platform_bus
-
-__BEGIN_CDECLS
-zx_status_t platform_bus_create(void* ctx, zx_device_t* parent, const char* name, const char* args,
-                                zx_handle_t rpc_channel);
-__END_CDECLS
 
 #endif  // SRC_DEVICES_BUS_DRIVERS_PLATFORM_PLATFORM_BUS_H_
