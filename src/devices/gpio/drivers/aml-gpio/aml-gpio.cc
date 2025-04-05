@@ -541,10 +541,11 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
   // Create Interrupt Object, removing the requested polarity, since the polarity is managed by
   // ConfigureInterrupt().
 
-  // TODO(361851116): Manually convert options instead of casting.
-  uint32_t flags = static_cast<uint32_t>(request->options);
-  // Remove some options that are not relevant or will be replaced and preserve other values.
-  flags &= ~(ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_VIRTUAL);
+  uint32_t flags = 0;
+  if (request->options & fuchsia_hardware_gpio::wire::InterruptOptions::kWakeable) {
+    // TODO(b/361851116): Use ZX_INTERRUPT_WAKE_VECTOR when syscall-next is available.
+    flags |= /* ZX_INTERRUPT_WAKE_VECTOR */ 0x20;
+  }
 
   if (pin_irq_modes_[request->pin]) {
     SetInterruptMode(index, *pin_irq_modes_[request->pin]);

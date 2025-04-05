@@ -849,10 +849,12 @@ TEST_F(S905d2AmlGpioTest, S905d2GetDriveStrength) {
 }
 
 TEST_F(S905d2AmlGpioTest, ExtraInterruptOptions) {
-  constexpr uint32_t kExtraInterruptOption = 0x20;
+  constexpr fuchsia_hardware_gpio::InterruptOptions kWakeableInterruptOption =
+      fuchsia_hardware_gpio::InterruptOptions::kWakeable;
+  constexpr uint32_t kWakeableZirconInterruptOption = 0x20;
 
   incoming().platform_device.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH |
-                                                       kExtraInterruptOption);
+                                                       kWakeableZirconInterruptOption);
   interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
 
   // Modify IRQ index for IRQ pin.
@@ -862,8 +864,9 @@ TEST_F(S905d2AmlGpioTest, ExtraInterruptOptions) {
 
   // The mode is now set by ConfigureInterrupt(); the mode passed here should be ignored. Other
   // options should be passed through to platform-bus.
-  const auto options = static_cast<fuchsia_hardware_gpio::InterruptOptions>(
-      ZX_INTERRUPT_MODE_LEVEL_LOW | kExtraInterruptOption);
+  const auto options =
+      static_cast<fuchsia_hardware_gpio::InterruptOptions>(ZX_INTERRUPT_MODE_LEVEL_LOW) |
+      kWakeableInterruptOption;
 
   zx::interrupt out_int;
   fdf::Arena arena('GPIO');
