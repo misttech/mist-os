@@ -9,10 +9,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-import fidl.fuchsia_wlan_common as fidl_common
-import fidl.fuchsia_wlan_common_security as fidl_security
-import fidl.fuchsia_wlan_ieee80211 as fidl_ieee80211
-import fidl.fuchsia_wlan_sme as fidl_sme
+import fidl_fuchsia_wlan_common as fidl_common
+import fidl_fuchsia_wlan_common_security as fidl_security
+import fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211
+import fidl_fuchsia_wlan_sme as fidl_sme
 from antlion import utils
 from antlion.controllers.access_point import setup_ap
 from antlion.controllers.ap_lib.hostapd_constants import (
@@ -60,15 +60,29 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
             security=security,
         )
 
-        req = fidl_sme.ScanRequest(passive=fidl_sme.PassiveScanRequest())
         scan_results = (
-            (await self.client_sme_proxy.scan_for_controller(req=req))
+            (
+                await self.client_sme_proxy.scan_for_controller(
+                    req=fidl_sme.ScanRequest(
+                        passive=fidl_sme.PassiveScanRequest()
+                    )
+                )
+            )
             .unwrap()
             .scan_results
         )
+        assert (
+            scan_results is not None
+        ), "ClientSme.ScanForController() response is missing scan_results"
 
         bss_description = None
         for scan_result in scan_results:
+            assert (
+                scan_result.bss_description is not None
+            ), "ScanResult is missing bss_description"
+            assert (
+                scan_result.bss_description.ies is not None
+            ), "ScanResult.BssDescription is missing ies"
             scanned_ssid = read_ssid(bytes(scan_result.bss_description.ies))
             if scanned_ssid == ssid:
                 logger.info(f"Found SSID: {scanned_ssid}")
@@ -99,8 +113,8 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
             else:
                 fail(f"Unsupported security mode: {security.security_mode}")
 
-            req = fidl_sme.ConnectRequest(
-                ssid=fidl_ieee80211.Ssid(list(ssid.encode("ascii"))),
+            connect_request = fidl_sme.ConnectRequest(
+                ssid=list(ssid.encode("ascii")),
                 bss_description=bss_description,
                 multiple_bss_candidates=False,
                 authentication=fidl_security.Authentication(
@@ -109,8 +123,10 @@ class ConnectToApTest(base_test.ConnectionBaseTestClass):
                 ),
                 deprecated_scan_type=fidl_common.ScanType.PASSIVE,
             )
-            logger.info(f"ConnectRequest: {req!r}")
-            self.client_sme_proxy.connect(req=req, txn=server.take())
+            logger.info(f"ConnectRequest: {connect_request!r}")
+            self.client_sme_proxy.connect(
+                req=connect_request, txn=server.take()
+            )
 
             next_txn = await txn_queue.get()
             assert_equal(
