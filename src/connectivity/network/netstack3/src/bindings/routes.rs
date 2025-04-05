@@ -54,17 +54,33 @@ pub(crate) use witness::{main_table_id, TableId, TableIdEither};
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsCtx>;
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsCtx>;
 
+#[derive(GenericOverIp, Debug, Clone)]
+#[generic_over_ip(T, GenericOverIp)]
+pub(crate) enum Matcher<T> {
+    /// Only matches when the input exactly matches the specified.
+    Exact(T),
+    /// Matches any input.
+    Any,
+}
+
+impl<T: PartialEq> Matcher<T> {
+    pub(crate) fn matches(&self, input: &T) -> bool {
+        match self {
+            Matcher::Exact(matcher) => matcher == input,
+            Matcher::Any => true,
+        }
+    }
+}
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(A, IpAddress)]
 #[derive(Clone)]
 pub(crate) enum RouteOp<A: IpAddress> {
     Add(netstack3_core::routes::AddableEntry<A, WeakDeviceId>),
-    RemoveToSubnet(Subnet<A>),
     RemoveMatching {
         subnet: Subnet<A>,
         device: WeakDeviceId,
-        gateway: Option<SpecifiedAddr<A>>,
-        metric: Option<AddableMetric>,
+        gateway: Matcher<Option<SpecifiedAddr<A>>>,
+        metric: Matcher<AddableMetric>,
     },
 }
 
@@ -839,30 +855,21 @@ where
                 }
             }
         }
-        Change::RouteOp(RouteOp::RemoveToSubnet(subnet), set) => {
-            match table.remove(|entry| &entry.subnet == &subnet, set) {
-                TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
-                TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
-                TableModifyResult::TableChanged(entries) => {
-                    TableChange::Remove(itertools::Either::Left(entries.into_iter()))
-                }
-            }
-        }
         Change::RouteOp(RouteOp::RemoveMatching { subnet, device, gateway, metric }, set) => {
             match table.remove(
                 |entry| {
                     entry.subnet == subnet
                         && entry.device == device
-                        && entry.gateway == gateway
-                        && metric.map(|metric| metric == entry.metric).unwrap_or(true)
+                        && gateway.matches(&entry.gateway)
+                        && metric.matches(&entry.metric)
                 },
                 set,
             ) {
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
-                TableModifyResult::TableChanged(entries) => TableChange::Remove(
-                    itertools::Either::Right(itertools::Either::Left(entries.into_iter())),
-                ),
+                TableModifyResult::TableChanged(entries) => {
+                    TableChange::Remove(itertools::Either::Left(entries.into_iter()))
+                }
             }
         }
         Change::RemoveMatchingDevice(device) => {
@@ -882,8 +889,8 @@ where
                     )
                 }
                 TableModifyResult::TableChanged(routes_from_table) => {
-                    TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                        itertools::Either::Left(routes_from_table.into_iter()),
+                    TableChange::Remove(itertools::Either::Right(itertools::Either::Left(
+                        routes_from_table.into_iter(),
                     )))
                 }
             }
@@ -894,7 +901,7 @@ where
                 return Ok(ChangeOutcome::NoChange);
             }
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                itertools::Either::Right(itertools::Either::Left(entries.into_iter())),
+                itertools::Either::Left(entries.into_iter()),
             )))
         }
         Change::RemoveTable(_table_id) => {
@@ -902,7 +909,7 @@ where
                 .into_iter()
                 .map(|(entry, EntryData { generation, set_membership: _ })| (entry, generation));
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                itertools::Either::Right(itertools::Either::Right(removed)),
+                itertools::Either::Right(removed),
             )))
         }
     };

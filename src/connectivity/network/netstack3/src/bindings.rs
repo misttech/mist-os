@@ -733,7 +733,12 @@ impl<I: IpExt + FidlMulticastAdminIpExt> EventContext<IpLayerEvent<DeviceId<Bind
             }
             IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
                 self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
-                    routes::RouteOp::RemoveMatching { subnet, device, gateway, metric: None },
+                    routes::RouteOp::RemoveMatching {
+                        subnet,
+                        device,
+                        gateway: routes::Matcher::Exact(gateway),
+                        metric: routes::Matcher::Any,
+                    },
                     routes::SetMembership::CoreNdp,
                 ))
             }

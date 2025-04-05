@@ -655,8 +655,8 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             .apply_route_op(routes::RouteOp::RemoveMatching {
                 subnet,
                 device,
-                gateway,
-                metric: Some(metric),
+                gateway: routes::Matcher::Exact(gateway),
+                metric: routes::Matcher::Exact(metric),
             })
             .await;
 
