@@ -197,7 +197,7 @@ impl MountedVolumesGuard<'_> {
                 .await?
                 .ok_or(FxfsError::NotFound)?
             {
-                (object_id, ObjectDescriptor::Volume) => object_id,
+                (object_id, ObjectDescriptor::Volume, _) => object_id,
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             };
             // We have to ensure that the store isn't flushed while we delete it, because deleting
@@ -221,10 +221,12 @@ impl MountedVolumesGuard<'_> {
                 .await?
                 .ok_or(FxfsError::NotFound)?
             {
-                (second_object_id, ObjectDescriptor::Volume) if second_object_id == object_id => {
+                (second_object_id, ObjectDescriptor::Volume, _)
+                    if second_object_id == object_id =>
+                {
                     break Ok((object_id, transaction));
                 }
-                (_, ObjectDescriptor::Volume) => continue,
+                (_, ObjectDescriptor::Volume, _) => continue,
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
             }
         }

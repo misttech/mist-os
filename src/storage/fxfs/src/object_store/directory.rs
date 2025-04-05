@@ -523,7 +523,7 @@ impl<S: HandleOwner> Directory<S> {
             let mut src_id_and_descriptor = None;
             if let Some((src_dir, src_name)) = src {
                 match src_dir.lookup(src_name).await? {
-                    Some((object_id, object_descriptor)) => match object_descriptor {
+                    Some((object_id, object_descriptor, _)) => match object_descriptor {
                         ObjectDescriptor::File
                         | ObjectDescriptor::Directory
                         | ObjectDescriptor::Symlink => {
@@ -542,7 +542,7 @@ impl<S: HandleOwner> Directory<S> {
                 }
             };
             let dst_id_and_descriptor = match self.lookup(dst).await? {
-                Some((object_id, object_descriptor)) => match object_descriptor {
+                Some((object_id, object_descriptor, _)) => match object_descriptor {
                     ObjectDescriptor::File
                     | ObjectDescriptor::Directory
                     | ObjectDescriptor::Symlink => {
@@ -581,9 +581,11 @@ impl<S: HandleOwner> Directory<S> {
         Ok(self.iter(&mut merger).await?.get().is_some())
     }
 
-    /// Returns the object ID and descriptor for the given child, or None if not found.
+    /// Returns the object ID and descriptor for the given child, or None if not found. If found,
+    /// also returns a boolean indicating whether or not the parent directory was locked during the
+    /// lookup.
     #[trace]
-    pub async fn lookup(&self, name: &str) -> Result<Option<(u64, ObjectDescriptor)>, Error> {
+    pub async fn lookup(&self, name: &str) -> Result<Option<(u64, ObjectDescriptor, bool)>, Error> {
         if self.is_deleted() {
             return Ok(None);
         }
@@ -601,6 +603,7 @@ impl<S: HandleOwner> Directory<S> {
                             target_casefold_hash,
                         ))
                         .await?
+                        .map(|x| (x, false))
                 } else {
                     let key =
                         ObjectKey::encrypted_child(self.object_id(), vec![], target_casefold_hash);
@@ -634,11 +637,10 @@ impl<S: HandleOwner> Directory<S> {
                                 if fxfs_unicode::casefold_cmp(name, &decrypted_name)
                                     == std::cmp::Ordering::Equal
                                 {
-                                    break Some(Item {
-                                        key: key.clone(),
-                                        value: value.clone(),
-                                        sequence,
-                                    });
+                                    break Some((
+                                        Item { key: key.clone(), value: value.clone(), sequence },
+                                        false,
+                                    ));
                                 }
                             }
                             _ => break None,
@@ -669,11 +671,10 @@ impl<S: HandleOwner> Directory<S> {
                         {
                             let filename = ProxyFilename::new(*casefold_hash as u64, name);
                             if filename == target_filename {
-                                break Some(Item {
-                                    key: key.clone(),
-                                    value: value.clone(),
-                                    sequence,
-                                });
+                                break Some((
+                                    Item { key: key.clone(), value: value.clone(), sequence },
+                                    true,
+                                ));
                             }
                         }
                         _ => break None,
@@ -686,13 +687,17 @@ impl<S: HandleOwner> Directory<S> {
                 .tree()
                 .find(&ObjectKey::child(self.object_id(), name, self.casefold()))
                 .await?
+                .map(|x| (x, false))
         };
         match res {
-            None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
-            Some(ObjectItem {
-                value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
-                ..
-            }) => Ok(Some((object_id, object_descriptor))),
+            None | Some((ObjectItem { value: ObjectValue::None, .. }, _)) => Ok(None),
+            Some((
+                ObjectItem {
+                    value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
+                    ..
+                },
+                locked,
+            )) => Ok(Some((object_id, object_descriptor, locked))),
             Some(item) => Err(anyhow!(FxfsError::Inconsistent)
                 .context(format!("Unexpected item in lookup: {:?}", item))),
         }
@@ -1561,7 +1566,7 @@ pub async fn replace_child<'a, S: HandleOwner>(
             // TODO: https://fxbug.dev/360172175: Support renames out of encrypted directories.
             _ => bail!(FxfsError::NotSupported),
         }
-        let (id, descriptor) = src_dir.lookup(src_name).await?.ok_or(FxfsError::NotFound)?;
+        let (id, descriptor, _) = src_dir.lookup(src_name).await?.ok_or(FxfsError::NotFound)?;
         src_dir.store().update_attributes(transaction, id, None, Some(now)).await?;
         if src_dir.object_id() != dst.0.object_id() {
             sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
@@ -1605,7 +1610,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     // There might be optimizations here that allow us to skip the graveyard where we can delete an
     // object in a single transaction (which should be the common case).
     let result = match deleted_id_and_descriptor {
-        Some((old_id, ObjectDescriptor::File | ObjectDescriptor::Symlink)) => {
+        Some((old_id, ObjectDescriptor::File | ObjectDescriptor::Symlink, _)) => {
             let was_last_ref = dst.0.store().adjust_refs(transaction, old_id, -1).await?;
             dst.0.store().update_attributes(transaction, old_id, None, Some(timestamp)).await?;
             if was_last_ref {
@@ -1614,7 +1619,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
                 ReplacedChild::ObjectWithRemainingLinks(old_id)
             }
         }
-        Some((old_id, ObjectDescriptor::Directory)) => {
+        Some((old_id, ObjectDescriptor::Directory, _)) => {
             let dir = Directory::open(&dst.0.owner(), old_id).await?;
             if dir.has_children().await? {
                 bail!(FxfsError::NotEmpty);
@@ -1626,7 +1631,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             sub_dirs_delta -= 1;
             ReplacedChild::Directory(old_id)
         }
-        Some((_, ObjectDescriptor::Volume)) => {
+        Some((_, ObjectDescriptor::Volume, _)) => {
             bail!(anyhow!(FxfsError::Inconsistent).context("Unexpected volume child"))
         }
         None => {
@@ -1778,12 +1783,12 @@ mod tests {
         let fs = FxFilesystem::open(device).await.expect("open failed");
         {
             let dir = Directory::open(&fs.root_store(), object_id).await.expect("open failed");
-            let (object_id, object_descriptor) =
+            let (object_id, object_descriptor, _) =
                 dir.lookup("foo").await.expect("lookup failed").expect("not found");
             assert_eq!(object_descriptor, ObjectDescriptor::Directory);
             let child_dir =
                 Directory::open(&fs.root_store(), object_id).await.expect("open failed");
-            let (object_id, object_descriptor) =
+            let (object_id, object_descriptor, _) =
                 child_dir.lookup("bar").await.expect("lookup failed").expect("not found");
             assert_eq!(object_descriptor, ObjectDescriptor::File);
             let _child_dir_file = ObjectStore::open_object(
@@ -1794,7 +1799,7 @@ mod tests {
             )
             .await
             .expect("open object failed");
-            let (object_id, object_descriptor) =
+            let (object_id, object_descriptor, _) =
                 dir.lookup("baz").await.expect("lookup failed").expect("not found");
             assert_eq!(object_descriptor, ObjectDescriptor::File);
             let _child_file = ObjectStore::open_object(
@@ -1805,7 +1810,7 @@ mod tests {
             )
             .await
             .expect("open object failed");
-            let (object_id, object_descriptor) =
+            let (object_id, object_descriptor, _) =
                 dir.lookup("corge").await.expect("lookup failed").expect("not found");
             assert_eq!(object_id, 100);
             if let ObjectDescriptor::Volume = object_descriptor {
@@ -2112,7 +2117,7 @@ mod tests {
                 .expect("new transaction failed");
             replace_child_with_object(
                 &mut transaction,
-                Some(src_child),
+                Some((src_child.0, src_child.1)),
                 (&parent_directory, &encrypted_dst_name.expect("dst child not found")),
                 0,
                 Timestamp::now(),
@@ -2530,7 +2535,7 @@ mod tests {
         assert_eq!(child_dir1.lookup("foo").await.expect("lookup failed"), None);
 
         // Check the contents to ensure that the file was replaced.
-        let (oid, object_descriptor) =
+        let (oid, object_descriptor, _) =
             child_dir2.lookup("bar").await.expect("lookup failed").expect("not found");
         assert_eq!(object_descriptor, ObjectDescriptor::File);
         let bar =
@@ -2926,7 +2931,7 @@ mod tests {
             let dir = Directory::open(&fs.root_store(), dir_id).await.expect("open failed");
             assert_eq!(
                 dir.lookup("foo").await.expect("lookup failed").expect("not found"),
-                (symlink_id, ObjectDescriptor::Symlink)
+                (symlink_id, ObjectDescriptor::Symlink, false)
             );
         }
         fs.close().await.expect("Close failed");
@@ -3767,14 +3772,14 @@ mod tests {
         let fs = FxFilesystem::open(device).await.expect("open failed");
         {
             let dir = Directory::open(&fs.root_store(), object_id).await.expect("open failed");
-            let (object_id, object_descriptor) =
+            let (object_id, object_descriptor, _) =
                 dir.lookup("foo").await.expect("lookup failed").expect("not found");
             assert_eq!(object_descriptor, ObjectDescriptor::Directory);
             let child_dir =
                 Directory::open(&fs.root_store(), object_id).await.expect("open failed");
             assert!(!child_dir.casefold());
             assert!(child_dir.lookup("BAR").await.expect("lookup failed").is_none());
-            let (object_id, descriptor) =
+            let (object_id, descriptor, _) =
                 child_dir.lookup("bAr").await.expect("lookup failed").unwrap();
             assert_eq!(descriptor, ObjectDescriptor::File);
 

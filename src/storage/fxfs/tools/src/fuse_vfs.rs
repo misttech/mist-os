@@ -37,7 +37,7 @@ impl FuseFs {
         let dir = self.open_dir(parent).await?;
         let object = dir.lookup(name.osstr_to_str()?).await?;
 
-        if let Some((object_id, object_descriptor)) = object {
+        if let Some((object_id, object_descriptor, _)) = object {
             Ok(ReplyEntry {
                 ttl: TTL,
                 attr: self.create_object_attr(object_id, object_descriptor).await?,
@@ -1200,7 +1200,7 @@ mod tests {
             .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("mkdir failed");
-        let (foo_id, foo_descriptor) =
+        let (foo_id, foo_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(foo_descriptor, ObjectDescriptor::Directory);
         assert_eq!(mkdir_reply.attr.ino, foo_id);
@@ -1211,7 +1211,7 @@ mod tests {
             .await
             .expect("mkdir failed");
         let child_dir = fs.open_dir(foo_id).await.expect("open_dir failed");
-        let (bar_id, bar_descriptor) =
+        let (bar_id, bar_descriptor, _) =
             child_dir.lookup(OsStr::new("bar").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(bar_descriptor, ObjectDescriptor::Directory);
         assert_eq!(_mkdir_reply.attr.ino, bar_id);
@@ -1281,7 +1281,7 @@ mod tests {
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("mkdir failed");
-        let (child_id, child_descriptor) =
+        let (child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_descriptor, ObjectDescriptor::Directory);
         assert_ne!(child_id, dir.object_id());
@@ -1302,7 +1302,7 @@ mod tests {
         fs.mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("mkdir failed");
-        let (child_id, _) =
+        let (child_id, _, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         fs.mkdir(new_fake_request(), child_id, OsStr::new("bar"), DEFAULT_FILE_MODE, 0)
             .await
@@ -1310,7 +1310,7 @@ mod tests {
 
         let rmdir_res = fs.rmdir(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
         assert_eq!(rmdir_res, Err(libc::ENOTEMPTY.into()));
-        let (_child_id, child_descriptor) =
+        let (_child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_id, _child_id);
         assert_eq!(child_descriptor, ObjectDescriptor::Directory);
@@ -1515,7 +1515,7 @@ mod tests {
             .create(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("mkdir failed");
-        let (child_id, child_descriptor) =
+        let (child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_descriptor, ObjectDescriptor::File);
         assert_eq!(create_reply.attr.ino, child_id);
@@ -3964,7 +3964,7 @@ mod tests {
             .mkdir(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("mkdir failed");
-        let (child_id, child_descriptor) =
+        let (child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_descriptor, ObjectDescriptor::Directory);
         assert_eq!(mkdir_reply.attr.ino, child_id);
@@ -3975,7 +3975,7 @@ mod tests {
         let fs = FuseFs::open_file_backed("/tmp/fuse_dir_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
-        let (_child_id, _child_descriptor) =
+        let (_child_id, _child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(_child_descriptor, ObjectDescriptor::Directory);
 
@@ -3991,7 +3991,7 @@ mod tests {
             .create(new_fake_request(), dir.object_id(), OsStr::new("foo"), DEFAULT_FILE_MODE, 0)
             .await
             .expect("open_file failed");
-        let (child_id, child_descriptor) =
+        let (child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_descriptor, ObjectDescriptor::File);
         assert_eq!(create_reply.attr.ino, child_id);
@@ -4002,7 +4002,7 @@ mod tests {
         let fs = FuseFs::open_file_backed("/tmp/fuse_file_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
-        let (_child_id, child_descriptor) =
+        let (_child_id, child_descriptor, _) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
         assert_eq!(child_descriptor, ObjectDescriptor::File);
 

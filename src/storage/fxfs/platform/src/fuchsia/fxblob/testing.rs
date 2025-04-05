@@ -67,7 +67,7 @@ impl BlobFixture for TestFixture {
         let root_object_id = self.volume().volume().store().root_directory_object_id();
         let root_dir =
             Directory::open(self.volume().volume(), root_object_id).await.expect("open failed");
-        let (object_id, _) =
+        let (object_id, _, _) =
             root_dir.lookup(name).await.expect("lookup failed").expect("file doesn't exist yet");
 
         ObjectStore::open_object(self.volume().volume(), object_id, HandleOptions::default(), None)

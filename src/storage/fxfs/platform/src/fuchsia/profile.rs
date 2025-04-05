@@ -373,7 +373,7 @@ async fn record<T: RecordedVolume>(
     let mut old_id = INVALID_OBJECT_ID;
     let mut transaction = loop {
         let transaction = fs.clone().new_transaction(lock_keys, Options::default()).await?;
-        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+        if let Some((id, descriptor, _)) = profile_dir.lookup(name).await? {
             ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
             if id == old_id {
                 break transaction;

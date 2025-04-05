@@ -2885,7 +2885,7 @@ mod tests {
                 .await
                 .expect("open failed");
             let oid = root_directory.lookup("foo").await.expect("lookup failed");
-            if let Some((oid, _)) = oid {
+            if let Some((oid, _, _)) = oid {
                 let object = ObjectStore::open_object(store, oid, HandleOptions::default(), None)
                     .await
                     .expect("open_object failed");

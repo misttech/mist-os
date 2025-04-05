@@ -210,7 +210,9 @@ impl FxVolume {
             )
             .await?;
         Ok(match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
-            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id, None, false),
+            Some((object_id, _, _)) => {
+                Directory::open_unchecked(self.clone(), object_id, None, false)
+            }
             None => {
                 let new_dir = internal_dir
                     .directory()
@@ -237,7 +239,7 @@ impl FxVolume {
 
         // If there is a recording already, prepare to replay it.
         let profile_dir = self.get_profile_directory().await?;
-        let replay_handle = if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+        let replay_handle = if let Some((id, descriptor, _)) = profile_dir.lookup(name).await? {
             ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
             Some(Box::new(
                 ObjectStore::open_object(self, id, HandleOptions::default(), None).await?,

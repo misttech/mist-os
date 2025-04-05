@@ -148,7 +148,7 @@ impl FxDirectory {
                         Some((node, desc))
                     }
                     None => {
-                        if let Some((object_id, object_descriptor)) =
+                        if let Some((object_id, object_descriptor, locked)) =
                             current_dir.directory.lookup(name).await?
                         {
                             let child_node = self
@@ -159,12 +159,16 @@ impl FxDirectory {
                                     Some(current_dir.clone()),
                                 )
                                 .await?;
-
-                            self.directory.owner().dirent_cache().insert(
-                                current_dir.object_id(),
-                                name.to_owned(),
-                                child_node.clone(),
-                            );
+                            // Do not add a locked encrypted child to the dirent cache. That way, if
+                            // a user opens a locked directory, unlocks the directory, and then
+                            // reopens the directory, fxfs does not return the cached locked node.
+                            if !locked {
+                                self.directory.owner().dirent_cache().insert(
+                                    current_dir.object_id(),
+                                    name.to_owned(),
+                                    child_node.clone(),
+                                );
+                            }
                             Some((child_node, object_descriptor))
                         } else {
                             None
@@ -415,7 +419,7 @@ impl FxDirectory {
         let store = self.store();
         let mut source_id =
             match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
-                Some((object_id, ObjectDescriptor::File)) => object_id,
+                Some((object_id, ObjectDescriptor::File, _)) => object_id,
                 None => return Err(zx::Status::NOT_FOUND),
                 _ => return Err(zx::Status::NOT_SUPPORTED),
             };
@@ -441,7 +445,7 @@ impl FxDirectory {
             self.check_fscrypt_hard_link_conditions(source_dir.directory().wrapping_key_id())?;
             // Ensure under lock that the file still exists there.
             match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
-                Some((new_id, ObjectDescriptor::File)) => {
+                Some((new_id, ObjectDescriptor::File, _)) => {
                     if new_id == source_id {
                         // We found the object that we got a lock on, it is still valid.
                         return self

@@ -109,7 +109,7 @@ pub async fn walk_dir(
         if path.len() == 0 {
             continue;
         }
-        if let Some((object_id, descriptor)) = dir.lookup(&path).await? {
+        if let Some((object_id, descriptor, _)) = dir.lookup(&path).await? {
             if descriptor != ObjectDescriptor::Directory {
                 bail!("Not a directory: {}", path);
             }
@@ -164,7 +164,7 @@ pub async fn fsck(fs: &OpenFxFilesystem, verbose: bool) -> Result<fsck::FsckResu
 /// Read a file's contents into a Vec and return it.
 pub async fn get(vol: &Arc<ObjectStore>, src: &Path) -> Result<Vec<u8>, Error> {
     let dir = walk_dir(vol, src.parent().unwrap()).await?;
-    if let Some((object_id, descriptor)) =
+    if let Some((object_id, descriptor, _)) =
         dir.lookup(&src.file_name().unwrap().to_str().unwrap()).await?
     {
         if descriptor != ObjectDescriptor::File {
@@ -221,7 +221,7 @@ pub async fn put(
 pub async fn enable_verity(vol: &Arc<ObjectStore>, dst: &Path) -> Result<(), Error> {
     let dir = walk_dir(vol, dst.parent().unwrap()).await?;
     let filename = dst.file_name().unwrap().to_str().unwrap();
-    let handle = if let Some((oid, _)) = dir.lookup(filename).await? {
+    let handle = if let Some((oid, _, _)) = dir.lookup(filename).await? {
         ObjectStore::open_object(vol, oid, HandleOptions::default(), None).await?
     } else {
         bail!("{} does not exist", filename);
@@ -275,7 +275,7 @@ pub async fn set_project_for_node(
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
     let filename = path.file_name().unwrap().to_str().unwrap();
-    let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
+    let (node_id, _, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
     vol.set_project_for_node(node_id, project_id).await
 }
 
@@ -287,7 +287,7 @@ pub async fn set_extended_attribute_for_node(
 ) -> Result<(), Error> {
     let dir = walk_dir(vol, path.parent().unwrap()).await?;
     let filename = path.file_name().unwrap().to_str().unwrap();
-    let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
+    let (node_id, _, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
     let handle = StoreObjectHandle::new(
         vol.clone(),
         node_id,

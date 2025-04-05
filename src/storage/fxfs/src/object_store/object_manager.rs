@@ -217,7 +217,7 @@ impl ObjectManager {
 
         match root_directory.lookup(VOLUMES_DIRECTORY).await? {
             None => bail!("Root directory not found"),
-            Some((object_id, ObjectDescriptor::Directory)) => {
+            Some((object_id, ObjectDescriptor::Directory, _)) => {
                 let volume_directory = Directory::open(&root_store, object_id)
                     .await
                     .context("Unable to open volumes directory")?;

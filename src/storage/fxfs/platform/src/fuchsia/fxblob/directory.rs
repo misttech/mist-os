@@ -157,7 +157,9 @@ impl BlobDirectory {
         {
             Some(node) => Some(node),
             None => {
-                if let Some((object_id, _)) = self.directory.directory().lookup(&id.string).await? {
+                if let Some((object_id, _, _)) =
+                    self.directory.directory().lookup(&id.string).await?
+                {
                     let node = self.get_or_load_node(object_id, &id).await?;
                     self.directory.directory().owner().dirent_cache().insert(
                         self.directory.object_id(),

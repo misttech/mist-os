@@ -12,6 +12,7 @@ group("tests") {
   deps = [
     ":starnix_remotevol_key_file_integration_test",
     ":starnix_remotevol_shutdown_integration_test",
+    "//src/starnix/tests/remotevol/stat:tests",
     "//src/starnix/tests/remotevol/symlinks:tests",
   ]
 }
