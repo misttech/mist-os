@@ -1055,6 +1055,21 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
   // TODO: Use LLCPP epitaphs when available to detect ZX_ERR_PEER_CLOSED.
 }
 
+TEST_F(IntegrationTest, DisplayOwnershipChangeEvents) {
+  std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
+  ASSERT_OK(virtcon_client->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
+
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+  EXPECT_FALSE(virtcon_client->state().has_display_ownership());
+
+  primary_client.reset();
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client->state().has_display_ownership(); }));
+}
+
 TEST_F(IntegrationTest, SendVsyncsAfterImagelessConfig) {
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
