@@ -853,7 +853,10 @@ impl DirEntry {
         // simply return the child and we do not need to call init_fn.
         let child = self.children.read().get(name).and_then(Weak::upgrade);
         let (child, create_result) = if let Some(child) = child {
-            child.node.fs().did_access_dir_entry(&child);
+            // Do not cache a child in a locked directory
+            if self.node.fail_if_locked(current_task).is_ok() {
+                child.node.fs().did_access_dir_entry(&child);
+            }
             (child, CreationResult::Existed { create_fn })
         } else {
             let (child, create_result) = self.lock_children().get_or_create_child(
@@ -1079,7 +1082,10 @@ impl<'a> DirEntryLockedChildren<'a> {
         let (child, create_result) = match self.children.entry(name.to_owned()) {
             Entry::Vacant(entry) => {
                 let (child, create_result) = create_child(locked, create_fn)?;
-                entry.insert(Arc::downgrade(&child));
+                // Do not cache a child in a locked directory
+                if self.entry.node.fail_if_locked(current_task).is_ok() {
+                    entry.insert(Arc::downgrade(&child));
+                }
                 (child, create_result)
             }
             Entry::Occupied(mut entry) => {
@@ -1087,11 +1093,17 @@ impl<'a> DirEntryLockedChildren<'a> {
                 // the read lock before acquiring the write lock. Another thread might have
                 // populated this entry while we were not holding any locks.
                 if let Some(child) = Weak::upgrade(entry.get()) {
-                    child.node.fs().did_access_dir_entry(&child);
+                    // Do not cache a child in a locked directory
+                    if self.entry.node.fail_if_locked(current_task).is_ok() {
+                        child.node.fs().did_access_dir_entry(&child);
+                    }
                     return Ok((child, CreationResult::Existed { create_fn }));
                 }
                 let (child, create_result) = create_child(locked, create_fn)?;
-                entry.insert(Arc::downgrade(&child));
+                // Do not cache a child in a locked directory
+                if self.entry.node.fail_if_locked(current_task).is_ok() {
+                    entry.insert(Arc::downgrade(&child));
+                }
                 (child, create_result)
             }
         };

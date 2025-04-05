@@ -12,6 +12,7 @@ group("tests") {
   deps = [
     ":starnix_remotevol_key_file_integration_test",
     ":starnix_remotevol_shutdown_integration_test",
+    "//src/starnix/tests/remotevol/symlinks:tests",
   ]
 }
 
@@ -38,6 +39,19 @@ rustc_library("remotevol_fuchsia_test_util") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:log",
+  ]
+}
+
+rustc_library("remotevol_linux_test_util") {
+  testonly = true
+  name = "remotevol_linux_test_util"
+  edition = "2021"
+  source_root = "lib/linux.rs"
+  sources = [ source_root ]
+  deps = [
+    "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:zerocopy",
   ]
 }
 

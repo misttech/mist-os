@@ -1289,16 +1289,11 @@ impl FsNode {
         self.ops.as_ref()
     }
 
-    /// Returns an error if this node is encrypted and locked.
-    pub fn fail_if_locked<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        let node_info = self.fetch_and_refresh_info(locked, current_task)?;
+    /// Returns an error if this node is encrypted and locked. Does not require
+    /// fetch_and_refresh_info because FS_IOC_SET_ENCRYPTION_POLICY updates info and once a node is
+    /// encrypted, it remains encrypted forever.
+    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let node_info = self.info();
         if let Some(wrapping_key_id) = node_info.wrapping_key_id {
             if !current_task
                 .kernel()

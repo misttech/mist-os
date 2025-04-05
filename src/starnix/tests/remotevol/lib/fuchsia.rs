@@ -23,10 +23,13 @@ pub async fn open_sysrq_trigger(realm: &RealmInstance) -> fio::FileProxy {
 }
 
 pub async fn wait_for_starnix_volume_to_be_mounted() {
-    let test_fxfs_inspect =
-        ArchiveReader::inspect().select_all_for_component("test-fxfs").snapshot().await.unwrap();
     loop {
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
+        let test_fxfs_inspect = ArchiveReader::inspect()
+            .select_all_for_component("test-fxfs")
+            .snapshot()
+            .await
+            .unwrap();
         if test_fxfs_inspect.len() == 0 {
             continue;
         }

@@ -17,12 +17,11 @@
             environment: "#starnix_kernel_env",
         },
     ],
-    capabilities: [
+    collections: [
         {
-            directory: "fs_root",
-            from: "#debian_container",
-            rights: [ "rw*" ],
-            path: "/fs_root",
+            name: "debian_programs",
+            environment: "#debian_container_env",
+            durability: "single_run",
         },
     ],
     offer: [
@@ -49,7 +48,7 @@
     ],
     expose: [
         {
-            directory: "fs_root",
+            protocol: "fuchsia.component.Binder",
             from: "#debian_container",
         },
         {

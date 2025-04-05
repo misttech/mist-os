@@ -196,7 +196,7 @@ impl FileSystemOps for RemoteFs {
 
     fn rename(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -207,8 +207,8 @@ impl FileSystemOps for RemoteFs {
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
         // Renames should fail if the src or target directory is encrypted and locked.
-        old_parent.fail_if_locked(locked, current_task)?;
-        new_parent.fail_if_locked(locked, current_task)?;
+        old_parent.fail_if_locked(current_task)?;
+        new_parent.fail_if_locked(current_task)?;
 
         let Some(old_parent) = old_parent.downcast_ops::<RemoteNode>() else {
             return error!(EXDEV);
@@ -578,7 +578,7 @@ impl FsNodeOps for RemoteNode {
         }
 
         // Locked encrypted files cannot be opened.
-        node.fail_if_locked(locked, current_task)?;
+        node.fail_if_locked(current_task)?;
 
         // fsverity files cannot be opened in write mode, including while building.
         if flags.can_write() {
@@ -592,7 +592,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mknod(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -600,7 +600,7 @@ impl FsNodeOps for RemoteNode {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.fail_if_locked(locked, current_task)?;
+        node.fail_if_locked(current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -668,14 +668,14 @@ impl FsNodeOps for RemoteNode {
 
     fn mkdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.fail_if_locked(locked, current_task)?;
+        node.fail_if_locked(current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -780,6 +780,7 @@ impl FsNodeOps for RemoteNode {
                 .open(name, self.rights, options)
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
+        let symlink_zxio = zxio.clone();
         mode = get_mode(&attrs);
         node_id = attrs.id;
         rdev = DeviceType::from_bits(attrs.rdev);
@@ -807,7 +808,7 @@ impl FsNodeOps for RemoteNode {
             },
             |node_id| {
                 let ops = if mode.is_lnk() {
-                    Box::new(RemoteSymlink { zxio }) as Box<dyn FsNodeOps>
+                    Box::new(RemoteSymlink { zxio: Mutex::new(zxio) }) as Box<dyn FsNodeOps>
                 } else if mode.is_reg() || mode.is_dir() {
                     Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
                 } else {
@@ -842,24 +843,28 @@ impl FsNodeOps for RemoteNode {
                 Ok(child)
             },
         )?;
+        if let Some(symlink) = node.downcast_ops::<RemoteSymlink>() {
+            let mut zxio_guard = symlink.zxio.lock();
+            *zxio_guard = symlink_zxio;
+        }
         Ok(node)
     }
 
     fn truncate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        node.fail_if_locked(locked, current_task)?;
+        node.fail_if_locked(current_task)?;
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
     fn allocate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -869,7 +874,7 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<(), Errno> {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
-                node.fail_if_locked(locked, current_task)?;
+                node.fail_if_locked(current_task)?;
                 self.zxio
                     .allocate(offset, length, AllocateMode::empty())
                     .map_err(|status| from_status_like_fdio!(status))?;
@@ -935,14 +940,14 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.fail_if_locked(locked, current_task)?;
+        node.fail_if_locked(current_task)?;
 
         let name = get_name_str(name)?;
         let zxio = Arc::new(
@@ -964,7 +969,7 @@ impl FsNodeOps for RemoteNode {
         };
         let symlink = fs.create_node_with_id(
             current_task,
-            RemoteSymlink { zxio },
+            RemoteSymlink { zxio: Mutex::new(zxio) },
             node_id,
             FsNodeInfo {
                 size: target.len(),
@@ -1067,7 +1072,7 @@ impl FsNodeOps for RemoteNode {
         if let Some(child) = child.downcast_ops::<RemoteNode>() {
             link_into(&child.zxio)
         } else if let Some(child) = child.downcast_ops::<RemoteSymlink>() {
-            link_into(&child.zxio)
+            link_into(&child.zxio())
         } else {
             error!(EXDEV)
         }
@@ -1610,12 +1615,18 @@ impl FileOps for RemoteFileObject {
 }
 
 struct RemoteSymlink {
-    zxio: Arc<syncio::Zxio>,
+    zxio: Mutex<Arc<syncio::Zxio>>,
+}
+
+impl RemoteSymlink {
+    fn zxio(&self) -> Arc<syncio::Zxio> {
+        self.zxio.lock().clone()
+    }
 }
 
 impl FsNodeOps for RemoteSymlink {
     fs_node_impl_symlink!();
-    fs_node_impl_xattr_delegate!(self, self.zxio);
+    fs_node_impl_xattr_delegate!(self, self.zxio());
 
     fn readlink(
         &self,
@@ -1624,7 +1635,7 @@ impl FsNodeOps for RemoteSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path(
-            self.zxio.read_link().map_err(|status| from_status_like_fdio!(status))?.into(),
+            self.zxio().read_link().map_err(|status| from_status_like_fdio!(status))?.into(),
         ))
     }
 
@@ -1635,7 +1646,7 @@ impl FsNodeOps for RemoteSymlink {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        fetch_and_refresh_info_impl(&self.zxio, info)
+        fetch_and_refresh_info_impl(&self.zxio(), info)
     }
 
     fn forget(
@@ -1648,7 +1659,7 @@ impl FsNodeOps for RemoteSymlink {
         if info.pending_time_access_update {
             // Expect `Arc::try_unwrap` to succeed as we shouldn't be forgetting a node if there are
             // other references around.
-            let zxio = Arc::try_unwrap(self.zxio)
+            let zxio = Arc::try_unwrap(self.zxio.into_inner())
                 .expect("should not forget remotefs nodes that have multiple references");
             zxio.close_and_update_access_time().map_err(|status| from_status_like_fdio!(status))?;
         }
