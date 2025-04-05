@@ -509,7 +509,7 @@ TEST_F(MetricsBufferTest, Histograms) {
   const uint32_t kFooIntBucketsFloor = 1;
   const uint32_t kFooIntBucketsNumBuckets = 12;
   const uint32_t kFooIntBucketsInitialStep = 1;
-  const uint32_t kFooIntBucketsStepMultiplier = 2;
+  const uint32_t kFooIntBucketsStepMultiplierFloat = 2;
   auto histogram_buffer =
       metrics_buffer->CreateHistogramMetricBuffer(COBALT_EXPONENTIAL_HISTOGRAM_INFO(kFoo));
 

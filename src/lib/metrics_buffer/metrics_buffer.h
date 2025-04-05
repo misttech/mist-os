@@ -76,14 +76,15 @@ struct HistogramInfo {
 };
 
 // If metrics.cb.h codegen provides a non-macro way in future, switch to that.
-#define COBALT_EXPONENTIAL_HISTOGRAM_INFO(base_name)                                      \
-  [] {                                                                                    \
-    ::cobalt::ExponentialIntegerBuckets buckets;                                          \
-    buckets.floor = base_name##IntBucketsFloor;                                           \
-    buckets.num_buckets = base_name##IntBucketsNumBuckets;                                \
-    buckets.initial_step = base_name##IntBucketsInitialStep;                              \
-    buckets.step_multiplier = base_name##IntBucketsStepMultiplier;                        \
-    return ::cobalt::HistogramInfo{.metric_id = base_name##MetricId, .buckets = buckets}; \
+// TODO: Update to using the StepMultiplierFloat directly.
+#define COBALT_EXPONENTIAL_HISTOGRAM_INFO(base_name)                                           \
+  [] {                                                                                         \
+    ::cobalt::ExponentialIntegerBuckets buckets;                                               \
+    buckets.floor = base_name##IntBucketsFloor;                                                \
+    buckets.num_buckets = base_name##IntBucketsNumBuckets;                                     \
+    buckets.initial_step = base_name##IntBucketsInitialStep;                                   \
+    buckets.step_multiplier = static_cast<uint32_t>(base_name##IntBucketsStepMultiplierFloat); \
+    return ::cobalt::HistogramInfo{.metric_id = base_name##MetricId, .buckets = buckets};      \
   }()
 
 #define COBALT_LINEAR_HISTOGRAM_INFO(base_name)                                           \
