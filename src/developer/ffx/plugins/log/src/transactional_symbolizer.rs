@@ -257,7 +257,7 @@ pub struct RealSymbolizerProcess {
 
 impl RealSymbolizerProcess {
     /// Constructs a new symbolizer.
-    pub async fn new(enable_prettification: bool) -> Result<Self, LogError> {
+    pub fn new(enable_prettification: bool) -> Result<Self, LogError> {
         let sdk = global_env_context().unwrap().get_sdk().map_err(|err| {
             tracing::warn!(?err, "Failed to get SDK");
             LogError::SdkNotAvailable { msg: "not found" }
@@ -278,7 +278,7 @@ impl RealSymbolizerProcess {
         if enable_prettification {
             args.push("--prettify-backtrace");
         }
-        let path = ffx_config::get_host_tool(&sdk, "symbolizer").await.map_err(|err| {
+        let path = ffx_config::get_host_tool(&sdk, "symbolizer").map_err(|err| {
             tracing::warn!(?err, "Failed to get symbolizer binary");
             LogError::SdkNotAvailable { msg: "symbolizer not found" }
         })?;

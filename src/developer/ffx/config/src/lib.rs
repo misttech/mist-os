@@ -232,8 +232,7 @@ pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
 /// Returns the path to the tool with the given name by first
 /// checking for configured override with the key of `sdk.override.{name}`,
 /// and no override is found, sdk.get_host_tool() is called.
-#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
-pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
+pub fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     // Check for configured override for the host tool.
     let override_key = format!("{SDK_OVERRIDE_KEY_PREFIX}.{name}");
     let override_result: Result<PathBuf, ConfigError> = query(&override_key).get();
@@ -258,15 +257,13 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     }
 }
 
-#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
-pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
+pub fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
     let config = ctx.load()?.config_from_cache()?;
     let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
 
-#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
-pub async fn get_log_dirs() -> Result<Vec<String>> {
+pub fn get_log_dirs() -> Result<Vec<String>> {
     match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
         Err(e) => ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
@@ -274,8 +271,8 @@ pub async fn get_log_dirs() -> Result<Vec<String>> {
 }
 
 /// Print out useful hints about where important log information might be found after an error.
-pub async fn print_log_hint<W: std::io::Write>(writer: &mut W) {
-    let msg = match get_log_dirs().await {
+pub fn print_log_hint<W: std::io::Write>(writer: &mut W) {
+    let msg = match get_log_dirs() {
         Ok(log_dirs) if log_dirs.len() == 1 => format!(
                 "More information may be available in ffx host logs in directory:\n    {}",
                 log_dirs[0]
@@ -420,7 +417,7 @@ mod test {
     #[derive(FfxConfigBacked, Default)] // This should just compile despite having no config.
     struct TestEmptyBackedStruct {}
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_config_backed_attribute() {
         let env = ffx_config::test_init().await.expect("create test config");
         let mut empty_config_struct = TestConfigBackedStruct::default();
@@ -471,7 +468,7 @@ mod test {
         }};
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_host_tool() {
         let env = ffx_config::test_init().await.expect("create test config");
         let sdk_root = env.isolate_root.path().join("sdk");
@@ -488,10 +485,11 @@ mod test {
 
         let sdk = env.context.get_sdk().expect("test sdk");
 
-        let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
+        let result = get_host_tool(&sdk, "a_host_tool").expect("a_host_tool");
         assert_eq!(result, sdk_root.join("tools/x64/a-host-tool"));
     }
-    #[fuchsia_async::run_singlethreaded(test)]
+
+    #[fuchsia::test]
     async fn test_get_host_tool_override() {
         let env = ffx_config::test_init().await.expect("create test config");
         let sdk_root = env.isolate_root.path().join("sdk");
@@ -517,11 +515,11 @@ mod test {
 
         let sdk = env.context.get_sdk().expect("test sdk");
 
-        let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
+        let result = get_host_tool(&sdk, "a_host_tool").expect("a_host_tool");
         assert_eq!(result, override_path);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_host_tool_override_no_exists() {
         let env = ffx_config::test_init().await.expect("create test config");
         let sdk_root = env.isolate_root.path().join("sdk");
@@ -549,7 +547,7 @@ mod test {
 
         let sdk = env.context.get_sdk().expect("test sdk");
 
-        let result = get_host_tool(&sdk, "a_host_tool").await;
+        let result = get_host_tool(&sdk, "a_host_tool");
         assert_eq!(
             result.err().unwrap().to_string(),
             format!("Override path for a_host_tool set to {override_path:?}, but does not exist")

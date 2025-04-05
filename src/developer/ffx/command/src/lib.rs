@@ -296,7 +296,7 @@ pub async fn exit(res: Result<ExitStatus>, should_format: bool) -> ! {
                 let mut out = std::io::stderr();
                 let message = format!("{err}");
                 writeln!(&mut out, "{message}").unwrap();
-                ffx_config::print_log_hint(&mut out).await;
+                ffx_config::print_log_hint(&mut out);
             };
             report_bug(&err).await;
         }

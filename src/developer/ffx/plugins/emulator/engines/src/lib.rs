@@ -150,7 +150,7 @@ impl EngineBuilder {
         let mut engine: Box<dyn EmulatorEngine> = self.from_data(instance_data);
         engine.configure()?;
 
-        engine.load_emulator_binary().await?;
+        engine.load_emulator_binary()?;
 
         engine.emu_config_mut().flags = process_flag_template(engine.emu_config())
             .map_err(|e| bug!("Engine builder failed to process the flags template file: {e}"))?;

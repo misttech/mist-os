@@ -273,7 +273,7 @@ async fn stack_trace_subcommand(
     };
     match explorer_proxy.get_stack_trace(&arg).await?.map_err(Status::from_raw) {
         Ok(stack_trace) => {
-            write_symbolized_stack_traces(w, stack_trace).await?;
+            write_symbolized_stack_traces(w, stack_trace)?;
             Ok(())
         }
         Err(Status::NOT_FOUND) => {
@@ -287,7 +287,7 @@ async fn stack_trace_subcommand(
     }
 }
 
-async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<()> {
+fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Result<()> {
     let sdk = global_env_context().context("Loading global environment context")?.get_sdk()?;
     if let Err(e) = symbol_index::ensure_symbol_index_registered(
         &global_env_context().ok_or_else(|| anyhow!("Failed to get global context"))?,
@@ -295,9 +295,8 @@ async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Re
         tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 
-    let path = ffx_config::get_host_tool(&sdk, "symbolizer")
-        .await
-        .context("getting symbolizer binary path")?;
+    let path =
+        ffx_config::get_host_tool(&sdk, "symbolizer").context("getting symbolizer binary path")?;
     let mut cmd = Command::new(path)
         .args(vec![
             "--symbol-server",

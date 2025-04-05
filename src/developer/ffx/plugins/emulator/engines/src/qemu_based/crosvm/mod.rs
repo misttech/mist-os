@@ -229,8 +229,8 @@ impl EmulatorEngine for CrosvmEngine {
     }
 
     /// Loads the path to the crosvm binary to execute. This is based on the guest OS architecture.
-    async fn load_emulator_binary(&mut self) -> Result<()> {
-        let emulator_binary = match get_host_tool(CROSVM_TOOL).await {
+    fn load_emulator_binary(&mut self) -> Result<()> {
+        let emulator_binary = match get_host_tool(CROSVM_TOOL) {
             Ok(crosvm_path) => crosvm_path.canonicalize().map_err(|e| {
                 bug!("Failed to canonicalize the path to the emulator binary: {crosvm_path:?}: {e}")
             })?,

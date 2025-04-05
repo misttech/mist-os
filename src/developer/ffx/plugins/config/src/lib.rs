@@ -139,7 +139,7 @@ async fn exec_get<W: Write>(
             }
         },
         None => {
-            print_config(ctx, writer /*, get_cmd.query().get_build_dir().await.as_deref()*/).await
+            print_config(ctx, writer /*, get_cmd.query().get_build_dir().await.as_deref()*/)
         }
     }
 }

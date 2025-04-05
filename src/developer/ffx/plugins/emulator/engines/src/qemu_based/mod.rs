@@ -39,7 +39,7 @@ use std::{env, str};
 use tempfile::NamedTempFile;
 use vbmeta::{HashDescriptor, Key, Salt, VBMeta};
 
-pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
+pub(crate) fn get_host_tool(name: &str) -> Result<PathBuf> {
     let sdk = ffx_config::global_env_context()
         .ok_or_else(|| bug!("loading global environment context"))?
         .get_sdk()?;
@@ -49,7 +49,7 @@ pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
     // for its existence in `ffx`'s directory.
     // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
     // hack can be removed.
-    match ffx_config::get_host_tool(&sdk, name).await {
+    match ffx_config::get_host_tool(&sdk, name) {
         Ok(path) => Ok(path),
         Err(error) => {
             tracing::warn!(
@@ -256,7 +256,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     DiskImage::Fvm(_) => {
                         fs::copy(src_path, &dest_path)
                             .map_err(|e| bug!("cannot stage disk image file: {e}"))?;
-                        Self::fvm_extend(&dest_path, target_size).await?;
+                        Self::fvm_extend(&dest_path, target_size)?;
                     }
                     DiskImage::Fxfs(_) => {
                         let mut tmp =
@@ -339,7 +339,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     .arch(emu_config.device.cpu.architecture)
                     .cmdline(&zedboot_cmdline_path)
                     .output_path(&gpt_image_path)
-                    .mkfs_msdosfs_path(&get_host_tool("mkfs-msdosfs").await?)
+                    .mkfs_msdosfs_path(&get_host_tool("mkfs-msdosfs")?)
                     .product_bundle(product_path)
                     .resize(gpt::DEFAULT_IMAGE_SIZE)
                     .use_fxfs(true)
@@ -358,9 +358,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         Ok(updated_guest)
     }
 
-    async fn fvm_extend(dest_path: &Path, target_size: u64) -> Result<()> {
+    fn fvm_extend(dest_path: &Path, target_size: u64) -> Result<()> {
         let fvm_tool = get_host_tool(config::FVM_HOST_TOOL)
-            .await
             .map_err(|e| bug!("cannot locate fvm tool: {e}"))?;
         let mut resize_command = Command::new(fvm_tool);
 
@@ -393,9 +392,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         dest: &PathBuf,
         cmdline: Option<String>,
     ) -> Result<()> {
-        let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
-            .await
-            .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
+        let zbi_tool =
+            get_host_tool(config::ZBI_HOST_TOOL).map_err(|e| bug!("ZBI tool is missing: {e}"))?;
         let ssh_keys = SshKeyFiles::load(Some(ctx))
             .await
             .map_err(|e| bug!("Error finding ssh authorized_keys file: {e}"))?;

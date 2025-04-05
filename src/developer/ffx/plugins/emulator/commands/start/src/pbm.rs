@@ -59,7 +59,7 @@ pub(crate) async fn make_configs(
                     CpuArchitecture::X64 => OVMF_CODE_X64,
                     CpuArchitecture::Arm64 => OVMF_CODE_ARM64,
                     arch @ _ => bail!("CPU architecture {} is currently unsupported with (U)EFI", arch),
-                }).await.map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
+                }).map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
 
             tracing::info!("Found ovmf code at {:?}", &emu_config.guest.ovmf_code);
 
