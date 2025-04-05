@@ -28,6 +28,8 @@ namespace {
 enum class SkipPersistedDebuglog { No = 0, Yes };
 
 DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(dputc_spin_lock, MonitoredSpinLock);
+DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(print_spin_lock, MonitoredSpinLock);
+static fbl::DoublyLinkedList<PrintCallback*> print_callbacks TA_GUARDED(print_spin_lock::Get());
 
 }  // namespace
 
@@ -36,6 +38,15 @@ void serial_write(ktl::string_view str) {
 
   // Write out the serial port.
   platform_dputs_irq(str.data(), str.size());
+}
+
+void console_write(ktl::string_view str) {
+  // Print to any registered console loggers.
+  Guard<MonitoredSpinLock, IrqSave> guard{print_spin_lock::Get(), SOURCE_TAG};
+
+  for (PrintCallback& print_callback : print_callbacks) {
+    print_callback.Print(str);
+  }
 }
 
 static void stdout_write(ktl::string_view str, SkipPersistedDebuglog skip_pdlog) {
@@ -47,6 +58,7 @@ static void stdout_write(ktl::string_view str, SkipPersistedDebuglog skip_pdlog)
     if (dlog_write(DEBUGLOG_INFO, 0, str) == ZX_OK)
       return;
   }
+  console_write(str);
   serial_write(str);
 }
 
@@ -105,6 +117,18 @@ static void stdout_write_buffered(ktl::string_view str, SkipPersistedDebuglog sk
   }
 }
 
+void register_print_callback(PrintCallback* cb) {
+  Guard<MonitoredSpinLock, IrqSave> guard{print_spin_lock::Get(), SOURCE_TAG};
+
+  print_callbacks.push_front(cb);
+}
+
+void unregister_print_callback(PrintCallback* cb) {
+  Guard<MonitoredSpinLock, IrqSave> guard{print_spin_lock::Get(), SOURCE_TAG};
+
+  print_callbacks.erase(*cb);
+}
+
 // This is what printf calls.  Really this could and should be const.
 // But all the stdio function signatures require non-const `FILE*`.
 FILE FILE::stdout_{[](void*, ktl::string_view str) {
@@ -112,6 +136,12 @@ FILE FILE::stdout_{[](void*, ktl::string_view str) {
                      return static_cast<int>(str.size());
                    },
                    nullptr};
+
+FILE gConsoleFile{[](void*, ktl::string_view str) {
+                    console_write(str);
+                    return static_cast<int>(str.size());
+                  },
+                  nullptr};
 
 FILE gSerialFile{[](void*, ktl::string_view str) {
                    serial_write(str);
