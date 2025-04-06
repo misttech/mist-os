@@ -183,8 +183,20 @@ impl UnixSocket {
         downcast_socket_to_unix(&left).lock().credentials = Some(credentials.clone());
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
         downcast_socket_to_unix(&right).lock().credentials = Some(credentials);
-        let left = Socket::new_file(locked, current_task, left, open_flags);
-        let right = Socket::new_file(locked, current_task, right, open_flags);
+        let left = Socket::new_file(
+            locked,
+            current_task,
+            left,
+            open_flags,
+            /* kernel_private= */ false,
+        );
+        let right = Socket::new_file(
+            locked,
+            current_task,
+            right,
+            open_flags,
+            /* kernel_private= */ false,
+        );
         Ok((left, right))
     }
 

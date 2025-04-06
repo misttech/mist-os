@@ -173,6 +173,7 @@ mod tests {
                     SocketType::Stream,
                     OpenFlags::RDWR,
                     SocketProtocol::IP,
+                    /* kernel_private=*/ false,
                 )
                 .expect("failed to create socket");
                 assert_eq!(

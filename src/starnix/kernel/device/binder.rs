@@ -7550,7 +7550,7 @@ pub mod tests {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
-            Anon::default(),
+            Anon::new_for_binder_device(),
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
 

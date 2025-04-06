@@ -14,8 +14,8 @@ use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::socket::{Socket, SocketAddress};
 use crate::vfs::{
-    DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr, FsString,
-    Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
+    Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
+    FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
@@ -315,6 +315,18 @@ pub fn fs_node_init_with_dentry_no_xattr(
     // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
     // state, thereby ensuring safe ordering.
     if let Some(state) = &current_task.kernel().security_state.state {
+        // Sockets are currently implemented using `Anon` nodes, and may be kernel-private, in
+        // which case delegate to the anonymous node initializer to apply a placeholder label.
+        if Anon::is_private(&dir_entry.node) {
+            selinux_hooks::fs_node::fs_node_init_anon(
+                &state.server,
+                current_task,
+                &dir_entry.node,
+                "",
+            );
+            return Ok(());
+        }
+
         selinux_hooks::fs_node::fs_node_init_with_dentry(
             None,
             &state.server,

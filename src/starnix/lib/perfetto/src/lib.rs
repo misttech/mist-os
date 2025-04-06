@@ -265,6 +265,7 @@ impl Consumer {
             SocketType::Stream,
             OpenFlags::RDWR,
             SocketProtocol::from_raw(0),
+            /* kernel_private=*/ false,
         )?;
         let conn_socket = Socket::get_from_file(&conn_file)?;
         let peer =
