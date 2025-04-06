@@ -18,6 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class SerializableStruct:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "SerializableStruct"
     __fidl_raw_type__ = "test.serializable/SerializableStruct"
@@ -35,8 +38,6 @@ class SerializableStruct:
             self, "test.serializable", "test.serializable/SerializableStruct"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})

@@ -18,9 +18,11 @@ add_ir_path(_ir_path)
 
 @dataclass
 class OverrideTest:
-    op: int
-    left: typing.Optional[Expression]
-    right: typing.Optional[Expression]
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    op: int | None
+    left: typing.Optional[Expression] | None
+    right: typing.Optional[Expression] | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "OverrideTest"
@@ -39,23 +41,23 @@ class OverrideTest:
             self, "test.anonymous", "test.anonymous/OverrideTest"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "op": None,  # type: ignore[arg-type,unused-ignore]
-                "left": None,  # type: ignore[arg-type,unused-ignore]
-                "right": None,  # type: ignore[arg-type,unused-ignore]
+                "op": None,
+                "left": None,
+                "right": None,
             }
         )
 
 
 @dataclass
 class SomeProtocolSomeMethodRequest:
-    union_member: UnionMember
-    table_member: TableMember
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    union_member: UnionMember | None
+    table_member: TableMember | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SomeProtocolSomeMethodRequest"
@@ -76,21 +78,21 @@ class SomeProtocolSomeMethodRequest:
             "test.anonymous/SomeProtocolSomeMethodRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "union_member": None,  # type: ignore[arg-type,unused-ignore]
-                "table_member": None,  # type: ignore[arg-type,unused-ignore]
+                "union_member": None,
+                "table_member": None,
             }
         )
 
 
 @dataclass
 class SomeProtocolSomeMethodResponse:
-    bits_member: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    bits_member: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SomeProtocolSomeMethodResponse"
@@ -111,20 +113,20 @@ class SomeProtocolSomeMethodResponse:
             "test.anonymous/SomeProtocol_SomeMethod_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "bits_member": None,  # type: ignore[arg-type,unused-ignore]
+                "bits_member": None,
             }
         )
 
 
 @dataclass
 class TableData:
-    data: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    data: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "TableData"
@@ -143,13 +145,11 @@ class TableData:
             self, "test.anonymous", "test.anonymous/TableData"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "data": None,  # type: ignore[arg-type,unused-ignore]
+                "data": None,
             }
         )
 

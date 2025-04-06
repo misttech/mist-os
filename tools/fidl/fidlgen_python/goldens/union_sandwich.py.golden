@@ -18,9 +18,11 @@ add_ir_path(_ir_path)
 
 @dataclass
 class SandwichUnionSize12Alignment4:
-    before: int
-    union: UnionSize12Alignment4
-    after: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    before: int | None
+    union: UnionSize12Alignment4 | None
+    after: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SandwichUnionSize12Alignment4"
@@ -41,24 +43,24 @@ class SandwichUnionSize12Alignment4:
             "test.unionsandwich/SandwichUnionSize12Alignment4",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "before": None,  # type: ignore[arg-type,unused-ignore]
-                "union": None,  # type: ignore[arg-type,unused-ignore]
-                "after": None,  # type: ignore[arg-type,unused-ignore]
+                "before": None,
+                "union": None,
+                "after": None,
             }
         )
 
 
 @dataclass
 class SandwichUnionSize24Alignment8:
-    before: int
-    union: UnionSize24Alignment8
-    after: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    before: int | None
+    union: UnionSize24Alignment8 | None
+    after: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SandwichUnionSize24Alignment8"
@@ -79,24 +81,24 @@ class SandwichUnionSize24Alignment8:
             "test.unionsandwich/SandwichUnionSize24Alignment8",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "before": None,  # type: ignore[arg-type,unused-ignore]
-                "union": None,  # type: ignore[arg-type,unused-ignore]
-                "after": None,  # type: ignore[arg-type,unused-ignore]
+                "before": None,
+                "union": None,
+                "after": None,
             }
         )
 
 
 @dataclass
 class SandwichUnionSize36Alignment4:
-    before: int
-    union: UnionSize36Alignment4
-    after: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    before: int | None
+    union: UnionSize36Alignment4 | None
+    after: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SandwichUnionSize36Alignment4"
@@ -117,24 +119,24 @@ class SandwichUnionSize36Alignment4:
             "test.unionsandwich/SandwichUnionSize36Alignment4",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "before": None,  # type: ignore[arg-type,unused-ignore]
-                "union": None,  # type: ignore[arg-type,unused-ignore]
-                "after": None,  # type: ignore[arg-type,unused-ignore]
+                "before": None,
+                "union": None,
+                "after": None,
             }
         )
 
 
 @dataclass
 class SandwichUnionSize8Alignment4:
-    before: int
-    union: UnionSize8Alignment4
-    after: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    before: int | None
+    union: UnionSize8Alignment4 | None
+    after: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SandwichUnionSize8Alignment4"
@@ -155,23 +157,23 @@ class SandwichUnionSize8Alignment4:
             "test.unionsandwich/SandwichUnionSize8Alignment4",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "before": None,  # type: ignore[arg-type,unused-ignore]
-                "union": None,  # type: ignore[arg-type,unused-ignore]
-                "after": None,  # type: ignore[arg-type,unused-ignore]
+                "before": None,
+                "union": None,
+                "after": None,
             }
         )
 
 
 @dataclass
 class StructSize16Alignment8:
-    f1: int
-    f2: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    f1: int | None
+    f2: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructSize16Alignment8"
@@ -192,14 +194,12 @@ class StructSize16Alignment8:
             "test.unionsandwich/StructSize16Alignment8",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "f1": None,  # type: ignore[arg-type,unused-ignore]
-                "f2": None,  # type: ignore[arg-type,unused-ignore]
+                "f1": None,
+                "f2": None,
             }
         )
 

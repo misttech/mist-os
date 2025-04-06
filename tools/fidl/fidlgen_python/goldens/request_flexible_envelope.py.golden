@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ProtocolRequestFlexibleResponseStrictRequest:
-    s: FlexibleFoo
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    s: FlexibleFoo | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ProtocolRequestFlexibleResponseStrictRequest"
@@ -39,20 +41,20 @@ class ProtocolRequestFlexibleResponseStrictRequest:
             "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,  # type: ignore[arg-type,unused-ignore]
+                "s": None,
             }
         )
 
 
 @dataclass
 class ProtocolRequestFlexibleResponseStrictResponse:
-    f: StrictFoo
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    f: StrictFoo | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ProtocolRequestFlexibleResponseStrictResponse"
@@ -73,20 +75,20 @@ class ProtocolRequestFlexibleResponseStrictResponse:
             "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "f": None,  # type: ignore[arg-type,unused-ignore]
+                "f": None,
             }
         )
 
 
 @dataclass
 class ProtocolRequestStrictResponseFlexibleRequest:
-    s: StrictFoo
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    s: StrictFoo | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ProtocolRequestStrictResponseFlexibleRequest"
@@ -107,20 +109,20 @@ class ProtocolRequestStrictResponseFlexibleRequest:
             "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,  # type: ignore[arg-type,unused-ignore]
+                "s": None,
             }
         )
 
 
 @dataclass
 class ProtocolRequestStrictResponseFlexibleResponse:
-    f: FlexibleFoo
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    f: FlexibleFoo | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ProtocolRequestStrictResponseFlexibleResponse"
@@ -141,13 +143,11 @@ class ProtocolRequestStrictResponseFlexibleResponse:
             "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "f": None,  # type: ignore[arg-type,unused-ignore]
+                "f": None,
             }
         )
 

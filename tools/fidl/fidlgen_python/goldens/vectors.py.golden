@@ -18,8 +18,10 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ExampleUseOfVectors:
-    vector_of_uint8: typing.Sequence[int]
-    vector_of_vector_of_bool: typing.Sequence[typing.Sequence[bool]]
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    vector_of_uint8: typing.Sequence[int] | None
+    vector_of_vector_of_bool: typing.Sequence[typing.Sequence[bool]] | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleUseOfVectors"
@@ -38,13 +40,11 @@ class ExampleUseOfVectors:
             self, "test.vectors", "test.vectors/ExampleUseOfVectors"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "vector_of_uint8": None,  # type: ignore[arg-type,unused-ignore]
-                "vector_of_vector_of_bool": None,  # type: ignore[arg-type,unused-ignore]
+                "vector_of_uint8": None,
+                "vector_of_vector_of_bool": None,
             }
         )

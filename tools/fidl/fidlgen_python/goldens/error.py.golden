@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ExampleFooRequest:
-    s: str
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    s: str | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleFooRequest"
@@ -37,20 +39,20 @@ class ExampleFooRequest:
             self, "test.error", "test.error/ExampleFooRequest"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,  # type: ignore[arg-type,unused-ignore]
+                "s": None,
             }
         )
 
 
 @dataclass
 class ExampleFooResponse:
-    y: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    y: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleFooResponse"
@@ -69,13 +71,11 @@ class ExampleFooResponse:
             self, "test.error", "test.error/Example_foo_Response"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "y": None,  # type: ignore[arg-type,unused-ignore]
+                "y": None,
             }
         )
 

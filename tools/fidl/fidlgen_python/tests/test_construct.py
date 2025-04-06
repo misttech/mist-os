@@ -122,6 +122,6 @@ class Construct(unittest.TestCase):
         self.assertEqual(expected, got)
 
     def test_make_default_obj_composited_type(self) -> None:
-        expected = ffx.TargetIp(ip=None, scope_id=None)  # type: ignore[arg-type]
+        expected = ffx.TargetIp(ip=None, scope_id=None)
         got = make_default_obj_from_ident("fuchsia.developer.ffx/TargetIp")
         self.assertEqual(expected, got)

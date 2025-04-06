@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ParentGetChildRequestResponse:
-    r: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    r: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentGetChildRequestResponse"
@@ -39,20 +41,20 @@ class ParentGetChildRequestResponse:
             "test.protocolrequest/ParentGetChildRequestResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "r": None,  # type: ignore[arg-type,unused-ignore]
+                "r": None,
             }
         )
 
 
 @dataclass
 class ParentGetChildResponse:
-    c: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    c: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentGetChildResponse"
@@ -73,20 +75,20 @@ class ParentGetChildResponse:
             "test.protocolrequest/ParentGetChildResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "c": None,  # type: ignore[arg-type,unused-ignore]
+                "c": None,
             }
         )
 
 
 @dataclass
 class ParentTakeChildRequest:
-    c: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    c: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentTakeChildRequest"
@@ -107,20 +109,20 @@ class ParentTakeChildRequest:
             "test.protocolrequest/ParentTakeChildRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "c": None,  # type: ignore[arg-type,unused-ignore]
+                "c": None,
             }
         )
 
 
 @dataclass
 class ParentTakeChildRequestRequest:
-    r: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    r: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentTakeChildRequestRequest"
@@ -141,13 +143,11 @@ class ParentTakeChildRequestRequest:
             "test.protocolrequest/ParentTakeChildRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "r": None,  # type: ignore[arg-type,unused-ignore]
+                "r": None,
             }
         )
 

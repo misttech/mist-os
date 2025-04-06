@@ -20,7 +20,9 @@ import fidl_test_errorsyntax_parent
 
 @dataclass
 class ExampleUseOfErrorSyntaxCallWhichMayFailRequest:
-    s: str
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    s: str | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleUseOfErrorSyntaxCallWhichMayFailRequest"
@@ -43,20 +45,20 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest:
             "test.errorsyntax/ExampleUseOfErrorSyntaxCallWhichMayFailRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "s": None,  # type: ignore[arg-type,unused-ignore]
+                "s": None,
             }
         )
 
 
 @dataclass
 class ExampleUseOfErrorSyntaxCallWhichMayFailResponse:
-    value: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    value: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ExampleUseOfErrorSyntaxCallWhichMayFailResponse"
@@ -79,13 +81,11 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResponse:
             "test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "value": None,  # type: ignore[arg-type,unused-ignore]
+                "value": None,
             }
         )
 

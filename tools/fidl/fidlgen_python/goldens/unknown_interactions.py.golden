@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest"
@@ -39,20 +41,20 @@ class UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest:
             "test.unknowninteractions/UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsAjarProtocolStrictEventFieldsRequest:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsAjarProtocolStrictEventFieldsRequest"
@@ -73,20 +75,20 @@ class UnknownInteractionsAjarProtocolStrictEventFieldsRequest:
             "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictEventFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse"
@@ -107,19 +109,20 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse:
             "test.unknowninteractions/UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsAjarProtocolStrictTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsAjarProtocolStrictTwoWayErrResponse"
     __fidl_raw_type__ = "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response"
@@ -139,8 +142,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayErrResponse:
             "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -148,7 +149,9 @@ class UnknownInteractionsAjarProtocolStrictTwoWayErrResponse:
 
 @dataclass
 class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = (
@@ -171,20 +174,20 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
             "test.unknowninteractions/UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsClosedProtocolStrictEventFieldsRequest:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsClosedProtocolStrictEventFieldsRequest"
@@ -205,20 +208,20 @@ class UnknownInteractionsClosedProtocolStrictEventFieldsRequest:
             "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictEventFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = (
@@ -241,19 +244,20 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse:
             "test.unknowninteractions/UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsClosedProtocolStrictTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsClosedProtocolStrictTwoWayErrResponse"
     __fidl_raw_type__ = "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response"
@@ -273,8 +277,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayErrResponse:
             "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -282,7 +284,9 @@ class UnknownInteractionsClosedProtocolStrictTwoWayErrResponse:
 
 @dataclass
 class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = (
@@ -305,20 +309,20 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
             "test.unknowninteractions/UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolFlexibleEventFieldsRequest:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolFlexibleEventFieldsRequest"
@@ -339,20 +343,20 @@ class UnknownInteractionsProtocolFlexibleEventFieldsRequest:
             "test.unknowninteractions/UnknownInteractionsProtocolFlexibleEventFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolStrictEventFieldsRequest:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolStrictEventFieldsRequest"
@@ -373,20 +377,20 @@ class UnknownInteractionsProtocolStrictEventFieldsRequest:
             "test.unknowninteractions/UnknownInteractionsProtocolStrictEventFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolStrictTwoWayFieldsResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolStrictTwoWayFieldsResponse"
@@ -407,19 +411,20 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsResponse:
             "test.unknowninteractions/UnknownInteractionsProtocolStrictTwoWayFieldsResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolFlexibleTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolFlexibleTwoWayErrResponse"
     __fidl_raw_type__ = "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Response"
@@ -439,8 +444,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -448,7 +451,9 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResponse:
 
 @dataclass
 class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse"
@@ -469,20 +474,20 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse"
@@ -503,19 +508,20 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWayFields_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class UnknownInteractionsProtocolFlexibleTwoWayResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolFlexibleTwoWayResponse"
     __fidl_raw_type__ = "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Response"
@@ -535,8 +541,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_FlexibleTwoWay_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -544,6 +548,9 @@ class UnknownInteractionsProtocolFlexibleTwoWayResponse:
 
 @dataclass
 class UnknownInteractionsProtocolStrictTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolStrictTwoWayErrResponse"
     __fidl_raw_type__ = "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Response"
@@ -563,8 +570,6 @@ class UnknownInteractionsProtocolStrictTwoWayErrResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -572,7 +577,9 @@ class UnknownInteractionsProtocolStrictTwoWayErrResponse:
 
 @dataclass
 class UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse"
@@ -593,13 +600,11 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse:
             "test.unknowninteractions/UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 

@@ -18,6 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class Empty:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "Empty"
     __fidl_raw_type__ = "fidl.clientsuite/Empty"
@@ -35,8 +38,6 @@ class Empty:
             self, "fidl.clientsuite", "fidl.clientsuite/Empty"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -44,7 +45,9 @@ class Empty:
 
 @dataclass
 class NonEmptyPayload:
-    some_field: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    some_field: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "NonEmptyPayload"
@@ -63,19 +66,20 @@ class NonEmptyPayload:
             self, "fidl.clientsuite", "fidl.clientsuite/NonEmptyPayload"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "some_field": None,  # type: ignore[arg-type,unused-ignore]
+                "some_field": None,
             }
         )
 
 
 @dataclass
 class OpenTargetFlexibleTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetFlexibleTwoWayErrResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Response"
@@ -95,8 +99,6 @@ class OpenTargetFlexibleTwoWayErrResponse:
             "fidl.clientsuite/OpenTarget_FlexibleTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -104,6 +106,9 @@ class OpenTargetFlexibleTwoWayErrResponse:
 
 @dataclass
 class OpenTargetFlexibleTwoWayResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetFlexibleTwoWayResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Response"
@@ -123,8 +128,6 @@ class OpenTargetFlexibleTwoWayResponse:
             "fidl.clientsuite/OpenTarget_FlexibleTwoWay_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -132,6 +135,9 @@ class OpenTargetFlexibleTwoWayResponse:
 
 @dataclass
 class OpenTargetStrictTwoWayErrResponse:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "OpenTargetStrictTwoWayErrResponse"
     __fidl_raw_type__ = "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Response"
@@ -151,8 +157,6 @@ class OpenTargetStrictTwoWayErrResponse:
             "fidl.clientsuite/OpenTarget_StrictTwoWayErr_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -160,7 +164,9 @@ class OpenTargetStrictTwoWayErrResponse:
 
 @dataclass
 class RunnerCallFlexibleOneWayRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleOneWayRequest"
@@ -181,20 +187,20 @@ class RunnerCallFlexibleOneWayRequest:
             "fidl.clientsuite/RunnerCallFlexibleOneWayRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayErrRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayErrRequest"
@@ -215,20 +221,20 @@ class RunnerCallFlexibleTwoWayErrRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayErrRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayFieldsErrRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayFieldsErrRequest"
@@ -251,20 +257,20 @@ class RunnerCallFlexibleTwoWayFieldsErrRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsErrRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayFieldsRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayFieldsRequest"
@@ -285,20 +291,20 @@ class RunnerCallFlexibleTwoWayFieldsRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallFlexibleTwoWayRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallFlexibleTwoWayRequest"
@@ -319,20 +325,20 @@ class RunnerCallFlexibleTwoWayRequest:
             "fidl.clientsuite/RunnerCallFlexibleTwoWayRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayNoRequestRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayNoRequestRequest"
@@ -353,21 +359,21 @@ class RunnerCallOneWayNoRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayNoRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayStructRequestRequest:
-    target: int
-    request: NonEmptyPayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: NonEmptyPayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayStructRequestRequest"
@@ -388,22 +394,22 @@ class RunnerCallOneWayStructRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayStructRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayTableRequestRequest:
-    target: int
-    request: TablePayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: TablePayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayTableRequestRequest"
@@ -424,22 +430,22 @@ class RunnerCallOneWayTableRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayTableRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerCallOneWayUnionRequestRequest:
-    target: int
-    request: UnionPayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: UnionPayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallOneWayUnionRequestRequest"
@@ -460,21 +466,21 @@ class RunnerCallOneWayUnionRequestRequest:
             "fidl.clientsuite/RunnerCallOneWayUnionRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerCallStrictOneWayRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictOneWayRequest"
@@ -495,20 +501,20 @@ class RunnerCallStrictOneWayRequest:
             "fidl.clientsuite/RunnerCallStrictOneWayRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayErrRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayErrRequest"
@@ -529,20 +535,20 @@ class RunnerCallStrictTwoWayErrRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayErrRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayFieldsErrRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayFieldsErrRequest"
@@ -565,20 +571,20 @@ class RunnerCallStrictTwoWayFieldsErrRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayFieldsErrRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayFieldsRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayFieldsRequest"
@@ -599,20 +605,20 @@ class RunnerCallStrictTwoWayFieldsRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayFieldsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallStrictTwoWayRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallStrictTwoWayRequest"
@@ -633,20 +639,20 @@ class RunnerCallStrictTwoWayRequest:
             "fidl.clientsuite/RunnerCallStrictTwoWayRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayNoPayloadRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayNoPayloadRequest"
@@ -667,20 +673,20 @@ class RunnerCallTwoWayNoPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayNoPayloadRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructPayloadErrRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructPayloadErrRequest"
@@ -703,20 +709,20 @@ class RunnerCallTwoWayStructPayloadErrRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructPayloadErrRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructPayloadRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructPayloadRequest"
@@ -737,21 +743,21 @@ class RunnerCallTwoWayStructPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructPayloadRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayStructRequestRequest:
-    target: int
-    request: NonEmptyPayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: NonEmptyPayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayStructRequestRequest"
@@ -772,21 +778,21 @@ class RunnerCallTwoWayStructRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayStructRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayTablePayloadRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayTablePayloadRequest"
@@ -807,21 +813,21 @@ class RunnerCallTwoWayTablePayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayTablePayloadRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayTableRequestRequest:
-    target: int
-    request: TablePayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: TablePayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayTableRequestRequest"
@@ -842,21 +848,21 @@ class RunnerCallTwoWayTableRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayTableRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayUnionPayloadRequest:
-    target: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayUnionPayloadRequest"
@@ -877,21 +883,21 @@ class RunnerCallTwoWayUnionPayloadRequest:
             "fidl.clientsuite/RunnerCallTwoWayUnionPayloadRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
             }
         )
 
 
 @dataclass
 class RunnerCallTwoWayUnionRequestRequest:
-    target: int
-    request: UnionPayload
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    request: UnionPayload | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerCallTwoWayUnionRequestRequest"
@@ -912,21 +918,21 @@ class RunnerCallTwoWayUnionRequestRequest:
             "fidl.clientsuite/RunnerCallTwoWayUnionRequestRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "request": None,
             }
         )
 
 
 @dataclass
 class RunnerGetVersionResponse:
-    version: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    version: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerGetVersionResponse"
@@ -947,20 +953,20 @@ class RunnerGetVersionResponse:
             "fidl.clientsuite/RunnerGetVersionResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "version": None,  # type: ignore[arg-type,unused-ignore]
+                "version": None,
             }
         )
 
 
 @dataclass
 class RunnerIsTestEnabledRequest:
-    test: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    test: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerIsTestEnabledRequest"
@@ -981,20 +987,20 @@ class RunnerIsTestEnabledRequest:
             "fidl.clientsuite/RunnerIsTestEnabledRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "test": None,  # type: ignore[arg-type,unused-ignore]
+                "test": None,
             }
         )
 
 
 @dataclass
 class RunnerIsTestEnabledResponse:
-    is_enabled: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    is_enabled: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerIsTestEnabledResponse"
@@ -1015,21 +1021,21 @@ class RunnerIsTestEnabledResponse:
             "fidl.clientsuite/RunnerIsTestEnabledResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "is_enabled": None,  # type: ignore[arg-type,unused-ignore]
+                "is_enabled": None,
             }
         )
 
 
 @dataclass
 class RunnerReceiveAjarEventsRequest:
-    target: int
-    reporter: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    reporter: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveAjarEventsRequest"
@@ -1050,22 +1056,22 @@ class RunnerReceiveAjarEventsRequest:
             "fidl.clientsuite/RunnerReceiveAjarEventsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "reporter": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "reporter": None,
             }
         )
 
 
 @dataclass
 class RunnerReceiveClosedEventsRequest:
-    target: int
-    reporter: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    reporter: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveClosedEventsRequest"
@@ -1086,22 +1092,22 @@ class RunnerReceiveClosedEventsRequest:
             "fidl.clientsuite/RunnerReceiveClosedEventsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "reporter": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "reporter": None,
             }
         )
 
 
 @dataclass
 class RunnerReceiveOpenEventsRequest:
-    target: int
-    reporter: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    target: int | None
+    reporter: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerReceiveOpenEventsRequest"
@@ -1122,21 +1128,21 @@ class RunnerReceiveOpenEventsRequest:
             "fidl.clientsuite/RunnerReceiveOpenEventsRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "target": None,  # type: ignore[arg-type,unused-ignore]
-                "reporter": None,  # type: ignore[arg-type,unused-ignore]
+                "target": None,
+                "reporter": None,
             }
         )
 
 
 @dataclass
 class UnknownEvent:
-    ordinal: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    ordinal: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "UnknownEvent"
@@ -1155,13 +1161,11 @@ class UnknownEvent:
             self, "fidl.clientsuite", "fidl.clientsuite/UnknownEvent"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "ordinal": None,  # type: ignore[arg-type,unused-ignore]
+                "ordinal": None,
             }
         )
 

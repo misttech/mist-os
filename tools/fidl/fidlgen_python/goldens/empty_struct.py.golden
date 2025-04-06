@@ -18,6 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class Empty:
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+
     __fidl_kind__ = "struct"
     __fidl_type__ = "Empty"
     __fidl_raw_type__ = "test.emptystruct/Empty"
@@ -35,8 +38,6 @@ class Empty:
             self, "test.emptystruct", "test.emptystruct/Empty"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{})
@@ -44,7 +45,9 @@ class Empty:
 
 @dataclass
 class EmptyProtocolReceiveRequest:
-    e: Empty
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    e: Empty | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "EmptyProtocolReceiveRequest"
@@ -65,20 +68,20 @@ class EmptyProtocolReceiveRequest:
             "test.emptystruct/EmptyProtocolReceiveRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "e": None,  # type: ignore[arg-type,unused-ignore]
+                "e": None,
             }
         )
 
 
 @dataclass
 class EmptyProtocolSendAndReceiveRequest:
-    e: Empty
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    e: Empty | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "EmptyProtocolSendAndReceiveRequest"
@@ -99,20 +102,20 @@ class EmptyProtocolSendAndReceiveRequest:
             "test.emptystruct/EmptyProtocolSendAndReceiveRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "e": None,  # type: ignore[arg-type,unused-ignore]
+                "e": None,
             }
         )
 
 
 @dataclass
 class EmptyProtocolSendAndReceiveResponse:
-    e: Empty
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    e: Empty | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "EmptyProtocolSendAndReceiveResponse"
@@ -133,20 +136,20 @@ class EmptyProtocolSendAndReceiveResponse:
             "test.emptystruct/EmptyProtocolSendAndReceiveResponse",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "e": None,  # type: ignore[arg-type,unused-ignore]
+                "e": None,
             }
         )
 
 
 @dataclass
 class EmptyProtocolSendRequest:
-    e: Empty
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    e: Empty | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "EmptyProtocolSendRequest"
@@ -167,13 +170,11 @@ class EmptyProtocolSendRequest:
             "test.emptystruct/EmptyProtocolSendRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "e": None,  # type: ignore[arg-type,unused-ignore]
+                "e": None,
             }
         )
 

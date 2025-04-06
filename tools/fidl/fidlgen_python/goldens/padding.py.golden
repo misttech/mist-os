@@ -18,8 +18,10 @@ add_ir_path(_ir_path)
 
 @dataclass
 class Padding1ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding1ByteEnd"
@@ -38,22 +40,22 @@ class Padding1ByteEnd:
             self, "test.padding", "test.padding/Padding1ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding1ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding1ByteMiddle"
@@ -72,23 +74,23 @@ class Padding1ByteMiddle:
             self, "test.padding", "test.padding/Padding1ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding2ByteAlignmentLength6:
-    a: int
-    b: int
-    c: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
+    c: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding2ByteAlignmentLength6"
@@ -107,23 +109,23 @@ class Padding2ByteAlignmentLength6:
             self, "test.padding", "test.padding/Padding2ByteAlignmentLength6"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
-                "c": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
+                "c": None,
             }
         )
 
 
 @dataclass
 class Padding2ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding2ByteEnd"
@@ -142,22 +144,22 @@ class Padding2ByteEnd:
             self, "test.padding", "test.padding/Padding2ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding2ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding2ByteMiddle"
@@ -176,22 +178,22 @@ class Padding2ByteMiddle:
             self, "test.padding", "test.padding/Padding2ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding3ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding3ByteEnd"
@@ -210,22 +212,22 @@ class Padding3ByteEnd:
             self, "test.padding", "test.padding/Padding3ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding3ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding3ByteMiddle"
@@ -244,24 +246,24 @@ class Padding3ByteMiddle:
             self, "test.padding", "test.padding/Padding3ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding4ByteAlignmentLength12:
-    a: int
-    b: int
-    c: int
-    d: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
+    c: int | None
+    d: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding4ByteAlignmentLength12"
@@ -280,24 +282,24 @@ class Padding4ByteAlignmentLength12:
             self, "test.padding", "test.padding/Padding4ByteAlignmentLength12"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
-                "c": None,  # type: ignore[arg-type,unused-ignore]
-                "d": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
+                "c": None,
+                "d": None,
             }
         )
 
 
 @dataclass
 class Padding4ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding4ByteEnd"
@@ -316,22 +318,22 @@ class Padding4ByteEnd:
             self, "test.padding", "test.padding/Padding4ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding4ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding4ByteMiddle"
@@ -350,23 +352,23 @@ class Padding4ByteMiddle:
             self, "test.padding", "test.padding/Padding4ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding5ByteEnd:
-    a: int
-    b: int
-    c: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
+    c: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding5ByteEnd"
@@ -385,24 +387,24 @@ class Padding5ByteEnd:
             self, "test.padding", "test.padding/Padding5ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
-                "c": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
+                "c": None,
             }
         )
 
 
 @dataclass
 class Padding5ByteMiddle:
-    a: int
-    b: int
-    c: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
+    c: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding5ByteMiddle"
@@ -421,23 +423,23 @@ class Padding5ByteMiddle:
             self, "test.padding", "test.padding/Padding5ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
-                "c": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
+                "c": None,
             }
         )
 
 
 @dataclass
 class Padding6ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding6ByteEnd"
@@ -456,22 +458,22 @@ class Padding6ByteEnd:
             self, "test.padding", "test.padding/Padding6ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding6ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding6ByteMiddle"
@@ -490,22 +492,22 @@ class Padding6ByteMiddle:
             self, "test.padding", "test.padding/Padding6ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding7ByteEnd:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding7ByteEnd"
@@ -524,22 +526,22 @@ class Padding7ByteEnd:
             self, "test.padding", "test.padding/Padding7ByteEnd"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )
 
 
 @dataclass
 class Padding7ByteMiddle:
-    a: int
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: int | None
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Padding7ByteMiddle"
@@ -558,13 +560,11 @@ class Padding7ByteMiddle:
             self, "test.padding", "test.padding/Padding7ByteMiddle"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
+                "b": None,
             }
         )

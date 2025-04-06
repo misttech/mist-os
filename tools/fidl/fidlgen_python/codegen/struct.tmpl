@@ -13,6 +13,8 @@ class {{ .PythonName }}:
     {{- end }}
     """
     {{- end }}
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
     {{- range .PythonMembers }}
     {{- if .DocComments }}
     """
@@ -21,7 +23,7 @@ class {{ .PythonName }}:
     {{- end }}
     """
     {{- end }}
-    {{ .PythonName }}: {{ .PythonType.PythonName }}
+    {{ .PythonName }}: {{ .PythonType.PythonName }} | None
     {{- end }}
 
     __fidl_kind__ = "struct"
@@ -39,13 +41,11 @@ class {{ .PythonName }}:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "{{ .Library }}", "{{ .Name }}")
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(**{
             {{- range .PythonMembers }}
-            "{{ .PythonName }}": None,  # type: ignore[arg-type,unused-ignore]
+            "{{ .PythonName }}": None,
             {{- end }}
         })
 

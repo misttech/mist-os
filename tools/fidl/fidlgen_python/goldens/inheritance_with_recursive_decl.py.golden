@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class ChildSecondRequest:
-    request: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    request: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ChildSecondRequest"
@@ -39,20 +41,20 @@ class ChildSecondRequest:
             "test.inheritancewithrecursivedecl/ChildSecondRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,
             }
         )
 
 
 @dataclass
 class ParentFirstRequest:
-    request: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    request: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "ParentFirstRequest"
@@ -73,13 +75,11 @@ class ParentFirstRequest:
             "test.inheritancewithrecursivedecl/ParentFirstRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "request": None,  # type: ignore[arg-type,unused-ignore]
+                "request": None,
             }
         )
 

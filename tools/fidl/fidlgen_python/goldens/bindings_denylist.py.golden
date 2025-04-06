@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class DenyEachBindingOnlyDenyCppRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyCppRequest"
@@ -41,20 +43,20 @@ class DenyEachBindingOnlyDenyCppRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenyCppRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyDartRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyDartRequest"
@@ -77,20 +79,20 @@ class DenyEachBindingOnlyDenyDartRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenyDartRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyGoRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyGoRequest"
@@ -111,20 +113,20 @@ class DenyEachBindingOnlyDenyGoRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenyGoRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyLibfuzzerRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyLibfuzzerRequest"
@@ -147,20 +149,20 @@ class DenyEachBindingOnlyDenyLibfuzzerRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenyLibfuzzerRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyRustRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyRustRequest"
@@ -183,20 +185,20 @@ class DenyEachBindingOnlyDenyRustRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenyRustRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenySyzkallerRequest:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenySyzkallerRequest"
@@ -219,20 +221,20 @@ class DenyEachBindingOnlyDenySyzkallerRequest:
             "test.bindingsdenylist/DenyEachBindingOnlyDenySyzkallerRequest",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyCppResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyCppResponse"
@@ -255,20 +257,20 @@ class DenyEachBindingOnlyDenyCppResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenyCpp_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyDartResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyDartResponse"
@@ -291,20 +293,20 @@ class DenyEachBindingOnlyDenyDartResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenyDart_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyGoResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyGoResponse"
@@ -327,20 +329,20 @@ class DenyEachBindingOnlyDenyGoResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenyGo_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyLibfuzzerResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyLibfuzzerResponse"
@@ -363,20 +365,20 @@ class DenyEachBindingOnlyDenyLibfuzzerResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenyRustResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenyRustResponse"
@@ -399,20 +401,20 @@ class DenyEachBindingOnlyDenyRustResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class DenyEachBindingOnlyDenySyzkallerResponse:
-    b: int
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    b: int | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "DenyEachBindingOnlyDenySyzkallerResponse"
@@ -435,20 +437,20 @@ class DenyEachBindingOnlyDenySyzkallerResponse:
             "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Response",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "b": None,  # type: ignore[arg-type,unused-ignore]
+                "b": None,
             }
         )
 
 
 @dataclass
 class MemberOnlyAppearsInImportingLibrary:
-    a: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "MemberOnlyAppearsInImportingLibrary"
@@ -471,20 +473,20 @@ class MemberOnlyAppearsInImportingLibrary:
             "test.bindingsdenylist/MemberOnlyAppearsInImportingLibrary",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class OnlyAppearsInImportingLibrary:
-    member_only_appears_in_importing_library: MemberOnlyAppearsInImportingLibrary
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    member_only_appears_in_importing_library: MemberOnlyAppearsInImportingLibrary | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "OnlyAppearsInImportingLibrary"
@@ -505,13 +507,11 @@ class OnlyAppearsInImportingLibrary:
             "test.bindingsdenylist/OnlyAppearsInImportingLibrary",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "member_only_appears_in_importing_library": None,  # type: ignore[arg-type,unused-ignore]
+                "member_only_appears_in_importing_library": None,
             }
         )
 

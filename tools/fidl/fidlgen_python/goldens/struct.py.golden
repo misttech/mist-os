@@ -18,8 +18,10 @@ add_ir_path(_ir_path)
 
 @dataclass
 class BasicStruct:
-    x: int
-    y: str
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    x: int | None
+    y: str | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "BasicStruct"
@@ -38,22 +40,22 @@ class BasicStruct:
             self, "test.struct", "test.struct/BasicStruct"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "x": None,  # type: ignore[arg-type,unused-ignore]
-                "y": None,  # type: ignore[arg-type,unused-ignore]
+                "x": None,
+                "y": None,
             }
         )
 
 
 @dataclass
 class Simple:
-    f1: int
-    f2: bool
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    f1: int | None
+    f2: bool | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Simple"
@@ -70,13 +72,11 @@ class Simple:
     def encode(self) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
         return encode_fidl_object(self, "test.struct", "test.struct/Simple")
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "f1": None,  # type: ignore[arg-type,unused-ignore]
-                "f2": None,  # type: ignore[arg-type,unused-ignore]
+                "f1": None,
+                "f2": None,
             }
         )

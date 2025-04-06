@@ -20,7 +20,9 @@ import fidl_test_middle
 
 @dataclass
 class Baz:
-    g: fidl_test_middle.Bar
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    g: fidl_test_middle.Bar | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Baz"
@@ -41,12 +43,10 @@ class Baz:
             "test.transitivedependencies/Baz",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "g": None,  # type: ignore[arg-type,unused-ignore]
+                "g": None,
             }
         )

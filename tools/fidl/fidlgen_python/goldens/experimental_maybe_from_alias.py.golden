@@ -18,34 +18,36 @@ add_ir_path(_ir_path)
 
 @dataclass
 class Testing:
-    u1: int
-    u2: typing.Sequence[int]
-    u3: typing.Sequence[int]
-    u4: typing.Sequence[typing.Sequence[int]]
-    u5: typing.Sequence[typing.Sequence[int]]
-    u6: typing.Sequence[typing.Sequence[int]]
-    u7: typing.Sequence[typing.Sequence[int]]
-    v1: typing.Optional[typing.Sequence[int]]
-    v2: typing.Sequence[typing.Optional[typing.Sequence[int]]]
-    v3: typing.Sequence[typing.Optional[typing.Sequence[int]]]
-    a1: typing.Sequence[int]
-    a2: typing.Sequence[typing.Sequence[int]]
-    a3: typing.Sequence[typing.Sequence[int]]
-    r1: typing.Optional[int]
-    r2: typing.Sequence[typing.Optional[int]]
-    r3: typing.Sequence[typing.Optional[int]]
-    b1: typing.Sequence[int]
-    b2: typing.Sequence[typing.Sequence[int]]
-    b3: typing.Sequence[typing.Sequence[int]]
-    s1: str
-    s2: typing.Sequence[str]
-    s3: typing.Sequence[str]
-    vv1: typing.Sequence[int]
-    vv2: typing.Sequence[typing.Sequence[int]]
-    vv3: typing.Sequence[typing.Sequence[int]]
-    aa1: typing.Sequence[int]
-    aa2: typing.Sequence[typing.Sequence[int]]
-    aa3: typing.Sequence[typing.Sequence[int]]
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    u1: int | None
+    u2: typing.Sequence[int] | None
+    u3: typing.Sequence[int] | None
+    u4: typing.Sequence[typing.Sequence[int]] | None
+    u5: typing.Sequence[typing.Sequence[int]] | None
+    u6: typing.Sequence[typing.Sequence[int]] | None
+    u7: typing.Sequence[typing.Sequence[int]] | None
+    v1: typing.Optional[typing.Sequence[int]] | None
+    v2: typing.Sequence[typing.Optional[typing.Sequence[int]]] | None
+    v3: typing.Sequence[typing.Optional[typing.Sequence[int]]] | None
+    a1: typing.Sequence[int] | None
+    a2: typing.Sequence[typing.Sequence[int]] | None
+    a3: typing.Sequence[typing.Sequence[int]] | None
+    r1: typing.Optional[int] | None
+    r2: typing.Sequence[typing.Optional[int]] | None
+    r3: typing.Sequence[typing.Optional[int]] | None
+    b1: typing.Sequence[int] | None
+    b2: typing.Sequence[typing.Sequence[int]] | None
+    b3: typing.Sequence[typing.Sequence[int]] | None
+    s1: str | None
+    s2: typing.Sequence[str] | None
+    s3: typing.Sequence[str] | None
+    vv1: typing.Sequence[int] | None
+    vv2: typing.Sequence[typing.Sequence[int]] | None
+    vv3: typing.Sequence[typing.Sequence[int]] | None
+    aa1: typing.Sequence[int] | None
+    aa2: typing.Sequence[typing.Sequence[int]] | None
+    aa3: typing.Sequence[typing.Sequence[int]] | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "Testing"
@@ -66,40 +68,38 @@ class Testing:
             "test.experimentalmaybefromalias/Testing",
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "u1": None,  # type: ignore[arg-type,unused-ignore]
-                "u2": None,  # type: ignore[arg-type,unused-ignore]
-                "u3": None,  # type: ignore[arg-type,unused-ignore]
-                "u4": None,  # type: ignore[arg-type,unused-ignore]
-                "u5": None,  # type: ignore[arg-type,unused-ignore]
-                "u6": None,  # type: ignore[arg-type,unused-ignore]
-                "u7": None,  # type: ignore[arg-type,unused-ignore]
-                "v1": None,  # type: ignore[arg-type,unused-ignore]
-                "v2": None,  # type: ignore[arg-type,unused-ignore]
-                "v3": None,  # type: ignore[arg-type,unused-ignore]
-                "a1": None,  # type: ignore[arg-type,unused-ignore]
-                "a2": None,  # type: ignore[arg-type,unused-ignore]
-                "a3": None,  # type: ignore[arg-type,unused-ignore]
-                "r1": None,  # type: ignore[arg-type,unused-ignore]
-                "r2": None,  # type: ignore[arg-type,unused-ignore]
-                "r3": None,  # type: ignore[arg-type,unused-ignore]
-                "b1": None,  # type: ignore[arg-type,unused-ignore]
-                "b2": None,  # type: ignore[arg-type,unused-ignore]
-                "b3": None,  # type: ignore[arg-type,unused-ignore]
-                "s1": None,  # type: ignore[arg-type,unused-ignore]
-                "s2": None,  # type: ignore[arg-type,unused-ignore]
-                "s3": None,  # type: ignore[arg-type,unused-ignore]
-                "vv1": None,  # type: ignore[arg-type,unused-ignore]
-                "vv2": None,  # type: ignore[arg-type,unused-ignore]
-                "vv3": None,  # type: ignore[arg-type,unused-ignore]
-                "aa1": None,  # type: ignore[arg-type,unused-ignore]
-                "aa2": None,  # type: ignore[arg-type,unused-ignore]
-                "aa3": None,  # type: ignore[arg-type,unused-ignore]
+                "u1": None,
+                "u2": None,
+                "u3": None,
+                "u4": None,
+                "u5": None,
+                "u6": None,
+                "u7": None,
+                "v1": None,
+                "v2": None,
+                "v3": None,
+                "a1": None,
+                "a2": None,
+                "a3": None,
+                "r1": None,
+                "r2": None,
+                "r3": None,
+                "b1": None,
+                "b2": None,
+                "b3": None,
+                "s1": None,
+                "s2": None,
+                "s3": None,
+                "vv1": None,
+                "vv2": None,
+                "vv3": None,
+                "aa1": None,
+                "aa2": None,
+                "aa3": None,
             }
         )
 

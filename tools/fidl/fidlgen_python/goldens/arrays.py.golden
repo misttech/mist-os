@@ -18,7 +18,9 @@ add_ir_path(_ir_path)
 
 @dataclass
 class StructLargeArray:
-    a: typing.Sequence[int]
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: typing.Sequence[int] | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructLargeArray"
@@ -37,20 +39,20 @@ class StructLargeArray:
             self, "test.arrays", "test.arrays/StructLargeArray"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
 
 @dataclass
 class StructSmallArray:
-    a: typing.Sequence[int]
+    # TODO(https://fxbug.dev/394421154): The None variant of each type is a consequence
+    # of needing to support creation of a "default object" before decoding.
+    a: typing.Sequence[int] | None
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "StructSmallArray"
@@ -69,13 +71,11 @@ class StructSmallArray:
             self, "test.arrays", "test.arrays/StructSmallArray"
         )
 
-    # TODO(https://fxbug.dev/394421154): Assigning None (incorrectly) to each type is a consequence
-    # of needing to support creation of a "default object" before decoding.
     @classmethod
     def make_default(cls) -> typing.Self:
         return cls(
             **{
-                "a": None,  # type: ignore[arg-type,unused-ignore]
+                "a": None,
             }
         )
 
