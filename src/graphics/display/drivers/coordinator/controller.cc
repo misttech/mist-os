@@ -288,6 +288,9 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
 void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
                                                      zx_time_t banjo_timestamp,
                                                      const config_stamp_t* banjo_config_stamp_ptr) {
+  ZX_DEBUG_ASSERT(banjo_display_id != INVALID_DISPLAY_ID);
+  ZX_DEBUG_ASSERT(banjo_config_stamp_ptr != nullptr);
+
   // TODO(https://fxbug.dev/402445178): This trace event is load bearing for fps trace processor.
   // Remove it after changing the dependency.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
@@ -300,10 +303,9 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   const display::DisplayId display_id(banjo_display_id);
 
-  zx::time vsync_timestamp = zx::time(banjo_timestamp);
-  display::DriverConfigStamp vsync_config_stamp =
-      banjo_config_stamp_ptr ? display::ToDriverConfigStamp(*banjo_config_stamp_ptr)
-                             : display::kInvalidDriverConfigStamp;
+  const zx::time vsync_timestamp(banjo_timestamp);
+  const display::DriverConfigStamp vsync_config_stamp =
+      display::ToDriverConfigStamp(*banjo_config_stamp_ptr);
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
