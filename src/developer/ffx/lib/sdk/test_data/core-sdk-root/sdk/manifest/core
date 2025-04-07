@@ -1,0 +1,85 @@
+{
+    "atoms": [
+    {
+        "category": "partner",
+        "deps": [],
+        "files": [
+        {
+            "destination": "tools/x64/zxdb",
+            "source": "host_x64/zxdb"
+        },
+        {
+            "destination": "tools/x64/zxdb-meta.json",
+            "source": "host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json"
+        }
+        ],
+        "gn-label": "//src/developer/debug/zxdb:zxdb_sdk(//build/toolchain:host_x64)",
+        "id": "sdk://tools/x64/zxdb",
+        "meta": "tools/x64/zxdb-meta.json",
+        "type": "host_tool"
+    },
+    {
+        "category": "partner",
+        "deps": [],
+        "files": [
+        {
+            "destination": "tools/arm64/symbol-index",
+            "source": "host_arm64/symbol-index"
+        },
+        {
+            "destination": "tools/arm64/symbol-index-meta.json",
+            "source": "host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
+        }
+        ],
+        "gn-label": "//tools/symbol-index:symbol_index_sdk(//build/toolchain:host_arm64)",
+        "id": "sdk://tools/arm64/symbol-index",
+        "meta": "tools/arm64/symbol-index-meta.json",
+        "type": "host_tool"
+    },
+    {
+        "category": "partner",
+        "deps": [],
+        "files": [
+        {
+            "destination": "tools/x64/symbol-index",
+            "source": "host_x64/symbol-index"
+        },
+        {
+            "destination": "tools/x64/symbol-index-meta.json",
+            "source": "host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
+        }
+        ],
+        "gn-label": "//tools/symbol-index:symbol_index_sdk(//build/toolchain:host_x64)",
+        "id": "sdk://tools/x64/symbol-index",
+        "meta": "tools/x64/symbol-index-meta.json",
+        "type": "host_tool"
+    },
+    {
+        "category": "partner",
+        "deps": [],
+        "files": [
+            {
+            "destination": "tools/x64/ffx_tools/ffx-assembly",
+            "source": "host_x64/ffx-assembly"
+            },
+            {
+            "destination": "tools/arm64/ffx_tools/ffx-assembly",
+            "source": "host_arm64/ffx-assembly"
+            },
+            {
+            "destination": "tools/ffx_tools/ffx-assembly.json",
+            "source": "host_x64/ffx-assembly.json"
+            },
+            {
+            "destination": "tools/ffx_tools/ffx-assembly-meta.json",
+            "source": "host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json"
+            }
+        ],
+        "gn-label": "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
+        "id": "sdk://tools/ffx_tools/ffx-assembly",
+        "meta": "tools/ffx_tools/ffx-assembly-meta.json",
+        "type": "ffx_tool"
+        }
+    ],
+    "ids": []
+}

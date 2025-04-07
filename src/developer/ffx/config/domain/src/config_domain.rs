@@ -239,10 +239,10 @@ impl ConfigDomain {
 
         // check that the SDK exists at the given path.
         if sdk_root.manifest_path().is_none() {
-            tracing::warn!("SDK manifest didn't exist for {sdk_root:?}");
+            tracing::trace!("SDK manifest didn't exist for {sdk_root:?}");
             return Some(update_cmd);
         } else {
-            tracing::debug!("SDK manifest existed for {sdk_root:?}");
+            tracing::trace!("SDK manifest existed for {sdk_root:?}");
         }
 
         tracing::trace!("checking files: {files:?}");
@@ -451,8 +451,7 @@ mod tests {
             "sdk example has a config file, so would not need bootstrap"
         );
 
-        let rfc_root_sdk =
-            domain.get_build_dir().unwrap().to_owned().join("some-internal-idk-root");
+        let rfc_root_sdk = domain.get_build_dir().unwrap().to_owned();
         let rfc_root_states =
             FileStates::check_paths(rfc_root.clone(), &["manifest/bazel_sdk.ensure"]).unwrap();
         let mut known_state = FileStates::default();

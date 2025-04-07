@@ -32,6 +32,7 @@ rustc_library("lib") {
   inputs = [
     "//integration/MILESTONE",
     "test_data/core-sdk-root/host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json",
+    "test_data/core-sdk-root/sdk/manifest/core",
     "test_data/core-sdk-root/host_x64/sdk/manifest/host_tools_used_by_ffx_action_during_build",
     "test_data/core-sdk-root/host_arm64/sdk/manifest/host_tools_used_by_ffx_action_during_build",
     "test_data/core-sdk-root/host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json",
