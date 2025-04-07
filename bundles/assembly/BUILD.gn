@@ -798,7 +798,6 @@ assembly_input_bundle("kernel_args_eng") {
 assembly_input_bundle("kernel_args_userdebug") {
   kernel_cmdline = [
     "console.shell=false",
-    "kernel.enable-debugging-syscalls=false",
     "kernel.enable-serial-syscalls=output-only",
     "netsvc.disable=true",
   ]
@@ -2065,7 +2064,6 @@ assembly_input_bundle("standard_eng") {
           shards = [
             "//src/developer/process_explorer/meta/process_explorer.core_shard.cml",
             "//src/devices/bin/driver_playground/meta/driver_playground.core_shard.cml",
-            "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
             "//src/power/metrics-logger/meta/metrics-logger.core_shard.cml",
           ]
         },
@@ -2670,6 +2668,24 @@ assembly_input_bundle("testing_support_bootstrap") {
   ]
 }
 
+# This AIB enables tracing support for userdebug configs
+assembly_input_bundle("tracing") {
+  base_packages = [ "//src/performance/trace_manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
 # This AIB enables testing support, and is meant to be used with either the
 # `common_standard_eng` and `common_standard_userdebug` AIBs.
 #
@@ -2677,7 +2693,7 @@ assembly_input_bundle("testing_support_bootstrap") {
 # via `universe`
 assembly_input_bundle("testing_support") {
   testonly = true
-  base_packages = [ "//src/performance/trace_manager" ]
+
   bootfs_files_labels = [ "//src/tests/microbenchmarks/config:bootfs" ]
   cache_packages = [
     # test-manager and all of its runners:

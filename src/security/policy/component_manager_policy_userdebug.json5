@@ -186,6 +186,15 @@
                 ],
             },
             {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.TracingResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/trace_manager/ktrace_provider",
+                ],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "bin",
