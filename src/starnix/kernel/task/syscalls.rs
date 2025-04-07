@@ -60,6 +60,9 @@ use std::ffi::CString;
 use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+#[cfg(target_arch = "aarch64")]
+use starnix_uapi::{PR_GET_TAGGED_ADDR_CTRL, PR_SET_TAGGED_ADDR_CTRL, PR_TAGGED_ADDR_ENABLE};
+
 pub type SockFProgPtr =
     MappingMultiArchUserRef<SockFProg, uapi::sock_fprog, uapi::arch32::sock_fprog>;
 pub type SockFilterPtr = MultiArchUserRef<uapi::sock_filter, uapi::arch32::sock_filter>;
@@ -1168,6 +1171,28 @@ pub fn sys_prctl(
             current_task.write().set_timerslack_ns(arg2);
             Ok(().into())
         }
+        #[cfg(target_arch = "aarch64")]
+        PR_GET_TAGGED_ADDR_CTRL => {
+            track_stub!(TODO("https://fxbug.dev/408554469"), "PR_GET_TAGGED_ADDR_CTRL");
+            Ok(0.into())
+        }
+        #[cfg(target_arch = "aarch64")]
+        PR_SET_TAGGED_ADDR_CTRL => match u32::try_from(arg2).map_err(|_| errno!(EINVAL))? {
+            // Only untagged pointers are allowed, the default.
+            0 => Ok(().into()),
+            PR_TAGGED_ADDR_ENABLE => {
+                track_stub!(TODO("https://fxbug.dev/408554469"), "PR_TAGGED_ADDR_ENABLE");
+                error!(EINVAL)
+            }
+            unknown_mode => {
+                track_stub!(
+                    TODO("https://fxbug.dev/408554469"),
+                    "PR_SET_TAGGED_ADDR_CTRL unknown mode",
+                    unknown_mode,
+                );
+                error!(EINVAL)
+            }
+        },
         _ => {
             track_stub!(TODO("https://fxbug.dev/322874733"), "prctl fallthrough", option);
             error!(ENOSYS)

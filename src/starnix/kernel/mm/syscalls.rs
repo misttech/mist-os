@@ -269,6 +269,19 @@ pub fn sys_madvise(
     Ok(())
 }
 
+pub fn sys_process_madvise(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _pidfd: FdNumber,
+    _iovec_addr: IOVecPtr,
+    _iovec_count: UserValue<i32>,
+    _advice: UserValue<i32>,
+    _flags: UserValue<u32>,
+) -> Result<usize, Errno> {
+    track_stub!(TODO("https://fxbug.dev/409060664"), "process_madvise");
+    error!(ENOSYS)
+}
+
 pub fn sys_brk(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,

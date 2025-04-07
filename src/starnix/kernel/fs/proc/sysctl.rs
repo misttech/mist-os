@@ -36,6 +36,16 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             StubSysctl::new_node("/proc/sys/abi/swp", bug_ref!("https://fxbug.dev/322873460")),
             mode,
         );
+        #[cfg(target_arch = "aarch64")]
+        _dir.entry(
+            current_task,
+            "tagged_addr_disabled",
+            StubSysctl::new_node(
+                "/proc/sys/abi/tagged_addr_disabled",
+                bug_ref!("https://fxbug.dev/408554469"),
+            ),
+            mode,
+        );
     });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
         dir.node(
@@ -96,7 +106,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             "hung_task_check_count",
             StubSysctl::new_node(
                 "/proc/sys/kernel/hung_task_check_count",
-                bug_ref!("https://fxbug.dev/322874644"),
+                bug_ref!("https://fxbug.dev/322873962"),
             ),
             mode,
         );
@@ -105,7 +115,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             "hung_task_panic",
             StubSysctl::new_node(
                 "/proc/sys/kernel/hung_task_panic",
-                bug_ref!("https://fxbug.dev/322874332"),
+                bug_ref!("https://fxbug.dev/322873962"),
             ),
             mode,
         );
@@ -124,7 +134,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             "hung_task_warnings",
             StubSysctl::new_node(
                 "/proc/sys/kernel/hung_task_warnings",
-                bug_ref!("https://fxbug.dev/322873740"),
+                bug_ref!("https://fxbug.dev/322873962"),
             ),
             mode,
         );

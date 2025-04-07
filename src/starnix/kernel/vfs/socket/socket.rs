@@ -40,8 +40,8 @@ use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     arch_union_wrapper, c_char, errno, error, uapi, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
-    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS, SIOCSIFNETMASK,
-    SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+    SIOCGIFINDEX, SIOCGIFMTU, SIOCGIFNAME, SIOCGIFNETMASK, SIOCSIFADDR, SIOCSIFFLAGS,
+    SIOCSIFNETMASK, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
 use std::collections::VecDeque;
@@ -740,6 +740,10 @@ impl Socket {
                 current_task
                     .write_multi_arch_object(IfReqPtr::new(current_task, user_addr), out_ifreq)?;
                 Ok(SUCCESS)
+            }
+            SIOCGIFNAME => {
+                track_stub!(TODO("https://fxbug.dev/325639438"), "SIOCGIFNAME");
+                error!(EINVAL)
             }
             SIOCSIFADDR => {
                 if security::check_task_capable(current_task, CAP_NET_ADMIN).is_err() {

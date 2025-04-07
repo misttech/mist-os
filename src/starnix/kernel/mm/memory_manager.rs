@@ -46,8 +46,11 @@ use starnix_uapi::user_address::{
 };
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, uapi, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK,
-    MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
+    errno, error, uapi, MADV_COLD, MADV_COLLAPSE, MADV_DODUMP, MADV_DOFORK, MADV_DONTDUMP,
+    MADV_DONTFORK, MADV_DONTNEED, MADV_DONTNEED_LOCKED, MADV_FREE, MADV_HUGEPAGE, MADV_HWPOISON,
+    MADV_KEEPONFORK, MADV_MERGEABLE, MADV_NOHUGEPAGE, MADV_NORMAL, MADV_PAGEOUT,
+    MADV_POPULATE_READ, MADV_RANDOM, MADV_REMOVE, MADV_SEQUENTIAL, MADV_SOFT_OFFLINE,
+    MADV_UNMERGEABLE, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED,
     MREMAP_MAYMOVE, PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use std::borrow::Borrow;
@@ -61,7 +64,6 @@ use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 use zx::VmarInfo;
-
 pub type IOVecPtr = MultiArchUserRef<uapi::iovec, uapi::arch32::iovec>;
 
 pub const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
@@ -1469,6 +1471,7 @@ impl MemoryManagerState {
         }
 
         if advice == MADV_NORMAL {
+            track_stub!(TODO("https://fxbug.dev/322874202"), "madvise undo hints for MADV_NORMAL");
             return Ok(());
         }
 
@@ -1485,6 +1488,10 @@ impl MemoryManagerState {
                 || advice == MADV_DOFORK
                 || advice == MADV_WIPEONFORK
                 || advice == MADV_KEEPONFORK
+                || advice == MADV_DONTDUMP
+                || advice == MADV_DODUMP
+                || advice == MADV_MERGEABLE
+                || advice == MADV_UNMERGEABLE
             {
                 // WIPEONFORK is only supported on private anonymous mappings per madvise(2).
                 // KEEPONFORK can be specified on ranges that cover other sorts of mappings. It should
@@ -1498,7 +1505,25 @@ impl MemoryManagerState {
                     MADV_DOFORK => mapping.flags() & MappingFlags::DONTFORK.complement(),
                     MADV_WIPEONFORK => mapping.flags() | MappingFlags::WIPEONFORK,
                     MADV_KEEPONFORK => mapping.flags() & MappingFlags::WIPEONFORK.complement(),
-                    _ => mapping.flags(),
+                    MADV_DONTDUMP => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_DONTDUMP");
+                        mapping.flags()
+                    }
+                    MADV_DODUMP => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_DODUMP");
+                        mapping.flags()
+                    }
+                    MADV_MERGEABLE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_MERGEABLE");
+                        mapping.flags()
+                    }
+                    MADV_UNMERGEABLE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_UNMERGEABLE");
+                        mapping.flags()
+                    }
+                    // Only the variants in this match should be reachable given the condition for
+                    // the containing branch.
+                    unknown_advice => unreachable!("unknown advice {unknown_advice}"),
                 };
                 let new_mapping = match mapping.backing() {
                     MappingBacking::Memory(backing) => Mapping::with_name(
@@ -1535,12 +1560,60 @@ impl MemoryManagerState {
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
+                    MADV_DONTNEED_LOCKED => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_DONTNEED_LOCKED");
+                        return error!(EINVAL);
+                    }
                     MADV_WILLNEED => {
                         if mapping.flags().contains(MappingFlags::WRITE) {
                             zx::VmoOp::COMMIT
                         } else {
                             zx::VmoOp::PREFETCH
                         }
+                    }
+                    MADV_COLD => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_COLD");
+                        return error!(EINVAL);
+                    }
+                    MADV_PAGEOUT => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_PAGEOUT");
+                        return error!(EINVAL);
+                    }
+                    MADV_POPULATE_READ => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_POPULATE_READ");
+                        return error!(EINVAL);
+                    }
+                    MADV_RANDOM => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_RANDOM");
+                        return error!(EINVAL);
+                    }
+                    MADV_SEQUENTIAL => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_SEQUENTIAL");
+                        return error!(EINVAL);
+                    }
+                    MADV_FREE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_FREE");
+                        return error!(EINVAL);
+                    }
+                    MADV_REMOVE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_REMOVE");
+                        return error!(EINVAL);
+                    }
+                    MADV_HWPOISON => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_HWPOISON");
+                        return error!(EINVAL);
+                    }
+                    MADV_SOFT_OFFLINE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_SOFT_OFFLINE");
+                        return error!(EINVAL);
+                    }
+                    MADV_HUGEPAGE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_HUGEPAGE");
+                        return error!(EINVAL);
+                    }
+                    MADV_COLLAPSE => {
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "MADV_COLLAPSE");
+                        return error!(EINVAL);
                     }
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
