@@ -16,17 +16,21 @@ use crate::internal::seq_ranges::{FirstHoleResult, SeqRange, SeqRanges};
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct SackScoreboard {
     /// The ranges for which we've received selective acknowledgements.
-    ///
-    /// Each range is tagged with a boolean that caches the result of [IsLost] for
-    /// the un-sacked range before it.
-    ///
-    /// [IsLost]: https://datatracker.ietf.org/doc/html/rfc6675#section-4
-    acked_ranges: SeqRanges<bool>,
+    acked_ranges: SeqRanges<()>,
     /// Stores the number of bytes assumed to be in transit according to the definition of Pipe
     /// defined in [RFC 6675 section 4].
     ///
     /// [RFC 6675 section 4]: https://datatracker.ietf.org/doc/html/rfc6675#section-4
     pipe: u32,
+    /// A sequence number before which all holes should be considered lost as
+    /// per the IsLost definition in [RFC 66752 section 4].
+    ///
+    /// `None` if none of the tracked holes are lost, or if there are no holes
+    /// in `acked_ranges`.
+    ///
+    /// [RFC 6675 section 4]:
+    ///     https://datatracker.ietf.org/doc/html/rfc6675#section-4
+    is_lost_seqnum_end: Option<SeqNum>,
 }
 
 impl SackScoreboard {
@@ -66,7 +70,7 @@ impl SackScoreboard {
         sack_blocks: &SackBlocks,
         smss: Mss,
     ) -> bool {
-        let Self { acked_ranges, pipe } = self;
+        let Self { acked_ranges, pipe, is_lost_seqnum_end } = self;
 
         // If we receive an ACK that is after SND.NXT, this must be a very
         // delayed acknowledgement post a retransmission event. The state
@@ -100,10 +104,7 @@ impl SackScoreboard {
                 // Ignore block that is not in the expected range [ack, snd_nxt].
                 return new;
             }
-            // Insert with an arbitrary metadata value, we'll update it with the
-            // IsLost value afterwards.
-            let is_lost = false;
-            let changed = acked_ranges.insert(start..end, is_lost);
+            let changed = acked_ranges.insert(start..end, ());
 
             new || changed
         });
@@ -129,55 +130,79 @@ impl SackScoreboard {
             pipe
         };
 
+        enum IsLostPivotInfo {
+            Looking { sacked_count: usize, sacked_bytes: u32 },
+            Found(SeqNum),
+        }
+
         // Recalculate pipe and update IsLost in the collection.
         //
         // We iterate acked_ranges in reverse order so we can fold over the
-        // total number of ranges and SACKed bytes that come *after* the range we
-        // operate on at each point.
-        let (new_pipe, _sacked, _count, later_start, later_is_lost) =
-            acked_ranges.iter_mut().rev().fold(
-                (0u32, 0, 0, snd_nxt, false),
-                |(pipe, sacked, count, later_start, later_is_lost), acked_range| {
-                    // IsLost is kept for the hole to the left of this block. So the
-                    // block we're currently iterating on counts as part of is_lost,
-                    // as well as the the total number of sacked bytes.
-                    let count = count + 1;
-                    let sacked = sacked + acked_range.len();
-                    // From RFC 6675, IsLost is defined as:
-                    //
-                    //  The routine returns true when either DupThresh discontiguous
-                    //  SACKed sequences have arrived above 'SeqNum' or more than
-                    //  (DupThresh - 1) * SMSS bytes with sequence numbers greater
-                    //  than 'SeqNum' have been SACKed
-                    let is_lost = count >= DUP_ACK_THRESHOLD || sacked > sacked_byte_threshold;
-                    acked_range.set_meta(is_lost);
+        // total number of ranges and SACKed bytes that come *after* the range
+        // we operate on at each point.
+        let (new_pipe, pivot_info, later_start) = acked_ranges.iter_mut().rev().fold(
+            (0u32, IsLostPivotInfo::Looking { sacked_count: 0, sacked_bytes: 0 }, snd_nxt),
+            |(pipe, pivot_info, later_start), acked_range| {
+                let (pivot_info, later_is_lost) = match pivot_info {
+                    IsLostPivotInfo::Looking { sacked_count, sacked_bytes } => {
+                        let sacked_count = sacked_count + 1;
+                        let sacked_bytes = sacked_bytes + acked_range.len();
+                        // From RFC 6675, IsLost is defined as:
+                        //
+                        //  The routine returns true when either DupThresh
+                        //  discontiguous SACKed sequences have arrived
+                        //  above 'SeqNum' or more than (DupThresh - 1) *
+                        //  SMSS bytes with sequence numbers greater than
+                        //  'SeqNum' have been SACKed.
+                        //
+                        // is_lost here tells us whether all sequence
+                        // numbers before the start of the current
+                        // acked_range are lost.
+                        let is_lost = sacked_count >= usize::from(DUP_ACK_THRESHOLD)
+                            || sacked_bytes > sacked_byte_threshold;
+                        let pivot_info = if is_lost {
+                            IsLostPivotInfo::Found(acked_range.start())
+                        } else {
+                            IsLostPivotInfo::Looking { sacked_count, sacked_bytes }
+                        };
+                        (pivot_info, false)
+                    }
+                    // We already found the sequence number before which all
+                    // holes are lost.
+                    IsLostPivotInfo::Found(seq_num) => (IsLostPivotInfo::Found(seq_num), true),
+                };
 
-                    // Increment pipe. From RFC 6675:
-                    //
-                    //  After initializing pipe to zero, the following steps are
-                    //  taken for each octet 'S1' in the sequence space between
-                    //  HighACK and HighData that has not been SACKed[...]
-                    //
-                    // So pipe is only calculated for the gaps between the acked
-                    // ranges, i.e., from the current end to the start of the
-                    // later block.
-                    let pipe = if let Some(hole) =
-                        SeqRange::new(acked_range.end()..later_start, later_is_lost)
-                    {
-                        pipe.saturating_add(get_pipe_increment(hole))
-                    } else {
-                        // An empty hole can only happen in the first iteration,
-                        // when the right edge is SND.NXT.
-                        assert_eq!(later_start, snd_nxt);
-                        pipe
-                    };
+                // Increment pipe. From RFC 6675:
+                //
+                //  After initializing pipe to zero, the following steps are
+                //  taken for each octet 'S1' in the sequence space between
+                //  HighACK and HighData that has not been SACKed[...]
+                //
+                // So pipe is only calculated for the gaps between the acked
+                // ranges, i.e., from the current end to the start of the
+                // later block.
+                let pipe = if let Some(hole) =
+                    SeqRange::new(acked_range.end()..later_start, later_is_lost)
+                {
+                    pipe.saturating_add(get_pipe_increment(hole))
+                } else {
+                    // An empty hole can only happen in the first iteration,
+                    // when the right edge is SND.NXT.
+                    assert_eq!(later_start, snd_nxt);
+                    pipe
+                };
 
-                    (pipe, sacked, count, acked_range.start(), is_lost)
-                },
-            );
+                (pipe, pivot_info, acked_range.start())
+            },
+        );
+        *is_lost_seqnum_end = match pivot_info {
+            IsLostPivotInfo::Looking { sacked_count: _, sacked_bytes: _ } => None,
+            IsLostPivotInfo::Found(seq_num) => Some(seq_num),
+        };
+
         // Add the final hole between cumulative ack and first sack block
         // and finalize the pipe value.
-        *pipe = match SeqRange::new(ack..later_start, later_is_lost) {
+        *pipe = match SeqRange::new(ack..later_start, is_lost_seqnum_end.is_some()) {
             Some(first_hole) => new_pipe.saturating_add(get_pipe_increment(first_hole)),
             None => {
                 // An empty first hole can only happen if we don't have any
@@ -203,7 +228,9 @@ impl SackScoreboard {
     ///
     /// [RFC 6675 section 5]: https://datatracker.ietf.org/doc/html/rfc6675#section-4
     pub(crate) fn is_first_hole_lost(&self) -> bool {
-        self.acked_ranges.iter().next().is_some_and(|range| *range.meta())
+        // If we have defined any value for the lost sequence number it means
+        // the first hole must be lost.
+        self.is_lost_seqnum_end.is_some()
     }
 
     pub(crate) fn pipe(&self) -> u32 {
@@ -229,12 +256,18 @@ impl SackScoreboard {
     /// Returns a [`SeqRange`] whose metadata is a boolean indicating if this
     /// range is considered lost.
     pub(crate) fn first_unsacked_range_from(&self, mark: SeqNum) -> Option<SeqRange<bool>> {
-        let Self { acked_ranges, pipe: _ } = self;
+        let Self { acked_ranges, pipe: _, is_lost_seqnum_end } = self;
         match acked_ranges.first_hole_on_or_after(mark) {
             FirstHoleResult::None => None,
-            FirstHoleResult::Right(right) => SeqRange::new(mark..right.start(), *right.meta()),
+            FirstHoleResult::Right(right) => {
+                SeqRange::new(mark..right.start(), is_lost_seqnum_end.is_some())
+            }
             FirstHoleResult::Both(left, right) => {
-                SeqRange::new(left.end().latest(mark)..right.start(), *right.meta())
+                let left = left.end().latest(mark);
+                SeqRange::new(
+                    left..right.start(),
+                    is_lost_seqnum_end.is_some_and(|s| left.before(s)),
+                )
             }
         }
     }
@@ -242,12 +275,12 @@ impl SackScoreboard {
     /// Returns the end of the sequence number range in the scoreboard, if there
     /// are any ranges tracked.
     pub(crate) fn right_edge(&self) -> Option<SeqNum> {
-        let Self { acked_ranges, pipe: _ } = self;
+        let Self { acked_ranges, pipe: _, is_lost_seqnum_end: _ } = self;
         acked_ranges.last().map(|seq_range| seq_range.end())
     }
 
     pub(crate) fn on_retransmission_timeout(&mut self) {
-        let Self { acked_ranges, pipe } = self;
+        let Self { acked_ranges, pipe, is_lost_seqnum_end } = self;
         // RFC 2018 says that we MUST clear all SACK information on a
         // retransmission timeout.
         //
@@ -268,6 +301,7 @@ impl SackScoreboard {
         // - https://datatracker.ietf.org/doc/html/rfc6675
         *pipe = 0;
         acked_ranges.clear();
+        *is_lost_seqnum_end = None;
     }
 
     pub(crate) fn on_mss_update(
@@ -302,6 +336,7 @@ fn sacked_bytes_threshold(mss: Mss) -> u32 {
 mod test {
     use core::num::NonZeroU16;
     use core::ops::Range;
+    use test_case::test_case;
 
     use super::*;
     use crate::internal::seq_ranges::SeqRange;
@@ -309,10 +344,10 @@ mod test {
 
     const TEST_MSS: Mss = Mss(NonZeroU16::new(50).unwrap());
 
-    fn seq_ranges(iter: impl IntoIterator<Item = (Range<u32>, bool)>) -> SeqRanges<bool> {
+    fn seq_ranges(iter: impl IntoIterator<Item = Range<u32>>) -> SeqRanges<()> {
         iter.into_iter()
-            .map(|(Range { start, end }, is_lost)| {
-                SeqRange::new(SeqNum::new(start)..SeqNum::new(end), is_lost).unwrap()
+            .map(|Range { start, end }| {
+                SeqRange::new(SeqNum::new(start)..SeqNum::new(end), ()).unwrap()
             })
             .collect()
     }
@@ -369,13 +404,15 @@ mod test {
         let high_rxt = None;
         let blocks = testutil::sack_blocks([20..30]);
         assert!(sb.process_ack(ack, snd_nxt, high_rxt, &blocks, TEST_MSS));
-        let expect_ranges = seq_ranges([(20..30, false)]);
+        let expect_ranges = seq_ranges([20..30]);
         assert_eq!(sb.acked_ranges, expect_ranges);
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
 
         let ack = SeqNum::new(10);
         assert!(!sb.process_ack(ack, snd_nxt, high_rxt, &blocks, TEST_MSS));
         assert_eq!(sb.acked_ranges, expect_ranges);
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
     }
 
@@ -397,10 +434,8 @@ mod test {
             &testutil::sack_blocks([block1.clone(), block2.clone(), block3.clone()]),
             TEST_MSS
         ));
-        assert_eq!(
-            sb.acked_ranges,
-            seq_ranges([(block1.clone(), true), (block2, false), (block3, false)])
-        );
+        assert_eq!(sb.acked_ranges, seq_ranges([block1.clone(), block2, block3]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(block1.start)));
         assert_eq!(
             sb.pipe,
             u32::try_from(snd_nxt - ack).unwrap()
@@ -428,10 +463,8 @@ mod test {
         ));
         // Large block is exactly at the limit of the hole to its left being
         // considered lost as well.
-        assert_eq!(
-            sb.acked_ranges,
-            seq_ranges([(small_block.clone(), true), (large_block.clone(), false)])
-        );
+        assert_eq!(sb.acked_ranges, seq_ranges([small_block.clone(), large_block.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(small_block.start)));
         assert_eq!(
             sb.pipe,
             u32::try_from(snd_nxt - ack).unwrap()
@@ -449,10 +482,8 @@ mod test {
             TEST_MSS
         ));
         // Now the hole to the left of large block is also considered lost.
-        assert_eq!(
-            sb.acked_ranges,
-            seq_ranges([(small_block.clone(), true), (large_block.clone(), true)])
-        );
+        assert_eq!(sb.acked_ranges, seq_ranges([small_block.clone(), large_block.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(large_block.start)));
         assert_eq!(
             sb.pipe,
             u32::try_from(snd_nxt - ack).unwrap()
@@ -512,7 +543,8 @@ mod test {
 
         // Receive a single cumulative ack up to ack.
         assert!(!sb.process_ack(ack, snd_nxt, high_rxt, &SackBlocks::default(), TEST_MSS));
-        assert_eq!(sb.acked_ranges, SeqRanges::default(),);
+        assert_eq!(sb.acked_ranges, SeqRanges::default());
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap());
 
         // Cumulative ack doesn't move, 1 SACK range signaling loss is received.
@@ -524,7 +556,8 @@ mod test {
             &testutil::sack_blocks([sack1.clone()]),
             TEST_MSS
         ));
-        assert_eq!(sb.acked_ranges, seq_ranges([(sack1.clone(), true)]),);
+        assert_eq!(sb.acked_ranges, seq_ranges([sack1.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(sack1.start)));
         assert_eq!(
             sb.pipe,
             u32::try_from(snd_nxt - ack).unwrap()
@@ -541,7 +574,8 @@ mod test {
             &testutil::sack_blocks([sack1.clone(), sack2.clone()]),
             TEST_MSS
         ));
-        assert_eq!(sb.acked_ranges, seq_ranges([(sack1.clone(), true), (sack2.clone(), false)]));
+        assert_eq!(sb.acked_ranges, seq_ranges([sack1.clone(), sack2.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(sack1.start)));
         assert_eq!(
             sb.pipe,
             u32::try_from(snd_nxt - ack).unwrap()
@@ -558,12 +592,14 @@ mod test {
             &testutil::sack_blocks([sack2.clone()]),
             TEST_MSS
         ));
-        assert_eq!(sb.acked_ranges, seq_ranges([(sack2, false)]));
+        assert_eq!(sb.acked_ranges, seq_ranges([sack2]));
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
 
         // Cumulative acknowledge all the transmission.
         assert!(!sb.process_ack(snd_nxt, snd_nxt, high_rxt, &SackBlocks::default(), TEST_MSS));
         assert_eq!(sb.acked_ranges, SeqRanges::default());
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, 0);
     }
 
@@ -581,7 +617,8 @@ mod test {
             &testutil::sack_blocks([block.clone()]),
             TEST_MSS
         ));
-        assert_eq!(sb.acked_ranges, seq_ranges([(block.clone(), false)]));
+        assert_eq!(sb.acked_ranges, seq_ranges([block.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, u32::try_from(snd_nxt - ack).unwrap() - sb.sacked_bytes());
 
         // SND.NXT rewinds after RTO.
@@ -591,6 +628,7 @@ mod test {
         assert!(ack.after(snd_nxt));
         assert!(!sb.process_ack(ack, snd_nxt, high_rxt, &SackBlocks::default(), TEST_MSS));
         assert_eq!(sb.acked_ranges, SeqRanges::default());
+        assert_eq!(sb.is_lost_seqnum_end, None);
         assert_eq!(sb.pipe, 0);
     }
 
@@ -610,10 +648,8 @@ mod test {
             &testutil::sack_blocks([block1.clone(), block2.clone(), block3.clone()]),
             TEST_MSS
         ));
-        assert_eq!(
-            sb.acked_ranges,
-            seq_ranges([(block1.clone(), true), (block2.clone(), false), (block3.clone(), false)])
-        );
+        assert_eq!(sb.acked_ranges, seq_ranges([block1.clone(), block2.clone(), block3.clone()]));
+        assert_eq!(sb.is_lost_seqnum_end, Some(SeqNum::new(block1.start)));
         for high_rxt in u32::from(ack)..u32::from(snd_nxt) {
             let expect = if high_rxt < block3.start {
                 let lost = high_rxt < block1.start;
@@ -633,6 +669,48 @@ mod test {
                 expect,
                 "high_rxt={high_rxt}"
             );
+        }
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(3)]
+    fn lost_holes(count: usize) {
+        let mss = u32::from(TEST_MSS);
+        let mut sb = SackScoreboard::default();
+        let ack = SeqNum::new(0);
+
+        // Process enough evenly spaced SACK blocks (each 1 MSS and spaced by
+        // 1 MSS) until we have enough gaps to match count.
+        let mut start = u32::from(ack) + mss;
+        let sack_blocks_count = usize::from(DUP_ACK_THRESHOLD) + count - 1;
+        for _ in 0..sack_blocks_count {
+            let block = start..(start + mss);
+            assert!(sb.process_ack(
+                ack,
+                SeqNum::new(block.end),
+                None,
+                &testutil::sack_blocks([block.clone()]),
+                TEST_MSS
+            ));
+            start = block.end + mss;
+        }
+        assert_eq!(sb.acked_ranges.iter().count(), sack_blocks_count);
+
+        // The IsLost marker should be the start of the (count-1)-th sacked
+        // block.
+        let expect =
+            count.checked_sub(1).map(|i| sb.acked_ranges.iter().skip(i).next().unwrap().start());
+        assert_eq!(sb.is_lost_seqnum_end, expect);
+
+        // Verify the IsLost check when getting each unsacked range back.
+        let mut start = ack;
+        for i in 0..sack_blocks_count {
+            let expect_lost = i < count;
+            let expect_range = SeqRange::new(start..(start + mss), expect_lost).unwrap();
+            assert_eq!(sb.first_unsacked_range_from(start), Some(expect_range.clone()));
+            start = expect_range.end() + mss;
         }
     }
 }
