@@ -129,6 +129,10 @@ type Object = flexible resource union {
     1: semaphore zx.Handle:EVENT;
     2: buffer zx.Handle:VMO;
     3: vmo_semaphore zx.Handle:VMO;
+    // A counter-based semaphore. This can store a timestamp, and uses less memory to do so than the
+    // VMO equivalent.
+    @available(added=HEAD)
+    4: counter_semaphore zx.Handle:COUNTER;
 };
 
 type ObjectType = flexible enum : uint32 {
@@ -136,7 +140,7 @@ type ObjectType = flexible enum : uint32 {
     EVENT = 10;
     /// A memory object backeed by a Zircon VMO.
     BUFFER = 11;
-    /// A sync object backed by a Zircon event or VMO.
+    /// A sync object backed by a Zircon event, VMO, or counter.
     @available(added=13)
     SEMAPHORE = 12;
 };

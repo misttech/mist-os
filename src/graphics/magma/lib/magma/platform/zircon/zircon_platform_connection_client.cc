@@ -175,10 +175,21 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
 
   switch (object_type) {
     case magma::PlatformObject::SEMAPHORE:
-      if (info.type == ZX_OBJ_TYPE_EVENT) {
-        wire_object = fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
-      } else if (info.type == ZX_OBJ_TYPE_VMO) {
-        wire_object = fuchsia_gpu_magma::wire::Object::WithVmoSemaphore(zx::vmo(std::move(handle)));
+      switch (info.type) {
+        case ZX_OBJ_TYPE_EVENT:
+          wire_object =
+              fuchsia_gpu_magma::wire::Object::WithSemaphore(zx::event(std::move(handle)));
+          break;
+        case ZX_OBJ_TYPE_VMO:
+          wire_object =
+              fuchsia_gpu_magma::wire::Object::WithVmoSemaphore(zx::vmo(std::move(handle)));
+          break;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+        case ZX_OBJ_TYPE_COUNTER:
+          wire_object =
+              fuchsia_gpu_magma::wire::Object::WithCounterSemaphore(zx::counter(std::move(handle)));
+          break;
+#endif
       }
       break;
 

@@ -294,6 +294,8 @@ source_set("semaphore") {
   configs += [ "..:platform_include_config" ]
 
   sources = [
+    "zircon_counter_semaphore.cc",
+    "zircon_counter_semaphore.h",
     "zircon_platform_semaphore.cc",
     "zircon_platform_semaphore.h",
     "zircon_vmo_semaphore.cc",

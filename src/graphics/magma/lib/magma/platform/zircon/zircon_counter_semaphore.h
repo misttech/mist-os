@@ -1,25 +1,26 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_VMO_SEMAPHORE_H_
-#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_VMO_SEMAPHORE_H_
+#ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_COUNTER_SEMAPHORE_H_
+#define SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_COUNTER_SEMAPHORE_H_
 
 #include <lib/magma/platform/platform_semaphore.h>
 #include <lib/magma/platform/platform_trace.h>
 #include <lib/magma/util/short_macros.h>
-#include <lib/zx/vmo.h>
+#include <lib/zx/counter.h>
 
 namespace magma {
 
-// VMO semaphores support timestamps.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
+// Counter semaphores support timestamps.
 // They aren't created by default since they're less memory efficient than the event-based
-// ZirconPlatformSemaphore, but they can be imported given a VMO handle.
-// Timestamp is updated on Signal and Reset but it's a bit racy.
-class ZirconVmoSemaphore : public PlatformSemaphore {
+// ZirconPlatformSemaphore, but they can be imported given a counter handle.
+class ZirconCounterSemaphore : public PlatformSemaphore {
  public:
-  ZirconVmoSemaphore(zx::vmo vmo, uint64_t koid, uint64_t flags)
-      : PlatformSemaphore(flags), vmo_(std::move(vmo)), koid_(koid) {}
+  ZirconCounterSemaphore(zx::counter counter, uint64_t koid, uint64_t flags)
+      : PlatformSemaphore(flags), counter_(std::move(counter)), koid_(koid) {}
 
   void set_local_id(uint64_t id) override {
     DASSERT(id);
@@ -48,11 +49,13 @@ class ZirconVmoSemaphore : public PlatformSemaphore {
  private:
   void WriteTimestamp(uint64_t timestamp_ns);
 
-  zx::vmo vmo_;
+  zx::counter counter_;
   uint64_t koid_;
   uint64_t local_id_ = 0;
 };
 
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 }  // namespace magma
 
-#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_VMO_SEMAPHORE_H_
+#endif  // SRC_GRAPHICS_MAGMA_LIB_MAGMA_PLATFORM_ZIRCON_ZIRCON_COUNTER_SEMAPHORE_H_

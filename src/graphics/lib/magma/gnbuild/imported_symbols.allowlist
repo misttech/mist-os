@@ -444,6 +444,8 @@ zx_channel_write
 zx_channel_write_etc
 zx_clock_get_boot
 zx_clock_get_monotonic
+zx_counter_read
+zx_counter_write
 zx_cprng_draw
 zx_deadline_after
 zx_debuglog_create
