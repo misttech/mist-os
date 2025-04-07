@@ -15,7 +15,7 @@ import asyncio
 import logging
 import random
 
-import fidl.fuchsia_blackout_test as blackout
+import fidl_fuchsia_blackout_test as blackout
 import honeydew.utils.common
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.transports.ffx.errors import FfxCommandError
@@ -71,24 +71,28 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
     def setup_test(self) -> None:
         super().setup_test()
         _LOGGER.info("Blackout: Setting up test filesystem")
-        res = asyncio.run(
-            self.blackout_proxy.setup(
-                device_label=self.device_label,
-                device_path=self.device_path,
-                seed=self.seed,
-            )
-        )
-        asserts.assert_equal(res.err, None, "Failed to run setup")
+        try:
+            asyncio.run(
+                self.blackout_proxy.setup(
+                    device_label=self.device_label,
+                    device_path=self.device_path,
+                    seed=self.seed,
+                )
+            ).unwrap()
+        except AssertionError as e:
+            asserts.fail(f"Failed to run setup: {e}")
         _LOGGER.info("Blackout: Running filesystem load")
-        res = asyncio.run(
-            self.blackout_proxy.test(
-                device_label=self.device_label,
-                device_path=self.device_path,
-                seed=self.seed,
-                duration=self.load_generation_duration,
-            )
-        )
-        asserts.assert_equal(res.err, None, "Failed to run load generation")
+        try:
+            asyncio.run(
+                self.blackout_proxy.test(
+                    device_label=self.device_label,
+                    device_path=self.device_path,
+                    seed=self.seed,
+                    duration=self.load_generation_duration,
+                )
+            ).unwrap()
+        except AssertionError as e:
+            asserts.fail(f"Failed to run load generation: {e}")
         if self.destroy_after_test:
             _LOGGER.info("Blackout: destroying test component instance")
             self.dut.ffx.run(
