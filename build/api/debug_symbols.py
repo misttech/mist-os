@@ -171,10 +171,9 @@ class DebugSymbolsManifestParser(object):
                         build_id_file_path = self._build_dir / build_id_file
                         self._visited_paths.add(build_id_file_path)
                         build_id = build_id_file_path.read_text().strip()
-                        if not build_id:
-                            raise ValueError(
-                                f"Empty build-id file {build_id_file_path}"
-                            )
+                        # It is possible for certain files to have an empty
+                        # build_id file, for example, see
+                        # /zircon/kernel/lib/libc/string/arch/x86:_hermetic_code_blob.memcpy_movsb.executable(//zircon/kernel:kernel_x64)
 
                 if not build_id:
                     # As a fallback, try to extract the build id directly from the file.
@@ -182,9 +181,9 @@ class DebugSymbolsManifestParser(object):
                     self._visited_paths.add(debug_path)
                     build_id = self._get_build_id(debug_path)
                     if not build_id:
-                        raise ValueError(
-                            f"Cannot find build-id value in {debug_path}"
-                        )
+                        # It is possible for unstripped files to not have a GNU .build-id
+                        # value, for example Go host binaries.
+                        return
 
                 entry["elf_build_id"] = build_id
 

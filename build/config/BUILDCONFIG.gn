@@ -3112,7 +3112,7 @@ template("_fuchsia_shared_library") {
           cpu = current_cpu
           debug = rebase_path(link_output_file, root_build_dir)
           if (current_os != "mac" && current_os != "win") {
-            elf_build_id = rebased_output_file + ".build-id.stamp"
+            elf_build_id_file = rebased_output_file + ".build-id.stamp"
           }
           if (output_breakpad_syms && current_os == "fuchsia") {
             breakpad = rebased_output_file + ".sym"
