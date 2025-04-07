@@ -163,7 +163,17 @@ impl TraceTask {
         let client = fidl::AsyncSocket::from_socket(client);
         let f = File::create(&output_file).await.context("opening file")?;
         let (client_end, server_end) = fidl::endpoints::create_proxy::<trace::SessionMarker>();
-        provisioner.initialize_tracing(server_end, &config, server)?;
+        let expanded_categories = match config.categories.clone() {
+            Some(categories) => {
+                let context = ffx_config::global_env_context()
+                    .context("Discovering ffx environment context")?;
+                Some(ffx_trace::expand_categories(&context, categories).await?)
+            }
+            None => None,
+        };
+        let config_with_expanded_categories =
+            trace::TraceConfig { categories: expanded_categories, ..config.clone() };
+        provisioner.initialize_tracing(server_end, &config_with_expanded_categories, server)?;
         client_end
             .start_tracing(&trace::StartOptions::default())
             .await?
@@ -426,24 +436,12 @@ impl FidlProtocol for TracingProtocol {
                             .map_err(Into::into);
                     }
                     Entry::Vacant(e) => {
-                        let expanded_categories = match target_config.categories.clone() {
-                            Some(categories) => {
-                                let context = ffx_config::global_env_context()
-                                    .context("Discovering ffx environment context")?;
-                                Some(ffx_trace::expand_categories(&context, categories).await?)
-                            }
-                            None => None,
-                        };
-                        let target_config_with_expanded_categories = trace::TraceConfig {
-                            categories: expanded_categories,
-                            ..target_config.clone()
-                        };
                         let task = match TraceTask::new(
                             Rc::downgrade(&self.tasks),
                             target_info.clone(),
                             output_file.clone(),
                             options,
-                            target_config_with_expanded_categories,
+                            target_config,
                             provisioner,
                         )
                         .await
