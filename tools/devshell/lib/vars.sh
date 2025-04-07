@@ -1232,3 +1232,7 @@ function fx-zbi {
 function fx-zbi-default-compression {
   "${FUCHSIA_BUILD_DIR}/$(fx-command-run list-build-artifacts --name zbi --expect-one tools)" "$@"
 }
+
+function fx-choose {
+    fx-command-run gum choose "$@"
+}
