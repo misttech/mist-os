@@ -2007,7 +2007,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
 
 zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list,
                                            VmCowPages* page_owner, vm_page_t* page,
-                                           uint64_t owner_offset,
+                                           uint64_t owner_offset, DeferredOps& deferred,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
   DEBUG_ASSERT(page != vm_get_zero_page());
@@ -2070,7 +2070,6 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   // If the new page is different from the original page, then we must remove the original page
   // from any mappings that reference this node or its descendants.
   const bool do_range_update = (*out_page != page);
-  __UNINITIALIZED DeferredOps deferred(this, DeferredOps::LockedTag{});
   [[maybe_unused]] VmPageOrMarker prev_content = CompleteAddPageLocked(
       *page_transaction, VmPageOrMarker::Page(*out_page), do_range_update ? &deferred : nullptr);
   // We should not have been trying to fork at this offset if something already existed.
@@ -2987,8 +2986,9 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
       return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
                                             page_request->GetAnonymous());
     }
+    __UNINITIALIZED DeferredOps deferred(target_, DeferredOps::LockedTag{});
     zx_status_t result = target_->CloneCowPageLocked(
-        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset_,
+        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset_, deferred,
         page_request->GetAnonymous(), &res_page);
     if (result != ZX_OK) {
       return zx::error(result);

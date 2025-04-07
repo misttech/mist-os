@@ -1304,7 +1304,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |page| must not be the zero-page, as there is no need to do the complex page fork logic to
   // reduce memory consumption in that case.
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
-                                 vm_page_t* page, uint64_t owner_offset,
+                                 vm_page_t* page, uint64_t owner_offset, DeferredOps& deferred,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock()) TA_REQ(page_owner->lock());
 
