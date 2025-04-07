@@ -398,6 +398,12 @@ pub struct UsbVsockHost {
     event_sender: mpsc::Sender<UsbVsockHostEvent>,
 }
 
+impl std::fmt::Debug for UsbVsockHost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UsbVsockHost").finish()
+    }
+}
+
 impl UsbVsockHost {
     /// Create a new USB VSOCK host.
     pub fn new(

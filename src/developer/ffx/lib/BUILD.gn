@@ -40,12 +40,15 @@ libs = [
   "testing",
   "timeout",
   "usb_fastboot_discovery",
-  "usb_vsock_host",
   "version",
   "writer",
 
   # keep-sorted end
 ]
+
+if (!is_mac) {
+  libs += [ "usb_vsock_host" ]
+}
 
 # The fuchsia-controller library supports end-to-end testing from
 # Linux hosts, and we don't intend to explicitly support end-to-end

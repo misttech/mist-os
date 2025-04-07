@@ -45,10 +45,18 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//third_party/rust_crates:tracing",
   ]
 
+  if (!is_mac) {
+    deps += [
+      "//src/developer/ffx/lib/usb_vsock_host:lib",
+      "//src/lib/fidl/rust/fidl_message",
+    ]
+  }
+
   test_deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/connectivity/overnet/lib/circuit",
+    "//src/connectivity/overnet/lib/usb_vsock",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fuchsia",

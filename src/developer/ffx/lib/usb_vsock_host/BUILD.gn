@@ -5,6 +5,7 @@
 import("//build/rust/rustc_library.gni")
 
 assert(is_host, "The USB VSOCK host should only be built for the host OS")
+assert(!is_mac, "The USB VSOCK host does not support Mac")
 
 rustc_library("lib") {
   name = "usb_vsock_host"

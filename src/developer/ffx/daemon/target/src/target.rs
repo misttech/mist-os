@@ -5,6 +5,8 @@
 use crate::overnet::host_pipe::{
     spawn, HostPipeChildBuilder, HostPipeChildDefaultBuilder, LogBuffer,
 };
+#[cfg(not(target_os = "macos"))]
+use crate::overnet::usb::spawn_usb;
 use crate::overnet::vsock::spawn_vsock;
 use crate::{FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE};
 use addr::{TargetAddr, TargetIpAddr};
@@ -39,9 +41,13 @@ use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
+#[cfg(not(target_os = "macos"))]
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 use usb_bulk::AsyncInterface as Interface;
 use usb_fastboot_discovery::open_interface_with_serial;
+#[cfg(not(target_os = "macos"))]
+use usb_vsock_host::UsbVsockHost;
 
 mod identity;
 mod update;
@@ -51,6 +57,8 @@ pub use self::update::{TargetUpdate, TargetUpdateBuilder};
 const DEFAULT_SSH_PORT: u16 = 22;
 const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
 const CONFIG_ENABLE_VSOCK: &str = "connectivity.enable_vsock";
+#[cfg(not(target_os = "macos"))]
+const CONFIG_ENABLE_USB: &str = "connectivity.enable_usb";
 
 pub(crate) type SharedIdentity = Rc<Identity>;
 pub(crate) type WeakIdentity = Weak<Identity>;
@@ -64,6 +72,14 @@ pub struct TargetAddrStatus {
 }
 
 impl TargetAddrStatus {
+    pub fn usb() -> Self {
+        Self {
+            protocol: TargetProtocol::Vsock,
+            transport: TargetTransport::Usb,
+            source: TargetSource::Discovered,
+        }
+    }
+
     pub fn vsock() -> Self {
         Self {
             protocol: TargetProtocol::Vsock,
@@ -277,6 +293,9 @@ impl HostPipeState {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+static USB_VSOCK_HOST: Mutex<Option<Arc<UsbVsockHost>>> = Mutex::new(None);
+
 pub struct Target {
     pub events: events::Queue<TargetEvent>,
 
@@ -353,6 +372,31 @@ impl Target {
         });
         target.target_event_synthesizer.target.replace(Rc::downgrade(&target));
         target
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn init_usb_vsock_host(
+    ) -> Option<channel::mpsc::Receiver<usb_vsock_host::UsbVsockHostEvent>> {
+        if ffx_config::get(CONFIG_ENABLE_USB).unwrap_or(false) {
+            let (sender, receiver) = channel::mpsc::channel(1);
+
+            if USB_VSOCK_HOST
+                .lock()
+                .unwrap()
+                .replace(UsbVsockHost::new(Vec::<std::path::PathBuf>::new(), true, sender))
+                .is_some()
+            {
+                tracing::warn!("Re-initializing USB VSock host");
+            }
+            Some(receiver)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn get_usb_vsock_host() -> Option<Arc<UsbVsockHost>> {
+        (*USB_VSOCK_HOST.lock().unwrap()).clone()
     }
 
     pub fn new() -> Rc<Self> {
@@ -1278,7 +1322,7 @@ impl Target {
             // active, we don't need a host pipe. This will start happening more as we introduce USB
             // links, where the first thing we hear about a target is its appearance as an Overnet peer,
             // and thus we have an RCS connection from inception.
-            let cid = {
+            let cid_and_usb_host = {
                 let Some(target) = weak_target.upgrade() else {
                     // weird that self is already gone, but ¯\_(ツ)_/¯
                     // Unfortunately that means we have no access to its remote-overnet-id waiters :-(
@@ -1296,26 +1340,63 @@ impl Target {
 
                 target.addrs().into_iter().find_map(|addr| {
                     if let TargetAddr::VSockCtx(cid) = addr {
-                        Some(cid)
+                        if ffx_config::get(CONFIG_ENABLE_VSOCK).unwrap_or(false) {
+                            Some((cid, None))
+                        } else {
+                            None
+                        }
+                    } else if let TargetAddr::UsbCtx(cid) = addr {
+                        #[cfg(not(target_os = "macos"))]
+                        let ret = if let Some(host) = Target::get_usb_vsock_host() {
+                            Some((cid, Some(host)))
+                        } else {
+                            None
+                        };
+                        #[cfg(target_os = "macos")]
+                        let (ret, _) = (Option::<(u32, Option<()>)>::None, cid);
+                        ret
                     } else {
                         None
                     }
                 })
             };
 
-            if ffx_config::get(CONFIG_ENABLE_VSOCK).unwrap_or(false) {
-                if let Some(cid) = cid {
-                    // We have a VSOCK. Use that to connect instead of SSH.
+            if let Some((cid, host)) = cid_and_usb_host {
+                // We have a VSOCK. Use that to connect instead of SSH.
 
-                    spawn_vsock(cid, node).await;
-                    weak_target.upgrade().and_then(|target| {
-                        tracing::debug!(
-                            "Exiting run_host_pipe for {target_name_str} (VSOCK connection)"
-                        );
-                        target.host_pipe.borrow_mut().take()
-                    });
-                    return;
+                let conn_type = if host.is_some() { "USB" } else { "VSOCK" };
+
+                // We might be able to connect on VSOCK port 201 to call the
+                // identify service and then we could get something to return to
+                // these waiters.
+                if let Some(target) = weak_target.upgrade() {
+                    if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                        if let RemoteOvernetIdState::Pending(waiters) = std::mem::replace(
+                            &mut host_pipe.remote_overnet_id,
+                            RemoteOvernetIdState::Ready(None),
+                        ) {
+                            for waiter in waiters {
+                                let _ = waiter.send(None);
+                            }
+                        }
+                    }
                 }
+
+                if let Some(host) = host {
+                    let _ = &host;
+                    #[cfg(not(target_os = "macos"))]
+                    Box::pin(spawn_usb(host, cid, node)).await;
+                } else {
+                    spawn_vsock(cid, node).await;
+                }
+
+                weak_target.upgrade().and_then(|target| {
+                    tracing::debug!(
+                        "Exiting run_host_pipe for {target_name_str} ({conn_type} connection)"
+                    );
+                    target.host_pipe.borrow_mut().take()
+                });
+                return;
             }
 
             let watchdogs: bool = ffx_config::get("watchdogs.host_pipe.enabled").unwrap_or(false);
@@ -1385,7 +1466,6 @@ impl Target {
                     // Change this to a debug message (from warn). We will get any error from
                     // SSH client in the logs so this is redundant.
                     tracing::debug!("Host pipe spawn {:?}", e);
-                    eprintln!("Host pipe spawn {:?}", e);
                     let compatibility_status = Some(CompatibilityInfo {
                         status: CompatibilityState::Error,
                         platform_abi: 0,
