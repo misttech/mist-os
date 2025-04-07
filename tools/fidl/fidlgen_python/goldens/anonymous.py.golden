@@ -18,7 +18,7 @@ add_ir_path(_ir_path)
 
 @dataclass
 class OverrideTest:
-    op: int
+    op: int | Op
     left: typing.Optional[Expression]
     right: typing.Optional[Expression]
 
@@ -90,7 +90,7 @@ class SomeProtocolSomeMethodRequest:
 
 @dataclass
 class SomeProtocolSomeMethodResponse:
-    bits_member: int
+    bits_member: int | BitsMember
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "SomeProtocolSomeMethodResponse"
@@ -158,13 +158,13 @@ class TableData:
 class FunctionApplication:
     func: str | None
     args: typing.Sequence[typing.Optional[Expression]] | None
-    flags: int | None
+    flags: int | Flags | None
 
     def __init__(
         self,
         func: str | None = None,
         args: typing.Sequence[typing.Optional[Expression]] | None = None,
-        flags: int | None = None,
+        flags: int | Flags | None = None,
     ) -> None:
         self.func = func
         self.args = args
@@ -321,7 +321,7 @@ class Expression:
 
 class SomeProtocolSomeMethodResult:
     _response: typing.Optional[SomeProtocolSomeMethodResponse]
-    _err: typing.Optional[int]
+    _err: typing.Optional[int | SomeProtocolSomeMethodError]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "SomeProtocolSomeMethodResult"
@@ -351,7 +351,7 @@ class SomeProtocolSomeMethodResult:
     def __init__(
         self,
         response: typing.Optional[SomeProtocolSomeMethodResponse] = None,
-        err: typing.Optional[int] = None,
+        err: typing.Optional[int | SomeProtocolSomeMethodError] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -379,7 +379,7 @@ class SomeProtocolSomeMethodResult:
         return getattr(self, "_response", None)
 
     @property
-    def err(self) -> int | None:
+    def err(self) -> int | SomeProtocolSomeMethodError | None:
         return getattr(self, "_err", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we

@@ -39,7 +39,7 @@ class Construct(unittest.TestCase):
 
     def test_unwrap_bad_union(self) -> None:
         ty = typing.cast(type, float | int | None)
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(ty)
 
     def test_unwrap_fidl_forward_ref(self) -> None:
@@ -58,9 +58,9 @@ class Construct(unittest.TestCase):
         self.assertEqual(str, unwrap_innermost_type(str))
 
     def test_unwrap_multiple_type_arguments(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(tuple[int, str])
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(tuple[tuple[int], str])
 
     def test_unwrap_bad_forward_ref(self) -> None:
@@ -68,7 +68,7 @@ class Construct(unittest.TestCase):
             unwrap_innermost_type(ForwardRef("foo"))
 
     def test_unwrap_bad_inception(self) -> None:
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(TypeError):
             unwrap_innermost_type(
                 ForwardRef(
                     "tuple[ForwardRef('list[ForwardRef(\"tuple[int, str]\")]')]"

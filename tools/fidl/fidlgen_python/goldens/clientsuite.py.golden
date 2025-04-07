@@ -960,7 +960,7 @@ class RunnerGetVersionResponse:
 
 @dataclass
 class RunnerIsTestEnabledRequest:
-    test: int
+    test: int | Test
 
     __fidl_kind__ = "struct"
     __fidl_type__ = "RunnerIsTestEnabledRequest"
@@ -1168,11 +1168,11 @@ class UnknownEvent:
 
 @dataclass
 class BindingsProperties:
-    io_style: int | None
+    io_style: int | IoStyle | None
 
     def __init__(
         self,
-        io_style: int | None = None,
+        io_style: int | IoStyle | None = None,
     ) -> None:
         self.io_style = io_style
 
@@ -1231,7 +1231,7 @@ class TablePayload:
 
 
 class AjarTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _unknown_event: typing.Optional[UnknownEvent]
 
     __fidl_kind__ = "union"
@@ -1261,7 +1261,7 @@ class AjarTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         unknown_event: typing.Optional[UnknownEvent] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
@@ -1286,7 +1286,7 @@ class AjarTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -1312,7 +1312,7 @@ class AjarTargetEventReport:
 
 
 class ClosedTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _on_event_no_payload: typing.Optional[Empty]
     _on_event_struct_payload: typing.Optional[NonEmptyPayload]
     _on_event_table_payload: typing.Optional[TablePayload]
@@ -1359,7 +1359,7 @@ class ClosedTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         on_event_no_payload: typing.Optional[Empty] = None,
         on_event_struct_payload: typing.Optional[NonEmptyPayload] = None,
         on_event_table_payload: typing.Optional[TablePayload] = None,
@@ -1399,7 +1399,7 @@ class ClosedTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -1548,7 +1548,7 @@ class ClosedTargetTwoWayStructPayloadErrResult:
 
 class EmptyResultClassification:
     _success: typing.Optional[Empty]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultClassification"
@@ -1578,7 +1578,7 @@ class EmptyResultClassification:
     def __init__(
         self,
         success: typing.Optional[Empty] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1606,7 +1606,7 @@ class EmptyResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1632,7 +1632,7 @@ class EmptyResultClassification:
 class EmptyResultWithErrorClassification:
     _success: typing.Optional[Empty]
     _application_error: typing.Optional[int]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "EmptyResultWithErrorClassification"
@@ -1667,7 +1667,7 @@ class EmptyResultWithErrorClassification:
         self,
         success: typing.Optional[Empty] = None,
         application_error: typing.Optional[int] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1703,7 +1703,7 @@ class EmptyResultWithErrorClassification:
         return getattr(self, "_application_error", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1728,7 +1728,7 @@ class EmptyResultWithErrorClassification:
 
 class NonEmptyResultClassification:
     _success: typing.Optional[NonEmptyPayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultClassification"
@@ -1758,7 +1758,7 @@ class NonEmptyResultClassification:
     def __init__(
         self,
         success: typing.Optional[NonEmptyPayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1786,7 +1786,7 @@ class NonEmptyResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1812,7 +1812,7 @@ class NonEmptyResultClassification:
 class NonEmptyResultWithErrorClassification:
     _success: typing.Optional[NonEmptyPayload]
     _application_error: typing.Optional[int]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "NonEmptyResultWithErrorClassification"
@@ -1847,7 +1847,7 @@ class NonEmptyResultWithErrorClassification:
         self,
         success: typing.Optional[NonEmptyPayload] = None,
         application_error: typing.Optional[int] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1883,7 +1883,7 @@ class NonEmptyResultWithErrorClassification:
         return getattr(self, "_application_error", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -1907,7 +1907,7 @@ class NonEmptyResultWithErrorClassification:
 
 
 class OpenTargetEventReport:
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
     _unknown_event: typing.Optional[UnknownEvent]
     _strict_event: typing.Optional[Empty]
     _flexible_event: typing.Optional[Empty]
@@ -1947,7 +1947,7 @@ class OpenTargetEventReport:
 
     def __init__(
         self,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         unknown_event: typing.Optional[UnknownEvent] = None,
         strict_event: typing.Optional[Empty] = None,
         flexible_event: typing.Optional[Empty] = None,
@@ -1982,7 +1982,7 @@ class OpenTargetEventReport:
             )
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     @property
@@ -2696,7 +2696,7 @@ class OpenTargetStrictTwoWayFieldsErrResult:
 
 class TableResultClassification:
     _success: typing.Optional[TablePayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "TableResultClassification"
@@ -2726,7 +2726,7 @@ class TableResultClassification:
     def __init__(
         self,
         success: typing.Optional[TablePayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -2754,7 +2754,7 @@ class TableResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -2846,7 +2846,7 @@ class UnionPayload:
 
 class UnionResultClassification:
     _success: typing.Optional[UnionPayload]
-    _fidl_error: typing.Optional[int]
+    _fidl_error: typing.Optional[int | FidlErrorKind]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "UnionResultClassification"
@@ -2876,7 +2876,7 @@ class UnionResultClassification:
     def __init__(
         self,
         success: typing.Optional[UnionPayload] = None,
-        fidl_error: typing.Optional[int] = None,
+        fidl_error: typing.Optional[int | FidlErrorKind] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -2904,7 +2904,7 @@ class UnionResultClassification:
         return getattr(self, "_success", None)
 
     @property
-    def fidl_error(self) -> int | None:
+    def fidl_error(self) -> int | FidlErrorKind | None:
         return getattr(self, "_fidl_error", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we
@@ -3148,7 +3148,7 @@ class AjarTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         unknown_event: UnknownEvent | None = None,
     ) -> None:
         msg = AjarTargetEventReport(
@@ -3817,7 +3817,7 @@ class ClosedTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         on_event_no_payload: Empty | None = None,
         on_event_struct_payload: NonEmptyPayload | None = None,
         on_event_table_payload: TablePayload | None = None,
@@ -4372,7 +4372,7 @@ class OpenTargetEventReporterClient(fidl._client.FidlClient):
     def report_event(
         self,
         *,
-        fidl_error: int | None = None,
+        fidl_error: int | FidlErrorKind | None = None,
         unknown_event: UnknownEvent | None = None,
         strict_event: Empty | None = None,
         flexible_event: Empty | None = None,
@@ -5144,7 +5144,7 @@ class RunnerClient(fidl._client.FidlClient):
     def is_test_enabled(
         self,
         *,
-        test: int,
+        test: int | Test,
     ) -> typing.Coroutine[typing.Any, typing.Any, RunnerIsTestEnabledResponse]:
         msg = RunnerIsTestEnabledRequest(
             test,

@@ -15,6 +15,8 @@ import fidl
 _ir_path = fidl._library.get_fidl_ir_map()["test.consts"]
 add_ir_path(_ir_path)
 
+import fidl_zx
+
 
 EnumType = enum.IntEnum(
     "EnumType",
@@ -58,15 +60,15 @@ OFFSET: int = -33
 POPULATION_USA_2018: int = 330000000
 USERNAME: str = """\"squeenze\""""
 ZX_CONST: int = 65536
-ZX_OBJ_VAL: int = 4
-ZX_RIGHTS_VAL: int = 4
+ZX_OBJ_VAL: int | fidl_zx.ObjType = 4
+ZX_RIGHTS_VAL: int | fidl_zx.Rights = 4
 BITS_PRIMITIVE_TRUE: int = 2
 BITS_PRIMITIVE_VAL: int = 1
 BITS_PRIMITIVE_VAL_NARROWED: int = 1
-BITS_TRUE: int = 2
-BITS_VAL: int = 1
+BITS_TRUE: int | BitsType = 2
+BITS_VAL: int | BitsType = 1
 ENUM_PRIMITIVE_TRUE: int = 2
 ENUM_PRIMITIVE_VAL: int = 1
 ENUM_PRIMITIVE_VAL_NARROWED: int = 1
-ENUM_TRUE: int = 2
-ENUM_VAL: int = 1
+ENUM_TRUE: int | EnumType = 2
+ENUM_VAL: int | EnumType = 1

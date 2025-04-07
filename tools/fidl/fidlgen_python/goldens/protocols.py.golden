@@ -1191,7 +1191,7 @@ class TheUnion:
 
 class WithErrorSyntaxErrorAsEnumResult:
     _response: typing.Optional[None]
-    _err: typing.Optional[int]
+    _err: typing.Optional[int | ErrorEnum]
 
     __fidl_kind__ = "union"
     __fidl_type__ = "WithErrorSyntaxErrorAsEnumResult"
@@ -1221,7 +1221,7 @@ class WithErrorSyntaxErrorAsEnumResult:
     def __init__(
         self,
         response: typing.Optional[None] = None,
-        err: typing.Optional[int] = None,
+        err: typing.Optional[int | ErrorEnum] = None,
         _empty: typing.Optional[tuple[()]] = None,
     ):
         object.__init__(self)
@@ -1249,7 +1249,7 @@ class WithErrorSyntaxErrorAsEnumResult:
         return getattr(self, "_response", None)
 
     @property
-    def err(self) -> int | None:
+    def err(self) -> int | ErrorEnum | None:
         return getattr(self, "_err", None)
 
     # TODO(https://fxbug.dev/394421154): We should probably remove this method when we

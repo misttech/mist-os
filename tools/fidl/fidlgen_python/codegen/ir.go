@@ -238,11 +238,12 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	case fidlgen.IdentifierType:
 		// TODO(https://fxbug.dev/394421154): This should be changed to use the enum type itself
 		// when we start making breaking changes for these bindings.
+		identifier := *c.compileDeclIdentifier(val.Identifier)
 		switch c.decls[val.Identifier].Type {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
-			name += "int"
+			name += fmt.Sprintf("int | %s", identifier)
 		default:
-			name += *c.compileDeclIdentifier(val.Identifier)
+			name += identifier
 		}
 	case fidlgen.PrimitiveType:
 		subtype := string(val.PrimitiveSubtype)
