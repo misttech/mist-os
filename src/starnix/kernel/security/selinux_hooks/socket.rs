@@ -7,7 +7,7 @@ use crate::task::CurrentTask;
 use crate::vfs::socket::{
     NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketProtocol, SocketType,
 };
-use crate::vfs::FsNode;
+use crate::vfs::{Anon, FsNode};
 use selinux::permission_check::PermissionCheck;
 use selinux::{
     CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission, SecurityId, SecurityServer,
@@ -25,6 +25,11 @@ fn has_socket_permission(
     permission: &KernelPermission,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
+    // Permissions are allowed for kernel sockets.
+    if Anon::is_private(socket_node) {
+        return Ok(());
+    }
+
     let socket_sid = fs_node_effective_sid_and_class(socket_node).sid;
 
     // If the socket is for kernel-internal use we can return success immediately.
