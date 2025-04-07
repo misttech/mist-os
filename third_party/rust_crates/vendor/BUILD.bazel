@@ -1483,14 +1483,14 @@ alias(
 )
 
 alias(
-    name = "memoffset-0.7.1",
-    actual = "//third_party/rust_crates/vendor/memoffset-0.7.1:memoffset",
+    name = "memoffset-0.9.1",
+    actual = "//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset",
     tags = ["manual"],
 )
 
 alias(
     name = "memoffset",
-    actual = "//third_party/rust_crates/vendor/memoffset-0.7.1:memoffset",
+    actual = "//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset",
     tags = ["manual"],
 )
 

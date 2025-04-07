@@ -149,7 +149,7 @@ maplit = "1.0"
 maybe-owned = "0.3.4"
 md-5 = "0.10.5"
 memchr = "2.7.4"
-memoffset = "0.7.1"
+memoffset = "0.9.1"
 miniz_oxide = "0.3.6"
 mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
