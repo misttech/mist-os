@@ -685,7 +685,7 @@ mod test {
             ],
         });
 
-        Type::PtrToStruct { id: MemoryId::new(), offset: 0, descriptor }
+        Type::PtrToStruct { id: MemoryId::new(), offset: 0.into(), descriptor }
     });
 
     impl Default for TestArgument {
@@ -761,7 +761,7 @@ mod test {
             ],
         });
 
-        Type::PtrToStruct { id: TEST_ARG_32_BIT_MEMORY_ID.clone(), offset: 0, descriptor }
+        Type::PtrToStruct { id: TEST_ARG_32_BIT_MEMORY_ID.clone(), offset: 0.into(), descriptor }
     });
 
     impl ProgramArgument for &'_ TestArgument32BitMapped {
@@ -1006,8 +1006,8 @@ mod test {
         exit
         "#;
         let args = vec![
-            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
-            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0.into(), buffer_size: 16 },
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0.into(), buffer_size: 16 },
         ];
         let verify_result = verify_program(
             parse_asm(program),

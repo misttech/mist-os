@@ -566,8 +566,11 @@ mod tests {
         const CBPF_CONFIG: &'static CbpfConfig = &TEST_CBPF_CONFIG;
     }
 
-    static SECCOMP_DATA_TYPE: LazyLock<Type> =
-        LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
+    static SECCOMP_DATA_TYPE: LazyLock<Type> = LazyLock::new(|| Type::PtrToMemory {
+        id: MemoryId::new(),
+        offset: 0.into(),
+        buffer_size: 0,
+    });
 
     impl ProgramArgument for &'_ seccomp_data {
         fn get_type() -> &'static Type {
@@ -787,7 +790,7 @@ mod tests {
 
     static VARIABLE_LENGTH_PACKET_TYPE: LazyLock<Type> = LazyLock::new(|| Type::PtrToMemory {
         id: MemoryId::new(),
-        offset: 0,
+        offset: 0.into(),
         buffer_size: size_of::<VariableLengthPacket>() as u64,
     });
 

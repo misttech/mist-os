@@ -139,7 +139,7 @@ impl BpfProgramContext for SeccompFilter {
 }
 
 static SECCOMP_DATA_TYPE: LazyLock<Type> =
-    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
+    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0.into(), buffer_size: 0 });
 
 impl ProgramArgument for &'_ SeccompData {
     fn get_type() -> &'static Type {

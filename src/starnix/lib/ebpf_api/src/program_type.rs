@@ -604,11 +604,11 @@ fn array_end_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
 }
 
 fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
-    Type::PtrToStruct { id, offset: 0, descriptor: Arc::new(StructDescriptor { fields }) }
+    Type::PtrToStruct { id, offset: 0.into(), descriptor: Arc::new(StructDescriptor { fields }) }
 }
 
 fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
-    Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }
+    Type::PtrToMemory { id, offset: 0.into(), buffer_size: std::mem::size_of::<T>() as u64 }
 }
 
 static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);

@@ -24,8 +24,23 @@ impl<T: Clone + Copy + std::fmt::Debug + PartialOrd + Ord + PartialEq + Eq> From
     }
 }
 
+macro_rules! make_from {
+    ($target_type:ty : $base_from_type:ty {$($types:ty),*}) => {
+        $(
+            impl From<$types> for $target_type {
+                fn from(v: $types) -> Self {
+                    (v as $base_from_type).into()
+                }
+            }
+        )*
+    }
+}
+
 macro_rules! make_scalar_value_data {
-    ($t:ident) => { paste::paste! {
+    ($t:ident ($($types:ty),*)) => { paste::paste! {
+
+make_from!([< $t:upper Range>]: [< $t >] {$($types),*});
+make_from!([< $t:upper ScalarValueData>]: [< $t >] {$($types),*});
 
 pub type [< $t:upper Range>] = Range<[< $t >]>;
 
@@ -108,6 +123,20 @@ impl [< $t:upper Range>] {
 
         [< $t:upper Range>]::new(final_min, final_max)
     }
+
+    pub fn checked_add<T: Into<[< $t:upper Range>]>>(self, rhs: T) -> Option<Self> {
+        let rhs = rhs.into();
+        let min = self.min.checked_add(rhs.min)?;
+        let max = self.max.checked_add(rhs.max)?;
+        Some(Self {min, max})
+    }
+
+    pub fn checked_sub<T: Into<[< $t:upper Range>]>>(self, rhs: T) -> Option<Self> {
+        let rhs = rhs.into();
+        let min = self.min.checked_sub(rhs.min)?;
+        let max = self.max.checked_sub(rhs.max)?;
+        Some(Self {min, max})
+    }
 }
 
 impl PartialOrd for [< $t:upper Range>] {
@@ -125,9 +154,10 @@ impl PartialOrd for [< $t:upper Range>] {
     }
 }
 
-impl std::ops::Add for [< $t:upper Range>] {
+impl<T: Into<[< $t:upper Range>]>> std::ops::Add<T> for [< $t:upper Range>] {
     type Output = Self;
-    fn add(self, rhs: Self) -> Self {
+    fn add(self, rhs: T) -> Self {
+        let rhs = rhs.into();
         let (min, min_overflowed) = self.min.overflowing_add(rhs.min);
         let (max, max_overflowed) = self.max.overflowing_add(rhs.max);
         if min_overflowed != max_overflowed {
@@ -250,11 +280,13 @@ pub struct [< $t:upper ScalarValueData>] {
     /// if the equivalent mask in unknown_mask is 0.
     pub unknown_mask: [< $t >],
     /// A bit mask of unwritten bits. A bit in `value` is written (and can be sent back to
-    /// userspace) if the equivalent mask in unknown_mask is 0. `unknown_mask` must always be a
-    /// subset of `unwritten_mask`.
+    /// userspace) if the equivalent mask in unwritten_mask is 0. `unwritten_mask` must always be a
+    /// subset of `unknown_mask`.
     pub unwritten_mask: [< $t >],
     /// The range of possible unsigned values of this scalar.
     pub urange: [< $t:upper Range >],
+    /// Prevent instantiation without using new.
+    _guard: (),
 }
 
 /// Defines a partial ordering on `ScalarValueData` instances, capturing the notion of how "broad"
@@ -299,17 +331,43 @@ impl PartialOrd for [< $t:upper ScalarValueData>] {
     }
 }
 
+impl From<&[< $t:upper ScalarValueData>]> for [< $t:upper ScalarValueData>] {
+    fn from(value: &Self) -> Self {
+        value.clone()
+    }
+}
+
 impl From<[< $t >]> for [< $t:upper ScalarValueData>] {
     fn from(value: [< $t >]) -> Self {
-        Self { value, unknown_mask: 0, unwritten_mask: 0, urange: value.into() }
+        Self::new(value, 0, 0, value.into())
     }
 }
 
 impl [< $t:upper ScalarValueData>] {
     pub const UNINITIALIZED: Self =
-        Self { value: 0, unknown_mask: [< $t >]::MAX, unwritten_mask: [< $t >]::MAX, urange: [< $t:upper Range >]::max() };
+        Self::new(0, [< $t >]::MAX, [< $t >]::MAX, [< $t:upper Range >]::max());
     pub const UNKNOWN_WRITTEN: Self =
-        Self { value: 0, unknown_mask: [< $t >]::MAX, unwritten_mask: 0, urange: [< $t:upper Range >]::max() };
+        Self::new(0, [< $t >]::MAX, 0, [< $t:upper Range >]::max());
+
+    pub const fn new(value: [< $t >], unknown_mask: [< $t >], unwritten_mask: [< $t >], urange: [< $t:upper Range >]) -> Self {
+        debug_assert!(value <= urange.max);
+        debug_assert!(unknown_mask & unwritten_mask == unwritten_mask);
+        debug_assert!(value & unknown_mask == 0);
+        let urange = if unknown_mask == 0 {
+            [< $t:upper Range >]::new(value, value)
+        } else {
+            let mut min = value;
+            if urange.min > min {
+                min = urange.min;
+            }
+            let mut max = value | unknown_mask;
+            if urange.max < max {
+                max = urange.max;
+            }
+            [< $t:upper Range >]::new(min, max)
+        };
+        Self { value, unknown_mask, unwritten_mask, urange, _guard: () }
+    }
 
     pub const fn is_known(&self) -> bool {
         self.unknown_mask == 0
@@ -325,6 +383,40 @@ impl [< $t:upper ScalarValueData>] {
 
     pub const fn is_zero(&self) -> bool {
         self.is_known() && self.value == 0
+    }
+
+    pub const fn min(&self) -> [< $t >] {
+        self.urange.min
+    }
+
+    pub const fn max(&self) -> [< $t >] {
+        self.urange.max
+    }
+
+    pub fn update_range(self, urange: [< $t:upper Range >]) -> Self {
+        Self::new(self.value, self.unknown_mask, self.unwritten_mask, urange)
+    }
+
+    pub fn checked_add<T: Into<[< $t:upper ScalarValueData>]>>(self, rhs: T) -> Option<Self> {
+        let rhs = rhs.into();
+        if self.is_known() && rhs.is_known() {
+            return self.value.checked_add(rhs.value).map(Into::into);
+        }
+        Some(Self {
+            urange: self.urange.checked_add(rhs.urange)?,
+            .. self.base(rhs)
+        })
+    }
+
+    pub fn checked_sub<T: Into<[< $t:upper ScalarValueData>]>>(self, rhs: T) -> Option<Self> {
+        let rhs = rhs.into();
+        if self.is_known() && rhs.is_known() {
+            return self.value.checked_sub(rhs.value).map(Into::into);
+        }
+        Some(Self {
+            urange: self.urange.checked_sub(rhs.urange)?,
+            .. self.base(rhs)
+        })
     }
 
     /// Arithmetic right shift.
@@ -358,28 +450,27 @@ impl [< $t:upper ScalarValueData>] {
         let unwritten_mask = shr(self.unwritten_mask, rhs.value);
         let value = ashr(self.value, rhs.value) & !unknown_mask;
         let urange = [< $t:upper Range >]::max();
-        Self {
+        Self::new(
             value, unknown_mask, unwritten_mask, urange
-        }
+        )
     }
 
-    fn biwise_operation(self,
+    fn bitwise_operation(self,
                         rhs: Self,
                         urange: [< $t:upper Range >],
                         op: impl Fn([< $t >], [< $t >]) -> [< $t >]) -> Self {
         let unknown_mask = self.unknown_mask | rhs.unknown_mask;
         let unwritten_mask = self.unwritten_mask | rhs.unwritten_mask;
         let value = op(self.value, rhs.value) & !unknown_mask;
-        Self { value, unknown_mask, unwritten_mask, urange }
+        Self::new(value, unknown_mask, unwritten_mask, urange)
     }
 
     fn shift_operation(self, rhs: [< $t >], urange: [< $t:upper Range >], op: impl Fn([< $t >], [< $t >]) -> [< $t >]) -> Self {
         let value = op(self.value, rhs);
         let unknown_mask = op(self.unknown_mask, rhs);
         let unwritten_mask = op(self.unwritten_mask, rhs);
-        Self { value, unknown_mask, unwritten_mask, urange }
+        Self::new(value, unknown_mask, unwritten_mask, urange)
     }
-
 
     fn base(&self, rhs: Self) -> Self {
         if !self.is_fully_initialized() || !rhs.is_fully_initialized() {
@@ -390,9 +481,10 @@ impl [< $t:upper ScalarValueData>] {
     }
 }
 
-impl std::ops::Add for [< $t:upper ScalarValueData>] {
+impl<T: Into<[< $t:upper ScalarValueData>]>> std::ops::Add<T> for [< $t:upper ScalarValueData>] {
     type Output = Self;
-    fn add(self, rhs: Self) -> Self {
+    fn add(self, rhs: T) -> Self {
+        let rhs = rhs.into();
         if self.is_known() && rhs.is_known() {
             return self.value.overflowing_add(rhs.value).0.into();
         }
@@ -407,7 +499,7 @@ impl std::ops::Div for [< $t:upper ScalarValueData>] {
     type Output = Self;
     fn div(self, rhs: Self) -> Self {
         if self.is_known() && rhs.is_known() {
-            if rhs.value  ==0 {
+            if rhs.value  == 0 {
                 return 0.into();
             } else {
                 return (self.value / rhs.value).into();
@@ -468,9 +560,10 @@ impl std::ops::Rem for [< $t:upper ScalarValueData>] {
     }
 }
 
-impl std::ops::Sub for [< $t:upper ScalarValueData>] {
+impl<T: Into<[< $t:upper ScalarValueData>]>> std::ops::Sub<T> for [< $t:upper ScalarValueData>] {
     type Output = Self;
-    fn sub(self, rhs: Self) -> Self {
+    fn sub(self, rhs: T) -> Self {
+        let rhs = rhs.into();
         if self.is_known() && rhs.is_known() {
             return self.value.overflowing_sub(rhs.value).0.into();
         }
@@ -484,16 +577,16 @@ impl std::ops::Sub for [< $t:upper ScalarValueData>] {
 impl std::ops::BitAnd for [< $t:upper ScalarValueData>] {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self {
-        let urange = [< $t:upper Range >]::new(0, std::cmp::min(self.urange.max, rhs.urange.max));
-        self.biwise_operation(rhs, urange, |x, y| x & y)
+        let urange = [< $t:upper Range >]::new(0, std::cmp::min(self.max(), rhs.max()));
+        self.bitwise_operation(rhs, urange, |x, y| x & y)
     }
 }
 
 impl std::ops::BitOr for [< $t:upper ScalarValueData>] {
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self {
-        let urange = [< $t:upper Range >]::new( std::cmp::max(self.urange.min, rhs.urange.min), [< $t >]::MAX);
-        self.biwise_operation(rhs, urange, |x, y| x | y)
+        let urange = [< $t:upper Range >]::new( std::cmp::max(self.min(), rhs.min()), [< $t >]::MAX);
+        self.bitwise_operation(rhs, urange, |x, y| x | y)
     }
 }
 
@@ -501,7 +594,7 @@ impl std::ops::BitXor for [< $t:upper ScalarValueData>] {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self {
         let urange = [< $t:upper Range >]::max();
-        self.biwise_operation(rhs, urange, |x, y| x ^ y)
+        self.bitwise_operation(rhs, urange, |x, y| x ^ y)
     }
 }
 
@@ -546,33 +639,28 @@ impl std::ops::Shr for [< $t:upper ScalarValueData>] {
 }
 
 }}}
-make_scalar_value_data!(u32);
-make_scalar_value_data!(u64);
+make_scalar_value_data!(u32(i32, u16, i16, u8, i8));
+make_scalar_value_data!(u64(i64, u32, i32, u16, i16, u8, i8, usize));
 pub type ScalarValueData = U64ScalarValueData;
 
 impl From<U64ScalarValueData> for U32ScalarValueData {
     fn from(v: U64ScalarValueData) -> Self {
-        let urange = if v.urange.max >> 32 == v.urange.min >> 32 {
-            U32Range::new(v.urange.min as u32, v.urange.max as u32)
+        let urange = if v.max() >> 32 == v.min() >> 32 {
+            U32Range::new(v.min() as u32, v.max() as u32)
         } else {
             U32Range::max()
         };
-        Self {
-            value: v.value as u32,
-            unknown_mask: v.unknown_mask as u32,
-            unwritten_mask: v.unwritten_mask as u32,
-            urange,
-        }
+        Self::new(v.value as u32, v.unknown_mask as u32, v.unwritten_mask as u32, urange)
     }
 }
 
 impl From<U32ScalarValueData> for U64ScalarValueData {
     fn from(v: U32ScalarValueData) -> Self {
-        Self {
-            value: v.value.into(),
-            unknown_mask: v.unknown_mask.into(),
-            unwritten_mask: v.unwritten_mask.into(),
-            urange: U64Range::new(v.urange.min.into(), v.urange.max.into()),
-        }
+        Self::new(
+            v.value.into(),
+            v.unknown_mask.into(),
+            v.unwritten_mask.into(),
+            U64Range::new(v.min().into(), v.max().into()),
+        )
     }
 }

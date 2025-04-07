@@ -486,7 +486,7 @@ pub mod test {
             } else {
                 Type::PtrToMemory {
                     id: TEST_ARG_MEMORY_ID.clone(),
-                    offset: 0,
+                    offset: 0.into(),
                     buffer_size: self.size as u64,
                 }
             }
@@ -902,6 +902,7 @@ pub mod test {
     #[test_case(ubpf_test_data!("stxh.data"))]
     #[test_case(ubpf_test_data!("stxw.data"))]
     #[test_case(ubpf_test_data!("subnet.data"))]
+    #[test_case(local_test_data!("access_with_check.data"))]
     #[test_case(local_test_data!("err_offset_overflow.data"))]
     #[test_case(local_test_data!("err_read_only_helper.data"))]
     #[test_case(local_test_data!("err_write_r10.data"))]
