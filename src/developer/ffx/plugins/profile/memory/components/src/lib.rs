@@ -51,7 +51,7 @@ impl FfxMain for MemoryComponentsTool {
             println!("{}", serde_json::to_string(&snapshot.to_json()).unwrap());
         } else {
             let (output, kernel_statistics) = process_snapshot(snapshot);
-            output::write_summary(&mut writer, &output, kernel_statistics)
+            output::write_summary(&mut writer, &self.cmd, &output, kernel_statistics)
                 .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
                 .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
