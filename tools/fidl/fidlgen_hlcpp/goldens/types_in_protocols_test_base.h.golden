@@ -67,10 +67,10 @@ class Protocol_TestBase : public ::test::typesinprotocols::Protocol {
   void ErrorVectorCompound(ErrorVectorCompoundCallback callback) override {
     NotImplemented_("ErrorVectorCompound");
   }
-  void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override {
+  void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override {
     NotImplemented_("OneWayVectorOptional");
   }
-  void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) override {
+  void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) override {
     NotImplemented_("TwoWayVectorOptional");
   }
   void ErrorVectorOptional(ErrorVectorOptionalCallback callback) override {

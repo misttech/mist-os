@@ -13,13 +13,6 @@ namespace fidl {
 namespace testing {
 
 template <>
-class TestBase<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> : public ::fidl::Server<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> {
- public:
-  virtual ~TestBase<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>() = default;
-  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
-};
-
-template <>
 class TestBase<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> {
  public:
   virtual ~TestBase<::test_bindingsdenylist::OnlyCppAndDeps>() = default;
@@ -38,10 +31,6 @@ class TestBase<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::Server
   virtual void OnlyDenyGo(OnlyDenyGoRequest& request,
                           OnlyDenyGoCompleter::Sync& completer) {
     NotImplemented_("OnlyDenyGo", completer);
-  }
-  virtual void OnlyDenyLibfuzzer(OnlyDenyLibfuzzerRequest& request,
-                                 OnlyDenyLibfuzzerCompleter::Sync& completer) {
-    NotImplemented_("OnlyDenyLibfuzzer", completer);
   }
   virtual void OnlyDenyPython(OnlyDenyPythonRequest& request,
                               OnlyDenyPythonCompleter::Sync& completer) {

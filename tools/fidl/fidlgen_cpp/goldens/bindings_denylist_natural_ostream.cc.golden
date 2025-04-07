@@ -39,22 +39,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   os << "}";
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest";
-  os << "{ ";
-  os << "a";
-  os << " = " << fidl::ostream::Formatted<bool>(value.a()) << ", ";
-  os << "}";
-  return os;
-}
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse";
-  os << "{ ";
-  os << "b";
-  os << " = " << fidl::ostream::Formatted<int32_t>(value.b()) << ", ";
-  os << "}";
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest";
   os << "{ ";
@@ -158,20 +142,6 @@ std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingO
   }
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult& value) {
-  os << "test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::";
-  switch (value.Which()) {
-    case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kResponse:
-      os << "response(" << fidl::ostream::Formatted<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>(value.response().value()) << ")";
-      break;
-    case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kErr:
-      os << "err(" << fidl::ostream::Formatted<uint32_t>(value.err().value()) << ")";
-      break;
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult::";
   switch (value.Which()) {
@@ -243,18 +213,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEa
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult& value) {
-  return fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest& value) {

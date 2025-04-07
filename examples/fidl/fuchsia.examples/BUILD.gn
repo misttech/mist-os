@@ -19,9 +19,4 @@ fidl("fuchsia.examples") {
   ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
-  fuzzers = [
-    {
-      protocol = "fuchsia.examples.Echo"
-    },
-  ]
 }

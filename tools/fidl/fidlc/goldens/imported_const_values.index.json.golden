@@ -233,8 +233,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/imported_const_values/example.test.fidl",
         "data": "BITS_MEMBER_PRIMITIVE",
-        "start_offset": 490,
-        "end_offset": 511
+        "start_offset": 479,
+        "end_offset": 500
       },
       "value": {
         "type": "identifier",
@@ -243,8 +243,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/imported_const_values/example.test.fidl",
           "data": "test.dependent.MyBits.MEMBER",
-          "start_offset": 519,
-          "end_offset": 547
+          "start_offset": 508,
+          "end_offset": 536
         }
       }
     },
@@ -275,8 +275,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/imported_const_values/example.test.fidl",
         "data": "ENUM_MEMBER_PRIMITIVE",
-        "start_offset": 672,
-        "end_offset": 693
+        "start_offset": 650,
+        "end_offset": 671
       },
       "value": {
         "type": "identifier",
@@ -285,8 +285,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/imported_const_values/example.test.fidl",
           "data": "test.dependent.MyEnum.MEMBER",
-          "start_offset": 701,
-          "end_offset": 729
+          "start_offset": 679,
+          "end_offset": 707
         }
       }
     }

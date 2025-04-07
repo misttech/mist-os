@@ -872,17 +872,19 @@ class VectorOptional final {
  public:
   static const fidl_type_t* FidlType;
   VectorOptional() = default;
-  explicit VectorOptional(::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>> _value_tuple) {
-    std::tie(opt_vector_uint8, opt_vector_string, opt_vector_opt_struct) = std::move(_value_tuple);
+  explicit VectorOptional(::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>> _value_tuple) {
+    std::tie(opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct) = std::move(_value_tuple);
   }
-  operator ::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>() && {
-    return std::make_tuple(std::move(opt_vector_uint8), std::move(opt_vector_string), std::move(opt_vector_opt_struct)
+  operator ::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>() && {
+    return std::make_tuple(std::move(opt_vector_uint8), std::move(opt_vector_string), std::move(opt_vector_struct), std::move(opt_vector_opt_struct)
     );
   }
   
   ::fidl::VectorPtr<uint8_t> opt_vector_uint8;
   
   ::fidl::VectorPtr<::std::string> opt_vector_string;
+  
+  ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct;
   
   ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct;
 
@@ -1771,13 +1773,13 @@ class Protocol_ErrorVectorOptional_Result final {
   }
 
   friend ::fidl::Equality<::test::typesinprotocols::Protocol_ErrorVectorOptional_Result>;
-  Protocol_ErrorVectorOptional_Result(fpromise::ok_result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>>&& result) {
+  Protocol_ErrorVectorOptional_Result(fpromise::ok_result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>>&& result) {
     set_response(::test::typesinprotocols::VectorOptional{std::move(result.value)});
   }
   Protocol_ErrorVectorOptional_Result(fpromise::error_result<uint32_t>&& result) {
       set_err(std::move(result.error));
   }
-  Protocol_ErrorVectorOptional_Result(fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>&& result) {
+  Protocol_ErrorVectorOptional_Result(fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>&& result) {
     ZX_ASSERT(!result.is_pending());
     if (result.is_ok()) {
       set_response(::test::typesinprotocols::VectorOptional{result.take_value()});
@@ -1785,7 +1787,7 @@ class Protocol_ErrorVectorOptional_Result final {
       set_err(result.take_error());
     }
   }
-  operator fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>() && {
+  operator fpromise::result<::std::tuple<::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>, uint32_t>() && {
     if (is_err()) {
       return fpromise::error(err());
     }
@@ -2404,22 +2406,26 @@ class Protocol_RequestEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage OneWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
+  static ::fidl::HLCPPOutgoingMessage OneWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_string, 16 + sizeof(fidl_message_header_t));
+    
+    ::fidl::Encode(_encoder, opt_vector_struct, 32 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_string, 16 + sizeof(fidl_message_header_t));
+    
+    ::fidl::Encode(_encoder, opt_vector_struct, 32 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
@@ -3059,11 +3065,13 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
+  static ::fidl::HLCPPOutgoingMessage TwoWayVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_string, 16 + sizeof(fidl_message_header_t));
+    
+    ::fidl::Encode(_encoder, opt_vector_struct, 32 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
@@ -3077,11 +3085,13 @@ class Protocol_ResponseEncoder {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage EventVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
+  static ::fidl::HLCPPOutgoingMessage EventVectorOptional(::fidl::MessageEncoder* _encoder, ::fidl::VectorPtr<uint8_t>* opt_vector_uint8, ::fidl::VectorPtr<::std::string>* opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* opt_vector_opt_struct) {
     _encoder->Alloc(64);
     ::fidl::Encode(_encoder, opt_vector_uint8, 0 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_string, 16 + sizeof(fidl_message_header_t));
+    
+    ::fidl::Encode(_encoder, opt_vector_struct, 32 + sizeof(fidl_message_header_t));
     
     ::fidl::Encode(_encoder, opt_vector_opt_struct, 48 + sizeof(fidl_message_header_t));
     
@@ -4013,6 +4023,7 @@ struct IsMemcpyCompatible<::test::typesinprotocols::VectorOptional> : public int
     !HasPadding<::test::typesinprotocols::VectorOptional>::value
     && IsMemcpyCompatible<::fidl::VectorPtr<uint8_t>>::value
     && IsMemcpyCompatible<::fidl::VectorPtr<::std::string>>::value
+    && IsMemcpyCompatible<::fidl::VectorPtr<::test::typesinprotocols::Struct>>::value
     && IsMemcpyCompatible<::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>>::value> {};
 
 
@@ -4028,6 +4039,9 @@ struct Equality<::test::typesinprotocols::VectorOptional> {
       return false;
     }
     if (!::fidl::Equals(_lhs.opt_vector_string, _rhs.opt_vector_string)) {
+      return false;
+    }
+    if (!::fidl::Equals(_lhs.opt_vector_struct, _rhs.opt_vector_struct)) {
       return false;
     }
     if (!::fidl::Equals(_lhs.opt_vector_opt_struct, _rhs.opt_vector_opt_struct)) {
@@ -4979,17 +4993,17 @@ class Protocol {
   using EventVectorCompoundCallback =
       fit::function<void(::std::vector<::test::typesinprotocols::Bits>, ::std::vector<::test::typesinprotocols::Enum>, ::std::vector<::test::typesinprotocols::Struct>, ::std::vector<::test::typesinprotocols::Table>, ::std::vector<::test::typesinprotocols::Union>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>)>;
       
-  virtual void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   using TwoWayVectorOptionalCallback =
-      fit::function<void(::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>)>;
+      fit::function<void(::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>)>;
       
-  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) = 0;
+  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) = 0;
   using ErrorVectorOptionalCallback =
       fit::function<void(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result)>;
       
   virtual void ErrorVectorOptional(ErrorVectorOptionalCallback callback) = 0;
   using EventVectorOptionalCallback =
-      fit::function<void(::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>)>;
+      fit::function<void(::fidl::VectorPtr<uint8_t>, ::fidl::VectorPtr<::std::string>, ::fidl::VectorPtr<::test::typesinprotocols::Struct>, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>)>;
       
   virtual void OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   using TwoWayArrayVectorNestedCallback =
@@ -5041,8 +5055,8 @@ class Protocol_RequestDecoder {
   virtual void OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual void TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual void ErrorVectorCompound() = 0;
-  virtual void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
-  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual void ErrorVectorOptional() = 0;
   virtual void OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual void TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
@@ -5075,9 +5089,9 @@ class Protocol_ResponseDecoder {
   virtual void TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual void ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result Protocol_ErrorVectorCompound_Result) = 0;
   virtual void EventVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
-  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual void ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result Protocol_ErrorVectorOptional_Result) = 0;
-  virtual void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual void TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual void ErrorArrayVectorNested(::test::typesinprotocols::Protocol_ErrorArrayVectorNested_Result Protocol_ErrorArrayVectorNested_Result) = 0;
   virtual void EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
@@ -5095,7 +5109,7 @@ class Protocol_EventSender {
   virtual void EventArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) = 0;
   virtual void EventVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) = 0;
   virtual void EventVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
-  virtual void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
   virtual void EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual void EventResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) = 0;
 };
@@ -5122,8 +5136,8 @@ class Protocol_Sync {
   virtual zx_status_t OneWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) = 0;
   virtual zx_status_t TwoWayVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union, ::std::vector<::test::typesinprotocols::Bits>* out_vector_bits, ::std::vector<::test::typesinprotocols::Enum>* out_vector_enum, ::std::vector<::test::typesinprotocols::Struct>* out_vector_struct, ::std::vector<::test::typesinprotocols::Table>* out_vector_table, ::std::vector<::test::typesinprotocols::Union>* out_vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>>* out_vector_opt_union) = 0;
   virtual zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_Protocol_ErrorVectorCompound_Result) = 0;
-  virtual zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
-  virtual zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) = 0;
+  virtual zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) = 0;
+  virtual zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* out_opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) = 0;
   virtual zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_Protocol_ErrorVectorOptional_Result) = 0;
   virtual zx_status_t OneWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) = 0;
   virtual zx_status_t TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8, ::std::array<::std::array<uint8_t, 5>, 5>* out_array_array_uint8, ::std::array<::std::vector<uint8_t>, 5>* out_array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>>* out_vector_array_uint8, ::std::vector<::std::vector<uint8_t>>* out_vector_vector_uint8) = 0;
@@ -5182,9 +5196,9 @@ class Protocol_Proxy final : public ::fidl::internal::Proxy, public Protocol {
   void ErrorVectorCompound(ErrorVectorCompoundCallback callback) override;
   EventVectorCompoundCallback EventVectorCompound;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayVectorOptional
-  void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
+  void OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayVectorOptional
-  void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) override;
+  void TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, TwoWayVectorOptionalCallback callback) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorOptional
   void ErrorVectorOptional(ErrorVectorOptionalCallback callback) override;
   EventVectorOptionalCallback EventVectorOptional;
@@ -5227,7 +5241,7 @@ class Protocol_Stub final : public ::fidl::internal::Stub, public ::test::typesi
   void EventArrayCompound(::std::array<::test::typesinprotocols::Bits, 5> array_bits, ::std::array<::test::typesinprotocols::Enum, 5> array_enum, ::std::array<::test::typesinprotocols::Struct, 5> array_struct, ::std::array<::test::typesinprotocols::Table, 5> array_table, ::std::array<::test::typesinprotocols::Union, 5> array_union, ::std::array<::std::unique_ptr<::test::typesinprotocols::Struct>, 5> array_opt_struct, ::std::array<::std::unique_ptr<::test::typesinprotocols::Union>, 5> array_opt_union) override;
   void EventVectorBasic(::std::vector<uint8_t> vector_uint8, ::std::vector<uint16_t> vector_uint16, ::std::vector<uint32_t> vector_uint32, ::std::vector<uint64_t> vector_uint64, ::std::vector<int8_t> vector_int8, ::std::vector<int16_t> vector_int16, ::std::vector<int32_t> vector_int32, ::std::vector<int64_t> vector_int64, ::std::vector<float> vector_float32, ::std::vector<double> vector_float64, ::std::vector<::std::string> vector_string, ::std::vector<::fidl::StringPtr> vector_opt_string) override;
   void EventVectorCompound(::std::vector<::test::typesinprotocols::Bits> vector_bits, ::std::vector<::test::typesinprotocols::Enum> vector_enum, ::std::vector<::test::typesinprotocols::Struct> vector_struct, ::std::vector<::test::typesinprotocols::Table> vector_table, ::std::vector<::test::typesinprotocols::Union> vector_union, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Struct>> vector_opt_struct, ::std::vector<::std::unique_ptr<::test::typesinprotocols::Union>> vector_opt_union) override;
-  void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
+  void EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
   void EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) override;
   void EventResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) override;
 
@@ -5276,9 +5290,9 @@ class Protocol_SyncProxy : public ::test::typesinprotocols::Protocol_Sync {
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorCompound
   zx_status_t ErrorVectorCompound(::test::typesinprotocols::Protocol_ErrorVectorCompound_Result* out_Protocol_ErrorVectorCompound_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayVectorOptional
-  zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
+  zx_status_t OneWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.TwoWayVectorOptional
-  zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) override;
+  zx_status_t TwoWayVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_uint8, ::fidl::VectorPtr<::std::string> opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct> opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>> opt_vector_opt_struct, ::fidl::VectorPtr<uint8_t>* out_opt_vector_uint8, ::fidl::VectorPtr<::std::string>* out_opt_vector_string, ::fidl::VectorPtr<::test::typesinprotocols::Struct>* out_opt_vector_struct, ::fidl::VectorPtr<::std::unique_ptr<::test::typesinprotocols::Struct>>* out_opt_vector_opt_struct) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.ErrorVectorOptional
   zx_status_t ErrorVectorOptional(::test::typesinprotocols::Protocol_ErrorVectorOptional_Result* out_Protocol_ErrorVectorOptional_Result) override;
   // cts-coverage-fidl-name:test.typesinprotocols/Protocol.OneWayArrayVectorNested

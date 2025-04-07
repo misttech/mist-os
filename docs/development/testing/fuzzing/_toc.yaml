@@ -18,6 +18,3 @@ toc:
   path: /docs/development/testing/fuzzing/handle-results.md
 - title: "Improving Your Fuzzer"
   path: /docs/development/testing/fuzzing/improve-a-fuzzer.md
-  section:
-  - title: "Additional Topics"
-    path: /docs/development/testing/fuzzing/fidl-fuzzing.md

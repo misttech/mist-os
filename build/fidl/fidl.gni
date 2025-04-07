@@ -60,22 +60,6 @@ import("//build/testing/host_test_data.gni")
 #     A scope giving private, backend-specific parameters.
 #     Currently supported backends: zither
 #
-#   fuzzers (optional)
-#     Protocol/methods for which to generate LibFuzzer fuzz targets. Example:
-#       [
-#         {
-#           # Required:
-#           protocol = "fully.qualified.FIDLProtocolName"
-#           # Optional. Default: All methods in protocol.
-#           methods = [ "MethodName1", "MethodName2", ... ]
-#         },
-#         ...
-#       ]
-#
-#   golden_fuzzer (optional)
-#     Boolean flag to generate a LibFuzzer fuzz target for all protocols, used
-#     to ensure fuzzers for golden libraries compile successfully.
-#
 #   versioned (optional)
 #     A string of the form PLATFORM or PLATFORM:VERSION. If provided, fidlc
 #     will validate that the library is versioned under PLATFORM and added at
@@ -441,8 +425,6 @@ template("fidl") {
     not_needed(invoker,
                [
                  "contains_drivers",
-                 "fuzzers",
-                 "golden_fuzzer",
                  "sdk_category",
                ])
   }
@@ -467,8 +449,6 @@ template("fidl") {
                                  "visibility",
                                  "public_deps",
                                  "contains_drivers",
-                                 "fuzzers",
-                                 "golden_fuzzer",
                                ])
         forward_variables_from(common_parameters, "*")
         fidl_target = _fidl_target_name

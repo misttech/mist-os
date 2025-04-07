@@ -11,7 +11,6 @@ You can learn more details about:
  * [How to run a fuzzer](run-a-fuzzer.md)
  * [What to do with bugs and other results produced by fuzzing](handle-results.md)
  * [How to improve your fuzzer](improve-a-fuzzer.md)
- * [Experimental efforts to fuzz FIDL](fidl-fuzzing.md)
 
 You can find complete examples under [`//examples/fuzzers`](/examples/fuzzers).
 

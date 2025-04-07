@@ -22,8 +22,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "EmptyFlexibleUnion",
-        "start_offset": 3026,
-        "end_offset": 3044
+        "start_offset": 2913,
+        "end_offset": 2931
       },
       "members": []
     },

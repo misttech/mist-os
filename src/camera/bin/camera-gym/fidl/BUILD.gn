@@ -9,9 +9,5 @@ fidl("controller") {
 
   sources = [ "controller.fidl" ]
 
-  fuzzers = [
-    {
-      protocol = "fuchsia.camera.gym.Controller"
-    },
-  ]
+  enable_hlcpp = true
 }

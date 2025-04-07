@@ -123,7 +123,7 @@ Type: <code>uint32</code>
 ## **UNIONS**
 
 ### EmptyResourceUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#EmptyResourceUnion data-text="EmptyResourceUnion"}
-*Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=41)*
+*Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=39)*
 
 ### UnionWithHandle [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#UnionWithHandle data-text="UnionWithHandle"}
 *Defined in [test.handlesintypes/handles_in_types.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/handles_in_types.test.fidl;l=21)*

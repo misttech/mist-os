@@ -10,9 +10,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.examples") {
   testonly = true
   sources = [ "echo.test.fidl" ]
-  fuzzers = [
-    {
-      protocol = "fuchsia.examples.Echo"
-    },
-  ]
 }

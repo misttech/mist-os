@@ -146,6 +146,4 @@ type UnionWithAttributes = flexible union {
     1: x int64;
 };
 
-// TODO(https://fxbug.dev/42070033): Support empty flexible unions in libfuzzer.
-@bindings_denylist("libfuzzer")
 type EmptyFlexibleUnion = flexible union {};

@@ -19,7 +19,6 @@ group("tests") {
     "driver_test_realm:tests",
     "fdio:tests",
     "fidl/cpp/tests:tests",
-    "fidl/hlcpp/fuzzing:tests",
     "file-lock:tests",
     "fit:tests",
     "fit-promise:tests",

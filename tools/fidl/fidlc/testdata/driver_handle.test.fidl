@@ -9,18 +9,18 @@ using zx;
 @transport("Driver")
 closed protocol DriverProtocol {};
 
-@bindings_denylist("rust, cpp, hlcpp, dart, go, libfuzzer")
+@bindings_denylist("rust, cpp, hlcpp, dart, go")
 type ClientEndWrapper = resource struct {
     value client_end:DriverProtocol;
 };
 
-@bindings_denylist("rust, cpp, hlcpp, dart, go, libfuzzer")
+@bindings_denylist("rust, cpp, hlcpp, dart, go")
 type ServerEndWrapper = resource struct {
     value server_end:DriverProtocol;
 };
 
 @transport("Driver")
-@bindings_denylist("rust, cpp, hlcpp, dart, go, libfuzzer")
+@bindings_denylist("rust, cpp, hlcpp, dart, go")
 closed protocol HandlesInProtocol {
     strict SendHandles(resource struct {
         t resource table {

@@ -12,7 +12,6 @@ group("tests_no_e2e") {
     "//examples/fidl:hermetic_tests",
     "//sdk/ctf/tests/pkg/fidl/cpp:tests",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",
-    "//sdk/lib/fidl/hlcpp/fuzzing:tests",
     "//sdk/lib/fidl_driver/tests",
     "//src/lib/fidl:tests",
     "//src/lib/fidl_codec:tests",
@@ -34,7 +33,6 @@ group("e2e_tests") {
     "//src/tests/fidl/compatibility",
     "//src/tests/fidl/dangerous_identifiers:tests",
     "//src/tests/fidl/fidl_go_conformance:tests",
-    "//src/tests/fidl/fuzzer:tests",
   ]
 }
 

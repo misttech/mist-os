@@ -17,57 +17,6 @@ namespace fidl {
 namespace internal {
 
 template <>
-struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using HLCPPType = fidl::InterfaceHandle<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::InterfaceHandle<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::ClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return fidl::InterfaceHandle<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>(c.TakeChannel());
-  }
-};
-
-template <>
-struct NaturalToHLCPPTraits<fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using HLCPPType = fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>(c.TakeChannel());
-  }
-};
-
-template <>
-struct HLCPPToNaturalTraits<fidl::InterfaceHandle<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using NaturalType = fidl::ClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::ClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::InterfaceHandle<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return fidl::ClientEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>(c.TakeChannel());
-  }
-};
-
-template <>
-struct HLCPPToNaturalTraits<fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using NaturalType = fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>(c.TakeChannel());
-  }
-};
-
-template <>
-struct NaturalToHLCPPTraits<fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using HLCPPType = fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return [c = std::move(c)](fidl::InterfaceRequest<::test::bindingsdenylist::OnlyLibfuzzerAndDeps> r) {
-      c(::fidl::HLCPPToNatural(r));
-    };
-  }
-};
-
-template <>
-struct HLCPPToNaturalTraits<fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>> {
-  using NaturalType = fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps>;
-  static inline fidl::ProtocolHandler<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> Convert(fidl::InterfaceRequestHandler<::test::bindingsdenylist::OnlyLibfuzzerAndDeps>&& c) {
-    return [c = std::move(c)](fidl::ServerEnd<::test_bindingsdenylist::OnlyLibfuzzerAndDeps> r) {
-      c(::fidl::NaturalToHLCPP(r));
-    };
-  }
-};
-template <>
 struct NaturalToHLCPPTraits<fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>> {
   using HLCPPType = fidl::InterfaceHandle<::test::bindingsdenylist::OnlyCppAndDeps>;
   static inline fidl::InterfaceHandle<::test::bindingsdenylist::OnlyCppAndDeps> Convert(fidl::ClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>&& c) {
@@ -313,26 +262,6 @@ struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo
   static inline ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> {
-  using HLCPPType = ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest;
-  static inline ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest> {
-  using NaturalType = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest;
-  static inline ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest Convert(::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest&&);
-};
-template <>
-struct NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse> {
-  using HLCPPType = ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response;
-  static inline ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response> {
-  using NaturalType = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse;
-  static inline ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest> {
   using HLCPPType = ::test::bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest;
   static inline ::test::bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonRequest&&);
@@ -443,16 +372,6 @@ struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo
   static inline ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult> {
-  using HLCPPType = ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result;
-  static inline ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result> {
-  using NaturalType = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult;
-  static inline ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result&&);
-};
-template <>
 struct NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult> {
   using HLCPPType = ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result;
   static inline ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult&&);
@@ -524,28 +443,6 @@ struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenySy
 
 ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response>::Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Response&& value) {
   return ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse{{
-      .b = ::fidl::HLCPPToNatural(std::move(value.b)),
-  }};
-}
-::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest>::Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest&& value) {
-  ::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest hlcpp;
-  hlcpp.a = ::fidl::NaturalToHLCPP(std::move(value.a()));
-  return hlcpp;
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest>::Convert(::test::bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest&& value) {
-  return ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest{{
-      .a = ::fidl::HLCPPToNatural(std::move(value.a)),
-  }};
-}
-::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse>::Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse&& value) {
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response hlcpp;
-  hlcpp.b = ::fidl::NaturalToHLCPP(std::move(value.b()));
-  return hlcpp;
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response>::Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Response&& value) {
-  return ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse{{
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
   }};
 }
@@ -714,34 +611,6 @@ struct HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenySy
           ::fidl::HLCPPToNatural(std::move(value.err())));
     default:
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result");
-  }
-}
-::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult>::Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult&& value) {
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result hlcpp;
-  switch (value.Which()) {
-    case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kResponse:
-      hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
-      break;
-    case ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult::Tag::kErr:
-      hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
-      break;
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult HLCPPToNaturalTraits<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>::Convert(::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result&& value) {
-  using _NaturalUnion = ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult;
-  switch (value.Which()) {
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result::Tag::kResponse:
-      return _NaturalUnion::WithResponse(
-          ::fidl::HLCPPToNatural(std::move(value.response())));
-    case ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result::Tag::kErr:
-      return _NaturalUnion::WithErr(
-          ::fidl::HLCPPToNatural(std::move(value.err())));
-    default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result");
   }
 }
 ::test::bindingsdenylist::DenyEachBinding_OnlyDenyPython_Result NaturalToHLCPPTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult>::Convert(::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult&& value) {
